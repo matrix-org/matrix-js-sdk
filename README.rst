@@ -15,7 +15,7 @@ the console to see a working version.
 
 In Node
 -------
-Run `examples/node` via ``node app.js`` to see a working version.
+Run `examples/node`_ via ``node app.js`` to see a working version.
 
 .. _Matrix: http://matrix.org
 .. _examples/browser: examples/browser
