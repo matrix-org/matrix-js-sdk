@@ -1,0 +1,5 @@
+node_modules
+.lock-wscript
+build/Release
+coverage
+lib-cov

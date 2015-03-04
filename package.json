@@ -1,0 +1,15 @@
+{
+  "name": "matrix-js-sdk",
+  "version": "0.0.1",
+  "description": "Matrix Client-Server SDK for Javascript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "matrix-org"
+  ],
+  "browserify": "browser/index.js",
+  "author": "matrix.org",
+  "license": "Apache 2.0"
+}
