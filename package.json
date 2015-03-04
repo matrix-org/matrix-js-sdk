@@ -11,5 +11,9 @@
   ],
   "browserify": "browser/index.js",
   "author": "matrix.org",
-  "license": "Apache 2.0"
+  "license": "Apache 2.0",
+  "dependencies": {
+    "browser-request": "^0.3.3",
+    "request": "^2.53.0"
+  }
 }
