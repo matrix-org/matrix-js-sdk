@@ -15,6 +15,17 @@ the console to see a working version.
 
 In Node
 -------
+
+``npm install matrix-js-sdk``
+
+::
+
+  var matrixcs = require("matrix-js-sdk");
+  var client = matrixcs.createClient("https://matrix.org");
+  client.publicRooms(function(err, data) {
+    console.log("Public Rooms: %s", JSON.stringify(data));
+  });
+
 Run `examples/node`_ via ``node app.js`` to see a working version.
 
 API
@@ -27,8 +38,8 @@ Matrix Client
 ``MatrixClient`` is constructed via ``matrixcs.createClient(args)`` where ``args`` can be:
 
 - ``baseUrl`` (String) : The home server base URL to make requests to.
-- ``credentials`` (Object) : Consists of a ``baseUrl`` (String)  and an ``accessToken``
-  (String).
+- ``credentials`` (Object) : Consists of a ``baseUrl`` (String), a ``userId`` (String)
+  and an ``accessToken`` (String).
 - ``credentials, config`` (Object, Object) : As before, but with a ``config`` which has
   the following options:
   
@@ -39,16 +50,27 @@ Matrix Client
 At any point these values can be modified by accessing ``matrixClient.credentials`` and
 ``matrixClient.config``.
 
+Promises
+--------
+Promises are supported using ``Q``, but are not enabled by default. To enable them, simply
+call ``matrixcs.usePromises()`` like so::
+
+  var matrixcs = require("matrix-js-sdk");
+  matrixcs.usePromises();
+  var client = matrixcs.createClient("https://matrix.org");
+  client.publicRooms().then(function(data) {
+    console.log("Public Rooms: %s", JSON.stringify(data));
+  });
+  
+You will need to ``npm install q`` as it is not a hard dependency on this project.
+
 Request
 -------
 
 ``MatrixClient`` **requires** a ``request`` module in order to function. This is
-usually done for you when using ``npm`` via the ``index.js`` files. You can also
-manually inject this by calling ``matrixcs.request(<request>)``. Wrappers around
-``request`` are also provided to modify the API interface from invoking callbacks
-to resolving/rejecting Promises. See ``lib/matrix-promise.js`` for more info.
-
-
+usually done for you when using ``npm``. You can manually inject this by calling
+``matrixcs.request(<request>)``. Wrappers around ``request`` allow you to easily
+support different HTTP libraries (such as AngularJS's ``$http``).
 
 .. _Matrix: http://matrix.org
 .. _examples/browser: examples/browser
