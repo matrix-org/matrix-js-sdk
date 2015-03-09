@@ -53,11 +53,11 @@ At any point these values can be modified by accessing ``matrixClient.credential
 Promises
 --------
 Promises are supported using ``Q``, but are not enabled by default. To enable them, simply
-call ``matrixcs.usePromises()`` like so::
+call ``sdk.usePromises()`` like so::
 
-  var matrixcs = require("matrix-js-sdk");
-  matrixcs.usePromises();
-  var client = matrixcs.createClient("https://matrix.org");
+  var sdk = require("matrix-js-sdk");
+  sdk.usePromises();
+  var client = sdk.createClient("https://matrix.org");
   client.publicRooms().then(function(data) {
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
@@ -69,7 +69,7 @@ Request
 
 ``MatrixClient`` **requires** a ``request`` module in order to function. This is
 usually done for you when using ``npm``. You can manually inject this by calling
-``matrixcs.request(<request>)``. Wrappers around ``request`` allow you to easily
+``sdk.request(<request>)``. Wrappers around ``request`` allow you to easily
 support different HTTP libraries (such as AngularJS's ``$http``).
 
 .. _Matrix: http://matrix.org
