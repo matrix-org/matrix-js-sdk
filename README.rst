@@ -20,8 +20,8 @@ In Node
 
 ::
 
-  var matrixcs = require("matrix-js-sdk");
-  var client = matrixcs.createClient("https://matrix.org");
+  var sdk = require("matrix-js-sdk");
+  var client = sdk.createClient("https://matrix.org");
   client.publicRooms(function(err, data) {
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
@@ -35,7 +35,7 @@ Please see the `client server API`_ for more information on the HTTP calls.
 
 Matrix Client
 -------------
-``MatrixClient`` is constructed via ``matrixcs.createClient(args)`` where ``args`` can be:
+``MatrixClient`` is constructed via ``sdk.createClient(args)`` where ``args`` can be:
 
 - ``baseUrl`` (String) : The home server base URL to make requests to.
 - ``credentials`` (Object) : Consists of a ``baseUrl`` (String), a ``userId`` (String)
