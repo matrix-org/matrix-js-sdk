@@ -6,6 +6,12 @@ matrixcs.request(request);
 
 var client = matrixcs.createClient("http://matrix.org");
 client.publicRooms(function (err, data) {
-	console.log("data %s", JSON.stringify(data));
-	console.error("err %s", JSON.stringify(err));
+    if (err) {
+	   console.error("err %s", JSON.stringify(err));
+       return;
+    }
+    console.log("data %s [...]", JSON.stringify(data).substring(0, 100));
+    console.log("Congratulations! The SDK is working on the browser!");
+    var result = document.getElementById("result");
+    result.innerHTML = "<p>The SDK appears to be working correctly.</p>";
 });

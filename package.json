@@ -14,7 +14,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "browserify": "browser/index.js",
+  "browserify": "browser-index.js",
   "author": "matrix.org",
   "license": "Apache 2.0",
   "dependencies": {
