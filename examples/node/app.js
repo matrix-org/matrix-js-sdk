@@ -2,7 +2,6 @@
 console.log("Loading node sdk");
 
 var matrix = require("matrix-js-sdk");
-matrix.request(require("request"));
 
 var client = matrix.createClient("http://matrix.org");
 client.publicRooms(function (err, data) {
