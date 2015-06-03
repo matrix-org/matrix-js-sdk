@@ -1,0 +1,11 @@
+{
+    "node": true,
+    "jasmine": true,
+
+    "nonew": true,
+    "curly": true,
+    "forin": true,
+    "freeze": true,
+    "undef": true,
+    "unused": "vars"
+}
