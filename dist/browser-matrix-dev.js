@@ -12,6 +12,10 @@ TODO:
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
 var request;
+/**
+ * The function used to perform HTTP requests.
+ * @param {Function} r The request function which accepts (opts, callback)
+ */
 module.exports.request = function(r) {
     request = r;
 };
@@ -50,7 +54,18 @@ function MatrixClient(credentials, config, store) {
     this.fromToken = undefined;
     this.clientRunning = false;
 }
+/**
+ * The high-level Matrix Client class.
+ */
 module.exports.MatrixClient = MatrixClient;  // expose the class
+
+/**
+ * Create a new Matrix Client.
+ * @param {Object} credentials The Matrix credentials to use.
+ * @param {Object} config The config options for the client
+ * @param {Store} store The type of store to use.
+ * @return {MatrixClient} A new Matrix Client
+ */
 module.exports.createClient = function(credentials, config, store) {
     return new MatrixClient(credentials, config, store);
 };
@@ -72,6 +87,10 @@ var HEADERS = {
 function MatrixEvent(event) {
     this.event = event || {};
 }
+
+/**
+ * An event from Matrix.
+ */
 module.exports.MatrixEvent = MatrixEvent;
 
 MatrixEvent.prototype = {
@@ -108,6 +127,10 @@ function MatrixInMemoryStore() {
         // presence objects keyed by userId
     };
 }
+
+/**
+ * An in-memory store for Matrix.
+ */
 module.exports.MatrixInMemoryStore = MatrixInMemoryStore;
 
 // XXX: this is currently quite procedural - we could possibly pass back
@@ -1096,6 +1119,7 @@ var map = function(array, fn) {
     }
     return results;
 };
+
 },{}],2:[function(require,module,exports){
 // Browser Request
 //
