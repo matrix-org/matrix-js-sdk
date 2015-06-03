@@ -4,7 +4,9 @@
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build-js": "./browser-build.sh",
+    "watch-js": "./browser-build.sh -w"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
@@ -17,6 +19,10 @@
   "license": "Apache 2.0",
   "dependencies": {
     "browser-request": "^0.3.3",
+    "browserify": "^10.2.3",
     "request": "^2.53.0"
+  },
+  "devDependencies": {
+    "watchify": "^3.2.1"
   }
 }
