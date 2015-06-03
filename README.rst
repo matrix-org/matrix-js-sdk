@@ -1,20 +1,22 @@
 Matrix Javascript SDK
 =====================
 
-This is the Matrix_ Client-Server v1 SDK for Javascript. This SDK can be run
-in a browser (using ``browserify`` or stand-alone with a suitable 
-``request.js``) or in Node.js.
+This is the Matrix_ Client-Server v1 SDK for JavaScript. This SDK can be run
+in a browser or in Node.js.
 
 Quickstart
 ==========
 
 In a browser
 ------------
-Host `examples/browser`_ (e.g. using ``python -m SimpleHTTPServer``) and check
-the console to see a working version.
+Copy ``dist/browser-matrix-$VERSION.js`` and add that as a ``<script>`` to
+your page. There will be a global variable ``matrixcs`` attached to
+``window`` through which you can access the SDK.
 
-In Node
--------
+Please check `examples/browser`_ for a working example. 
+
+In Node.js
+----------
 
 ``npm install matrix-js-sdk``
 
@@ -26,7 +28,36 @@ In Node
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
 
-Run `examples/node`_ via ``node app.js`` to see a working version.
+Please check `examples/node`_ to see a working version.
+
+Contributing
+============
+*This section is for people who want to modify the SDK. If you just
+want to use this SDK, skip this section.*
+
+First, you need to pull in the right build tools (we use ``browserify``
+and ``watchify``)::
+
+ $ npm install
+
+
+Building
+--------
+
+To build a browser version from scratch when developing::
+
+ $ ./browser-build.sh
+
+
+To constantly do builds when files are modified (using ``watchify``)::
+
+ $ npm run watch-js
+
+
+To do a "release" build (``version`` is added to the filename)::
+
+ $ npm run build-js
+
 
 API
 ===
