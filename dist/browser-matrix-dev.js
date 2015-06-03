@@ -1,24 +1,18 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function (global){
+var matrixcs = require("./lib/matrix");
+matrixcs.request(require("browser-request"));
+module.exports = matrixcs; // keep export for browserify package deps
+global.matrixcs = matrixcs;
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./lib/matrix":4,"browser-request":7}],2:[function(require,module,exports){
 "use strict";
+var MatrixHttpApi = require("./http-api");
+var MatrixEvent = require("./models/event").MatrixEvent;
 
-/*
-TODO:
-- CS: complete register function (doing stages)
-- Internal: rate limiting
-- Identity server: linkEmail, authEmail, bindEmail, lookup3pid
-- uploadContent (?)
-*/
-
-// expose the underlying request object so different environments can use
-// different request libs (e.g. request or browser-request)
-var request;
-/**
- * The function used to perform HTTP requests.
- * @param {Function} r The request function which accepts (opts, callback)
- */
-module.exports.request = function(r) {
-    request = r;
-};
+// TODO:
+// Internal: rate limiting
 
 /*
  * Construct a Matrix Client.
@@ -28,8 +22,9 @@ module.exports.request = function(r) {
  *      noUserAgent: true // to avoid warnings whilst setting UA headers
  *      debug: true // to use console.err() style debugging from the lib
  * @param {Object} store The data store (if any) for this client.
+ * @param {Function} request The request fn to use.
  */
-function MatrixClient(credentials, config, store) {
+function MatrixClient(credentials, config, store, request) {
     if (typeof credentials === "string") {
         credentials = {
             "baseUrl": credentials
@@ -43,9 +38,6 @@ function MatrixClient(credentials, config, store) {
             throw new Error("Missing required key: " + requiredKeys[i]);
         }
     }
-    if (config && config.noUserAgent) {
-        HEADERS = undefined;
-    }
     this.config = config;
     this.credentials = credentials;
     this.store = store;
@@ -53,236 +45,12 @@ function MatrixClient(credentials, config, store) {
     // track our position in the overall eventstream
     this.fromToken = undefined;
     this.clientRunning = false;
+    this._http = new MatrixHttpApi(credentials, config, request);
 }
-/**
- * The high-level Matrix Client class.
- */
-module.exports.MatrixClient = MatrixClient;  // expose the class
-
-/**
- * Create a new Matrix Client.
- * @param {Object} credentials The Matrix credentials to use.
- * @param {Object} config The config options for the client
- * @param {Store} store The type of store to use.
- * @return {MatrixClient} A new Matrix Client
- */
-module.exports.createClient = function(credentials, config, store) {
-    return new MatrixClient(credentials, config, store);
-};
-
-var CLIENT_PREFIX = "/_matrix/client/api/v1";
-var CLIENT_V2_PREFIX = "/_matrix/client/v2_alpha";
-var HEADERS = {
-    "User-Agent": "matrix-js"
-};
-
-// Basic DAOs to abstract slightly from the line protocol and let the
-// application customise events with domain-specific info
-// (e.g. chat-specific semantics) if it so desires.
-
-/*
- * Construct a Matrix Event object
- * @param {Object} event The raw event to be wrapped in this DAO
- */
-function MatrixEvent(event) {
-    this.event = event || {};
-}
-
-/**
- * An event from Matrix.
- */
-module.exports.MatrixEvent = MatrixEvent;
-
-MatrixEvent.prototype = {
-    getId: function() {
-        return this.event.event_id;
-    },
-    getSender: function() {
-        return this.event.user_id;
-    },
-    getType: function() {
-        return this.event.type;
-    },
-    getRoomId: function() {
-        return this.event.room_id;
-    },
-    getTs: function() {
-        return this.event.ts;
-    },
-    getContent: function() {
-        return this.event.content;
-    },
-    isState: function() {
-        return this.event.state_key !== undefined;
-    },
-};
-
-function MatrixInMemoryStore() {
-    this.rooms = {
-        // state: { },
-        // timeline: [ ],
-    };
-
-    this.presence = {
-        // presence objects keyed by userId
-    };
-}
-
-/**
- * An in-memory store for Matrix.
- */
-module.exports.MatrixInMemoryStore = MatrixInMemoryStore;
-
-// XXX: this is currently quite procedural - we could possibly pass back
-// models of Rooms, Users, Events, etc instead.
-MatrixInMemoryStore.prototype = {
-
-    /*
-     * Add an array of one or more state MatrixEvents into the store, overwriting
-     * any existing state with the same {room, type, stateKey} tuple.
-     */
-    setStateEvents: function(stateEvents) {
-        // we store stateEvents indexed by room, event type and state key.
-        for (var i = 0; i < stateEvents.length; i++) {
-            var event = stateEvents[i].event;
-            var roomId = event.room_id;
-            if (this.rooms[roomId] === undefined) {
-                this.rooms[roomId] = {};
-            }
-            if (this.rooms[roomId].state === undefined) {
-                this.rooms[roomId].state = {};
-            }
-            if (this.rooms[roomId].state[event.type] === undefined) {
-                this.rooms[roomId].state[event.type] = {};
-            }
-            this.rooms[roomId].state[event.type][event.state_key] = stateEvents[i];
-        }
-    },
-
-    /*
-     * Add a single state MatrixEvents into the store, overwriting
-     * any existing state with the same {room, type, stateKey} tuple.
-     */
-    setStateEvent: function(stateEvent) {
-        this.setStateEvents([stateEvent]);
-    },
-
-    /*
-     * Return a list of MatrixEvents from the store
-     * @param {String} roomId the Room ID whose state is to be returned
-     * @param {String} type the type of the state events to be returned (optional)
-     * @param {String} stateKey the stateKey of the state events to be returned
-     *                 (optional, requires type to be specified)
-     * @return {MatrixEvent[]} an array of MatrixEvents from the store,
-     * filtered by roomid, type and state key.
-     */
-    getStateEvents: function(roomId, type, stateKey) {
-        var stateEvents = [];
-        if (stateKey === undefined && type === undefined) {
-            for (type in this.rooms[roomId].state) {
-                if (this.rooms[roomId].state.hasOwnProperty(type)) {
-                    for (stateKey in this.rooms[roomId].state[type]) {
-                        if (this.rooms[roomId].state[type].hasOwnProperty(stateKey)) {
-                            stateEvents.push(
-                                this.rooms[roomId].state[type][stateKey]
-                            );
-                        }
-                    }
-                }
-            }
-            return stateEvents;
-        }
-        else if (stateKey === undefined) {
-            for (stateKey in this.rooms[roomId].state[type]) {
-                if (this.rooms[roomId].state[type].hasOwnProperty(stateKey)) {
-                    stateEvents.push(this.rooms[roomId].state[type][stateKey]);
-                }
-            }
-            return stateEvents;
-        }
-        else {
-            return [this.rooms[roomId].state[type][stateKey]];
-        }
-    },
-
-    /*
-     * Return a single state MatrixEvent from the store for the given roomId
-     * and type.
-     * @param {String} roomId the Room ID whose state is to be returned
-     * @param {String} type the type of the state events to be returned
-     * @param {String} stateKey the stateKey of the state events to be returned
-     * @return {MatrixEvent} a single MatrixEvent from the store, filtered
-     * by roomid, type and state key.
-     */
-    getStateEvent: function(roomId, type, stateKey) {
-        return this.rooms[roomId].state[type][stateKey];
-    },
-
-    /*
-     * Adds a list of arbitrary MatrixEvents into the store.
-     * If the event is a state event, it is also updates state.
-     */
-    setEvents: function(events) {
-        for (var i = 0; i < events.length; i++) {
-            var event = events[i].event;
-            if (event.type === "m.presence") {
-                this.setPresenceEvents([events[i]]);
-                continue;
-            }
-            var roomId = event.room_id;
-            if (this.rooms[roomId] === undefined) {
-                this.rooms[roomId] = {};
-            }
-            if (this.rooms[roomId].timeline === undefined) {
-                this.rooms[roomId].timeline = [];
-            }
-            if (event.state_key !== undefined) {
-                this.setStateEvents([events[i]]);
-            }
-            this.rooms[roomId].timeline.push(events[i]);
-        }
-    },
-
-    /*
-     * Get the timeline of events for a given room
-     * TODO: ordering!
-     */
-    getEvents: function(roomId) {
-        return this.room[roomId].timeline;
-    },
-
-    setPresenceEvents: function(presenceEvents) {
-        for (var i = 0; i < presenceEvents.length; i++) {
-            var matrixEvent = presenceEvents[i];
-            this.presence[matrixEvent.event.user_id] = matrixEvent;
-        }
-    },
-
-    getPresenceEvents: function(userId) {
-        return this.presence[userId];
-    },
-
-    getRoomList: function() {
-        var roomIds = [];
-        for (var roomId in this.rooms) {
-            if (this.rooms.hasOwnProperty(roomId)) {
-                roomIds.push(roomId);
-            }
-        }
-        return roomIds;
-    },
-
-    // TODO
-    //setMaxHistoryPerRoom: function(maxHistory) {},
-
-    // TODO
-    //reapOldMessages: function() {},
-};
-
 MatrixClient.prototype = {
     isLoggedIn: function() {
         return this.credentials.accessToken !== undefined &&
-               this.credentials.userId !== undefined;
+            this.credentials.userId !== undefined;
     },
 
     // Higher level APIs
@@ -413,7 +181,8 @@ MatrixClient.prototype = {
 
         var self = this;
         if (!this.fromToken) {
-            this.initialSync(historyLen, function(err, data) {
+            this._http.initialSync(historyLen, function(err, data) {
+                var i, j;
                 if (err) {
                     if (this.config && this.config.debug) {
                         console.error(
@@ -422,9 +191,28 @@ MatrixClient.prototype = {
                         );
                     }
                     callback(err);
-                } else {
+                    return;
+                }
+                if (self.store) {
+                    var eventMapper = function(event) {
+                        return new MatrixEvent(event);
+                    };
+                    // intercept the results and put them into our store
+                    self.store.setPresenceEvents(
+                        map(data.presence, eventMapper)
+                    );
+                    for (i = 0; i < data.rooms.length; i++) {
+                        self.store.setStateEvents(
+                            map(data.rooms[i].state, eventMapper)
+                        );
+                        self.store.setEvents(
+                            map(data.rooms[i].messages.chunk, eventMapper)
+                        );
+                    }
+                }
+                if (data) {
+                    self.fromToken = data.end;
                     var events = [];
-                    var i, j;
                     for (i = 0; i < data.presence.length; i++) {
                         events.push(new MatrixEvent(data.presence[i]));
                     }
@@ -439,9 +227,10 @@ MatrixClient.prototype = {
                         }
                     }
                     callback(undefined, events, false);
-                    self.clientRunning = true;
-                    self._pollForEvents(callback);
                 }
+
+                self.clientRunning = true;
+                self._pollForEvents(callback);
             });
         }
         else {
@@ -454,7 +243,7 @@ MatrixClient.prototype = {
         if (!this.clientRunning) {
             return;
         }
-        this.eventStream(this.fromToken, 30000, function(err, data) {
+        this._http.eventStream(this.fromToken, 30000, function(err, data) {
             if (err) {
                 if (this.config && this.config.debug) {
                     console.error(
@@ -468,14 +257,25 @@ MatrixClient.prototype = {
                 setTimeout(function() {
                     self._pollForEvents(callback);
                 }, 2000);
-            } else {
+                return;
+            }
+
+            if (self.store) {
+                self.store.setEvents(map(data.chunk,
+                    function(event) {
+                        return new MatrixEvent(event);
+                    }
+                ));
+            }
+            if (data) {
+                self.fromToken = data.end;
                 var events = [];
                 for (var j = 0; j < data.chunk.length; j++) {
                     events.push(new MatrixEvent(data.chunk[j]));
                 }
                 callback(undefined, events, true);
-                self._pollForEvents(callback);
             }
+            self._pollForEvents(callback);
         });
     },
 
@@ -486,7 +286,65 @@ MatrixClient.prototype = {
     stopClient: function() {
         this.clientRunning = false;
     },
+};
 
+var map = function(array, fn) {
+    var results = new Array(array.length);
+    for (var i = 0; i < array.length; i++) {
+        results[i] = fn(array[i]);
+    }
+    return results;
+};
+
+/**
+ * The high-level Matrix Client class.
+ */
+module.exports = MatrixClient;  // expose the class
+
+},{"./http-api":3,"./models/event":5}],3:[function(require,module,exports){
+"use strict";
+
+/*
+TODO:
+- CS: complete register function (doing stages)
+- Identity server: linkEmail, authEmail, bindEmail, lookup3pid
+- uploadContent (?)
+*/
+var CLIENT_PREFIX = "/_matrix/client/api/v1";
+var CLIENT_V2_PREFIX = "/_matrix/client/v2_alpha";
+var HEADERS = {
+    "User-Agent": "matrix-js"
+};
+
+/*
+ * Construct a MatrixHttpApi.
+ * @param {Object} credentials The credentials for this client
+ * @param {Object} config The config for this client.
+ * @param {Function} request The request function for doing HTTP requests
+ */
+function MatrixHttpApi(credentials, config, request) {
+    if (typeof credentials === "string") {
+        credentials = {
+            "baseUrl": credentials
+        };
+    }
+    var requiredKeys = [
+        "baseUrl"
+    ];
+    for (var i = 0; i < requiredKeys.length; i++) {
+        if (!credentials.hasOwnProperty(requiredKeys[i])) {
+            throw new Error("Missing required key: " + requiredKeys[i]);
+        }
+    }
+    if (config && config.noUserAgent) {
+        HEADERS = undefined;
+    }
+    this.config = config;
+    this.credentials = credentials;
+    this.request = request;
+}
+
+MatrixHttpApi.prototype = {
     // Room operations
     // ===============
 
@@ -801,31 +659,8 @@ MatrixClient.prototype = {
         var params = {
             limit: limit
         };
-        var self = this;
         return this._doAuthedRequest(
-            function(err, data) {
-                if (self.store) {
-                    var eventMapper = function(event) {
-                        return new MatrixEvent(event);
-                    };
-                    // intercept the results and put them into our store
-                    self.store.setPresenceEvents(
-                        map(data.presence, eventMapper)
-                    );
-                    for (var i = 0; i < data.rooms.length; i++) {
-                        self.store.setStateEvents(
-                            map(data.rooms[i].state, eventMapper)
-                        );
-                        self.store.setEvents(
-                            map(data.rooms[i].messages.chunk, eventMapper)
-                        );
-                    }
-                }
-                if (data) {
-                    self.fromToken = data.end;
-                }
-                callback(err, data); // continue with original callback
-            }, "GET", "/initialSync", params
+            callback, "GET", "/initialSync", params
         );
     },
 
@@ -871,21 +706,7 @@ MatrixClient.prototype = {
             from: from,
             timeout: timeout
         };
-        var self = this;
-        return this._doAuthedRequest(
-            function(err, data) {
-                if (self.store) {
-                    self.store.setEvents(map(data.chunk,
-                        function(event) {
-                            return new MatrixEvent(event);
-                        }
-                    ));
-                }
-                if (data) {
-                    self.fromToken = data.end;
-                }
-                callback(err, data); // continue with original callback
-            }, "GET", "/events", params);
+        return this._doAuthedRequest(callback, "GET", "/events", params);
     },
 
     // Registration/Login operations
@@ -896,7 +717,6 @@ MatrixClient.prototype = {
         return this._doAuthedRequest(
             callback, "POST", "/login", undefined, data
         );
-        // XXX: surely we should store the results of this into our credentials
     },
 
     register: function(loginType, data, callback) {
@@ -1008,8 +828,8 @@ MatrixClient.prototype = {
 
     /**
      * Get the content repository url with query parameters.
-     * @return {Object} An object with a 'base', 'path' and 'params' for
-     * base URL, path and query parameters respectively.
+     * @return {Object} An object with a 'base', 'path' and 'params' for base URL,
+     *          path and query parameters respectively.
      */
     getContentUri: function() {
         var params = {
@@ -1054,7 +874,7 @@ MatrixClient.prototype = {
             throw Error("Expected callback to be a function");
         }
 
-        return request(
+        return this.request(
         {
             uri: uri,
             method: method,
@@ -1112,15 +932,251 @@ var isFunction = function(value) {
     return Object.prototype.toString.call(value) == "[object Function]";
 };
 
-var map = function(array, fn) {
-    var results = new Array(array.length);
-    for (var i = 0; i < array.length; i++) {
-        results[i] = fn(array[i]);
-    }
-    return results;
+/**
+ * The Matrix HTTP API class.
+ */
+module.exports = MatrixHttpApi;
+
+},{}],4:[function(require,module,exports){
+"use strict";
+
+/** The Matrix Event class */
+module.exports.MatrixEvent = require("./models/event").MatrixEvent;
+/** An in-memory store for the SDK */
+module.exports.MatrixInMemoryStore = require("./store/memory");
+/** The raw HTTP API */
+module.exports.MatrixHttpApi = require("./http-api");
+/** The managed client class */
+module.exports.MatrixClient = require("./client");
+
+// expose the underlying request object so different environments can use
+// different request libs (e.g. request or browser-request)
+var request;
+/**
+ * The function used to perform HTTP requests.
+ * @param {Function} r The request function which accepts (opts, callback)
+ */
+module.exports.request = function(r) {
+    request = r;
 };
 
-},{}],2:[function(require,module,exports){
+/**
+ * Create a new Matrix Client.
+ * @param {Object} credentials The Matrix credentials to use.
+ * @param {Object} config The config options for the client
+ * @param {Store} store The type of store to use.
+ * @return {MatrixClient} A new Matrix Client
+ */
+module.exports.createClient = function(credentials, config, store) {
+    return new module.exports.MatrixClient(credentials, config, store, request);
+};
+
+
+},{"./client":2,"./http-api":3,"./models/event":5,"./store/memory":6}],5:[function(require,module,exports){
+"use strict";
+
+/*
+ * Construct a Matrix Event object
+ * @param {Object} event The raw event to be wrapped in this DAO
+ */
+function MatrixEvent(event) {
+    this.event = event || {};
+}
+MatrixEvent.prototype = {
+    getId: function() {
+        return this.event.event_id;
+    },
+    getSender: function() {
+        return this.event.user_id;
+    },
+    getType: function() {
+        return this.event.type;
+    },
+    getRoomId: function() {
+        return this.event.room_id;
+    },
+    getTs: function() {
+        return this.event.ts;
+    },
+    getContent: function() {
+        return this.event.content;
+    },
+    isState: function() {
+        return this.event.state_key !== undefined;
+    },
+};
+
+/**
+ * An event from Matrix.
+ */
+module.exports.MatrixEvent = MatrixEvent;
+
+},{}],6:[function(require,module,exports){
+"use strict";
+
+function MatrixInMemoryStore() {
+    this.rooms = {
+        // state: { },
+        // timeline: [ ],
+    };
+
+    this.presence = {
+        // presence objects keyed by userId
+    };
+}
+
+// XXX: this is currently quite procedural - we could possibly pass back
+// models of Rooms, Users, Events, etc instead.
+MatrixInMemoryStore.prototype = {
+
+    /*
+     * Add an array of one or more state MatrixEvents into the store, overwriting
+     * any existing state with the same {room, type, stateKey} tuple.
+     */
+    setStateEvents: function(stateEvents) {
+        // we store stateEvents indexed by room, event type and state key.
+        for (var i = 0; i < stateEvents.length; i++) {
+            var event = stateEvents[i].event;
+            var roomId = event.room_id;
+            if (this.rooms[roomId] === undefined) {
+                this.rooms[roomId] = {};
+            }
+            if (this.rooms[roomId].state === undefined) {
+                this.rooms[roomId].state = {};
+            }
+            if (this.rooms[roomId].state[event.type] === undefined) {
+                this.rooms[roomId].state[event.type] = {};
+            }
+            this.rooms[roomId].state[event.type][event.state_key] = stateEvents[i];
+        }
+    },
+
+    /*
+     * Add a single state MatrixEvents into the store, overwriting
+     * any existing state with the same {room, type, stateKey} tuple.
+     */
+    setStateEvent: function(stateEvent) {
+        this.setStateEvents([stateEvent]);
+    },
+
+    /*
+     * Return a list of MatrixEvents from the store
+     * @param {String} roomId the Room ID whose state is to be returned
+     * @param {String} type the type of the state events to be returned (optional)
+     * @param {String} stateKey the stateKey of the state events to be returned
+     *                 (optional, requires type to be specified)
+     * @return {MatrixEvent[]} an array of MatrixEvents from the store,
+     * filtered by roomid, type and state key.
+     */
+    getStateEvents: function(roomId, type, stateKey) {
+        var stateEvents = [];
+        if (stateKey === undefined && type === undefined) {
+            for (type in this.rooms[roomId].state) {
+                if (this.rooms[roomId].state.hasOwnProperty(type)) {
+                    for (stateKey in this.rooms[roomId].state[type]) {
+                        if (this.rooms[roomId].state[type].hasOwnProperty(stateKey)) {
+                            stateEvents.push(
+                                this.rooms[roomId].state[type][stateKey]
+                            );
+                        }
+                    }
+                }
+            }
+            return stateEvents;
+        }
+        else if (stateKey === undefined) {
+            for (stateKey in this.rooms[roomId].state[type]) {
+                if (this.rooms[roomId].state[type].hasOwnProperty(stateKey)) {
+                    stateEvents.push(this.rooms[roomId].state[type][stateKey]);
+                }
+            }
+            return stateEvents;
+        }
+        else {
+            return [this.rooms[roomId].state[type][stateKey]];
+        }
+    },
+
+    /*
+     * Return a single state MatrixEvent from the store for the given roomId
+     * and type.
+     * @param {String} roomId the Room ID whose state is to be returned
+     * @param {String} type the type of the state events to be returned
+     * @param {String} stateKey the stateKey of the state events to be returned
+     * @return {MatrixEvent} a single MatrixEvent from the store, filtered
+     * by roomid, type and state key.
+     */
+    getStateEvent: function(roomId, type, stateKey) {
+        return this.rooms[roomId].state[type][stateKey];
+    },
+
+    /*
+     * Adds a list of arbitrary MatrixEvents into the store.
+     * If the event is a state event, it is also updates state.
+     */
+    setEvents: function(events) {
+        for (var i = 0; i < events.length; i++) {
+            var event = events[i].event;
+            if (event.type === "m.presence") {
+                this.setPresenceEvents([events[i]]);
+                continue;
+            }
+            var roomId = event.room_id;
+            if (this.rooms[roomId] === undefined) {
+                this.rooms[roomId] = {};
+            }
+            if (this.rooms[roomId].timeline === undefined) {
+                this.rooms[roomId].timeline = [];
+            }
+            if (event.state_key !== undefined) {
+                this.setStateEvents([events[i]]);
+            }
+            this.rooms[roomId].timeline.push(events[i]);
+        }
+    },
+
+    /*
+     * Get the timeline of events for a given room
+     * TODO: ordering!
+     */
+    getEvents: function(roomId) {
+        return this.room[roomId].timeline;
+    },
+
+    setPresenceEvents: function(presenceEvents) {
+        for (var i = 0; i < presenceEvents.length; i++) {
+            var matrixEvent = presenceEvents[i];
+            this.presence[matrixEvent.event.user_id] = matrixEvent;
+        }
+    },
+
+    getPresenceEvents: function(userId) {
+        return this.presence[userId];
+    },
+
+    getRoomList: function() {
+        var roomIds = [];
+        for (var roomId in this.rooms) {
+            if (this.rooms.hasOwnProperty(roomId)) {
+                roomIds.push(roomId);
+            }
+        }
+        return roomIds;
+    },
+
+    // TODO
+    //setMaxHistoryPerRoom: function(maxHistory) {},
+
+    // TODO
+    //reapOldMessages: function() {},
+};
+
+/**
+ * An in-memory store for Matrix.
+ */
+module.exports = MatrixInMemoryStore;
+
+},{}],7:[function(require,module,exports){
 // Browser Request
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -1616,12 +1672,4 @@ function b64_enc (data) {
 }));
 //UMD FOOTER END
 
-},{}],3:[function(require,module,exports){
-(function (global){
-var matrixcs = require("./lib/matrix");
-matrixcs.request(require("browser-request"));
-module.exports = matrixcs; // keep export for browserify package deps
-global.matrixcs = matrixcs;
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/matrix":1,"browser-request":2}]},{},[3]);
+},{}]},{},[1]);
