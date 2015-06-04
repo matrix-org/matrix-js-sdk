@@ -1,57 +1,476 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-(function (global){
-var matrixcs = require("./lib/matrix");
-matrixcs.request(require("browser-request"));
-module.exports = matrixcs; // keep export for browserify package deps
-global.matrixcs = matrixcs;
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/matrix":4,"browser-request":7}],2:[function(require,module,exports){
 "use strict";
-var MatrixHttpApi = require("./http-api");
+var httpApi = require("./http-api");
 var MatrixEvent = require("./models/event").MatrixEvent;
+var utils = require("./utils");
 
 // TODO:
 // Internal: rate limiting
 
 /*
  * Construct a Matrix Client.
- * @param {Object} credentials The credentials for this client
- * @param {Object} config The config (if any) for this client.
- *  Valid config params include:
- *      noUserAgent: true // to avoid warnings whilst setting UA headers
- *      debug: true // to use console.err() style debugging from the lib
- * @param {Object} store The data store (if any) for this client.
- * @param {Function} request The request fn to use.
+ * @param {Object} opts The configuration options for this client.
+ * @param {string} opts.baseUrl Required. The base URL to the client-server HTTP API.
+ * @param {Function} opts.request Required. The function to invoke for HTTP requests.
+ * @param {boolean} opts.usePromises True to use promises rather than callbacks.
+ * @param {string} opts.accessToken The access_token for this user.
+ * @param {string} opts.userId The user ID for this user.
+ * @param {Object} opts.store The data store to use. See {@link store/memory}.
  */
-function MatrixClient(credentials, config, store, request) {
-    if (typeof credentials === "string") {
-        credentials = {
-            "baseUrl": credentials
-        };
-    }
-    var requiredKeys = [
-        "baseUrl"
-    ];
-    for (var i = 0; i < requiredKeys.length; i++) {
-        if (!credentials.hasOwnProperty(requiredKeys[i])) {
-            throw new Error("Missing required key: " + requiredKeys[i]);
-        }
-    }
-    this.config = config;
-    this.credentials = credentials;
-    this.store = store;
-
+function MatrixClient(opts) {
+    utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
+    utils.checkObjectHasNoAdditionalKeys(opts,
+        ["baseUrl", "request", "usePromises", "accessToken", "userId", "store"]
+    );
+    
+    this.store = opts.store || null;
     // track our position in the overall eventstream
     this.fromToken = undefined;
     this.clientRunning = false;
-    this._http = new MatrixHttpApi(credentials, config, request);
+
+    var httpOpts = {
+        baseUrl: opts.baseUrl,
+        accessToken: opts.accessToken,
+        request: opts.request,
+        prefix: httpApi.PREFIX_V1
+    };
+    this.credentials = {
+        userId: (opts.userId || null)
+    };
+    this._http = new httpApi.MatrixHttpApi(httpOpts);
 }
 MatrixClient.prototype = {
-    isLoggedIn: function() {
-        return this.credentials.accessToken !== undefined &&
-            this.credentials.userId !== undefined;
+
+    // Room operations
+    // ===============
+
+    createRoom: function(options, callback) {
+        // valid options include: room_alias_name, visibility, invite
+        return this._http.authedRequest(
+            callback, "POST", "/createRoom", undefined, options
+        );
     },
+
+    joinRoom: function(roomIdOrAlias, callback) {
+        var path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
+        return this._http.authedRequest(callback, "POST", path, undefined, {});
+    },
+
+    setRoomName: function(roomId, name, callback) {
+        return this.sendStateEvent(roomId, "m.room.name", {name: name},
+                                   undefined, callback);
+    },
+
+    setRoomTopic: function(roomId, topic, callback) {
+        return this.sendStateEvent(roomId, "m.room.topic", {topic: topic},
+                                   undefined, callback);
+    },
+
+    setPowerLevel: function(roomId, userId, powerLevel, event, callback) {
+        var content = {
+            users: {}
+        };
+        if (event && event.type === "m.room.power_levels") {
+            content = event.content;
+        }
+        content.users[userId] = powerLevel;
+        var path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
+            $roomId: roomId
+        });
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, content
+        );
+    },
+
+    getStateEvent: function(roomId, eventType, stateKey, callback) {
+        var pathParams = {
+            $roomId: roomId,
+            $eventType: eventType,
+            $stateKey: stateKey
+        };
+        var path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
+        }
+        return this._http.authedRequest(
+            callback, "GET", path
+        );
+    },
+
+    sendStateEvent: function(roomId, eventType, content, stateKey, 
+                             callback) {
+        var pathParams = {
+            $roomId: roomId,
+            $eventType: eventType,
+            $stateKey: stateKey
+        };
+        var path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
+        }
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, content
+        );
+    },
+
+    sendEvent: function(roomId, eventType, content, txnId, callback) {
+        if (utils.isFunction(txnId)) { callback = txnId; txnId = undefined; }
+
+        if (!txnId) {
+            txnId = "m" + new Date().getTime();
+        }
+
+        var path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", {
+            $roomId: roomId,
+            $eventType: eventType,
+            $txnId: txnId
+        });
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, content
+        );
+    },
+
+    sendMessage: function(roomId, content, txnId, callback) {
+        if (utils.isFunction(txnId)) { callback = txnId; txnId = undefined; }
+        return this.sendEvent(
+            roomId, "m.room.message", content, txnId, callback
+        );
+    },
+
+    sendTextMessage: function(roomId, body, txnId, callback) {
+        var content = {
+             msgtype: "m.text",
+             body: body
+        };
+        return this.sendMessage(roomId, content, txnId, callback);
+    },
+
+    sendEmoteMessage: function(roomId, body, txnId, callback) {
+        var content = {
+             msgtype: "m.emote",
+             body: body
+        };
+        return this.sendMessage(roomId, content, txnId, callback);
+    },
+
+    sendImageMessage: function(roomId, url, info, text, callback) {
+        if (utils.isFunction(text)) { callback = text; text = undefined; }
+        if (!text) { text = "Image"; }
+        var content = {
+             msgtype: "m.image",
+             url: url,
+             info: info,
+             body: text
+        };
+        return this.sendMessage(roomId, content, callback);
+    },
+
+    sendHtmlMessage: function(roomId, body, htmlBody, callback) {
+        var content = {
+            msgtype: "m.text",
+            format: "org.matrix.custom.html",
+            body: body,
+            formatted_body: htmlBody
+        };
+        return this.sendMessage(roomId, content, callback);
+    },
+
+    sendTyping: function(roomId, isTyping, timeoutMs, callback) {
+        var path = utils.encodeUri("/rooms/$roomId/typing/$userId", {
+            $roomId: roomId,
+            $userId: this.credentials.userId
+        });
+        var data = {
+            typing: isTyping
+        };
+        if (isTyping) {
+            data.timeout = timeoutMs ? timeoutMs : 20000;
+        }
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, data
+        );
+    },
+
+    redactEvent: function(roomId, eventId, callback) {
+        var path = utils.encodeUri("/rooms/$roomId/redact/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId
+        });
+        return this._http.authedRequest(callback, "POST", path, undefined, {});
+    },
+
+    invite: function(roomId, userId, callback) {
+        return this._membershipChange(roomId, userId, "invite", undefined,
+            callback);
+    },
+
+    leave: function(roomId, callback) {
+        return this._membershipChange(roomId, undefined, "leave", undefined,
+            callback);
+    },
+
+    ban: function(roomId, userId, reason, callback) {
+        return this._membershipChange(roomId, userId, "ban", reason,
+            callback);
+    },
+
+    unban: function(roomId, userId, callback) {
+        // unbanning = set their state to leave
+        return this._setMembershipState(
+            roomId, userId, "leave", undefined, callback
+        );
+    },
+
+    kick: function(roomId, userId, reason, callback) {
+        return this._setMembershipState(
+            roomId, userId, "leave", reason, callback
+        );
+    },
+
+    _setMembershipState: function(roomId, userId, membershipValue, reason, 
+                            callback) {
+        if (utils.isFunction(reason)) { callback = reason; reason = undefined; }
+
+        var path = utils.encodeUri(
+            "/rooms/$roomId/state/m.room.member/$userId",
+            { $roomId: roomId, $userId: userId}
+        );
+
+        return this._http.authedRequest(callback, "PUT", path, undefined, {
+            membership: membershipValue,
+            reason: reason
+        });
+    },
+
+    _membershipChange: function(roomId, userId, membership, reason, 
+                                callback) {
+        if (utils.isFunction(reason)) { callback = reason; reason = undefined; }
+
+        var path = utils.encodeUri("/rooms/$room_id/$membership", {
+            $room_id: roomId,
+            $membership: membership
+        });
+        return this._http.authedRequest(
+            callback, "POST", path, undefined, {
+                user_id: userId,  // may be undefined e.g. on leave
+                reason: reason
+            }
+        );
+    },
+
+    // Profile operations
+    // ==================
+
+    getProfileInfo: function(userId, info, callback) {
+        if (utils.isFunction(info)) { callback = info; info = undefined; }
+
+        var path = info ?
+        utils.encodeUri("/profile/$userId/$info",
+                 { $userId: userId, $info: info }) :
+        utils.encodeUri("/profile/$userId",
+                 { $userId: userId });
+        return this._http.authedRequest(callback, "GET", path);
+    },
+
+    setProfileInfo: function(info, data, callback) {
+        var path = utils.encodeUri("/profile/$userId/$info", {
+            $userId: this.credentials.userId,
+            $info: info
+        });
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, data
+        );
+    },
+
+    setDisplayName: function(name, callback) {
+        return this.setProfileInfo(
+            "displayname", { displayname: name }, callback
+        );
+    },
+
+    setAvatarUrl: function(url, callback) {
+        return this.setProfileInfo(
+            "avatar_url", { avatar_url: url }, callback
+        );
+    },
+
+    getThreePids: function(creds, bind, callback) {
+        var path = "/account/3pid";
+        return this._http.authedRequestWithPrefix(
+            callback, "GET", path, undefined, undefined, httpApi.PREFIX_V2_ALPHA
+        );
+    },
+
+    addThreePid: function(creds, bind, callback) {
+        var path = "/account/3pid";
+        var data = {
+            'threePidCreds': creds,
+            'bind': bind
+        };
+        return this._http.authedRequestWithPrefix(
+            callback, "POST", path, qps, data, httpApi.PREFIX_V2_ALPHA
+        );
+    },
+
+    setPresence: function(presence, callback) {
+        var path = utils.encodeUri("/presence/$userId/status", {
+            $userId: this.credentials.userId
+        });
+        var validStates = ["offline", "online", "unavailable"];
+        if (validStates.indexOf(presence) == -1) {
+            throw new Error("Bad presence value: " + presence);
+        }
+        var content = {
+            presence: presence
+        };
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, content
+        );
+    },
+
+    // Public (non-authed) operations
+    // ==============================
+
+    publicRooms: function(callback) {
+        return this._http.request(callback, "GET", "/publicRooms");
+    },
+
+    registerFlows: function(callback) {
+        return this._http.request(callback, "GET", "/register");
+    },
+
+    loginFlows: function(callback) {
+        return this._http.request(callback, "GET", "/login");
+    },
+
+    resolveRoomAlias: function(roomAlias, callback) {
+        var path = utils.encodeUri("/directory/room/$alias", {$alias: roomAlias});
+        return this._http.request(callback, "GET", path);
+    },
+
+    // Syncing operations
+    // ==================
+
+    initialSync: function(limit, callback) {
+        var params = {
+            limit: limit
+        };
+        return this._http.authedRequest(
+            callback, "GET", "/initialSync", params
+        );
+    },
+
+    roomInitialSync: function(roomId, limit, callback) {
+        if (utils.isFunction(limit)) { callback = limit; limit = undefined; }
+        var path = utils.encodeUri("/rooms/$roomId/initialSync",
+            {$roomId: roomId}
+        );
+        if (!limit) {
+            limit = 30;
+        }
+        return this._http.authedRequest(
+            callback, "GET", path, { limit: limit }
+        );
+    },
+
+    roomState: function(roomId, callback) {
+        var path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
+        return this._http.authedRequest(callback, "GET", path);
+    },
+
+    scrollback: function(roomId, from, limit, callback) {
+        if (utils.isFunction(limit)) { callback = limit; limit = undefined; }
+        var path = utils.encodeUri("/rooms/$roomId/messages", {$roomId: roomId});
+        if (!limit) {
+            limit = 30;
+        }
+        var params = {
+            from: from,
+            limit: limit,
+            dir: 'b'
+        };
+        return this._http.authedRequest(callback, "GET", path, params);
+    },
+
+    eventStream: function(from, timeout, callback) {
+        if (utils.isFunction(timeout)) { callback = timeout; timeout = undefined;}
+        if (!timeout) {
+            timeout = 30000;
+        }
+
+        var params = {
+            from: from,
+            timeout: timeout
+        };
+        return this._http.authedRequest(callback, "GET", "/events", params);
+    },
+
+    // Registration/Login operations
+    // =============================
+
+    login: function(loginType, data, callback) {
+        data.type = loginType;
+        return this._http.authedRequest(
+            callback, "POST", "/login", undefined, data
+        );
+    },
+
+    register: function(loginType, data, callback) {
+        data.type = loginType;
+        return this._http.authedRequest(
+            callback, "POST", "/register", undefined, data
+        );
+    },
+
+    loginWithPassword: function(user, password, callback) {
+        return this.login("m.login.password", {
+            user: user,
+            password: password
+        }, callback);
+    },
+
+    // Push operations
+    // ===============
+
+    pushRules: function(callback) {
+        return this._http.authedRequest(callback, "GET", "/pushrules/");
+    },
+
+    addPushRule: function(scope, kind, ruleId, body, callback) {
+        // NB. Scope not uri encoded because devices need the '/'
+        var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+            $kind: kind,
+            $ruleId: ruleId
+        });
+        return this._http.authedRequest(
+            callback, "PUT", path, undefined, body
+        );
+    },
+
+    deletePushRule: function(scope, kind, ruleId, callback) {
+        // NB. Scope not uri encoded because devices need the '/'
+        var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+            $kind: kind,
+            $ruleId: ruleId
+        });
+        return this._http.authedRequest(callback, "DELETE", path);
+    },
+
+    // VoIP operations
+    // ===============
+
+    turnServer: function(callback) {
+        return this._http.authedRequest(callback, "GET", "/voip/turnServer");
+    },
+
+    isLoggedIn: function() {
+        return this._http.opts.accessToken !== undefined
+    },
+
+
+
+
+
 
     // Higher level APIs
     // =================
@@ -199,14 +618,14 @@ MatrixClient.prototype = {
                     };
                     // intercept the results and put them into our store
                     self.store.setPresenceEvents(
-                        map(data.presence, eventMapper)
+                        utils.map(data.presence, eventMapper)
                     );
                     for (i = 0; i < data.rooms.length; i++) {
                         self.store.setStateEvents(
-                            map(data.rooms[i].state, eventMapper)
+                            utils.map(data.rooms[i].state, eventMapper)
                         );
                         self.store.setEvents(
-                            map(data.rooms[i].messages.chunk, eventMapper)
+                            utils.map(data.rooms[i].messages.chunk, eventMapper)
                         );
                     }
                 }
@@ -261,7 +680,7 @@ MatrixClient.prototype = {
             }
 
             if (self.store) {
-                self.store.setEvents(map(data.chunk,
+                self.store.setEvents(utils.map(data.chunk,
                     function(event) {
                         return new MatrixEvent(event);
                     }
@@ -288,21 +707,15 @@ MatrixClient.prototype = {
     },
 };
 
-var map = function(array, fn) {
-    var results = new Array(array.length);
-    for (var i = 0; i < array.length; i++) {
-        results[i] = fn(array[i]);
-    }
-    return results;
-};
-
 /**
  * The high-level Matrix Client class.
  */
 module.exports = MatrixClient;  // expose the class
 
-},{"./http-api":3,"./models/event":5}],3:[function(require,module,exports){
+},{"./http-api":2,"./models/event":4,"./utils":6}],2:[function(require,module,exports){
 "use strict";
+
+var utils = require("./utils");
 
 /*
 TODO:
@@ -310,462 +723,43 @@ TODO:
 - Identity server: linkEmail, authEmail, bindEmail, lookup3pid
 - uploadContent (?)
 */
-var CLIENT_PREFIX = "/_matrix/client/api/v1";
-var CLIENT_V2_PREFIX = "/_matrix/client/v2_alpha";
+
+/**
+ * A constant representing the URI path for version 1 of the Client-Server HTTP API.
+ */
+module.exports.PREFIX_V1 = "/_matrix/client/api/v1";
+
+/**
+ * A constant representing the URI path for version 2 Alpha of the Client-Server
+ * HTTP API.
+ */
+module.exports.PREFIX_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha";
+
 var HEADERS = {
     "User-Agent": "matrix-js"
 };
 
-/*
+/**
  * Construct a MatrixHttpApi.
- * @param {Object} credentials The credentials for this client
- * @param {Object} config The config for this client.
- * @param {Function} request The request function for doing HTTP requests
+ * @param {Object} opts The options to use for this HTTP API.
+ * @param {string} opts.baseUrl Required. The base client-server URL e.g.
+ * 'http://localhost:8008'.
+ * @param {Function} opts.request Required. The function to call for HTTP
+ * requests. This function must look like function(opts, callback){ ... }.
+ * @param {string} opts.prefix Required. The matrix client prefix to use, e.g.
+ * '/_matrix/client/api/v1'. See PREFIX_V1 and PREFIX_V2_ALPHA for constants.
+ * @param {boolean} opts.setUserAgent True to set a user-agent string on requests.
+ * Default: True, unless there is a 'window' global present in which case the default
+ * is False.
+ * @param {string} opts.accessToken The access_token to send with requests. Can be
+ * null to not send an access token.
  */
-function MatrixHttpApi(credentials, config, request) {
-    if (typeof credentials === "string") {
-        credentials = {
-            "baseUrl": credentials
-        };
-    }
-    var requiredKeys = [
-        "baseUrl"
-    ];
-    for (var i = 0; i < requiredKeys.length; i++) {
-        if (!credentials.hasOwnProperty(requiredKeys[i])) {
-            throw new Error("Missing required key: " + requiredKeys[i]);
-        }
-    }
-    if (config && config.noUserAgent) {
-        HEADERS = undefined;
-    }
-    this.config = config;
-    this.credentials = credentials;
-    this.request = request;
+function MatrixHttpApi(opts) {
+    utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
+    this.opts = opts;
 }
 
 MatrixHttpApi.prototype = {
-    // Room operations
-    // ===============
-
-    createRoom: function(options, callback) {
-        // valid options include: room_alias_name, visibility, invite
-        return this._doAuthedRequest(
-            callback, "POST", "/createRoom", undefined, options
-        );
-    },
-
-    joinRoom: function(roomIdOrAlias, callback) {
-        var path = encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
-        return this._doAuthedRequest(callback, "POST", path, undefined, {});
-    },
-
-    setRoomName: function(roomId, name, callback) {
-        return this.sendStateEvent(roomId, "m.room.name", {name: name},
-                                   undefined, callback);
-    },
-
-    setRoomTopic: function(roomId, topic, callback) {
-        return this.sendStateEvent(roomId, "m.room.topic", {topic: topic},
-                                   undefined, callback);
-    },
-
-    setPowerLevel: function(roomId, userId, powerLevel, event, callback) {
-        var content = {
-            users: {}
-        };
-        if (event && event.type == "m.room.power_levels") {
-            content = event.content;
-        }
-        content.users[userId] = powerLevel;
-        var path = encodeUri("/rooms/$roomId/state/m.room.power_levels", {
-            $roomId: roomId
-        });
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, content
-        );
-    },
-
-    getStateEvent: function(roomId, eventType, stateKey, callback) {
-        var pathParams = {
-            $roomId: roomId,
-            $eventType: eventType,
-            $stateKey: stateKey
-        };
-        var path = encodeUri("/rooms/$roomId/state/$eventType", pathParams);
-        if (stateKey !== undefined) {
-            path = encodeUri(path + "/$stateKey", pathParams);
-        }
-        return this._doAuthedRequest(
-            callback, "GET", path
-        );
-    },
-
-    sendStateEvent: function(roomId, eventType, content, stateKey, 
-                             callback) {
-        var pathParams = {
-            $roomId: roomId,
-            $eventType: eventType,
-            $stateKey: stateKey
-        };
-        var path = encodeUri("/rooms/$roomId/state/$eventType", pathParams);
-        if (stateKey !== undefined) {
-            path = encodeUri(path + "/$stateKey", pathParams);
-        }
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, content
-        );
-    },
-
-    sendEvent: function(roomId, eventType, content, txnId, callback) {
-        if (isFunction(txnId)) { callback = txnId; txnId = undefined; }
-
-        if (!txnId) {
-            txnId = "m" + new Date().getTime();
-        }
-
-        var path = encodeUri("/rooms/$roomId/send/$eventType/$txnId", {
-            $roomId: roomId,
-            $eventType: eventType,
-            $txnId: txnId
-        });
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, content
-        );
-    },
-
-    sendMessage: function(roomId, content, txnId, callback) {
-        if (isFunction(txnId)) { callback = txnId; txnId = undefined; }
-        return this.sendEvent(
-            roomId, "m.room.message", content, txnId, callback
-        );
-    },
-
-    sendTextMessage: function(roomId, body, txnId, callback) {
-        var content = {
-             msgtype: "m.text",
-             body: body
-        };
-        return this.sendMessage(roomId, content, txnId, callback);
-    },
-
-    sendEmoteMessage: function(roomId, body, txnId, callback) {
-        var content = {
-             msgtype: "m.emote",
-             body: body
-        };
-        return this.sendMessage(roomId, content, txnId, callback);
-    },
-
-    sendImageMessage: function(roomId, url, info, text, callback) {
-        if (isFunction(text)) { callback = text; text = undefined; }
-        if (!text) { text = "Image"; }
-        var content = {
-             msgtype: "m.image",
-             url: url,
-             info: info,
-             body: text
-        };
-        return this.sendMessage(roomId, content, callback);
-    },
-
-    sendHtmlMessage: function(roomId, body, htmlBody, callback) {
-        var content = {
-            msgtype: "m.text",
-            format: "org.matrix.custom.html",
-            body: body,
-            formatted_body: htmlBody
-        };
-        return this.sendMessage(roomId, content, callback);
-    },
-
-    sendTyping: function(roomId, isTyping, timeoutMs, callback) {
-        var path = encodeUri("/rooms/$roomId/typing/$userId", {
-            $roomId: roomId,
-            $userId: this.credentials.userId
-        });
-        var data = {
-            typing: isTyping
-        };
-        if (isTyping) {
-            data.timeout = timeoutMs ? timeoutMs : 20000;
-        }
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, data
-        );
-    },
-
-    redactEvent: function(roomId, eventId, callback) {
-        var path = encodeUri("/rooms/$roomId/redact/$eventId", {
-            $roomId: roomId,
-            $eventId: eventId
-        });
-        return this._doAuthedRequest(callback, "POST", path, undefined, {});
-    },
-
-    invite: function(roomId, userId, callback) {
-        return this._membershipChange(roomId, userId, "invite", undefined,
-            callback);
-    },
-
-    leave: function(roomId, callback) {
-        return this._membershipChange(roomId, undefined, "leave", undefined,
-            callback);
-    },
-
-    ban: function(roomId, userId, reason, callback) {
-        return this._membershipChange(roomId, userId, "ban", reason,
-            callback);
-    },
-
-    unban: function(roomId, userId, callback) {
-        // unbanning = set their state to leave
-        return this._setMembershipState(
-            roomId, userId, "leave", undefined, callback
-        );
-    },
-
-    kick: function(roomId, userId, reason, callback) {
-        return this._setMembershipState(
-            roomId, userId, "leave", reason, callback
-        );
-    },
-
-    _setMembershipState: function(roomId, userId, membershipValue, reason, 
-                            callback) {
-        if (isFunction(reason)) { callback = reason; reason = undefined; }
-
-        var path = encodeUri(
-            "/rooms/$roomId/state/m.room.member/$userId",
-            { $roomId: roomId, $userId: userId}
-        );
-
-        return this._doAuthedRequest(callback, "PUT", path, undefined, {
-            membership: membershipValue,
-            reason: reason
-        });
-    },
-
-    _membershipChange: function(roomId, userId, membership, reason, 
-                                callback) {
-        if (isFunction(reason)) { callback = reason; reason = undefined; }
-
-        var path = encodeUri("/rooms/$room_id/$membership", {
-            $room_id: roomId,
-            $membership: membership
-        });
-        return this._doAuthedRequest(
-            callback, "POST", path, undefined, {
-                user_id: userId,  // may be undefined e.g. on leave
-                reason: reason
-            }
-        );
-    },
-
-    // Profile operations
-    // ==================
-
-    getProfileInfo: function(userId, info, callback) {
-        if (isFunction(info)) { callback = info; info = undefined; }
-
-        var path = info ?
-        encodeUri("/profile/$userId/$info",
-                 { $userId: userId, $info: info }) :
-        encodeUri("/profile/$userId",
-                 { $userId: userId });
-        return this._doAuthedRequest(callback, "GET", path);
-    },
-
-    setProfileInfo: function(info, data, callback) {
-        var path = encodeUri("/profile/$userId/$info", {
-            $userId: this.credentials.userId,
-            $info: info
-        });
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, data
-        );
-    },
-
-    setDisplayName: function(name, callback) {
-        return this.setProfileInfo(
-            "displayname", { displayname: name }, callback
-        );
-    },
-
-    setAvatarUrl: function(url, callback) {
-        return this.setProfileInfo(
-            "avatar_url", { avatar_url: url }, callback
-        );
-    },
-
-    getThreePids: function(creds, bind, callback) {
-        var path = "/account/3pid";
-        return this._doAuthedV2Request(
-            callback, "GET", path, undefined, undefined
-        );
-    },
-
-    addThreePid: function(creds, bind, callback) {
-        var path = "/account/3pid";
-        var data = {
-            'threePidCreds': creds,
-            'bind': bind
-        };
-        return this._doAuthedV2Request(
-            callback, "POST", path, undefined, data
-        );
-    },
-
-    setPresence: function(presence, callback) {
-        var path = encodeUri("/presence/$userId/status", {
-            $userId: this.credentials.userId
-        });
-        var validStates = ["offline", "online", "unavailable"];
-        if (validStates.indexOf(presence) == -1) {
-            throw new Error("Bad presence value: " + presence);
-        }
-        var content = {
-            presence: presence
-        };
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, content
-        );
-    },
-
-    // Public (non-authed) operations
-    // ==============================
-
-    publicRooms: function(callback) {
-        return this._doRequest(callback, "GET", "/publicRooms");
-    },
-
-    registerFlows: function(callback) {
-        return this._doRequest(callback, "GET", "/register");
-    },
-
-    loginFlows: function(callback) {
-        return this._doRequest(callback, "GET", "/login");
-    },
-
-    resolveRoomAlias: function(roomAlias, callback) {
-        var path = encodeUri("/directory/room/$alias", {$alias: roomAlias});
-        return this._doRequest(callback, "GET", path);
-    },
-
-    // Syncing operations
-    // ==================
-
-    initialSync: function(limit, callback) {
-        var params = {
-            limit: limit
-        };
-        return this._doAuthedRequest(
-            callback, "GET", "/initialSync", params
-        );
-    },
-
-    roomInitialSync: function(roomId, limit, callback) {
-        if (isFunction(limit)) { callback = limit; limit = undefined; }
-        var path = encodeUri("/rooms/$roomId/initialSync",
-            {$roomId: roomId}
-        );
-        if (!limit) {
-            limit = 30;
-        }
-        return this._doAuthedRequest(
-            callback, "GET", path, { limit: limit }
-        );
-    },
-
-    roomState: function(roomId, callback) {
-        var path = encodeUri("/rooms/$roomId/state", {$roomId: roomId});
-        return this._doAuthedRequest(callback, "GET", path);
-    },
-
-    scrollback: function(roomId, from, limit, callback) {
-        if (isFunction(limit)) { callback = limit; limit = undefined; }
-        var path = encodeUri("/rooms/$roomId/messages", {$roomId: roomId});
-        if (!limit) {
-            limit = 30;
-        }
-        var params = {
-            from: from,
-            limit: limit,
-            dir: 'b'
-        };
-        return this._doAuthedRequest(callback, "GET", path, params);
-    },
-
-    eventStream: function(from, timeout, callback) {
-        if (isFunction(timeout)) { callback = timeout; timeout = undefined;}
-        if (!timeout) {
-            timeout = 30000;
-        }
-
-        var params = {
-            from: from,
-            timeout: timeout
-        };
-        return this._doAuthedRequest(callback, "GET", "/events", params);
-    },
-
-    // Registration/Login operations
-    // =============================
-
-    login: function(loginType, data, callback) {
-        data.type = loginType;
-        return this._doAuthedRequest(
-            callback, "POST", "/login", undefined, data
-        );
-    },
-
-    register: function(loginType, data, callback) {
-        data.type = loginType;
-        return this._doAuthedRequest(
-            callback, "POST", "/register", undefined, data
-        );
-    },
-
-    loginWithPassword: function(user, password, callback) {
-        return this.login("m.login.password", {
-            user: user,
-            password: password
-        }, callback);
-    },
-
-    // Push operations
-    // ===============
-
-    pushRules: function(callback) {
-        return this._doAuthedRequest(callback, "GET", "/pushrules/");
-    },
-
-    addPushRule: function(scope, kind, ruleId, body, callback) {
-        // NB. Scope not uri encoded because devices need the '/'
-        var path = encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
-            $kind: kind,
-            $ruleId: ruleId
-        });
-        return this._doAuthedRequest(
-            callback, "PUT", path, undefined, body
-        );
-    },
-
-    deletePushRule: function(scope, kind, ruleId, callback) {
-        // NB. Scope not uri encoded because devices need the '/'
-        var path = encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
-            $kind: kind,
-            $ruleId: ruleId
-        });
-        return this._doAuthedRequest(callback, "DELETE", path);
-    },
-
-    // VoIP operations
-    // ===============
-
-    turnServer: function(callback) {
-        return this._doAuthedRequest(callback, "GET", "/voip/turnServer");
-    },
 
     // URI functions
     // =============
@@ -804,7 +798,7 @@ MatrixHttpApi.prototype = {
         }
         return this.credentials.baseUrl + prefix + serverAndMediaId +
             (Object.keys(params).length === 0 ? "" :
-            ("?" + encodeParams(params))) + fragment;
+            ("?" + utils.encodeParams(params))) + fragment;
     },
 
     getIdenticonUri: function(identiconString, width, height) {
@@ -818,12 +812,12 @@ MatrixHttpApi.prototype = {
             height: height
         };
 
-        var path = encodeUri("/_matrix/media/v1/identicon/$ident", {
+        var path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
             $ident: identiconString
         });
         return this.credentials.baseUrl + path +
             (Object.keys(params).length === 0 ? "" :
-                ("?" + encodeParams(params)));
+                ("?" + utils.encodeParams(params)));
     },
 
     /**
@@ -842,74 +836,59 @@ MatrixHttpApi.prototype = {
         };
     },
 
-    // Internals
-    // =========
-
-    _doAuthedRequest: function(callback, method, path, params, data) {
-        if (!params) { params = {}; }
-        params.access_token = this.credentials.accessToken;
-        return this._doRequest(callback, method, path, params, data);
+    authedRequest: function(callback, method, path, queryParams, data) {
+        if (!queryParams) { queryParams = {}; }
+        queryParams.access_token = this.opts.accessToken;
+        return this.request(callback, method, path, queryParams, data);
     },
 
-    _doAuthedV2Request: function(callback, method, path, params, data) {
-        if (!params) { params = {}; }
-        params.access_token = this.credentials.accessToken;
-        return this._doV2Request(callback, method, path, params, data);
+    request: function(callback, method, path, queryParams, data) {
+        return this.requestWithPrefix(
+            callback, method, path, queryParams, data, this.opts.prefix
+        );
     },
 
-    _doRequest: function(callback, method, path, params, data) {
-        var fullUri = this.credentials.baseUrl + CLIENT_PREFIX + path;
-        if (!params) { params = {}; }
-        return this._request(callback, method, fullUri, params, data);
+    authedRequestWithPrefix: function(callback, method, path, queryParams, data,
+                                      prefix) {
+        var fullUri = this.opts.baseUrl + prefix + path;
+        if (!queryParams) {
+            queryParams = {};
+        }
+        queryParams.access_token = this.opts.accessToken;
+        return this._request(callback, method, fullUri, queryParams, data);
     },
 
-    _doV2Request: function(callback, method, path, params, data) {
-        var fullUri = this.credentials.baseUrl + CLIENT_V2_PREFIX + path;
-        if (!params) { params = {}; }
-        return this._request(callback, method, fullUri, params, data);
+    requestWithPrefix: function(callback, method, path, queryParams, data, prefix) {
+        var fullUri = this.opts.baseUrl + prefix + path;
+        if (!queryParams) {
+            queryParams = {};
+        }
+        return this._request(callback, method, fullUri, queryParams, data);
     },
 
-    _request: function(callback, method, uri, params, data) {
-        if (callback !== undefined && !isFunction(callback)) {
-            throw Error("Expected callback to be a function");
+    _request: function(callback, method, uri, queryParams, data) {
+        if (callback !== undefined && !utils.isFunction(callback)) {
+            throw Error(
+                "Expected callback to be a function but got "+typeof callback
+            );
         }
 
-        return this.request(
+        return this.opts.request(
         {
             uri: uri,
             method: method,
             withCredentials: false,
-            qs: params,
+            qs: queryParams,
             body: data,
             json: true,
             headers: HEADERS,
-            _matrix_credentials: this.credentials
+            _matrix_opts: this.opts
         },
         requestCallback(callback)
         );
     }
 };
 
-var encodeUri = function(pathTemplate, variables) {
-    for (var key in variables) {
-        if (!variables.hasOwnProperty(key)) { continue; }
-        pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key])
-        );
-    }
-    return pathTemplate;
-};
-
-// avoiding deps on jquery and co
-var encodeParams = function(params) {
-    var qs = "";
-    for (var key in params) {
-        if (!params.hasOwnProperty(key)) { continue; }
-        qs += "&" + encodeURIComponent(key) + "=" +
-                encodeURIComponent(params[key]);
-    }
-    return qs.substring(1);
-};
 
 var requestCallback = function(userDefinedCallback) {
     if (!userDefinedCallback) {
@@ -928,16 +907,14 @@ var requestCallback = function(userDefinedCallback) {
     };
 };
 
-var isFunction = function(value) {
-    return Object.prototype.toString.call(value) == "[object Function]";
-};
+
 
 /**
  * The Matrix HTTP API class.
  */
-module.exports = MatrixHttpApi;
+module.exports.MatrixHttpApi = MatrixHttpApi;
 
-},{}],4:[function(require,module,exports){
+},{"./utils":6}],3:[function(require,module,exports){
 "use strict";
 
 /** The Matrix Event class */
@@ -960,19 +937,28 @@ module.exports.request = function(r) {
     request = r;
 };
 
-/**
- * Create a new Matrix Client.
- * @param {Object} credentials The Matrix credentials to use.
- * @param {Object} config The config options for the client
- * @param {Store} store The type of store to use.
- * @return {MatrixClient} A new Matrix Client
+/*
+ * Construct a Matrix Client. Identical to {@link client/MatrixClient} except
+ * the 'request' option is already specified.
+ * @param {(Object|string)} opts The configuration options for this client. If
+ * this is a string, it is assumed to be the base URL.
+ * @param {string} opts.baseUrl The base URL to the client-server HTTP API.
+ * @param {boolean} opts.usePromises True to use promises rather than callbacks.
+ * @param {string} opts.accessToken The access_token for this user.
+ * @param {string} opts.userId The user ID for this user.
  */
-module.exports.createClient = function(credentials, config, store) {
-    return new module.exports.MatrixClient(credentials, config, store, request);
+module.exports.createClient = function(opts) {
+    if (typeof opts === "string") {
+        opts = {
+            "baseUrl": opts
+        };
+    }
+    opts.request = request;
+    return new module.exports.MatrixClient(opts);
 };
 
 
-},{"./client":2,"./http-api":3,"./models/event":5,"./store/memory":6}],5:[function(require,module,exports){
+},{"./client":1,"./http-api":2,"./models/event":4,"./store/memory":5}],4:[function(require,module,exports){
 "use strict";
 
 /*
@@ -1011,7 +997,7 @@ MatrixEvent.prototype = {
  */
 module.exports.MatrixEvent = MatrixEvent;
 
-},{}],6:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 "use strict";
 
 function MatrixInMemoryStore() {
@@ -1176,6 +1162,59 @@ MatrixInMemoryStore.prototype = {
  */
 module.exports = MatrixInMemoryStore;
 
+},{}],6:[function(require,module,exports){
+"use strict";
+
+
+// avoiding deps on jquery and co
+module.exports.encodeParams = function(params) {
+    var qs = "";
+    for (var key in params) {
+        if (!params.hasOwnProperty(key)) { continue; }
+        qs += "&" + encodeURIComponent(key) + "=" +
+                encodeURIComponent(params[key]);
+    }
+    return qs.substring(1);
+};
+
+module.exports.encodeUri = function(pathTemplate, variables) {
+    for (var key in variables) {
+        if (!variables.hasOwnProperty(key)) { continue; }
+        pathTemplate = pathTemplate.replace(
+            key, encodeURIComponent(variables[key])
+        );
+    }
+    return pathTemplate;
+};
+
+module.exports.map = function(array, fn) {
+    var results = new Array(array.length);
+    for (var i = 0; i < array.length; i++) {
+        results[i] = fn(array[i]);
+    }
+    return results;
+};
+
+module.exports.isFunction = function(value) {
+    return Object.prototype.toString.call(value) == "[object Function]";
+};
+
+module.exports.checkObjectHasKeys = function(obj, keys) {
+    for (var i = 0; i < keys.length; i++) {
+        if (!obj.hasOwnProperty(keys[i])) {
+            throw new Error("Missing required key: "+keys[i]);
+        }
+    }
+};
+
+module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
+    for (var key in obj) {
+        if (!obj.hasOwnProperty(key)) { continue; }
+        if (allowedKeys.indexOf(key) === -1) {
+            throw new Error("Unknown key: "+key);
+        }
+    }
+};
 },{}],7:[function(require,module,exports){
 // Browser Request
 //
@@ -1672,4 +1711,12 @@ function b64_enc (data) {
 }));
 //UMD FOOTER END
 
-},{}]},{},[1]);
+},{}],8:[function(require,module,exports){
+(function (global){
+var matrixcs = require("./lib/matrix");
+matrixcs.request(require("browser-request"));
+module.exports = matrixcs; // keep export for browserify package deps
+global.matrixcs = matrixcs;
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"./lib/matrix":3,"browser-request":7}]},{},[8]);
