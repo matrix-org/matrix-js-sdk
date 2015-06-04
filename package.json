@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build-js": "./browser-build.sh",
-    "watch-js": "./browser-build.sh -w"
+    "build": "browserify browser-index.js -o dist/browser-matrix-dev.js",
+    "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"

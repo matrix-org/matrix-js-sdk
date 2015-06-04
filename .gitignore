@@ -3,3 +3,4 @@ node_modules
 build/Release
 coverage
 lib-cov
+dist/browser-matrix-dev.js

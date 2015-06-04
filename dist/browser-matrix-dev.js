@@ -1,5 +1,10 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 "use strict";
+/**
+ * This is an internal module. See {@link MatrixClient} for the public class.
+ * @module client
+ */
+
 var httpApi = require("./http-api");
 var MatrixEvent = require("./models/event").MatrixEvent;
 var utils = require("./utils");
@@ -7,8 +12,9 @@ var utils = require("./utils");
 // TODO:
 // Internal: rate limiting
 
-/*
+/**
  * Construct a Matrix Client.
+ * @constructor
  * @param {Object} opts The configuration options for this client.
  * @param {string} opts.baseUrl Required. The base URL to the client-server HTTP API.
  * @param {Function} opts.request Required. The function to invoke for HTTP requests.
@@ -17,7 +23,7 @@ var utils = require("./utils");
  * @param {string} opts.userId The user ID for this user.
  * @param {Object} opts.store The data store to use. See {@link store/memory}.
  */
-function MatrixClient(opts) {
+module.exports.MatrixClient = function MatrixClient(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
     utils.checkObjectHasNoAdditionalKeys(opts,
         ["baseUrl", "request", "usePromises", "accessToken", "userId", "store"]
@@ -38,8 +44,8 @@ function MatrixClient(opts) {
         userId: (opts.userId || null)
     };
     this._http = new httpApi.MatrixHttpApi(httpOpts);
-}
-MatrixClient.prototype = {
+};
+module.exports.MatrixClient.prototype = {
 
     // Room operations
     // ===============
@@ -707,13 +713,12 @@ MatrixClient.prototype = {
     },
 };
 
-/**
- * The high-level Matrix Client class.
- */
-module.exports = MatrixClient;  // expose the class
-
 },{"./http-api":2,"./models/event":4,"./utils":6}],2:[function(require,module,exports){
 "use strict";
+/**
+ * This is an internal module. See {@link MatrixHttpApi} for the public class.
+ * @module http-api
+ */
 
 var utils = require("./utils");
 
@@ -730,7 +735,7 @@ TODO:
 module.exports.PREFIX_V1 = "/_matrix/client/api/v1";
 
 /**
- * A constant representing the URI path for version 2 Alpha of the Client-Server
+ * A constant representing the URI path for version 2 alpha of the Client-Server
  * HTTP API.
  */
 module.exports.PREFIX_V2_ALPHA_PREFIX = "/_matrix/client/v2_alpha";
@@ -755,12 +760,12 @@ var HEADERS = {
  * @param {string} opts.accessToken The access_token to send with requests. Can be
  * null to not send an access token.
  */
-function MatrixHttpApi(opts) {
+module.exports.MatrixHttpApi = function MatrixHttpApi(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     this.opts = opts;
-}
+};
 
-MatrixHttpApi.prototype = {
+module.exports.MatrixHttpApi.prototype = {
 
     // URI functions
     // =============
@@ -908,24 +913,17 @@ var requestCallback = function(userDefinedCallback) {
     };
 };
 
-
-
-/**
- * The Matrix HTTP API class.
- */
-module.exports.MatrixHttpApi = MatrixHttpApi;
-
 },{"./utils":6}],3:[function(require,module,exports){
 "use strict";
 
-/** The Matrix Event class */
+/** The Matrix Event class. */
 module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 /** An in-memory store for the SDK */
 module.exports.MatrixInMemoryStore = require("./store/memory");
-/** The raw HTTP API */
-module.exports.MatrixHttpApi = require("./http-api");
-/** The managed client class */
-module.exports.MatrixClient = require("./client");
+/** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
+module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
+/** The {@link module:client.MatrixClient|MatrixClient} class. */
+module.exports.MatrixClient = require("./client").MatrixClient;
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
@@ -939,8 +937,8 @@ module.exports.request = function(r) {
 };
 
 /**
- * Construct a Matrix Client. Identical to {@link client/MatrixClient} except
- * the 'request' option is already specified.
+ * Construct a Matrix Client. Identical to {@link module:client.MatrixClient}
+ * except the 'request' option is already specified.
  * @param {(Object|string)} opts The configuration options for this client. If
  * this is a string, it is assumed to be the base URL.
  * @param {string} opts.baseUrl The base URL to the client-server HTTP API.
@@ -1166,7 +1164,10 @@ module.exports = MatrixInMemoryStore;
 
 },{}],6:[function(require,module,exports){
 "use strict";
-
+/**
+ * This is an internal module.
+ * @module utils
+ */
 
 /**
  * Encode a dictionary of query parameters.
