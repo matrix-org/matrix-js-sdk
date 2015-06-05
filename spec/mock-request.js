@@ -8,16 +8,17 @@ function HttpBackend() {
         var realReq = new Request(opts.method, opts.uri, opts.body, opts.qs);
         realReq.callback = callback;
         self.requests.push(realReq);
-    }
-};
+    };
+}
 HttpBackend.prototype = {
     flush: function() {
         // if there's more real requests and more expected requests, flush 'em.
         while(this.requests.length > 0 && this.expectedRequests.length > 0) {
             var req = this.requests.shift();
+            var i;
 
             var matchingReq = null;
-            for (var i = 0; i < this.expectedRequests.length; i++) {
+            for (i = 0; i < this.expectedRequests.length; i++) {
                 var expectedReq = this.expectedRequests[i];
                 if (expectedReq.method === req.method && 
                         req.path.indexOf(expectedReq.path) !== -1) {
@@ -31,9 +32,9 @@ HttpBackend.prototype = {
             }
 
             if (matchingReq) {
-                matchingReq.checks.forEach(function(check) {
-                    check(req);
-                });
+                for (i = 0; i < matchingReq.checks.length; i++) {
+                    matchingReq.checks[i](req);
+                }
                 var testResponse = matchingReq.response;
                 req.callback(
                     testResponse.err, testResponse.response, testResponse.body
@@ -69,7 +70,7 @@ function Request(method, path, data, queryParams) {
     this.callback = null;
     this.response = null;
     this.checks = [];
-};
+}
 Request.prototype = {
     check: function(fn) {
         this.checks.push(fn);

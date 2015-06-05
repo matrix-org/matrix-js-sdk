@@ -5,7 +5,6 @@ var HttpBackend = require("../mock-request");
 describe("MatrixClient", function() {
     var baseUrl = "http://localhost.or.something";
     var client, httpBackend;
-    var requestPool = [];
 
     beforeEach(function() {
         httpBackend = new HttpBackend();
@@ -46,7 +45,7 @@ describe("MatrixClient", function() {
             }).respond(200, eventData);
 
             client.startClient(function(err, data, isLive) {});
-            
+
             httpBackend.flush();
         });
     });
