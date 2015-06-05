@@ -1,9 +1,9 @@
 "use strict";
 
 /**
- * This is a mock framework for an HTTP backend, heavily inspired by Angular.js
+ * Construct a mock HTTP backend, heavily inspired by Angular.js.
+ * @constructor
  */
-
 function HttpBackend() {
     this.requests = [];
     this.expectedRequests = [];
@@ -21,14 +21,14 @@ HttpBackend.prototype = {
      */
     flush: function() {
         // if there's more real requests and more expected requests, flush 'em.
-        while(this.requests.length > 0 && this.expectedRequests.length > 0) {
+        while (this.requests.length > 0 && this.expectedRequests.length > 0) {
             var req = this.requests.shift();
             var i;
 
             var matchingReq = null;
             for (i = 0; i < this.expectedRequests.length; i++) {
                 var expectedReq = this.expectedRequests[i];
-                if (expectedReq.method === req.method && 
+                if (expectedReq.method === req.method &&
                         req.path.indexOf(expectedReq.path) !== -1) {
                     if (!expectedReq.data || (JSON.stringify(expectedReq.data) ===
                             JSON.stringify(req.data))) {
@@ -57,7 +57,7 @@ HttpBackend.prototype = {
     verifyNoOutstandingRequests: function() {
         var firstOutstandingReq = this.requests[0] || {};
         expect(this.requests.length).toEqual(0,
-            "Expected no more HTTP requests but received request to "+
+            "Expected no more HTTP requests but received request to " +
             firstOutstandingReq.path
         );
     },
@@ -68,7 +68,7 @@ HttpBackend.prototype = {
     verifyNoOutstandingExpectation: function() {
         var firstOutstandingExpectation = this.expectedRequests[0] || {};
         expect(this.expectedRequests.length).toEqual(0,
-            "Expected to see HTTP request for "+firstOutstandingExpectation.path
+            "Expected to see HTTP request for " + firstOutstandingExpectation.path
         );
     },
 
@@ -139,4 +139,7 @@ Request.prototype = {
     }
 };
 
+/**
+ * The HttpBackend class.
+ */
 module.exports = HttpBackend;

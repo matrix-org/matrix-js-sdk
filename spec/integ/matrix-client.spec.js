@@ -37,7 +37,7 @@ describe("MatrixClient", function() {
             httpBackend.flush();
         });
 
-        it("should pass the 'end' token from /initialSync to the from= param "+
+        it("should pass the 'end' token from /initialSync to the from= param " +
             " of /events", function() {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").check(function(req) {
