@@ -6,7 +6,8 @@
   "scripts": {
     "test": "istanbul cover --report cobertura -x **/examples/**/*.js jasmine-node -- spec --verbose --junitreport --forceexit --captureExceptions",
     "build": "jshint -c .jshint lib/ && browserify browser-index.js -o dist/browser-matrix-dev.js",
-    "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v"
+    "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
+    "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200 --max_line_length 90 -r spec/ -r lib/"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
