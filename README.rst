@@ -37,8 +37,7 @@ Contributing
 *This section is for people who want to modify the SDK. If you just
 want to use this SDK, skip this section.*
 
-First, you need to pull in the right build tools (we use ``browserify``
-and ``watchify``)::
+First, you need to pull in the right build tools::
 
  $ npm install
 
@@ -54,6 +53,14 @@ To build a browser version from scratch when developing::
 To constantly do builds when files are modified (using ``watchify``)::
 
  $ npm run watch
+ 
+To run tests::
+
+ $ npm test
+ 
+To run linters::
+
+ $ npm run lint
 
 API
 ===
