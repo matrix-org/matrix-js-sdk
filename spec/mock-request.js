@@ -1,4 +1,5 @@
 "use strict";
+var q = require("q");
 
 /**
  * Construct a mock HTTP backend, heavily inspired by Angular.js.
@@ -18,37 +19,77 @@ function HttpBackend() {
 HttpBackend.prototype = {
     /**
      * Respond to all of the requests (flush the queue).
+     * @return Promise resolved when there is nothing left to flush.
      */
     flush: function() {
-        // if there's more real requests and more expected requests, flush 'em.
-        while (this.requests.length > 0 && this.expectedRequests.length > 0) {
-            var req = this.requests.shift();
-            var i;
+        var defer = q.defer();
+        var self = this;
+        console.log("HTTP backend flushing...");
+        var tryFlush = function() {
+            // if there's more real requests and more expected requests, flush 'em.
+            console.log(
+                "  trying to flush queue => reqs=%s expected=%s",
+                self.requests.length, self.expectedRequests.length
+            );
+            if (self._takeFromQueue()) {
+                // try again on the next tick.
+                console.log("  flushed. Trying for more.");
+                setTimeout(tryFlush, 0);
+            }
+            else {
+                console.log("  no more flushes.");
+                defer.resolve();
+            }
+        };
 
-            var matchingReq = null;
-            for (i = 0; i < this.expectedRequests.length; i++) {
-                var expectedReq = this.expectedRequests[i];
+        setTimeout(tryFlush, 0);
+
+        return defer.promise;
+    },
+
+    /**
+     * Attempts to resolve requests/expected requests.
+     * @return true if something was resolved.
+     */
+    _takeFromQueue: function() {
+        var req = null;
+        var i, j;
+        var matchingReq, expectedReq, testResponse = null;
+        for (i =0; i < this.requests.length; i++) {
+            req = this.requests[i];
+            for (j = 0; j < this.expectedRequests.length; j++) {
+                expectedReq = this.expectedRequests[j];
                 if (expectedReq.method === req.method &&
                         req.path.indexOf(expectedReq.path) !== -1) {
                     if (!expectedReq.data || (JSON.stringify(expectedReq.data) ===
                             JSON.stringify(req.data))) {
                         matchingReq = expectedReq;
-                        this.expectedRequests.splice(i, 1);
+                        this.expectedRequests.splice(j, 1);
                         break;
                     }
                 }
             }
 
             if (matchingReq) {
-                for (i = 0; i < matchingReq.checks.length; i++) {
-                    matchingReq.checks[i](req);
+                // remove from request queue
+                this.requests.splice(i, 1);
+                i--;
+
+                for (j = 0; j < matchingReq.checks.length; j++) {
+                    matchingReq.checks[j](req);
                 }
-                var testResponse = matchingReq.response;
+                testResponse = matchingReq.response;
+                console.log("    responding to %s", matchingReq.path);
+
                 req.callback(
                     testResponse.err, testResponse.response, testResponse.body
                 );
             }
+        };
+        if (testResponse) {  // flushed something
+            return true;
         }
+        return false;
     },
 
     /**
