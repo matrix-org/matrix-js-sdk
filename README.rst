@@ -54,57 +54,13 @@ To constantly do builds when files are modified (using ``watchify``)::
 
  $ npm run watch
  
-To run tests::
+To run tests (Jasmine)::
 
  $ npm test
  
-To run linters::
+To run linters (Google Closure Linter and JSHint)::
 
  $ npm run lint
-
-API
-===
-
-Please see the `client server API`_ for more information on the HTTP calls.
-
-Matrix Client
--------------
-``MatrixClient`` is constructed via ``sdk.createClient(args)`` where ``args`` can be:
-
-- ``baseUrl`` (String) : The home server base URL to make requests to.
-- ``credentials`` (Object) : Consists of a ``baseUrl`` (String), a ``userId`` (String)
-  and an ``accessToken`` (String).
-- ``credentials, config`` (Object, Object) : As before, but with a ``config`` which has
-  the following options:
-  
-  *  ``noUserAgent`` (Boolean: default ``false``) : Set to ``true`` to stop setting a 
-     ``User-Agent`` on requests. This is typically done when using the SDK in a browser 
-     which logs errors when trying to clobber the User-Agent.
-
-At any point these values can be modified by accessing ``matrixClient.credentials`` and
-``matrixClient.config``.
-
-Promises
---------
-Promises are supported using ``Q``, but are not enabled by default. To enable them, simply
-call ``sdk.usePromises()`` like so::
-
-  var sdk = require("matrix-js-sdk");
-  sdk.usePromises();
-  var client = sdk.createClient("https://matrix.org");
-  client.publicRooms().then(function(data) {
-    console.log("Public Rooms: %s", JSON.stringify(data));
-  });
-  
-You will need to ``npm install q`` as it is not a hard dependency on this project.
-
-Request
--------
-
-``MatrixClient`` **requires** a ``request`` module in order to function. This is
-usually done for you when using ``npm``. You can manually inject this by calling
-``sdk.request(<request>)``. Wrappers around ``request`` allow you to easily
-support different HTTP libraries (such as AngularJS's ``$http``).
 
 .. _Matrix: http://matrix.org
 .. _examples/browser: examples/browser
