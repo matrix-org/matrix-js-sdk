@@ -48,18 +48,12 @@ Building
 
 To build a browser version from scratch when developing::
 
- $ ./browser-build.sh
+ $ npm run build
 
 
 To constantly do builds when files are modified (using ``watchify``)::
 
- $ npm run watch-js
-
-
-To do a "release" build (``version`` is added to the filename)::
-
- $ npm run build-js
-
+ $ npm run watch
 
 API
 ===
