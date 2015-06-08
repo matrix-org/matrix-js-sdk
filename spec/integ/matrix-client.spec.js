@@ -172,7 +172,7 @@ describe("MatrixClient", function() {
             httpBackend.flush().done(function() {
                 var room = client.getStore().getRoom(roomTwo);
                 // should use the display name of the other person.
-                expect(room.name).toEqual(otherDisplayName); 
+                expect(room.name).toEqual(otherDisplayName);
                 done();
             });
         });

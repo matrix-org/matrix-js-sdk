@@ -17,6 +17,7 @@ module.exports.beforeEach = function(testCase) {
  * @param {string} room The event.room_id
  * @param {string} userId The event.user_id
  * @param {Object} content The event.content
+ * @return {Object} a JSON object representing this event.
  */
 module.exports.mkEvent = function(type, room, userId, content) {
     var event = {
@@ -27,13 +28,24 @@ module.exports.mkEvent = function(type, room, userId, content) {
         event_id: "$" + Math.random() + "-" + Math.random()
     };
     if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
-         "m.room.power_levels", "m.room.topic", "com.example.state"].indexOf(type)
-            !== -1) {
+         "m.room.power_levels", "m.room.topic",
+         "com.example.state"].indexOf(type) !== -1) {
         event.state_key = "";
     }
     return event;
 };
 
+/**
+ * Create an m.room.member POJO.
+ * @param {string} room The room ID for the event.
+ * @param {string} membership The content.membership for the event.
+ * @param {string} userId The user ID for the event.
+ * @param {string} otherUserId The other user ID for the event if applicable
+ * e.g. for invites/bans.
+ * @param {string} displayName The content.displayname for the event.
+ * @param {string} avatarUrl The content.avatar_url for the event.
+ * @return {Object} The event
+ */
 module.exports.mkMembership = function(room, membership, userId, otherUserId,
                                        displayName, avatarUrl) {
     var event = module.exports.mkEvent("m.room.member", room, userId, {
@@ -48,9 +60,16 @@ module.exports.mkMembership = function(room, membership, userId, otherUserId,
     return event;
 };
 
+/**
+ * Create an m.room.message POJO.
+ * @param {string} room The room ID for the event.
+ * @param {string} userId The user ID for the event.
+ * @param {string} msg The content.body for the event.
+ * @return {Object} The event
+ */
 module.exports.mkMessage = function(room, userId, msg) {
     if (!msg) {
-        msg = "Random->"+Math.random();
+        msg = "Random->" + Math.random();
     }
     return module.exports.mkEvent("m.room.message", room, userId, {
         msgtype: "m.text",
