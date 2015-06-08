@@ -19,7 +19,7 @@ function HttpBackend() {
 HttpBackend.prototype = {
     /**
      * Respond to all of the requests (flush the queue).
-     * @return Promise resolved when there is nothing left to flush.
+     * @return {Promise} resolved when there is nothing left to flush.
      */
     flush: function() {
         var defer = q.defer();
@@ -49,13 +49,13 @@ HttpBackend.prototype = {
 
     /**
      * Attempts to resolve requests/expected requests.
-     * @return true if something was resolved.
+     * @return {boolean} true if something was resolved.
      */
     _takeFromQueue: function() {
         var req = null;
         var i, j;
         var matchingReq, expectedReq, testResponse = null;
-        for (i =0; i < this.requests.length; i++) {
+        for (i = 0; i < this.requests.length; i++) {
             req = this.requests[i];
             for (j = 0; j < this.expectedRequests.length; j++) {
                 expectedReq = this.expectedRequests[j];
@@ -85,7 +85,7 @@ HttpBackend.prototype = {
                     testResponse.err, testResponse.response, testResponse.body
                 );
             }
-        };
+        }
         if (testResponse) {  // flushed something
             return true;
         }
