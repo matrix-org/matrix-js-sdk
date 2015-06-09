@@ -7,8 +7,6 @@ var utils = require("../test-utils");
 describe("Room", function() {
     var roomId = "!foo:bar";
     var userA = "@alice:bar";
-    var userB = "@bertha:bar";
-    var userC = "@clarissa:bar";
     var room;
 
     beforeEach(function() {
