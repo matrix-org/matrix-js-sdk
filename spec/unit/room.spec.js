@@ -10,9 +10,6 @@ describe("Room", function() {
     var userB = "@bertha:bar";
     var userC = "@clarissa:bar";
     var userD = "@dorothy:bar";
-    var userAName = "Alice";
-    var userBName = "Big Bertha";
-    var userCName = "Clarissa Explains";
     var room;
 
     beforeEach(function() {
@@ -68,7 +65,7 @@ describe("Room", function() {
         var mockRoomState = {
             getStateEvents: function(type, key) {
                 if (key === undefined) {
-                    var prefix = type+"$";
+                    var prefix = type + "$";
                     var list = [];
                     for (var stateBlob in stateLookup) {
                         if (!stateLookup.hasOwnProperty(stateBlob)) { continue; }
@@ -79,7 +76,7 @@ describe("Room", function() {
                     return list;
                 }
                 else {
-                    return stateLookup[type+"$"+key];
+                    return stateLookup[type + "$" + key];
                 }
             },
             getMembers: function() {
@@ -106,7 +103,7 @@ describe("Room", function() {
         };
         var setAliases = function(aliases, stateKey) {
             if (!stateKey) { stateKey = "flibble"; }
-            stateLookup["m.room.aliases$"+stateKey] = new MatrixEvent(
+            stateLookup["m.room.aliases$" + stateKey] = new MatrixEvent(
                 utils.mkEvent("m.room.aliases", roomId, stateKey, {
                     aliases: aliases
                 })
@@ -121,7 +118,7 @@ describe("Room", function() {
         };
         var addMember = function(userId, state) {
             if (!state) { state = "join"; }
-            stateLookup["m.room.member$"+userId] = new MatrixEvent(
+            stateLookup["m.room.member$" + userId] = new MatrixEvent(
                 utils.mkMembership(roomId, state, userId, userId)
             );
         };
