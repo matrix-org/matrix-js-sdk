@@ -131,7 +131,10 @@ describe("MatrixClient", function() {
                 utils.mkEvent("m.room.name", roomOne, selfUserId, {
                     name: "A new room name"
                 }),
-                utils.mkMessage(roomTwo, otherUserId, msgText)
+                utils.mkMessage(roomTwo, otherUserId, msgText),
+                utils.mkEvent("m.typing", roomTwo, undefined, {
+                    user_ids: [otherUserId]
+                })
             ]
         };
 
@@ -173,6 +176,24 @@ describe("MatrixClient", function() {
                 var room = client.getStore().getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
+                done();
+            });
+        });
+
+        it("should set the right user's typing flag.", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient(function(err, data, isLive) {});
+
+            httpBackend.flush().done(function() {
+                var room = client.getStore().getRoom(roomTwo);
+                var member = room.getMember(otherUserId);
+                expect(member).toBeDefined();
+                expect(member.typing).toEqual(true);
+                member = room.getMember(selfUserId);
+                expect(member).toBeDefined();
+                expect(member.typing).toEqual(false);
                 done();
             });
         });
