@@ -6,6 +6,9 @@ var utils = require("../test-utils");
 
 describe("RoomState", function() {
     var roomId = "!foo:bar";
+    var userA = "@alice:bar";
+    var userB = "@bertha:bar";
+    var userC = "@clarissa:bar";
     var state;
 
     beforeEach(function() {
@@ -22,19 +25,19 @@ describe("RoomState", function() {
                 powerLevel: -1,
                 powerLevelNorm: -1,
                 roomId: roomId,
-                userId: "@alice:bar"
+                userId: userA
             },
             "@bertha:bar": {
                 powerLevel: -1,
                 powerLevelNorm: -1,
                 roomId: roomId,
-                userId: "@bertha:bar"
+                userId: userB
             }
         };
 
         state.setStateEvents([
             new MatrixEvent(
-                utils.mkEvent("m.room.power_levels", roomId, "@alice:bar", {
+                utils.mkEvent("m.room.power_levels", roomId, userA, {
                     users_default: 20,
                     users: {
                         "@bertha:bar": 200,
@@ -43,17 +46,17 @@ describe("RoomState", function() {
                 })
             )
         ]);
-        expect(state.members["@alice:bar"].powerLevel).toEqual(20);
-        expect(state.members["@alice:bar"].powerLevelNorm).toEqual(10);
-        expect(state.members["@bertha:bar"].powerLevel).toEqual(200);
-        expect(state.members["@bertha:bar"].powerLevelNorm).toEqual(100);
+        expect(state.members[userA].powerLevel).toEqual(20);
+        expect(state.members[userA].powerLevelNorm).toEqual(10);
+        expect(state.members[userB].powerLevel).toEqual(200);
+        expect(state.members[userB].powerLevelNorm).toEqual(100);
     });
 
     it("should set power levels retrospectively for members",
     function() {
         state.setStateEvents([
             new MatrixEvent(
-                utils.mkEvent("m.room.power_levels", roomId, "@alice:bar", {
+                utils.mkEvent("m.room.power_levels", roomId, userA, {
                     users_default: 20,
                     users: {
                         "@clarissa:bar": 200
@@ -64,19 +67,57 @@ describe("RoomState", function() {
 
         // Now add the room member events (it should calc power levels)
         state.setStateEvents([
-            new MatrixEvent(utils.mkMembership(roomId, "join", "@alice:bar")),
-            new MatrixEvent(utils.mkMembership(roomId, "join", "@bertha:bar")),
+            new MatrixEvent(utils.mkMembership(roomId, "join", userA)),
+            new MatrixEvent(utils.mkMembership(roomId, "join", userA)),
             new MatrixEvent(
                 utils.mkMembership(
-                    roomId, "invite", "@bertha:bar", "@clarissa:bar"
+                    roomId, "invite", userB, userC
                 )
             )
         ]);
 
-        expect(state.members["@alice:bar"].powerLevel).toEqual(20);
-        expect(state.members["@alice:bar"].powerLevelNorm).toEqual(10);
-        expect(state.members["@clarissa:bar"].powerLevel).toEqual(200);
-        expect(state.members["@clarissa:bar"].powerLevelNorm).toEqual(100);
+        expect(state.members[userA].powerLevel).toEqual(20);
+        expect(state.members[userA].powerLevelNorm).toEqual(10);
+        expect(state.members[userC].powerLevel).toEqual(200);
+        expect(state.members[userC].powerLevelNorm).toEqual(100);
+    });
+
+    it("should set typing notifications correctly on room members", function() {
+        state.members = {
+            "@alice:bar": {
+                powerLevel: 0,
+                powerLevelNorm: 0,
+                typing: false,
+                roomId: roomId,
+                userId: userA
+            },
+            "@bertha:bar": {
+                powerLevel: 0,
+                powerLevelNorm: 0,
+                typing: true,
+                roomId: roomId,
+                userId: userB
+            },
+            "@clarissa:bar": {
+                powerLevel: 0,
+                powerLevelNorm: 0,
+                typing: true,
+                roomId: roomId,
+                userId: userC
+            }
+        };
+
+        state.setTypingEvent(new MatrixEvent(
+            utils.mkEvent("m.typing", roomId, userA, {
+                user_ids: [
+                    userA, userC
+                ]
+            })
+        ));
+
+        expect(state.members[userA].typing).toEqual(true);
+        expect(state.members[userB].typing).toEqual(false);
+        expect(state.members[userC].typing).toEqual(true);
     });
 
 });
