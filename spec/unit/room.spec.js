@@ -253,5 +253,11 @@ describe("Room", function() {
             var name = room.calculateRoomName(userA);
             expect(name).toEqual(userA);
         });
+
+        it("should return '?' if there is no name, alias or members in the room.",
+        function() {
+            var name = room.calculateRoomName(userA);
+            expect(name).toEqual("?");
+        });
     });
 });
