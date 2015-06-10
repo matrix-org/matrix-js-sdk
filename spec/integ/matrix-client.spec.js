@@ -28,20 +28,44 @@ describe("MatrixClient", function() {
     describe("startClient", function() {
         var initialSync = {
             end: "s_5_3",
-            presence: [],
-            rooms: []
+            presence: [{
+                event_id: "$wefiuewh:bar",
+                type: "m.presence",
+                content: {
+                    user_id: "@foo:bar",
+                    displayname: "Foo Bar",
+                    presence: "online"
+                }
+            }],
+            rooms: [{
+                room_id: "!erufh:bar",
+                membership: "join",
+                messages: {
+                    start: "s",
+                    end: "t",
+                    chunk: [
+                        utils.mkMessage("!erufh:bar", "@foo:bar", "hmmm")
+                    ]
+                },
+                state: [
+                    utils.mkMembership("!erufh:bar", "join", "@foo:bar")
+                ]
+            }]
         };
         var eventData = {
             start: "s_5_3",
             end: "e_6_7",
-            chunk: []
+            chunk: [
+                utils.mkMessage("!erufh:bar", "@foo:bar", "ello ello"),
+                utils.mkMessage("!erufh:bar", "@foo:bar", ":D")
+            ]
         };
 
         it("should start with /initialSync then move onto /events.", function(done) {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
 
             httpBackend.flush().done(function() {
                 done();
@@ -55,9 +79,54 @@ describe("MatrixClient", function() {
                 expect(req.queryParams.from).toEqual(initialSync.end);
             }).respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
 
             httpBackend.flush().done(function() {
+                done();
+            });
+        });
+
+        it("should emit events from both /initialSync and /events", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            // initial sync events are unordered, so make an array of the types
+            // that should be emitted and we'll just pick them off one by one,
+            // so long as this is emptied we're good.
+            var initialSyncEventTypes = [
+                "m.presence", "m.room.member", "m.room.message"
+            ];
+            var chunkIndex = 0;
+            client.on("event", function(event) {
+                if (initialSyncEventTypes.length === 0) {
+                    if (chunkIndex + 1 >= eventData.chunk.length) {
+                        return;
+                    }
+                    // this should be /events now
+                    expect(eventData.chunk[chunkIndex].event_id).toEqual(
+                        event.getId()
+                    );
+                    chunkIndex++;
+                    return;
+                }
+                var index = initialSyncEventTypes.indexOf(event.getType());
+                expect(index).not.toEqual(
+                    -1, "Unexpected event type: " + event.getType()
+                );
+                if (index >= 0) {
+                    initialSyncEventTypes.splice(index, 1);
+                }
+            });
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(initialSyncEventTypes.length).toEqual(
+                    0, "Failed to see all events from /initialSync"
+                );
+                expect(chunkIndex + 1).toEqual(
+                    eventData.chunk.length, "Failed to see all events from /events"
+                );
                 done();
             });
         });
@@ -142,7 +211,7 @@ describe("MatrixClient", function() {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
 
             httpBackend.flush().done(function() {
                 var room = client.getStore().getRoom(roomOne);
@@ -156,7 +225,7 @@ describe("MatrixClient", function() {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
 
             httpBackend.flush().done(function() {
                 var room = client.getStore().getRoom(roomTwo);
@@ -171,7 +240,7 @@ describe("MatrixClient", function() {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
             httpBackend.flush().done(function() {
                 var room = client.getStore().getRoom(roomTwo);
                 // should use the display name of the other person.
@@ -184,7 +253,7 @@ describe("MatrixClient", function() {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
 
-            client.startClient(function(err, data, isLive) {});
+            client.startClient();
 
             httpBackend.flush().done(function() {
                 var room = client.getStore().getRoom(roomTwo);
