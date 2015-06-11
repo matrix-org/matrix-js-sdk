@@ -138,6 +138,46 @@ Print out messages for all rooms
    });
    
    matrixClient.startClient();
+   
+Output::
+
+  (My Room) @megan:localhost :: Hello world
+  (My Room) @megan:localhost :: how are you?
+  (My Room) @example:localhost :: I am good
+  (My Room) @example:localhost :: change the room name
+  (My New Room) @megan:localhost :: done
+   
+Print out membership lists whenever they are changed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code:: javascript
+
+   matrixClient.on("RoomState.members", function(event, state, member) {
+       var room = matrixClient.getRoom(state.roomId);
+       if (!room) {
+           return;
+       }
+       var memberList = state.getMembers();
+       console.log(room.name);
+       console.log(Array(room.name.length + 1).join("="));  // underline
+       for (var i = 0; i < memberList.length; i++) {
+           console.log(
+               "(%s) %s",
+               memberList[i].membership,
+               memberList[i].name
+           );
+       }
+   });
+   
+   matrixClient.startClient();
+   
+Output::
+
+  My Room
+  =======
+  (join) @example:localhost
+  (leave) @alice:localhost
+  (join) Bob
+  (invite) @charlie:localhost
 
   
 API Reference
