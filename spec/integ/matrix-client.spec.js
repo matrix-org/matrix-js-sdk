@@ -86,7 +86,10 @@ describe("MatrixClient", function() {
                     ]
                 },
                 state: [
-                    utils.mkMembership("!erufh:bar", "join", "@foo:bar")
+                    utils.mkMembership("!erufh:bar", "join", "@foo:bar"),
+                    utils.mkEvent("m.room.create", "!erufh:bar", "@foo:bar", {
+                        creator: "@foo:bar"
+                    })
                 ]
             }]
         };
@@ -95,7 +98,10 @@ describe("MatrixClient", function() {
             end: "e_6_7",
             chunk: [
                 utils.mkMessage("!erufh:bar", "@foo:bar", "ello ello"),
-                utils.mkMessage("!erufh:bar", "@foo:bar", ":D")
+                utils.mkMessage("!erufh:bar", "@foo:bar", ":D"),
+                utils.mkEvent("m.typing", "!erufh:bar", "bar", {
+                    user_ids: ["@foo:bar"]
+                })
             ]
         };
 
@@ -107,7 +113,7 @@ describe("MatrixClient", function() {
             // that should be emitted and we'll just pick them off one by one,
             // so long as this is emptied we're good.
             var initialSyncEventTypes = [
-                "m.presence", "m.room.member", "m.room.message"
+                "m.presence", "m.room.member", "m.room.message", "m.room.create"
             ];
             var chunkIndex = 0;
             client.on("event", function(event) {
@@ -171,11 +177,11 @@ describe("MatrixClient", function() {
         it("should emit Room events", function(done) {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
-            var firedRoom = false;
-            var firedName = false;
+            var roomInvokeCount = 0;
+            var roomNameInvokeCount = 0;
             var timelineFireCount = 0;
             client.on("Room", function(room) {
-                firedRoom = true;
+                roomInvokeCount++;
                 expect(room.roomId).toEqual("!erufh:bar");
             });
             client.on("Room.timeline", function(event, room) {
@@ -183,16 +189,111 @@ describe("MatrixClient", function() {
                 expect(room.roomId).toEqual("!erufh:bar");
             });
             client.on("Room.name", function(room) {
-                firedName = true;
+                roomNameInvokeCount++;
             });
 
             client.startClient();
 
             httpBackend.flush().done(function() {
-                expect(firedRoom).toBe(true, "Room didn't fire.");
-                expect(firedName).toBe(true, "Room.name didn't fire.");
+                expect(roomInvokeCount).toEqual(
+                    1, "Room fired wrong number of times."
+                );
+                expect(roomNameInvokeCount).toEqual(
+                    1, "Room.name fired wrong number of times."
+                );
                 expect(timelineFireCount).toEqual(
                     3, "Room.timeline fired the wrong number of times"
+                );
+                done();
+            });
+        });
+
+        it("should emit RoomState events", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            var roomStateEventTypes = [
+                "m.room.member", "m.room.create"
+            ];
+            var eventsInvokeCount = 0;
+            var membersInvokeCount = 0;
+            var newMemberInvokeCount = 0;
+            client.on("RoomState.events", function(event, state) {
+                eventsInvokeCount++;
+                var index = roomStateEventTypes.indexOf(event.getType());
+                expect(index).not.toEqual(
+                    -1, "Unexpected room state event type: " + event.getType()
+                );
+                if (index >= 0) {
+                    roomStateEventTypes.splice(index, 1);
+                }
+            });
+            client.on("RoomState.members", function(event, state, member) {
+                membersInvokeCount++;
+                expect(member.roomId).toEqual("!erufh:bar");
+                expect(member.userId).toEqual("@foo:bar");
+                expect(member.membership).toEqual("join");
+            });
+            client.on("RoomState.newMember", function(event, state, member) {
+                newMemberInvokeCount++;
+                expect(member.roomId).toEqual("!erufh:bar");
+                expect(member.userId).toEqual("@foo:bar");
+                expect(member.membership).toBeFalsy();
+            });
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(membersInvokeCount).toEqual(
+                    1, "RoomState.members fired wrong number of times"
+                );
+                expect(newMemberInvokeCount).toEqual(
+                    1, "RoomState.newMember fired wrong number of times"
+                );
+                expect(eventsInvokeCount).toEqual(
+                    2, "RoomState.events fired wrong number of times"
+                );
+                done();
+            });
+        });
+
+        it("should emit RoomMember events", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            var typingInvokeCount = 0;
+            var powerLevelInvokeCount = 0;
+            var nameInvokeCount = 0;
+            var membershipInvokeCount = 0;
+            client.on("RoomMember.name", function(event, member) {
+                nameInvokeCount++;
+            });
+            client.on("RoomMember.typing", function(event, member) {
+                typingInvokeCount++;
+                expect(member.typing).toBe(true);
+            });
+            client.on("RoomMember.powerLevel", function(event, member) {
+                powerLevelInvokeCount++;
+            });
+            client.on("RoomMember.membership", function(event, member) {
+                membershipInvokeCount++;
+                expect(member.membership).toEqual("join");
+            });
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(typingInvokeCount).toEqual(
+                    1, "RoomMember.typing fired wrong number of times"
+                );
+                expect(powerLevelInvokeCount).toEqual(
+                    0, "RoomMember.powerLevel fired wrong number of times"
+                );
+                expect(nameInvokeCount).toEqual(
+                    0, "RoomMember.name fired wrong number of times"
+                );
+                expect(membershipInvokeCount).toEqual(
+                    1, "RoomMember.membership fired wrong number of times"
                 );
                 done();
             });
