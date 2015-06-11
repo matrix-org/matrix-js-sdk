@@ -22,7 +22,7 @@ In Node.js
 
 ``npm install matrix-js-sdk``
 
-::
+.. code:: javascript
 
   var sdk = require("matrix-js-sdk");
   var client = sdk.createClient("https://matrix.org");
@@ -31,6 +31,80 @@ In Node.js
   });
 
 Please check `examples/node`_ to see a working version.
+
+Usage
+=====
+
+Conventions
+-----------
+
+Emitted events
+~~~~~~~~~~~~~~
+
+The SDK will emit events using an ``EventEmitter``. It also
+emits object models (e.g. ``Rooms``, ``RoomMembers``) when they
+are updated.
+
+.. code:: javascript
+  
+  // Listen for low-level MatrixEvents
+  client.on("event", function(event) {
+    console.log(event.getType());
+  });
+  
+  // Listen for typing changes
+  client.on("RoomMember.typing", function(event, member) {
+    if (member.typing) {
+      console.log(member.name + " is typing...");
+    }
+    else {
+      console.log(member.name + " stopped typing.");
+    }
+  });
+
+Promises or Callbacks
+~~~~~~~~~~~~~~~~~~~~~
+The SDK supports *both* callbacks and Promises (Q). The convention
+you'll see used is:
+
+.. code:: javascript
+
+  var promise = matrixClient.someMethod(arg1, arg2, callback);
+  
+The ``callback`` parameter is optional, so you could do:
+
+.. code:: javascript
+
+  matrixClient.someMethod(arg1, arg2).then(function(result) {
+    ...
+  });
+  
+Alternatively, you could do:
+
+.. code:: javascript
+
+  matrixClient.someMethod(arg1, arg2, function(result) {
+    ...
+  });
+  
+Methods which support this will be clearly marked as returning
+``Promises``.
+  
+API Reference
+=============
+
+A hosted reference can be found at http://matrix-org.github.io/matrix-js-sdk
+
+This SDK uses JSDoc3 style comments. You can manually build and
+host the API reference from the source files like this::
+
+  $ npm install -g jsdoc
+  $ jsdoc -r lib/
+  $ cd out
+  $ python -m SimpleHTTPServer 8005
+  
+Then visit ``http://localhost:8005`` to see the API docs. By
+default, ``jsdoc`` produces HTML in the ``out`` folder.
 
 Contributing
 ============
