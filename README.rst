@@ -3,7 +3,7 @@ Matrix Javascript SDK
 .. image:: http://matrix.org/jenkins/buildStatus/icon?job=JavascriptSDK
    :target: http://matrix.org/jenkins/job/JavascriptSDK/
 
-This is the Matrix_ Client-Server v1 SDK for JavaScript. This SDK can be run
+This is the Matrix_ Client-Server v1/v2 alpha SDK for JavaScript. This SDK can be run
 in a browser or in Node.js.
 
 Quickstart
