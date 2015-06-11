@@ -196,7 +196,7 @@ Output::
     [3] My New Room (6 members)
     [4] @megan:localhost (2 members)
     [5] Bob (2 members)
-Enter a room by typing 'enter <index>', e.g. 'enter 5'
-Leave a room by typing '/exit'.
-Show a room member list by typing '/members'
+    Enter a room by typing 'enter <index>', e.g. 'enter 5'
+    Leave a room by typing '/exit'.
+    Show a room member list by typing '/members'
 
