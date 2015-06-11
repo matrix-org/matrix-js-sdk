@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Home</title>
+    <title>JSDoc: Source: models/room-summary.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,32 +17,45 @@
 
 <div id="main">
 
-    <h1 class="page-title">Home</h1>
+    <h1 class="page-title">Source: models/room-summary.js</h1>
 
     
 
 
 
     
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>"use strict";
+/**
+ * @module models/room-summary
+ */
 
+/**
+ * Construct a new Room Summary. A summary can be used for display on a recent
+ * list, without having to load the entire room list into memory.
+ * @constructor
+ * @param {string} roomId Required. The ID of this room.
+ * @param {Object} info Optional. The summary info. Additional keys are supported.
+ * @param {string} info.title The title of the room (e.g. &lt;code>m.room.name&lt;/code>)
+ * @param {string} info.desc The description of the room (e.g.
+ * &lt;code>m.room.topic&lt;/code>)
+ * @param {Number} info.numMembers The number of joined users.
+ * @param {string[]} info.aliases The list of aliases for this room.
+ * @param {Number} info.timestamp The timestamp for this room.
+ */
+function RoomSummary(roomId, info) {
+    this.roomId = roomId;
+    this.info = info;
+}
 
-    <h3> </h3>
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
+/**
+ * The RoomSummary class.
+ */
+module.exports = RoomSummary;
+</code></pre>
+        </article>
+    </section>
 
 
 
