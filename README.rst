@@ -89,11 +89,62 @@ Alternatively, you could do:
   
 Methods which support this will be clearly marked as returning
 ``Promises``.
+
+Examples
+--------
+This section provides some useful code snippets which demonstrate the
+core functionality of the SDK. These examples assume the SDK is setup like this:
+
+.. code:: javascript
+
+   var sdk = require("matrix-js-sdk");
+   var myUserId = "@example:localhost";
+   var myAccessToken = "QGV4YW1wbGU6bG9jYWxob3N0.qPEvLuYfNBjxikiCjP";
+   var matrixClient = sdk.createClient({
+       baseUrl: "http://localhost:8008",
+       accessToken: myAccessToken,
+       userId: myUserId
+   });
+
+Automatically join rooms when invited
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code:: javascript
+   
+   matrixClient.on("RoomMember.membership", function(event, member) {
+       if (member.membership === "invite" && member.userId === myUserId) {
+           matrixClient.joinRoom(member.roomId).done(function() {
+               console.log("Auto-joined %s", member.roomId);
+           });
+       }
+   });
+   
+   matrixClient.startClient();
+   
+Print out messages for all rooms
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code:: javascript
+
+   matrixClient.on("Room.timeline", function(event, room, toStartOfTimeline) {
+       if (toStartOfTimeline) {
+           return; // don't print paginated results
+       }
+       if (event.getType() !== "m.room.message") {
+           return; // only print messages
+       }
+       console.log(
+           // the room name will update with m.room.name events automatically
+           "(%s) %s :: %s", room.name, event.getSender(), event.getContent().body
+       );
+   });
+   
+   matrixClient.startClient();
+
   
 API Reference
 =============
 
-A hosted reference can be found at http://matrix-org.github.io/matrix-js-sdk
+A hosted reference can be found at
+http://matrix-org.github.io/matrix-js-sdk/global.html
 
 This SDK uses JSDoc3 style comments. You can manually build and
 host the API reference from the source files like this::
