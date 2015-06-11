@@ -28,6 +28,44 @@ describe("MatrixClient", function() {
     describe("startClient", function() {
         var initialSync = {
             end: "s_5_3",
+            presence: [],
+            rooms: []
+        };
+        var eventData = {
+            start: "s_5_3",
+            end: "e_6_7",
+            chunk: []
+        };
+
+        it("should start with /initialSync then move onto /events.", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                done();
+            });
+        });
+
+        it("should pass the 'end' token from /initialSync to the from= param " +
+            " of /events", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").check(function(req) {
+                expect(req.queryParams.from).toEqual(initialSync.end);
+            }).respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                done();
+            });
+        });
+    });
+
+    describe("EventEmitter", function() {
+        var initialSync = {
+            end: "s_5_3",
             presence: [{
                 event_id: "$wefiuewh:bar",
                 type: "m.presence",
@@ -60,31 +98,6 @@ describe("MatrixClient", function() {
                 utils.mkMessage("!erufh:bar", "@foo:bar", ":D")
             ]
         };
-
-        it("should start with /initialSync then move onto /events.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
-
-            client.startClient();
-
-            httpBackend.flush().done(function() {
-                done();
-            });
-        });
-
-        it("should pass the 'end' token from /initialSync to the from= param " +
-            " of /events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").check(function(req) {
-                expect(req.queryParams.from).toEqual(initialSync.end);
-            }).respond(200, eventData);
-
-            client.startClient();
-
-            httpBackend.flush().done(function() {
-                done();
-            });
-        });
 
         it("should emit events from both /initialSync and /events", function(done) {
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
@@ -151,6 +164,36 @@ describe("MatrixClient", function() {
 
             httpBackend.flush().done(function() {
                 expect(fired).toBe(true, "User.presence didn't fire.");
+                done();
+            });
+        });
+
+        it("should emit Room events", function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+            var firedRoom = false;
+            var firedName = false;
+            var timelineFireCount = 0;
+            client.on("Room", function(room) {
+                firedRoom = true;
+                expect(room.roomId).toEqual("!erufh:bar");
+            });
+            client.on("Room.timeline", function(event, room) {
+                timelineFireCount++;
+                expect(room.roomId).toEqual("!erufh:bar");
+            });
+            client.on("Room.name", function(room) {
+                firedName = true;
+            });
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(firedRoom).toBe(true, "Room didn't fire.");
+                expect(firedName).toBe(true, "Room.name didn't fire.");
+                expect(timelineFireCount).toEqual(
+                    3, "Room.timeline fired the wrong number of times"
+                );
                 done();
             });
         });
