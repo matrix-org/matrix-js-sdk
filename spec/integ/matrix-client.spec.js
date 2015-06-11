@@ -382,7 +382,7 @@ describe("MatrixClient", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                var room = client.getStore().getRoom(roomOne);
+                var room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(eventData.chunk[0].content.name);
                 done();
@@ -396,7 +396,7 @@ describe("MatrixClient", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                var room = client.getStore().getRoom(roomTwo);
+                var room = client.getRoom(roomTwo);
                 // should have added the message from /events
                 expect(room.timeline.length).toEqual(2);
                 expect(room.timeline[1].getContent().body).toEqual(msgText);
@@ -410,7 +410,7 @@ describe("MatrixClient", function() {
 
             client.startClient();
             httpBackend.flush().done(function() {
-                var room = client.getStore().getRoom(roomTwo);
+                var room = client.getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
                 done();
@@ -424,7 +424,7 @@ describe("MatrixClient", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                var room = client.getStore().getRoom(roomTwo);
+                var room = client.getRoom(roomTwo);
                 var member = room.getMember(otherUserId);
                 expect(member).toBeDefined();
                 expect(member.typing).toEqual(true);
