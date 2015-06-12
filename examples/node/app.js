@@ -22,7 +22,7 @@ var rl = readline.createInterface({
     terminal: false
 });
 rl.on('line', function(line) {
-    if (line.indexOf("enter ") === 0 && !viewingRoom) {
+    if (line.indexOf("/enter ") === 0 && !viewingRoom) {
         var roomIndex = line.split(" ")[1];
         viewingRoom = roomList[roomIndex];
         if (viewingRoom.getMember(myUserId).membership === "invite") {
@@ -44,6 +44,9 @@ rl.on('line', function(line) {
     else if (line === "/members" && viewingRoom) {
         printMemberList();
     }
+    else if (line === "/help") {
+        printHelp();
+    }
     else if (viewingRoom) {
         matrixClient.sendTextMessage(viewingRoom.roomId, line).done(function() {
             console.log('\x1B[2J'); // clear console
@@ -59,6 +62,7 @@ rl.on('line', function(line) {
 matrixClient.on("syncComplete", function() {
     roomList = matrixClient.getRooms();
     printRoomList();
+    printHelp();
 });
 
 // print incoming messages.
@@ -80,12 +84,19 @@ function printRoomList() {
     for (var i = 0; i < roomList.length; i++) {
         console.log(
             "[%s] %s (%s members)",
-            i, roomList[i].name, roomList[i].currentState.getMembers().length
+            i, roomList[i].name, roomList[i].getJoinedMembers().length
         );
     }
-    console.log("Enter a room by typing 'enter <index>', e.g. 'enter 5'");
-    console.log("Leave a room by typing '/exit'.");
-    console.log("Show a room member list by typing '/members'");
+}
+
+function printHelp() {
+    console.log("Global commands:");
+    console.log("  '/help' : Show this help.");
+    console.log("Room list index commands:");
+    console.log("  '/enter <index>' Enter a room, e.g. '/enter 5'");
+    console.log("Room commands:");
+    console.log("  '/exit' Return to the room list index.");
+    console.log("  '/members' Show the room member list.");
 }
 
 function printMessages() {
@@ -119,8 +130,8 @@ function printMemberList() {
         }
         return 0;
     });
-    console.log(viewingRoom.name);
-    console.log(new Array(viewingRoom.name.length + 1).join("-"));
+    console.log("Membership list for room \"%s\"", viewingRoom.name);
+    console.log(new Array(viewingRoom.name.length + 28).join("-"));
     viewingRoom.currentState.getMembers().forEach(function(member) {
         if (!member.membership) {
             return;
@@ -128,7 +139,10 @@ function printMemberList() {
         var membershipWithPadding = (
             member.membership + new Array(10 - member.membership.length).join(" ")
         );
-        console.log("%s :: %s", membershipWithPadding, member.name);
+        console.log(
+            "%s :: %s (%s)", membershipWithPadding, member.name, 
+            (member.userId === myUserId ? "Me" : member.userId)
+        );
     });
 }
 
