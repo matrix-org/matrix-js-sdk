@@ -31,6 +31,30 @@ In Node.js
 
 Please check [the Node.js terminal app](examples/node) for a more complex example.
 
+What does this SDK do?
+----------------------
+
+This SDK provides a full object model around the Matrix Client-Server API and emits
+events for incoming data and state changes. Aside from wrapping the HTTP API, it:
+ - Handles syncing (via `/initialSync` and `/events`)
+ - Handles the generation of "friendly" room and member names.
+ - Handles historical `RoomMember` information (e.g. display names).
+ - Manages room member state across multiple events (e.g. it handles typing, power
+   levels and membership changes).
+ - Exposes high-level objects like `Rooms`, `RoomState`, `RoomMembers` and `Users`
+   which can be listened to for things like name changes, new messages, membership
+   changes, presence changes, and more.
+
+Later versions of the SDK will:
+ - Automatically retry requests to send messages due to network errors.
+ - Automatically retry requests to send messages due to rate limiting errors.
+ - Mark events' sent status (e.g. 'not sent').
+ - Handle "local echo" of messages sent.
+ - Handle queueing of messages.
+ - Handle pagination.
+ - Expose a `RoomSummary` which would be suitable for a recents page.
+ - Provide different pluggable storage layers (e.g. local storage, database-backed)
+
 Usage
 =====
 
