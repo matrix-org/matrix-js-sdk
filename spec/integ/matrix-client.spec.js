@@ -156,7 +156,6 @@ describe("MatrixClient", function() {
             var fired = false;
             client.on("User.presence", function(event, user) {
                 fired = true;
-                console.log("handle");
                 expect(user).toBeDefined();
                 expect(event).toBeDefined();
                 if (!user || !event) { return; }
