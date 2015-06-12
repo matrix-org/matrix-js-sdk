@@ -147,8 +147,13 @@ function printMemberList() {
 }
 
 function printLine(event) {
-    // TODO: Update with event.sender when implemented.
-    console.log("%s :: %s", event.getSender(), event.getContent().body);
+    var name = event.sender ? event.sender.name : event.getSender();
+    var separator = "<<<";
+    if (event.getSender() === myUserId) {
+        name = "Me";
+        separator = ">>>";
+    }
+    console.log("%s %s %s", name, separator, event.getContent().body);
 }
    
 matrixClient.startClient(numMessagesToShow);  // messages for each room.
