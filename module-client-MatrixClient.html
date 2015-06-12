@@ -474,7 +474,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1071">line 1071</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1129">line 1129</a>
     </li></ul></dd>
     
 
@@ -715,7 +715,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line743">line 743</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line758">line 758</a>
     </li></ul></dd>
     
 
@@ -930,7 +930,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line549">line 549</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line564">line 564</a>
     </li></ul></dd>
     
 
@@ -1168,7 +1168,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line382">line 382</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line397">line 397</a>
     </li></ul></dd>
     
 
@@ -1506,7 +1506,7 @@ this room.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line80">line 80</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line95">line 95</a>
     </li></ul></dd>
     
 
@@ -1745,7 +1745,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line762">line 762</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line777">line 777</a>
     </li></ul></dd>
     
 
@@ -1946,7 +1946,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1107">line 1107</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1165">line 1165</a>
     </li></ul></dd>
     
 
@@ -2142,7 +2142,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line478">line 478</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line493">line 493</a>
     </li></ul></dd>
     
 
@@ -2207,6 +2207,263 @@ room_alias: {string(opt)}}</code>
 </dl>
 </li>
     </ul>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="getRoom"><span class="type-signature"></span>getRoom<span class="signature">(roomId)</span><span class="type-signature"> &rarr; {<a href="global.html#Room">Room</a>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Get the room for the given room ID.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room ID</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line60">line 60</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The Room or null if it doesn't exist or there is no data store.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="getRooms"><span class="type-signature"></span>getRooms<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;<a href="global.html#Room">Room</a>>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Retrieve all known rooms.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line71">line 71</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A list of rooms, or an empty list if there is no data store.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;<a href="global.html#Room">Room</a>></span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -2384,7 +2641,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line159">line 159</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line174">line 174</a>
     </li></ul></dd>
     
 
@@ -2449,110 +2706,6 @@ room_alias: {string(opt)}}</code>
 </dl>
 </li>
     </ul>
-
-
-
-        
-            
-
-    
-
-    <h4 class="name" id="getStore"><span class="type-signature"></span>getStore<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
-
-    
-
-
-
-<div class="description">
-    Get the data store for this client.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line59">line 59</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    The data store or null if one wasn't set.
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Object</span>
-
-
-    </dd>
-</dl>
-
-    
 
 
 
@@ -2657,7 +2810,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line535">line 535</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line550">line 550</a>
     </li></ul></dd>
     
 
@@ -2872,7 +3025,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line358">line 358</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line373">line 373</a>
     </li></ul></dd>
     
 
@@ -2992,7 +3145,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line786">line 786</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line801">line 801</a>
     </li></ul></dd>
     
 
@@ -3168,7 +3321,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line94">line 94</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line109">line 109</a>
     </li></ul></dd>
     
 
@@ -3406,7 +3559,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line409">line 409</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line424">line 424</a>
     </li></ul></dd>
     
 
@@ -3598,7 +3751,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line369">line 369</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line384">line 384</a>
     </li></ul></dd>
     
 
@@ -3813,7 +3966,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line687">line 687</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line702">line 702</a>
     </li></ul></dd>
     
 
@@ -3982,7 +4135,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line609">line 609</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line624">line 624</a>
     </li></ul></dd>
     
 
@@ -4197,7 +4350,7 @@ room_alias: {string(opt)}}</code>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line715">line 715</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line730">line 730</a>
     </li></ul></dd>
     
 
@@ -4401,7 +4554,7 @@ listener being added multiple times.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1060">line 1060</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1118">line 1118</a>
     </li></ul></dd>
     
 
@@ -4583,7 +4736,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1079">line 1079</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1137">line 1137</a>
     </li></ul></dd>
     
 
@@ -4732,7 +4885,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line591">line 591</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line606">line 606</a>
     </li></ul></dd>
     
 
@@ -4901,7 +5054,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line730">line 730</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line745">line 745</a>
     </li></ul></dd>
     
 
@@ -5116,7 +5269,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line343">line 343</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line358">line 358</a>
     </li></ul></dd>
     
 
@@ -5331,7 +5484,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line701">line 701</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line716">line 716</a>
     </li></ul></dd>
     
 
@@ -5500,7 +5653,7 @@ the next time the event is fired, after which it is removed.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line600">line 600</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line615">line 615</a>
     </li></ul></dd>
     
 
@@ -5680,7 +5833,7 @@ it's on an emitter that you didn't create (e.g. sockets or file streams).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1098">line 1098</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1156">line 1156</a>
     </li></ul></dd>
     
 
@@ -5863,7 +6016,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1088">line 1088</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1146">line 1146</a>
     </li></ul></dd>
     
 
@@ -6035,7 +6188,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line619">line 619</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line634">line 634</a>
     </li></ul></dd>
     
 
@@ -6250,7 +6403,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line631">line 631</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line646">line 646</a>
     </li></ul></dd>
     
 
@@ -6442,7 +6595,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line650">line 650</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line665">line 665</a>
     </li></ul></dd>
     
 
@@ -6680,7 +6833,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line663">line 663</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line678">line 678</a>
     </li></ul></dd>
     
 
@@ -6918,7 +7071,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line265">line 265</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line280">line 280</a>
     </li></ul></dd>
     
 
@@ -7179,7 +7332,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line208">line 208</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line223">line 223</a>
     </li></ul></dd>
     
 
@@ -7417,7 +7570,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line302">line 302</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line317">line 317</a>
     </li></ul></dd>
     
 
@@ -7678,7 +7831,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line282">line 282</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line297">line 297</a>
     </li></ul></dd>
     
 
@@ -7916,7 +8069,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line234">line 234</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line249">line 249</a>
     </li></ul></dd>
     
 
@@ -8177,7 +8330,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line183">line 183</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line198">line 198</a>
     </li></ul></dd>
     
 
@@ -8415,7 +8568,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line249">line 249</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line264">line 264</a>
     </li></ul></dd>
     
 
@@ -8653,7 +8806,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line320">line 320</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line335">line 335</a>
     </li></ul></dd>
     
 
@@ -8845,7 +8998,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line524">line 524</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line539">line 539</a>
     </li></ul></dd>
     
 
@@ -9037,7 +9190,7 @@ listener.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line512">line 512</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line527">line 527</a>
     </li></ul></dd>
     
 
@@ -9218,7 +9371,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1115">line 1115</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1173">line 1173</a>
     </li></ul></dd>
     
 
@@ -9463,7 +9616,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line133">line 133</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line148">line 148</a>
     </li></ul></dd>
     
 
@@ -9655,7 +9808,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line567">line 567</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line582">line 582</a>
     </li></ul></dd>
     
 
@@ -9882,7 +10035,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line496">line 496</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line511">line 511</a>
     </li></ul></dd>
     
 
@@ -10097,7 +10250,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line106">line 106</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line121">line 121</a>
     </li></ul></dd>
     
 
@@ -10312,7 +10465,7 @@ function allows that to be increased. Set to zero for unlimited.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line118">line 118</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line133">line 133</a>
     </li></ul></dd>
     
 
@@ -10489,7 +10642,7 @@ emit during from the initial sync. Default: 12.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line817">line 817</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line832">line 832</a>
     </li></ul></dd>
     
 
@@ -10572,7 +10725,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line963">line 963</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1010">line 1010</a>
     </li></ul></dd>
     
 
@@ -10699,7 +10852,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line779">line 779</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line794">line 794</a>
     </li></ul></dd>
     
 
@@ -10914,7 +11067,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line394">line 394</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line409">line 409</a>
     </li></ul></dd>
     
 
@@ -11095,7 +11248,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1021">line 1021</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1068">line 1068</a>
     </li></ul></dd>
     
 
@@ -11233,7 +11386,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line184">line 184</a>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line220">line 220</a>
     </li></ul></dd>
     
 
@@ -11418,7 +11571,7 @@ clean shutdown.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line169">line 169</a>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line205">line 205</a>
     </li></ul></dd>
     
 
@@ -11466,7 +11619,7 @@ clean shutdown.
 
 <div class="description">
     Fires whenever a new Room is created. This Room will not be fully populated
-yet (e.g. no members).
+yet (e.g. no members). <strong>This event is experimental and may change.</strong>
 </div>
 
 
@@ -11559,7 +11712,7 @@ yet (e.g. no members).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1041">line 1041</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1099">line 1099</a>
     </li></ul></dd>
     
 
@@ -11720,7 +11873,7 @@ yet (e.g. no members).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line173">line 173</a>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line172">line 172</a>
     </li></ul></dd>
     
 
@@ -11881,7 +12034,7 @@ yet (e.g. no members).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line162">line 162</a>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line161">line 161</a>
     </li></ul></dd>
     
 
@@ -12042,7 +12195,7 @@ yet (e.g. no members).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line195">line 195</a>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line194">line 194</a>
     </li></ul></dd>
     
 
@@ -12204,7 +12357,7 @@ yet (e.g. no members).
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line184">line 184</a>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line183">line 183</a>
     </li></ul></dd>
     
 
@@ -12366,7 +12519,7 @@ was updated.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line121">line 121</a>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line158">line 158</a>
     </li></ul></dd>
     
 
@@ -12551,7 +12704,7 @@ was updated.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line133">line 133</a>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line170">line 170</a>
     </li></ul></dd>
     
 
@@ -12737,7 +12890,7 @@ was updated with a new entry.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line146">line 146</a>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line183">line 183</a>
     </li></ul></dd>
     
 
@@ -12775,6 +12928,96 @@ was updated with a new entry.</td>
 
     
 
+    <h4 class="name" id="event:%22syncComplete%22">"syncComplete"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires when the SDK has finished catching up and is now listening for live
+events. <strong>This event is experimental and may change.</strong>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1089">line 1089</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("syncComplete", function(){
+  var rooms = matrixClient.getRooms();
+});</code></pre>
+
+
+
+        
+            
+
+    
+
     <h4 class="name" id="event:%22syncError%22">"syncError"</h4>
 
     
@@ -12782,7 +13025,8 @@ was updated with a new entry.</td>
 
 
 <div class="description">
-    Fires whenever the SDK has a problem syncing.
+    Fires whenever the SDK has a problem syncing. <strong>This event is experimental
+and may change.</strong>
 </div>
 
 
@@ -12875,7 +13119,7 @@ was updated with a new entry.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1031">line 1031</a>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1078">line 1078</a>
     </li></ul></dd>
     
 
@@ -13403,13 +13647,13 @@ was updated with a new entry.</td>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Thu Jun 11 2015 15:45:11 GMT+0100 (BST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Fri Jun 12 2015 16:58:04 GMT+0100 (BST)
 </footer>
 
 <script> prettyPrint(); </script>
