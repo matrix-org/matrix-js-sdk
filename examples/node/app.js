@@ -70,9 +70,6 @@ matrixClient.on("Room.timeline", function(event, room, toStartOfTimeline) {
     if (toStartOfTimeline) {
         return; // don't print paginated results
     }
-    if (event.getType() !== "m.room.message") {
-        return; // only print messages
-    }
     if (!viewingRoom || viewingRoom.roomId !== room.roomId) {
         return; // not viewing a room or viewing the wrong room.
     }
@@ -107,9 +104,6 @@ function printMessages() {
     console.log('\x1B[2J'); // clear console
     var mostRecentMessages = viewingRoom.timeline.slice(numMessagesToShow * -1);
     for (var i = 0; i < mostRecentMessages.length; i++) {
-        if (mostRecentMessages[i].getType() !== "m.room.message") {
-            continue;
-        }
         printLine(mostRecentMessages[i]);
     }
 }
@@ -148,12 +142,42 @@ function printMemberList() {
 
 function printLine(event) {
     var name = event.sender ? event.sender.name : event.getSender();
+    var time = new Date(
+        event.getTs()
+    ).toISOString().replace(/T/, ' ').replace(/\..+/, '');
     var separator = "<<<";
     if (event.getSender() === myUserId) {
         name = "Me";
         separator = ">>>";
     }
-    console.log("%s %s %s", name, separator, event.getContent().body);
+    var body = "";
+
+    var maxNameWidth = 15;
+    if (name.length > maxNameWidth) {
+        name = name.substr(0, maxNameWidth-1) + "\u2026";
+    }
+
+    if (event.getType() === "m.room.message") {
+        body = event.getContent().body;
+    }
+    else if (event.isState()) {
+        var stateName = event.getType();
+        if (event.getStateKey().length > 0) {
+            stateName += " ("+event.getStateKey()+")";
+        }
+        body = (
+            "[State: "+stateName+" updated to: "+JSON.stringify(event.getContent())+"]"
+        );
+        separator = "---";
+    }
+    else {
+        // random message event
+        body = (
+            "[Message: "+event.getType()+" Content: "+JSON.stringify(event.getContent())+"]"
+        );
+        separator = "---";
+    }
+    console.log("[%s] %s %s %s", time, name, separator, body);
 }
    
 matrixClient.startClient(numMessagesToShow);  // messages for each room.
