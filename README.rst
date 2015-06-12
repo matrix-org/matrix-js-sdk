@@ -30,7 +30,7 @@ In Node.js
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
 
-Please check `examples/node`_ to see a working version.
+Please check `examples/node`_ to see a working terminal app.
 
 Usage
 =====
