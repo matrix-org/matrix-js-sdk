@@ -58,7 +58,7 @@ describe("Room", function() {
         });
     });
 
-    describe("calculateRoomName", function() {
+    describe("calculate (Room Name)", function() {
         var stateLookup = {
             // event.type + "$" event.state_key : MatrixEvent
         };
@@ -136,7 +136,8 @@ describe("Room", function() {
             addMember(userB);
             addMember(userC);
             addMember(userD);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             // we expect at least 1 member to be mentioned
             var others = [userB, userC, userD];
             var found = false;
@@ -156,7 +157,8 @@ describe("Room", function() {
             addMember(userA);
             addMember(userB);
             addMember(userC);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name.indexOf(userB)).not.toEqual(-1, name);
             expect(name.indexOf(userC)).not.toEqual(-1, name);
         });
@@ -168,7 +170,8 @@ describe("Room", function() {
             addMember(userA);
             addMember(userB);
             addMember(userC);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name.indexOf(userB)).not.toEqual(-1, name);
             expect(name.indexOf(userC)).not.toEqual(-1, name);
         });
@@ -179,7 +182,8 @@ describe("Room", function() {
             setJoinRule("public");
             addMember(userA);
             addMember(userB);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name.indexOf(userB)).not.toEqual(-1, name);
         });
 
@@ -189,7 +193,8 @@ describe("Room", function() {
             setJoinRule("invite");
             addMember(userA);
             addMember(userB);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name.indexOf(userB)).not.toEqual(-1, name);
         });
 
@@ -198,7 +203,8 @@ describe("Room", function() {
             setJoinRule("invite");
             addMember(userA, "invite");
             addMember(userB);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name.indexOf(userB)).not.toEqual(-1, name);
         });
 
@@ -207,7 +213,8 @@ describe("Room", function() {
             var alias = "#room_alias:here";
             setJoinRule("invite");
             setAliases([alias, "#another:one"]);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(alias);
         });
 
@@ -216,7 +223,8 @@ describe("Room", function() {
             var alias = "#room_alias:here";
             setJoinRule("public");
             setAliases([alias, "#another:one"]);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(alias);
         });
 
@@ -225,7 +233,8 @@ describe("Room", function() {
             var roomName = "A mighty name indeed";
             setJoinRule("invite");
             setRoomName(roomName);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(roomName);
         });
 
@@ -234,7 +243,8 @@ describe("Room", function() {
             var roomName = "A mighty name indeed";
             setJoinRule("public");
             setRoomName(roomName);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(roomName);
         });
 
@@ -242,7 +252,8 @@ describe("Room", function() {
         " a room name and alias don't exist and it is a self-chat.", function() {
             setJoinRule("invite");
             addMember(userA);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(userA);
         });
 
@@ -250,13 +261,15 @@ describe("Room", function() {
         " room name and alias don't exist and it is a self-chat.", function() {
             setJoinRule("public");
             addMember(userA);
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual(userA);
         });
 
         it("should return '?' if there is no name, alias or members in the room.",
         function() {
-            var name = room.calculateRoomName(userA);
+            room.recalculate(userA);
+            var name = room.name;
             expect(name).toEqual("?");
         });
     });
