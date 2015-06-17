@@ -8,3 +8,8 @@ Breaking changes:
 New properties:
  * `User.events`
  * `RoomMember.events`
+
+New features:
+ * Local echo. When you send an event using the SDK it will immediately be
+  added to the timeline with the event.status of `'sending'`. When the event is
+  finally sent, this status will be removed.

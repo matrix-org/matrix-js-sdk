@@ -15,6 +15,7 @@ var viewingRoom = null;
 var numMessagesToShow = 20;
 
 // Reading from stdin
+var CLEAR_CONSOLE = '\x1B[2J';
 var readline = require("readline");
 var rl = readline.createInterface({
     input: process.stdin,
@@ -49,11 +50,14 @@ rl.on('line', function(line) {
     }
     else if (viewingRoom) {
         matrixClient.sendTextMessage(viewingRoom.roomId, line).done(function() {
-            console.log('\x1B[2J'); // clear console
+            console.log(CLEAR_CONSOLE);
             printMessages();
         }, function(err) {
             console.log("Error: %s", err);
         });
+        // print local echo immediately
+        console.log(CLEAR_CONSOLE);
+        printMessages();
     }
 });
 // ==== END User input
@@ -101,7 +105,7 @@ function printMessages() {
         printRoomList();
         return;
     }
-    console.log('\x1B[2J'); // clear console
+    console.log(CLEAR_CONSOLE);
     var mostRecentMessages = viewingRoom.timeline.slice(numMessagesToShow * -1);
     for (var i = 0; i < mostRecentMessages.length; i++) {
         printLine(mostRecentMessages[i]);
@@ -149,6 +153,9 @@ function printLine(event) {
     if (event.getSender() === myUserId) {
         name = "Me";
         separator = ">>>";
+        if (event.status === "sending") {
+            separator = "...";
+        }
     }
     var body = "";
 
