@@ -153,8 +153,11 @@ function printLine(event) {
     if (event.getSender() === myUserId) {
         name = "Me";
         separator = ">>>";
-        if (event.status === "sending") {
+        if (event.status === sdk.EventStatus.SENDING) {
             separator = "...";
+        }
+        else if (event.status === sdk.EventStatus.NOT_SENT) {
+            separator = " x ";
         }
     }
     var body = "";

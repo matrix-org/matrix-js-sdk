@@ -48,11 +48,11 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
    that have just been sent will appear in the timeline as 'sending', until it
    completes. This is beneficial because it prevents there being a gap between
    hitting the send button and having the "remote echo" arrive.
+ - Mark messages which failed to send as not sent.
 
 Later versions of the SDK will:
  - Automatically retry requests to send messages due to network errors.
  - Automatically retry requests to send messages due to rate limiting errors.
- - Mark events' sent status (e.g. 'not sent').
  - Handle queueing of messages.
  - Handle pagination.
  - Expose a `RoomSummary` which would be suitable for a recents page.
