@@ -15,7 +15,7 @@ New properties:
 
 New features:
  * Local echo. When you send an event using the SDK it will immediately be
-   added to the timeline with the event.status of `EventStatus.SENDING`. When
+   added to `Room.timeline` with the `event.status` of `EventStatus.SENDING`. When
    the event is finally sent, this status will be removed.
  * Not sent status. When an event fails to send using the SDK, it will have the
    `event.status` of `EventStatus.NOT_SENT`.
