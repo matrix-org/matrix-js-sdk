@@ -4,6 +4,10 @@ Changes in 0.1.1
 Breaking changes:
  * `Room.calculateRoomName` is now private. Use `Room.recalculate` instead, and
    access the calculated name via `Room.name`.
+ * `new MatrixClient(...)` no longer creates a `MatrixInMemoryStore` if
+   `opts.store` is not specified. Instead, the `createClient` global function
+   creates it and passes it to the constructor. This change will not affect
+   users who have always used `createClient` to create a `MatrixClient`.
 
 New properties:
  * `User.events`
