@@ -8,6 +8,8 @@ Breaking changes:
    `opts.store` is not specified. Instead, the `createClient` global function
    creates it and passes it to the constructor. This change will not affect
    users who have always used `createClient` to create a `MatrixClient`.
+ * `"Room"` events will now be emitted when the Room has *finished* being
+   populated with state rather than at the moment of creation.
 
 New properties:
  * `User.events`
