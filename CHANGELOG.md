@@ -21,3 +21,6 @@ New features:
    the event is finally sent, this status will be removed.
  * Not sent status. When an event fails to send using the SDK, it will have the
    `event.status` of `EventStatus.NOT_SENT`.
+ * Retries. If events fail to send, they will be automatically retried.
+ * Queueing. Messages sent in quick succession will be queued to preserve the order
+   in which they were submitted.
