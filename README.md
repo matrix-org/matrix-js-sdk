@@ -49,12 +49,13 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
    completes. This is beneficial because it prevents there being a gap between
    hitting the send button and having the "remote echo" arrive.
  - Mark messages which failed to send as not sent.
-
-Later versions of the SDK will:
  - Automatically retry requests to send messages due to network errors.
  - Automatically retry requests to send messages due to rate limiting errors.
  - Handle queueing of messages.
+
+Later versions of the SDK will:
  - Handle pagination.
+ - Handle room initial sync on accepting invites.
  - Expose a `RoomSummary` which would be suitable for a recents page.
  - Provide different pluggable storage layers (e.g. local storage, database-backed)
 
