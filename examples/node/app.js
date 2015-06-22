@@ -28,7 +28,9 @@ rl.on('line', function(line) {
         viewingRoom = roomList[roomIndex];
         if (viewingRoom.getMember(myUserId).membership === "invite") {
             // join the room first
-            matrixClient.joinRoom(viewingRoom.roomId).done(function() {
+            matrixClient.joinRoom(viewingRoom.roomId).done(function(room) {
+                roomList = matrixClient.getRooms();
+                viewingRoom = room;
                 printMessages();
             }, function(err) {
                 console.log("Error: %s", err);
@@ -67,6 +69,13 @@ matrixClient.on("syncComplete", function() {
     roomList = matrixClient.getRooms();
     printRoomList();
     printHelp();
+});
+
+matrixClient.on("Room", function() {
+    roomList = matrixClient.getRooms();
+    if (!viewingRoom) {
+        printRoomList();
+    }
 });
 
 // print incoming messages.
