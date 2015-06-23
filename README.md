@@ -10,7 +10,7 @@ Quickstart
 
 In a browser
 ------------
-Copy ``dist/browser-matrix-$VERSION.js`` and add that as a ``<script>`` to
+Copy ``dist/$VERSION/browser-matrix-$VERSION.js`` and add that as a ``<script>`` to
 your page. There will be a global variable ``matrixcs`` attached to
 ``window`` through which you can access the SDK.
 
@@ -52,10 +52,10 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
  - Automatically retry requests to send messages due to network errors.
  - Automatically retry requests to send messages due to rate limiting errors.
  - Handle queueing of messages.
+ - Handles pagination.
+ - Handles room initial sync on accepting invites.
 
 Later versions of the SDK will:
- - Handle pagination.
- - Handle room initial sync on accepting invites.
  - Expose a `RoomSummary` which would be suitable for a recents page.
  - Provide different pluggable storage layers (e.g. local storage, database-backed)
 
