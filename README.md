@@ -10,7 +10,7 @@ Quickstart
 
 In a browser
 ------------
-Copy ``dist/browser-matrix-$VERSION.js`` and add that as a ``<script>`` to
+Copy ``dist/$VERSION/browser-matrix-$VERSION.js`` and add that as a ``<script>`` to
 your page. There will be a global variable ``matrixcs`` attached to
 ``window`` through which you can access the SDK.
 
@@ -44,14 +44,18 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
  - Exposes high-level objects like `Rooms`, `RoomState`, `RoomMembers` and `Users`
    which can be listened to for things like name changes, new messages, membership
    changes, presence changes, and more.
-
-Later versions of the SDK will:
+ - Handle "local echo" of messages sent using the SDK. This means that messages
+   that have just been sent will appear in the timeline as 'sending', until it
+   completes. This is beneficial because it prevents there being a gap between
+   hitting the send button and having the "remote echo" arrive.
+ - Mark messages which failed to send as not sent.
  - Automatically retry requests to send messages due to network errors.
  - Automatically retry requests to send messages due to rate limiting errors.
- - Mark events' sent status (e.g. 'not sent').
- - Handle "local echo" of messages sent.
  - Handle queueing of messages.
- - Handle pagination.
+ - Handles pagination.
+ - Handles room initial sync on accepting invites.
+
+Later versions of the SDK will:
  - Expose a `RoomSummary` which would be suitable for a recents page.
  - Provide different pluggable storage layers (e.g. local storage, database-backed)
 
