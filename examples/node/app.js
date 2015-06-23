@@ -24,6 +24,10 @@ var rl = readline.createInterface({
 });
 rl.setPrompt("$ ");
 rl.on('line', function(line) {
+    if (line.trim().length === 0) {
+        rl.prompt();
+        return;
+    }
     if (line.indexOf("/join ") === 0 && !viewingRoom) {
         var roomIndex = line.split(" ")[1];
         viewingRoom = roomList[roomIndex];

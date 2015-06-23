@@ -39,6 +39,8 @@ New features:
    in which they were submitted.
  * Room state is automatcally synchronised when joining a room (including if
    another device joins a room).
+ * Scrollback. You can request earlier events in a room using
+   `MatrixClient.scrollback(room, limit, callback)`.
 
 Bug fixes:
  * Fixed a bug which prevented the event stream from polling. Some devices will
