@@ -27,6 +27,7 @@ New properties:
 
 New methods:
  * `Room.hasMembershipState(userId, membership)`
+ * `MatrixClient.resendEvent(event, room)`
 
 New features:
  * Local echo. When you send an event using the SDK it will immediately be
@@ -35,6 +36,8 @@ New features:
  * Not sent status. When an event fails to send using the SDK, it will have the
    `event.status` of `EventStatus.NOT_SENT`.
  * Retries. If events fail to send, they will be automatically retried.
+ * Manual resending. Events which failed to send can be passed to
+   `MatrixClient.resendEvent(event, room)` to resend them.
  * Queueing. Messages sent in quick succession will be queued to preserve the
    order in which they were submitted.
  * Room state is automatcally synchronised when joining a room (including if
