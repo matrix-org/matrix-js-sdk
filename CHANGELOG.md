@@ -15,6 +15,11 @@ Breaking changes:
    state (e.g. after calling joinRoom).
  * `MatrixClient.joinRoom` now returns a `Room` object when resolved, not an
    object with a `room_id` property.
+ * `MatrixClient.scrollback` now expects a `Room` arg instead of a `room_id`
+   and `from` token. Construct a `new Room(roomId)` if you want to continue
+   using this directly, then set the pagination token using
+   `room.oldState.paginationToken = from`. It now resolves to a `Room` object
+   instead of the raw HTTP response.
 
 New properties:
  * `User.events`

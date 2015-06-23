@@ -33,7 +33,7 @@ rl.on('line', function(line) {
                 viewingRoom = room;
                 printMessages();
             }, function(err) {
-                console.log("Error: %s", err);
+                console.log("/join Error: %s", err);
             });
         }
         else {
@@ -46,6 +46,14 @@ rl.on('line', function(line) {
     }
     else if (line === "/members" && viewingRoom) {
         printMemberList();
+    }
+    else if (line.indexOf("/more ") === 0 && viewingRoom) {
+        var amount = parseInt(line.split(" ")[1]) || 20;
+        matrixClient.scrollback(viewingRoom, amount).done(function(room) {
+            printMessages();
+        }, function(err) {
+            console.log("/more Error: %s", err);
+        });
     }
     else if (line === "/help") {
         printHelp();
@@ -107,6 +115,7 @@ function printHelp() {
     console.log("Room commands:");
     console.log("  '/exit' Return to the room list index.");
     console.log("  '/members' Show the room member list.");
+    console.log("  '/more 15' Scrollback 15 events");
 }
 
 function printMessages() {
@@ -115,7 +124,7 @@ function printMessages() {
         return;
     }
     console.log(CLEAR_CONSOLE);
-    var mostRecentMessages = viewingRoom.timeline.slice(numMessagesToShow * -1);
+    var mostRecentMessages = viewingRoom.timeline;
     for (var i = 0; i < mostRecentMessages.length; i++) {
         printLine(mostRecentMessages[i]);
     }
