@@ -23,7 +23,7 @@ var rl = readline.createInterface({
     terminal: false
 });
 rl.on('line', function(line) {
-    if (line.indexOf("/enter ") === 0 && !viewingRoom) {
+    if (line.indexOf("/join ") === 0 && !viewingRoom) {
         var roomIndex = line.split(" ")[1];
         viewingRoom = roomList[roomIndex];
         if (viewingRoom.getMember(myUserId).membership === "invite") {
@@ -103,7 +103,7 @@ function printHelp() {
     console.log("Global commands:");
     console.log("  '/help' : Show this help.");
     console.log("Room list index commands:");
-    console.log("  '/enter <index>' Enter a room, e.g. '/enter 5'");
+    console.log("  '/join <index>' Join a room, e.g. '/join 5'");
     console.log("Room commands:");
     console.log("  '/exit' Return to the room list index.");
     console.log("  '/members' Show the room member list.");
