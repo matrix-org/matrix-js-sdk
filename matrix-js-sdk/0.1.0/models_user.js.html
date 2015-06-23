@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: models/user.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: models/user.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>"use strict";
+/**
+ * @module models/user
+ */
+ var EventEmitter = require("events").EventEmitter;
+ var utils = require("../utils");
+
+/**
+ * Construct a new User. A User must have an ID and can optionally have extra
+ * information associated with it.
+ * @constructor
+ * @param {string} userId Required. The ID of this user.
+ * @prop {string} userId The ID of the user.
+ * @prop {Object} info The info object supplied in the constructor.
+ * @prop {string} displayName The 'displayname' of the user if known.
+ * @prop {string} avatarUrl The 'avatar_url' of the user if known.
+ * @prop {string} presence The presence enum if known.
+ * @prop {Number} lastActiveAgo The last time the user performed some action in ms.
+ * @prop {Object} events The events describing this user.
+ * @prop {MatrixEvent} events.presence The m.presence event for this user.
+ */
+function User(userId) {
+    this.userId = userId;
+    this.presence = "offline";
+    this.displayName = userId;
+    this.avatarUrl = null;
+    this.lastActiveAgo = 0;
+    this.events = {
+        presence: null,
+        profile: null
+    };
+}
+utils.inherits(User, EventEmitter);
+
+/**
+ * Update this User with the given presence event. May fire "User.presence",
+ * "User.avatarUrl" and/or "User.displayName" if this event updates this user's
+ * properties.
+ * @param {MatrixEvent} event The &lt;code>m.presence&lt;/code> event.
+ * @fires module:client~MatrixClient#event:"User.presence"
+ * @fires module:client~MatrixClient#event:"User.displayName"
+ * @fires module:client~MatrixClient#event:"User.avatarUrl"
+ */
+User.prototype.setPresenceEvent = function(event) {
+    if (event.getType() !== "m.presence") {
+        return;
+    }
+    this.events.presence = event;
+
+    var eventsToFire = [];
+    if (event.getContent().presence !== this.presence) {
+        eventsToFire.push("User.presence");
+    }
+    if (event.getContent().avatar_url !== this.avatarUrl) {
+        eventsToFire.push("User.avatarUrl");
+    }
+    if (event.getContent().displayname !== this.displayName) {
+        eventsToFire.push("User.displayName");
+    }
+
+    this.presence = event.getContent().presence;
+    this.displayName = event.getContent().displayname;
+    this.avatarUrl = event.getContent().avatar_url;
+    this.lastActiveAgo = event.getContent().last_active_ago;
+
+    for (var i = 0; i &lt; eventsToFire.length; i++) {
+        this.emit(eventsToFire[i], event, this);
+    }
+};
+
+/**
+ * The User class.
+ */
+module.exports = User;
+
+/**
+ * Fires whenever any user's presence changes.
+ * @event module:client~MatrixClient#"User.presence"
+ * @param {MatrixEvent} event The matrix event which caused this event to fire.
+ * @param {User} user The user whose User.presence changed.
+ * @example
+ * matrixClient.on("User.presence", function(event, user){
+ *   var newPresence = user.presence;
+ * });
+ */
+
+/**
+ * Fires whenever any user's display name changes.
+ * @event module:client~MatrixClient#"User.displayName"
+ * @param {MatrixEvent} event The matrix event which caused this event to fire.
+ * @param {User} user The user whose User.displayName changed.
+ * @example
+ * matrixClient.on("User.displayName", function(event, user){
+ *   var newName = user.displayName;
+ * });
+ */
+
+/**
+ * Fires whenever any user's avatar URL changes.
+ * @event module:client~MatrixClient#"User.avatarUrl"
+ * @param {MatrixEvent} event The matrix event which caused this event to fire.
+ * @param {User} user The user whose User.avatarUrl changed.
+ * @example
+ * matrixClient.on("User.avatarUrl", function(event, user){
+ *   var newUrl = user.avatarUrl;
+ * });
+ */
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Mon Jun 15 2015 10:18:36 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
