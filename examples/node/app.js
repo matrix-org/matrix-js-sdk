@@ -20,8 +20,9 @@ var readline = require("readline");
 var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: false
+    completer: completer
 });
+rl.setPrompt("$ ");
 rl.on('line', function(line) {
     if (line.indexOf("/join ") === 0 && !viewingRoom) {
         var roomIndex = line.split(" ")[1];
@@ -32,6 +33,7 @@ rl.on('line', function(line) {
                 roomList = matrixClient.getRooms();
                 viewingRoom = room;
                 printMessages();
+                rl.prompt();
             }, function(err) {
                 console.log("/join Error: %s", err);
             });
@@ -51,6 +53,7 @@ rl.on('line', function(line) {
         var amount = parseInt(line.split(" ")[1]) || 20;
         matrixClient.scrollback(viewingRoom, amount).done(function(room) {
             printMessages();
+            rl.prompt();
         }, function(err) {
             console.log("/more Error: %s", err);
         });
@@ -62,6 +65,7 @@ rl.on('line', function(line) {
         matrixClient.sendTextMessage(viewingRoom.roomId, line).done(function() {
             console.log(CLEAR_CONSOLE);
             printMessages();
+            rl.prompt();
         }, function(err) {
             console.log("Error: %s", err);
         });
@@ -69,6 +73,7 @@ rl.on('line', function(line) {
         console.log(CLEAR_CONSOLE);
         printMessages();
     }
+    rl.prompt();
 });
 // ==== END User input
 
@@ -77,12 +82,14 @@ matrixClient.on("syncComplete", function() {
     roomList = matrixClient.getRooms();
     printRoomList();
     printHelp();
+    rl.prompt();
 });
 
 matrixClient.on("Room", function() {
     roomList = matrixClient.getRooms();
     if (!viewingRoom) {
         printRoomList();
+        rl.prompt();
     }
 });
 
@@ -116,6 +123,15 @@ function printHelp() {
     console.log("  '/exit' Return to the room list index.");
     console.log("  '/members' Show the room member list.");
     console.log("  '/more 15' Scrollback 15 events");
+}
+
+function completer(line) {
+    var completions = [
+        "/help", "/join ", "/exit", "/members", "/more "
+    ];
+    var hits = completions.filter(function(c) { return c.indexOf(line) == 0 });
+    // show all completions if none found
+    return [hits.length ? hits : completions, line]
 }
 
 function printMessages() {
@@ -207,5 +223,5 @@ function printLine(event) {
     }
     console.log("[%s] %s %s %s", time, name, separator, body);
 }
-   
+
 matrixClient.startClient(numMessagesToShow);  // messages for each room.
