@@ -53,6 +53,24 @@ rl.on('line', function(line) {
     else if (line === "/members" && viewingRoom) {
         printMemberList();
     }
+    else if (line === "/resend" && viewingRoom) {
+        // get the oldest not sent event.
+        var notSentEvent;
+        for (var i = 0; i < viewingRoom.timeline.length; i++) {
+            if (viewingRoom.timeline[i].status == sdk.EventStatus.NOT_SENT) {
+                notSentEvent = viewingRoom.timeline[i];
+                break;
+            }
+        }
+        if (notSentEvent) {
+            matrixClient.resendEvent(notSentEvent, viewingRoom).done(function() {
+                printMessages();
+                rl.prompt();
+            }, function(err) {
+                console.log("/resend Error: %s", err);
+            });
+        }
+    }
     else if (line.indexOf("/more ") === 0 && viewingRoom) {
         var amount = parseInt(line.split(" ")[1]) || 20;
         matrixClient.scrollback(viewingRoom, amount).done(function(room) {
@@ -66,15 +84,11 @@ rl.on('line', function(line) {
         printHelp();
     }
     else if (viewingRoom) {
-        matrixClient.sendTextMessage(viewingRoom.roomId, line).done(function() {
-            console.log(CLEAR_CONSOLE);
+        matrixClient.sendTextMessage(viewingRoom.roomId, line).finally(function() {
             printMessages();
             rl.prompt();
-        }, function(err) {
-            console.log("Error: %s", err);
         });
         // print local echo immediately
-        console.log(CLEAR_CONSOLE);
         printMessages();
     }
     rl.prompt();
@@ -127,11 +141,12 @@ function printHelp() {
     console.log("  '/exit' Return to the room list index.");
     console.log("  '/members' Show the room member list.");
     console.log("  '/more 15' Scrollback 15 events");
+    console.log("  '/resend' Resend the oldest event which failed to send.");
 }
 
 function completer(line) {
     var completions = [
-        "/help", "/join ", "/exit", "/members", "/more "
+        "/help", "/join ", "/exit", "/members", "/more ", "/resend"
     ];
     var hits = completions.filter(function(c) { return c.indexOf(line) == 0 });
     // show all completions if none found
