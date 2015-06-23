@@ -1,13 +1,14 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
     "test": "istanbul cover --report cobertura -i \"lib/**/*.js\" jasmine-node -- spec --verbose --junitreport --forceexit --captureExceptions",
     "build": "jshint -c .jshint lib/ && browserify browser-index.js -o dist/browser-matrix-dev.js",
     "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
-    "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200 --max_line_length 90 -r spec/ -r lib/"
+    "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200 --max_line_length 90 -r spec/ -r lib/",
+    "release": "npm run build && mkdir dist/$npm_package_version && uglifyjs -c -m -o dist/$npm_package_version/browser-matrix-$npm_package_version.min.js dist/browser-matrix-dev.js && cp dist/browser-matrix-dev.js dist/$npm_package_version/browser-matrix-$npm_package_version.js"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
