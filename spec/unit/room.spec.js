@@ -45,9 +45,10 @@ describe("Room", function() {
             utils.mkMessage({
                 room: roomId, user: userA, msg: "changing room name", event: true
             }),
-            new MatrixEvent(utils.mkEvent("m.room.name", roomId, userA, {
-                name: "New Room Name"
-            }))
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            })
         ];
 
         it("should be able to add events to the end", function() {
@@ -116,12 +117,14 @@ describe("Room", function() {
                 return null;
             });
 
-            var newEv = new MatrixEvent(utils.mkEvent("m.room.name", roomId, userA, {
-                name: "New Room Name"
-            }));
-            var oldEv = new MatrixEvent(utils.mkEvent("m.room.name", roomId, userA, {
-                name: "Old Room Name"
-            }));
+            var newEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            });
+            var oldEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "Old Room Name" }
+            });
             room.addEventsToTimeline([newEv]);
             expect(newEv.sender).toEqual(sentinel);
             room.addEventsToTimeline([oldEv], true);
@@ -153,12 +156,12 @@ describe("Room", function() {
                 return null;
             });
 
-            var newEv = new MatrixEvent(
-                utils.mkMembership(roomId, "invite", userB, userA)
-            );
-            var oldEv = new MatrixEvent(
-                utils.mkMembership(roomId, "ban", userB, userA)
-            );
+            var newEv = utils.mkMembership({
+                room: roomId, mship: "invite", user: userB, skey: userA, event: true
+            });
+            var oldEv = utils.mkMembership({
+                room: roomId, mship: "ban", user: userB, skey: userA, event: true
+            });
             room.addEventsToTimeline([newEv]);
             expect(newEv.target).toEqual(sentinel);
             room.addEventsToTimeline([oldEv], true);
@@ -250,32 +253,32 @@ describe("Room", function() {
         };
 
         var setJoinRule = function(rule) {
-            stateLookup["m.room.join_rules$"] = new MatrixEvent(
-                utils.mkEvent("m.room.join_rules", roomId, userA, {
+            stateLookup["m.room.join_rules$"] = utils.mkEvent({
+                type: "m.room.join_rules", room: roomId, user: userA, content: {
                     join_rule: rule
-                })
-            );
+                }, event: true
+            });
         };
         var setAliases = function(aliases, stateKey) {
             if (!stateKey) { stateKey = "flibble"; }
-            stateLookup["m.room.aliases$" + stateKey] = new MatrixEvent(
-                utils.mkEvent("m.room.aliases", roomId, stateKey, {
+            stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
+                type: "m.room.aliases", room: roomId, skey: stateKey, content: {
                     aliases: aliases
-                })
-            );
+                }, event: true
+            });
         };
         var setRoomName = function(name) {
-            stateLookup["m.room.name$"] = new MatrixEvent(
-                utils.mkEvent("m.room.name", roomId, userA, {
+            stateLookup["m.room.name$"] = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, content: {
                     name: name
-                })
-            );
+                }, event: true
+            });
         };
         var addMember = function(userId, state) {
             if (!state) { state = "join"; }
-            stateLookup["m.room.member$" + userId] = new MatrixEvent(
-                utils.mkMembership(roomId, state, userId, userId)
-            );
+            stateLookup["m.room.member$" + userId] = utils.mkMembership({
+                room: roomId, mship: state, user: userId, skey: userId, event: true
+            });
         };
 
         beforeEach(function() {

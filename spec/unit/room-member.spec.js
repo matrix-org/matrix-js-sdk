@@ -18,15 +18,19 @@ describe("RoomMember", function() {
 
     it("setPowerLevelEvent should set 'powerLevel' and 'powerLevelNorm'.",
     function() {
-        var event = new MatrixEvent(
-            utils.mkEvent("m.room.power_levels", roomId, userA, {
+        var event = utils.mkEvent({
+            type: "m.room.power_levels",
+            room: roomId,
+            user: userA,
+            content: {
                 users_default: 20,
                 users: {
                     "@bertha:bar": 200,
                     "@invalid:user": 10  // shouldn't barf on this.
                 }
-            })
-        );
+            },
+            event: true
+        });
         member.setPowerLevelEvent(event);
         expect(member.powerLevel).toEqual(20);
         expect(member.powerLevelNorm).toEqual(10);
@@ -44,13 +48,17 @@ describe("RoomMember", function() {
         var memberC = new RoomMember(roomId, userC);
         memberC.typing = true;
 
-        var event = new MatrixEvent(
-            utils.mkEvent("m.typing", roomId, userA, {
+        var event = utils.mkEvent({
+            type: "m.typing",
+            user: userA,
+            room: roomId,
+            content: {
                 user_ids: [
                     userA, userC
                 ]
-            })
-        );
+            },
+            event: true
+        });
         member.setTypingEvent(event);
         memberB.setTypingEvent(event);
         memberC.setTypingEvent(event);

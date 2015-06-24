@@ -88,9 +88,14 @@ describe("MatrixClient", function() {
                     ]
                 },
                 state: [
-                    utils.mkMembership("!erufh:bar", "join", "@foo:bar"),
-                    utils.mkEvent("m.room.create", "!erufh:bar", "@foo:bar", {
-                        creator: "@foo:bar"
+                    utils.mkMembership({
+                        room: "!erufh:bar", mship: "join", user: "@foo:bar"
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.create", room: "!erufh:bar", user: "@foo:bar",
+                        content: {
+                            creator: "@foo:bar"
+                        }
                     })
                 ]
             }]
@@ -105,8 +110,10 @@ describe("MatrixClient", function() {
                 utils.mkMessage({
                     room: "!erufh:bar", user: "@foo:bar", msg: ":D"
                 }),
-                utils.mkEvent("m.typing", "!erufh:bar", "bar", {
-                    user_ids: ["@foo:bar"]
+                utils.mkEvent({
+                    type: "m.typing", room: "!erufh:bar", content: {
+                        user_ids: ["@foo:bar"]
+                    }
                 })
             ]
         };
@@ -327,20 +334,24 @@ describe("MatrixClient", function() {
                         ]
                     },
                     state: [
-                        utils.mkEvent(
-                            "m.room.name", roomOne, otherUserId,
-                            {
+                        utils.mkEvent({
+                            type: "m.room.name", room: roomOne, user: otherUserId,
+                            content: {
                                 name: "Old room name"
                             }
-                        ),
-                        utils.mkMembership(roomOne, "join", otherUserId),
-                        utils.mkMembership(roomOne, "join", selfUserId),
-                        utils.mkEvent(
-                            "m.room.create", roomOne, selfUserId,
-                            {
+                        }),
+                        utils.mkMembership({
+                            room: roomOne, mship: "join", user: otherUserId
+                        }),
+                        utils.mkMembership({
+                            room: roomOne, mship: "join", user: selfUserId
+                        }),
+                        utils.mkEvent({
+                            type: "m.room.create", room: roomOne, user: selfUserId,
+                            content: {
                                 creator: selfUserId
                             }
-                        )
+                        })
                     ]
                 },
                 {
@@ -356,16 +367,19 @@ describe("MatrixClient", function() {
                         ]
                     },
                     state: [
-                        utils.mkMembership(
-                            roomTwo, "join", otherUserId, null, otherDisplayName
-                        ),
-                        utils.mkMembership(roomTwo, "join", selfUserId),
-                        utils.mkEvent(
-                            "m.room.create", roomTwo, selfUserId,
-                            {
+                        utils.mkMembership({
+                            room: roomTwo, mship: "join", user: otherUserId,
+                            name: otherDisplayName
+                        }),
+                        utils.mkMembership({
+                            room: roomTwo, mship: "join", user: selfUserId
+                        }),
+                        utils.mkEvent({
+                            type: "m.room.create", room: roomTwo, user: selfUserId,
+                            content: {
                                 creator: selfUserId
                             }
-                        )
+                        })
                     ]
                 }
             ]
@@ -374,14 +388,16 @@ describe("MatrixClient", function() {
             start: "s_5_3",
             end: "e_6_7",
             chunk: [
-                utils.mkEvent("m.room.name", roomOne, selfUserId, {
-                    name: "A new room name"
+                utils.mkEvent({
+                    type: "m.room.name", room: roomOne, user: selfUserId,
+                    content: { name: "A new room name" }
                 }),
                 utils.mkMessage({
                     room: roomTwo, user: otherUserId, msg: msgText
                 }),
-                utils.mkEvent("m.typing", roomTwo, undefined, {
-                    user_ids: [otherUserId]
+                utils.mkEvent({
+                    type: "m.typing", room: roomTwo,
+                    content: { user_ids: [otherUserId] }
                 })
             ]
         };
