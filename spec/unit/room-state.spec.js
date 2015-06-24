@@ -61,7 +61,7 @@ describe("RoomState", function() {
             var member = state.getMember(userB);
             expect(member.membership).toEqual("join");
             expect(member.name).toEqual(userB);
-            
+
             state.setStateEvents([
                 utils.mkMembership({
                     room: roomId, user: userB, mship: "leave", event: true,
@@ -222,7 +222,7 @@ describe("RoomState", function() {
             var userC = "@cleo:bar";
             var memberEvent = utils.mkMembership({
                 mship: "join", user: userC, room: roomId, event: true
-            })
+            });
             var powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
