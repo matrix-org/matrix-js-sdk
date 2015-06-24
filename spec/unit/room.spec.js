@@ -1,7 +1,6 @@
 "use strict";
 var sdk = require("../..");
 var Room = sdk.Room;
-var MatrixEvent = sdk.MatrixEvent;
 var utils = require("../test-utils");
 
 describe("Room", function() {

@@ -56,7 +56,7 @@ module.exports.mock = function(constr, name) {
  */
 module.exports.mkEvent = function(opts) {
     if (!opts.type || !opts.content) {
-        throw new Error("Missing .type or .content =>"+JSON.stringify(opts));
+        throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
     var event = {
         type: opts.type,
@@ -95,7 +95,7 @@ module.exports.mkMembership = function(opts) {
         opts.skey = opts.user;
     }
     if (!opts.mship) {
-        throw new Error("Missing .mship => "+JSON.stringify(opts));
+        throw new Error("Missing .mship => " + JSON.stringify(opts));
     }
     opts.content = {
         membership: opts.mship
