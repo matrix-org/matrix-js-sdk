@@ -101,6 +101,43 @@ describe("MatrixScheduler", function() {
         });
     });
 
+    it("should give up if the retryFn on failure returns -1 and try the next event",
+    function(done) {
+        // Queue A & B.
+        // Reject A and return -1 on retry.
+        // Expect B to be tried next and the promise for A to be rejected.
+        retryFn = function() {
+            return -1;
+        };
+        queueFn = function() { return "yep"; };
+
+        var deferA = q.defer();
+        var deferB = q.defer();
+        var procCount = 0;
+        scheduler.setProcessFunction(function(ev) {
+            procCount += 1;
+            if (procCount === 1) {
+                expect(ev).toEqual(eventA);
+                return deferA.promise;
+            }
+            else if (procCount === 2) {
+                expect(ev).toEqual(eventB);
+                return deferB.promise;
+            }
+            expect(procCount).toBeLessThan(3);
+        });
+
+        var globalA = scheduler.queueEvent(eventA);
+        scheduler.queueEvent(eventB);
+
+        expect(procCount).toEqual(1);
+        deferA.reject({});
+        globalA.catch(function() {
+            expect(procCount).toEqual(2);
+            done();
+        });
+    });
+
     it("should treat each queue separately", function(done) {
         // Queue messages A B C D.
         // Bucket A&D into queue_A
