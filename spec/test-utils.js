@@ -1,4 +1,6 @@
 "use strict";
+var sdk = require("..");
+var MatrixEvent = sdk.MatrixEvent;
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
@@ -92,17 +94,28 @@ module.exports.mkMembership = function(room, membership, userId, otherUserId,
 
 /**
  * Create an m.room.message POJO.
- * @param {string} room The room ID for the event.
- * @param {string} userId The user ID for the event.
- * @param {string} msg The content.body for the event.
+ * @param {Object} opts Values for the message
+ * @param {string} opts.room The room ID for the event.
+ * @param {string} opts.user The user ID for the event.
+ * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object} The event
  */
-module.exports.mkMessage = function(room, userId, msg) {
-    if (!msg) {
-        msg = "Random->" + Math.random();
+module.exports.mkMessage = function(opts) {
+    if (!opts.msg) {
+        opts.msg = "Random->" + Math.random();
     }
-    return module.exports.mkEvent("m.room.message", room, userId, {
+    if (!opts.room || !opts.user) {
+        throw new Error("Missing .room or .user from %s", opts);
+    }
+    opts.type = "m.room.message";
+    opts.content = {
         msgtype: "m.text",
-        body: msg
-    });
+        body: opts.msg
+    };
+    //var pojo = module.exports.mkEvent(opts);
+    var pojo = module.exports.mkEvent(
+        opts.type, opts.room, opts.user, opts.content
+    );
+    return opts.event ? new MatrixEvent(pojo) : pojo;
 };

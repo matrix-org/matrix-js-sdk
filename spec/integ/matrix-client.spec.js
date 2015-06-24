@@ -82,7 +82,9 @@ describe("MatrixClient", function() {
                     start: "s",
                     end: "t",
                     chunk: [
-                        utils.mkMessage("!erufh:bar", "@foo:bar", "hmmm")
+                        utils.mkMessage({
+                            room: "!erufh:bar", user: "@foo:bar", msg: "hmmm"
+                        })
                     ]
                 },
                 state: [
@@ -97,8 +99,12 @@ describe("MatrixClient", function() {
             start: "s_5_3",
             end: "e_6_7",
             chunk: [
-                utils.mkMessage("!erufh:bar", "@foo:bar", "ello ello"),
-                utils.mkMessage("!erufh:bar", "@foo:bar", ":D"),
+                utils.mkMessage({
+                    room: "!erufh:bar", user: "@foo:bar", msg: "ello ello"
+                }),
+                utils.mkMessage({
+                    room: "!erufh:bar", user: "@foo:bar", msg: ":D"
+                }),
                 utils.mkEvent("m.typing", "!erufh:bar", "bar", {
                     user_ids: ["@foo:bar"]
                 })
@@ -315,7 +321,9 @@ describe("MatrixClient", function() {
                         start: "f_1_1",
                         end: "f_2_2",
                         chunk: [
-                            utils.mkMessage(roomOne, otherUserId, "hello")
+                            utils.mkMessage({
+                                room: roomOne, user: otherUserId, msg: "hello"
+                            })
                         ]
                     },
                     state: [
@@ -342,7 +350,9 @@ describe("MatrixClient", function() {
                         start: "f_1_1",
                         end: "f_2_2",
                         chunk: [
-                            utils.mkMessage(roomTwo, otherUserId, "hiii")
+                            utils.mkMessage({
+                                room: roomTwo, user: otherUserId, msg: "hiii"
+                            })
                         ]
                     },
                     state: [
@@ -367,7 +377,9 @@ describe("MatrixClient", function() {
                 utils.mkEvent("m.room.name", roomOne, selfUserId, {
                     name: "A new room name"
                 }),
-                utils.mkMessage(roomTwo, otherUserId, msgText),
+                utils.mkMessage({
+                    room: roomTwo, user: otherUserId, msg: msgText
+                }),
                 utils.mkEvent("m.typing", roomTwo, undefined, {
                     user_ids: [otherUserId]
                 })

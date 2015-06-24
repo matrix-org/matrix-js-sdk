@@ -42,7 +42,9 @@ describe("Room", function() {
 
     describe("addEventsToTimeline", function() {
         var events = [
-            new MatrixEvent(utils.mkMessage(roomId, userA, "changing room name")),
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "changing room name", event: true
+            }),
             new MatrixEvent(utils.mkEvent("m.room.name", roomId, userA, {
                 name: "New Room Name"
             }))
