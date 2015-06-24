@@ -12,6 +12,36 @@ module.exports.beforeEach = function(testCase) {
 };
 
 /**
+ * Create a spy for an object and automatically spy its methods.
+ * @param {*} constr The class constructor (used with 'new')
+ * @param {string} name The name of the class
+ * @return {Object} An instantiated object with spied methods/properties.
+ */
+module.exports.mock = function(constr, name) {
+    // By Tim Buschtöns
+    // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
+    var HelperConstr = new Function(); // jshint ignore:line
+    HelperConstr.prototype = constr.prototype;
+    var result = new HelperConstr();
+    result.jasmineToString = function() {
+        return "mock" + (name ? " of " + name : "");
+    };
+    for (var key in constr.prototype) { // jshint ignore:line
+        try {
+            if (constr.prototype[key] instanceof Function) {
+                result[key] = jasmine.createSpy((name || "mock") + '.' + key);
+            }
+        }
+        catch (ex) {
+            // Direct access to some non-function fields of DOM prototypes may
+            // cause exceptions.
+            // Overwriting will not work either in that case.
+        }
+    }
+    return result;
+};
+
+/**
  * Create a JSON object representing an Event.
  * @param {string} type The event.type
  * @param {string} room The event.room_id
