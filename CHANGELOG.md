@@ -1,3 +1,10 @@
+Changes in 0.1.2
+================
+
+Bug fixes:
+ * Fixed an issue which prevented RoomMember.name being disambiguated if there
+   was exactly 1 other person with the same display name.
+
 Changes in 0.1.1
 ================
 
