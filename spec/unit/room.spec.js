@@ -1,6 +1,7 @@
 "use strict";
 var sdk = require("../..");
 var Room = sdk.Room;
+var RoomState = sdk.RoomState;
 var utils = require("../test-utils");
 
 describe("Room", function() {
@@ -36,6 +37,57 @@ describe("Room", function() {
 
         it("should return the member from current state", function() {
             expect(room.getMember(userA)).not.toEqual(null);
+        });
+    });
+
+    describe("addEvents", function() {
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "changing room name", event: true
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            })
+        ];
+
+        it("should call RoomState.setTypingEvent on m.typing events", function() {
+            room.currentState = utils.mock(RoomState);
+            var typing = utils.mkEvent({
+                room: roomId, type: "m.typing", event: true, content: {
+                    user_ids: [userA]
+                }
+            });
+            room.addEvents([typing]);
+            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
+        });
+
+        it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
+            expect(function() { room.addEvents(events, "foo"); }).toThrow();
+        });
+
+        it("should replace a timeline event if dupe strategy is 'replace'", function() {
+            // make a duplicate
+            var dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true
+            });
+            dupe.event.event_id = events[0].getId();
+            room.addEvents(events);
+            expect(room.timeline[0]).toEqual(events[0]);
+            room.addEvents([dupe], "replace");
+            expect(room.timeline[0]).toEqual(dupe);
+        });
+
+        it("should ignore a given dupe event if dupe strategy is 'ignore'", function() {
+            // make a duplicate
+            var dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true
+            });
+            dupe.event.event_id = events[0].getId();
+            room.addEvents(events);
+            expect(room.timeline[0]).toEqual(events[0]);
+            room.addEvents([dupe], "ignore");
+            expect(room.timeline[0]).toEqual(events[0]);
         });
     });
 
@@ -165,6 +217,45 @@ describe("Room", function() {
             expect(newEv.target).toEqual(sentinel);
             room.addEventsToTimeline([oldEv], true);
             expect(oldEv.target).toEqual(oldSentinel);
+        });
+
+        it("should call setStateEvents on the right RoomState with the right " +
+        "forwardLooking value", function() {
+            room.oldState = utils.mock(RoomState);
+            room.currentState = utils.mock(RoomState);
+
+            var events = [
+                utils.mkMembership({
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userB, event: true,
+                    content: {
+                        name: "New room"
+                    }
+                })
+            ];
+            room.addEventsToTimeline(events);
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
+                [events[0]]
+            );
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
+                [events[1]]
+            );
+            expect(events[0].forwardLooking).toBe(true);
+            expect(events[1].forwardLooking).toBe(true);
+            expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
+
+            // test old
+            room.addEventsToTimeline(events, true);
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[0]]
+            );
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[1]]
+            );
+            expect(events[0].forwardLooking).toBe(false);
+            expect(events[1].forwardLooking).toBe(false);
         });
     });
 
