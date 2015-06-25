@@ -1,6 +1,9 @@
 Changes in 0.1.2
 ================
 
+New methods:
+ * `MatrixScheduler.getQueue(name)`
+
 Bug fixes:
  * Fixed an issue which prevented RoomMember.name being disambiguated if there
    was exactly 1 other person with the same display name.
