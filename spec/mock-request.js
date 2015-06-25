@@ -27,7 +27,9 @@ HttpBackend.prototype = {
         var defer = q.defer();
         var self = this;
         var flushed = 0;
-        console.log("HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush);
+        console.log(
+            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
+        );
         var tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(

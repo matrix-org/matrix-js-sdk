@@ -73,17 +73,14 @@ describe("MatrixClient room timelines", function() {
     });
 
     describe("local echo events", function() {
-        var sendEvent = utils.mkMessage({
-            room: roomId, user: otherUserId, msg: "hello"
-        });
 
-        it("should be added immediately after calling MatrixClient.sendEvent "+
+        it("should be added immediately after calling MatrixClient.sendEvent " +
         "with EventStatus.SENDING and the right event.sender", function(done) {
             client.on("syncComplete", function() {
                 var room = client.getRoom(roomId);
                 expect(room.timeline.length).toEqual(1);
 
-                var promise = client.sendTextMessage(roomId, "I am a fish", "txn1");
+                client.sendTextMessage(roomId, "I am a fish", "txn1");
                 // check it was added
                 expect(room.timeline.length).toEqual(2);
                 // check status
@@ -95,13 +92,13 @@ describe("MatrixClient room timelines", function() {
 
                 httpBackend.flush("/events", 1).done(function() {
                     done();
-                })
+                });
             });
             client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
-        it("should be updated correctly when the send request finishes "+
+        it("should be updated correctly when the send request finishes " +
         "BEFORE the event comes down the event stream", function(done) {
             var eventId = "$foo:bar";
             httpBackend.when("PUT", "/txn1").respond(200, {
@@ -130,7 +127,7 @@ describe("MatrixClient room timelines", function() {
             httpBackend.flush("/initialSync", 1);
         });
 
-        it("should be updated correctly when the send request finishes "+
+        it("should be updated correctly when the send request finishes " +
         "AFTER the event comes down the event stream", function(done) {
             var eventId = "$foo:bar";
             httpBackend.when("PUT", "/txn1").respond(200, {
@@ -156,7 +153,7 @@ describe("MatrixClient room timelines", function() {
                         done();
                     });
                 });
-                
+
             });
             client.startClient();
             httpBackend.flush("/initialSync", 1);
