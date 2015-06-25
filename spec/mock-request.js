@@ -94,9 +94,12 @@ HttpBackend.prototype = {
                 }
                 testResponse = matchingReq.response;
                 console.log("    responding to %s", matchingReq.path);
-
+                var body = testResponse.body;
+                if (Object.prototype.toString.call(body) == "[object Function]") {
+                    body = body();
+                }
                 req.callback(
-                    testResponse.err, testResponse.response, testResponse.body
+                    testResponse.err, testResponse.response, body
                 );
                 matchingReq = null;
             }
@@ -165,7 +168,8 @@ Request.prototype = {
     /**
      * Respond with the given data when this request is satisfied.
      * @param {Number} code The HTTP status code.
-     * @param {Object} data The HTTP JSON body.
+     * @param {Object|Function} data The HTTP JSON body. If this is a function,
+     * it will be invoked when the JSON body is required (which should be returned).
      */
     respond: function(code, data) {
         this.response = {

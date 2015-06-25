@@ -165,16 +165,17 @@ describe("MatrixClient room timelines", function() {
 
         beforeEach(function() {
             sbEvents = [];
-            httpBackend.when("GET", "/messages").respond(200, {
-                chunk: sbEvents,
-                start: "pagin_start",
-                end: "pagin_end"
+            httpBackend.when("GET", "/messages").respond(200, function() {
+                return {
+                    chunk: sbEvents,
+                    start: "pagin_start",
+                    end: "pagin_end"
+                };
             });
         });
 
         it("should set Room.oldState.paginationToken to null at the start" +
         " of the timeline.", function(done) {
-
             client.on("syncComplete", function() {
                 var room = client.getRoom(roomId);
                 expect(room.timeline.length).toEqual(1);
@@ -191,14 +192,78 @@ describe("MatrixClient room timelines", function() {
             client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
-/*
-        it("should set the right event.sender values", function() {
 
+        it("should set the right event.sender values", function(done) {
+            // make an m.room.member event with prev_content
+            var oldMshipEvent = utils.mkMembership({
+                mship: "join", user: userId, room: roomId, name: "Alice",
+                url: "mxc://some/url"
+            });
+            oldMshipEvent.prev_content = {
+                displayname: "Old Alice",
+                avatar_url: null,
+                membership: "join"
+            };
+
+            // set the list of events to return on scrollback
+            sbEvents = [
+                utils.mkMessage({
+                    user: userId, room: roomId, msg: "I'm alice"
+                }),
+                oldMshipEvent,
+                utils.mkMessage({
+                    user: userId, room: roomId, msg: "I'm old alice"
+                })
+            ];
+
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                expect(room.timeline.length).toEqual(1);
+
+                client.scrollback(room).done(function() {
+                    expect(room.timeline.length).toEqual(4);
+                    var oldMsg = room.timeline[0];
+                    expect(oldMsg.sender.name).toEqual("Old Alice");
+                    var newMsg = room.timeline[2];
+                    expect(newMsg.sender.name).toEqual("Alice");
+                    done();
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/events", 1);
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
         });
 
-        it("should add it them to the right place in the timeline", function() {
+        it("should add it them to the right place in the timeline", function(done) {
+            // set the list of events to return on scrollback
+            sbEvents = [
+                utils.mkMessage({
+                    user: userId, room: roomId, msg: "I am new"
+                }),
+                utils.mkMessage({
+                    user: userId, room: roomId, msg: "I am old"
+                })
+            ];
 
-        }); */
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                expect(room.timeline.length).toEqual(1);
+
+                client.scrollback(room).done(function() {
+                    expect(room.timeline.length).toEqual(3);
+                    expect(room.timeline[0].event).toEqual(sbEvents[1]);
+                    expect(room.timeline[1].event).toEqual(sbEvents[0]);
+                    done();
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/events", 1);
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
+        });
     });
 
     describe("new events", function() {
