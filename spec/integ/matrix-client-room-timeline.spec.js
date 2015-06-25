@@ -162,6 +162,7 @@ describe("MatrixClient room timelines", function() {
 
     describe("paginated events", function() {
         var sbEvents;
+        var sbEndTok = "pagin_end";
 
         beforeEach(function() {
             sbEvents = [];
@@ -169,7 +170,7 @@ describe("MatrixClient room timelines", function() {
                 return {
                     chunk: sbEvents,
                     start: "pagin_start",
-                    end: "pagin_end"
+                    end: sbEndTok
                 };
             });
         });
@@ -255,6 +256,30 @@ describe("MatrixClient room timelines", function() {
                     expect(room.timeline.length).toEqual(3);
                     expect(room.timeline[0].event).toEqual(sbEvents[1]);
                     expect(room.timeline[1].event).toEqual(sbEvents[0]);
+                    done();
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/events", 1);
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
+        });
+
+        it("should use 'end' as the next pagination token", function(done) {
+            // set the list of events to return on scrollback
+            sbEvents = [
+                utils.mkMessage({
+                    user: userId, room: roomId, msg: "I am new"
+                })
+            ];
+
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                expect(room.oldState.paginationToken).toBeDefined();
+
+                client.scrollback(room, 1).done(function() {
+                    expect(room.oldState.paginationToken).toEqual(sbEndTok);
                     done();
                 });
 
