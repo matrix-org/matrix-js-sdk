@@ -292,6 +292,20 @@ describe("MatrixClient room timelines", function() {
     });
 
     describe("new events", function() {
+        xit("should be added to the right place in the timeline", function() {
 
+        });
+
+        xit("should set the right event.sender values", function() {
+
+        });
+
+        xit("should set the right room.name", function() {
+
+        });
+
+        xit("should set the right room members", function() {
+
+        });
     });
 });

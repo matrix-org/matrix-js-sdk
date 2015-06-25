@@ -212,6 +212,24 @@ describe("MatrixClient syncing", function() {
                 done();
             });
         });
+
+        xit("should update power levels for users in a room", function() {
+
+        });
+
+        xit("should update the room topic", function() {
+
+        });
     });
 
+    describe("of a room", function() {
+        xit("should sync when a join event (which changes state) for the user" +
+        " arrives down the event stream (e.g. join from another device)", function() {
+
+        });
+
+        xit("should sync when the user explicitly calls joinRoom", function() {
+
+        });
+    });
 });
