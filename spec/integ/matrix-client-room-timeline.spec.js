@@ -161,7 +161,44 @@ describe("MatrixClient room timelines", function() {
     });
 
     describe("paginated events", function() {
+        var sbEvents;
 
+        beforeEach(function() {
+            sbEvents = [];
+            httpBackend.when("GET", "/messages").respond(200, {
+                chunk: sbEvents,
+                start: "pagin_start",
+                end: "pagin_end"
+            });
+        });
+
+        it("should set Room.oldState.paginationToken to null at the start" +
+        " of the timeline.", function(done) {
+
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                expect(room.timeline.length).toEqual(1);
+
+                client.scrollback(room).done(function() {
+                    expect(room.timeline.length).toEqual(1);
+                    expect(room.oldState.paginationToken).toBeNull();
+                    done();
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/events", 1);
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
+        });
+/*
+        it("should set the right event.sender values", function() {
+
+        });
+
+        it("should add it them to the right place in the timeline", function() {
+
+        }); */
     });
 
     describe("new events", function() {
