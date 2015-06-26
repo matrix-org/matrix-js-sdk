@@ -8,6 +8,8 @@ New features:
 New methods:
  * `MatrixScheduler.getQueueForEvent(event)`
  * `MatrixScheduler.removeEventFromQueue(event)`
+ * `$DATA_STORE.setSyncToken(token)`
+ * `$DATA_STORE.getSyncToken()`
 
 Bug fixes:
  * Fixed an issue which prevented RoomMember.name being disambiguated if there
