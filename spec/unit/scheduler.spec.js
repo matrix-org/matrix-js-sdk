@@ -203,6 +203,78 @@ describe("MatrixScheduler", function() {
         });
     });
 
+    describe("getQueueForEvent", function() {
+        it("should return null if the event doesn't map to a queue name", function() {
+            queueFn = function() {
+                return null;
+            };
+            expect(scheduler.getQueueForEvent(eventA)).toBeNull();
+        });
+
+        it("should return null if the mapped queue doesn't exist", function() {
+            queueFn = function() {
+                return "yep";
+            };
+            expect(scheduler.getQueueForEvent(eventA)).toBeNull();
+        });
+
+        it("should return a list of events in the queue and modifications to" +
+        " the list should not affect the underlying queue.", function() {
+            queueFn = function() {
+                return "yep";
+            };
+            scheduler.queueEvent(eventA);
+            scheduler.queueEvent(eventB);
+            var queue = scheduler.getQueueForEvent(eventA);
+            expect(queue.length).toEqual(2);
+            expect(queue).toEqual([eventA, eventB]);
+            // modify the queue
+            var eventC = utils.mkMessage(
+                {user: "@a:bar", room: roomId, event: true}
+            );
+            queue.push(eventC);
+            var queueAgain = scheduler.getQueueForEvent(eventA);
+            expect(queueAgain.length).toEqual(2);
+        });
+
+        it("should return a list of events in the queue and modifications to" +
+        " an event in the queue should affect the underlying queue.", function() {
+            queueFn = function() {
+                return "yep";
+            };
+            scheduler.queueEvent(eventA);
+            scheduler.queueEvent(eventB);
+            var queue = scheduler.getQueueForEvent(eventA);
+            queue[1].event.content.body = "foo";
+            var queueAgain = scheduler.getQueueForEvent(eventA);
+            expect(queueAgain[1].event.content.body).toEqual("foo");
+        });
+    });
+
+    describe("removeEventFromQueue", function() {
+        it("should return false if the event doesn't map to a queue name", function() {
+            queueFn = function() {
+                return null;
+            };
+            expect(scheduler.removeEventFromQueue(eventA)).toBe(false);
+        });
+
+        it("should return false if the event isn't in the queue", function() {
+            queueFn = function() {
+                return "yep";
+            };
+            expect(scheduler.removeEventFromQueue(eventA)).toBe(false);
+        });
+
+        it("should return true if the event was removed", function() {
+            queueFn = function() {
+                return "yep";
+            };
+            scheduler.queueEvent(eventA);
+            expect(scheduler.removeEventFromQueue(eventA)).toBe(true);
+        });
+    });
+
     describe("setProcessFunction", function() {
         it("should call the processFn if there are queued events", function() {
             queueFn = function() {

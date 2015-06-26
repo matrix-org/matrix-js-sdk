@@ -1,8 +1,13 @@
 Changes in 0.1.2
 ================
 
+New features:
+ * Added `EventStatus.QUEUED` which is set on an event when it is waiting to be
+   sent by the scheduler and there are other events in front.
+
 New methods:
- * `MatrixScheduler.getQueue(name)`
+ * `MatrixScheduler.getQueueForEvent(event)`
+ * `MatrixScheduler.removeEventFromQueue(event)`
 
 Bug fixes:
  * Fixed an issue which prevented RoomMember.name being disambiguated if there

@@ -36,6 +36,10 @@ describe("MatrixClient retrying", function() {
 
     });
 
+    xit("should mark events as EventStatus.QUEUED when queued", function() {
+
+    });
+
     describe("resending", function() {
         xit("should be able to resend a NOT_SENT event", function() {
 
