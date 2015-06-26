@@ -8,6 +8,7 @@ describe("MatrixClient room timelines", function() {
     var baseUrl = "http://localhost.or.something";
     var client, httpBackend;
     var userId = "@alice:localhost";
+    var userName = "Alice";
     var accessToken = "aseukfgwef";
     var roomId = "!foo:bar";
     var otherUserId = "@bob:localhost";
@@ -38,7 +39,7 @@ describe("MatrixClient room timelines", function() {
                     room: roomId, mship: "join", user: otherUserId, name: "Bob"
                 }),
                 utils.mkMembership({
-                    room: roomId, mship: "join", user: userId, name: "Alice"
+                    room: roomId, mship: "join", user: userId, name: userName
                 }),
                 utils.mkEvent({
                     type: "m.room.create", room: roomId, user: userId,
@@ -65,7 +66,9 @@ describe("MatrixClient room timelines", function() {
             start: "start_"
         };
         httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-        httpBackend.when("GET", "/events").respond(200, eventData);
+        httpBackend.when("GET", "/events").respond(200, function() {
+            return eventData;
+        });
     });
 
     afterEach(function() {
@@ -88,7 +91,7 @@ describe("MatrixClient room timelines", function() {
                 // check member
                 var member = room.timeline[1].sender;
                 expect(member.userId).toEqual(userId);
-                expect(member.name).toEqual("Alice");
+                expect(member.name).toEqual(userName);
 
                 httpBackend.flush("/events", 1).done(function() {
                     done();
@@ -197,7 +200,7 @@ describe("MatrixClient room timelines", function() {
         it("should set the right event.sender values", function(done) {
             // make an m.room.member event with prev_content
             var oldMshipEvent = utils.mkMembership({
-                mship: "join", user: userId, room: roomId, name: "Alice",
+                mship: "join", user: userId, room: roomId, name: userName,
                 url: "mxc://some/url"
             });
             oldMshipEvent.prev_content = {
@@ -226,7 +229,7 @@ describe("MatrixClient room timelines", function() {
                     var oldMsg = room.timeline[0];
                     expect(oldMsg.sender.name).toEqual("Old Alice");
                     var newMsg = room.timeline[2];
-                    expect(newMsg.sender.name).toEqual("Alice");
+                    expect(newMsg.sender.name).toEqual(userName);
                     done();
                 });
 
@@ -292,20 +295,126 @@ describe("MatrixClient room timelines", function() {
     });
 
     describe("new events", function() {
-        xit("should be added to the right place in the timeline", function() {
+        it("should be added to the right place in the timeline", function(done) {
+            eventData.chunk = [
+                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({user: userId, room: roomId})
+            ];
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
 
+                var index = 0;
+                client.on("Room.timeline", function(event, rm, toStart) {
+                    expect(toStart).toBe(false);
+                    expect(rm).toEqual(room);
+                    expect(event.event).toEqual(eventData.chunk[index]);
+                    index += 1;
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/events", 1).done(function() {
+                    expect(index).toEqual(2);
+                    expect(room.timeline[room.timeline.length - 1].event).toEqual(
+                        eventData.chunk[1]
+                    );
+                    expect(room.timeline[room.timeline.length - 2].event).toEqual(
+                        eventData.chunk[0]
+                    );
+                    done();
+                });
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
         });
 
-        xit("should set the right event.sender values", function() {
-
+        it("should set the right event.sender values", function(done) {
+            eventData.chunk = [
+                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMembership({
+                    user: userId, room: roomId, mship: "join", name: "New Name"
+                }),
+                utils.mkMessage({user: userId, room: roomId})
+            ];
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                httpBackend.flush("/events", 1).done(function() {
+                    var preNameEvent = room.timeline[room.timeline.length - 3];
+                    var postNameEvent = room.timeline[room.timeline.length - 1];
+                    expect(preNameEvent.sender.name).toEqual(userName);
+                    expect(postNameEvent.sender.name).toEqual("New Name");
+                    done();
+                });
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
         });
 
-        xit("should set the right room.name", function() {
+        it("should set the right room.name", function(done) {
+            eventData.chunk = [
+                utils.mkEvent({
+                    user: userId, room: roomId, type: "m.room.name", content: {
+                        name: "Room 2"
+                    }
+                })
+            ];
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                var nameEmitCount = 0;
+                client.on("Room.name", function(rm) {
+                    nameEmitCount += 1;
+                });
 
+                httpBackend.flush("/events", 1).done(function() {
+                    expect(nameEmitCount).toEqual(1);
+                    expect(room.name).toEqual("Room 2");
+                    // do another round
+                    eventData.chunk = [
+                        utils.mkEvent({
+                            user: userId, room: roomId, type: "m.room.name", content: {
+                                name: "Room 3"
+                            }
+                        })
+                    ];
+                    httpBackend.when("GET", "/events").respond(200, eventData);
+                    httpBackend.flush("/events", 1).done(function() {
+                        expect(nameEmitCount).toEqual(2);
+                        expect(room.name).toEqual("Room 3");
+                        done();
+                    });
+                });
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
         });
 
-        xit("should set the right room members", function() {
-
+        it("should set the right room members", function(done) {
+            var userC = "@cee:bar";
+            var userD = "@dee:bar";
+            eventData.chunk = [
+                utils.mkMembership({
+                    user: userC, room: roomId, mship: "join", name: "C"
+                }),
+                utils.mkMembership({
+                    user: userC, room: roomId, mship: "invite", skey: userD
+                })
+            ];
+            client.on("syncComplete", function() {
+                var room = client.getRoom(roomId);
+                httpBackend.flush("/events", 1).done(function() {
+                    expect(room.currentState.getMembers().length).toEqual(4);
+                    expect(room.currentState.getMember(userC).name).toEqual("C");
+                    expect(room.currentState.getMember(userC).membership).toEqual(
+                        "join"
+                    );
+                    expect(room.currentState.getMember(userD).name).toEqual(userD);
+                    expect(room.currentState.getMember(userD).membership).toEqual(
+                        "invite"
+                    );
+                    done();
+                });
+            });
+            client.startClient();
+            httpBackend.flush("/initialSync", 1);
         });
     });
 });
