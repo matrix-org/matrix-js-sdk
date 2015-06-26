@@ -19,6 +19,7 @@ describe("MatrixClient syncing", function() {
             userId: selfUserId,
             accessToken: selfAccessToken
         });
+        httpBackend.when("GET", "/pushrules").respond(200, {});
     });
 
     afterEach(function() {

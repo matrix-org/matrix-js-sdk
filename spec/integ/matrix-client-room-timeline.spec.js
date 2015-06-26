@@ -51,7 +51,7 @@ describe("MatrixClient room timelines", function() {
         }]
     };
 
-    beforeEach(function() {
+    beforeEach(function(done) {
         utils.beforeEach(this);
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
@@ -65,10 +65,13 @@ describe("MatrixClient room timelines", function() {
             end: "end_",
             start: "start_"
         };
+        httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("GET", "/initialSync").respond(200, initialSync);
         httpBackend.when("GET", "/events").respond(200, function() {
             return eventData;
         });
+        client.startClient();
+        httpBackend.flush("/pushrules").done(done);
     });
 
     afterEach(function() {
@@ -97,7 +100,6 @@ describe("MatrixClient room timelines", function() {
                     done();
                 });
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -126,7 +128,6 @@ describe("MatrixClient room timelines", function() {
                 });
                 httpBackend.flush("/txn1", 1);
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -158,7 +159,6 @@ describe("MatrixClient room timelines", function() {
                 });
 
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
     });
@@ -193,7 +193,6 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/messages", 1);
                 httpBackend.flush("/events", 1);
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -236,7 +235,6 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/messages", 1);
                 httpBackend.flush("/events", 1);
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -265,7 +263,6 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/messages", 1);
                 httpBackend.flush("/events", 1);
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -289,7 +286,6 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/messages", 1);
                 httpBackend.flush("/events", 1);
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
     });
@@ -323,7 +319,6 @@ describe("MatrixClient room timelines", function() {
                     done();
                 });
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -345,7 +340,6 @@ describe("MatrixClient room timelines", function() {
                     done();
                 });
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -383,7 +377,6 @@ describe("MatrixClient room timelines", function() {
                     });
                 });
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
 
@@ -413,7 +406,6 @@ describe("MatrixClient room timelines", function() {
                     done();
                 });
             });
-            client.startClient();
             httpBackend.flush("/initialSync", 1);
         });
     });

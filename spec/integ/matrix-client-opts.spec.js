@@ -100,10 +100,13 @@ describe("MatrixClient opts", function() {
                     expectedEventTypes.indexOf(event.getType()), 1
                 );
             });
+            httpBackend.when("GET", "/pushrules").respond(200, {});
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
             client.startClient();
-            httpBackend.flush("/initialSync", 1).then(function() {
+            httpBackend.flush("/pushrules", 1).then(function() {
+                return httpBackend.flush("/initialSync", 1);
+            }).then(function() {
                 return httpBackend.flush("/events", 1);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
