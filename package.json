@@ -22,7 +22,6 @@
   "dependencies": {
     "browser-request": "^0.3.3",
     "browserify": "^10.2.3",
-    "micromatch": "^2.1.6",
     "q": "^1.4.1",
     "request": "^2.53.0"
   },
