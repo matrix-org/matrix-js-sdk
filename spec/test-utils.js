@@ -1,4 +1,6 @@
 "use strict";
+var sdk = require("..");
+var MatrixEvent = sdk.MatrixEvent;
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
@@ -12,67 +14,117 @@ module.exports.beforeEach = function(testCase) {
 };
 
 /**
- * Create a JSON object representing an Event.
- * @param {string} type The event.type
- * @param {string} room The event.room_id
- * @param {string} userId The event.user_id
- * @param {Object} content The event.content
+ * Create a spy for an object and automatically spy its methods.
+ * @param {*} constr The class constructor (used with 'new')
+ * @param {string} name The name of the class
+ * @return {Object} An instantiated object with spied methods/properties.
+ */
+module.exports.mock = function(constr, name) {
+    // By Tim Buschtöns
+    // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
+    var HelperConstr = new Function(); // jshint ignore:line
+    HelperConstr.prototype = constr.prototype;
+    var result = new HelperConstr();
+    result.jasmineToString = function() {
+        return "mock" + (name ? " of " + name : "");
+    };
+    for (var key in constr.prototype) { // jshint ignore:line
+        try {
+            if (constr.prototype[key] instanceof Function) {
+                result[key] = jasmine.createSpy((name || "mock") + '.' + key);
+            }
+        }
+        catch (ex) {
+            // Direct access to some non-function fields of DOM prototypes may
+            // cause exceptions.
+            // Overwriting will not work either in that case.
+        }
+    }
+    return result;
+};
+
+/**
+ * Create an Event.
+ * @param {Object} opts Values for the event.
+ * @param {string} opts.type The event.type
+ * @param {string} opts.room The event.room_id
+ * @param {string} opts.user The event.user_id
+ * @param {string} opts.skey Optional. The state key (auto inserts empty string)
+ * @param {Object} opts.content The event.content
+ * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object} a JSON object representing this event.
  */
-module.exports.mkEvent = function(type, room, userId, content) {
+module.exports.mkEvent = function(opts) {
+    if (!opts.type || !opts.content) {
+        throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
+    }
     var event = {
-        type: type,
-        room_id: room,
-        user_id: userId,
-        content: content,
+        type: opts.type,
+        room_id: opts.room,
+        user_id: opts.user,
+        content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
-    if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
+    if (opts.skey) {
+        event.state_key = opts.skey;
+    }
+    else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
          "m.room.power_levels", "m.room.topic",
-         "com.example.state"].indexOf(type) !== -1) {
+         "com.example.state"].indexOf(opts.type) !== -1) {
         event.state_key = "";
     }
-    return event;
+    return opts.event ? new MatrixEvent(event) : event;
 };
 
 /**
- * Create an m.room.member POJO.
- * @param {string} room The room ID for the event.
- * @param {string} membership The content.membership for the event.
- * @param {string} userId The user ID for the event.
- * @param {string} otherUserId The other user ID for the event if applicable
+ * Create an m.room.member event.
+ * @param {Object} opts Values for the membership.
+ * @param {string} opts.room The room ID for the event.
+ * @param {string} opts.mship The content.membership for the event.
+ * @param {string} opts.user The user ID for the event.
+ * @param {string} opts.skey The other user ID for the event if applicable
  * e.g. for invites/bans.
- * @param {string} displayName The content.displayname for the event.
- * @param {string} avatarUrl The content.avatar_url for the event.
- * @return {Object} The event
+ * @param {string} opts.name The content.displayname for the event.
+ * @param {string} opts.url The content.avatar_url for the event.
+ * @param {boolean} opts.event True to make a MatrixEvent.
+ * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMembership = function(room, membership, userId, otherUserId,
-                                       displayName, avatarUrl) {
-    var event = module.exports.mkEvent("m.room.member", room, userId, {
-        membership: membership,
-        displayname: displayName,
-        avatar_url: avatarUrl
-    });
-    event.state_key = userId;
-    if (["invite", "ban"].indexOf(membership) !== -1) {
-        event.state_key = otherUserId;
+module.exports.mkMembership = function(opts) {
+    opts.type = "m.room.member";
+    if (!opts.skey) {
+        opts.skey = opts.user;
     }
-    return event;
+    if (!opts.mship) {
+        throw new Error("Missing .mship => " + JSON.stringify(opts));
+    }
+    opts.content = {
+        membership: opts.mship
+    };
+    if (opts.name) { opts.content.displayname = opts.name; }
+    if (opts.url) { opts.content.avatar_url = opts.url; }
+    return module.exports.mkEvent(opts);
 };
 
 /**
- * Create an m.room.message POJO.
- * @param {string} room The room ID for the event.
- * @param {string} userId The user ID for the event.
- * @param {string} msg The content.body for the event.
- * @return {Object} The event
+ * Create an m.room.message event.
+ * @param {Object} opts Values for the message
+ * @param {string} opts.room The room ID for the event.
+ * @param {string} opts.user The user ID for the event.
+ * @param {string} opts.msg Optional. The content.body for the event.
+ * @param {boolean} opts.event True to make a MatrixEvent.
+ * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMessage = function(room, userId, msg) {
-    if (!msg) {
-        msg = "Random->" + Math.random();
+module.exports.mkMessage = function(opts) {
+    opts.type = "m.room.message";
+    if (!opts.msg) {
+        opts.msg = "Random->" + Math.random();
     }
-    return module.exports.mkEvent("m.room.message", room, userId, {
+    if (!opts.room || !opts.user) {
+        throw new Error("Missing .room or .user from %s", opts);
+    }
+    opts.content = {
         msgtype: "m.text",
-        body: msg
-    });
+        body: opts.msg
+    };
+    return module.exports.mkEvent(opts);
 };

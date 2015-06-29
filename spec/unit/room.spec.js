@@ -1,7 +1,7 @@
 "use strict";
 var sdk = require("../..");
 var Room = sdk.Room;
-var MatrixEvent = sdk.MatrixEvent;
+var RoomState = sdk.RoomState;
 var utils = require("../test-utils");
 
 describe("Room", function() {
@@ -15,10 +15,14 @@ describe("Room", function() {
     beforeEach(function() {
         utils.beforeEach(this);
         room = new Room(roomId);
+        // mock RoomStates
+        room.oldState = utils.mock(sdk.RoomState, "oldState");
+        room.currentState = utils.mock(sdk.RoomState, "currentState");
     });
 
     describe("getMember", function() {
         beforeEach(function() {
+            // clobber members property with test data
             room.currentState.members = {
                 "@alice:bar": {
                     userId: userA,
@@ -36,13 +40,68 @@ describe("Room", function() {
         });
     });
 
+    describe("addEvents", function() {
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "changing room name", event: true
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            })
+        ];
+
+        it("should call RoomState.setTypingEvent on m.typing events", function() {
+            room.currentState = utils.mock(RoomState);
+            var typing = utils.mkEvent({
+                room: roomId, type: "m.typing", event: true, content: {
+                    user_ids: [userA]
+                }
+            });
+            room.addEvents([typing]);
+            expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
+        });
+
+        it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
+            expect(function() { room.addEvents(events, "foo"); }).toThrow();
+        });
+
+        it("should replace a timeline event if dupe strategy is 'replace'", function() {
+            // make a duplicate
+            var dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true
+            });
+            dupe.event.event_id = events[0].getId();
+            room.addEvents(events);
+            expect(room.timeline[0]).toEqual(events[0]);
+            room.addEvents([dupe], "replace");
+            expect(room.timeline[0]).toEqual(dupe);
+        });
+
+        it("should ignore a given dupe event if dupe strategy is 'ignore'", function() {
+            // make a duplicate
+            var dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true
+            });
+            dupe.event.event_id = events[0].getId();
+            room.addEvents(events);
+            expect(room.timeline[0]).toEqual(events[0]);
+            room.addEvents([dupe], "ignore");
+            expect(room.timeline[0]).toEqual(events[0]);
+        });
+    });
+
     describe("addEventsToTimeline", function() {
         var events = [
-            new MatrixEvent(utils.mkMessage(roomId, userA, "changing room name")),
-            new MatrixEvent(utils.mkEvent("m.room.name", roomId, userA, {
-                name: "New Room Name"
-            }))
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "changing room name", event: true
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            })
         ];
+
         it("should be able to add events to the end", function() {
             room.addEventsToTimeline(events);
             expect(room.timeline.length).toEqual(2);
@@ -56,14 +115,265 @@ describe("Room", function() {
             expect(room.timeline[0]).toEqual(events[1]);
             expect(room.timeline[1]).toEqual(events[0]);
         });
+
+        it("should emit 'Room.timeline' events when added to the end",
+        function() {
+            var callCount = 0;
+            room.on("Room.timeline", function(event, emitRoom, toStart) {
+                callCount += 1;
+                expect(room.timeline.length).toEqual(callCount);
+                expect(event).toEqual(events[callCount - 1]);
+                expect(emitRoom).toEqual(room);
+                expect(toStart).toBeFalsy();
+            });
+            room.addEventsToTimeline(events);
+            expect(callCount).toEqual(2);
+        });
+
+        it("should emit 'Room.timeline' events when added to the start",
+        function() {
+            var callCount = 0;
+            room.on("Room.timeline", function(event, emitRoom, toStart) {
+                callCount += 1;
+                expect(room.timeline.length).toEqual(callCount);
+                expect(event).toEqual(events[callCount - 1]);
+                expect(emitRoom).toEqual(room);
+                expect(toStart).toBe(true);
+            });
+            room.addEventsToTimeline(events, true);
+            expect(callCount).toEqual(2);
+        });
+
+        it("should set event.sender for new and old events", function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            var oldSentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Old Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.oldState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return oldSentinel;
+                }
+                return null;
+            });
+
+            var newEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            });
+            var oldEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "Old Room Name" }
+            });
+            room.addEventsToTimeline([newEv]);
+            expect(newEv.sender).toEqual(sentinel);
+            room.addEventsToTimeline([oldEv], true);
+            expect(oldEv.sender).toEqual(oldSentinel);
+        });
+
+        it("should set event.target for new and old m.room.member events",
+        function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            var oldSentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Old Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.oldState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return oldSentinel;
+                }
+                return null;
+            });
+
+            var newEv = utils.mkMembership({
+                room: roomId, mship: "invite", user: userB, skey: userA, event: true
+            });
+            var oldEv = utils.mkMembership({
+                room: roomId, mship: "ban", user: userB, skey: userA, event: true
+            });
+            room.addEventsToTimeline([newEv]);
+            expect(newEv.target).toEqual(sentinel);
+            room.addEventsToTimeline([oldEv], true);
+            expect(oldEv.target).toEqual(oldSentinel);
+        });
+
+        it("should call setStateEvents on the right RoomState with the right " +
+        "forwardLooking value", function() {
+            room.oldState = utils.mock(RoomState);
+            room.currentState = utils.mock(RoomState);
+
+            var events = [
+                utils.mkMembership({
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userB, event: true,
+                    content: {
+                        name: "New room"
+                    }
+                })
+            ];
+            room.addEventsToTimeline(events);
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
+                [events[0]]
+            );
+            expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
+                [events[1]]
+            );
+            expect(events[0].forwardLooking).toBe(true);
+            expect(events[1].forwardLooking).toBe(true);
+            expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
+
+            // test old
+            room.addEventsToTimeline(events, true);
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[0]]
+            );
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[1]]
+            );
+            expect(events[0].forwardLooking).toBe(false);
+            expect(events[1].forwardLooking).toBe(false);
+        });
     });
 
-    describe("calculate (Room Name)", function() {
+    describe("getJoinedMembers", function() {
+
+        it("should return members whose membership is 'join'", function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@alice:bar", membership: "join" },
+                    { userId: "@bob:bar", membership: "invite" },
+                    { userId: "@cleo:bar", membership: "leave" }
+                ];
+            });
+            var res = room.getJoinedMembers();
+            expect(res.length).toEqual(1);
+            expect(res[0].userId).toEqual("@alice:bar");
+        });
+
+        it("should return an empty list if no membership is 'join'", function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@bob:bar", membership: "invite" }
+                ];
+            });
+            var res = room.getJoinedMembers();
+            expect(res.length).toEqual(0);
+        });
+    });
+
+    describe("hasMembershipState", function() {
+
+        it("should return true for a matching userId and membership",
+        function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@alice:bar", membership: "join" },
+                    { userId: "@bob:bar", membership: "invite" }
+                ];
+            });
+            expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
+        });
+
+        it("should return false if match membership but no match userId",
+        function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@alice:bar", membership: "join" }
+                ];
+            });
+            expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
+        });
+
+        it("should return false if match userId but no match membership",
+        function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@alice:bar", membership: "join" }
+                ];
+            });
+            expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
+        });
+
+        it("should return false if no match membership or userId",
+        function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [
+                    { userId: "@alice:bar", membership: "join" }
+                ];
+            });
+            expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
+        });
+
+        it("should return false if no members exist",
+        function() {
+            room.currentState.getMembers.andCallFake(function() {
+                return [];
+            });
+            expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
+        });
+    });
+
+    describe("recalculate (Room Name)", function() {
         var stateLookup = {
             // event.type + "$" event.state_key : MatrixEvent
         };
-        var mockRoomState = {
-            getStateEvents: function(type, key) {
+
+        var setJoinRule = function(rule) {
+            stateLookup["m.room.join_rules$"] = utils.mkEvent({
+                type: "m.room.join_rules", room: roomId, user: userA, content: {
+                    join_rule: rule
+                }, event: true
+            });
+        };
+        var setAliases = function(aliases, stateKey) {
+            if (!stateKey) { stateKey = "flibble"; }
+            stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
+                type: "m.room.aliases", room: roomId, skey: stateKey, content: {
+                    aliases: aliases
+                }, event: true
+            });
+        };
+        var setRoomName = function(name) {
+            stateLookup["m.room.name$"] = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, content: {
+                    name: name
+                }, event: true
+            });
+        };
+        var addMember = function(userId, state) {
+            if (!state) { state = "join"; }
+            stateLookup["m.room.member$" + userId] = utils.mkMembership({
+                room: roomId, mship: state, user: userId, skey: userId, event: true
+            });
+        };
+
+        beforeEach(function() {
+            stateLookup = {};
+            room.currentState.getStateEvents.andCallFake(function(type, key) {
                 if (key === undefined) {
                     var prefix = type + "$";
                     var list = [];
@@ -78,9 +388,9 @@ describe("Room", function() {
                 else {
                     return stateLookup[type + "$" + key];
                 }
-            },
-            getMembers: function() {
-                var memberEvents = this.getStateEvents("m.room.member");
+            });
+            room.currentState.getMembers.andCallFake(function() {
+                var memberEvents = room.currentState.getStateEvents("m.room.member");
                 var members = [];
                 for (var i = 0; i < memberEvents.length; i++) {
                     members.push({
@@ -91,41 +401,7 @@ describe("Room", function() {
                     });
                 }
                 return members;
-            }
-        };
-
-        var setJoinRule = function(rule) {
-            stateLookup["m.room.join_rules$"] = new MatrixEvent(
-                utils.mkEvent("m.room.join_rules", roomId, userA, {
-                    join_rule: rule
-                })
-            );
-        };
-        var setAliases = function(aliases, stateKey) {
-            if (!stateKey) { stateKey = "flibble"; }
-            stateLookup["m.room.aliases$" + stateKey] = new MatrixEvent(
-                utils.mkEvent("m.room.aliases", roomId, stateKey, {
-                    aliases: aliases
-                })
-            );
-        };
-        var setRoomName = function(name) {
-            stateLookup["m.room.name$"] = new MatrixEvent(
-                utils.mkEvent("m.room.name", roomId, userA, {
-                    name: name
-                })
-            );
-        };
-        var addMember = function(userId, state) {
-            if (!state) { state = "join"; }
-            stateLookup["m.room.member$" + userId] = new MatrixEvent(
-                utils.mkMembership(roomId, state, userId, userId)
-            );
-        };
-
-        beforeEach(function() {
-            stateLookup = {};
-            room.currentState = mockRoomState;
+            });
         });
 
         it("should return the names of members in a private (invite join_rules)" +

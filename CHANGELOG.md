@@ -1,3 +1,20 @@
+Changes in 0.1.2
+================
+
+New features:
+ * Added `EventStatus.QUEUED` which is set on an event when it is waiting to be
+   sent by the scheduler and there are other events in front.
+
+New methods:
+ * `MatrixScheduler.getQueueForEvent(event)`
+ * `MatrixScheduler.removeEventFromQueue(event)`
+ * `$DATA_STORE.setSyncToken(token)`
+ * `$DATA_STORE.getSyncToken()`
+
+Bug fixes:
+ * Fixed an issue which prevented RoomMember.name being disambiguated if there
+   was exactly 1 other person with the same display name.
+
 Changes in 0.1.1
 ================
 

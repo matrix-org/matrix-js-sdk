@@ -19,25 +19,37 @@ function HttpBackend() {
 HttpBackend.prototype = {
     /**
      * Respond to all of the requests (flush the queue).
+     * @param {string} path The path to flush (optional) default: all.
+     * @param {integer} numToFlush The number of things to flush (optional), default: all.
      * @return {Promise} resolved when there is nothing left to flush.
      */
-    flush: function() {
+    flush: function(path, numToFlush) {
         var defer = q.defer();
         var self = this;
-        console.log("HTTP backend flushing...");
+        var flushed = 0;
+        console.log(
+            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
+        );
         var tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
-                "  trying to flush queue => reqs=%s expected=%s",
-                self.requests.length, self.expectedRequests.length
+                "  trying to flush queue => reqs=%s expected=%s [%s]",
+                self.requests.length, self.expectedRequests.length, path
             );
-            if (self._takeFromQueue()) {
+            if (self._takeFromQueue(path)) {
                 // try again on the next tick.
-                console.log("  flushed. Trying for more.");
-                setTimeout(tryFlush, 0);
+                console.log("  flushed. Trying for more. [%s]", path);
+                flushed += 1;
+                if (numToFlush && flushed === numToFlush) {
+                    console.log("  [%s] Flushed assigned amount: %s", path, numToFlush);
+                    defer.resolve();
+                }
+                else {
+                    setTimeout(tryFlush, 0);
+                }
             }
             else {
-                console.log("  no more flushes.");
+                console.log("  no more flushes. [%s]", path);
                 defer.resolve();
             }
         };
@@ -49,9 +61,10 @@ HttpBackend.prototype = {
 
     /**
      * Attempts to resolve requests/expected requests.
+     * @param {string} path The path to flush (optional) default: all.
      * @return {boolean} true if something was resolved.
      */
-    _takeFromQueue: function() {
+    _takeFromQueue: function(path) {
         var req = null;
         var i, j;
         var matchingReq, expectedReq, testResponse = null;
@@ -59,6 +72,7 @@ HttpBackend.prototype = {
             req = this.requests[i];
             for (j = 0; j < this.expectedRequests.length; j++) {
                 expectedReq = this.expectedRequests[j];
+                if (path && path !== expectedReq.path) { continue; }
                 if (expectedReq.method === req.method &&
                         req.path.indexOf(expectedReq.path) !== -1) {
                     if (!expectedReq.data || (JSON.stringify(expectedReq.data) ===
@@ -80,10 +94,14 @@ HttpBackend.prototype = {
                 }
                 testResponse = matchingReq.response;
                 console.log("    responding to %s", matchingReq.path);
-
+                var body = testResponse.body;
+                if (Object.prototype.toString.call(body) == "[object Function]") {
+                    body = body();
+                }
                 req.callback(
-                    testResponse.err, testResponse.response, testResponse.body
+                    testResponse.err, testResponse.response, body
                 );
+                matchingReq = null;
             }
         }
         if (testResponse) {  // flushed something
@@ -150,7 +168,8 @@ Request.prototype = {
     /**
      * Respond with the given data when this request is satisfied.
      * @param {Number} code The HTTP status code.
-     * @param {Object} data The HTTP JSON body.
+     * @param {Object|Function} data The HTTP JSON body. If this is a function,
+     * it will be invoked when the JSON body is required (which should be returned).
      */
     respond: function(code, data) {
         this.response = {
