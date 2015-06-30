@@ -71,7 +71,7 @@ describe("WebStorageStore", function() {
         });
 
         xit("should persist timeline events correctly", function() {
-            
+
         });
     });
 });
