@@ -86,6 +86,9 @@ are updated.
       console.log(member.name + " stopped typing.");
     }
   });
+  
+  // start the client to setup the connection to the server
+  client.startClient();
 ```
 
 ### Promises or Callbacks
