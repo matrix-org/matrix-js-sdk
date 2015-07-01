@@ -197,6 +197,25 @@ describe("WebStorageStore", function() {
             ).toEqual(stateEventMap["m.room.member"][userId]);
         });
 
+        it("should reconstruct old room state", function() {
+            var inviteEvent = utils.mkMembership({
+                user: userId, room: roomId, mship: "invite"
+            });
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", [inviteEvent]);
+
+            var storedRoom = store.getRoom(roomId);
+            expect(
+                storedRoom.currentState.getStateEvents("m.room.member", userId).event
+            ).toEqual(stateEventMap["m.room.member"][userId]);
+            expect(
+                storedRoom.oldState.getStateEvents("m.room.member", userId).event
+            ).toEqual(inviteEvent);
+        });
+
         it("should reconstruct the room timeline", function() {
             mockStorageApi.setItem(stateKeyName, {
                 events: stateEventMap,
