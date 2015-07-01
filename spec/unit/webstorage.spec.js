@@ -12,6 +12,7 @@ function MockStorageApi() {
 MockStorageApi.prototype = {
     setItem: function(k, v) {
         this.data[k] = v;
+        console.log("SetItem: %s => %s", k, JSON.stringify(v, undefined, 2));
         this._recalc();
     },
     getItem: function(k) {
@@ -49,19 +50,16 @@ describe("WebStorageStore", function() {
         room = new Room(roomId);
     });
 
-    describe("getSyncToken", function() {
-        it("should return the token from the store", function() {
-
+    describe("syncToken", function() {
+        it("get: should return the token from the store", function() {
+            var token = "flibble";
+            store.setSyncToken(token);
+            expect(store.getSyncToken()).toEqual(token);
+            expect(mockStorageApi.length).toEqual(1);
         });
-        it("should return null if the token does not exist", function() {
-
-        });
-    });
-
-    describe("setSyncToken", function() {
-        it("should store the token in the store, which is retrievable from " +
-        "getSyncToken", function() {
-
+        it("get: should return null if the token does not exist", function() {
+            expect(store.getSyncToken()).toEqual(null);
+            expect(mockStorageApi.length).toEqual(0);
         });
     });
 
@@ -115,24 +113,168 @@ describe("WebStorageStore", function() {
     });
 
     describe("getRoom", function() {
+        // web storage api keys
+        var prefix = "room_" + roomId + "_timeline_";
+        var stateKeyName = "room_" + roomId + "_state";
+
+        // stored state events
+        var stateEventMap = {
+            "m.room.member": {},
+            "m.room.name": {}
+        };
+        stateEventMap["m.room.member"][userId] = utils.mkMembership(
+            {user: userId, room: roomId, mship: "join"}
+        );
+        stateEventMap["m.room.name"][""] = utils.mkEvent(
+            {user: userId, room: roomId, type: "m.room.name",
+            content: {
+                name: "foo"
+            }}
+        );
+
+        // stored timeline events
+        var timeline0 = [];
+        var timeline1 = [];
+        for (var i = 0; i < batchNum; i++) {
+            timeline0[i] = utils.mkMessage({user: userId, room: roomId});
+            if (i !== (batchNum - 1)) { // miss last one
+                timeline1[i] = utils.mkMessage({user: userId, room: roomId});
+            }
+        }
+
         it("should reconstruct room state", function() {
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
 
+            var storedRoom = store.getRoom(roomId);
+            expect(
+                storedRoom.currentState.getStateEvents("m.room.name", "").event
+            ).toEqual(stateEventMap["m.room.name"][""]);
+            expect(
+                storedRoom.currentState.getStateEvents("m.room.member", userId).event
+            ).toEqual(stateEventMap["m.room.member"][userId]);
         });
+
         it("should reconstruct the room timeline", function() {
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", timeline0);
+            mockStorageApi.setItem(prefix + "1", timeline1);
 
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom).not.toBeNull();
+            // should only get up to the batch num timeline events
+            expect(storedRoom.timeline.length).toEqual(batchNum);
+            for (i = 0; i < batchNum; i++) {
+                expect(storedRoom.timeline[batchNum - 1 - i].event).toEqual(
+                    timeline0[i]
+                );
+            }
         });
-        it("should sync the timeline for any 'live' events", function() {
 
+        it("should sync the timeline for 'live' events " +
+        "(full low batch; 1+bit live batches)", function() {
+            var i;
+            var timelineLive = [
+                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({user: userId, room: roomId}),
+                utils.mkMessage({user: userId, room: roomId})
+            ];
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", timeline0);
+            mockStorageApi.setItem(prefix + "1", timeline1);
+            mockStorageApi.setItem(
+                // deep copy the timeline via parse/stringify else items will
+                // be shift()ed from timelineLive and we can't compare!
+                prefix + "live", JSON.parse(JSON.stringify(timelineLive))
+            );
+
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom).not.toBeNull();
+            // should only get up to the batch num timeline events (highest
+            // index of timelineLive is the newest message)
+            expect(storedRoom.timeline.length).toEqual(batchNum);
+            for (i = 0; i < batchNum; i++) {
+                expect(storedRoom.timeline[i].event).toEqual(
+                    timelineLive[i + 1]
+                );
+            }
         });
+
+        it("should sync the timeline for 'live' events " +
+        "(no low batch; 1 live batches)", function() {
+            var i;
+            var timelineLive = [];
+            for (i = 0; i < batchNum; i++) {
+                timelineLive.push(
+                    utils.mkMessage({user: userId, room: roomId})
+                );
+            }
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", []);
+            mockStorageApi.setItem(
+                // deep copy the timeline via parse/stringify else items will
+                // be shift()ed from timelineLive and we can't compare!
+                prefix + "live", JSON.parse(JSON.stringify(timelineLive))
+            );
+
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom).not.toBeNull();
+            // should only get up to the batch num timeline events (highest
+            // index of timelineLive is the newest message)
+            expect(storedRoom.timeline.length).toEqual(batchNum);
+            for (i = 0; i < batchNum; i++) {
+                expect(storedRoom.timeline[i].event).toEqual(
+                    timelineLive[i]
+                );
+            }
+        });
+
         it("should be able to reconstruct the timeline with negative indices",
         function() {
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "-5", timeline0);
+            mockStorageApi.setItem(prefix + "-4", timeline1);
 
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom).not.toBeNull();
+            // should only get up to the batch num timeline events
+            expect(storedRoom.timeline.length).toEqual(batchNum);
+            for (i = 0; i < batchNum; i++) {
+                expect(storedRoom.timeline[batchNum - 1 - i].event).toEqual(
+                    timeline0[i]
+                );
+            }
         });
+
         it("should return null if the room doesn't exist", function() {
-
+            expect(store.getRoom("nothing")).toEqual(null);
         });
-        it("should assign a storageToken to the Room", function() {
 
+        xit("should assign a storageToken to the Room", function() {
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", timeline0);
+            mockStorageApi.setItem(prefix + "1", timeline1);
+
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom.storageToken).toBeDefined();
         });
     });
 });
