@@ -201,20 +201,20 @@ describe('NotificationService', function() {
             content: {
                 body: "",
                 msgtype: "m.text"
-            },
+            }
         });
         pushProcessor = new PushProcessor(matrixClient);
-        console.log("badger: "+JSON.stringify(pushProcessor));
+        console.log("badger: " + JSON.stringify(pushProcessor));
     });
 
     // User IDs
-    
+
     it('should bing on a user ID.', function() {
         testEvent.event.content.body = "Hello @ali:matrix.org, how are you?";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     it('should bing on a partial user ID with an @.', function() {
         testEvent.event.content.body = "Hello @ali, how are you?";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
@@ -226,41 +226,41 @@ describe('NotificationService', function() {
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     it('should bing on a case-insensitive user ID.', function() {
         testEvent.event.content.body = "Hello @AlI:matrix.org, how are you?";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     // Display names
-    
+
     it('should bing on a display name.', function() {
         testEvent.event.content.body = "Hello Alice M, how are you?";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     it('should bing on a case-insensitive display name.', function() {
         testEvent.event.content.body = "Hello ALICE M, how are you?";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     // Bing words
-    
+
     it('should bing on a bing word.', function() {
         testEvent.event.content.body = "I really like coffee";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     it('should bing on case-insensitive bing words.', function() {
         testEvent.event.content.body = "Coffee is great";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(true);
     });
-    
+
     it('should bing on wildcard (.*) bing words.', function() {
         testEvent.event.content.body = "It was foomahbar I think.";
         var actions = pushProcessor.actionsForEvent(testEvent.event);
@@ -290,9 +290,9 @@ describe('NotificationService', function() {
         actions = pushProcessor.actionsForEvent(testEvent.event);
         expect(actions.tweaks.highlight).toEqual(false);
     });
-    
+
     // invalid
-    
+
     it('should gracefully handle bad input.', function() {
         testEvent.event.content.body = { "foo": "bar" };
         var actions = pushProcessor.actionsForEvent(testEvent.event);
