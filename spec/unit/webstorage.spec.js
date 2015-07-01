@@ -12,7 +12,6 @@ function MockStorageApi() {
 MockStorageApi.prototype = {
     setItem: function(k, v) {
         this.data[k] = v;
-        console.log("SetItem: %s => %s", k, JSON.stringify(v, undefined, 2));
         this._recalc();
     },
     getItem: function(k) {
@@ -48,6 +47,18 @@ describe("WebStorageStore", function() {
         mockStorageApi = new MockStorageApi();
         store = new WebStorageStore(mockStorageApi, batchNum);
         room = new Room(roomId);
+    });
+
+    describe("constructor", function() {
+        it("should throw if the WebStorage API functions are missing", function() {
+            expect(function() {
+                store = new WebStorageStore({}, 5);
+            }).toThrow();
+            expect(function() {
+                mockStorageApi.length = undefined;
+                store = new WebStorageStore(mockStorageApi, 5);
+            }).toThrow();
+        });
     });
 
     describe("syncToken", function() {
@@ -110,6 +121,31 @@ describe("WebStorageStore", function() {
                 }
             }
         });
+
+        it("should persist timeline events in one bucket if batchNum=0", function() {
+            store = new WebStorageStore(mockStorageApi, 0);
+            var prefix = "room_" + roomId + "_timeline_";
+            var timelineEvents = [];
+            var entries = batchNum + batchNum - 1;
+            var i = 0;
+            for (i = 0; i < entries; i++) {
+                timelineEvents.push(
+                    utils.mkMessage({room: roomId, user: userId, event: true})
+                );
+            }
+            room.timeline = timelineEvents;
+            store.storeRoom(room);
+            expect(mockStorageApi.getItem(prefix + "-1")).toBe(null);
+            expect(mockStorageApi.getItem(prefix + "1")).toBe(null);
+            expect(mockStorageApi.getItem(prefix + "live")).toBe(null);
+            var timeline = mockStorageApi.getItem(prefix + "0");
+            expect(timeline.length).toEqual(timelineEvents.length);
+            for (i = 0; i < timeline.length; i++) {
+                expect(timeline[i]).toEqual(
+                    timelineEvents[i].event
+                );
+            }
+        });
     });
 
     describe("getRoom", function() {
@@ -133,14 +169,18 @@ describe("WebStorageStore", function() {
         );
 
         // stored timeline events
-        var timeline0 = [];
-        var timeline1 = [];
-        for (var i = 0; i < batchNum; i++) {
-            timeline0[i] = utils.mkMessage({user: userId, room: roomId});
-            if (i !== (batchNum - 1)) { // miss last one
+        var timeline0, timeline1, i;
+
+        beforeEach(function() {
+            timeline0 = [];
+            timeline1 = [];
+            for (i = 0; i < batchNum; i++) {
                 timeline1[i] = utils.mkMessage({user: userId, room: roomId});
+                if (i !== (batchNum - 1)) { // miss last one
+                    timeline0[i] = utils.mkMessage({user: userId, room: roomId});
+                }
             }
-        }
+        });
 
         it("should reconstruct room state", function() {
             mockStorageApi.setItem(stateKeyName, {
@@ -169,22 +209,25 @@ describe("WebStorageStore", function() {
             expect(storedRoom).not.toBeNull();
             // should only get up to the batch num timeline events
             expect(storedRoom.timeline.length).toEqual(batchNum);
+            var timeline = timeline0.concat(timeline1);
             for (i = 0; i < batchNum; i++) {
                 expect(storedRoom.timeline[batchNum - 1 - i].event).toEqual(
-                    timeline0[i]
+                    timeline[timeline.length - 1 - i]
                 );
             }
         });
 
         it("should sync the timeline for 'live' events " +
-        "(full low batch; 1+bit live batches)", function() {
-            var i;
-            var timelineLive = [
-                utils.mkMessage({user: userId, room: roomId}),
-                utils.mkMessage({user: userId, room: roomId}),
-                utils.mkMessage({user: userId, room: roomId}),
-                utils.mkMessage({user: userId, room: roomId})
-            ];
+        "(full hi batch; 1+bit live batches)", function() {
+            // 1 and a bit events go into _live
+            var timelineLive = [];
+            timelineLive.push(utils.mkMessage({user: userId, room: roomId}));
+            for (i = 0; i < batchNum; i++) {
+                timelineLive.push(
+                    utils.mkMessage({user: userId, room: roomId})
+                );
+            }
+
             mockStorageApi.setItem(stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
@@ -211,7 +254,6 @@ describe("WebStorageStore", function() {
 
         it("should sync the timeline for 'live' events " +
         "(no low batch; 1 live batches)", function() {
-            var i;
             var timelineLive = [];
             for (i = 0; i < batchNum; i++) {
                 timelineLive.push(
@@ -249,14 +291,14 @@ describe("WebStorageStore", function() {
             });
             mockStorageApi.setItem(prefix + "-5", timeline0);
             mockStorageApi.setItem(prefix + "-4", timeline1);
-
+            var timeline = timeline0.concat(timeline1);
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom).not.toBeNull();
             // should only get up to the batch num timeline events
             expect(storedRoom.timeline.length).toEqual(batchNum);
             for (i = 0; i < batchNum; i++) {
                 expect(storedRoom.timeline[batchNum - 1 - i].event).toEqual(
-                    timeline0[i]
+                    timeline[timeline.length - 1 - i]
                 );
             }
         });
