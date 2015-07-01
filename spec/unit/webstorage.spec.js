@@ -49,6 +49,22 @@ describe("WebStorageStore", function() {
         room = new Room(roomId);
     });
 
+    describe("getSyncToken", function() {
+        it("should return the token from the store", function() {
+
+        });
+        it("should return null if the token does not exist", function() {
+
+        });
+    });
+
+    describe("setSyncToken", function() {
+        it("should store the token in the store, which is retrievable from " +
+        "getSyncToken", function() {
+
+        });
+    });
+
     describe("storeRoom", function() {
         it("should persist the room state correctly", function() {
             var stateEvents = [
@@ -70,7 +86,52 @@ describe("WebStorageStore", function() {
             expect(storedEvents["m.room.create"][""]).toEqual(stateEvents[0].event);
         });
 
-        xit("should persist timeline events correctly", function() {
+        it("should persist timeline events correctly", function() {
+            var prefix = "room_" + roomId + "_timeline_";
+            var timelineEvents = [];
+            var entries = batchNum + batchNum - 1;
+            var i = 0;
+            for (i = 0; i < entries; i++) {
+                timelineEvents.push(
+                    utils.mkMessage({room: roomId, user: userId, event: true})
+                );
+            }
+            room.timeline = timelineEvents;
+            store.storeRoom(room);
+            expect(mockStorageApi.getItem(prefix + "-1")).toBe(null);
+            expect(mockStorageApi.getItem(prefix + "2")).toBe(null);
+            expect(mockStorageApi.getItem(prefix + "live")).toBe(null);
+            var timeline0 = mockStorageApi.getItem(prefix + "0");
+            var timeline1 = mockStorageApi.getItem(prefix + "1");
+            expect(timeline0.length).toEqual(batchNum);
+            expect(timeline1.length).toEqual(batchNum - 1);
+            for (i = 0; i < batchNum; i++) {
+                expect(timeline0[i]).toEqual(timelineEvents[i].event);
+                if ((i + batchNum) < timelineEvents.length) {
+                    expect(timeline1[i]).toEqual(timelineEvents[i + batchNum].event);
+                }
+            }
+        });
+    });
+
+    describe("getRoom", function() {
+        it("should reconstruct room state", function() {
+
+        });
+        it("should reconstruct the room timeline", function() {
+
+        });
+        it("should sync the timeline for any 'live' events", function() {
+
+        });
+        it("should be able to reconstruct the timeline with negative indices",
+        function() {
+
+        });
+        it("should return null if the room doesn't exist", function() {
+
+        });
+        it("should assign a storageToken to the Room", function() {
 
         });
     });
