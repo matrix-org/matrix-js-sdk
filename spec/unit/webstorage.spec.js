@@ -42,6 +42,24 @@ describe("WebStorageStore", function() {
     var userId = "@alice:bar";
     var mockStorageApi;
     var batchNum = 3;
+    // web storage api keys
+    var prefix = "room_" + roomId + "_timeline_";
+    var stateKeyName = "room_" + roomId + "_state";
+
+    // stored state events
+    var stateEventMap = {
+        "m.room.member": {},
+        "m.room.name": {}
+    };
+    stateEventMap["m.room.member"][userId] = utils.mkMembership(
+        {user: userId, room: roomId, mship: "join"}
+    );
+    stateEventMap["m.room.name"][""] = utils.mkEvent(
+        {user: userId, room: roomId, type: "m.room.name",
+        content: {
+            name: "foo"
+        }}
+    );
 
     beforeEach(function() {
         utils.beforeEach(this);
@@ -150,25 +168,6 @@ describe("WebStorageStore", function() {
     });
 
     describe("getRoom", function() {
-        // web storage api keys
-        var prefix = "room_" + roomId + "_timeline_";
-        var stateKeyName = "room_" + roomId + "_state";
-
-        // stored state events
-        var stateEventMap = {
-            "m.room.member": {},
-            "m.room.name": {}
-        };
-        stateEventMap["m.room.member"][userId] = utils.mkMembership(
-            {user: userId, room: roomId, mship: "join"}
-        );
-        stateEventMap["m.room.name"][""] = utils.mkEvent(
-            {user: userId, room: roomId, type: "m.room.name",
-            content: {
-                name: "foo"
-            }}
-        );
-
         // stored timeline events
         var timeline0, timeline1, i;
 
@@ -327,7 +326,7 @@ describe("WebStorageStore", function() {
             expect(store.getRoom("nothing")).toEqual(null);
         });
 
-        xit("should assign a storageToken to the Room", function() {
+        it("should assign a storageToken to the Room", function() {
             mockStorageApi.setItem(stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
@@ -337,6 +336,66 @@ describe("WebStorageStore", function() {
 
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom.storageToken).toBeDefined();
+        });
+    });
+
+    describe("scrollback", function() {
+        // stored timeline events
+        var timeline0, timeline1, timeline2;
+
+        beforeEach(function() {
+            // batch size is 3
+            store = new WebStorageStore(mockStorageApi, 3);
+            timeline0 = [
+                // _
+                utils.mkMessage({user: userId, room: roomId}), // 1  OLDEST
+                utils.mkMessage({user: userId, room: roomId}), // 2
+            ];
+            timeline1 = [
+                utils.mkMessage({user: userId, room: roomId}), // 3
+                utils.mkMessage({user: userId, room: roomId}), // 4
+                utils.mkMessage({user: userId, room: roomId})  // 5
+            ];
+            timeline2 = [
+                utils.mkMessage({user: userId, room: roomId}), // 6
+                utils.mkMessage({user: userId, room: roomId}), // 7
+                utils.mkMessage({user: userId, room: roomId})  // 8  NEWEST
+            ];
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", timeline0);
+            mockStorageApi.setItem(prefix + "1", timeline1);
+            mockStorageApi.setItem(prefix + "2", timeline2);
+        });
+
+        it("should scroll back locally giving 'limit' events", function() {
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom.timeline.length).toEqual(3);
+            var events = store.scrollback(storedRoom, 3);
+            expect(events.length).toEqual(3);
+            // TODO expect(events).toEqual(timeline1);
+        });
+
+        it("should give less than 'limit' events near the end of the stored timeline",
+        function() {
+
+        });
+
+        it("should give 0 events if there is no token on the room", function() {
+            var r = new Room(roomId);
+            expect(store.scrollback(r, 3)).toEqual([]);
+        });
+
+        it("should given 0 events for unknown rooms", function() {
+            var r = new Room("!unknown:room");
+            expect(store.scrollback(r, 3)).toEqual([]);
+        });
+
+        it("should give 0 events if the boundary event is the last in the timeline",
+        function() {
+
         });
     });
 
