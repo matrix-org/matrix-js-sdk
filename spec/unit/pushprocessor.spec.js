@@ -197,7 +197,10 @@ describe('NotificationService', function() {
 
     beforeEach(function() {
         testEvent = utils.mkEvent({
-            type: "m.room.message", room: testRoomId, user: "@alfred:localhost", event: true,
+            type: "m.room.message",
+            room: testRoomId,
+            user: "@alfred:localhost",
+            event: true,
             content: {
                 body: "",
                 msgtype: "m.text"
