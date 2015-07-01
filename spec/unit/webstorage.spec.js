@@ -2,6 +2,7 @@
 var sdk = require("../..");
 var WebStorageStore = sdk.WebStorageStore;
 var Room = sdk.Room;
+var User = sdk.User;
 var utils = require("../test-utils");
 
 function MockStorageApi() {
@@ -336,6 +337,69 @@ describe("WebStorageStore", function() {
 
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom.storageToken).toBeDefined();
+        });
+    });
+
+    describe("getRooms", function() {
+        var mkState = function(id) {
+            return [
+                utils.mkEvent({
+                    event: true, type: "m.room.create", user: userId, room: id,
+                    content: {
+                        creator: userId
+                    }
+                }),
+                utils.mkMembership({
+                    event: true, user: userId, room: id, mship: "join"
+                })
+            ];
+        };
+
+        it("should get all rooms in the store", function() {
+            var roomIds = [
+                "!alpha:bet", "!beta:fet"
+            ];
+            // store 2 dynamically
+            var roomA = new Room(roomIds[0]);
+            roomA.currentState.setStateEvents(mkState(roomIds[0]));
+            var roomB = new Room(roomIds[1]);
+            roomB.currentState.setStateEvents(mkState(roomIds[1]));
+            store.storeRoom(roomA);
+            store.storeRoom(roomB);
+
+            var rooms = store.getRooms();
+            expect(rooms.length).toEqual(2);
+            for (var i = 0; i < rooms.length; i++) {
+                var index = roomIds.indexOf(rooms[i].roomId);
+                expect(index).not.toEqual(
+                    -1, "Unknown room"
+                );
+                roomIds.splice(index, 1);
+            }
+        });
+    });
+
+    describe("getUser", function() {
+        it("should be able to retrieve a stored user", function() {
+            var user = new User(userId);
+            store.storeUser(user);
+            var result = store.getUser(userId);
+            expect(result).toBeDefined();
+            expect(result.userId).toEqual(userId);
+        });
+
+        it("should be able to retrieve a stored user with name data", function() {
+            var presence = utils.mkEvent({
+                type: "m.presence", event: true, content: {
+                    user_id: userId,
+                    displayname: "Flibble"
+                }
+            });
+            var user = new User(userId);
+            user.setPresenceEvent(presence);
+            store.storeUser(user);
+            var result = store.getUser(userId);
+            expect(result.events.presence).toEqual(presence);
         });
     });
 });
