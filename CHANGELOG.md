@@ -8,6 +8,7 @@ New features:
 New methods:
  * `MatrixScheduler.getQueueForEvent(event)`
  * `MatrixScheduler.removeEventFromQueue(event)`
+ * `RoomMember.getAvatarUrl()`
  * `$DATA_STORE.setSyncToken(token)`
  * `$DATA_STORE.getSyncToken()`
 
