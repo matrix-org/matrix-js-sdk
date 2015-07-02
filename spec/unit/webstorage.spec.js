@@ -108,7 +108,7 @@ describe("WebStorageStore", function() {
             ];
             room.currentState.setStateEvents(stateEvents);
             store.storeRoom(room);
-            var storedEvents = mockStorageApi.getItem(
+            var storedEvents = getItem(mockStorageApi,
                 "room_" + roomId + "_state"
             ).events;
             expect(storedEvents["m.room.create"][""]).toEqual(stateEvents[0].event);
@@ -125,11 +125,11 @@ describe("WebStorageStore", function() {
             }
             room.timeline = timelineEvents;
             store.storeRoom(room);
-            expect(mockStorageApi.getItem(prefix + "-1")).toBe(null);
-            expect(mockStorageApi.getItem(prefix + "2")).toBe(null);
-            expect(mockStorageApi.getItem(prefix + "live")).toBe(null);
-            var timeline0 = mockStorageApi.getItem(prefix + "0");
-            var timeline1 = mockStorageApi.getItem(prefix + "1");
+            expect(getItem(mockStorageApi, prefix + "-1")).toBe(null);
+            expect(getItem(mockStorageApi, prefix + "2")).toBe(null);
+            expect(getItem(mockStorageApi, prefix + "live")).toBe(null);
+            var timeline0 = getItem(mockStorageApi, prefix + "0");
+            var timeline1 = getItem(mockStorageApi, prefix + "1");
             expect(timeline0.length).toEqual(batchNum);
             expect(timeline1.length).toEqual(batchNum - 1);
             for (i = 0; i < batchNum; i++) {
@@ -152,10 +152,10 @@ describe("WebStorageStore", function() {
             }
             room.timeline = timelineEvents;
             store.storeRoom(room);
-            expect(mockStorageApi.getItem(prefix + "-1")).toBe(null);
-            expect(mockStorageApi.getItem(prefix + "1")).toBe(null);
-            expect(mockStorageApi.getItem(prefix + "live")).toBe(null);
-            var timeline = mockStorageApi.getItem(prefix + "0");
+            expect(getItem(mockStorageApi, prefix + "-1")).toBe(null);
+            expect(getItem(mockStorageApi, prefix + "1")).toBe(null);
+            expect(getItem(mockStorageApi, prefix + "live")).toBe(null);
+            var timeline = getItem(mockStorageApi, prefix + "0");
             expect(timeline.length).toEqual(timelineEvents.length);
             for (i = 0; i < timeline.length; i++) {
                 expect(timeline[i]).toEqual(
@@ -181,7 +181,7 @@ describe("WebStorageStore", function() {
         });
 
         it("should reconstruct room state", function() {
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
@@ -199,11 +199,11 @@ describe("WebStorageStore", function() {
             var inviteEvent = utils.mkMembership({
                 user: userId, room: roomId, mship: "invite"
             });
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", [inviteEvent]);
+            setItem(mockStorageApi, prefix + "0", [inviteEvent]);
 
             var storedRoom = store.getRoom(roomId);
             expect(
@@ -215,12 +215,12 @@ describe("WebStorageStore", function() {
         });
 
         it("should reconstruct the room timeline", function() {
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", timeline0);
-            mockStorageApi.setItem(prefix + "1", timeline1);
+            setItem(mockStorageApi, prefix + "0", timeline0);
+            setItem(mockStorageApi, prefix + "1", timeline1);
 
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom).not.toBeNull();
@@ -245,13 +245,13 @@ describe("WebStorageStore", function() {
                 );
             }
 
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", timeline0);
-            mockStorageApi.setItem(prefix + "1", timeline1);
-            mockStorageApi.setItem(
+            setItem(mockStorageApi, prefix + "0", timeline0);
+            setItem(mockStorageApi, prefix + "1", timeline1);
+            setItem(mockStorageApi,
                 // deep copy the timeline via parse/stringify else items will
                 // be shift()ed from timelineLive and we can't compare!
                 prefix + "live", JSON.parse(JSON.stringify(timelineLive))
@@ -277,12 +277,12 @@ describe("WebStorageStore", function() {
                     utils.mkMessage({user: userId, room: roomId})
                 );
             }
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", []);
-            mockStorageApi.setItem(
+            setItem(mockStorageApi, prefix + "0", []);
+            setItem(mockStorageApi,
                 // deep copy the timeline via parse/stringify else items will
                 // be shift()ed from timelineLive and we can't compare!
                 prefix + "live", JSON.parse(JSON.stringify(timelineLive))
@@ -302,12 +302,12 @@ describe("WebStorageStore", function() {
 
         it("should be able to reconstruct the timeline with negative indices",
         function() {
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "-5", timeline0);
-            mockStorageApi.setItem(prefix + "-4", timeline1);
+            setItem(mockStorageApi, prefix + "-5", timeline0);
+            setItem(mockStorageApi, prefix + "-4", timeline1);
             var timeline = timeline0.concat(timeline1);
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom).not.toBeNull();
@@ -325,12 +325,12 @@ describe("WebStorageStore", function() {
         });
 
         it("should assign a storageToken to the Room", function() {
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", timeline0);
-            mockStorageApi.setItem(prefix + "1", timeline1);
+            setItem(mockStorageApi, prefix + "0", timeline0);
+            setItem(mockStorageApi, prefix + "1", timeline1);
 
             var storedRoom = store.getRoom(roomId);
             expect(storedRoom.storageToken).toBeDefined();
@@ -359,13 +359,13 @@ describe("WebStorageStore", function() {
                 utils.mkMessage({user: userId, room: roomId}), // 7
                 utils.mkMessage({user: userId, room: roomId})  // 8  NEWEST
             ];
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", timeline0);
-            mockStorageApi.setItem(prefix + "1", timeline1);
-            mockStorageApi.setItem(prefix + "2", timeline2);
+            setItem(mockStorageApi, prefix + "0", timeline0);
+            setItem(mockStorageApi, prefix + "1", timeline1);
+            setItem(mockStorageApi, prefix + "2", timeline2);
         });
 
         it("should scroll back locally giving 'limit' events", function() {
@@ -442,11 +442,11 @@ describe("WebStorageStore", function() {
             for (i = 0; i < batchNum; i++) {
                 timeline0.push(utils.mkMessage({user: userId, room: roomId}));
             }
-            mockStorageApi.setItem(stateKeyName, {
+            setItem(mockStorageApi, stateKeyName, {
                 events: stateEventMap,
                 pagination_token: "tok"
             });
-            mockStorageApi.setItem(prefix + "0", timeline0);
+            setItem(mockStorageApi, prefix + "0", timeline0);
         });
 
         it("should add to the live batch", function() {
@@ -455,7 +455,7 @@ describe("WebStorageStore", function() {
                 utils.mkMessage({user: userId, room: roomId, event: true})
             ];
             store.storeEvents(room, events, "atoken");
-            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            var liveEvents = getItem(mockStorageApi, prefix + "live");
             expect(liveEvents.length).toEqual(2);
             expect(liveEvents[0]).toEqual(events[0].event);
             expect(liveEvents[1]).toEqual(events[1].event);
@@ -463,13 +463,13 @@ describe("WebStorageStore", function() {
 
         it("should preserve existing live events in the store", function() {
             var existingEvent = utils.mkMessage({user: userId, room: roomId});
-            mockStorageApi.setItem(prefix + "live", [existingEvent]);
+            setItem(mockStorageApi, prefix + "live", [existingEvent]);
             var events = [
                 utils.mkMessage({user: userId, room: roomId, event: true}),
                 utils.mkMessage({user: userId, room: roomId, event: true})
             ];
             store.storeEvents(room, events, "atoken");
-            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            var liveEvents = getItem(mockStorageApi, prefix + "live");
             expect(liveEvents.length).toEqual(3);
             expect(liveEvents[0]).toEqual(existingEvent);
             expect(liveEvents[1]).toEqual(events[0].event);
@@ -482,7 +482,7 @@ describe("WebStorageStore", function() {
                 utils.mkMessage({user: userId, room: roomId, event: true})
             ];
             store.storeEvents(room, events, "atoken", true);
-            var timelineNeg1 = mockStorageApi.getItem(prefix + "-1");
+            var timelineNeg1 = getItem(mockStorageApi, prefix + "-1");
             expect(timelineNeg1.length).toEqual(2);
             expect(timelineNeg1[0]).toEqual(events[1].event);
             expect(timelineNeg1[1]).toEqual(events[0].event);
@@ -504,8 +504,8 @@ describe("WebStorageStore", function() {
             var events = timelineNeg2.concat(timelineNeg1).reverse();
             store.storeEvents(room, events, "atoken", true);
 
-            var storedNeg1 = mockStorageApi.getItem(prefix + "-1");
-            var storedNeg2 = mockStorageApi.getItem(prefix + "-2");
+            var storedNeg1 = getItem(mockStorageApi, prefix + "-1");
+            var storedNeg2 = getItem(mockStorageApi, prefix + "-2");
             expect(timelineNeg1.length).toEqual(storedNeg1.length);
             expect(timelineNeg2.length).toEqual(storedNeg2.length);
             for (i = 0; i < timelineNeg1.length; i++) {
@@ -526,11 +526,11 @@ describe("WebStorageStore", function() {
             room.currentState.setStateEvents(events);
             store.storeEvents(room, events, "atoken");
 
-            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            var liveEvents = getItem(mockStorageApi, prefix + "live");
             expect(liveEvents.length).toEqual(1);
             expect(liveEvents[0]).toEqual(events[0].event);
 
-            var stateEvents = mockStorageApi.getItem(stateKeyName);
+            var stateEvents = getItem(mockStorageApi, stateKeyName);
             expect(stateEvents.events["m.room.name"][""]).toEqual(events[0].event);
         });
     });
@@ -594,7 +594,16 @@ describe("WebStorageStore", function() {
             user.setPresenceEvent(presence);
             store.storeUser(user);
             var result = store.getUser(userId);
+            console.log(result);
             expect(result.events.presence).toEqual(presence);
         });
     });
 });
+
+function getItem(store, key) {
+    return JSON.parse(store.getItem(key));
+}
+
+function setItem(store, key, val) {
+    store.setItem(key, JSON.stringify(val));
+}
