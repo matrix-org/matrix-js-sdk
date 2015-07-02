@@ -375,12 +375,39 @@ describe("WebStorageStore", function() {
             expect(storedRoom.timeline.length).toEqual(3);
             var events = store.scrollback(storedRoom, 3);
             expect(events.length).toEqual(3);
-            // TODO expect(events).toEqual(timeline1);
+            expect(events.reverse()).toEqual(timeline1);
         });
 
         it("should give less than 'limit' events near the end of the stored timeline",
         function() {
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom.timeline.length).toEqual(3);
+            var events = store.scrollback(storedRoom, 7);
+            expect(events.length).toEqual(5);
+            expect(events.reverse()).toEqual(timeline0.concat(timeline1));
+        });
 
+        it("should progressively give older messages the more times scrollback is called",
+        function() {
+            var events;
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom.timeline.length).toEqual(3);
+
+            events = store.scrollback(storedRoom, 2);
+            expect(events.reverse()).toEqual([timeline1[1], timeline1[2]]);
+            expect(storedRoom.timeline.length).toEqual(5);
+
+            events = store.scrollback(storedRoom, 2);
+            expect(events.reverse()).toEqual([timeline0[1], timeline1[0]]);
+            expect(storedRoom.timeline.length).toEqual(7);
+
+            events = store.scrollback(storedRoom, 2);
+            expect(events).toEqual([timeline0[0]]);
+            expect(storedRoom.timeline.length).toEqual(8);
+
+            events = store.scrollback(storedRoom, 2);
+            expect(events).toEqual([]);
+            expect(storedRoom.timeline.length).toEqual(8);
         });
 
         it("should give 0 events if there is no token on the room", function() {
@@ -390,6 +417,7 @@ describe("WebStorageStore", function() {
 
         it("should given 0 events for unknown rooms", function() {
             var r = new Room("!unknown:room");
+            r.storageToken = "foo";
             expect(store.scrollback(r, 3)).toEqual([]);
         });
 
