@@ -415,7 +415,7 @@ describe("WebStorageStore", function() {
             expect(store.scrollback(r, 3)).toEqual([]);
         });
 
-        it("should given 0 events for unknown rooms", function() {
+        it("should give 0 events for unknown rooms", function() {
             var r = new Room("!unknown:room");
             r.storageToken = "foo";
             expect(store.scrollback(r, 3)).toEqual([]);
@@ -423,7 +423,16 @@ describe("WebStorageStore", function() {
 
         it("should give 0 events if the boundary event is the last in the timeline",
         function() {
+            var events;
+            var storedRoom = store.getRoom(roomId);
+            expect(storedRoom.timeline.length).toEqual(3);
 
+            // go up to the boundary (8 messages total)
+            events = store.scrollback(storedRoom, 5);
+            expect(events.length).toEqual(5);
+
+            events = store.scrollback(storedRoom, 5);
+            expect(events.length).toEqual(0);
         });
     });
 
