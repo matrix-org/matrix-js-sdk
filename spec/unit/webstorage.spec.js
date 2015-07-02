@@ -115,7 +115,6 @@ describe("WebStorageStore", function() {
         });
 
         it("should persist timeline events correctly", function() {
-            var prefix = "room_" + roomId + "_timeline_";
             var timelineEvents = [];
             var entries = batchNum + batchNum - 1;
             var i = 0;
@@ -143,7 +142,6 @@ describe("WebStorageStore", function() {
 
         it("should persist timeline events in one bucket if batchNum=0", function() {
             store = new WebStorageStore(mockStorageApi, 0);
-            var prefix = "room_" + roomId + "_timeline_";
             var timelineEvents = [];
             var entries = batchNum + batchNum - 1;
             var i = 0;
@@ -433,6 +431,107 @@ describe("WebStorageStore", function() {
 
             events = store.scrollback(storedRoom, 5);
             expect(events.length).toEqual(0);
+        });
+    });
+
+    describe("storeEvents", function() {
+        var timeline0, i;
+
+        beforeEach(function() {
+            timeline0 = [];
+            for (i = 0; i < batchNum; i++) {
+                timeline0.push(utils.mkMessage({user: userId, room: roomId}));
+            }
+            mockStorageApi.setItem(stateKeyName, {
+                events: stateEventMap,
+                pagination_token: "tok"
+            });
+            mockStorageApi.setItem(prefix + "0", timeline0);
+        });
+
+        it("should add to the live batch", function() {
+            var events = [
+                utils.mkMessage({user: userId, room: roomId, event: true}),
+                utils.mkMessage({user: userId, room: roomId, event: true})
+            ];
+            store.storeEvents(room, events, "atoken");
+            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            expect(liveEvents.length).toEqual(2);
+            expect(liveEvents[0]).toEqual(events[0].event);
+            expect(liveEvents[1]).toEqual(events[1].event);
+        });
+
+        it("should preserve existing live events in the store", function() {
+            var existingEvent = utils.mkMessage({user: userId, room: roomId});
+            mockStorageApi.setItem(prefix + "live", [existingEvent]);
+            var events = [
+                utils.mkMessage({user: userId, room: roomId, event: true}),
+                utils.mkMessage({user: userId, room: roomId, event: true})
+            ];
+            store.storeEvents(room, events, "atoken");
+            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            expect(liveEvents.length).toEqual(3);
+            expect(liveEvents[0]).toEqual(existingEvent);
+            expect(liveEvents[1]).toEqual(events[0].event);
+            expect(liveEvents[2]).toEqual(events[1].event);
+        });
+
+        it("should add to the lowest batch index if toStart=true", function() {
+            var events = [
+                utils.mkMessage({user: userId, room: roomId, event: true}),
+                utils.mkMessage({user: userId, room: roomId, event: true})
+            ];
+            store.storeEvents(room, events, "atoken", true);
+            var timelineNeg1 = mockStorageApi.getItem(prefix + "-1");
+            expect(timelineNeg1.length).toEqual(2);
+            expect(timelineNeg1[0]).toEqual(events[1].event);
+            expect(timelineNeg1[1]).toEqual(events[0].event);
+        });
+
+        it("should add multiple batches to the lowest batch index if toStart=true",
+        function() {
+            var timelineNeg1 = [];
+            var timelineNeg2 = [];
+            for (i = 0; i < batchNum; i++) {
+                timelineNeg1.push(
+                    utils.mkMessage({user: userId, room: roomId, event: true})
+                );
+                timelineNeg2.push(
+                    utils.mkMessage({user: userId, room: roomId, event: true})
+                );
+            }
+
+            var events = timelineNeg2.concat(timelineNeg1).reverse();
+            store.storeEvents(room, events, "atoken", true);
+
+            var storedNeg1 = mockStorageApi.getItem(prefix + "-1");
+            var storedNeg2 = mockStorageApi.getItem(prefix + "-2");
+            expect(timelineNeg1.length).toEqual(storedNeg1.length);
+            expect(timelineNeg2.length).toEqual(storedNeg2.length);
+            for (i = 0; i < timelineNeg1.length; i++) {
+                expect(timelineNeg1[i].event).toEqual(storedNeg1[i]);
+                expect(timelineNeg2[i].event).toEqual(storedNeg2[i]);
+            }
+        });
+
+        it("should update stored state if state events exist", function() {
+            var events = [
+                utils.mkEvent({
+                    user: userId, room: roomId, type: "m.room.name", event: true,
+                    content: {
+                        name: "Room Name Here for updates"
+                    }
+                })
+            ];
+            room.currentState.setStateEvents(events);
+            store.storeEvents(room, events, "atoken");
+
+            var liveEvents = mockStorageApi.getItem(prefix + "live");
+            expect(liveEvents.length).toEqual(1);
+            expect(liveEvents[0]).toEqual(events[0].event);
+
+            var stateEvents = mockStorageApi.getItem(stateKeyName);
+            expect(stateEvents.events["m.room.name"][""]).toEqual(events[0].event);
         });
     });
 
