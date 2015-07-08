@@ -86,6 +86,21 @@ rl.on('line', function(line) {
                 print("/invite Error: %s", err);
             });
         }
+        else if (line.indexOf("/file ") === 0) {
+            var filename = line.split(" ")[1].trim();
+            var stream = fs.createReadStream(filename);
+            matrixClient.uploadContent({
+                stream: stream,
+                name: filename
+            }).done(function(url) {
+                var content = {
+                    msgtype: "m.file",
+                    body: filename,
+                    url: JSON.parse(url).content_uri
+                };
+                matrixClient.sendMessage(viewingRoom.roomId, content);
+            });
+        }
         else {
             matrixClient.sendTextMessage(viewingRoom.roomId, line).finally(function() {
                 printMessages();
