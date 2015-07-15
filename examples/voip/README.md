@@ -2,7 +2,7 @@ To try it out, **you must build the SDK first** and then host this folder:
 
 ```
  $ npm run build
- $ cd examples/browser
+ $ cd examples/voip
  $ python -m SimpleHTTPServer 8003
 ```
 
