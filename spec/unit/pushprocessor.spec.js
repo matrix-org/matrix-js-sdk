@@ -21,7 +21,8 @@ describe('NotificationService', function() {
                         return {
                             name: testDisplayName
                         };
-                    }
+                    },
+                    members: {}
                 }
             };
         },
