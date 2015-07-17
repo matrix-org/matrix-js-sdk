@@ -210,7 +210,7 @@ describe("MatrixClient crypto", function() {
         bobClient.startClient();
     }
 
-    it("Ali sends a message", function(done) {
+    it("Bob receives a message", function(done) {
         bobUploadsKeys(function() {
             aliDownloadsKeys(function() {
                 aliEnablesEncryption(function() {
