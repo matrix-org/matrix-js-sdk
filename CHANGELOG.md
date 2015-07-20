@@ -1,6 +1,10 @@
 Changes in 0.1.2
 ================
 
+Breaking changes:
+ * `MatrixClient.setPowerLevel` now expects a `MatrixEvent` and not an `Object`
+   for the `event` parameter.
+
 New features:
  * Added `EventStatus.QUEUED` which is set on an event when it is waiting to be
    sent by the scheduler and there are other events in front.
