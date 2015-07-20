@@ -64,6 +64,53 @@ describe("MatrixClient syncing", function() {
         });
     });
 
+    describe("users", function() {
+        var userA = "@alice:bar";
+        var userB = "@bob:bar";
+        var userC = "@claire:bar";
+        var initialSync = {
+            end: "s_5_3",
+            presence: [
+                utils.mkPresence({
+                    user: userA, presence: "online"
+                }),
+                utils.mkPresence({
+                    user: userB, presence: "unavailable"
+                })
+            ],
+            rooms: []
+        };
+        var eventData = {
+            start: "s_5_3",
+            end: "e_6_7",
+            chunk: [
+                // existing user change
+                utils.mkPresence({
+                    user: userA, presence: "offline"
+                }),
+                // new user C
+                utils.mkPresence({
+                    user: userC, presence: "online"
+                })
+            ]
+        };
+
+        it("should create users for presence events from /initialSync and /events",
+        function(done) {
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(client.getUser(userA).presence).toEqual("offline");
+                expect(client.getUser(userB).presence).toEqual("unavailable");
+                expect(client.getUser(userC).presence).toEqual("online");
+                done();
+            });
+        });
+    });
+
     describe("room state", function() {
         var roomOne = "!foo:localhost";
         var roomTwo = "!bar:localhost";

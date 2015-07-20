@@ -77,6 +77,29 @@ module.exports.mkEvent = function(opts) {
 };
 
 /**
+ * Create an m.presence event.
+ * @param {Object} opts Values for the presence.
+ * @return {Object|MatrixEvent} The event
+ */
+module.exports.mkPresence = function(opts) {
+    if (!opts.user) {
+        throw new Error("Missing user");
+    }
+    var event = {
+        event_id: "$" + Math.random() + "-" + Math.random(),
+        type: "m.presence",
+        content: {
+            user_id: opts.user,
+            avatar_url: opts.url,
+            displayname: opts.name,
+            last_active_ago: opts.ago,
+            presence: opts.presence || "offline"
+        }
+    };
+    return opts.event ? new MatrixEvent(event) : event;
+};
+
+/**
  * Create an m.room.member event.
  * @param {Object} opts Values for the membership.
  * @param {string} opts.room The room ID for the event.
