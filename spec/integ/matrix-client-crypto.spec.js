@@ -150,6 +150,7 @@ describe("MatrixClient crypto", function() {
         }).then(function(res) {
             expect(res.missingUsers).toEqual([]);
             expect(res.missingDevices).toEqual({});
+            expect(aliClient.isRoomEncrypted(roomId)).toBeTruthy();
             done();
         });
         httpBackend.flush();
