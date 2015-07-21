@@ -220,7 +220,7 @@ describe("MatrixClient crypto", function() {
                 });
             });
         });
-    });
+    }, 30000); //timeout after 30s
 
 
 
