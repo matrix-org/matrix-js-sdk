@@ -213,6 +213,7 @@ describe("MatrixClient crypto", function() {
             done();
         });
         bobClient.startClient();
+        httpBackend.flush();
     }
 
     it("Bob receives a message", function(done) {
