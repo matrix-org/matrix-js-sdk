@@ -96,7 +96,7 @@ HttpBackend.prototype = {
                 console.log("    responding to %s", matchingReq.path);
                 var body = testResponse.body;
                 if (Object.prototype.toString.call(body) == "[object Function]") {
-                    body = body();
+                    body = body(req.path, req.data);
                 }
                 req.callback(
                     testResponse.err, testResponse.response, body
