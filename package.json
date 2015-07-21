@@ -24,7 +24,8 @@
     "browser-request": "^0.3.3",
     "browserify": "^10.2.3",
     "q": "^1.4.1",
-    "request": "^2.53.0"
+    "request": "^2.53.0",
+    "olm": "0.1.0"
   },
   "devDependencies": {
     "watchify": "^3.2.1",
