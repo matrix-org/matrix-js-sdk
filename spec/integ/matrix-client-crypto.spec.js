@@ -23,11 +23,11 @@ describe("MatrixClient crypto", function() {
     var aliClient;
     var roomId = "!room:localhost";
     var aliUserId = "@ali:localhost";
-    var aliDeviceId = "zxcvb"
+    var aliDeviceId = "zxcvb";
     var aliAccessToken = "aseukfgwef";
-    var bobClient, httpBackend;
+    var bobClient;
     var bobUserId = "@bob:localhost";
-    var bobDeviceId = "bvcxz"
+    var bobDeviceId = "bvcxz";
     var bobAccessToken = "fewgfkuesa";
     var bobOneTimeKeys;
     var bobDeviceKeys;
@@ -50,7 +50,7 @@ describe("MatrixClient crypto", function() {
             userId: aliUserId,
             accessToken: aliAccessToken,
             deviceId: aliDeviceId,
-            sessionStore: aliStorage,
+            sessionStore: aliStorage
         });
 
         bobClient = sdk.createClient({
@@ -58,7 +58,7 @@ describe("MatrixClient crypto", function() {
             userId: bobUserId,
             accessToken: bobAccessToken,
             deviceId: bobDeviceId,
-            sessionStore: bobStorage,
+            sessionStore: bobStorage
         });
 
         httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -78,15 +78,18 @@ describe("MatrixClient crypto", function() {
     });
 
     function bobUploadsKeys(done) {
-        httpBackend.when("POST", "/keys/upload/bvcxz").respond(200, function(path, content) {
+        var uploadPath = "/keys/upload/bvcxz";
+        httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
             expect(content.one_time_keys).toEqual({});
-            httpBackend.when("POST", "/keys/upload/bvcxz").respond(200, function(path, content) {
+            httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
                 expect(content.one_time_keys).not.toEqual({});
                 bobDeviceKeys = content.device_keys;
                 bobOneTimeKeys = content.one_time_keys;
-                var count =  0;
+                var count = 0;
                 for (var key in content.one_time_keys) {
-                    count++;
+                    if (content.one_time_keys.hasOwnProperty(key)) {
+                        count++;
+                    }
                 }
                 expect(count).toEqual(5);
                 return {one_time_key_counts: {curve25519: count}};
@@ -102,7 +105,7 @@ describe("MatrixClient crypto", function() {
         });
     }
 
-    it("Bob should upload without one-time keys and then again with one-time keys", bobUploadsKeys);
+    it("Bob uploads without one-time keys and with one-time keys", bobUploadsKeys);
 
     function aliDownloadsKeys(done) {
         var bobKeys = {};
@@ -129,8 +132,10 @@ describe("MatrixClient crypto", function() {
         httpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
             expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
             for (var keyId in bobOneTimeKeys) {
-                if (keyId.indexOf("curve25519:") == 0) {
-                    break;
+                if (bobOneTimeKeys.hasOwnProperty(keyId)) {
+                    if (keyId.indexOf("curve25519:") === 0) {
+                        break;
+                    }
                 }
             }
             var result = {};
@@ -159,7 +164,7 @@ describe("MatrixClient crypto", function() {
     });
 
     function aliSendsMessage(done) {
-        var txnId = "a.transaction.id"
+        var txnId = "a.transaction.id";
         var path = "/send/m.room.encrypted/" + txnId;
         httpBackend.when("PUT", path).respond(200, function(path, content) {
             aliMessage = content;
@@ -169,7 +174,7 @@ describe("MatrixClient crypto", function() {
         aliClient.sendMessage(
             roomId, {msgtype: "m.text", body: "Hello, World"}, txnId
         );
-        httpBackend.flush().done(function() {done()});
+        httpBackend.flush().done(function() {done();});
     }
 
     it("Ali sends a message", function(done) {
@@ -221,8 +226,5 @@ describe("MatrixClient crypto", function() {
             });
         });
     }, 30000); //timeout after 30s
-
-
-
 
 });
