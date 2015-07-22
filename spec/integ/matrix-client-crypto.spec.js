@@ -32,6 +32,7 @@ describe("MatrixClient crypto", function() {
     var bobOneTimeKeys;
     var bobDeviceKeys;
     var bobDeviceCurve25519Key;
+    var bobDeviceEd25519Key;
     var aliLocalStore;
     var aliStorage;
     var bobStorage;
@@ -101,6 +102,7 @@ describe("MatrixClient crypto", function() {
             expect(bobDeviceKeys).toBeDefined();
             expect(bobOneTimeKeys).toBeDefined();
             bobDeviceCurve25519Key = bobDeviceKeys.keys["curve25519:bvcxz"];
+            bobDeviceEd25519Key = bobDeviceKeys.keys["ed25519:bvcxz"];
             done();
         });
     }
@@ -116,7 +118,12 @@ describe("MatrixClient crypto", function() {
             result[bobUserId] = bobKeys;
             return {device_keys: result};
         });
-        aliClient.downloadKeys([bobUserId]);
+        aliClient.downloadKeys([bobUserId]).then(function() {
+            expect(aliClient.listDeviceKeys(bobUserId)).toEqual([{
+                id: "bvcxz",
+                key: bobDeviceEd25519Key
+            }]);
+        });
         httpBackend.flush().done(function() {
             var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
             expect(devices).toEqual(bobKeys);
