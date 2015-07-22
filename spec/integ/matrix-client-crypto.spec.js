@@ -218,6 +218,7 @@ describe("MatrixClient crypto", function() {
                 msgtype: "m.text",
                 body: "Hello, World"
             });
+            expect(event.isEncrypted()).toBeTruthy();
             done();
         });
         bobClient.startClient();
