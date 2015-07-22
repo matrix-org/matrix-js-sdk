@@ -347,7 +347,7 @@ describe("WebStorageStore", function() {
             timeline0 = [
                 // _
                 utils.mkMessage({user: userId, room: roomId}), // 1  OLDEST
-                utils.mkMessage({user: userId, room: roomId}), // 2
+                utils.mkMessage({user: userId, room: roomId})  // 2
             ];
             timeline1 = [
                 utils.mkMessage({user: userId, room: roomId}), // 3
