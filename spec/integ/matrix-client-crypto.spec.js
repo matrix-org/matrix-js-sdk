@@ -18,6 +18,10 @@ MockStorageApi.prototype = {
 };
 
 describe("MatrixClient crypto", function() {
+    if (!sdk.CRYPTO_ENABLED) {
+        return;
+    }
+
     var baseUrl = "http://localhost.or.something";
     var httpBackend;
     var aliClient;
