@@ -86,6 +86,21 @@ rl.on('line', function(line) {
                 print("/invite Error: %s", err);
             });
         }
+        else if (line.indexOf("/file ") === 0) {
+            var filename = line.split(" ")[1].trim();
+            var stream = fs.createReadStream(filename);
+            matrixClient.uploadContent({
+                stream: stream,
+                name: filename
+            }).done(function(url) {
+                var content = {
+                    msgtype: "m.file",
+                    body: filename,
+                    url: JSON.parse(url).content_uri
+                };
+                matrixClient.sendMessage(viewingRoom.roomId, content);
+            });
+        }
         else {
             matrixClient.sendTextMessage(viewingRoom.roomId, line).finally(function() {
                 printMessages();
@@ -102,7 +117,7 @@ rl.on('line', function(line) {
             if (viewingRoom.getMember(myUserId).membership === "invite") {
                 // join the room first
                 matrixClient.joinRoom(viewingRoom.roomId).done(function(room) {
-                    roomList = matrixClient.getRooms();
+                    setRoomList();
                     viewingRoom = room;
                     printMessages();
                     rl.prompt();
@@ -121,14 +136,14 @@ rl.on('line', function(line) {
 
 // show the room list after syncing.
 matrixClient.on("syncComplete", function() {
-    roomList = matrixClient.getRooms();
+    setRoomList();
     printRoomList();
     printHelp();
     rl.prompt();
 });
 
 matrixClient.on("Room", function() {
-    roomList = matrixClient.getRooms();
+    setRoomList();
     if (!viewingRoom) {
         printRoomList();
         rl.prompt();
@@ -146,29 +161,70 @@ matrixClient.on("Room.timeline", function(event, room, toStartOfTimeline) {
     printLine(event);
 });
 
+function setRoomList() {
+    roomList = matrixClient.getRooms();
+    roomList.sort(function(a,b) {
+        // < 0 = a comes first (lower index) - we want high indexes = newer
+        var aMsg = a.timeline[a.timeline.length-1];
+        if (!aMsg) {
+            return -1;
+        }
+        var bMsg = b.timeline[b.timeline.length-1];
+        if (!bMsg) {
+            return 1;
+        }
+        if (aMsg.getTs() > bMsg.getTs()) {
+            return 1;
+        }
+        else if (aMsg.getTs() < bMsg.getTs()) {
+            return -1;
+        }
+        return 0;
+    });
+}
+
 function printRoomList() {
+    print(CLEAR_CONSOLE);
     print("Room List:");
+    var fmts = {
+        "invite": clc.cyanBright,
+        "leave": clc.blackBright
+    };
     for (var i = 0; i < roomList.length; i++) {
+        var msg = roomList[i].timeline[roomList[i].timeline.length-1];
+        var dateStr = "---";
+        var fmt;
+        if (msg) {
+            dateStr = new Date(msg.getTs()).toISOString().replace(
+                /T/, ' ').replace(/\..+/, '');
+        }
+        var me = roomList[i].getMember(myUserId);
+        if (me) {
+            fmt = fmts[me.membership];
+        }
+        var roomName = fixWidth(roomList[i].name, 25);
         print(
-            "[%s] %s (%s members)",
-            i, roomList[i].name, roomList[i].getJoinedMembers().length
+            "[%s] %s (%s members)  %s",
+            i, fmt ? fmt(roomName) : roomName,
+            roomList[i].getJoinedMembers().length,
+            dateStr
         );
     }
 }
 
 function printHelp() {
-    var hlp = clc.italic;
+    var hlp = clc.italic.white;
     print("Global commands:", hlp);
-    print("  '/help' : Show this help.");
+    print("  '/help' : Show this help.", clc.white);
     print("Room list index commands:", hlp);
-    print("  '/join <index>' Join a room, e.g. '/join 5'");
+    print("  '/join <index>' Join a room, e.g. '/join 5'", clc.white);
     print("Room commands:", hlp);
-    print("  '/exit' Return to the room list index.");
-    print("  '/members' Show the room member list.");
-    print("  '/invite @foo:bar' Invite @foo:bar to the room.");
-    print("  '/more 15' Scrollback 15 events");
-    print("  '/resend' Resend the oldest event which failed to send.");
-    print("  '/roominfo' Display room info e.g. name, topic.");
+    print("  '/exit' Return to the room list index.", clc.white);
+    print("  '/members' Show the room member list.", clc.white);
+    print("  '/invite @foo:bar' Invite @foo:bar to the room.", clc.white);
+    print("  '/more 15' Scrollback 15 events", clc.white);
+    print("  '/resend' Resend the oldest event which failed to send.", clc.white);
+    print("  '/roominfo' Display room info e.g. name, topic.", clc.white);
 }
 
 function completer(line) {
@@ -193,6 +249,12 @@ function printMessages() {
 }
 
 function printMemberList(room) {
+    var fmts = {
+        "join": clc.green,
+        "ban": clc.red,
+        "invite": clc.blue,
+        "leave": clc.blackBright
+    };
     var members = room.currentState.getMembers();
     // sorted based on name.
     members.sort(function(a, b) {
@@ -210,12 +272,15 @@ function printMemberList(room) {
         if (!member.membership) {
             return;
         }
+        var fmt = fmts[member.membership] || function(a){return a;};
         var membershipWithPadding = (
             member.membership + new Array(10 - member.membership.length).join(" ")
         );
         print(
-            "%s :: %s (%s)", membershipWithPadding, member.name, 
-            (member.userId === myUserId ? "Me" : member.userId)
+            "%s"+fmt(" :: ")+"%s"+fmt(" (")+"%s"+fmt(")"), 
+            membershipWithPadding, member.name, 
+            (member.userId === myUserId ? "Me" : member.userId),
+            fmt
         );
     });
 }
@@ -288,6 +353,7 @@ function printLine(event) {
             "[State: "+stateName+" updated to: "+JSON.stringify(event.getContent())+"]"
         );
         separator = "---";
+        fmt = clc.xterm(249).italic;
     }
     else {
         // random message event
@@ -295,10 +361,11 @@ function printLine(event) {
             "[Message: "+event.getType()+" Content: "+JSON.stringify(event.getContent())+"]"
         );
         separator = "---";
+        fmt = clc.xterm(249).italic;
     }
     if (fmt) {
         print(
-            "[%s] %s %s %s", fmt(time), fmt(name), fmt(separator), fmt(body)
+            "[%s] %s %s %s", time, name, separator, body, fmt
         );
     }
     else {
@@ -307,11 +374,23 @@ function printLine(event) {
 }
 
 function print(str, formatter) {
-    if (arguments.length == 2 && typeof arguments[1] === "function") {
-        console.log(arguments[1](str));
-        return;
+    if (typeof arguments[arguments.length-1] === "function") {
+        // last arg is the formatter so get rid of it and use it on each
+        // param passed in but not the template string.
+        var newArgs = [];
+        var i = 0;
+        for (i=0; i<arguments.length-1; i++) {
+            newArgs.push(arguments[i]);
+        }
+        var fmt = arguments[arguments.length-1];
+        for (i=0; i<newArgs.length; i++) {
+            newArgs[i] = fmt(newArgs[i]);
+        }
+        console.log.apply(console.log, newArgs);
     }
-    console.log.apply(console.log, arguments);
+    else {
+        console.log.apply(console.log, arguments);
+    }
 }
 
 function fixWidth(str, len) {

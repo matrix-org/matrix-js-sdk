@@ -1,0 +1,305 @@
+"use strict";
+var PushProcessor = require("../../lib/pushprocessor");
+var MatrixEvent = MatrixEvent;
+var utils = require("../test-utils");
+
+describe('NotificationService', function() {
+    var testUserId = "@ali:matrix.org";
+    var testDisplayName = "Alice M";
+    var testRoomId = "!fl1bb13:localhost";
+
+    var testEvent;
+
+    var pushProcessor;
+
+    // These would be better if individual rules were configured in the tests themselves.
+    var matrixClient = {
+        getRoom: function() {
+            return {
+                currentState: {
+                    getMember: function() {
+                        return {
+                            name: testDisplayName
+                        };
+                    },
+                    members: {}
+                }
+            };
+        },
+        credentials: {
+            userId: testUserId
+        },
+        pushRules: {
+            "device": {},
+            "global": {
+                "content": [
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "ali",
+                        "rule_id": ".m.rule.contains_user_name"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "coffee",
+                        "rule_id": "coffee"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "foo*bar",
+                        "rule_id": "foobar"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "p[io]ng",
+                        "rule_id": "pingpong"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "I ate [0-9] pies",
+                        "rule_id": "pies"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "enabled": true,
+                        "pattern": "b[!ai]ke",
+                        "rule_id": "bakebike"
+                    }
+                ],
+                "override": [
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            },
+                            {
+                                "set_tweak": "highlight"
+                            }
+                        ],
+                        "conditions": [
+                            {
+                                "kind": "contains_display_name"
+                            }
+                        ],
+                        "enabled": true,
+                        "rule_id": ".m.rule.contains_display_name"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "sound",
+                                "value": "default"
+                            }
+                        ],
+                        "conditions": [
+                            {
+                                "is": "2",
+                                "kind": "room_member_count"
+                            }
+                        ],
+                        "enabled": true,
+                        "rule_id": ".m.rule.room_one_to_one"
+                    }
+                ],
+                "room": [],
+                "sender": [],
+                "underride": [
+                    {
+                        "actions": [
+                            "dont-notify"
+                        ],
+                        "conditions": [
+                            {
+                                "key": "content.msgtype",
+                                "kind": "event_match",
+                                "pattern": "m.notice"
+                            }
+                        ],
+                        "enabled": true,
+                        "rule_id": ".m.rule.suppress_notices"
+                    },
+                    {
+                        "actions": [
+                            "notify",
+                            {
+                                "set_tweak": "highlight",
+                                "value": false
+                            }
+                        ],
+                        "conditions": [],
+                        "enabled": true,
+                        "rule_id": ".m.rule.fallback"
+                    }
+                ]
+            }
+        }
+    };
+
+    beforeEach(function() {
+        testEvent = utils.mkEvent({
+            type: "m.room.message",
+            room: testRoomId,
+            user: "@alfred:localhost",
+            event: true,
+            content: {
+                body: "",
+                msgtype: "m.text"
+            }
+        });
+        pushProcessor = new PushProcessor(matrixClient);
+        console.log("badger: " + JSON.stringify(pushProcessor));
+    });
+
+    // User IDs
+
+    it('should bing on a user ID.', function() {
+        testEvent.event.content.body = "Hello @ali:matrix.org, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on a partial user ID with an @.', function() {
+        testEvent.event.content.body = "Hello @ali, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on a partial user ID without @.', function() {
+        testEvent.event.content.body = "Hello ali, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on a case-insensitive user ID.', function() {
+        testEvent.event.content.body = "Hello @AlI:matrix.org, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    // Display names
+
+    it('should bing on a display name.', function() {
+        testEvent.event.content.body = "Hello Alice M, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on a case-insensitive display name.', function() {
+        testEvent.event.content.body = "Hello ALICE M, how are you?";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    // Bing words
+
+    it('should bing on a bing word.', function() {
+        testEvent.event.content.body = "I really like coffee";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on case-insensitive bing words.', function() {
+        testEvent.event.content.body = "Coffee is great";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on wildcard (.*) bing words.', function() {
+        testEvent.event.content.body = "It was foomahbar I think.";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on character group ([abc]) bing words.', function() {
+        testEvent.event.content.body = "Ping!";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+        testEvent.event.content.body = "Pong!";
+        actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on character range ([a-z]) bing words.', function() {
+        testEvent.event.content.body = "I ate 6 pies";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+    });
+
+    it('should bing on character negation ([!a]) bing words.', function() {
+        testEvent.event.content.body = "boke";
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(true);
+        testEvent.event.content.body = "bake";
+        actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(false);
+    });
+
+    // invalid
+
+    it('should gracefully handle bad input.', function() {
+        testEvent.event.content.body = { "foo": "bar" };
+        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        expect(actions.tweaks.highlight).toEqual(false);
+    });
+});
