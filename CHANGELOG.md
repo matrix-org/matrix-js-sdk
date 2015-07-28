@@ -49,9 +49,11 @@ Crypto infrastructure (crypto is *NOT* available in this version):
 
 New classes:
  * `MatrixCall`
+ * `WebStorageStore` - *WIP; unstable*
+ * `WebStorageSessionStore` - *WIP; unstable*
 
 Bug fixes:
- * Member name bugfix: Fixed an issue which prevented RoomMember.name being
+ * Member name bugfix: Fixed an issue which prevented `RoomMember.name` being
    disambiguated if there was exactly 1 other person with the same display name.
  * Member name bugfix: Disambiguate both clashing display names with user IDs in
    the event of a clash.
