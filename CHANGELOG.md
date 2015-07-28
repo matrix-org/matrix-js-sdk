@@ -1,3 +1,12 @@
+Changes in 0.2.1
+================
+
+New methods:
+ * `MatrixClient.createAlias(alias, roomId)`
+ * `MatrixClient.getRoomIdForAlias(alias)`
+ * `MatrixClient.sendNotice(roomId, body, txnId, callback)`
+ * `MatrixClient.sendHtmlNotice(roomId, body, htmlBody, callback)`
+
 Changes in 0.2.0
 ================
 
