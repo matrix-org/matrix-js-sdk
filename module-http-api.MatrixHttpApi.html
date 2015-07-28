@@ -247,6 +247,30 @@ null to not send an access token.</td>
         </tr>
 
     
+
+        <tr>
+            
+                <td class="name"><code>extraParams</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. Extra query parameters to send on
+requests.</td>
+        </tr>
+
+    
     </tbody>
 </table>
 
@@ -291,7 +315,7 @@ null to not send an access token.</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line43">line 43</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line49">line 49</a>
     </li></ul></dd>
     
 
@@ -535,7 +559,7 @@ urlencoded).</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line159">line 159</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line273">line 273</a>
     </li></ul></dd>
     
 
@@ -833,7 +857,7 @@ urlencoded).</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line209">line 209</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line323">line 323</a>
     </li></ul></dd>
     
 
@@ -961,7 +985,7 @@ occurred. This includes network problems and Matrix-specific error JSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line131">line 131</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line137">line 137</a>
     </li></ul></dd>
     
 
@@ -1185,7 +1209,7 @@ occurred. This includes network problems and Matrix-specific error JSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line63">line 63</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line69">line 69</a>
     </li></ul></dd>
     
 
@@ -1384,7 +1408,7 @@ occurred. This includes network problems and Matrix-specific error JSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line107">line 107</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line113">line 113</a>
     </li></ul></dd>
     
 
@@ -1632,7 +1656,7 @@ urlencoded).</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line182">line 182</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line296">line 296</a>
     </li></ul></dd>
     
 
@@ -1930,7 +1954,7 @@ urlencoded).</td>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line240">line 240</a>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line354">line 354</a>
     </li></ul></dd>
     
 
@@ -2003,6 +2027,186 @@ occurred. This includes network problems and Matrix-specific error JSON.
 
 
         
+            
+
+    
+
+    <h4 class="name" id="uploadContent"><span class="type-signature"></span>uploadContent<span class="signature">(file, callback)</span><span class="type-signature"> &rarr; {<a href="module-client.html#.Promise">module:client.Promise</a>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Upload content to the Home Server
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">File</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A File object (in a browser) or in Node,
+                                 an object with properties:
+                                 name: The file's name
+                                 stream: A read stream</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. The callback to invoke on
+success/failure. See the promise return values for more information.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="http-api.js.html">http-api.js</a>, <a href="http-api.js.html#line158">line 158</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Resolves to <code>{data: {Object},
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-client.html#.Promise">module:client.Promise</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
     
 
     
@@ -2018,13 +2222,13 @@ occurred. This includes network problems and Matrix-specific error JSON.
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522Call.incoming%2522">"Call.incoming"</a></li><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Tue Jun 23 2015 15:48:24 GMT+0100 (BST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.2</a> on Tue Jul 28 2015 13:28:22 GMT+0100 (BST)
 </footer>
 
 <script> prettyPrint(); </script>

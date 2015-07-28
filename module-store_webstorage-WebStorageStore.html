@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: StubStore</title>
+    <title>JSDoc: Class: WebStorageStore</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: StubStore</h1>
+    <h1 class="page-title">Class: WebStorageStore</h1>
 
     
 
@@ -29,9 +29,9 @@
 <header>
     
         <h2>
-            <span class="ancestors"><a href="module-store_stub.html">module:store/stub</a>~</span>
+            <span class="ancestors"><a href="module-store_webstorage.html">module:store/webstorage</a>~</span>
         
-        StubStore
+        WebStorageStore
         </h2>
         
     
@@ -44,14 +44,14 @@
 
     
 
-    <h4 class="name" id="StubStore"><span class="type-signature"></span>new StubStore<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="WebStorageStore"><span class="type-signature"></span>new WebStorageStore<span class="signature">(webStore, batchSize)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Construct a stub store. This does no-ops on most store methods.
+    Construct a web storage store, capable of storing rooms and users.
 </div>
 
 
@@ -60,6 +60,80 @@
 
 
 
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>webStore</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">WebStorage</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A web storage implementation, e.g.
+'window.localStorage' or 'window.sessionStorage' or a custom implementation.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>batchSize</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">integer</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of events to store per key/value (room
+scoped). Use -1 to store all events for a room under one key/value.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -95,7 +169,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line11">line 11</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line128">line 128</a>
     </li></ul></dd>
     
 
@@ -116,6 +190,19 @@
 
 
 
+<h5>Throws:</h5>
+
+        
+
+    <div class="param-desc">
+    
+        if the supplied 'store' does not meet the Storage interface of the
+WebStorage API.
+    
+    </div>
+
+
+    
 
 
 
@@ -144,14 +231,169 @@
 
     
 
-    <h4 class="name" id="getRoom"><span class="type-signature"></span>getRoom<span class="signature">(roomId)</span><span class="type-signature"> &rarr; {null}</span></h4>
+    <h4 class="name" id="_syncTimeline"><span class="type-signature"></span>_syncTimeline<span class="signature">(roomId, timelineIndices)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Sync the 'live' timeline, batching live events according to 'batchSize'.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room to sync the timeline.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>timelineIndices</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;String></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional. The indices in the timeline
+if known already.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line431">line 431</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="getRoom"><span class="type-signature"></span>getRoom<span class="signature">(roomId)</span><span class="type-signature"> &rarr; (nullable) {<a href="global.html#Room">Room</a>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Retrieve a room from web storage.
 </div>
 
 
@@ -244,7 +486,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line45">line 45</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line185">line 185</a>
     </li></ul></dd>
     
 
@@ -278,7 +520,7 @@
     </dt>
     <dd>
         
-<span class="param-type">null</span>
+<span class="param-type"><a href="global.html#Room">Room</a></span>
 
 
     </dd>
@@ -300,7 +542,7 @@
 
 
 <div class="description">
-    No-op.
+    Get a list of all rooms from web storage.
 </div>
 
 
@@ -344,7 +586,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line53">line 53</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line203">line 203</a>
     </li></ul></dd>
     
 
@@ -404,7 +646,7 @@
 
 
 <div class="description">
-    No-op.
+    Get a list of summaries from web storage.
 </div>
 
 
@@ -448,7 +690,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line61">line 61</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line236">line 236</a>
     </li></ul></dd>
     
 
@@ -508,7 +750,7 @@
 
 
 <div class="description">
-    Get the sync token.
+    Retrieve the token to stream from.
 </div>
 
 
@@ -552,7 +794,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line21">line 21</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line156">line 156</a>
     </li></ul></dd>
     
 
@@ -578,6 +820,10 @@
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    The token or null.
+</div>
+
 
 
 <dl>
@@ -601,14 +847,14 @@
 
     
 
-    <h4 class="name" id="getUser"><span class="type-signature"></span>getUser<span class="signature">(userId)</span><span class="type-signature"> &rarr; {null}</span></h4>
+    <h4 class="name" id="getUser"><span class="type-signature"></span>getUser<span class="signature">(userId)</span><span class="type-signature"> &rarr; {<a href="global.html#User">User</a>}</span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Get a user from web storage.
 </div>
 
 
@@ -701,7 +947,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line77">line 77</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line256">line 256</a>
     </li></ul></dd>
     
 
@@ -735,7 +981,7 @@
     </dt>
     <dd>
         
-<span class="param-type">null</span>
+<span class="param-type"><a href="global.html#User">User</a></span>
 
 
     </dd>
@@ -750,14 +996,14 @@
 
     
 
-    <h4 class="name" id="scrollback"><span class="type-signature"></span>scrollback<span class="signature">(room, limit)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    <h4 class="name" id="scrollback"><span class="type-signature"></span>scrollback<span class="signature">(room, limit)</span><span class="type-signature"> &rarr; {Array.&lt;Object>}</span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Retrieve scrollback for this room. Automatically adds events to the timeline.
 </div>
 
 
@@ -809,7 +1055,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The matrix room to add the events to the start of the timeline.</td>
         </tr>
 
     
@@ -832,7 +1078,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The max number of old events to retrieve.</td>
         </tr>
 
     
@@ -873,7 +1119,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line87">line 87</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line276">line 276</a>
     </li></ul></dd>
     
 
@@ -899,6 +1145,12 @@
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    An array of objects which will be at most 'limit'
+length and at least 0. The objects are the raw event JSON. The last element
+is the 'oldest' (for parity with homeserver scrollback APIs).
+</div>
+
 
 
 <dl>
@@ -907,7 +1159,7 @@
     </dt>
     <dd>
         
-<span class="param-type">Array</span>
+<span class="param-type">Array.&lt;Object></span>
 
 
     </dd>
@@ -929,7 +1181,7 @@
 
 
 <div class="description">
-    Set the sync token.
+    Set the token to stream from.
 </div>
 
 
@@ -981,7 +1233,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The token to stream from.</td>
         </tr>
 
     
@@ -1022,7 +1274,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line29">line 29</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line164">line 164</a>
     </li></ul></dd>
     
 
@@ -1060,7 +1312,7 @@
 
 
 <div class="description">
-    Store events for a room.
+    Store events for a room. The events have already been added to the timeline.
 </div>
 
 
@@ -1181,7 +1433,8 @@
 
             
 
-            <td class="description last">True if these are paginated results.</td>
+            <td class="description last">True if these are paginated results. The last element
+is the 'oldest' (for parity with homeserver scrollback APIs).</td>
         </tr>
 
     
@@ -1222,7 +1475,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line98">line 98</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line377">line 377</a>
     </li></ul></dd>
     
 
@@ -1260,7 +1513,7 @@
 
 
 <div class="description">
-    No-op.
+    Store a room in web storage.
 </div>
 
 
@@ -1353,7 +1606,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line37">line 37</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line172">line 172</a>
     </li></ul></dd>
     
 
@@ -1391,7 +1644,7 @@
 
 
 <div class="description">
-    No-op.
+    Store a user in web storage.
 </div>
 
 
@@ -1484,7 +1737,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line69">line 69</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line244">line 244</a>
     </li></ul></dd>
     
 

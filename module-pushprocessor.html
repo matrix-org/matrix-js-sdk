@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: models/event</title>
+    <title>JSDoc: Module: pushprocessor</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: models/event</h1>
+    <h1 class="page-title">Module: pushprocessor</h1>
 
     
 
@@ -38,14 +38,21 @@
     <div class="container-overview">
     
         
-            <div class="description">This is an internal module. See <a href="global.html#MatrixEvent">MatrixEvent</a> and RoomEvent for
-the public classes.</div>
-        
 
         
             
 
+    
 
+    <h4 class="name" id="module:pushprocessor"><span class="type-signature"></span>module:pushprocessor<span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    The PushProcessor class.
+</div>
 
 
 
@@ -88,7 +95,7 @@ the public classes.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line3">line 3</a>
+        <a href="pushprocessor.js.html">pushprocessor.js</a>, <a href="pushprocessor.js.html#line258">line 258</a>
     </li></ul></dd>
     
 
@@ -126,7 +133,7 @@ the public classes.</div>
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></dt>
+            <dt><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></dt>
             <dd></dd>
         </dl>
     
@@ -136,18 +143,18 @@ the public classes.</div>
     
 
     
-        <h3 class="subsection-title">Members</h3>
+
+    
+
+    
+        <h3 class="subsection-title">Type Definitions</h3>
 
         
-            
-<h4 class="name" id=".EventStatus"><span class="type-signature">(static, readonly) </span>EventStatus<span class="type-signature"> :string</span></h4>
+                
+<h4 class="name" id="~PushAction">PushAction</h4>
 
 
 
-
-<div class="description">
-    Enum for event statuses.
-</div>
 
 
 
@@ -155,7 +162,7 @@ the public classes.</div>
     <ul>
         <li>
             
-<span class="param-type">string</span>
+<span class="param-type">Object</span>
 
 
         </li>
@@ -191,13 +198,13 @@ the public classes.</div>
 
         <tr>
             
-                <td class="name"><code>NOT_SENT</code></td>
+                <td class="name"><code>notify</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">boolean</span>
 
 
             
@@ -207,20 +214,20 @@ the public classes.</div>
 
             
 
-            <td class="description last">The event was not sent and will no longer be retried.</td>
+            <td class="description last">Whether this event should notify the user or not.</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>SENDING</code></td>
+                <td class="name"><code>tweaks</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">Object</span>
 
 
             
@@ -230,20 +237,62 @@ the public classes.</div>
 
             
 
-            <td class="description last">The event is in the process of being sent.</td>
+            <td class="description last">How this event should be notified.
+                <h6>Properties</h6>
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>highlight</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Whether this event should be highlighted
+on the UI.</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>QUEUED</code></td>
+                <td class="name"><code>sound</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">boolean</span>
 
 
             
@@ -253,7 +302,15 @@ the public classes.</div>
 
             
 
-            <td class="description last">The event is in a queue waiting to be sent.</td>
+            <td class="description last">Whether this notification should produce a
+noise.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
         </tr>
 
     
@@ -292,7 +349,7 @@ the public classes.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line15">line 15</a>
+        <a href="pushprocessor.js.html">pushprocessor.js</a>, <a href="pushprocessor.js.html#line246">line 246</a>
     </li></ul></dd>
     
 
@@ -308,11 +365,7 @@ the public classes.</div>
 
 
 
-        
-    
-
-    
-
+            
     
 
     

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: models/event</title>
+    <title>JSDoc: Module: webrtc/call</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: models/event</h1>
+    <h1 class="page-title">Module: webrtc/call</h1>
 
     
 
@@ -38,8 +38,7 @@
     <div class="container-overview">
     
         
-            <div class="description">This is an internal module. See <a href="global.html#MatrixEvent">MatrixEvent</a> and RoomEvent for
-the public classes.</div>
+            <div class="description">This is an internal module. See <a href="global.html#createNewMatrixCall">createNewMatrixCall</a> for the public API.</div>
         
 
         
@@ -88,7 +87,7 @@ the public classes.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line3">line 3</a>
+        <a href="webrtc_call.js.html">webrtc/call.js</a>, <a href="webrtc_call.js.html#line2">line 2</a>
     </li></ul></dd>
     
 
@@ -126,7 +125,7 @@ the public classes.</div>
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></dt>
+            <dt><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></dt>
             <dd></dd>
         </dl>
     
@@ -140,125 +139,17 @@ the public classes.</div>
 
         
             
-<h4 class="name" id=".EventStatus"><span class="type-signature">(static, readonly) </span>EventStatus<span class="type-signature"> :string</span></h4>
+<h4 class="name" id=".MatrixCall"><span class="type-signature">(static) </span>MatrixCall<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    Enum for event statuses.
+    The MatrixCall class.
 </div>
 
 
 
-    <h5>Type:</h5>
-    <ul>
-        <li>
-            
-<span class="param-type">string</span>
-
-
-        </li>
-    </ul>
-
-
-
-
-
-    <h5 class="subsection-title">Properties:</h5>
-
-    
-
-<table class="props">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>NOT_SENT</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event was not sent and will no longer be retried.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>SENDING</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event is in the process of being sent.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>QUEUED</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event is in a queue waiting to be sent.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -292,7 +183,7 @@ the public classes.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line15">line 15</a>
+        <a href="webrtc_call.js.html">webrtc/call.js</a>, <a href="webrtc_call.js.html#line863">line 863</a>
     </li></ul></dd>
     
 
@@ -311,6 +202,381 @@ the public classes.</div>
         
     
 
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id=".createNewMatrixCall"><span class="type-signature">(static) </span>createNewMatrixCall<span class="signature">(client, roomId)</span><span class="type-signature"> &rarr; {MatrixCall}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Create a new Matrix call for the browser.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>client</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixClient">MatrixClient</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The client instance to use.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room the call is in.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="webrtc_call.js.html">webrtc/call.js</a>, <a href="webrtc_call.js.html#line871">line 871</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    the call or null if the browser doesn't support calling.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">MatrixCall</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~sendEvent"><span class="type-signature">(inner) </span>sendEvent<span class="signature">(self, eventType, content)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Internal
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>self</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">MatrixCall</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>eventType</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>content</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="webrtc_call.js.html">webrtc/call.js</a>, <a href="webrtc_call.js.html#line643">line 643</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
     
 
     

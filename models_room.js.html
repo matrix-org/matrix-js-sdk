@@ -40,6 +40,9 @@ var utils = require("../utils");
  * Construct a new Room.
  * @constructor
  * @param {string} roomId Required. The ID of this room.
+ * @param {*} storageToken Optional. The token which a data store can use
+ * to remember the state of the room. What this means is dependent on the store
+ * implementation.
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
  * @prop {Array&lt;MatrixEvent>} timeline The ordered list of message events for
@@ -49,14 +52,18 @@ var utils = require("../utils");
  * @prop {RoomState} currentState The state of the room at the time of the
  * newest event in the timeline.
  * @prop {RoomSummary} summary The room summary.
+ * @prop {*} storageToken A token which a data store can use to remember
+ * the state of the room.
  */
-function Room(roomId) {
+function Room(roomId, storageToken) {
     this.roomId = roomId;
     this.name = roomId;
     this.timeline = [];
     this.oldState = new RoomState(roomId);
     this.currentState = new RoomState(roomId);
     this.summary = null;
+    this.storageToken = storageToken;
+    this._redactions = [];
 }
 utils.inherits(Room, EventEmitter);
 
@@ -78,8 +85,17 @@ utils.inherits(Room, EventEmitter);
  * @return {RoomMember[]} A list of currently joined members.
  */
  Room.prototype.getJoinedMembers = function() {
+    return this.getMembersWithMemership("join");
+ };
+
+/**
+ * Get a list of members with given membership state.
+ * @param {string} membership The membership state.
+ * @return {RoomMember[]} A list of members with the given membership state.
+ */
+ Room.prototype.getMembersWithMemership = function(membership) {
     return utils.filter(this.currentState.getMembers(), function(m) {
-        return m.membership === "join";
+        return m.membership === membership;
     });
  };
 
@@ -106,28 +122,43 @@ utils.inherits(Room, EventEmitter);
  */
 Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline) {
     var stateContext = toStartOfTimeline ? this.oldState : this.currentState;
+
+    function checkForRedaction(redactEvent) {
+        return function(e) {
+            return e.getId() === redactEvent.event.redacts;
+        };
+    }
+
     for (var i = 0; i &lt; events.length; i++) {
-        // set sender and target properties
-        events[i].sender = stateContext.getSentinelMember(
-            events[i].getSender()
-        );
-        if (events[i].getType() === "m.room.member") {
-            events[i].target = stateContext.getSentinelMember(
-                events[i].getStateKey()
-            );
+        if (toStartOfTimeline &amp;&amp; this._redactions.indexOf(events[i].getId()) >= 0) {
+            continue; // do not add the redacted event.
         }
 
+        setEventMetadata(events[i], stateContext, toStartOfTimeline);
         // modify state
         if (events[i].isState()) {
-            // room state has no concept of 'old' or 'current', but we want the
-            // room state to regress back to previous values if toStartOfTimeline
-            // is set, which means inspecting prev_content if it exists. This
-            // is done by toggling the forwardLooking flag.
-            if (toStartOfTimeline) {
-                events[i].forwardLooking = false;
+            stateContext.setStateEvents([events[i]]);
+            // it is possible that the act of setting the state event means we
+            // can set more metadata (specifically sender/target props), so try
+            // it again if the prop wasn't previously set.
+            if (!events[i].sender) {
+                setEventMetadata(events[i], stateContext, toStartOfTimeline);
             }
-            stateContext.setStateEvents([events[i]], toStartOfTimeline);
         }
+        if (events[i].getType() === "m.room.redaction") {
+            // try to remove the element
+            var removed = utils.removeElement(
+                this.timeline, checkForRedaction(events[i])
+            );
+            if (!removed &amp;&amp; toStartOfTimeline) {
+                // redactions will trickle in BEFORE the event redacted so make
+                // a note of the redacted event; we'll check it later.
+                this._redactions.push(events[i].event.redacts);
+            }
+            // NB: We continue to add the redaction event to the timeline so clients
+            // can say "so and so redacted an event" if they wish to.
+        }
+
         // TODO: pass through filter to see if this should be added to the timeline.
         if (toStartOfTimeline) {
             this.timeline.unshift(events[i]);
@@ -135,7 +166,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline) {
         else {
             this.timeline.push(events[i]);
         }
-        this.emit("Room.timeline", events[i], this, toStartOfTimeline);
+        this.emit("Room.timeline", events[i], this, Boolean(toStartOfTimeline));
     }
 };
 
@@ -168,7 +199,15 @@ Room.prototype.addEvents = function(events, duplicateStrategy) {
                 for (var j = 0; j &lt; this.timeline.length; j++) {
                     if (this.timeline[j].getId() === events[i].getId()) {
                         if (duplicateStrategy === "replace") {
-                            this.timeline[j] = events[i];
+                            // still need to set the right metadata on this event
+                            setEventMetadata(
+                                events[i],
+                                this.currentState,
+                                false
+                            );
+                            if (!this.timeline[j].encryptedType) {
+                                this.timeline[j] = events[i];
+                            }
                             // skip the insert so we don't add this event twice.
                             // Don't break in case we replace multiple events.
                             shouldIgnore = true;
@@ -209,6 +248,27 @@ Room.prototype.recalculate = function(userId) {
     }
 };
 
+function setEventMetadata(event, stateContext, toStartOfTimeline) {
+    // set sender and target properties
+    event.sender = stateContext.getSentinelMember(
+        event.getSender()
+    );
+    if (event.getType() === "m.room.member") {
+        event.target = stateContext.getSentinelMember(
+            event.getStateKey()
+        );
+    }
+    if (event.isState()) {
+        // room state has no concept of 'old' or 'current', but we want the
+        // room state to regress back to previous values if toStartOfTimeline
+        // is set, which means inspecting prev_content if it exists. This
+        // is done by toggling the forwardLooking flag.
+        if (toStartOfTimeline) {
+            event.forwardLooking = false;
+        }
+    }
+}
+
 /**
  * This is an internal method. Calculates the name of the room from the current
  * room state.
@@ -228,19 +288,21 @@ function calculateRoomName(room, userId) {
 
     var mRoomName = room.currentState.getStateEvents('m.room.name', '');
     if (mRoomName) {
-        return mRoomName.getContent().name + (alias ? " (" + alias + ")" : "");
+        return mRoomName.getContent().name + (false &amp;&amp; alias ? " (" + alias + ")" : "");
     }
     else if (alias) {
         return alias;
     }
     else {
-        // get members that are NOT ourselves.
+        // get members that are NOT ourselves and are actually in the room.
         var members = utils.filter(room.currentState.getMembers(), function(m) {
-            return m.userId !== userId;
+            return (m.userId !== userId &amp;&amp; m.membership !== "leave");
         });
         // TODO: Localisation
         if (members.length === 0) {
-            var memberList = room.currentState.getMembers();
+            var memberList = utils.filter(room.currentState.getMembers(), function(m) {
+                return (m.membership !== "leave");
+            });
             if (memberList.length === 1) {
                 // we exist, but no one else... self-chat or invite.
                 if (memberList[0].membership === "invite") {
@@ -310,13 +372,13 @@ module.exports = Room;
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522Call.incoming%2522">"Call.incoming"</a></li><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Tue Jun 23 2015 15:48:24 GMT+0100 (BST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.2</a> on Tue Jul 28 2015 13:28:21 GMT+0100 (BST)
 </footer>
 
 <script> prettyPrint(); </script>

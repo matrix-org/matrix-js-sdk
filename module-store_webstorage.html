@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: models/event</title>
+    <title>JSDoc: Module: store/webstorage</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: models/event</h1>
+    <h1 class="page-title">Module: store/webstorage</h1>
 
     
 
@@ -31,6 +31,8 @@
         
             
         
+            
+        
     
 </header>
 
@@ -38,9 +40,196 @@
     <div class="container-overview">
     
         
-            <div class="description">This is an internal module. See <a href="global.html#MatrixEvent">MatrixEvent</a> and RoomEvent for
-the public classes.</div>
+            <div class="description">This is an internal module. Implementation details:
+<pre>
+Room data is stored as follows:
+  room_$ROOMID_timeline_$INDEX : [ Event, Event, Event ]
+  room_$ROOMID_state : {
+                         pagination_token: <oldState.paginationToken>,
+                         events: {
+                           <event_type>: { <state_key> : {JSON} }
+                         }
+                       }
+User data is stored as follows:
+  user_$USERID : User
+Sync token:
+  sync_token : $TOKEN
+
+Room Retrieval
+--------------
+Retrieving a room requires the $ROOMID which then pulls out the current state
+from room_$ROOMID_state. A defined starting batch of timeline events are then
+extracted from the highest numbered $INDEX for room_$ROOMID_timeline_$INDEX
+(more indices as required). The $INDEX may be negative. These are
+added to the timeline in the same way as /initialSync (old state will diverge).
+If there exists a room_$ROOMID_timeline_live key, then a timeline sync should
+be performed before retrieving.
+
+Retrieval of earlier messages
+-----------------------------
+The earliest event the Room instance knows about is E. Retrieving earlier
+messages requires a Room which has a storageToken defined.
+This token maps to the index I where the Room is at. Events are then retrieved from
+room_$ROOMID_timeline_{I} and elements before E are extracted. If the limit
+demands more events, I-1 is retrieved, up until I=min $INDEX where it gives
+less than the limit. Index may go negative if you have paginated in the past.
+
+Full Insertion
+--------------
+Storing a room requires the timeline and state keys for $ROOMID to
+be blown away and completely replaced, which is computationally expensive.
+Room.timeline is batched according to the given batch size B. These batches
+are then inserted into storage as room_$ROOMID_timeline_$INDEX. Finally,
+the current room state is persisted to room_$ROOMID_state.
+
+Incremental Insertion
+---------------------
+As events arrive, the store can quickly persist these new events. This
+involves pushing the events to room_$ROOMID_timeline_live. If the
+current room state has been modified by the new event, then
+room_$ROOMID_state should be updated in addition to the timeline.
+
+Timeline sync
+-------------
+Retrieval of events from the timeline depends on the proper batching of
+events. This is computationally expensive to perform on every new event, so
+is deferred by inserting live events to room_$ROOMID_timeline_live. A
+timeline sync reconciles timeline_live and timeline_$INDEX. This involves
+retrieving _live and the highest numbered $INDEX batch. If the batch is < B,
+the earliest entries from _live are inserted into the $INDEX until the
+batch == B. Then, the remaining entries in _live are batched to $INDEX+1,
+$INDEX+2, and so on. The easiest way to visualise this is that the timeline
+goes from old to new, left to right:
+         -2         -1         0         1
+<--OLD---------------------------------------NEW-->
+       [a,b,c]    [d,e,f]   [g,h,i]   [j,k,l]
+
+Purging
+-------
+Events from the timeline can be purged by removing the lowest
+timeline_$INDEX in the store.
+
+Example
+-------
+A room with room_id !foo:bar has 9 messages (M1->9 where 9=newest) with a
+batch size of 4. The very first time, there is no entry for !foo:bar until
+storeRoom() is called, which results in the keys: [Full Insert]
+  room_!foo:bar_timeline_0 : [M1, M2, M3, M4]
+  room_!foo:bar_timeline_1 : [M5, M6, M7, M8]
+  room_!foo:bar_timeline_2 : [M9]
+  room_!foo:bar_state: { ... }
+
+5 new messages (N1-5, 5=newest) arrive and are then added: [Incremental Insert]
+  room_!foo:bar_timeline_live: [N1]
+  room_!foo:bar_timeline_live: [N1, N2]
+  room_!foo:bar_timeline_live: [N1, N2, N3]
+  room_!foo:bar_timeline_live: [N1, N2, N3, N4]
+  room_!foo:bar_timeline_live: [N1, N2, N3, N4, N5]
+
+App is shutdown. Restarts. The timeline is synced [Timeline Sync]
+  room_!foo:bar_timeline_2 : [M9, N1, N2, N3]
+  room_!foo:bar_timeline_3 : [N4, N5]
+  room_!foo:bar_timeline_live: []
+
+And the room is retrieved with 8 messages: [Room Retrieval]
+  Room.timeline: [M7, M8, M9, N1, N2, N3, N4, N5]
+  Room.storageToken: => early_index = 1 because that's where M7 is.
+
+3 earlier messages are requested: [Earlier retrieval]
+  Use storageToken to find batch index 1. Scan batch for earliest event ID.
+  earliest event = M7
+  events = room_!foo:bar_timeline_1 where event < M7 = [M5, M6]
+Too few events, use next index (0) and get 1 more:
+  events = room_!foo:bar_timeline_0 = [M1, M2, M3, M4] => [M4]
+Return concatentation:
+  [M4, M5, M6]
+
+Purge oldest events: [Purge]
+  del room_!foo:bar_timeline_0
+</pre></div>
         
+
+        
+            
+
+    
+
+    <h4 class="name" id="module:store/webstorage"><span class="type-signature"></span>module:store/webstorage<span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    Web Storage Store class.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line651">line 651</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         
             
@@ -88,7 +277,7 @@ the public classes.</div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line3">line 3</a>
+        <a href="store_webstorage.js.html">store/webstorage.js</a>, <a href="store_webstorage.js.html#line2">line 2</a>
     </li></ul></dd>
     
 
@@ -126,7 +315,7 @@ the public classes.</div>
         <h3 class="subsection-title">Classes</h3>
 
         <dl>
-            <dt><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></dt>
+            <dt><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></dt>
             <dd></dd>
         </dl>
     
@@ -135,180 +324,6 @@ the public classes.</div>
 
     
 
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id=".EventStatus"><span class="type-signature">(static, readonly) </span>EventStatus<span class="type-signature"> :string</span></h4>
-
-
-
-
-<div class="description">
-    Enum for event statuses.
-</div>
-
-
-
-    <h5>Type:</h5>
-    <ul>
-        <li>
-            
-<span class="param-type">string</span>
-
-
-        </li>
-    </ul>
-
-
-
-
-
-    <h5 class="subsection-title">Properties:</h5>
-
-    
-
-<table class="props">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>NOT_SENT</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event was not sent and will no longer be retried.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>SENDING</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event is in the process of being sent.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>QUEUED</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The event is in a queue waiting to be sent.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line15">line 15</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
     
 
     

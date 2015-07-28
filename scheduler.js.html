@@ -64,6 +64,47 @@ function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
 }
 
 /**
+ * Retrieve a queue based on an event. The event provided does not need to be in
+ * the queue.
+ * @param {MatrixEvent} event An event to get the queue for.
+ * @return {?Array&lt;MatrixEvent>} A shallow copy of events in the queue or null.
+ * Modifying this array will not modify the list itself. Modifying events in
+ * this array &lt;i>will&lt;/i> modify the underlying event in the queue.
+ * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
+ */
+MatrixScheduler.prototype.getQueueForEvent = function(event) {
+    var name = this.queueAlgorithm(event);
+    if (!name || !this._queues[name]) {
+        return null;
+    }
+    return utils.map(this._queues[name], function(obj) {
+        return obj.event;
+    });
+};
+
+/**
+ * Remove this event from the queue. The event is equal to another event if they
+ * have the same ID returned from event.getId().
+ * @param {MatrixEvent} event The event to remove.
+ * @return {boolean} True if this event was removed.
+ */
+MatrixScheduler.prototype.removeEventFromQueue = function(event) {
+    var name = this.queueAlgorithm(event);
+    if (!name || !this._queues[name]) {
+        return false;
+    }
+    var removed = false;
+    utils.removeElement(this._queues[name], function(element) {
+        if (element.event.getId() === event.getId()) {
+            removed = true;
+            return true;
+        }
+    });
+    return removed;
+};
+
+
+/**
  * Set the process function. Required for events in the queue to be processed.
  * If set after events have been added to the queue, this will immediately start
  * processing them.
@@ -251,11 +292,12 @@ function debuglog() {
  */
 
 /**
- * The queuing algorithm to apply to events. All queues created are serviced in
- * a FIFO manner. To send the event ASAP, return &lt;code>null&lt;/code> which will
- * not put this event in a queue. Events that fail to send that form part of
- * a queue will be removed from the queue and the next event in the queue will
- * be sent.
+ * The queuing algorithm to apply to events. This function must be idempotent as
+ * it may be called multiple times with the same event. All queues created are
+ * serviced in a FIFO manner. To send the event ASAP, return &lt;code>null&lt;/code>
+ * which will not put this event in a queue. Events that fail to send that form
+ * part of a queue will be removed from the queue and the next event in the
+ * queue will be sent.
  * @callback queueAlgorithm
  * @param {MatrixEvent} event The event to be sent.
  * @return {string} The name of the queue to put the event into. If a queue with
@@ -284,13 +326,13 @@ module.exports = MatrixScheduler;
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-utils.html">utils</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li></ul><h3>Events</h3><ul><li><a href="module-client-MatrixClient.html#event:%2522Call.incoming%2522">"Call.incoming"</a></li><li><a href="module-client-MatrixClient.html#event:%2522event%2522">"event"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.name%2522">"Room.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room.timeline%2522">"Room.timeline"</a></li><li><a href="module-client-MatrixClient.html#event:%2522Room%2522">"Room"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.membership%2522">"RoomMember.membership"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.name%2522">"RoomMember.name"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.powerLevel%2522">"RoomMember.powerLevel"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomMember.typing%2522">"RoomMember.typing"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.events%2522">"RoomState.events"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.members%2522">"RoomState.members"</a></li><li><a href="module-client-MatrixClient.html#event:%2522RoomState.newMember%2522">"RoomState.newMember"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncComplete%2522">"syncComplete"</a></li><li><a href="module-client-MatrixClient.html#event:%2522syncError%2522">"syncError"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.avatarUrl%2522">"User.avatarUrl"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.displayName%2522">"User.displayName"</a></li><li><a href="module-client-MatrixClient.html#event:%2522User.presence%2522">"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.0</a> on Tue Jun 23 2015 15:48:24 GMT+0100 (BST)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.3.2</a> on Tue Jul 28 2015 13:28:21 GMT+0100 (BST)
 </footer>
 
 <script> prettyPrint(); </script>

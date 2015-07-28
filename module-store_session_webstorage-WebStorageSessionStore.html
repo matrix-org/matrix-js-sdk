@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: StubStore</title>
+    <title>JSDoc: Class: WebStorageSessionStore</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: StubStore</h1>
+    <h1 class="page-title">Class: WebStorageSessionStore</h1>
 
     
 
@@ -29,9 +29,9 @@
 <header>
     
         <h2>
-            <span class="ancestors"><a href="module-store_stub.html">module:store/stub</a>~</span>
+            <span class="ancestors"><a href="module-store_session_webstorage.html">store/session/webstorage</a>~</span>
         
-        StubStore
+        WebStorageSessionStore
         </h2>
         
     
@@ -44,114 +44,15 @@
 
     
 
-    <h4 class="name" id="StubStore"><span class="type-signature"></span>new StubStore<span class="signature">()</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="WebStorageSessionStore"><span class="type-signature"></span>new WebStorageSessionStore<span class="signature">(webStore)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Construct a stub store. This does no-ops on most store methods.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line11">line 11</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    </div>
-
-    
-
-    
-
-    
-
-     
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    <h4 class="name" id="getRoom"><span class="type-signature"></span>getRoom<span class="signature">(roomId)</span><span class="type-signature"> &rarr; {null}</span></h4>
-
-    
-
-
-
-<div class="description">
-    No-op.
+    Construct a web storage session store, capable of storing account keys,
+session keys and access tokens.
 </div>
 
 
@@ -187,13 +88,13 @@
 
         <tr>
             
-                <td class="name"><code>roomId</code></td>
+                <td class="name"><code>webStore</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">string</span>
+<span class="param-type">WebStorage</span>
 
 
             
@@ -203,7 +104,8 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">A web storage implementation, e.g.
+'window.localStorage' or 'window.sessionStorage' or a custom implementation.</td>
         </tr>
 
     
@@ -244,7 +146,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line45">line 45</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line21">line 21</a>
     </li></ul></dd>
     
 
@@ -265,42 +167,55 @@
 
 
 
-
-
-<h5>Returns:</h5>
+<h5>Throws:</h5>
 
         
 
+    <div class="param-desc">
+    
+        if the supplied 'store' does not meet the Storage interface of the
+WebStorage API.
+    
+    </div>
 
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">null</span>
-
-
-    </dd>
-</dl>
 
     
 
 
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+     
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
 
         
             
 
     
 
-    <h4 class="name" id="getRooms"><span class="type-signature"></span>getRooms<span class="signature">()</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    <h4 class="name" id="getEndToEndAccount"><span class="type-signature"></span>getEndToEndAccount<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {string}</span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Load the end to end account for the logged-in user.
 </div>
 
 
@@ -344,7 +259,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line53">line 53</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line46">line 46</a>
     </li></ul></dd>
     
 
@@ -371,213 +286,9 @@
 
         
 <div class="param-desc">
-    An empty array.
+    Base64 encoded account.
 </div>
 
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Array</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-        
-            
-
-    
-
-    <h4 class="name" id="getRoomSummaries"><span class="type-signature"></span>getRoomSummaries<span class="signature">()</span><span class="type-signature"> &rarr; {Array}</span></h4>
-
-    
-
-
-
-<div class="description">
-    No-op.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line61">line 61</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    An empty array.
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Array</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-        
-            
-
-    
-
-    <h4 class="name" id="getSyncToken"><span class="type-signature"></span>getSyncToken<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
-
-    
-
-
-
-<div class="description">
-    Get the sync token.
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line21">line 21</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
 
 
 <dl>
@@ -601,14 +312,14 @@
 
     
 
-    <h4 class="name" id="getUser"><span class="type-signature"></span>getUser<span class="signature">(userId)</span><span class="type-signature"> &rarr; {null}</span></h4>
+    <h4 class="name" id="getEndToEndDevicesForUser"><span class="type-signature"></span>getEndToEndDevicesForUser<span class="signature">(userId)</span><span class="type-signature"> &rarr; {object}</span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Retrieves the known devices for a user.
 </div>
 
 
@@ -660,7 +371,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The user's ID.</td>
         </tr>
 
     
@@ -701,7 +412,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line77">line 77</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line64">line 64</a>
     </li></ul></dd>
     
 
@@ -727,6 +438,10 @@
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    A map from device ID to keys for the device.
+</div>
+
 
 
 <dl>
@@ -735,7 +450,7 @@
     </dt>
     <dd>
         
-<span class="param-type">null</span>
+<span class="param-type">object</span>
 
 
     </dd>
@@ -750,14 +465,14 @@
 
     
 
-    <h4 class="name" id="scrollback"><span class="type-signature"></span>scrollback<span class="signature">(room, limit)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    <h4 class="name" id="getEndToEndRoom"><span class="type-signature"></span>getEndToEndRoom<span class="signature">(roomId)</span><span class="type-signature"> &rarr; {object}</span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Get the end-to-end state for a room
 </div>
 
 
@@ -793,13 +508,13 @@
 
         <tr>
             
-                <td class="name"><code>room</code></td>
+                <td class="name"><code>roomId</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#Room">Room</a></span>
+<span class="param-type">string</span>
 
 
             
@@ -809,30 +524,7 @@
 
             
 
-            <td class="description last"></td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>limit</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">integer</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
+            <td class="description last">The room's ID.</td>
         </tr>
 
     
@@ -873,7 +565,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line87">line 87</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line106">line 106</a>
     </li></ul></dd>
     
 
@@ -899,6 +591,10 @@
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    The end-to-end info for the room.
+</div>
+
 
 
 <dl>
@@ -907,7 +603,7 @@
     </dt>
     <dd>
         
-<span class="param-type">Array</span>
+<span class="param-type">object</span>
 
 
     </dd>
@@ -922,14 +618,15 @@
 
     
 
-    <h4 class="name" id="setSyncToken"><span class="type-signature"></span>setSyncToken<span class="signature">(token)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="getEndToEndSessions"><span class="type-signature"></span>getEndToEndSessions<span class="signature">(deviceKey)</span><span class="type-signature"> &rarr; {object}</span></h4>
 
     
 
 
 
 <div class="description">
-    Set the sync token.
+    Retrieve the end-to-end sessions between the logged-in user and another
+device.
 </div>
 
 
@@ -965,7 +662,7 @@
 
         <tr>
             
-                <td class="name"><code>token</code></td>
+                <td class="name"><code>deviceKey</code></td>
             
 
             <td class="type">
@@ -981,7 +678,7 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The public key of the other device.</td>
         </tr>
 
     
@@ -1022,7 +719,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line29">line 29</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line88">line 88</a>
     </li></ul></dd>
     
 
@@ -1045,6 +742,28 @@
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A map from sessionId to Base64 end-to-end session.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">object</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -1053,14 +772,14 @@
 
     
 
-    <h4 class="name" id="storeEvents"><span class="type-signature"></span>storeEvents<span class="signature">(room, events, token, toStart)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="storeEndToEndAccount"><span class="type-signature"></span>storeEndToEndAccount<span class="signature">(account)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Store events for a room.
+    Store the end to end account for the logged-in user.
 </div>
 
 
@@ -1096,53 +815,7 @@
 
         <tr>
             
-                <td class="name"><code>room</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="global.html#Room">Room</a></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The room to store events for.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>events</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array.&lt;<a href="global.html#MatrixEvent">MatrixEvent</a>></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The events to store.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>token</code></td>
+                <td class="name"><code>account</code></td>
             
 
             <td class="type">
@@ -1158,30 +831,7 @@
 
             
 
-            <td class="description last">The token associated with these events.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>toStart</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">boolean</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">True if these are paginated results.</td>
+            <td class="description last">Base64 encoded account.</td>
         </tr>
 
     
@@ -1222,7 +872,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line98">line 98</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line38">line 38</a>
     </li></ul></dd>
     
 
@@ -1253,14 +903,14 @@
 
     
 
-    <h4 class="name" id="storeRoom"><span class="type-signature"></span>storeRoom<span class="signature">(room)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="storeEndToEndDevicesForUser"><span class="type-signature"></span>storeEndToEndDevicesForUser<span class="signature">(userId, devices)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Stores the known devices for a user.
 </div>
 
 
@@ -1296,13 +946,13 @@
 
         <tr>
             
-                <td class="name"><code>room</code></td>
+                <td class="name"><code>userId</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#Room">Room</a></span>
+<span class="param-type">string</span>
 
 
             
@@ -1312,7 +962,30 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The user's ID.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>devices</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A map from device ID to keys for the device.</td>
         </tr>
 
     
@@ -1353,7 +1026,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line37">line 37</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line55">line 55</a>
     </li></ul></dd>
     
 
@@ -1384,14 +1057,14 @@
 
     
 
-    <h4 class="name" id="storeUser"><span class="type-signature"></span>storeUser<span class="signature">(user)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="storeEndToEndRoom"><span class="type-signature"></span>storeEndToEndRoom<span class="signature">(roomId, roomInfo)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    No-op.
+    Store the end-to-end state for a room.
 </div>
 
 
@@ -1427,13 +1100,13 @@
 
         <tr>
             
-                <td class="name"><code>user</code></td>
+                <td class="name"><code>roomId</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#User">User</a></span>
+<span class="param-type">string</span>
 
 
             
@@ -1443,7 +1116,30 @@
 
             
 
-            <td class="description last"></td>
+            <td class="description last">The room's ID.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>roomInfo</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The end-to-end info for the room.</td>
         </tr>
 
     
@@ -1484,7 +1180,184 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="store_stub.js.html">store/stub.js</a>, <a href="store_stub.js.html#line69">line 69</a>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line97">line 97</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="storeEndToEndSession"><span class="type-signature"></span>storeEndToEndSession<span class="signature">(deviceKey, sessionId, session)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    Store a session between the logged-in user and another device
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>deviceKey</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The public key of the other device.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sessionId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The ID for this end-to-end session.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>session</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Base64 encoded end-to-end session.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="store_session_webstorage.js.html">store/session/webstorage.js</a>, <a href="store_session_webstorage.js.html#line74">line 74</a>
     </li></ul></dd>
     
 
