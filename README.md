@@ -2,8 +2,8 @@ Matrix Javascript SDK
 =====================
 [![Build Status](http://matrix.org/jenkins/buildStatus/icon?job=JavascriptSDK)](http://matrix.org/jenkins/job/JavascriptSDK/)
 
-This is the [Matrix](https://matrix.org) Client-Server v1/v2 alpha SDK for JavaScript. This SDK can be run
-in a browser or in Node.js.
+This is the [Matrix](https://matrix.org) Client-Server v1/v2 alpha SDK for
+JavaScript. This SDK can be run in a browser or in Node.js.
 
 Quickstart
 ==========
@@ -53,7 +53,9 @@ events for incoming data and state changes. Aside from wrapping the HTTP API, it
  - Automatically retry requests to send messages due to rate limiting errors.
  - Handle queueing of messages.
  - Handles pagination.
+ - Handle assigning push actions for events.
  - Handles room initial sync on accepting invites.
+ - Handles WebRTC calling.
 
 Later versions of the SDK will:
  - Expose a `RoomSummary` which would be suitable for a recents page.
