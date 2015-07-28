@@ -1,4 +1,4 @@
-Changes in 0.1.2
+Changes in 0.2.0
 ================
 
 Breaking changes:
@@ -8,17 +8,59 @@ Breaking changes:
 New features:
  * Added `EventStatus.QUEUED` which is set on an event when it is waiting to be
    sent by the scheduler and there are other events in front.
+ * Added support for processing push rules on an event. This can be obtained by
+   calling `MatrixClient.getPushActionsForEvent(event)`.
+ * Added WebRTC support. Outbound calls can be made via
+   `call = global.createNewMatrixCall(MatrixClient, roomId)` followed by
+   `call.placeVoiceCall()` or `call.placeVideoCall(remoteEle, localEle)`.
+   Inbound calls will be received via the event `"Call.incoming"` which provides
+   a call object which can be followed with `call.answer()` or `call.hangup()`.
+ * Added the ability to upload files to the media repository.
+ * Added the ability to change the client's password.
+ * Added the ability to register with an email via an identity server.
+ * Handle presence events by updating the associated `User` object.
+ * Handle redaction events.
+ * Added infrastructure for supporting End-to-End encryption. E2E is *NOT*
+   available in this version.
 
 New methods:
+ * `MatrixClient.getUser(userId)`
+ * `MatrixClient.getPushActionsForEvent(event)`
+ * `MatrixClient.setPassword(auth, newPassword)`
+ * `MatrixClient.loginWithSAML2(relayState, callback)`
+ * `MatrixClient.getAvatarUrlForMember(member, w, h, method)`
+ * `MatrixClient.mxcUrlToHttp(url, w, h, method)`
+ * `MatrixClient.getAvatarUrlForRoom(room, w, h, method)`
+ * `MatrixClient.uploadContent(file, callback)`
+ * `Room.getMembersWithMemership(membership)`
  * `MatrixScheduler.getQueueForEvent(event)`
  * `MatrixScheduler.removeEventFromQueue(event)`
- * `RoomMember.getAvatarUrl()`
  * `$DATA_STORE.setSyncToken(token)`
  * `$DATA_STORE.getSyncToken()`
 
+Crypto infrastructure (crypto is *NOT* available in this version):
+ * `global.CRYPTO_ENABLED`
+ * `MatrixClient.isCryptoEnabled()`
+ * `MatrixClient.uploadKeys(maxKeys)`
+ * `MatrixClient.downloadKeys(userIds, forceDownload)`
+ * `MatrixClient.listDeviceKeys(userId)`
+ * `MatrixClient.setRoomEncryption(roomId, config)`
+ * `MatrixClient.isRoomEncrypted(roomId)`
+
+New classes:
+ * `MatrixCall`
+
 Bug fixes:
- * Fixed an issue which prevented RoomMember.name being disambiguated if there
-   was exactly 1 other person with the same display name.
+ * Member name bugfix: Fixed an issue which prevented RoomMember.name being
+   disambiguated if there was exactly 1 other person with the same display name.
+ * Member name bugfix: Disambiguate both clashing display names with user IDs in
+   the event of a clash.
+ * Room state bugfix: Fixed a bug which incorrectly overwrote power levels
+   locally for a room.
+ * Room name bugfix: Ignore users who have left the room when determining a room
+   name.
+ * Events bugfix: Fixed a bug which prevented the `sender` and `target`
+   properties from being set.
 
 Changes in 0.1.1
 ================
