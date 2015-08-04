@@ -1,6 +1,10 @@
 Changes in 0.2.1
 ================
 
+Breaking changes:
+ * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
+   `(roomIdOrAlias, opts, callback)`.
+
 New methods:
  * `MatrixClient.createAlias(alias, roomId)`
  * `MatrixClient.getRoomIdForAlias(alias)`
