@@ -6,6 +6,7 @@
   "scripts": {
     "test": "istanbul cover --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" jasmine-node -- spec --verbose --junitreport --forceexit --captureExceptions",
     "check": "jasmine-node spec --verbose --junitreport --forceexit --captureExceptions",
+    "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
     "build": "jshint -c .jshint lib/ && browserify browser-index.js -o dist/browser-matrix-dev.js --ignore-missing",
     "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
     "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200,0222 --max_line_length 90 -r spec/ -r lib/",

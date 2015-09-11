@@ -1,3 +1,4 @@
+.jsdoc
 node_modules
 .lock-wscript
 build/Release
