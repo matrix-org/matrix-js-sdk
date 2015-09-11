@@ -216,7 +216,7 @@ API Reference
 =============
 
 A hosted reference can be found at
-http://matrix-org.github.io/matrix-js-sdk/global.html
+http://matrix-org.github.io/matrix-js-sdk/index.html
 
 This SDK uses JSDoc3 style comments. You can manually build and
 host the API reference from the source files like this:
