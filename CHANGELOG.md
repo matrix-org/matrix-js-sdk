@@ -1,6 +1,17 @@
 Changes in 0.2.1
 ================
 
+Bug fixes:
+ * The `Content-Type` of file uploads is now explicitly set, without relying
+   on the browser to do it for us.
+
+Improvements:
+ * The `MatrixScheduler.RETRY_BACKOFF_RATELIMIT` function will not retry when
+   the response is a 400,401,403.
+ * The text returned from a room invite now includes who the invite was from.
+ * There is now a try/catch block around the `request` function which will
+   reject/errback appropriately if an exception is thrown synchronously in it.
+
 Breaking changes:
  * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
    `(roomIdOrAlias, opts, callback)`.
@@ -10,6 +21,17 @@ New methods:
  * `MatrixClient.getRoomIdForAlias(alias)`
  * `MatrixClient.sendNotice(roomId, body, txnId, callback)`
  * `MatrixClient.sendHtmlNotice(roomId, body, htmlBody, callback)`
+
+Modified methods:
+ * `MatrixClient.joinRoom(roomIdOrAlias, opts)` where `opts` can include a
+   `syncRoom: true|false` flag to control whether a room initial sync is
+   performed after joining the room.
+ * `MatrixClient.getAvatarUrlForMember` has a new last arg `allowDefault` which
+   returns the default identicon URL if `true`.
+ * `MatrixClient.getAvatarUrlForRoom` has a new last arg `allowDefault` which
+   is passed through to the default identicon generation for
+   `getAvatarUrlForMember`.
+
 
 Changes in 0.2.0
 ================
