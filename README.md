@@ -227,8 +227,7 @@ host the API reference from the source files like this:
   $ python -m SimpleHTTPServer 8005
 ```
   
-Then visit ``http://localhost:8005`` to see the API docs. By
-default, ``jsdoc`` produces HTML in the ``out`` folder.
+Then visit ``http://localhost:8005`` to see the API docs.
 
 Contributing
 ============

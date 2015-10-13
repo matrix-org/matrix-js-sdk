@@ -1,3 +1,24 @@
+Changes in 0.2.2
+================
+
+Bug fixes:
+ * Null pointer fixes for VoIP calling and push notification processing.
+ * Set the `Content-Type` to `application/octet-stream` in the event that the
+   file object has no `type`.
+
+New methods:
+ * Added `MatrixClient.getCasServer()` which calls through to the HTTP endpoint
+   `/login/cas`.
+ * Added `MatrixClient.loginWithCas(ticket, service)` which logs in with the
+   type `m.login.cas`.
+ * Added `MatrixClient.getHomeserverUrl()` which returns the URL passed in the
+   constructor.
+ * Added `MatrixClient.getIdentityServerUrl()` which returns the URL passed in
+   the constructor.
+ * Added `getLastModifiedTime()` to `RoomMember`, `RoomState` and `User` objects.
+   This makes it easier to see if the object in question has changed, which can
+   be used to improve performance by only rendering when these objects change.
+
 Changes in 0.2.1
 ================
 
