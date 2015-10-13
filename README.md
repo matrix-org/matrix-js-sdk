@@ -105,7 +105,7 @@ you'll see used is:
 The ``callback`` parameter is optional, so you could do:
 
 ```javascript
-  matrixClient.someMethod(arg1, arg2).then(function(result) {
+  matrixClient.someMethod(arg1, arg2).then(function(err, result) {
     ...
   });
 ```
@@ -222,9 +222,8 @@ This SDK uses JSDoc3 style comments. You can manually build and
 host the API reference from the source files like this:
 
 ```
-  $ npm install -g jsdoc
-  $ jsdoc -r lib/
-  $ cd out
+  $ npm run gendoc
+  $ cd .jsdoc
   $ python -m SimpleHTTPServer 8005
 ```
   
@@ -259,7 +258,7 @@ To run tests (Jasmine)::
  $ npm test
 ```
  
-To run linters (Google Closure Linter and JSHint):
+To run linting:
 ```
  $ npm run lint
 ```

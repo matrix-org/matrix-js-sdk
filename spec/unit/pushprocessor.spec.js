@@ -208,7 +208,6 @@ describe('NotificationService', function() {
             }
         });
         pushProcessor = new PushProcessor(matrixClient);
-        console.log("badger: " + JSON.stringify(pushProcessor));
     });
 
     // User IDs
