@@ -2,6 +2,7 @@
 var sdk = require("../..");
 var Room = sdk.Room;
 var RoomState = sdk.RoomState;
+var MatrixEvent = sdk.MatrixEvent;
 var utils = require("../test-utils");
 
 describe("Room", function() {
@@ -549,4 +550,78 @@ describe("Room", function() {
             expect(name).toEqual("?");
         });
     });
+
+    describe("addReceipt", function() {
+
+        var eventToAck = utils.mkMessage({
+            room: roomId, user: userA, msg: "PLEASE ACKNOWLEDGE MY EXISTENCE",
+            event: true
+        });
+
+        function mkReceipt(roomId, records) {
+            var content = {};
+            records.forEach(function(r) {
+                if (!content[r.eventId]) { content[r.eventId] = {}; }
+                if (!content[r.eventId][r.type]) { content[r.eventId][r.type] = {}; }
+                content[r.eventId][r.type][r.userId] = {
+                    ts: r.ts
+                };
+            });
+            return new MatrixEvent({
+                content: content,
+                room_id: roomId,
+                type: "m.receipt"
+            });
+        }
+
+        function mkRecord(eventId, type, userId, ts) {
+            ts = ts || Date.now();
+            return {
+                eventId: eventId,
+                type: type,
+                userId: userId,
+                ts: ts
+            };
+        }
+
+        it("should store the receipt so it can be obtained via getReceiptsForEvent",
+        function() {
+            var ts = 13787898424;
+            room.addReceipt(mkReceipt(roomId, [
+                mkRecord(eventToAck.getId(), "m.read", userB, ts)
+            ]));
+            expect(room.getReceiptsForEvent(eventToAck)).toEqual([{
+                type: "m.read",
+                userId: userB,
+                data: {
+                    ts: ts
+                }
+            }]);
+        });
+
+        it("should clobber receipts based on type and user ID", function() {
+
+        });
+
+        it("should persist multiple receipts for a single event ID", function() {
+
+        });
+
+        it("should persist multiple receipts for a single receipt type", function() {
+
+        });
+
+        it("should persist multiple receipts for a single user ID", function() {
+
+        });
+
+    });
+
+    describe("getUsersReadUpTo", function() {
+
+        it("should return user IDs read up to the given event", function() {
+
+        });
+
+    })
 });
