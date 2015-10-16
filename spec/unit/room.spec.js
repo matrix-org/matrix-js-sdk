@@ -623,5 +623,5 @@ describe("Room", function() {
 
         });
 
-    })
+    });
 });
