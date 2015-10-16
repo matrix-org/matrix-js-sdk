@@ -551,7 +551,7 @@ describe("Room", function() {
         });
     });
 
-    describe("addReceipt", function() {
+    describe("receipts", function() {
 
         var eventToAck = utils.mkMessage({
             room: roomId, user: userA, msg: "PLEASE ACKNOWLEDGE MY EXISTENCE",
@@ -584,44 +584,124 @@ describe("Room", function() {
             };
         }
 
-        it("should store the receipt so it can be obtained via getReceiptsForEvent",
-        function() {
-            var ts = 13787898424;
-            room.addReceipt(mkReceipt(roomId, [
-                mkRecord(eventToAck.getId(), "m.read", userB, ts)
-            ]));
-            expect(room.getReceiptsForEvent(eventToAck)).toEqual([{
-                type: "m.read",
-                userId: userB,
-                data: {
-                    ts: ts
+        describe("addReceipt", function() {
+
+            it("should store the receipt so it can be obtained via getReceiptsForEvent",
+            function() {
+                var ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                ]));
+                expect(room.getReceiptsForEvent(eventToAck)).toEqual([{
+                    type: "m.read",
+                    userId: userB,
+                    data: {
+                        ts: ts
+                    }
+                }]);
+            });
+
+            it("should clobber receipts based on type and user ID", function() {
+                var nextEventToAck = utils.mkMessage({
+                    room: roomId, user: userA, msg: "I AM HERE YOU KNOW",
+                    event: true
+                });
+                var ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                ]));
+                var ts2 = 13787899999;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(nextEventToAck.getId(), "m.read", userB, ts2)
+                ]));
+                expect(room.getReceiptsForEvent(eventToAck)).toEqual([]);
+                expect(room.getReceiptsForEvent(nextEventToAck)).toEqual([{
+                    type: "m.read",
+                    userId: userB,
+                    data: {
+                        ts: ts2
+                    }
+                }]);
+            });
+
+            it("should persist multiple receipts for a single event ID", function() {
+                var ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventToAck.getId(), "m.read", userC, ts),
+                    mkRecord(eventToAck.getId(), "m.read", userD, ts)
+                ]));
+                expect(room.getUsersReadUpTo(eventToAck)).toEqual(
+                    [userB, userC, userD]
+                );
+            });
+
+            it("should persist multiple receipts for a single receipt type", function() {
+                var eventTwo = utils.mkMessage({
+                    room: roomId, user: userA, msg: "2222",
+                    event: true
+                });
+                var eventThree = utils.mkMessage({
+                    room: roomId, user: userA, msg: "3333",
+                    event: true
+                });
+                var ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventTwo.getId(), "m.read", userC, ts),
+                    mkRecord(eventThree.getId(), "m.read", userD, ts)
+                ]));
+                expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
+                expect(room.getUsersReadUpTo(eventTwo)).toEqual([userC]);
+                expect(room.getUsersReadUpTo(eventThree)).toEqual([userD]);
+            });
+
+            it("should persist multiple receipts for a single user ID", function() {
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.delivered", userB, 13787898424),
+                    mkRecord(eventToAck.getId(), "m.read", userB, 22222222),
+                    mkRecord(eventToAck.getId(), "m.seen", userB, 33333333),
+                ]));
+                expect(room.getReceiptsForEvent(eventToAck)).toEqual([
+                {
+                    type: "m.delivered",
+                    userId: userB,
+                    data: {
+                        ts: 13787898424
+                    }
+                },
+                {
+                    type: "m.read",
+                    userId: userB,
+                    data: {
+                        ts: 22222222
+                    }
+                },
+                {
+                    type: "m.seen",
+                    userId: userB,
+                    data: {
+                        ts: 33333333
+                    }
                 }
-            }]);
-        });
-
-        it("should clobber receipts based on type and user ID", function() {
+                ]);
+            });
 
         });
 
-        it("should persist multiple receipts for a single event ID", function() {
+        describe("getUsersReadUpTo", function() {
 
-        });
-
-        it("should persist multiple receipts for a single receipt type", function() {
-
-        });
-
-        it("should persist multiple receipts for a single user ID", function() {
-
-        });
-
-    });
-
-    describe("getUsersReadUpTo", function() {
-
-        it("should return user IDs read up to the given event", function() {
+            it("should return user IDs read up to the given event", function() {
+                var ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                ]));
+                expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
+            });
 
         });
 
     });
+
+    
 });
