@@ -703,5 +703,4 @@ describe("Room", function() {
 
     });
 
-    
 });
