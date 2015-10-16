@@ -337,7 +337,7 @@ describe("Room", function() {
         });
     });
 
-    describe("recalculate (Room Name)", function() {
+    describe("recalculate", function() {
         var stateLookup = {
             // event.type + "$" event.state_key : MatrixEvent
         };
@@ -404,149 +404,195 @@ describe("Room", function() {
             });
         });
 
-        it("should return the names of members in a private (invite join_rules)" +
-        " room if a room name and alias don't exist and there are >3 members.",
-        function() {
-            setJoinRule("invite");
-            addMember(userA);
-            addMember(userB);
-            addMember(userC);
-            addMember(userD);
-            room.recalculate(userA);
-            var name = room.name;
-            // we expect at least 1 member to be mentioned
-            var others = [userB, userC, userD];
-            var found = false;
-            for (var i = 0; i < others.length; i++) {
-                if (name.indexOf(others[i]) !== -1) {
-                    found = true;
-                    break;
+        describe("Room.recalculate => Stripped State Events", function() {
+            it("should set stripped state events as actual state events if the " +
+            "room is an invite room", function() {
+                var roomName = "flibble";
+
+                addMember(userA, "invite");
+                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                    {
+                        type: "m.room.name",
+                        state_key: "",
+                        content: {
+                            name: roomName
+                        }
+                    }
+                ];
+
+                room.recalculate(userA);
+                expect(room.currentState.setStateEvents).toHaveBeenCalled();
+                // first call, first arg (which is an array), first element in array
+                var fakeEvent = room.currentState.setStateEvents.calls[0].args[0][0];
+                expect(fakeEvent.getContent()).toEqual({
+                    name: roomName
+                });
+            });
+
+            it("should not clobber state events if it isn't an invite room", function() {
+                addMember(userA, "join");
+                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                    {
+                        type: "m.room.name",
+                        state_key: "",
+                        content: {
+                            name: "flibble"
+                        }
+                    }
+                ];
+
+                room.recalculate(userA);
+                expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
+            });
+        });
+
+        describe("Room.recalculate => Room Name", function() {
+
+            it("should return the names of members in a private (invite join_rules)" +
+            " room if a room name and alias don't exist and there are >3 members.",
+            function() {
+                setJoinRule("invite");
+                addMember(userA);
+                addMember(userB);
+                addMember(userC);
+                addMember(userD);
+                room.recalculate(userA);
+                var name = room.name;
+                // we expect at least 1 member to be mentioned
+                var others = [userB, userC, userD];
+                var found = false;
+                for (var i = 0; i < others.length; i++) {
+                    if (name.indexOf(others[i]) !== -1) {
+                        found = true;
+                        break;
+                    }
                 }
-            }
-            expect(found).toEqual(true, name);
-        });
+                expect(found).toEqual(true, name);
+            });
 
-        it("should return the names of members in a private (invite join_rules)" +
-        " room if a room name and alias don't exist and there are >2 members.",
-        function() {
-            setJoinRule("invite");
-            addMember(userA);
-            addMember(userB);
-            addMember(userC);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name.indexOf(userB)).not.toEqual(-1, name);
-            expect(name.indexOf(userC)).not.toEqual(-1, name);
-        });
+            it("should return the names of members in a private (invite join_rules)" +
+            " room if a room name and alias don't exist and there are >2 members.",
+            function() {
+                setJoinRule("invite");
+                addMember(userA);
+                addMember(userB);
+                addMember(userC);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name.indexOf(userB)).not.toEqual(-1, name);
+                expect(name.indexOf(userC)).not.toEqual(-1, name);
+            });
 
-        it("should return the names of members in a public (public join_rules)" +
-        " room if a room name and alias don't exist and there are >2 members.",
-        function() {
-            setJoinRule("public");
-            addMember(userA);
-            addMember(userB);
-            addMember(userC);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name.indexOf(userB)).not.toEqual(-1, name);
-            expect(name.indexOf(userC)).not.toEqual(-1, name);
-        });
+            it("should return the names of members in a public (public join_rules)" +
+            " room if a room name and alias don't exist and there are >2 members.",
+            function() {
+                setJoinRule("public");
+                addMember(userA);
+                addMember(userB);
+                addMember(userC);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name.indexOf(userB)).not.toEqual(-1, name);
+                expect(name.indexOf(userC)).not.toEqual(-1, name);
+            });
 
-        it("should show the other user's name for public (public join_rules)" +
-        " rooms if a room name and alias don't exist and it is a 1:1-chat.",
-        function() {
-            setJoinRule("public");
-            addMember(userA);
-            addMember(userB);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name.indexOf(userB)).not.toEqual(-1, name);
-        });
+            it("should show the other user's name for public (public join_rules)" +
+            " rooms if a room name and alias don't exist and it is a 1:1-chat.",
+            function() {
+                setJoinRule("public");
+                addMember(userA);
+                addMember(userB);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name.indexOf(userB)).not.toEqual(-1, name);
+            });
 
-        it("should show the other user's name for private " +
-        "(invite join_rules) rooms if a room name and alias don't exist and it" +
-        " is a 1:1-chat.", function() {
-            setJoinRule("invite");
-            addMember(userA);
-            addMember(userB);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name.indexOf(userB)).not.toEqual(-1, name);
-        });
+            it("should show the other user's name for private " +
+            "(invite join_rules) rooms if a room name and alias don't exist and it" +
+            " is a 1:1-chat.", function() {
+                setJoinRule("invite");
+                addMember(userA);
+                addMember(userB);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name.indexOf(userB)).not.toEqual(-1, name);
+            });
 
-        it("should show the other user's name for private" +
-        " (invite join_rules) rooms if you are invited to it.", function() {
-            setJoinRule("invite");
-            addMember(userA, "invite");
-            addMember(userB);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name.indexOf(userB)).not.toEqual(-1, name);
-        });
+            it("should show the other user's name for private" +
+            " (invite join_rules) rooms if you are invited to it.", function() {
+                setJoinRule("invite");
+                addMember(userA, "invite");
+                addMember(userB);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name.indexOf(userB)).not.toEqual(-1, name);
+            });
 
-        it("should show the room alias if one exists for private " +
-        "(invite join_rules) rooms if a room name doesn't exist.", function() {
-            var alias = "#room_alias:here";
-            setJoinRule("invite");
-            setAliases([alias, "#another:one"]);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(alias);
-        });
+            it("should show the room alias if one exists for private " +
+            "(invite join_rules) rooms if a room name doesn't exist.", function() {
+                var alias = "#room_alias:here";
+                setJoinRule("invite");
+                setAliases([alias, "#another:one"]);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(alias);
+            });
 
-        it("should show the room alias if one exists for public " +
-        "(public join_rules) rooms if a room name doesn't exist.", function() {
-            var alias = "#room_alias:here";
-            setJoinRule("public");
-            setAliases([alias, "#another:one"]);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(alias);
-        });
+            it("should show the room alias if one exists for public " +
+            "(public join_rules) rooms if a room name doesn't exist.", function() {
+                var alias = "#room_alias:here";
+                setJoinRule("public");
+                setAliases([alias, "#another:one"]);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(alias);
+            });
 
-        it("should show the room name if one exists for private " +
-        "(invite join_rules) rooms.", function() {
-            var roomName = "A mighty name indeed";
-            setJoinRule("invite");
-            setRoomName(roomName);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(roomName);
-        });
+            it("should show the room name if one exists for private " +
+            "(invite join_rules) rooms.", function() {
+                var roomName = "A mighty name indeed";
+                setJoinRule("invite");
+                setRoomName(roomName);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(roomName);
+            });
 
-        it("should show the room name if one exists for public " +
-        "(public join_rules) rooms.", function() {
-            var roomName = "A mighty name indeed";
-            setJoinRule("public");
-            setRoomName(roomName);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(roomName);
-        });
+            it("should show the room name if one exists for public " +
+            "(public join_rules) rooms.", function() {
+                var roomName = "A mighty name indeed";
+                setJoinRule("public");
+                setRoomName(roomName);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(roomName);
+            });
 
-        it("should show your name for private (invite join_rules) rooms if" +
-        " a room name and alias don't exist and it is a self-chat.", function() {
-            setJoinRule("invite");
-            addMember(userA);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(userA);
-        });
+            it("should show your name for private (invite join_rules) rooms if" +
+            " a room name and alias don't exist and it is a self-chat.", function() {
+                setJoinRule("invite");
+                addMember(userA);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(userA);
+            });
 
-        it("should show your name for public (public join_rules) rooms if a" +
-        " room name and alias don't exist and it is a self-chat.", function() {
-            setJoinRule("public");
-            addMember(userA);
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual(userA);
-        });
+            it("should show your name for public (public join_rules) rooms if a" +
+            " room name and alias don't exist and it is a self-chat.", function() {
+                setJoinRule("public");
+                addMember(userA);
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual(userA);
+            });
 
-        it("should return '?' if there is no name, alias or members in the room.",
-        function() {
-            room.recalculate(userA);
-            var name = room.name;
-            expect(name).toEqual("?");
+            it("should return '?' if there is no name, alias or members in the room.",
+            function() {
+                room.recalculate(userA);
+                var name = room.name;
+                expect(name).toEqual("?");
+            });
+
         });
     });
 });
