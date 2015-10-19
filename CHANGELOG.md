@@ -1,3 +1,26 @@
+Changes in XXX
+==============
+
+**BREAKING CHANGES**:
+ * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
+   `RoomMember.getAvatarUrl`. Arguments remain the same except the homeserver
+   URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+   ```javascript
+   // before
+   var url = client.getAvatarUrlForMember(member, width, height, resize, allowDefault)
+   // after
+   var url = member.getAvatarUrl(client.getHomeserverUrl(), width, height, resize, allowDefault)
+   ```
+ * `MatrixClient.getAvatarUrlForRoom` has been removed and replaced with
+   `Room.getAvatarUrl`. Arguments remain the same except the homeserver
+   URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+   ```javascript
+   // before
+   var url = client.getAvatarUrlForRoom(room, width, height, resize, allowDefault)
+   // after
+   var url = room.getAvatarUrl(client.getHomeserverUrl(), width, height, resize, allowDefault)
+   ```
+
 Changes in 0.2.2
 ================
 
@@ -22,6 +45,10 @@ New methods:
 Changes in 0.2.1
 ================
 
+**BREAKING CHANGES**
+ * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
+   `(roomIdOrAlias, opts, callback)`.
+
 Bug fixes:
  * The `Content-Type` of file uploads is now explicitly set, without relying
    on the browser to do it for us.
@@ -32,10 +59,6 @@ Improvements:
  * The text returned from a room invite now includes who the invite was from.
  * There is now a try/catch block around the `request` function which will
    reject/errback appropriately if an exception is thrown synchronously in it.
-
-Breaking changes:
- * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
-   `(roomIdOrAlias, opts, callback)`.
 
 New methods:
  * `MatrixClient.createAlias(alias, roomId)`
@@ -57,7 +80,7 @@ Modified methods:
 Changes in 0.2.0
 ================
 
-Breaking changes:
+**BREAKING CHANGES**:
  * `MatrixClient.setPowerLevel` now expects a `MatrixEvent` and not an `Object`
    for the `event` parameter.
 
@@ -123,7 +146,7 @@ Bug fixes:
 Changes in 0.1.1
 ================
 
-Breaking changes:
+**BREAKING CHANGES**:
  * `Room.calculateRoomName` is now private. Use `Room.recalculate` instead, and
    access the calculated name via `Room.name`.
  * `new MatrixClient(...)` no longer creates a `MatrixInMemoryStore` if
