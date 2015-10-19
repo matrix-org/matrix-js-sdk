@@ -5,6 +5,7 @@ Changes in XXX
  * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
    `RoomMember.getAvatarUrl`. Arguments remain the same except the homeserver
    URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+
    ```javascript
    // before
    var url = client.getAvatarUrlForMember(member, width, height, resize, allowDefault)
@@ -14,6 +15,7 @@ Changes in XXX
  * `MatrixClient.getAvatarUrlForRoom` has been removed and replaced with
    `Room.getAvatarUrl`. Arguments remain the same except the homeserver
    URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+
    ```javascript
    // before
    var url = client.getAvatarUrlForRoom(room, width, height, resize, allowDefault)
