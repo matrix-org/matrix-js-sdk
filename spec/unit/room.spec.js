@@ -20,6 +20,43 @@ describe("Room", function() {
         room.currentState = utils.mock(sdk.RoomState, "currentState");
     });
 
+    describe("getAvatarUrl", function() {
+        var hsUrl = "https://my.home.server";
+
+        it("should return the URL from m.room.avatar preferentially", function() {
+            room.currentState.getStateEvents.andCallFake(function(type, key) {
+                if (type === "m.room.avatar" && key === "") {
+                    return utils.mkEvent({
+                        event: true,
+                        type: "m.room.avatar",
+                        skey: "",
+                        room: roomId,
+                        user: userA,
+                        content: {
+                            url: "mxc://flibble/wibble"
+                        }
+                    });
+                }
+            });
+            var url = room.getAvatarUrl(hsUrl);
+            // we don't care about how the mxc->http conversion is done, other
+            // than it contains the mxc body.
+            expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
+        });
+
+        it("should return an identicon HTTP URL if allowDefault was set and there " +
+        "was no m.room.avatar event", function() {
+            var url = room.getAvatarUrl(hsUrl, 64, 64, "crop", true);
+            expect(url.indexOf("http")).toEqual(0); // don't care about form
+        });
+
+        it("should return nothing if there is no m.room.avatar and allowDefault=false",
+        function() {
+            var url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
+            expect(url).toEqual(null);
+        });
+    });
+
     describe("getMember", function() {
         beforeEach(function() {
             // clobber members property with test data

@@ -40,7 +40,8 @@ describe("ContentRepo", function() {
         function() {
             var mxcUri = "mxc://server.name/resourceid#automade";
             expect(ContentRepo.getHttpUriForMxc(baseUrl, mxcUri, 32)).toEqual(
-                baseUrl + "/_matrix/media/v1/thumbnail/server.name/resourceid?width=32#automade"
+                baseUrl + "/_matrix/media/v1/thumbnail/server.name/resourceid" +
+                "?width=32#automade"
             );
         });
 
