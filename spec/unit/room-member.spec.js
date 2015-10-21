@@ -201,6 +201,9 @@ describe("RoomMember", function() {
                         }),
                         joinEvent
                     ];
+                },
+                getUserIdsWithDisplayName: function(displayName) {
+                    return [userA, userC];
                 }
             };
             expect(member.name).toEqual(userA); // default = user_id
