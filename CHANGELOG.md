@@ -113,7 +113,7 @@ New methods:
  * `MatrixClient.mxcUrlToHttp(url, w, h, method)`
  * `MatrixClient.getAvatarUrlForRoom(room, w, h, method)`
  * `MatrixClient.uploadContent(file, callback)`
- * `Room.getMembersWithMemership(membership)`
+ * `Room.getMembersWithMembership(membership)`
  * `MatrixScheduler.getQueueForEvent(event)`
  * `MatrixScheduler.removeEventFromQueue(event)`
  * `$DATA_STORE.setSyncToken(token)`
