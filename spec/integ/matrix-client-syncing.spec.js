@@ -164,6 +164,36 @@ describe("MatrixClient syncing", function() {
             });
         });
 
+        it("should result in events on the room member firing", function(done) {
+            eventData.chunk = [
+                utils.mkPresence({
+                    user: userC, presence: "online", name: "The Ghost"
+                }),
+                utils.mkMembership({
+                    room: roomOne, mship: "invite", user: userC
+                })
+            ];
+
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            var latestFiredName = null;
+            client.on("RoomMember.name", function(event, m) {
+                if (m.userId === userC && m.roomId === roomOne) {
+                    latestFiredName = m.name;
+                }
+            });
+
+            client.startClient({
+                resolveInvitesToProfiles: true
+            });
+
+            httpBackend.flush().done(function() {
+                expect(latestFiredName).toEqual("The Ghost");
+                done();
+            });
+        });
+
         it("should no-op if resolveInvitesToProfiles is not set", function(done) {
             eventData.chunk = [
                 utils.mkMembership({
