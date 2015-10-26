@@ -13,6 +13,7 @@ function HttpBackend() {
     this.requestFn = function(opts, callback) {
         var realReq = new Request(opts.method, opts.uri, opts.body, opts.qs);
         realReq.callback = callback;
+        console.log("HTTP backend received request: %s %s", opts.method, opts.uri);
         self.requests.push(realReq);
     };
 }
