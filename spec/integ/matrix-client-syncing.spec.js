@@ -121,10 +121,12 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/initialSync").respond(200, initialSync);
             httpBackend.when("GET", "/events").respond(200, eventData);
-            httpBackend.when("GET", "/profile/" + encodeURIComponent(userC)).respond(200, {
-                avatar_url: "mxc://flibble/wibble",
-                displayname: "The Boss"
-            });
+            httpBackend.when("GET", "/profile/" + encodeURIComponent(userC)).respond(
+                200, {
+                    avatar_url: "mxc://flibble/wibble",
+                    displayname: "The Boss"
+                }
+            );
 
             client.startClient({
                 resolveInvitesToProfiles: true
