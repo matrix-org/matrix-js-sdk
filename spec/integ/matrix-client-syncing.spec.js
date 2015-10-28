@@ -2,6 +2,7 @@
 var sdk = require("../..");
 var HttpBackend = require("../mock-request");
 var utils = require("../test-utils");
+var MatrixEvent = sdk.MatrixEvent;
 
 describe("MatrixClient syncing", function() {
     var baseUrl = "http://localhost.or.something";
@@ -9,6 +10,11 @@ describe("MatrixClient syncing", function() {
     var selfUserId = "@alice:localhost";
     var selfAccessToken = "aseukfgwef";
     var otherUserId = "@bob:localhost";
+    var userA = "@alice:bar";
+    var userB = "@bob:bar";
+    var userC = "@claire:bar";
+    var roomOne = "!foo:localhost";
+    var roomTwo = "!bar:localhost";
 
     beforeEach(function() {
         utils.beforeEach(this);
@@ -64,10 +70,156 @@ describe("MatrixClient syncing", function() {
         });
     });
 
+    describe("resolving invites to profile info", function() {
+        var initialSync = {
+            end: "s_5_3",
+            presence: [],
+            rooms: [{
+                membership: "join",
+                room_id: roomOne,
+                messages: {
+                    start: "f_1_1",
+                    end: "f_2_2",
+                    chunk: [
+                        utils.mkMessage({
+                            room: roomOne, user: otherUserId, msg: "hello"
+                        })
+                    ]
+                },
+                state: [
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: otherUserId
+                    }),
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: selfUserId
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.create", room: roomOne, user: selfUserId,
+                        content: {
+                            creator: selfUserId
+                        }
+                    })
+                ]
+            }]
+        };
+        var eventData = {
+            start: "s_5_3",
+            end: "e_6_7",
+            chunk: []
+        };
+
+        beforeEach(function() {
+            eventData.chunk = [];
+        });
+
+        it("should resolve incoming invites from /events", function(done) {
+            eventData.chunk = [
+                utils.mkMembership({
+                    room: roomOne, mship: "invite", user: userC
+                })
+            ];
+
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/profile/" + encodeURIComponent(userC)).respond(
+                200, {
+                    avatar_url: "mxc://flibble/wibble",
+                    displayname: "The Boss"
+                }
+            );
+
+            client.startClient({
+                resolveInvitesToProfiles: true
+            });
+
+            httpBackend.flush().done(function() {
+                var member = client.getRoom(roomOne).getMember(userC);
+                expect(member.name).toEqual("The Boss");
+                expect(
+                    member.getAvatarUrl("home.server.url", null, null, null, false)
+                ).toBeDefined();
+                done();
+            });
+        });
+
+        it("should use cached values from m.presence wherever possible", function(done) {
+            eventData.chunk = [
+                utils.mkPresence({
+                    user: userC, presence: "online", name: "The Ghost"
+                }),
+                utils.mkMembership({
+                    room: roomOne, mship: "invite", user: userC
+                })
+            ];
+
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient({
+                resolveInvitesToProfiles: true
+            });
+
+            httpBackend.flush().done(function() {
+                var member = client.getRoom(roomOne).getMember(userC);
+                expect(member.name).toEqual("The Ghost");
+                done();
+            });
+        });
+
+        it("should result in events on the room member firing", function(done) {
+            eventData.chunk = [
+                utils.mkPresence({
+                    user: userC, presence: "online", name: "The Ghost"
+                }),
+                utils.mkMembership({
+                    room: roomOne, mship: "invite", user: userC
+                })
+            ];
+
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            var latestFiredName = null;
+            client.on("RoomMember.name", function(event, m) {
+                if (m.userId === userC && m.roomId === roomOne) {
+                    latestFiredName = m.name;
+                }
+            });
+
+            client.startClient({
+                resolveInvitesToProfiles: true
+            });
+
+            httpBackend.flush().done(function() {
+                expect(latestFiredName).toEqual("The Ghost");
+                done();
+            });
+        });
+
+        it("should no-op if resolveInvitesToProfiles is not set", function(done) {
+            eventData.chunk = [
+                utils.mkMembership({
+                    room: roomOne, mship: "invite", user: userC
+                })
+            ];
+
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                var member = client.getRoom(roomOne).getMember(userC);
+                expect(member.name).toEqual(userC);
+                expect(
+                    member.getAvatarUrl("home.server.url", null, null, null, false)
+                ).toBeNull();
+                done();
+            });
+        });
+    });
+
     describe("users", function() {
-        var userA = "@alice:bar";
-        var userB = "@bob:bar";
-        var userC = "@claire:bar";
         var initialSync = {
             end: "s_5_3",
             presence: [
@@ -112,8 +264,6 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("room state", function() {
-        var roomOne = "!foo:localhost";
-        var roomTwo = "!bar:localhost";
         var msgText = "some text here";
         var otherDisplayName = "Bob Smith";
         var initialSync = {
@@ -267,6 +417,121 @@ describe("MatrixClient syncing", function() {
 
         xit("should update the room topic", function() {
 
+        });
+    });
+
+    describe("receipts", function() {
+        var initialSync = {
+            end: "s_5_3",
+            presence: [],
+            receipts: [],
+            rooms: [{
+                membership: "join",
+                room_id: roomOne,
+                messages: {
+                    start: "f_1_1",
+                    end: "f_2_2",
+                    chunk: [
+                        utils.mkMessage({
+                            room: roomOne, user: otherUserId, msg: "hello"
+                        })
+                    ]
+                },
+                state: [
+                    utils.mkEvent({
+                        type: "m.room.name", room: roomOne, user: otherUserId,
+                        content: {
+                            name: "Old room name"
+                        }
+                    }),
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: otherUserId
+                    }),
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: selfUserId
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.create", room: roomOne, user: selfUserId,
+                        content: {
+                            creator: selfUserId
+                        }
+                    })
+                ]
+            }]
+        };
+        var eventData = {
+            start: "s_5_3",
+            end: "e_6_7",
+            chunk: []
+        };
+
+        beforeEach(function() {
+            eventData.chunk = [];
+            initialSync.receipts = [];
+        });
+
+        it("should sync receipts from /initialSync.", function(done) {
+            var ackEvent = initialSync.rooms[0].messages.chunk[0];
+            var receipt = {};
+            receipt[ackEvent.event_id] = {
+                "m.read": {}
+            };
+            receipt[ackEvent.event_id]["m.read"][otherUserId] = {
+                ts: 176592842636
+            };
+            initialSync.receipts = [{
+                content: receipt,
+                room_id: roomOne,
+                type: "m.receipt"
+            }];
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                var room = client.getRoom(roomOne);
+                expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
+                    type: "m.read",
+                    userId: otherUserId,
+                    data: {
+                        ts: 176592842636
+                    }
+                }]);
+                done();
+            });
+        });
+
+        it("should sync receipts from /events.", function(done) {
+            var ackEvent = initialSync.rooms[0].messages.chunk[0];
+            var receipt = {};
+            receipt[ackEvent.event_id] = {
+                "m.read": {}
+            };
+            receipt[ackEvent.event_id]["m.read"][otherUserId] = {
+                ts: 176592842636
+            };
+            eventData.chunk = [{
+                content: receipt,
+                room_id: roomOne,
+                type: "m.receipt"
+            }];
+            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
+            httpBackend.when("GET", "/events").respond(200, eventData);
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                var room = client.getRoom(roomOne);
+                expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
+                    type: "m.read",
+                    userId: otherUserId,
+                    data: {
+                        ts: 176592842636
+                    }
+                }]);
+                done();
+            });
         });
     });
 

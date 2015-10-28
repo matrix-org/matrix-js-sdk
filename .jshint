@@ -5,7 +5,7 @@
     "nonew": true,
     "curly": true,
     "forin": true,
-    "freeze": true,
+    "freeze": false,
     "undef": true,
     "unused": "vars"
 }

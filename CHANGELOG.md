@@ -1,3 +1,56 @@
+Changes in 0.3.0
+================
+
+**BREAKING CHANGES**:
+ * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
+   `RoomMember.getAvatarUrl`. Arguments remain the same except the homeserver
+   URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+
+   ```javascript
+   // before
+   var url = client.getAvatarUrlForMember(member, width, height, resize, allowDefault)
+   // after
+   var url = member.getAvatarUrl(client.getHomeserverUrl(), width, height, resize, allowDefault)
+   ```
+ * `MatrixClient.getAvatarUrlForRoom` has been removed and replaced with
+   `Room.getAvatarUrl`. Arguments remain the same except the homeserver
+   URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
+
+   ```javascript
+   // before
+   var url = client.getAvatarUrlForRoom(room, width, height, resize, allowDefault)
+   // after
+   var url = room.getAvatarUrl(client.getHomeserverUrl(), width, height, resize, allowDefault)
+   ```
+
+ * `s/Room.getMembersWithMemership/Room.getMembersWithMem`b`ership/g`
+
+New methods:
+ * Added support for sending receipts via
+   `MatrixClient.sendReceipt(event, receiptType, callback)` and
+   `MatrixClient.sendReadReceipt(event, callback)`.
+ * Added support for receiving receipts via
+   `Room.getReceiptsForEvent(event)` and `Room.getUsersReadUpTo(event)`. Receipts
+   can be directly added to a `Room` using `Room.addReceipt(event)` though the
+   `MatrixClient` does this for you.
+ * Added support for muting local video and audio via the new methods
+   `MatrixCall.setMicrophoneMuted()`, `MatrixCall.isMicrophoneMuted(muted)`,
+   `MatrixCall.isLocalVideoMuted()` and `Matrix.setLocalVideoMuted(muted)`.
+ * Added **experimental** support for screen-sharing in Chrome via
+   `MatrixCall.placeScreenSharingCall(remoteVideoElement, localVideoElement)`.
+ * Added ability to perform server-side searches using
+   `MatrixClient.searchMessageText(opts)` and `MatrixClient.search(opts)`.
+
+Improvements:
+ * Improve the performance of initial sync processing from `O(n^2)` to `O(n)`.
+ * `Room.name` will now take into account `m.room.canonical_alias` events.
+ * `MatrixClient.startClient` now takes an Object `opts` rather than a Number in
+   a backwards-compatible way. This `opts` allows syncing configuration options
+   to be specified including `includeArchivedRooms` and `resolveInvitesToProfiles`.
+ * `Room` objects which represent room invitations will now have state populated
+   from `invite_room_state` if it is included in the `m.room.member` event.
+ * `Room.getAvatarUrl` will now take into account `m.room.avatar` events.
+
 Changes in 0.2.2
 ================
 
@@ -22,6 +75,10 @@ New methods:
 Changes in 0.2.1
 ================
 
+**BREAKING CHANGES**
+ * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
+   `(roomIdOrAlias, opts, callback)`.
+
 Bug fixes:
  * The `Content-Type` of file uploads is now explicitly set, without relying
    on the browser to do it for us.
@@ -32,10 +89,6 @@ Improvements:
  * The text returned from a room invite now includes who the invite was from.
  * There is now a try/catch block around the `request` function which will
    reject/errback appropriately if an exception is thrown synchronously in it.
-
-Breaking changes:
- * `MatrixClient.joinRoom` has changed from `(roomIdOrAlias, callback)` to
-   `(roomIdOrAlias, opts, callback)`.
 
 New methods:
  * `MatrixClient.createAlias(alias, roomId)`
@@ -57,7 +110,7 @@ Modified methods:
 Changes in 0.2.0
 ================
 
-Breaking changes:
+**BREAKING CHANGES**:
  * `MatrixClient.setPowerLevel` now expects a `MatrixEvent` and not an `Object`
    for the `event` parameter.
 
@@ -88,7 +141,7 @@ New methods:
  * `MatrixClient.mxcUrlToHttp(url, w, h, method)`
  * `MatrixClient.getAvatarUrlForRoom(room, w, h, method)`
  * `MatrixClient.uploadContent(file, callback)`
- * `Room.getMembersWithMemership(membership)`
+ * `Room.getMembersWithMembership(membership)`
  * `MatrixScheduler.getQueueForEvent(event)`
  * `MatrixScheduler.removeEventFromQueue(event)`
  * `$DATA_STORE.setSyncToken(token)`
@@ -123,7 +176,7 @@ Bug fixes:
 Changes in 0.1.1
 ================
 
-Breaking changes:
+**BREAKING CHANGES**:
  * `Room.calculateRoomName` is now private. Use `Room.recalculate` instead, and
    access the calculated name via `Room.name`.
  * `new MatrixClient(...)` no longer creates a `MatrixInMemoryStore` if

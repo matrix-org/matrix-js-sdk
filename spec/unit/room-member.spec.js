@@ -15,6 +15,40 @@ describe("RoomMember", function() {
         member = new RoomMember(roomId, userA);
     });
 
+    describe("getAvatarUrl", function() {
+        var hsUrl = "https://my.home.server";
+
+        it("should return the URL from m.room.member preferentially", function() {
+            member.events.member = utils.mkEvent({
+                event: true,
+                type: "m.room.member",
+                skey: userA,
+                room: roomId,
+                user: userA,
+                content: {
+                    membership: "join",
+                    avatar_url: "mxc://flibble/wibble"
+                }
+            });
+            var url = member.getAvatarUrl(hsUrl);
+            // we don't care about how the mxc->http conversion is done, other
+            // than it contains the mxc body.
+            expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
+        });
+
+        it("should return an identicon HTTP URL if allowDefault was set and there " +
+        "was no m.room.member event", function() {
+            var url = member.getAvatarUrl(hsUrl, 64, 64, "crop", true);
+            expect(url.indexOf("http")).toEqual(0); // don't care about form
+        });
+
+        it("should return nothing if there is no m.room.member and allowDefault=false",
+        function() {
+            var url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false);
+            expect(url).toEqual(null);
+        });
+    });
+
     describe("setPowerLevelEvent", function() {
         it("should set 'powerLevel' and 'powerLevelNorm'.", function() {
             var event = utils.mkEvent({
@@ -167,6 +201,9 @@ describe("RoomMember", function() {
                         }),
                         joinEvent
                     ];
+                },
+                getUserIdsWithDisplayName: function(displayName) {
+                    return [userA, userC];
                 }
             };
             expect(member.name).toEqual(userA); // default = user_id

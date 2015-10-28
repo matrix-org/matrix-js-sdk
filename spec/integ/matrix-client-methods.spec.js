@@ -43,4 +43,48 @@ describe("MatrixClient", function() {
             httpBackend.verifyNoOutstandingRequests();
         });
     });
+
+    describe("searching", function() {
+
+        var response = {
+            search_categories: {
+                room_events: {
+                    count: 24,
+                    results: {
+                        "$flibble:localhost": {
+                            rank: 0.1,
+                            result: {
+                                type: "m.room.message",
+                                user_id: "@alice:localhost",
+                                room_id: "!feuiwhf:localhost",
+                                content: {
+                                    body: "a result",
+                                    msgtype: "m.text"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        it("searchMessageText should perform a /search for room_events", function(done) {
+            client.searchMessageText({
+                query: "monkeys"
+            });
+            httpBackend.when("POST", "/search").check(function(req) {
+                expect(req.data).toEqual({
+                    search_categories: {
+                        room_events: {
+                            search_term: "monkeys"
+                        }
+                    }
+                });
+            }).respond(200, response);
+
+            httpBackend.flush().done(function() {
+                done();
+            });
+        });
+    });
 });
