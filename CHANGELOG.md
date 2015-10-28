@@ -1,5 +1,5 @@
-Changes in XXX
-==============
+Changes in 0.3.0
+================
 
 **BREAKING CHANGES**:
  * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
@@ -22,6 +22,34 @@ Changes in XXX
    // after
    var url = room.getAvatarUrl(client.getHomeserverUrl(), width, height, resize, allowDefault)
    ```
+
+ * `s/Room.getMembersWithMemership/Room.getMembersWithMem`b`ership/g`
+
+New methods:
+ * Added support for sending receipts via
+   `MatrixClient.sendReceipt(event, receiptType, callback)` and
+   `MatrixClient.sendReadReceipt(event, callback)`.
+ * Added support for receiving receipts via
+   `Room.getReceiptsForEvent(event)` and `Room.getUsersReadUpTo(event)`. Receipts
+   can be directly added to a `Room` using `Room.addReceipt(event)` though the
+   `MatrixClient` does this for you.
+ * Added support for muting local video and audio via the new methods
+   `MatrixCall.setMicrophoneMuted()`, `MatrixCall.isMicrophoneMuted(muted)`,
+   `MatrixCall.isLocalVideoMuted()` and `Matrix.setLocalVideoMuted(muted)`.
+ * Added **experimental** support for screen-sharing in Chrome via
+   `MatrixCall.placeScreenSharingCall(remoteVideoElement, localVideoElement)`.
+ * Added ability to perform server-side searches using
+   `MatrixClient.searchMessageText(opts)` and `MatrixClient.search(opts)`.
+
+Improvements:
+ * Improve the performance of initial sync processing from `O(n^2)` to `O(n)`.
+ * `Room.name` will now take into account `m.room.canonical_alias` events.
+ * `MatrixClient.startClient` now takes an Object `opts` rather than a Number in
+   a backwards-compatible way. This `opts` allows syncing configuration options
+   to be specified including `includeArchivedRooms` and `resolveInvitesToProfiles`.
+ * `Room` objects which represent room invitations will now have state populated
+   from `invite_room_state` if it is included in the `m.room.member` event.
+ * `Room.getAvatarUrl` will now take into account `m.room.avatar` events.
 
 Changes in 0.2.2
 ================
