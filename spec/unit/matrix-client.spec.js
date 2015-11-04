@@ -81,7 +81,8 @@ describe("MatrixClient", function() {
             accessToken: "my.access.token",
             request: function() {}, // NOP
             store: store,
-            scheduler: scheduler
+            scheduler: scheduler,
+            userId: userId
         });
         // FIXME: We shouldn't be yanking _http like this.
         client._http = jasmine.createSpyObj("httpApi", [
