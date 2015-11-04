@@ -20,6 +20,10 @@ describe("MatrixClient", function() {
         chunk: []
     };
 
+    var PUSH_RULES_RESPONSE = {
+        method: "GET", path: "/pushrules/", data: {}
+    };
+
     var httpLookups = [
         // items are objects which look like:
         // {
@@ -76,6 +80,7 @@ describe("MatrixClient", function() {
 
     beforeEach(function() {
         utils.beforeEach(this);
+        jasmine.Clock.useMock();
         scheduler = jasmine.createSpyObj("scheduler", [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
             "setProcessFunction"
@@ -103,9 +108,7 @@ describe("MatrixClient", function() {
         // set reasonable working defaults
         pendingLookup = null;
         httpLookups = [];
-        httpLookups.push({
-            method: "GET", path: "/pushrules/", data: {}
-        });
+        httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push({
             method: "GET", path: "/initialSync", data: initialSyncData
         });
@@ -155,17 +158,62 @@ describe("MatrixClient", function() {
 
     describe("emitted sync events", function() {
 
-        it("should transition null -> PREPARED after /initialSync", function() {
-
+        it("should transition null -> PREPARED after /initialSync", function(done) {
+            // the first sync emitted should be null > prep
+            client.once("sync", function(state, old) {
+                expect(state).toEqual("PREPARED");
+                expect(old).toBeNull();
+                done();
+            });
+            client.startClient();
         });
 
-        it("should transition null -> ERROR after a failed /initialSync", function() {
-
+        it("should transition null -> ERROR after a failed /initialSync", function(done) {
+            httpLookups = [];
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push({
+                method: "GET", path: "/initialSync", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
+            // the first sync emitted should be null > prep
+            client.once("sync", function(state, old) {
+                expect(state).toEqual("ERROR");
+                expect(old).toBeNull();
+                done();
+                // FIXME: need to make next req tick else it pollutes other tests
+                jasmine.Clock.tick(10000);
+            });
+            client.startClient();
         });
 
         it("should transition ERROR -> PREPARED after /initialSync if prev failed",
-        function() {
-
+        function(done) {
+            httpLookups = [];
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push({
+                method: "GET", path: "/initialSync", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/initialSync", data: initialSyncData
+            });
+            var states = [
+                // current, old
+                ["ERROR", null],
+                ["PREPARED", "ERROR"]
+            ];
+            client.on("sync", function(state, old) {
+                var expected = states.shift();
+                if (!expected) {
+                    done();
+                    return;
+                }
+                expect(state).toEqual(expected[0]);
+                expect(old).toEqual(expected[1]);
+                if (expected.length === 0) {
+                    done();
+                }
+                jasmine.Clock.tick(10000);
+            });
+            client.startClient();
         });
 
         it("should transition PREPARED -> SYNCING after /initialSync", function() {
