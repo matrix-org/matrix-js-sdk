@@ -30,7 +30,7 @@ describe("MatrixClient", function() {
         // }
         // items are popped off when processed and block if no items left.
     ];
-    var pendingLookup = {};
+    var pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         var next = httpLookups.shift();
         var logLine = (
@@ -40,6 +40,14 @@ describe("MatrixClient", function() {
         console.log(logLine);
 
         if (!next) { // no more things to return
+            if (pendingLookup) {
+                // >1 pending thing, whine.
+                expect(false).toBe(
+                    true, ">1 pending request. You should probably handle them. " +
+                    "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
+                    method + " " + path
+                );
+            }
             pendingLookup = {
                 promise: q.defer().promise,
                 method: method,
@@ -93,7 +101,7 @@ describe("MatrixClient", function() {
         client._http.authedRequestWithPrefix.andCallFake(httpReq);
 
         // set reasonable working defaults
-        pendingLookup = {};
+        pendingLookup = null;
         httpLookups = [];
         httpLookups.push({
             method: "GET", path: "/pushrules/", data: {}
