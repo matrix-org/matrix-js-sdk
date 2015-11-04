@@ -54,7 +54,8 @@ describe("MatrixClient", function() {
 
         });
 
-        it("should transition ERROR -> PREPARED after /initialSync if prev failed", function() {
+        it("should transition ERROR -> PREPARED after /initialSync if prev failed",
+        function() {
 
         });
 
