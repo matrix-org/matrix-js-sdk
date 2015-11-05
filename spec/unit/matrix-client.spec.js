@@ -45,7 +45,10 @@ describe("MatrixClient", function() {
 
         if (!next) { // no more things to return
             if (pendingLookup) {
-                // >1 pending thing, whine.
+                if (pendingLookup.method === method && pendingLookup.path === path) {
+                    return pendingLookup.promise;
+                }
+                // >1 pending thing, and they are different, whine.
                 expect(false).toBe(
                     true, ">1 pending request. You should probably handle them. " +
                     "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
@@ -112,8 +115,19 @@ describe("MatrixClient", function() {
         httpLookups.push({
             method: "GET", path: "/initialSync", data: initialSyncData
         });
-        httpLookups.push({
-            method: "GET", path: "/events", data: eventData
+    });
+
+    afterEach(function() {
+        // need to re-stub the requests with NOPs because there are no guarantees
+        // clients from previous tests will be GC'd before the next test. This
+        // means they may call /events and then fail an expect() which will fail
+        // a DIFFERENT test (pollution between tests!) - we return unresolved
+        // promises to stop the client from continuing to run.
+        client._http.authedRequest.andCallFake(function() {
+            return q.defer().promise;
+        });
+        client._http.authedRequestWithPrefix.andCallFake(function() {
+            return q.defer().promise;
         });
     });
 
@@ -136,35 +150,103 @@ describe("MatrixClient", function() {
 
     describe("retryImmediately", function() {
         it("should return false if there is no request waiting", function() {
-
+            client.startClient();
+            expect(client.retryImmediately()).toBe(false);
         });
 
-        it("should return true if there is a request waiting", function() {
+        it("should work on /initialSync", function(done) {
+            httpLookups = [];
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push({
+                method: "GET", path: "/initialSync", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/initialSync", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
 
+            client.on("sync", function(state) {
+                if (state === "ERROR" && httpLookups.length > 0) {
+                    expect(httpLookups.length).toEqual(1);
+                    expect(client.retryImmediately()).toBe(true);
+                    expect(httpLookups.length).toEqual(0);
+                    done();
+                }
+            });
+            client.startClient();
         });
 
-        it("should work on /initialSync", function() {
+        it("should work on /events", function(done) {
+            httpLookups.push({
+                method: "GET", path: "/events", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/events", data: eventData
+            });
 
+            client.on("sync", function(state) {
+                if (state === "ERROR" && httpLookups.length > 0) {
+                    expect(httpLookups.length).toEqual(1);
+                    expect(client.retryImmediately()).toBe(true);
+                    expect(httpLookups.length).toEqual(0);
+                    done();
+                }
+            });
+            client.startClient();
         });
 
-        it("should work on /events", function() {
+        it("should work on /pushrules", function(done) {
+            httpLookups = [];
+            httpLookups.push({
+                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" }
+            });
 
-        });
-
-        it("should work on /pushrules", function() {
-
+            client.on("sync", function(state) {
+                if (state === "ERROR" && httpLookups.length > 0) {
+                    expect(httpLookups.length).toEqual(1);
+                    expect(client.retryImmediately()).toBe(true);
+                    expect(httpLookups.length).toEqual(0);
+                    done();
+                }
+            });
+            client.startClient();
         });
     });
 
     describe("emitted sync events", function() {
+        var expectedStates;
+
+        function syncChecker(done) {
+            return function(state, old) {
+                var expected = expectedStates.shift();
+                console.log(
+                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected
+                );
+                if (!expected) {
+                    done();
+                    return;
+                }
+                expect(state).toEqual(expected[0]);
+                expect(old).toEqual(expected[1]);
+                if (expectedStates.length === 0) {
+                    done();
+                }
+                // standard retry time is 4s
+                jasmine.Clock.tick(4001);
+            };
+        }
+
+        beforeEach(function() {
+            expectedStates = [
+            //  [current, old]
+            ];
+        });
 
         it("should transition null -> PREPARED after /initialSync", function(done) {
-            // the first sync emitted should be null > prep
-            client.once("sync", function(state, old) {
-                expect(state).toEqual("PREPARED");
-                expect(old).toBeNull();
-                done();
-            });
+            expectedStates.push(["PREPARED", null]);
+            client.on("sync", syncChecker(done));
             client.startClient();
         });
 
@@ -174,14 +256,8 @@ describe("MatrixClient", function() {
             httpLookups.push({
                 method: "GET", path: "/initialSync", error: { errcode: "NOPE_NOPE_NOPE" }
             });
-            // the first sync emitted should be null > prep
-            client.once("sync", function(state, old) {
-                expect(state).toEqual("ERROR");
-                expect(old).toBeNull();
-                done();
-                // FIXME: need to make next req tick else it pollutes other tests
-                jasmine.Clock.tick(10000);
-            });
+            expectedStates.push(["ERROR", null]);
+            client.on("sync", syncChecker(done));
             client.startClient();
         });
 
@@ -195,41 +271,62 @@ describe("MatrixClient", function() {
             httpLookups.push({
                 method: "GET", path: "/initialSync", data: initialSyncData
             });
-            var states = [
-                // current, old
-                ["ERROR", null],
-                ["PREPARED", "ERROR"]
-            ];
-            client.on("sync", function(state, old) {
-                var expected = states.shift();
-                if (!expected) {
-                    done();
-                    return;
-                }
-                expect(state).toEqual(expected[0]);
-                expect(old).toEqual(expected[1]);
-                if (expected.length === 0) {
-                    done();
-                }
-                jasmine.Clock.tick(10000);
-            });
+
+            expectedStates.push(["ERROR", null]);
+            expectedStates.push(["PREPARED", "ERROR"]);
+            client.on("sync", syncChecker(done));
             client.startClient();
         });
 
-        it("should transition PREPARED -> SYNCING after /initialSync", function() {
-
+        it("should transition PREPARED -> SYNCING after /initialSync", function(done) {
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            client.on("sync", syncChecker(done));
+            client.startClient();
         });
 
-        it("should transition SYNCING -> ERROR after a failed /events", function() {
+        it("should transition SYNCING -> ERROR after a failed /events", function(done) {
+            httpLookups.push({
+                method: "GET", path: "/events", error: { errcode: "NONONONONO" }
+            });
 
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["ERROR", "SYNCING"]);
+            client.on("sync", syncChecker(done));
+            client.startClient();
         });
 
-        it("should transition ERROR -> SYNCING after /events if prev failed", function() {
+        it("should transition ERROR -> SYNCING after /events if prev failed",
+        function(done) {
+            httpLookups.push({
+                method: "GET", path: "/events", error: { errcode: "NONONONONO" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/events", data: eventData
+            });
 
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["ERROR", "SYNCING"]);
+            client.on("sync", syncChecker(done));
+            client.startClient();
         });
 
-        it("should transition ERROR -> ERROR if multiple /events fails", function() {
+        it("should transition ERROR -> ERROR if multiple /events fails", function(done) {
+            httpLookups.push({
+                method: "GET", path: "/events", error: { errcode: "NONONONONO" }
+            });
+            httpLookups.push({
+                method: "GET", path: "/events", error: { errcode: "NONONONONO" }
+            });
 
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["ERROR", "SYNCING"]);
+            expectedStates.push(["ERROR", "ERROR"]);
+            client.on("sync", syncChecker(done));
+            client.startClient();
         });
     });
 });
