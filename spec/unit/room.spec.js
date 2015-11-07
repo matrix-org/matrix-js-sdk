@@ -801,4 +801,39 @@ describe("Room", function() {
 
     });
 
+    describe("tags", function() {
+
+        function mkTags(roomId, tags) {
+            var content = { "tags" : tags };
+            return new MatrixEvent({
+                content: content,
+                room_id: roomId,
+                type: "m.tag"
+            });
+        }
+
+        describe("addTag", function() {
+
+            it("should set tags on rooms from event stream so they can be obtained by the tags property",
+            function() {
+                var tags = { "m.foo": { "order": 0.5 } };
+                room.addTags(mkTags(roomId, tags));
+                expect(room.tags).toEqual(tags);
+            });
+
+            it("should emit Room.tags event when new tags are received on the event stream",
+            function() {
+                var listener = jasmine.createSpy('spy');
+                room.on("Room.tags", listener);
+
+                var tags = { "m.foo": { "order": 0.5 } };
+                var event = mkTags(roomId, tags);
+                room.addTags(event);
+                expect(listener).toHaveBeenCalledWith(event, room);
+            });
+
+            // XXX: shouldn't we try injecting actual m.tag events onto the eventstream
+            // rather than injecting via room.addTags()?
+        });
+    });
 });
