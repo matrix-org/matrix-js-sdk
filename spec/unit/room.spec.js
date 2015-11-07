@@ -814,14 +814,16 @@ describe("Room", function() {
 
         describe("addTag", function() {
 
-            it("should set tags on rooms from event stream so they can be obtained by the tags property",
+            it("should set tags on rooms from event stream so " +
+               "they can be obtained by the tags property",
             function() {
                 var tags = { "m.foo": { "order": 0.5 } };
                 room.addTags(mkTags(roomId, tags));
                 expect(room.tags).toEqual(tags);
             });
 
-            it("should emit Room.tags event when new tags are received on the event stream",
+            it("should emit Room.tags event when new tags are " +
+               "received on the event stream",
             function() {
                 var listener = jasmine.createSpy('spy');
                 room.on("Room.tags", listener);
