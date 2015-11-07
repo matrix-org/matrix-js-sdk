@@ -684,6 +684,21 @@ describe("Room", function() {
                 }]);
             });
 
+            it("should emit an event when a receipt is added",
+            function() {
+                var listener = jasmine.createSpy('spy');
+                room.on("Room.receipt", listener);
+
+                var ts = 13787898424;
+
+                var receiptEvent = mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                ]);
+
+                room.addReceipt(receiptEvent);
+                expect(listener).toHaveBeenCalledWith(receiptEvent, room);
+            });
+
             it("should clobber receipts based on type and user ID", function() {
                 var nextEventToAck = utils.mkMessage({
                     room: roomId, user: userA, msg: "I AM HERE YOU KNOW",
