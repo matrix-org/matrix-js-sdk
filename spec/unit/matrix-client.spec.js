@@ -372,5 +372,14 @@ describe("MatrixClient", function() {
             expect(httpLookups.length).toEqual(0);
         });
 
+        it("should throw if the displayName contains the address in it",
+        function() {
+            expect(function() {
+                client.inviteByEmail(
+                    roomId, "alice@gmail.com", "My Friend Alice (alice@gmail.com)"
+                );
+            }).toThrow();
+        });
+
     });
 });
