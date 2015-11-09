@@ -6,6 +6,7 @@ var utils = require("../test-utils");
 
 describe("MatrixClient", function() {
     var userId = "@alice:bar";
+    var identityServerUrl = "https://identity.server";
     var client, store, scheduler;
 
     var initialSyncData = {
@@ -30,7 +31,8 @@ describe("MatrixClient", function() {
         //   method: "GET",
         //   path: "/initialSync",
         //   data: {},
-        //   error: { errcode: M_FORBIDDEN } // if present will reject promise
+        //   error: { errcode: M_FORBIDDEN } // if present will reject promise,
+        //   expectBody: {} // additional expects on the body
         // }
         // items are popped off when processed and block if no items left.
     ];
@@ -67,6 +69,9 @@ describe("MatrixClient", function() {
                 "MatrixClient[UT] Matched. Returning " +
                 (next.error ? "BAD" : "GOOD") + " response"
             );
+            if (next.expectBody) {
+                expect(next.expectBody).toEqual(data);
+            }
             if (next.error) {
                 return q.reject({
                     errcode: next.error.errcode,
@@ -94,6 +99,7 @@ describe("MatrixClient", function() {
         ]);
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
+            idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
             request: function() {}, // NOP
             store: store,
@@ -328,5 +334,25 @@ describe("MatrixClient", function() {
             client.on("sync", syncChecker(done));
             client.startClient();
         });
+    });
+
+    describe("inviteByEmail", function() {
+        var roomId = "!foo:bar";
+
+        it("should send an invite HTTP POST", function() {
+            httpLookups = [{
+                method: "POST",
+                path: "/rooms/!foo%3Abar/invite",
+                data: {},
+                expectBody: {
+                    id_server: identityServerUrl,
+                    medium: "email",
+                    address: "alice@gmail.com"
+                }
+            }];
+            client.inviteByEmail(roomId, "alice@gmail.com");
+            expect(httpLookups.length).toEqual(0);
+        });
+
     });
 });
