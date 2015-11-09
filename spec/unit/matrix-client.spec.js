@@ -339,7 +339,7 @@ describe("MatrixClient", function() {
     describe("inviteByEmail", function() {
         var roomId = "!foo:bar";
 
-        it("should work with a displayName", function() {
+        it("should send an invite HTTP POST", function() {
             httpLookups = [{
                 method: "POST",
                 path: "/rooms/!foo%3Abar/invite",
@@ -347,38 +347,11 @@ describe("MatrixClient", function() {
                 expectBody: {
                     id_server: identityServerUrl,
                     medium: "email",
-                    address: "alice@gmail.com",
-                    display_name: "Alice"
-                }
-            }];
-            client.inviteByEmail(roomId, "alice@gmail.com", "Alice");
-            expect(httpLookups.length).toEqual(0);
-        });
-
-        it("should work without a displayName and use the stuff before the @",
-        function() {
-            httpLookups = [{
-                method: "POST",
-                path: "/rooms/!foo%3Abar/invite",
-                data: {},
-                expectBody: {
-                    id_server: identityServerUrl,
-                    medium: "email",
-                    address: "alice@gmail.com",
-                    display_name: "alice"
+                    address: "alice@gmail.com"
                 }
             }];
             client.inviteByEmail(roomId, "alice@gmail.com");
             expect(httpLookups.length).toEqual(0);
-        });
-
-        it("should throw if the displayName contains the address in it",
-        function() {
-            expect(function() {
-                client.inviteByEmail(
-                    roomId, "alice@gmail.com", "My Friend Alice (alice@gmail.com)"
-                );
-            }).toThrow();
         });
 
     });
