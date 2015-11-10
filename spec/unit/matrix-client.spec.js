@@ -33,6 +33,8 @@ describe("MatrixClient", function() {
         //   data: {},
         //   error: { errcode: M_FORBIDDEN } // if present will reject promise,
         //   expectBody: {} // additional expects on the body
+        //   expectQueryParams: {} // additional expects on query params
+        //   thenCall: function(){} // function to call *AFTER* returning response.
         // }
         // items are popped off when processed and block if no items left.
     ];
@@ -72,6 +74,16 @@ describe("MatrixClient", function() {
             if (next.expectBody) {
                 expect(next.expectBody).toEqual(data);
             }
+            if (next.expectQueryParams) {
+                Object.keys(next.expectQueryParams).forEach(function(k) {
+                    expect(qp[k]).toEqual(next.expectQueryParams[k]);
+                });
+            }
+
+            if (next.thenCall) {
+                process.nextTick(next.thenCall, 0); // next tick so we return first.
+            }
+
             if (next.error) {
                 return q.reject({
                     errcode: next.error.errcode,
@@ -354,5 +366,27 @@ describe("MatrixClient", function() {
             expect(httpLookups.length).toEqual(0);
         });
 
+    });
+
+    describe("guest rooms", function() {
+        var roomIds = [
+            "!foo:bar", "!baz:bar"
+        ];
+
+        it("should be set via setGuestRooms and used in /events calls", function(done) {
+            httpLookups.push({
+                method: "GET",
+                path: "/events",
+                data: eventData,
+                expectQueryParams: {
+                    room_id: roomIds
+                },
+                thenCall: function() {
+                    done();
+                }
+            });
+            client.setGuestRooms(roomIds);
+            client.startClient();
+        });
     });
 });
