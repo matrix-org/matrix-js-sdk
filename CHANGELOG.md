@@ -1,4 +1,4 @@
-Changes in 0.3.0
+Changes in XXX
 ================
 
 **BREAKING CHANGES**:
@@ -7,6 +7,10 @@ Changes in 0.3.0
     clients never inadvertantly reference content directly, leaking information
     to third party servers. Tne allowDirectLinks option is provided if the client
     wants to allow such links.
+
+Changes in 0.3.0
+================
+
  * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
    `RoomMember.getAvatarUrl`. Arguments remain the same except the homeserver
    URL must now be supplied from `MatrixClient.getHomeserverUrl()`.
