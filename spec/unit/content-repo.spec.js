@@ -10,9 +10,16 @@ describe("ContentRepo", function() {
     });
 
     describe("getHttpUriForMxc", function() {
-        it("should do nothing to HTTP URLs", function() {
+        it("should do nothing to HTTP URLs when allowing direct links", function() {
             var httpUrl = "http://example.com/image.jpeg";
-            expect(ContentRepo.getHttpUriForMxc(baseUrl, httpUrl)).toEqual(httpUrl);
+            expect(
+                ContentRepo.getHttpUriForMxc(baseUrl, httpUrl, undefined, undefined, undefined, true)
+            ).toEqual(httpUrl);
+        });
+
+        it("should return the empty string HTTP URLs by default", function() {
+            var httpUrl = "http://example.com/image.jpeg";
+            expect(ContentRepo.getHttpUriForMxc(baseUrl, httpUrl)).toEqual('');
         });
 
         it("should return a download URL if no width/height/resize are specified",
@@ -23,8 +30,8 @@ describe("ContentRepo", function() {
             );
         });
 
-        it("should do nothing for null input", function() {
-            expect(ContentRepo.getHttpUriForMxc(null)).toEqual(null);
+        it("should return the empty string for null input", function() {
+            expect(ContentRepo.getHttpUriForMxc(null)).toEqual('');
         });
 
         it("should return a thumbnail URL if a width/height/resize is specified",
