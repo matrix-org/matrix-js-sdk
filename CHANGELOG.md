@@ -5,7 +5,7 @@ Changes in XXX
  * `RoomMember.getAvatarUrl()` and `MatrixClient.mxcUrlToHttp()` now return the
     empty string when given anything other than an mxc:// URL. This ensures that
     clients never inadvertantly reference content directly, leaking information
-    to third party servers. Tne allowDirectLinks option is provided if the client
+    to third party servers. The allowDirectLinks option is provided if the client
     wants to allow such links.
 
 Changes in 0.3.0
