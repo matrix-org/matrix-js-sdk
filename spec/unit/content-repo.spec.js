@@ -13,7 +13,9 @@ describe("ContentRepo", function() {
         it("should do nothing to HTTP URLs when allowing direct links", function() {
             var httpUrl = "http://example.com/image.jpeg";
             expect(
-                ContentRepo.getHttpUriForMxc(baseUrl, httpUrl, undefined, undefined, undefined, true)
+                ContentRepo.getHttpUriForMxc(
+                    baseUrl, httpUrl, undefined, undefined, undefined, true
+                )
             ).toEqual(httpUrl);
         });
 
