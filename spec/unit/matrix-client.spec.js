@@ -374,6 +374,10 @@ describe("MatrixClient", function() {
         ];
 
         it("should be set via setGuestRooms and used in /events calls", function(done) {
+            httpLookups = []; // no /pushrules
+            httpLookups.push({
+                method: "GET", path: "/initialSync", data: initialSyncData
+            });
             httpLookups.push({
                 method: "GET",
                 path: "/events",
