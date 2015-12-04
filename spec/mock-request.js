@@ -28,6 +28,7 @@ HttpBackend.prototype = {
         var defer = q.defer();
         var self = this;
         var flushed = 0;
+        var triedWaiting = false;
         console.log(
             "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
         );
@@ -48,6 +49,12 @@ HttpBackend.prototype = {
                 else {
                     setTimeout(tryFlush, 0);
                 }
+            }
+            else if (flushed === 0 && !triedWaiting) {
+                // we may not have made the request yet, wait a generous amount of
+                // time before giving up.
+                setTimeout(tryFlush, 5);
+                triedWaiting = true;
             }
             else {
                 console.log("  no more flushes. [%s]", path);
