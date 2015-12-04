@@ -386,6 +386,7 @@ describe("MatrixClient", function() {
                 }
             });
             client.setGuestRooms(roomIds);
+            client.setGuest(true);
             client.startClient();
         });
     });
