@@ -289,10 +289,10 @@ describe("MatrixClient room timelines", function() {
                     expect(room.oldState.paginationToken).toEqual(sbEndTok);
                 });
 
-                httpBackend.flush("/messages", 1);
-                httpBackend.flush("/events", 1).done(function() {
-                     done();
-                 });
+                httpBackend.flush("/events", 1);
+                httpBackend.flush("/messages", 1).done(function() {
+                    done();
+                });
             });
             httpBackend.flush("/initialSync", 1);
         });
