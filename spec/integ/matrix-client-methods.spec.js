@@ -60,7 +60,8 @@ describe("MatrixClient", function() {
             httpBackend.verifyNoOutstandingRequests();
         });
 
-        it("should do an HTTP request if !allowCached even if one exists", function(done) {
+        it("should do an HTTP request if !allowCached even if one exists",
+        function(done) {
             var httpFilterDefinition = {
                 event_format: "federation"
             };
