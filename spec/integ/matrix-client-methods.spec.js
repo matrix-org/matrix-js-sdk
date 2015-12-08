@@ -4,6 +4,7 @@ var HttpBackend = require("../mock-request");
 var publicGlobals = require("../../lib/matrix");
 var Room = publicGlobals.Room;
 var MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
+var Filter = publicGlobals.Filter;
 var utils = require("../test-utils");
 
 describe("MatrixClient", function() {
@@ -41,6 +42,90 @@ describe("MatrixClient", function() {
             store.storeRoom(room);
             client.joinRoom(roomId);
             httpBackend.verifyNoOutstandingRequests();
+        });
+    });
+
+    describe("getFilter", function() {
+        var filterId = "f1lt3r1d";
+
+        it("should return a filter from the store if allowCached", function(done) {
+            var filter = Filter.fromJson(userId, filterId, {
+                event_format: "client"
+            });
+            store.storeFilter(filter);
+            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+                expect(gotFilter).toEqual(filter);
+                done();
+            });
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        it("should do an HTTP request if !allowCached even if one exists", function(done) {
+            var httpFilterDefinition = {
+                event_format: "federation"
+            };
+
+            httpBackend.when(
+                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId
+            ).respond(200, httpFilterDefinition);
+
+            var storeFilter = Filter.fromJson(userId, filterId, {
+                event_format: "client"
+            });
+            store.storeFilter(storeFilter);
+            client.getFilter(userId, filterId, false).done(function(gotFilter) {
+                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+                done();
+            });
+
+            httpBackend.flush();
+        });
+
+        it("should do an HTTP request if nothing is in the cache and then store it",
+        function(done) {
+            var httpFilterDefinition = {
+                event_format: "federation"
+            };
+            expect(store.getFilter(userId, filterId)).toBeNull();
+
+            httpBackend.when(
+                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId
+            ).respond(200, httpFilterDefinition);
+            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+                expect(store.getFilter(userId, filterId)).toBeDefined();
+                done();
+            });
+
+            httpBackend.flush();
+        });
+    });
+
+    describe("createFilter", function() {
+        var filterId = "f1llllllerid";
+
+        it("should do an HTTP request and then store the filter", function(done) {
+            expect(store.getFilter(userId, filterId)).toBeNull();
+
+            var filterDefinition = {
+                event_format: "client"
+            };
+
+            httpBackend.when(
+                "POST", "/user/" + encodeURIComponent(userId) + "/filter"
+            ).check(function(req) {
+                expect(req.data).toEqual(filterDefinition);
+            }).respond(200, {
+                filter_id: filterId
+            });
+
+            client.createFilter(filterDefinition).done(function(gotFilter) {
+                expect(gotFilter.getDefinition()).toEqual(filterDefinition);
+                expect(store.getFilter(userId, filterId)).toEqual(gotFilter);
+                done();
+            });
+
+            httpBackend.flush();
         });
     });
 
