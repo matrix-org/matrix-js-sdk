@@ -11,47 +11,45 @@ describe("MatrixClient opts", function() {
     var userB = "@bob:localhost";
     var accessToken = "aseukfgwef";
     var roomId = "!foo:bar";
-    var eventData = {
-        chunk: [],
-        start: "s",
-        end: "e"
-    };
-    var initialSync = {
-        end: "s_5_3",
-        presence: [],
-        rooms: [{
-            membership: "join",
-            room_id: roomId,
-            messages: {
-                start: "f_1_1",
-                end: "f_2_2",
-                chunk: [
-                    utils.mkMessage({
-                        room: roomId, user: userB, msg: "hello"
-                    })
-                ]
-            },
-            state: [
-                utils.mkEvent({
-                    type: "m.room.name", room: roomId, user: userB,
-                    content: {
-                        name: "Old room name"
+    var syncData = {
+        next_batch: "s_5_3",
+        presence: {},
+        rooms: {
+            join: {
+                "!foo:bar": { // roomId
+                    timeline: {
+                        events: [
+                            utils.mkMessage({
+                                room: roomId, user: userB, msg: "hello"
+                            })
+                        ],
+                        prev_batch: "f_1_1"
+                    },
+                    state: {
+                        events: [
+                            utils.mkEvent({
+                                type: "m.room.name", room: roomId, user: userB,
+                                content: {
+                                    name: "Old room name"
+                                }
+                            }),
+                            utils.mkMembership({
+                                room: roomId, mship: "join", user: userB, name: "Bob"
+                            }),
+                            utils.mkMembership({
+                                room: roomId, mship: "join", user: userId, name: "Alice"
+                            }),
+                            utils.mkEvent({
+                                type: "m.room.create", room: roomId, user: userId,
+                                content: {
+                                    creator: userId
+                                }
+                            })
+                        ]
                     }
-                }),
-                utils.mkMembership({
-                    room: roomId, mship: "join", user: userB, name: "Bob"
-                }),
-                utils.mkMembership({
-                    room: roomId, mship: "join", user: userId, name: "Alice"
-                }),
-                utils.mkEvent({
-                    type: "m.room.create", room: roomId, user: userId,
-                    content: {
-                        creator: userId
-                    }
-                })
-            ]
-        }]
+                }
+            }
+        }
     };
 
     beforeEach(function() {
@@ -101,13 +99,13 @@ describe("MatrixClient opts", function() {
                 );
             });
             httpBackend.when("GET", "/pushrules").respond(200, {});
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("POST", "/filter").respond(200, { filter_id: "foo" });
+            httpBackend.when("GET", "/sync").respond(200, syncData);
             client.startClient();
             httpBackend.flush("/pushrules", 1).then(function() {
-                return httpBackend.flush("/initialSync", 1);
+                return httpBackend.flush("/filter", 1);
             }).then(function() {
-                return httpBackend.flush("/events", 1);
+                return httpBackend.flush("/sync", 1);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
                     0, "Expected to see event types: " + expectedEventTypes
