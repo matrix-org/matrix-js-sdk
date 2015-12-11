@@ -39,7 +39,8 @@ describe("MatrixClient room timelines", function() {
                         events: [
                             ROOM_NAME_EVENT,
                             utils.mkMembership({
-                                room: roomId, mship: "join", user: otherUserId, name: "Bob"
+                                room: roomId, mship: "join",
+                                user: otherUserId, name: "Bob"
                             }),
                             USER_MEMBERSHIP_EVENT,
                             utils.mkEvent({
@@ -117,11 +118,8 @@ describe("MatrixClient room timelines", function() {
         });
         client.startClient();
         httpBackend.flush("/pushrules").then(function() {
-            console.log("Flushed push");
             return httpBackend.flush("/filter");
-        }).done(function () {
-            console.log("ALL READY"); done();
-        });
+        }).done(done);
     });
 
     afterEach(function() {

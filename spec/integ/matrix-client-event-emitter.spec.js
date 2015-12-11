@@ -53,7 +53,8 @@ describe("MatrixClient events", function() {
                                     room: "!erufh:bar", mship: "join", user: "@foo:bar"
                                 }),
                                 utils.mkEvent({
-                                    type: "m.room.create", room: "!erufh:bar", user: "@foo:bar",
+                                    type: "m.room.create", room: "!erufh:bar",
+                                    user: "@foo:bar",
                                     content: {
                                         creator: "@foo:bar"
                                     }
@@ -116,7 +117,9 @@ describe("MatrixClient events", function() {
                         break;
                     }
                 }
-                expect(found).toBe(true, "Unexpected 'event' emitted: " + event.getType());
+                expect(found).toBe(
+                    true, "Unexpected 'event' emitted: " + event.getType()
+                );
             });
 
             client.startClient();
