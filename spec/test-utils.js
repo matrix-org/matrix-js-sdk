@@ -61,7 +61,7 @@ module.exports.mkEvent = function(opts) {
     var event = {
         type: opts.type,
         room_id: opts.room,
-        user_id: opts.user,
+        sender: opts.user,
         content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
