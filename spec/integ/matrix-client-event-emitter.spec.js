@@ -107,8 +107,6 @@ describe("MatrixClient events", function() {
                 NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events
             );
 
-
-            var chunkIndex = 0;
             client.on("event", function(event) {
                 var found = false;
                 for (var i = 0; i < expectedEvents.length; i++) {

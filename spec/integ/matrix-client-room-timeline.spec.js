@@ -163,7 +163,7 @@ describe("MatrixClient room timelines", function() {
 
             var ev = utils.mkMessage({
                 body: "I am a fish", user: userId, room: roomId
-            })
+            });
             ev.event_id = eventId;
             setNextSyncData([ev]);
 
@@ -192,7 +192,7 @@ describe("MatrixClient room timelines", function() {
 
             var ev = utils.mkMessage({
                 body: "I am a fish", user: userId, room: roomId
-            })
+            });
             ev.event_id = eventId;
             setNextSyncData([ev]);
 
