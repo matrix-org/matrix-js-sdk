@@ -88,8 +88,8 @@ module.exports.mkPresence = function(opts) {
     var event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
+        sender: opts.user,
         content: {
-            user_id: opts.user,
             avatar_url: opts.url,
             displayname: opts.name,
             last_active_ago: opts.ago,
