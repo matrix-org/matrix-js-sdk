@@ -159,6 +159,23 @@ describe("MatrixClient", function() {
         });
     });
 
+    it("should not POST /filter if a filter already exists", function(done) {
+        httpLookups = [];
+        httpLookups.push(PUSH_RULES_RESPONSE);
+        httpLookups.push(SYNC_RESPONSE);
+        var filterId = "ehfewf";
+        store.getFilterIdByName.andReturn(filterId);
+        client.startClient();
+
+        client.on("sync", function syncListener(state) {
+            if (state === "SYNCING") {
+                expect(httpLookups.length).toEqual(0);
+                client.removeListener("sync", syncListener);
+                done();
+            }
+        });
+    });
+
     describe("getSyncState", function() {
 
         it("should return null if the client isn't started", function() {
