@@ -67,6 +67,7 @@ describe("MatrixClient crypto", function() {
         });
 
         httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     });
 
     describe("Ali account setup", function() {
