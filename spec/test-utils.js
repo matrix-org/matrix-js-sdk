@@ -61,7 +61,7 @@ module.exports.mkEvent = function(opts) {
     var event = {
         type: opts.type,
         room_id: opts.room,
-        user_id: opts.user,
+        sender: opts.user,
         content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
@@ -88,8 +88,8 @@ module.exports.mkPresence = function(opts) {
     var event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
+        sender: opts.user,
         content: {
-            user_id: opts.user,
             avatar_url: opts.url,
             displayname: opts.name,
             last_active_ago: opts.ago,

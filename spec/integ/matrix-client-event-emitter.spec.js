@@ -19,6 +19,7 @@ describe("MatrixClient events", function() {
             accessToken: selfAccessToken
         });
         httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });
 
     afterEach(function() {
@@ -26,108 +27,114 @@ describe("MatrixClient events", function() {
     });
 
     describe("emissions", function() {
-        var initialSync = {
-            end: "s_5_3",
-            presence: [{
-                event_id: "$wefiuewh:bar",
-                type: "m.presence",
-                content: {
-                    user_id: "@foo:bar",
-                    displayname: "Foo Bar",
-                    presence: "online"
-                }
-            }],
-            rooms: [{
-                room_id: "!erufh:bar",
-                membership: "join",
-                messages: {
-                    start: "s",
-                    end: "t",
-                    chunk: [
-                        utils.mkMessage({
-                            room: "!erufh:bar", user: "@foo:bar", msg: "hmmm"
-                        })
-                    ]
-                },
-                state: [
-                    utils.mkMembership({
-                        room: "!erufh:bar", mship: "join", user: "@foo:bar"
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.create", room: "!erufh:bar", user: "@foo:bar",
-                        content: {
-                            creator: "@foo:bar"
-                        }
+        var SYNC_DATA = {
+            next_batch: "s_5_3",
+            presence: {
+                events: [
+                    utils.mkPresence({
+                        user: "@foo:bar", name: "Foo Bar", presence: "online"
                     })
                 ]
-            }]
-        };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: [
-                utils.mkMessage({
-                    room: "!erufh:bar", user: "@foo:bar", msg: "ello ello"
-                }),
-                utils.mkMessage({
-                    room: "!erufh:bar", user: "@foo:bar", msg: ":D"
-                }),
-                utils.mkEvent({
-                    type: "m.typing", room: "!erufh:bar", content: {
-                        user_ids: ["@foo:bar"]
+            },
+            rooms: {
+                join: {
+                    "!erufh:bar": {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: "!erufh:bar", user: "@foo:bar", msg: "hmmm"
+                                })
+                            ],
+                            prev_batch: "s"
+                        },
+                        state: {
+                            events: [
+                                utils.mkMembership({
+                                    room: "!erufh:bar", mship: "join", user: "@foo:bar"
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.create", room: "!erufh:bar",
+                                    user: "@foo:bar",
+                                    content: {
+                                        creator: "@foo:bar"
+                                    }
+                                })
+                            ]
+                        }
                     }
-                })
-            ]
+                }
+            }
+        };
+        var NEXT_SYNC_DATA = {
+            next_batch: "e_6_7",
+            rooms: {
+                join: {
+                    "!erufh:bar": {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: "!erufh:bar", user: "@foo:bar", msg: "ello ello"
+                                }),
+                                utils.mkMessage({
+                                    room: "!erufh:bar", user: "@foo:bar", msg: ":D"
+                                }),
+                            ]
+                        },
+                        ephemeral: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.typing", room: "!erufh:bar", content: {
+                                        user_ids: ["@foo:bar"]
+                                    }
+                                })
+                            ]
+                        }
+                    }
+                }
+            }
         };
 
-        it("should emit events from both /initialSync and /events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+        it("should emit events from both the first and subsequent /sync calls",
+        function(done) {
+            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            // initial sync events are unordered, so make an array of the types
-            // that should be emitted and we'll just pick them off one by one,
-            // so long as this is emptied we're good.
-            var initialSyncEventTypes = [
-                "m.presence", "m.room.member", "m.room.message", "m.room.create"
-            ];
-            var chunkIndex = 0;
+            var expectedEvents = [];
+            expectedEvents = expectedEvents.concat(
+                SYNC_DATA.presence.events,
+                SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
+                SYNC_DATA.rooms.join["!erufh:bar"].state.events,
+                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
+                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events
+            );
+
             client.on("event", function(event) {
-                if (initialSyncEventTypes.length === 0) {
-                    if (chunkIndex + 1 >= eventData.chunk.length) {
-                        return;
+                var found = false;
+                for (var i = 0; i < expectedEvents.length; i++) {
+                    if (expectedEvents[i].event_id === event.getId()) {
+                        expectedEvents.splice(i, 1);
+                        found = true;
+                        break;
                     }
-                    // this should be /events now
-                    expect(eventData.chunk[chunkIndex].event_id).toEqual(
-                        event.getId()
-                    );
-                    chunkIndex++;
-                    return;
                 }
-                var index = initialSyncEventTypes.indexOf(event.getType());
-                expect(index).not.toEqual(
-                    -1, "Unexpected event type: " + event.getType()
+                expect(found).toBe(
+                    true, "Unexpected 'event' emitted: " + event.getType()
                 );
-                if (index >= 0) {
-                    initialSyncEventTypes.splice(index, 1);
-                }
             });
 
             client.startClient();
 
             httpBackend.flush().done(function() {
-                expect(initialSyncEventTypes.length).toEqual(
-                    0, "Failed to see all events from /initialSync"
-                );
-                expect(chunkIndex + 1).toEqual(
-                    eventData.chunk.length, "Failed to see all events from /events"
+                expect(expectedEvents.length).toEqual(
+                    0, "Failed to see all events from /sync calls"
                 );
                 done();
             });
         });
 
         it("should emit User events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             var fired = false;
             client.on("User.presence", function(event, user) {
                 fired = true;
@@ -135,9 +142,9 @@ describe("MatrixClient events", function() {
                 expect(event).toBeDefined();
                 if (!user || !event) { return; }
 
-                expect(event.event).toEqual(initialSync.presence[0]);
+                expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
-                    initialSync.presence[0].content.presence
+                    SYNC_DATA.presence.events[0].content.presence
                 );
             });
             client.startClient();
@@ -149,8 +156,8 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit Room events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             var roomInvokeCount = 0;
             var roomNameInvokeCount = 0;
             var timelineFireCount = 0;
@@ -183,8 +190,8 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit RoomState events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             var roomStateEventTypes = [
                 "m.room.member", "m.room.create"
@@ -232,8 +239,8 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit RoomMember events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             var typingInvokeCount = 0;
             var powerLevelInvokeCount = 0;

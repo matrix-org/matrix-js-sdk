@@ -67,6 +67,7 @@ describe("MatrixClient crypto", function() {
         });
 
         httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     });
 
     describe("Ali account setup", function() {
@@ -200,22 +201,26 @@ describe("MatrixClient crypto", function() {
     });
 
     function bobRecvMessage(done) {
-        var initialSync = {
-            end: "alpha",
-            presence: [],
-            rooms: []
+        var syncData = {
+            next_batch: "x",
+            rooms: {
+                join: {
+
+                }
+            }
         };
-        var events = {
-            start: "alpha",
-            end: "beta",
-            chunk: [utils.mkEvent({
-                type: "m.room.encrypted",
-                room: roomId,
-                content: aliMessage
-            })]
+        syncData.rooms.join[roomId] = {
+            timeline: {
+                events: [
+                    utils.mkEvent({
+                        type: "m.room.encrypted",
+                        room: roomId,
+                        content: aliMessage
+                    })
+                ]
+            }
         };
-        httpBackend.when("GET", "initialSync").respond(200, initialSync);
-        httpBackend.when("GET", "events").respond(200, events);
+        httpBackend.when("GET", "/sync").respond(200, syncData);
         bobClient.on("event", function(event) {
             expect(event.getType()).toEqual("m.room.message");
             expect(event.getContent()).toEqual({

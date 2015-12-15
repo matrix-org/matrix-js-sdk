@@ -26,6 +26,7 @@ describe("MatrixClient syncing", function() {
             accessToken: selfAccessToken
         });
         httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });
 
     afterEach(function() {
@@ -33,20 +34,14 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("startClient", function() {
-        var initialSync = {
-            end: "s_5_3",
-            presence: [],
-            rooms: []
-        };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: []
+        var syncData = {
+            next_batch: "batch_token",
+            rooms: {},
+            presence: {}
         };
 
-        it("should start with /initialSync then move onto /events.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+        it("should /sync after /pushrules and /filter.", function(done) {
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
 
@@ -55,12 +50,12 @@ describe("MatrixClient syncing", function() {
             });
         });
 
-        it("should pass the 'end' token from /initialSync to the from= param " +
-            " of /events", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").check(function(req) {
-                expect(req.queryParams.from).toEqual(initialSync.end);
-            }).respond(200, eventData);
+        it("should pass the 'next_batch' token from /sync to the since= param " +
+            " of the next /sync", function(done) {
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").check(function(req) {
+                expect(req.queryParams.since).toEqual(syncData.next_batch);
+            }).respond(200, syncData);
 
             client.startClient();
 
@@ -71,56 +66,56 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("resolving invites to profile info", function() {
-        var initialSync = {
-            end: "s_5_3",
-            presence: [],
-            rooms: [{
-                membership: "join",
-                room_id: roomOne,
-                messages: {
-                    start: "f_1_1",
-                    end: "f_2_2",
-                    chunk: [
+
+        var syncData = {
+            next_batch: "s_5_3",
+            presence: {
+                events: []
+            },
+            rooms: {
+                join: {
+
+                }
+            }
+        };
+
+        beforeEach(function() {
+            syncData.presence.events = [];
+            syncData.rooms.join[roomOne] = {
+                timeline: {
+                    events: [
                         utils.mkMessage({
                             room: roomOne, user: otherUserId, msg: "hello"
                         })
                     ]
                 },
-                state: [
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: otherUserId
-                    }),
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: selfUserId
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.create", room: roomOne, user: selfUserId,
-                        content: {
-                            creator: selfUserId
-                        }
-                    })
-                ]
-            }]
-        };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: []
-        };
-
-        beforeEach(function() {
-            eventData.chunk = [];
+                state: {
+                    events: [
+                        utils.mkMembership({
+                            room: roomOne, mship: "join", user: otherUserId
+                        }),
+                        utils.mkMembership({
+                            room: roomOne, mship: "join", user: selfUserId
+                        }),
+                        utils.mkEvent({
+                            type: "m.room.create", room: roomOne, user: selfUserId,
+                            content: {
+                                creator: selfUserId
+                            }
+                        })
+                    ]
+                }
+            };
         });
 
-        it("should resolve incoming invites from /events", function(done) {
-            eventData.chunk = [
+        it("should resolve incoming invites from /sync", function(done) {
+            syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC
                 })
-            ];
+            );
 
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/profile/" + encodeURIComponent(userC)).respond(
                 200, {
                     avatar_url: "mxc://flibble/wibble",
@@ -143,17 +138,18 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should use cached values from m.presence wherever possible", function(done) {
-            eventData.chunk = [
+            syncData.presence.events = [
                 utils.mkPresence({
                     user: userC, presence: "online", name: "The Ghost"
                 }),
+            ];
+            syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC
                 })
-            ];
+            );
 
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient({
                 resolveInvitesToProfiles: true
@@ -167,17 +163,18 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should result in events on the room member firing", function(done) {
-            eventData.chunk = [
+            syncData.presence.events = [
                 utils.mkPresence({
                     user: userC, presence: "online", name: "The Ghost"
-                }),
+                })
+            ];
+            syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC
                 })
-            ];
+            );
 
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             var latestFiredName = null;
             client.on("RoomMember.name", function(event, m) {
@@ -197,14 +194,13 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should no-op if resolveInvitesToProfiles is not set", function(done) {
-            eventData.chunk = [
+            syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC
                 })
-            ];
+            );
 
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
 
@@ -220,44 +216,29 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("users", function() {
-        var initialSync = {
-            end: "s_5_3",
-            presence: [
-                utils.mkPresence({
-                    user: userA, presence: "online"
-                }),
-                utils.mkPresence({
-                    user: userB, presence: "unavailable"
-                })
-            ],
-            rooms: []
-        };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: [
-                // existing user change
-                utils.mkPresence({
-                    user: userA, presence: "offline"
-                }),
-                // new user C
-                utils.mkPresence({
-                    user: userC, presence: "online"
-                })
-            ]
+        var syncData = {
+            next_batch: "nb",
+            presence: {
+                events: [
+                    utils.mkPresence({
+                        user: userA, presence: "online"
+                    }),
+                    utils.mkPresence({
+                        user: userB, presence: "unavailable"
+                    })
+                ]
+            }
         };
 
-        it("should create users for presence events from /initialSync and /events",
+        it("should create users for presence events from /sync",
         function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
 
             httpBackend.flush().done(function() {
-                expect(client.getUser(userA).presence).toEqual("offline");
+                expect(client.getUser(userA).presence).toEqual("online");
                 expect(client.getUser(userB).presence).toEqual("unavailable");
-                expect(client.getUser(userC).presence).toEqual("online");
                 done();
             });
         });
@@ -266,108 +247,128 @@ describe("MatrixClient syncing", function() {
     describe("room state", function() {
         var msgText = "some text here";
         var otherDisplayName = "Bob Smith";
-        var initialSync = {
-            end: "s_5_3",
-            presence: [],
-            rooms: [
-                {
-                    membership: "join",
-                    room_id: roomOne,
-                    messages: {
-                        start: "f_1_1",
-                        end: "f_2_2",
-                        chunk: [
-                            utils.mkMessage({
-                                room: roomOne, user: otherUserId, msg: "hello"
-                            })
-                        ]
-                    },
-                    state: [
-                        utils.mkEvent({
-                            type: "m.room.name", room: roomOne, user: otherUserId,
-                            content: {
-                                name: "Old room name"
-                            }
-                        }),
-                        utils.mkMembership({
-                            room: roomOne, mship: "join", user: otherUserId
-                        }),
-                        utils.mkMembership({
-                            room: roomOne, mship: "join", user: selfUserId
-                        }),
-                        utils.mkEvent({
-                            type: "m.room.create", room: roomOne, user: selfUserId,
-                            content: {
-                                creator: selfUserId
-                            }
-                        })
-                    ]
-                },
-                {
-                    membership: "join",
-                    room_id: roomTwo,
-                    messages: {
-                        start: "f_1_1",
-                        end: "f_2_2",
-                        chunk: [
-                            utils.mkMessage({
-                                room: roomTwo, user: otherUserId, msg: "hiii"
-                            })
-                        ]
-                    },
-                    state: [
-                        utils.mkMembership({
-                            room: roomTwo, mship: "join", user: otherUserId,
-                            name: otherDisplayName
-                        }),
-                        utils.mkMembership({
-                            room: roomTwo, mship: "join", user: selfUserId
-                        }),
-                        utils.mkEvent({
-                            type: "m.room.create", room: roomTwo, user: selfUserId,
-                            content: {
-                                creator: selfUserId
-                            }
-                        })
-                    ]
+
+        var syncData = {
+            rooms: {
+                join: {
+
                 }
-            ]
+            }
         };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: [
-                utils.mkEvent({
-                    type: "m.room.name", room: roomOne, user: selfUserId,
-                    content: { name: "A new room name" }
-                }),
-                utils.mkMessage({
-                    room: roomTwo, user: otherUserId, msg: msgText
-                }),
-                utils.mkEvent({
-                    type: "m.typing", room: roomTwo,
-                    content: { user_ids: [otherUserId] }
-                })
-            ]
+        syncData.rooms.join[roomOne] = {
+            timeline: {
+                events: [
+                    utils.mkMessage({
+                        room: roomOne, user: otherUserId, msg: "hello"
+                    })
+                ]
+            },
+            state: {
+                events: [
+                    utils.mkEvent({
+                        type: "m.room.name", room: roomOne, user: otherUserId,
+                        content: {
+                            name: "Old room name"
+                        }
+                    }),
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: otherUserId
+                    }),
+                    utils.mkMembership({
+                        room: roomOne, mship: "join", user: selfUserId
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.create", room: roomOne, user: selfUserId,
+                        content: {
+                            creator: selfUserId
+                        }
+                    })
+                ]
+            }
+        };
+        syncData.rooms.join[roomTwo] = {
+            timeline: {
+                events: [
+                    utils.mkMessage({
+                        room: roomTwo, user: otherUserId, msg: "hiii"
+                    })
+                ]
+            },
+            state: {
+                events: [
+                    utils.mkMembership({
+                        room: roomTwo, mship: "join", user: otherUserId,
+                        name: otherDisplayName
+                    }),
+                    utils.mkMembership({
+                        room: roomTwo, mship: "join", user: selfUserId
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.create", room: roomTwo, user: selfUserId,
+                        content: {
+                            creator: selfUserId
+                        }
+                    })
+                ]
+            }
+        };
+
+        var nextSyncData = {
+            rooms: {
+                join: {
+
+                }
+            }
+        };
+
+        nextSyncData.rooms.join[roomOne] = {
+            state: {
+                events: [
+                    utils.mkEvent({
+                        type: "m.room.name", room: roomOne, user: selfUserId,
+                        content: { name: "A new room name" }
+                    })
+                ]
+            }
+        };
+
+        nextSyncData.rooms.join[roomTwo] = {
+            timeline: {
+                events: [
+                    utils.mkMessage({
+                        room: roomTwo, user: otherUserId, msg: msgText
+                    })
+                ]
+            },
+            ephemeral: {
+                events: [
+                    utils.mkEvent({
+                        type: "m.typing", room: roomTwo,
+                        content: { user_ids: [otherUserId] }
+                    })
+                ]
+            }
         };
 
         it("should continually recalculate the right room name.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
             httpBackend.flush().done(function() {
                 var room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
-                expect(room.name).toEqual(eventData.chunk[0].content.name);
+                expect(room.name).toEqual(
+                    nextSyncData.rooms.join[roomOne].state.events[0].content.name
+                );
                 done();
             });
         });
 
         it("should store the right events in the timeline.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
@@ -381,8 +382,8 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should set the right room name.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
             httpBackend.flush().done(function() {
@@ -394,8 +395,8 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should set the right user's typing flag.", function(done) {
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
@@ -421,23 +422,23 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("receipts", function() {
-        var initialSync = {
-            end: "s_5_3",
-            presence: [],
-            receipts: [],
-            rooms: [{
-                membership: "join",
-                room_id: roomOne,
-                messages: {
-                    start: "f_1_1",
-                    end: "f_2_2",
-                    chunk: [
-                        utils.mkMessage({
-                            room: roomOne, user: otherUserId, msg: "hello"
-                        })
-                    ]
-                },
-                state: [
+        var syncData = {
+            rooms: {
+                join: {
+
+                }
+            }
+        };
+        syncData.rooms.join[roomOne] = {
+            timeline: {
+                events: [
+                    utils.mkMessage({
+                        room: roomOne, user: otherUserId, msg: "hello"
+                    })
+                ]
+            },
+            state: {
+                events: [
                     utils.mkEvent({
                         type: "m.room.name", room: roomOne, user: otherUserId,
                         content: {
@@ -457,21 +458,17 @@ describe("MatrixClient syncing", function() {
                         }
                     })
                 ]
-            }]
-        };
-        var eventData = {
-            start: "s_5_3",
-            end: "e_6_7",
-            chunk: []
+            }
         };
 
         beforeEach(function() {
-            eventData.chunk = [];
-            initialSync.receipts = [];
+            syncData.rooms.join[roomOne].ephemeral = {
+                events: []
+            };
         });
 
-        it("should sync receipts from /initialSync.", function(done) {
-            var ackEvent = initialSync.rooms[0].messages.chunk[0];
+        it("should sync receipts from /sync.", function(done) {
+            var ackEvent = syncData.rooms.join[roomOne].timeline.events[0];
             var receipt = {};
             receipt[ackEvent.event_id] = {
                 "m.read": {}
@@ -479,45 +476,12 @@ describe("MatrixClient syncing", function() {
             receipt[ackEvent.event_id]["m.read"][otherUserId] = {
                 ts: 176592842636
             };
-            initialSync.receipts = [{
+            syncData.rooms.join[roomOne].ephemeral.events = [{
                 content: receipt,
                 room_id: roomOne,
                 type: "m.receipt"
             }];
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
-
-            client.startClient();
-
-            httpBackend.flush().done(function() {
-                var room = client.getRoom(roomOne);
-                expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
-                    type: "m.read",
-                    userId: otherUserId,
-                    data: {
-                        ts: 176592842636
-                    }
-                }]);
-                done();
-            });
-        });
-
-        it("should sync receipts from /events.", function(done) {
-            var ackEvent = initialSync.rooms[0].messages.chunk[0];
-            var receipt = {};
-            receipt[ackEvent.event_id] = {
-                "m.read": {}
-            };
-            receipt[ackEvent.event_id]["m.read"][otherUserId] = {
-                ts: 176592842636
-            };
-            eventData.chunk = [{
-                content: receipt,
-                room_id: roomOne,
-                type: "m.receipt"
-            }];
-            httpBackend.when("GET", "/initialSync").respond(200, initialSync);
-            httpBackend.when("GET", "/events").respond(200, eventData);
+            httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
 
