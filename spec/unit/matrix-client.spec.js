@@ -7,6 +7,7 @@ var utils = require("../test-utils");
 describe("MatrixClient", function() {
     var userId = "@alice:bar";
     var identityServerUrl = "https://identity.server";
+    var identityServerDomain = "identity.server";
     var client, store, scheduler;
 
     var PUSH_RULES_RESPONSE = {
@@ -405,7 +406,7 @@ describe("MatrixClient", function() {
                 path: "/rooms/!foo%3Abar/invite",
                 data: {},
                 expectBody: {
-                    id_server: identityServerUrl,
+                    id_server: identityServerDomain,
                     medium: "email",
                     address: "alice@gmail.com"
                 }
