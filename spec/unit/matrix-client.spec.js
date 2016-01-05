@@ -423,14 +423,13 @@ describe("MatrixClient", function() {
         ];
 
         it("should be set via setGuestRooms and used in /sync calls", function(done) {
-            httpLookups = []; // no /pushrules
-            httpLookups.push(FILTER_RESPONSE);
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
                 expectQueryParams: {
-                    room_id: roomIds
+                    filter: JSON.stringify({ room: { rooms: roomIds } })
                 },
                 thenCall: function() {
                     done();
