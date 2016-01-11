@@ -418,27 +418,22 @@ describe("MatrixClient", function() {
     });
 
     describe("guest rooms", function() {
-        var roomIds = [
-            "!foo:bar", "!baz:bar"
-        ];
 
-        it("should be set via setGuestRooms and used in /sync calls", function(done) {
-            httpLookups = []; // no /pushrules
-            httpLookups.push(FILTER_RESPONSE);
+        it("should only do /sync calls (without filter/pushrules)", function(done) {
+            httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
                 data: SYNC_DATA,
-                expectQueryParams: {
-                    room_id: roomIds
-                },
                 thenCall: function() {
                     done();
                 }
             });
-            client.setGuestRooms(roomIds);
             client.setGuest(true);
             client.startClient();
+        });
+
+        xit("should be able to peek into a room using peekInRoom", function(done) {
         });
     });
 });
