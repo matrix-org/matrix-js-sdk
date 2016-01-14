@@ -107,7 +107,9 @@ describe("MatrixClient room timelines", function() {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
-            accessToken: accessToken
+            accessToken: accessToken,
+            // these tests should work with or without timelineSupport
+            timelineSupport: true,
         });
         setNextSyncData();
         httpBackend.when("GET", "/pushrules").respond(200, {});

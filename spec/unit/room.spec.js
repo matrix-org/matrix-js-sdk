@@ -18,8 +18,10 @@ describe("Room", function() {
         utils.beforeEach(this);
         room = new Room(roomId);
         // mock RoomStates
-        room.oldState = utils.mock(sdk.RoomState, "oldState");
-        room.currentState = utils.mock(sdk.RoomState, "currentState");
+        room.oldState = room.getLiveTimeline()._startState =
+            utils.mock(sdk.RoomState, "oldState");
+        room.currentState = room.getLiveTimeline()._endState =
+            utils.mock(sdk.RoomState, "currentState");
     });
 
     describe("getAvatarUrl", function() {
@@ -259,10 +261,7 @@ describe("Room", function() {
         });
 
         it("should call setStateEvents on the right RoomState with the right " +
-        "forwardLooking value", function() {
-            room.oldState = utils.mock(RoomState);
-            room.currentState = utils.mock(RoomState);
-
+        "forwardLooking value for new events", function() {
             var events = [
                 utils.mkMembership({
                     room: roomId, mship: "invite", user: userB, skey: userA, event: true
@@ -284,8 +283,23 @@ describe("Room", function() {
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
             expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
+        });
 
-            // test old
+
+        it("should call setStateEvents on the right RoomState with the right " +
+        "forwardLooking value for old events", function() {
+            var events = [
+                utils.mkMembership({
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userB, event: true,
+                    content: {
+                        name: "New room"
+                    }
+                })
+            ];
+
             room.addEventsToTimeline(events, true);
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[0]]
@@ -295,6 +309,7 @@ describe("Room", function() {
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
+            expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
         });
     });
 
