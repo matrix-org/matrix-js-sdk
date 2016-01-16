@@ -1,4 +1,5 @@
 "use strict";
+var q = require("q");
 var sdk = require("../..");
 var HttpBackend = require("../mock-request");
 var utils = require("../test-utils");
@@ -78,14 +79,18 @@ function startClient(httpBackend, client) {
 
     client.startClient();
 
-    var syncstate;
+    // set up a promise which will resolve once the client is initialised
+    var deferred = q.defer();
     client.on("sync", function(state) {
-        syncstate = state;
+        console.log("sync", state);
+        if (state != "SYNCING") {
+            return;
+        }
+        deferred.resolve();
     });
 
-    return httpBackend.flush().then(function() {
-        expect(syncstate).toEqual("SYNCING");
-    });
+    httpBackend.flush();
+    return deferred.promise;
 }
 
 
@@ -318,17 +323,17 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-
-            httpBackend.flush("/sync").then(function() {
-                return client.getEventTimeline(room, EVENTS[2].event_id);
-            }).then(function(tl) {
-                expect(tl.getEvents().length).toEqual(4);
-                expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
-                expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
-                expect(tl.getPaginationToken(true)).toEqual("start_token");
-                // expect(tl.getPaginationToken(false)).toEqual("s_5_4");
-            }).catch(exceptFail).done(done);
+            client.on("sync", function() {
+                client.getEventTimeline(room, EVENTS[2].event_id
+                ).then(function(tl) {
+                    expect(tl.getEvents().length).toEqual(4);
+                    expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
+                    expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
+                    expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
+                    expect(tl.getPaginationToken(true)).toEqual("start_token");
+                    // expect(tl.getPaginationToken(false)).toEqual("s_5_4");
+                }).catch(exceptFail).done(done);
+            });
 
             httpBackend.flush().catch(exceptFail);
         });
