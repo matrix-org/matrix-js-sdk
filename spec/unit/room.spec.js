@@ -615,11 +615,11 @@ describe("Room", function() {
                 expect(name).toEqual(userA);
             });
 
-            it("should return '?' if there is no name, alias or members in the room.",
+            it("should return 'Empty room' if there is no name, alias or members in the room.",
             function() {
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual("?");
+                expect(name).toEqual("Empty room");
             });
 
         });
