@@ -328,50 +328,40 @@ describe("Room", function() {
 
         it("should return true for a matching userId and membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" },
-                    { userId: "@bob:bar", membership: "invite" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                "@bob:bar": { userId: "@bob:bar", membership: "invite" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
 
         it("should return false if match membership but no match userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
 
         it("should return false if match userId but no match membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
 
         it("should return false if no match membership or userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
 
         it("should return false if no members exist",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [];
-            });
+            room.currentState.members = {};
             expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
         });
     });
