@@ -606,13 +606,13 @@ describe("Room", function() {
                 expect(name).toEqual("Empty room");
             });
 
-            it("should show your name for public (public join_rules) rooms if a" +
+            it("should return 'Empty room' for public (public join_rules) rooms if a" +
             " room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("public");
                 addMember(userA);
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual("Empty room");
             });
 
             it("should return 'Empty room' if there is no name, " +
