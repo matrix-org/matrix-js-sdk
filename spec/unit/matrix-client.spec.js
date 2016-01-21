@@ -10,7 +10,7 @@ describe("MatrixClient", function() {
     var identityServerDomain = "identity.server";
     var client, store, scheduler;
 
-    var KEEP_ALIVE_PATH = "/";
+    var KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
     var PUSH_RULES_RESPONSE = {
         method: "GET",
