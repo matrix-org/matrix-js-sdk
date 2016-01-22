@@ -10,6 +10,8 @@ describe("MatrixClient", function() {
     var identityServerDomain = "identity.server";
     var client, store, scheduler;
 
+    var KEEP_ALIVE_PATH = "/_matrix/client/versions";
+
     var PUSH_RULES_RESPONSE = {
         method: "GET",
         path: "/pushrules/",
@@ -51,6 +53,9 @@ describe("MatrixClient", function() {
     ];
     var pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
+        if (path === KEEP_ALIVE_PATH) {
+            return q();
+        }
         var next = httpLookups.shift();
         var logLine = (
             "MatrixClient[UT] RECV " + method + " " + path + "  " +
@@ -137,6 +142,7 @@ describe("MatrixClient", function() {
         ]);
         client._http.authedRequest.andCallFake(httpReq);
         client._http.authedRequestWithPrefix.andCallFake(httpReq);
+        client._http.requestWithPrefix.andCallFake(httpReq);
 
         // set reasonable working defaults
         pendingLookup = null;
