@@ -343,50 +343,40 @@ describe("Room", function() {
 
         it("should return true for a matching userId and membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" },
-                    { userId: "@bob:bar", membership: "invite" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                "@bob:bar": { userId: "@bob:bar", membership: "invite" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
 
         it("should return false if match membership but no match userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
 
         it("should return false if match userId but no match membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
 
         it("should return false if no match membership or userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
 
         it("should return false if no members exist",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [];
-            });
+            room.currentState.members = {};
             expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
         });
     });
@@ -622,29 +612,30 @@ describe("Room", function() {
                 expect(name).toEqual(roomName);
             });
 
-            it("should show your name for private (invite join_rules) rooms if" +
+            it("should return 'Empty room' for private (invite join_rules) rooms if" +
             " a room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual("Empty room");
             });
 
-            it("should show your name for public (public join_rules) rooms if a" +
+            it("should return 'Empty room' for public (public join_rules) rooms if a" +
             " room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("public");
                 addMember(userA);
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual("Empty room");
             });
 
-            it("should return '?' if there is no name, alias or members in the room.",
+            it("should return 'Empty room' if there is no name, " +
+               "alias or members in the room.",
             function() {
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual("?");
+                expect(name).toEqual("Empty room");
             });
 
         });
