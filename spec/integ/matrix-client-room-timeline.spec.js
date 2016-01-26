@@ -481,4 +481,36 @@ describe("MatrixClient room timelines", function() {
             httpBackend.flush("/sync", 1);
         });
     });
+
+    describe("gappy sync", function() {
+        it("should copy the last known state to the new timeline", function(done) {
+            var eventData = [
+                utils.mkMessage({user: userId, room: roomId}),
+            ];
+            setNextSyncData(eventData);
+            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+
+            client.on("sync", function(state) {
+                if (state !== "PREPARED") { return; }
+                var room = client.getRoom(roomId);
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/sync", 1).done(function() {
+                    expect(room.timeline.length).toEqual(1);
+                    expect(room.timeline[0].event).toEqual(eventData[0]);
+                    expect(room.currentState.getMembers().length).toEqual(2);
+                    expect(room.currentState.getMember(userId).name).toEqual(userName);
+                    expect(room.currentState.getMember(userId).membership).toEqual(
+                        "join"
+                    );
+                    expect(room.currentState.getMember(otherUserId).name).toEqual("Bob");
+                    expect(room.currentState.getMember(otherUserId).membership).toEqual(
+                        "join"
+                    );
+                    done();
+                });
+            });
+            httpBackend.flush("/sync", 1);
+        });
+    });
 });

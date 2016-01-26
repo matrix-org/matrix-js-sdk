@@ -54,11 +54,12 @@ describe("EventTimeline", function() {
                     event: true,
                 });
 
-            var state =
+            var state = [
                 utils.mkMembership({
                     room: roomId, mship: "invite", user: userB, skey: userA,
                     event: true,
-                });
+                })
+            ];
 
             expect(function() { timeline.initialiseState(state); }).not.toThrow();
             timeline.addEvent(event, false);
