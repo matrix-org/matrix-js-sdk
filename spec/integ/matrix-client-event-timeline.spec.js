@@ -3,6 +3,7 @@ var q = require("q");
 var sdk = require("../..");
 var HttpBackend = require("../mock-request");
 var utils = require("../test-utils");
+var EventTimeline = sdk.EventTimeline;
 
 var baseUrl = "http://localhost.or.something";
 var userId = "@alice:localhost";
@@ -254,8 +255,10 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
                     expect(tl.getEvents()[i].sender.name).toEqual(userName);
                 }
-                expect(tl.getPaginationToken(true)).toEqual("start_token");
-                expect(tl.getPaginationToken(false)).toEqual("end_token");
+                expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toEqual("start_token");
+                expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    .toEqual("end_token");
             }).catch(exceptFail).done(done);
 
             httpBackend.flush().catch(exceptFail);
@@ -285,8 +288,8 @@ describe("MatrixClient event timelines", function() {
                 expect(tl.getEvents().length).toEqual(2);
                 expect(tl.getEvents()[1].event).toEqual(EVENTS[0]);
                 expect(tl.getEvents()[1].sender.name).toEqual(userName);
-                expect(tl.getPaginationToken(true)).toEqual("f_1_1");
-                // expect(tl.getPaginationToken(false)).toEqual("s_5_4");
+                expect(tl.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("f_1_1");
+                // expect(tl.getPaginationToken(EventTimeline.FORWARDS)).toEqual("s_5_4");
             }).catch(exceptFail).done(done);
 
             httpBackend.flush().catch(exceptFail);
@@ -330,8 +333,10 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
                     expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
                     expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
-                    expect(tl.getPaginationToken(true)).toEqual("start_token");
-                    // expect(tl.getPaginationToken(false)).toEqual("s_5_4");
+                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    //    .toEqual("s_5_4");
                 }).catch(exceptFail).done(done);
             });
 
@@ -415,12 +420,18 @@ describe("MatrixClient event timelines", function() {
                 expect(tl.getEvents().length).toEqual(2);
                 expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
                 expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                expect(tl.getNeighbouringTimeline(true)).toBe(tl0);
-                expect(tl.getNeighbouringTimeline(false)).toBe(tl3);
-                expect(tl0.getPaginationToken(true)).toEqual("start_token0");
-                expect(tl0.getPaginationToken(false)).toBe(null);
-                expect(tl3.getPaginationToken(true)).toBe(null);
-                expect(tl3.getPaginationToken(false)).toEqual("end_token3");
+                expect(tl.getNeighbouringTimeline(EventTimeline.BACKWARDS))
+                    .toBe(tl0);
+                expect(tl.getNeighbouringTimeline(EventTimeline.FORWARDS))
+                    .toBe(tl3);
+                expect(tl0.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toEqual("start_token0");
+                expect(tl0.getPaginationToken(EventTimeline.FORWARDS))
+                    .toBe(null);
+                expect(tl3.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toBe(null);
+                expect(tl3.getPaginationToken(EventTimeline.FORWARDS))
+                    .toEqual("end_token3");
             }).catch(exceptFail).done(done);
 
             httpBackend.flush().catch(exceptFail);
@@ -494,8 +505,10 @@ describe("MatrixClient event timelines", function() {
                 expect(tl.getEvents()[0].event).toEqual(EVENTS[2]);
                 expect(tl.getEvents()[1].event).toEqual(EVENTS[1]);
                 expect(tl.getEvents()[2].event).toEqual(EVENTS[0]);
-                expect(tl.getPaginationToken(true)).toEqual("start_token1");
-                expect(tl.getPaginationToken(false)).toEqual("end_token0");
+                expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toEqual("start_token1");
+                expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    .toEqual("end_token0");
             }).catch(exceptFail).done(done);
 
             httpBackend.flush().catch(exceptFail);
@@ -535,15 +548,18 @@ describe("MatrixClient event timelines", function() {
             client.getEventTimeline(room, EVENTS[0].event_id
             ).then(function(tl0) {
                 tl = tl0;
-                return client.paginateEventTimeline(tl, {backwards: false, limit: 20});
+                return client.paginateEventTimeline(
+                    tl, {backwards: false, limit: 20});
             }).then(function(success) {
                 expect(success).toBeTruthy();
                 expect(tl.getEvents().length).toEqual(3);
                 expect(tl.getEvents()[0].event).toEqual(EVENTS[0]);
                 expect(tl.getEvents()[1].event).toEqual(EVENTS[1]);
                 expect(tl.getEvents()[2].event).toEqual(EVENTS[2]);
-                expect(tl.getPaginationToken(true)).toEqual("start_token0");
-                expect(tl.getPaginationToken(false)).toEqual("end_token1");
+                expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toEqual("start_token0");
+                expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    .toEqual("end_token1");
             }).catch(exceptFail).done(done);
 
             httpBackend.flush().catch(exceptFail);

@@ -74,48 +74,54 @@ describe("EventTimeline", function() {
 
     describe("paginationTokens", function() {
         it("pagination tokens should start null", function() {
-            expect(timeline.getPaginationToken(true)).toBe(null);
-            expect(timeline.getPaginationToken(false)).toBe(null);
+            expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toBe(null);
+            expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toBe(null);
         });
 
-        it("setPaginationToken should set token", function() {
-            timeline.setPaginationToken("back", true);
-            timeline.setPaginationToken("fwd", false);
-            expect(timeline.getPaginationToken(true)).toEqual("back");
-            expect(timeline.getPaginationToken(false)).toEqual("fwd");
+        it("setPaginationToken should set  token", function() {
+            timeline.setPaginationToken("back", EventTimeline.BACKWARDS);
+            timeline.setPaginationToken("fwd", EventTimeline.FORWARDS);
+            expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("back");
+            expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toEqual("fwd");
         });
     });
 
 
     describe("neighbouringTimelines", function() {
         it("neighbouring timelines should start null", function() {
-            expect(timeline.getNeighbouringTimeline(true)).toBe(null);
-            expect(timeline.getNeighbouringTimeline(false)).toBe(null);
+            expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)).toBe(null);
+            expect(timeline.getNeighbouringTimeline(EventTimeline.FORWARDS)).toBe(null);
         });
 
         it("setNeighbouringTimeline should set neighbour", function() {
             var prev = {a: "a"};
             var next = {b: "b"};
-            timeline.setNeighbouringTimeline(prev, true);
-            timeline.setNeighbouringTimeline(next, false);
-            expect(timeline.getNeighbouringTimeline(true)).toBe(prev);
-            expect(timeline.getNeighbouringTimeline(false)).toBe(next);
+            timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
+            timeline.setNeighbouringTimeline(next, EventTimeline.FORWARDS);
+            expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)).toBe(prev);
+            expect(timeline.getNeighbouringTimeline(EventTimeline.FORWARDS)).toBe(next);
         });
 
         it("setNeighbouringTimeline should throw if called twice", function() {
             var prev = {a: "a"};
             var next = {b: "b"};
-            expect(function() {timeline.setNeighbouringTimeline(prev, true);}).
-                not.toThrow();
-            expect(timeline.getNeighbouringTimeline(true)).toBe(prev);
-            expect(function() {timeline.setNeighbouringTimeline(prev, true);}).
-                toThrow();
+            expect(function() {
+                timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
+            }).not.toThrow();
+            expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS))
+                .toBe(prev);
+            expect(function() {
+                timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
+            }).toThrow();
 
-            expect(function() {timeline.setNeighbouringTimeline(next, false);}).
-                not.toThrow();
-            expect(timeline.getNeighbouringTimeline(false)).toBe(next);
-            expect(function() {timeline.setNeighbouringTimeline(next, false);}).
-                toThrow();
+            expect(function() {
+                timeline.setNeighbouringTimeline(next, EventTimeline.FORWARDS);
+            }).not.toThrow();
+            expect(timeline.getNeighbouringTimeline(EventTimeline.FORWARDS))
+                .toBe(next);
+            expect(function() {
+                timeline.setNeighbouringTimeline(next, EventTimeline.FORWARDS);
+            }).toThrow();
         });
     });
 
@@ -166,18 +172,20 @@ describe("EventTimeline", function() {
                 membership: "join",
                 name: "Old Alice"
             };
-            timeline.getState(false).getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return sentinel;
-                }
-                return null;
-            });
-            timeline.getState(true).getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return oldSentinel;
-                }
-                return null;
-            });
+            timeline.getState(EventTimeline.FORWARDS).getSentinelMember
+                .andCallFake(function(uid) {
+                    if (uid === userA) {
+                        return sentinel;
+                    }
+                    return null;
+                });
+            timeline.getState(EventTimeline.BACKWARDS).getSentinelMember
+                .andCallFake(function(uid) {
+                    if (uid === userA) {
+                        return oldSentinel;
+                    }
+                    return null;
+                });
 
             var newEv = utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
@@ -206,18 +214,20 @@ describe("EventTimeline", function() {
                 membership: "join",
                 name: "Old Alice"
             };
-            timeline.getState(false).getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return sentinel;
-                }
-                return null;
-            });
-            timeline.getState(true).getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return oldSentinel;
-                }
-                return null;
-            });
+            timeline.getState(EventTimeline.FORWARDS).getSentinelMember
+                .andCallFake(function(uid) {
+                    if (uid === userA) {
+                        return sentinel;
+                    }
+                    return null;
+                });
+            timeline.getState(EventTimeline.BACKWARDS).getSentinelMember
+                .andCallFake(function(uid) {
+                    if (uid === userA) {
+                        return oldSentinel;
+                    }
+                    return null;
+                });
 
             var newEv = utils.mkMembership({
                 room: roomId, mship: "invite", user: userB, skey: userA, event: true
@@ -248,15 +258,15 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[0], false);
             timeline.addEvent(events[1], false);
 
-            expect(timeline.getState(false).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
                 toHaveBeenCalledWith([events[0]]);
-            expect(timeline.getState(false).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
                 toHaveBeenCalledWith([events[1]]);
 
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
 
-            expect(timeline.getState(true).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
                 not.toHaveBeenCalled();
         });
 
@@ -278,15 +288,15 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[0], true);
             timeline.addEvent(events[1], true);
 
-            expect(timeline.getState(true).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
                 toHaveBeenCalledWith([events[0]]);
-            expect(timeline.getState(true).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
                 toHaveBeenCalledWith([events[1]]);
 
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
 
-            expect(timeline.getState(false).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
                 not.toHaveBeenCalled();
         });
     });
