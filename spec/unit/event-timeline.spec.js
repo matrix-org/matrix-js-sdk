@@ -3,6 +3,11 @@ var sdk = require("../..");
 var EventTimeline = sdk.EventTimeline;
 var utils = require("../test-utils");
 
+function mockRoomStates(timeline) {
+    timeline._startState = utils.mock(sdk.RoomState, "startState");
+    timeline._endState = utils.mock(sdk.RoomState, "endState");
+}
+
 describe("EventTimeline", function() {
     var roomId = "!foo:bar";
     var userA = "@alice:bar";
@@ -12,10 +17,6 @@ describe("EventTimeline", function() {
     beforeEach(function() {
         utils.beforeEach(this);
         timeline = new EventTimeline(roomId);
-
-        // mock RoomStates
-        timeline._startState = utils.mock(sdk.RoomState, "startState");
-        timeline._endState = utils.mock(sdk.RoomState, "endState");
     });
 
     describe("construction", function() {
@@ -26,6 +27,10 @@ describe("EventTimeline", function() {
     });
 
     describe("initialiseState", function() {
+        beforeEach(function() {
+            mockRoomStates(timeline);
+        });
+
         it("should copy state events to start and end state", function() {
             var events = [
                 utils.mkMembership({
@@ -68,9 +73,9 @@ describe("EventTimeline", function() {
     });
 
     describe("paginationTokens", function() {
-        it("pagination tokens should start undefined", function() {
-            expect(timeline.getPaginationToken(true)).toBe(undefined);
-            expect(timeline.getPaginationToken(false)).toBe(undefined);
+        it("pagination tokens should start null", function() {
+            expect(timeline.getPaginationToken(true)).toBe(null);
+            expect(timeline.getPaginationToken(false)).toBe(null);
         });
 
         it("setPaginationToken should set token", function() {
@@ -115,6 +120,10 @@ describe("EventTimeline", function() {
     });
 
     describe("addEvent", function() {
+        beforeEach(function() {
+            mockRoomStates(timeline);
+        });
+
         var events = [
             utils.mkMessage({
                 room: roomId, user: userA, msg: "hungry hungry hungry",
