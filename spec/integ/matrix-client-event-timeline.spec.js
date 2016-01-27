@@ -116,7 +116,7 @@ describe("getEventTimeline support", function() {
             var room = client.getRoom(roomId);
             expect(function() { client.getEventTimeline(room, "event"); })
                 .toThrow();
-        }).catch(exceptFail).done(done);
+        }).catch(utils.failTest).done(done);
     });
 
     it("timeline support works when enabled", function(done) {
@@ -132,9 +132,9 @@ describe("getEventTimeline support", function() {
             var room = client.getRoom(roomId);
             expect(function() { client.getEventTimeline(room, "event"); })
                 .not.toThrow();
-        }).catch(exceptFail).done(done);
+        }).catch(utils.failTest).done(done);
 
-        httpBackend.flush().catch(exceptFail);
+        httpBackend.flush().catch(utils.failTest);
     });
 
 
@@ -204,7 +204,7 @@ describe("getEventTimeline support", function() {
             expect(room.timeline[0].event).toEqual(EVENTS[0]);
             expect(room.timeline[1].event).toEqual(EVENTS[1]);
             expect(room.oldState.paginationToken).toEqual("pagin_end");
-        }).catch(exceptFail).done(done);
+        }).catch(utils.failTest).done(done);
     });
 });
 
@@ -224,7 +224,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         startClient(httpBackend, client)
-            .catch(exceptFail).done(done);
+            .catch(utils.failTest).done(done);
     });
 
     afterEach(function() {
@@ -259,9 +259,9 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token");
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
         it("should return existing timeline for known events", function(done) {
@@ -290,9 +290,9 @@ describe("MatrixClient event timelines", function() {
                 expect(tl.getEvents()[1].sender.name).toEqual(userName);
                 expect(tl.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("f_1_1");
                 // expect(tl.getPaginationToken(EventTimeline.FORWARDS)).toEqual("s_5_4");
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
         it("should update timelines where they overlap a previous /sync", function(done) {
@@ -337,10 +337,10 @@ describe("MatrixClient event timelines", function() {
                         .toEqual("start_token");
                     // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     //    .toEqual("s_5_4");
-                }).catch(exceptFail).done(done);
+                }).catch(utils.failTest).done(done);
             });
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
         it("should join timelines where they overlap a previous /context",
@@ -432,9 +432,9 @@ describe("MatrixClient event timelines", function() {
                     .toBe(null);
                 expect(tl3.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token3");
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
         it("should fail gracefully if there is no event field", function(done) {
@@ -458,9 +458,9 @@ describe("MatrixClient event timelines", function() {
                 expect(true).toBeFalsy();
             }).catch(function(e) {
                 expect(String(e)).toMatch(/'event'/);
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
     });
 
@@ -509,9 +509,9 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token1");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token0");
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
 
@@ -560,15 +560,10 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token0");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token1");
-            }).catch(exceptFail).done(done);
+            }).catch(utils.failTest).done(done);
 
-            httpBackend.flush().catch(exceptFail);
+            httpBackend.flush().catch(utils.failTest);
         });
 
     });
 });
-
-// make the test fail, with the given exception
-function exceptFail(error) {
-    expect(error.stack).toBe(null);
-}
