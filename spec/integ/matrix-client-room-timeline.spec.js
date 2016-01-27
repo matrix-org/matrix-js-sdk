@@ -107,7 +107,9 @@ describe("MatrixClient room timelines", function() {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
-            accessToken: accessToken
+            accessToken: accessToken,
+            // these tests should work with or without timelineSupport
+            timelineSupport: true,
         });
         setNextSyncData();
         httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -472,6 +474,38 @@ describe("MatrixClient room timelines", function() {
                     expect(room.currentState.getMember(userD).name).toEqual(userD);
                     expect(room.currentState.getMember(userD).membership).toEqual(
                         "invite"
+                    );
+                    done();
+                });
+            });
+            httpBackend.flush("/sync", 1);
+        });
+    });
+
+    describe("gappy sync", function() {
+        it("should copy the last known state to the new timeline", function(done) {
+            var eventData = [
+                utils.mkMessage({user: userId, room: roomId}),
+            ];
+            setNextSyncData(eventData);
+            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+
+            client.on("sync", function(state) {
+                if (state !== "PREPARED") { return; }
+                var room = client.getRoom(roomId);
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/sync", 1).done(function() {
+                    expect(room.timeline.length).toEqual(1);
+                    expect(room.timeline[0].event).toEqual(eventData[0]);
+                    expect(room.currentState.getMembers().length).toEqual(2);
+                    expect(room.currentState.getMember(userId).name).toEqual(userName);
+                    expect(room.currentState.getMember(userId).membership).toEqual(
+                        "join"
+                    );
+                    expect(room.currentState.getMember(otherUserId).name).toEqual("Bob");
+                    expect(room.currentState.getMember(otherUserId).membership).toEqual(
+                        "join"
                     );
                     done();
                 });
