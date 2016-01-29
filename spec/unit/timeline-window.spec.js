@@ -183,6 +183,37 @@ describe("TimelineWindow", function() {
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
             }).catch(utils.failTest).done(done);
         });
+
+        it("canPaginate should return false until load has returned",
+           function(done) {
+            var timeline = createTimeline();
+            timeline.setPaginationToken("toktok1", EventTimeline.BACKWARDS);
+            timeline.setPaginationToken("toktok2", EventTimeline.FORWARDS);
+
+            var eventId = timeline.getEvents()[1].getId();
+
+            var room = {};
+            var client = {};
+
+            var timelineWindow = new TimelineWindow(client, room);
+
+            client.getEventTimeline = function(room0, eventId0) {
+                expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
+                    .toBe(false);
+                expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
+                    .toBe(false);
+                return q(timeline);
+            };
+
+            timelineWindow.load(eventId, 3).then(function() {
+                var expectedEvents = timeline.getEvents();
+                expect(timelineWindow.getEvents()).toEqual(expectedEvents);
+                expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
+                    .toBe(true);
+                expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
+                    .toBe(true);
+            }).catch(utils.failTest).done(done);
+        });
     });
 
     describe("pagination", function() {
