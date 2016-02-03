@@ -564,6 +564,85 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.flush().catch(utils.failTest);
         });
+    });
 
+    describe("event timeline for sent events", function() {
+        var TXN_ID = "txn1";
+        var event = utils.mkMessage({
+            room: roomId, user: userId, msg: "a body",
+        });
+        event.unsigned = {transaction_id: TXN_ID};
+
+        beforeEach(function() {
+            // set up handlers for both the message send, and the
+            // /sync
+            httpBackend.when("PUT", "/send/m.room.message/"+TXN_ID).respond(200, {
+                event_id: event.event_id,
+            });
+            httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: "s_5_4",
+                rooms: {
+                    join: {
+                        "!foo:bar": {
+                            timeline: {
+                                events: [
+                                    event
+                                ],
+                                prev_batch: "f_1_1",
+                            },
+                        },
+                    },
+                },
+            });
+        });
+
+        it("should work when /send returns before /sync", function(done) {
+            var room = client.getRoom(roomId);
+
+            client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
+                expect(res.event_id).toEqual(event.event_id);
+                return client.getEventTimeline(room, event.event_id);
+            }).then(function(tl) {
+                expect(tl.getEvents().length).toEqual(2); // the initial sync contained an event
+                expect(tl.getEvents()[1].getContent().body).toEqual("a body");
+
+                // now let the sync complete, and check it again
+                return httpBackend.flush("/sync", 1);
+            }).then(function() {
+                return client.getEventTimeline(room, event.event_id);
+            }).then(function(tl) {
+                expect(tl.getEvents().length).toEqual(2);
+                expect(tl.getEvents()[1].event).toEqual(event);
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush("/send/m.room.message/" + TXN_ID, 1).catch(utils.failTest);
+        });
+
+        it("should work when /send returns after /sync", function(done) {
+            var room = client.getRoom(roomId);
+
+            // initiate the send, and set up checks to be done when it completes
+            // - but note that it won't complete until after the /sync does, below.
+            client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
+                console.log("sendTextMessage completed");
+                expect(res.event_id).toEqual(event.event_id);
+                return client.getEventTimeline(room, event.event_id);
+            }).then(function(tl) {
+                console.log("getEventTimeline completed (2)");
+                expect(tl.getEvents().length).toEqual(2);
+                expect(tl.getEvents()[1].getContent().body).toEqual("a body");
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush("/sync", 1).then(function() {
+                return client.getEventTimeline(room, event.event_id);
+            }).then(function(tl) {
+                console.log("getEventTimeline completed (1)");
+                expect(tl.getEvents().length).toEqual(2);
+                expect(tl.getEvents()[1].event).toEqual(event);
+
+                // now let the send complete.
+                return httpBackend.flush("/send/m.room.message/" + TXN_ID, 1);
+            }).catch(utils.failTest);
+        });
     });
 });
