@@ -576,9 +576,10 @@ describe("MatrixClient event timelines", function() {
         beforeEach(function() {
             // set up handlers for both the message send, and the
             // /sync
-            httpBackend.when("PUT", "/send/m.room.message/"+TXN_ID).respond(200, {
-                event_id: event.event_id,
-            });
+            httpBackend.when("PUT", "/send/m.room.message/" + TXN_ID)
+                .respond(200, {
+                    event_id: event.event_id,
+                });
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
                 rooms: {
@@ -603,7 +604,8 @@ describe("MatrixClient event timelines", function() {
                 expect(res.event_id).toEqual(event.event_id);
                 return client.getEventTimeline(room, event.event_id);
             }).then(function(tl) {
-                expect(tl.getEvents().length).toEqual(2); // the initial sync contained an event
+                // 2 because the initial sync contained an event
+                expect(tl.getEvents().length).toEqual(2);
                 expect(tl.getEvents()[1].getContent().body).toEqual("a body");
 
                 // now let the sync complete, and check it again
