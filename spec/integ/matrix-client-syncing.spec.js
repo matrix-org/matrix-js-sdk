@@ -434,6 +434,9 @@ describe("MatrixClient syncing", function() {
                 events: [
                     utils.mkMessage({
                         room: roomOne, user: otherUserId, msg: "hello"
+                    }),
+                    utils.mkMessage({
+                        room: roomOne, user: otherUserId, msg: "world"
                     })
                 ]
             },
@@ -473,7 +476,7 @@ describe("MatrixClient syncing", function() {
             receipt[ackEvent.event_id] = {
                 "m.read": {}
             };
-            receipt[ackEvent.event_id]["m.read"][otherUserId] = {
+            receipt[ackEvent.event_id]["m.read"][userC] = {
                 ts: 176592842636
             };
             syncData.rooms.join[roomOne].ephemeral.events = [{
@@ -489,7 +492,7 @@ describe("MatrixClient syncing", function() {
                 var room = client.getRoom(roomOne);
                 expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
                     type: "m.read",
-                    userId: otherUserId,
+                    userId: userC,
                     data: {
                         ts: 176592842636
                     }

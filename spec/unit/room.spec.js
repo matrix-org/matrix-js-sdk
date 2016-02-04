@@ -311,6 +311,96 @@ describe("Room", function() {
             expect(events[1].forwardLooking).toBe(false);
             expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
         });
+
+        it("should synthesize read receipts for the senders of events", function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.addEventsToTimeline(events);
+            expect(room.getEventReadUpTo(userA)).toEqual(events[1].getId());
+        });
+    });
+
+    describe("compareEventOrdering", function() {
+        beforeEach(function() {
+            room = new Room(roomId, {timelineSupport: true});
+        });
+
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "1111", event: true
+            }),
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "2222", event: true
+            }),
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "3333", event: true
+            }),
+        ];
+
+        it("should handle events in the same timeline", function() {
+            room.addEventsToTimeline(events);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBeLessThan(0);
+            expect(room.compareEventOrdering(events[2].getId(),
+                                             events[1].getId()))
+                .toBeGreaterThan(0);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[1].getId()))
+                .toEqual(0);
+        });
+
+        it("should handle events in adjacent timelines", function() {
+            var oldTimeline = room.addTimeline();
+            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), 'f');
+            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
+
+            room.addEventsToTimeline([events[0]], false, oldTimeline);
+            room.addEventsToTimeline([events[1]]);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBeLessThan(0);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[0].getId()))
+                .toBeGreaterThan(0);
+        });
+
+        it("should return null for events in non-adjacent timelines", function() {
+            var oldTimeline = room.addTimeline();
+
+            room.addEventsToTimeline([events[0]], false, oldTimeline);
+            room.addEventsToTimeline([events[1]]);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBe(null);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[0].getId()))
+                .toBe(null);
+        });
+
+        it("should return null for unknown events", function() {
+            room.addEventsToTimeline(events);
+
+            expect(room.compareEventOrdering(events[0].getId(), "xxx"))
+                .toBe(null);
+            expect(room.compareEventOrdering("xxx", events[0].getId()))
+                .toBe(null);
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[0].getId()))
+                .toBe(0);
+        });
     });
 
     describe("getJoinedMembers", function() {
@@ -792,6 +882,43 @@ describe("Room", function() {
                 ]);
             });
 
+            it("should prioritise the most recent event", function() {
+                var events = [
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "1111",
+                        event: true
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "2222",
+                        event: true
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "3333",
+                        event: true
+                    }),
+                ];
+
+                room.addEventsToTimeline(events);
+                var ts = 13787898424;
+
+                // check it initialises correctly
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[0].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[0].getId());
+
+                // 2>0, so it should move forward
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[2].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+
+                // 1<2, so it should stay put
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[1].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+            });
         });
 
         describe("getUsersReadUpTo", function() {
