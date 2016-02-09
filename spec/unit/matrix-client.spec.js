@@ -220,7 +220,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
-                } else if (state === "PREPARED" && httpLookups.length == 0) {
+                } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
                 } else {
@@ -245,7 +245,7 @@ describe("MatrixClient", function() {
                     expect(client.retryImmediately()).toBe(
                         true, "retryImmediately returned false"
                     );
-                } else if (state === "SYNCING" && httpLookups.length == 0) {
+                } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
                 }
@@ -266,7 +266,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
-                } else if (state === "PREPARED" && httpLookups.length == 0) {
+                } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
                 } else {
