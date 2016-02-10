@@ -213,17 +213,19 @@ describe("MatrixClient", function() {
             httpLookups.push({
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" }
             });
-            httpLookups.push({
-                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" }
-            });
+            httpLookups.push(FILTER_RESPONSE);
+            httpLookups.push(SYNC_RESPONSE);
 
             client.on("sync", function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
-                    expect(httpLookups.length).toEqual(1);
+                    expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
-                    expect(httpLookups.length).toEqual(0);
+                } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
+                } else {
+                    // unexpected state transition!
+                    expect(state).toEqual(null);
                 }
             });
             client.startClient();
@@ -243,9 +245,7 @@ describe("MatrixClient", function() {
                     expect(client.retryImmediately()).toBe(
                         true, "retryImmediately returned false"
                     );
-                    expect(httpLookups.length).toEqual(
-                        0, "more httpLookups remaining than expected"
-                    );
+                } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
                 }
@@ -258,17 +258,20 @@ describe("MatrixClient", function() {
             httpLookups.push({
                 method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" }
             });
-            httpLookups.push({
-                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" }
-            });
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(FILTER_RESPONSE);
+            httpLookups.push(SYNC_RESPONSE);
 
             client.on("sync", function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
-                    expect(httpLookups.length).toEqual(1);
+                    expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
-                    expect(httpLookups.length).toEqual(0);
+                } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
+                } else {
+                    // unexpected state transition!
+                    expect(state).toEqual(null);
                 }
             });
             client.startClient();
