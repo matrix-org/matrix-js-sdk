@@ -155,7 +155,7 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[0], true);
             var initialIndex = timeline.getBaseIndex();
             timeline.addEvent(events[1], true);
-            expect(timeline.getBaseIndex()).toEqual(initialIndex+1);
+            expect(timeline.getBaseIndex()).toEqual(initialIndex + 1);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getEvents()[0]).toEqual(events[1]);
             expect(timeline.getEvents()[1]).toEqual(events[0]);
