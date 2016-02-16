@@ -143,9 +143,9 @@ describe("EventTimeline", function() {
 
         it("should be able to add events to the end", function() {
             timeline.addEvent(events[0], false);
-            expect(timeline.getBaseIndex()).toEqual(0);
+            var initialIndex = timeline.getBaseIndex();
             timeline.addEvent(events[1], false);
-            expect(timeline.getBaseIndex()).toEqual(0);
+            expect(timeline.getBaseIndex()).toEqual(initialIndex);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getEvents()[0]).toEqual(events[0]);
             expect(timeline.getEvents()[1]).toEqual(events[1]);
@@ -153,9 +153,9 @@ describe("EventTimeline", function() {
 
         it("should be able to add events to the start", function() {
             timeline.addEvent(events[0], true);
-            expect(timeline.getBaseIndex()).toEqual(0);
+            var initialIndex = timeline.getBaseIndex();
             timeline.addEvent(events[1], true);
-            expect(timeline.getBaseIndex()).toEqual(1);
+            expect(timeline.getBaseIndex()).toEqual(initialIndex+1);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getEvents()[0]).toEqual(events[1]);
             expect(timeline.getEvents()[1]).toEqual(events[0]);
@@ -346,6 +346,20 @@ describe("EventTimeline", function() {
             expect(timeline.getEvents().length).toEqual(1);
             expect(timeline.getBaseIndex()).toEqual(0);
         });
+
+        // this is basically https://github.com/vector-im/vector-web/issues/937
+        // - removing the last event got baseIndex into such a state that
+        // further addEvent(ev, false) calls made the index increase.
+        it("should not make baseIndex assplode when removing the last event",
+           function() {
+               timeline.addEvent(events[0], true);
+               timeline.removeEvent(events[0].getId());
+               var initialIndex = timeline.getBaseIndex();
+               timeline.addEvent(events[1], false);
+               timeline.addEvent(events[2], false);
+               expect(timeline.getBaseIndex()).toEqual(initialIndex);
+               expect(timeline.getEvents().length).toEqual(2);
+           });
     });
 });
 
