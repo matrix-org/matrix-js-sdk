@@ -238,9 +238,9 @@ describe("MatrixClient event timelines", function() {
                 .respond(200, function() {
                     return {
                         start: "start_token",
-                        events_before: [EVENTS[0]],
-                        event: EVENTS[1],
-                        events_after: [EVENTS[2]],
+                        events_before: [EVENTS[1], EVENTS[0]],
+                        event: EVENTS[2],
+                        events_after: [EVENTS[3]],
                         state: [
                             ROOM_NAME_EVENT,
                             USER_MEMBERSHIP_EVENT,
@@ -250,8 +250,8 @@ describe("MatrixClient event timelines", function() {
                 });
 
             client.getEventTimeline(room, "event1:bar").then(function(tl) {
-                expect(tl.getEvents().length).toEqual(3);
-                for (var i = 0; i < 3; i++) {
+                expect(tl.getEvents().length).toEqual(4);
+                for (var i = 0; i < 4; i++) {
                     expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
                     expect(tl.getEvents()[i].sender.name).toEqual(userName);
                 }
