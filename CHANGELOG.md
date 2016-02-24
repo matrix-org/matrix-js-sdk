@@ -1,7 +1,16 @@
-Changes in 0.3.0
+Changes in XXX
 ================
 
 **BREAKING CHANGES**:
+ * `RoomMember.getAvatarUrl()` and `MatrixClient.mxcUrlToHttp()` now return the
+    empty string when given anything other than an mxc:// URL. This ensures that
+    clients never inadvertantly reference content directly, leaking information
+    to third party servers. The `allowDirectLinks` option is provided if the client
+    wants to allow such links.
+
+Changes in 0.3.0
+================
+
  * `MatrixClient.getAvatarUrlForMember` has been removed and replaced with
    `RoomMember.getAvatarUrl`. Arguments remain the same except the homeserver
    URL must now be supplied from `MatrixClient.getHomeserverUrl()`.

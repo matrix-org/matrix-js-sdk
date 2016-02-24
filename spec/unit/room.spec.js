@@ -3,6 +3,7 @@ var sdk = require("../..");
 var Room = sdk.Room;
 var RoomState = sdk.RoomState;
 var MatrixEvent = sdk.MatrixEvent;
+var EventStatus = sdk.EventStatus;
 var utils = require("../test-utils");
 
 describe("Room", function() {
@@ -17,8 +18,10 @@ describe("Room", function() {
         utils.beforeEach(this);
         room = new Room(roomId);
         // mock RoomStates
-        room.oldState = utils.mock(sdk.RoomState, "oldState");
-        room.currentState = utils.mock(sdk.RoomState, "currentState");
+        room.oldState = room.getLiveTimeline()._startState =
+            utils.mock(sdk.RoomState, "oldState");
+        room.currentState = room.getLiveTimeline()._endState =
+            utils.mock(sdk.RoomState, "currentState");
     });
 
     describe("getAvatarUrl", function() {
@@ -258,10 +261,7 @@ describe("Room", function() {
         });
 
         it("should call setStateEvents on the right RoomState with the right " +
-        "forwardLooking value", function() {
-            room.oldState = utils.mock(RoomState);
-            room.currentState = utils.mock(RoomState);
-
+        "forwardLooking value for new events", function() {
             var events = [
                 utils.mkMembership({
                     room: roomId, mship: "invite", user: userB, skey: userA, event: true
@@ -283,8 +283,23 @@ describe("Room", function() {
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
             expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
+        });
 
-            // test old
+
+        it("should call setStateEvents on the right RoomState with the right " +
+        "forwardLooking value for old events", function() {
+            var events = [
+                utils.mkMembership({
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userB, event: true,
+                    content: {
+                        name: "New room"
+                    }
+                })
+            ];
+
             room.addEventsToTimeline(events, true);
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
                 [events[0]]
@@ -294,6 +309,97 @@ describe("Room", function() {
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
+            expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
+        });
+
+        it("should synthesize read receipts for the senders of events", function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.addEventsToTimeline(events);
+            expect(room.getEventReadUpTo(userA)).toEqual(events[1].getId());
+        });
+    });
+
+    describe("compareEventOrdering", function() {
+        beforeEach(function() {
+            room = new Room(roomId, {timelineSupport: true});
+        });
+
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "1111", event: true
+            }),
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "2222", event: true
+            }),
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "3333", event: true
+            }),
+        ];
+
+        it("should handle events in the same timeline", function() {
+            room.addEventsToTimeline(events);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBeLessThan(0);
+            expect(room.compareEventOrdering(events[2].getId(),
+                                             events[1].getId()))
+                .toBeGreaterThan(0);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[1].getId()))
+                .toEqual(0);
+        });
+
+        it("should handle events in adjacent timelines", function() {
+            var oldTimeline = room.addTimeline();
+            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), 'f');
+            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
+
+            room.addEventsToTimeline([events[0]], false, oldTimeline);
+            room.addEventsToTimeline([events[1]]);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBeLessThan(0);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[0].getId()))
+                .toBeGreaterThan(0);
+        });
+
+        it("should return null for events in non-adjacent timelines", function() {
+            var oldTimeline = room.addTimeline();
+
+            room.addEventsToTimeline([events[0]], false, oldTimeline);
+            room.addEventsToTimeline([events[1]]);
+
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[1].getId()))
+                .toBe(null);
+            expect(room.compareEventOrdering(events[1].getId(),
+                                             events[0].getId()))
+                .toBe(null);
+        });
+
+        it("should return null for unknown events", function() {
+            room.addEventsToTimeline(events);
+
+            expect(room.compareEventOrdering(events[0].getId(), "xxx"))
+                .toBe(null);
+            expect(room.compareEventOrdering("xxx", events[0].getId()))
+                .toBe(null);
+            expect(room.compareEventOrdering(events[0].getId(),
+                                             events[0].getId()))
+                .toBe(0);
         });
     });
 
@@ -327,50 +433,40 @@ describe("Room", function() {
 
         it("should return true for a matching userId and membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" },
-                    { userId: "@bob:bar", membership: "invite" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                "@bob:bar": { userId: "@bob:bar", membership: "invite" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
 
         it("should return false if match membership but no match userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
 
         it("should return false if match userId but no match membership",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
 
         it("should return false if no match membership or userId",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [
-                    { userId: "@alice:bar", membership: "join" }
-                ];
-            });
+            room.currentState.members = {
+                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+            };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
 
         it("should return false if no members exist",
         function() {
-            room.currentState.getMembers.andCallFake(function() {
-                return [];
-            });
+            room.currentState.members = {};
             expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
         });
     });
@@ -606,29 +702,30 @@ describe("Room", function() {
                 expect(name).toEqual(roomName);
             });
 
-            it("should show your name for private (invite join_rules) rooms if" +
+            it("should return 'Empty room' for private (invite join_rules) rooms if" +
             " a room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual("Empty room");
             });
 
-            it("should show your name for public (public join_rules) rooms if a" +
+            it("should return 'Empty room' for public (public join_rules) rooms if a" +
             " room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("public");
                 addMember(userA);
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual("Empty room");
             });
 
-            it("should return '?' if there is no name, alias or members in the room.",
+            it("should return 'Empty room' if there is no name, " +
+               "alias or members in the room.",
             function() {
                 room.recalculate(userA);
                 var name = room.name;
-                expect(name).toEqual("?");
+                expect(name).toEqual("Empty room");
             });
 
         });
@@ -682,6 +779,21 @@ describe("Room", function() {
                         ts: ts
                     }
                 }]);
+            });
+
+            it("should emit an event when a receipt is added",
+            function() {
+                var listener = jasmine.createSpy('spy');
+                room.on("Room.receipt", listener);
+
+                var ts = 13787898424;
+
+                var receiptEvent = mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                ]);
+
+                room.addReceipt(receiptEvent);
+                expect(listener).toHaveBeenCalledWith(receiptEvent, room);
             });
 
             it("should clobber receipts based on type and user ID", function() {
@@ -770,6 +882,43 @@ describe("Room", function() {
                 ]);
             });
 
+            it("should prioritise the most recent event", function() {
+                var events = [
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "1111",
+                        event: true
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "2222",
+                        event: true
+                    }),
+                    utils.mkMessage({
+                        room: roomId, user: userA, msg: "3333",
+                        event: true
+                    }),
+                ];
+
+                room.addEventsToTimeline(events);
+                var ts = 13787898424;
+
+                // check it initialises correctly
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[0].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[0].getId());
+
+                // 2>0, so it should move forward
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[2].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+
+                // 1<2, so it should stay put
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(events[1].getId(), "m.read", userB, ts),
+                ]));
+                expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
+            });
         });
 
         describe("getUsersReadUpTo", function() {
@@ -786,4 +935,123 @@ describe("Room", function() {
 
     });
 
+    describe("tags", function() {
+
+        function mkTags(roomId, tags) {
+            var content = { "tags" : tags };
+            return new MatrixEvent({
+                content: content,
+                room_id: roomId,
+                type: "m.tag"
+            });
+        }
+
+        describe("addTag", function() {
+
+            it("should set tags on rooms from event stream so " +
+               "they can be obtained by the tags property",
+            function() {
+                var tags = { "m.foo": { "order": 0.5 } };
+                room.addTags(mkTags(roomId, tags));
+                expect(room.tags).toEqual(tags);
+            });
+
+            it("should emit Room.tags event when new tags are " +
+               "received on the event stream",
+            function() {
+                var listener = jasmine.createSpy('spy');
+                room.on("Room.tags", listener);
+
+                var tags = { "m.foo": { "order": 0.5 } };
+                var event = mkTags(roomId, tags);
+                room.addTags(event);
+                expect(listener).toHaveBeenCalledWith(event, room);
+            });
+
+            // XXX: shouldn't we try injecting actual m.tag events onto the eventstream
+            // rather than injecting via room.addTags()?
+        });
+    });
+
+    describe("pendingEventOrdering", function() {
+        it("should sort pending events to the end of the timeline if 'end'", function() {
+            var room = new Room(roomId, {
+                pendingEventOrdering: "end"
+            });
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true
+            });
+            var eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true
+            });
+            eventB.status = EventStatus.SENDING;
+            var eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true
+            });
+            room.addEvents([eventA, eventB, eventC]);
+            expect(room.timeline).toEqual(
+                [eventA, eventC, eventB]
+            );
+        });
+
+        it("should sort pending events chronologically if 'chronological'", function() {
+            room = new Room(roomId, {
+                pendingEventOrdering: "chronological"
+            });
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true
+            });
+            var eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true
+            });
+            eventB.status = EventStatus.SENDING;
+            var eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true
+            });
+            room.addEvents([eventA, eventB, eventC]);
+            expect(room.timeline).toEqual(
+                [eventA, eventB, eventC]
+            );
+        });
+
+        it("should treat NOT_SENT events as local echo", function() {
+            var room = new Room(roomId, {
+                pendingEventOrdering: "end"
+            });
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true
+            });
+            var eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true
+            });
+            eventB.status = EventStatus.NOT_SENT;
+            var eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true
+            });
+            room.addEvents([eventA, eventB, eventC]);
+            expect(room.timeline).toEqual(
+                [eventA, eventC, eventB]
+            );
+        });
+
+        it("should treat QUEUED events as local echo", function() {
+            var room = new Room(roomId, {
+                pendingEventOrdering: "end"
+            });
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true
+            });
+            var eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true
+            });
+            eventB.status = EventStatus.QUEUED;
+            var eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true
+            });
+            room.addEvents([eventA, eventB, eventC]);
+            expect(room.timeline).toEqual(
+                [eventA, eventC, eventB]
+            );
+        });
+    });
 });
