@@ -166,12 +166,15 @@ describe("MatrixClient", function() {
         });
     });
 
-    it("should not POST /filter if a filter already exists", function(done) {
+    it("should not POST /filter if a matching filter already exists", function(done) {
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
         var filterId = "ehfewf";
         store.getFilterIdByName.andReturn(filterId);
+        var filter = new sdk.Filter(0, filterId);
+        filter.setDefinition({"room": {"timeline": {"limit": 8}}});
+        store.getFilter.andReturn(filter);
         client.startClient();
 
         client.on("sync", function syncListener(state) {
