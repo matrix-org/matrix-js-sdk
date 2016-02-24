@@ -1,4 +1,4 @@
-Changes in XXX
+Changes in 0.4.0
 ================
 
 **BREAKING CHANGES**:
@@ -7,6 +7,32 @@ Changes in XXX
     clients never inadvertantly reference content directly, leaking information
     to third party servers. The `allowDirectLinks` option is provided if the client
     wants to allow such links.
+ * Add a 'bindEmail' option to register()
+
+Improvements:
+ * Support third prty invites
+ * More appropriate naming for third party invite rooms
+ * Poll the 'versions' endpoint to re-establish connectivity
+ * Catch exceptions when syncing
+ * Room tag support
+ * Generate implicit read receipts
+ * Support CAS login
+ * Guest access support
+ * Never return non-mxc URLs by default
+ * Ability to cancel file uploads
+ * Use the Matrix C/S API v2 with r0 prefix
+ * Account data support
+ * Support non-contiguous event timelines
+ * Support new unread counts
+ * Local echo for read-receipts
+ 
+
+New methods:
+ * Add method to fetch URLs not on the home or identity server
+ * Method to get the last receipt for a user
+ * Method to get all known users
+ * Method to delete an alias
+ 
 
 Changes in 0.3.0
 ================
