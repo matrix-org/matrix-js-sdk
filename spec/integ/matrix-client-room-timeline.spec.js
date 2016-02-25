@@ -512,5 +512,31 @@ describe("MatrixClient room timelines", function() {
             });
             httpBackend.flush("/sync", 1);
         });
+
+        it("should emit a 'Room.timelineReset' event", function(done) {
+            var eventData = [
+                utils.mkMessage({user: userId, room: roomId}),
+            ];
+            setNextSyncData(eventData);
+            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+
+            client.on("sync", function(state) {
+                if (state !== "PREPARED") { return; }
+                var room = client.getRoom(roomId);
+
+                var emitCount = 0;
+                client.on("Room.timelineReset", function(emitRoom) {
+                    expect(emitRoom).toEqual(room);
+                    emitCount++;
+                });
+
+                httpBackend.flush("/messages", 1);
+                httpBackend.flush("/sync", 1).done(function() {
+                    expect(emitCount).toEqual(1);
+                    done();
+                });
+            });
+            httpBackend.flush("/sync", 1);
+        });
     });
 });

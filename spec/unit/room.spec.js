@@ -4,6 +4,7 @@ var Room = sdk.Room;
 var RoomState = sdk.RoomState;
 var MatrixEvent = sdk.MatrixEvent;
 var EventStatus = sdk.EventStatus;
+var EventTimeline = sdk.EventTimeline;
 var utils = require("../test-utils");
 
 describe("Room", function() {
@@ -328,6 +329,80 @@ describe("Room", function() {
             expect(room.getEventReadUpTo(userA)).toEqual(events[1].getId());
         });
     });
+
+    var resetTimelineTests = function(timelineSupport) {
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "A message", event: true
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "Another New Name" }
+            }),
+        ];
+
+        beforeEach(function() {
+            room = new Room(roomId, {timelineSupport: timelineSupport});
+        });
+
+        it("should copy state from previous timeline", function() {
+            room.addEventsToTimeline([events[0], events[1]]);
+            expect(room.getLiveTimeline().getEvents().length).toEqual(2);
+            room.resetLiveTimeline();
+
+            room.addEventsToTimeline([events[2]]);
+            var oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
+            var newState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+            expect(room.getLiveTimeline().getEvents().length).toEqual(1);
+            expect(oldState.getStateEvents("m.room.name", "")).toEqual(events[1]);
+            expect(newState.getStateEvents("m.room.name", "")).toEqual(events[2]);
+        });
+
+        it("should reset the legacy timeline fields", function() {
+            room.addEventsToTimeline([events[0], events[1]]);
+            expect(room.timeline.length).toEqual(2);
+            room.resetLiveTimeline();
+
+            room.addEventsToTimeline([events[2]]);
+            var newLiveTimeline = room.getLiveTimeline();
+            expect(room.timeline).toEqual(newLiveTimeline.getEvents());
+            expect(room.oldState).toEqual(
+                newLiveTimeline.getState(EventTimeline.BACKWARDS));
+            expect(room.currentState).toEqual(
+                newLiveTimeline.getState(EventTimeline.FORWARDS));
+        });
+
+        it("should emit Room.timelineReset event", function() {
+            var callCount = 0;
+            room.on("Room.timelineReset", function(emitRoom) {
+                callCount += 1;
+                expect(emitRoom).toEqual(room);
+            });
+            room.resetLiveTimeline();
+            expect(callCount).toEqual(1);
+        });
+
+        it("should " + (timelineSupport ? "remember" : "forget") +
+                " old timelines", function() {
+            room.addEventsToTimeline([events[0]]);
+            expect(room.timeline.length).toEqual(1);
+            var firstLiveTimeline = room.getLiveTimeline();
+            room.resetLiveTimeline();
+
+            var tl = room.getTimelineForEvent(events[0].getId());
+            expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
+        });
+
+    };
+
+    describe("resetLiveTimeline with timelinesupport enabled",
+             resetTimelineTests.bind(null, true));
+    describe("resetLiveTimeline with timelinesupport disabled",
+             resetTimelineTests.bind(null, false));
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
