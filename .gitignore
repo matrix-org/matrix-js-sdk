@@ -8,5 +8,6 @@ out
 reports
 dist/browser-matrix-dev.js
 
-# tarball created by 'npm pack'
+# version file and tarball created by 'npm pack'
+/version.txt
 /matrix-js-sdk-*.tgz
