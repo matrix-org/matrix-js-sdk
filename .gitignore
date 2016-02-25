@@ -7,3 +7,6 @@ lib-cov
 out
 reports
 dist/browser-matrix-dev.js
+
+# tarball created by 'npm pack'
+/matrix-js-sdk-*.tgz
