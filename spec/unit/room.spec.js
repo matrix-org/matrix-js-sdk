@@ -573,11 +573,15 @@ describe("Room", function() {
                 }, event: true
             });
         };
-        var addMember = function(userId, state) {
+        var addMember = function(userId, state, opts) {
             if (!state) { state = "join"; }
-            stateLookup["m.room.member$" + userId] = utils.mkMembership({
-                room: roomId, mship: state, user: userId, skey: userId, event: true
-            });
+            opts = opts || {};
+            opts.room = roomId;
+            opts.mship = state;
+            opts.user = opts.user || userId;
+            opts.skey = userId;
+            opts.event = true;
+            stateLookup["m.room.member$" + userId] = utils.mkMembership(opts);
         };
 
         beforeEach(function() {
@@ -603,13 +607,28 @@ describe("Room", function() {
                 var members = [];
                 for (var i = 0; i < memberEvents.length; i++) {
                     members.push({
-                        // not interested in user ID vs display name semantics.
-                        // That should be tested in RoomMember UTs.
-                        name: memberEvents[i].getSender(),
-                        userId: memberEvents[i].getSender()
+                        name: memberEvents[i].event.content &&
+                                memberEvents[i].event.content.displayname ?
+                                memberEvents[i].event.content.displayname :
+                                memberEvents[i].getStateKey(),
+                        userId: memberEvents[i].getStateKey(),
+                        events: { member: memberEvents[i] }
                     });
                 }
                 return members;
+            });
+            room.currentState.getMember.andCallFake(function(userId) {
+                var memberEvent = room.currentState.getStateEvents(
+                    "m.room.member", userId
+                );
+                return {
+                    name: memberEvent.event.content &&
+                            memberEvent.event.content.displayname ?
+                            memberEvent.event.content.displayname :
+                            memberEvent.getStateKey(),
+                    userId: memberEvent.getStateKey(),
+                    events: { member: memberEvent }
+                };
             });
         });
 
@@ -730,7 +749,7 @@ describe("Room", function() {
             it("should show the other user's name for private" +
             " (invite join_rules) rooms if you are invited to it.", function() {
                 setJoinRule("invite");
-                addMember(userA, "invite");
+                addMember(userA, "invite", {user: userB});
                 addMember(userB);
                 room.recalculate(userA);
                 var name = room.name;
@@ -801,6 +820,27 @@ describe("Room", function() {
                 room.recalculate(userA);
                 var name = room.name;
                 expect(name).toEqual("Empty room");
+            });
+
+            it("should return 'Invite from [inviter display name] if state event " +
+               "available",
+            function() {
+                setJoinRule("invite");
+                addMember(userA, 'join', {name: "Alice"});
+                addMember(userB, "invite", {user: userA});
+                room.recalculate(userB);
+                var name = room.name;
+                expect(name).toEqual("Invite from Alice");
+            });
+
+            it("should return inviter mxid if display name not available",
+            function() {
+                setJoinRule("invite");
+                addMember(userA);
+                addMember(userB, "invite", {user: userA});
+                room.recalculate(userB);
+                var name = room.name;
+                expect(name).toEqual("Invite from " + userA);
             });
 
         });
