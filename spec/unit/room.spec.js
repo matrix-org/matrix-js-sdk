@@ -543,7 +543,9 @@ describe("Room", function() {
                 return members;
             });
             room.currentState.getMember.andCallFake(function(userId) {
-                var memberEvent = room.currentState.getStateEvents("m.room.member", userId);
+                var memberEvent = room.currentState.getStateEvents(
+                    "m.room.member", userId
+                );
                 return {
                     name: memberEvent.event.content &&
                             memberEvent.event.content.displayname ?
@@ -745,7 +747,8 @@ describe("Room", function() {
                 expect(name).toEqual("Empty room");
             });
 
-            it("should return 'Invite from [inviter display name] if state event available",
+            it("should return 'Invite from [inviter display name] if state event " +
+               "available",
             function() {
                 setJoinRule("invite");
                 addMember(userA, 'join', {name: "Alice"});
