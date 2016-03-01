@@ -512,4 +512,41 @@ describe("MatrixClient syncing", function() {
 
         });
     });
+
+    describe("syncLeftRooms", function() {
+        beforeEach(function(done) {
+            client.startClient();
+
+            httpBackend.flush().then(function() {
+                // the /sync call from syncLeftRooms ends up in the request
+                // queue behind the call from the running client; add a response
+                // to flush the client's one out.
+                httpBackend.when("GET", "/sync").respond(200, {});
+
+                done();
+            });
+        });
+
+        it("should create and use an appropriate filter", function(done) {
+            httpBackend.when("POST", "/filter").check(function(req) {
+                expect(req.data).toEqual({
+                    room: { timeline: {limit: 1},
+                            include_leave: true }});
+            }).respond(200, { filter_id: "another_id" });
+
+            httpBackend.when("GET", "/sync").check(function(req) {
+                expect(req.queryParams.filter).toEqual("another_id");
+                done();
+            }).respond(200, {});
+
+            client.syncLeftRooms();
+
+            // first flush the filter request; this will make syncLeftRooms
+            // make its /sync call
+            httpBackend.flush("/filter").then(function() {
+                // flush the syncs
+                return httpBackend.flush();
+            }).catch(utils.failTest);
+        });
+    });
 });
