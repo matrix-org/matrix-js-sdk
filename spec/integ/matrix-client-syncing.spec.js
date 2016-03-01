@@ -422,6 +422,101 @@ describe("MatrixClient syncing", function() {
         });
     });
 
+    describe("timeline", function() {
+        beforeEach(function() {
+            var syncData = {
+                next_batch: "batch_token",
+                rooms: {
+                    join: {},
+                },
+            };
+            syncData.rooms.join[roomOne] = {
+                timeline: {
+                    events: [
+                        utils.mkMessage({
+                            room: roomOne, user: otherUserId, msg: "hello"
+                        }),
+                    ],
+                    prev_batch: "pagTok",
+                },
+            };
+
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+
+            client.startClient();
+            httpBackend.flush();
+        });
+
+        it("should set the back-pagination token on new rooms", function(done) {
+            var syncData = {
+                next_batch: "batch_token",
+                rooms: {
+                    join: {},
+                },
+            };
+            syncData.rooms.join[roomTwo] = {
+                timeline: {
+                    events: [
+                        utils.mkMessage({
+                            room: roomTwo, user: otherUserId, msg: "roomtwo"
+                        }),
+                    ],
+                    prev_batch: "roomtwotok",
+                },
+            };
+
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+
+            httpBackend.flush().then(function() {
+                var room = client.getRoom(roomTwo);
+                var tok = room.getLiveTimeline()
+                    .getPaginationToken(EventTimeline.BACKWARDS);
+                expect(tok).toEqual("roomtwotok");
+                done();
+            }).catch(utils.failTest).done();
+        });
+
+        it("should set the back-pagination token on gappy syncs", function(done) {
+            var syncData = {
+                next_batch: "batch_token",
+                rooms: {
+                    join: {},
+                },
+            };
+            syncData.rooms.join[roomOne] = {
+                timeline: {
+                    events: [
+                        utils.mkMessage({
+                            room: roomOne, user: otherUserId, msg: "world"
+                        }),
+                    ],
+                    limited: true,
+                    prev_batch: "newerTok",
+                },
+            };
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+
+            var resetCallCount = 0;
+            // the token should be set *before* timelineReset is emitted
+            client.on("Room.timelineReset", function(room) {
+                resetCallCount++;
+
+                var tl = room.getLiveTimeline();
+                expect(tl.getEvents().length).toEqual(0);
+                var tok = tl.getPaginationToken(EventTimeline.BACKWARDS);
+                expect(tok).toEqual("newerTok");
+            });
+
+            httpBackend.flush().then(function() {
+                var room = client.getRoom(roomOne);
+                var tl = room.getLiveTimeline();
+                expect(tl.getEvents().length).toEqual(1);
+                expect(resetCallCount).toEqual(1);
+                done();
+            }).catch(utils.failTest).done();
+        });
+    });
+
     describe("receipts", function() {
         var syncData = {
             rooms: {
