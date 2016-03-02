@@ -376,13 +376,21 @@ describe("Room", function() {
                 newLiveTimeline.getState(EventTimeline.FORWARDS));
         });
 
-        it("should emit Room.timelineReset event", function() {
+        it("should emit Room.timelineReset event and set the correct " +
+                 "pagination token", function() {
             var callCount = 0;
             room.on("Room.timelineReset", function(emitRoom) {
                 callCount += 1;
                 expect(emitRoom).toEqual(room);
+
+                // make sure that the pagination token has been set before the
+                // event is emitted.
+                var tok = emitRoom.getLiveTimeline()
+                    .getPaginationToken(EventTimeline.BACKWARDS);
+
+                expect(tok).toEqual("pagToken");
             });
-            room.resetLiveTimeline();
+            room.resetLiveTimeline("pagToken");
             expect(callCount).toEqual(1);
         });
 
