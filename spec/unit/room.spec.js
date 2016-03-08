@@ -328,6 +328,39 @@ describe("Room", function() {
             room.addEventsToTimeline(events);
             expect(room.getEventReadUpTo(userA)).toEqual(events[1].getId());
         });
+
+        it("should emit Room.localEchoUpdated when a local echo is updated", function() {
+            var localEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            localEvent._txnId = "TXN_ID";
+            localEvent.status = EventStatus.SENDING;
+            var localEventId = localEvent.getId();
+
+            var remoteEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            remoteEvent.event.unsigned = {transaction_id: "TXN_ID"};
+            var remoteEventId = remoteEvent.getId();
+
+            var callCount = 0;
+            room.on("Room.localEchoUpdated", function(event, emitRoom, oldEventId) {
+                callCount += 1;
+                expect(event.getId()).toEqual(remoteEventId);
+                expect(emitRoom).toEqual(room);
+                expect(oldEventId).toEqual(localEventId);
+            });
+
+            // first add the local echo to the timeline
+            room.addEventsToTimeline([localEvent]);
+            expect(room.timeline.length).toEqual(1);
+
+            // then the remoteEvent
+            room.addEventsToTimeline([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
+
+            expect(callCount).toEqual(1);
+        });
     });
 
     var resetTimelineTests = function(timelineSupport) {
