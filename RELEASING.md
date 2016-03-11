@@ -6,5 +6,6 @@
 - Merge `develop` onto `master`.
 - Tag the commit: `git tag -a -m "v0.x.x"`
 - Push the tag: `git push --tags`
+- `npm publish`
 - Generate documentation: `npm run gendoc` (this outputs HTML to `.jsdoc`)
 - Copy the documentation from `.jsdoc` to the `gh-pages` branch and update `index.html`
