@@ -1,0 +1,10 @@
+- `git checkout -b release-v0.x.x`
+- Update `CHANGELOG.md` and bump `version` in `package.json`
+- Create `dist` entry by running `npm run release`.
+- Commit your changes.
+- Merge `release-v0.x.x` onto `develop`.
+- Merge `develop` onto `master`.
+- Tag the commit: `git tag -a -m "v0.x.x"`
+- Push the tag: `git push --tags`
+- Generate documentation: `npm run gendoc` (this outputs HTML to `.jsdoc`)
+- Copy the documentation from `.jsdoc` to the `gh-pages` branch and update `index.html`
