@@ -1,6 +1,7 @@
 - `git checkout -b release-v0.x.x`
 - Update `CHANGELOG.md` and bump `version` in `package.json`
 - Create `dist` entry by running `npm run release`.
+- `git add dist/0.x.x`
 - Commit your changes.
 - Merge `release-v0.x.x` onto `develop`.
 - Merge `develop` onto `master`.
