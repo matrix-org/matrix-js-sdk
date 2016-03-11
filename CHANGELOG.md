@@ -1,3 +1,33 @@
+Changes in 0.4.1
+================
+
+Improvements:
+ * Check that `/sync` filters are correct before reusing them, and recreate
+   them if not (https://github.com/matrix-org/matrix-js-sdk/pull/85).
+ * Fire a `Room.timelineReset` event when a room's timeline is reset by a gappy
+   `/sync` (https://github.com/matrix-org/matrix-js-sdk/pull/87,
+   https://github.com/matrix-org/matrix-js-sdk/pull/93).
+ * Make `TimelineWindow.load()` faster in the simple case of loading the live
+   timeline (https://github.com/matrix-org/matrix-js-sdk/pull/88).
+ * Update room-name calculation code to use the name of the sender of the
+   invite when invited to a room
+   (https://github.com/matrix-org/matrix-js-sdk/pull/89).
+ * Don't reset the timeline when we join a room after peeking into it
+   (https://github.com/matrix-org/matrix-js-sdk/pull/91).
+ * Fire `Room.localEchoUpdated` events as local echoes progress through their
+   transmission process (https://github.com/matrix-org/matrix-js-sdk/pull/95,
+   https://github.com/matrix-org/matrix-js-sdk/pull/97).
+ * Avoid getting stuck in a pagination loop when the server sends us only
+   messages we've already seen
+   (https://github.com/matrix-org/matrix-js-sdk/pull/96).
+   
+New methods:
+ * Add `MatrixClient.setPushRuleActions` to set the actions for a push
+   notification rule (https://github.com/matrix-org/matrix-js-sdk/pull/90)
+ * Add `RoomState.maySendStateEvent` which determines if a given user has
+   permission to send a state event
+   (https://github.com/matrix-org/matrix-js-sdk/pull/94)
+
 Changes in 0.4.0
 ================
 
@@ -10,7 +40,7 @@ Changes in 0.4.0
  * Add a 'bindEmail' option to register()
 
 Improvements:
- * Support third prty invites
+ * Support third party invites
  * More appropriate naming for third party invite rooms
  * Poll the 'versions' endpoint to re-establish connectivity
  * Catch exceptions when syncing
@@ -25,14 +55,14 @@ Improvements:
  * Support non-contiguous event timelines
  * Support new unread counts
  * Local echo for read-receipts
- 
+
 
 New methods:
  * Add method to fetch URLs not on the home or identity server
  * Method to get the last receipt for a user
  * Method to get all known users
  * Method to delete an alias
- 
+
 
 Changes in 0.3.0
 ================
