@@ -279,6 +279,24 @@ describe("MatrixClient events", function() {
                 done();
             });
         });
+
+        it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function(done) {
+            httpBackend.when("GET", "/sync").respond(401, { errcode: 'M_UNKNOWN_TOKEN' });
+
+            var sessionLoggedOutCount = 0;
+            client.on("Session.logged_out", function(event, member) {
+                sessionLoggedOutCount++;
+            });
+
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                expect(sessionLoggedOutCount).toEqual(
+                    1, "Session.logged_out fired wrong number of times"
+                );
+                done();
+            });
+        });
     });
 
 });
