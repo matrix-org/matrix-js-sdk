@@ -165,6 +165,7 @@ describe("MatrixClient room timelines", function() {
                 body: "I am a fish", user: userId, room: roomId
             });
             ev.event_id = eventId;
+            ev.unsigned = {transaction_id: "txn1"};
             setNextSyncData([ev]);
 
             client.on("sync", function(state) {
