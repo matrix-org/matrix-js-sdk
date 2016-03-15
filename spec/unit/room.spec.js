@@ -333,7 +333,6 @@ describe("Room", function() {
             var localEvent = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
-            localEvent._txnId = "TXN_ID";
             localEvent.status = EventStatus.SENDING;
             var localEventId = localEvent.getId();
 
@@ -344,22 +343,37 @@ describe("Room", function() {
             var remoteEventId = remoteEvent.getId();
 
             var callCount = 0;
-            room.on("Room.localEchoUpdated", function(event, emitRoom, oldEventId) {
-                callCount += 1;
-                expect(event.getId()).toEqual(remoteEventId);
-                expect(emitRoom).toEqual(room);
-                expect(oldEventId).toEqual(localEventId);
-            });
+            room.on("Room.localEchoUpdated",
+                function(event, emitRoom, oldEventId, oldStatus) {
+                    switch (callCount) {
+                    case 0:
+                        expect(event.getId()).toEqual(localEventId);
+                        expect(event.status).toEqual(EventStatus.SENDING);
+                        expect(emitRoom).toEqual(room);
+                        expect(oldEventId).toBe(null);
+                        expect(oldStatus).toBe(null);
+                        break;
+                    case 1:
+                        expect(event.getId()).toEqual(remoteEventId);
+                        expect(event.status).toBe(null);
+                        expect(emitRoom).toEqual(room);
+                        expect(oldEventId).toEqual(localEventId);
+                        expect(oldStatus).toBe(EventStatus.SENDING);
+                        break;
+                    }
+                    callCount += 1;
+                }
+            );
 
-            // first add the local echo to the timeline
-            room.addEventsToTimeline([localEvent]);
+            // first add the local echo
+            room.addPendingEvent(localEvent, "TXN_ID");
             expect(room.timeline.length).toEqual(1);
 
             // then the remoteEvent
             room.addEventsToTimeline([remoteEvent]);
             expect(room.timeline.length).toEqual(1);
 
-            expect(callCount).toEqual(1);
+            expect(callCount).toEqual(2);
         });
     });
 
@@ -1129,10 +1143,11 @@ describe("Room", function() {
         });
     });
 
-    describe("pendingEventOrdering", function() {
-        it("should sort pending events to the end of the timeline if 'end'", function() {
+    describe("addPendingEvent", function() {
+        it("should add pending events to the pendingEventList if " +
+                      "pendingEventOrdering == 'external'", function() {
             var room = new Room(roomId, {
-                pendingEventOrdering: "end"
+                pendingEventOrdering: "external"
             });
             var eventA = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 1", event: true
@@ -1140,17 +1155,24 @@ describe("Room", function() {
             var eventB = utils.mkMessage({
                 room: roomId, user: userA, msg: "local 1", event: true
             });
+            eventB._txnId = "TXN1";
             eventB.status = EventStatus.SENDING;
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
-            room.addEvents([eventA, eventB, eventC]);
+            room.addEvents([eventA]);
+            room.addPendingEvent(eventB);
+            room.addEvents([eventC]);
             expect(room.timeline).toEqual(
-                [eventA, eventC, eventB]
+                [eventA, eventC]
+            );
+            expect(room.getPendingEvents()).toEqual(
+                [eventB]
             );
         });
 
-        it("should sort pending events chronologically if 'chronological'", function() {
+        it("should add pending events to the timeline if " +
+                      "pendingEventOrdering == 'chronological'", function() {
             room = new Room(roomId, {
                 pendingEventOrdering: "chronological"
             });
@@ -1160,53 +1182,16 @@ describe("Room", function() {
             var eventB = utils.mkMessage({
                 room: roomId, user: userA, msg: "local 1", event: true
             });
+            eventB._txnId = "TXN1";
             eventB.status = EventStatus.SENDING;
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
-            room.addEvents([eventA, eventB, eventC]);
+            room.addEvents([eventA]);
+            room.addPendingEvent(eventB);
+            room.addEvents([eventC]);
             expect(room.timeline).toEqual(
                 [eventA, eventB, eventC]
-            );
-        });
-
-        it("should treat NOT_SENT events as local echo", function() {
-            var room = new Room(roomId, {
-                pendingEventOrdering: "end"
-            });
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 1", event: true
-            });
-            var eventB = utils.mkMessage({
-                room: roomId, user: userA, msg: "local 1", event: true
-            });
-            eventB.status = EventStatus.NOT_SENT;
-            var eventC = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 2", event: true
-            });
-            room.addEvents([eventA, eventB, eventC]);
-            expect(room.timeline).toEqual(
-                [eventA, eventC, eventB]
-            );
-        });
-
-        it("should treat QUEUED events as local echo", function() {
-            var room = new Room(roomId, {
-                pendingEventOrdering: "end"
-            });
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 1", event: true
-            });
-            var eventB = utils.mkMessage({
-                room: roomId, user: userA, msg: "local 1", event: true
-            });
-            eventB.status = EventStatus.QUEUED;
-            var eventC = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 2", event: true
-            });
-            room.addEvents([eventA, eventB, eventC]);
-            expect(room.timeline).toEqual(
-                [eventA, eventC, eventB]
             );
         });
     });
