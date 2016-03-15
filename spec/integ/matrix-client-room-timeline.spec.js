@@ -194,6 +194,7 @@ describe("MatrixClient room timelines", function() {
                 body: "I am a fish", user: userId, room: roomId
             });
             ev.event_id = eventId;
+            ev.unsigned = {transaction_id: "txn1"};
             setNextSyncData([ev]);
 
             client.on("sync", function(state) {
@@ -201,8 +202,7 @@ describe("MatrixClient room timelines", function() {
                 var room = client.getRoom(roomId);
                 var promise = client.sendTextMessage(roomId, "I am a fish", "txn1");
                 httpBackend.flush("/sync", 1).done(function() {
-                    // expect 3rd msg, it doesn't know this is the request is just did
-                    expect(room.timeline.length).toEqual(3);
+                    expect(room.timeline.length).toEqual(2);
                     httpBackend.flush("/txn1", 1);
                     promise.done(function() {
                         expect(room.timeline.length).toEqual(2);
