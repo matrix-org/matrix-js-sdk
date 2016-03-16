@@ -288,7 +288,7 @@ describe("MatrixClient room timelines", function() {
                 oldMshipEvent,
                 utils.mkMessage({
                     user: userId, room: roomId, msg: "I'm old alice"
-                }),                
+                }),
                 joinMshipEvent,
             ];
 
@@ -300,7 +300,7 @@ describe("MatrixClient room timelines", function() {
 
                 client.scrollback(room).done(function() {
                     expect(room.timeline.length).toEqual(5);
-                    var joinMsg = room.timeline[0]; 
+                    var joinMsg = room.timeline[0];
                     expect(joinMsg.sender.name).toEqual("Old Alice");
                     var oldMsg = room.timeline[1];
                     expect(oldMsg.sender.name).toEqual("Old Alice");
