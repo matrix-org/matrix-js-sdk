@@ -252,7 +252,23 @@ describe("MatrixClient room timelines", function() {
         });
 
         it("should set the right event.sender values", function(done) {
-            // make an m.room.member event with prev_content
+            // We're aiming for an eventual timeline of:
+            //
+            // 'Old Alice' joined the room
+            // <Old Alice> I'm old alice
+            // @alice:localhost changed their name from 'Old Alice' to 'Alice'
+            // <Alice> I'm alice
+            // ------^ /messages results above this point, /sync result below
+            // <Bob> hello
+
+            // make an m.room.member event for alice's join
+            var joinMshipEvent = utils.mkMembership({
+                mship: "join", user: userId, room: roomId, name: "Old Alice",
+                url: null
+            });
+
+            // make an m.room.member event with prev_content for alice's nick
+            // change
             var oldMshipEvent = utils.mkMembership({
                 mship: "join", user: userId, room: roomId, name: userName,
                 url: "mxc://some/url"
@@ -263,7 +279,8 @@ describe("MatrixClient room timelines", function() {
                 membership: "join"
             };
 
-            // set the list of events to return on scrollback
+            // set the list of events to return on scrollback (/messages)
+            // N.B. synapse returns /messages in reverse chronological order
             sbEvents = [
                 utils.mkMessage({
                     user: userId, room: roomId, msg: "I'm alice"
@@ -271,19 +288,23 @@ describe("MatrixClient room timelines", function() {
                 oldMshipEvent,
                 utils.mkMessage({
                     user: userId, room: roomId, msg: "I'm old alice"
-                })
+                }),
+                joinMshipEvent,
             ];
 
             client.on("sync", function(state) {
                 if (state !== "PREPARED") { return; }
                 var room = client.getRoom(roomId);
+                // sync response
                 expect(room.timeline.length).toEqual(1);
 
                 client.scrollback(room).done(function() {
-                    expect(room.timeline.length).toEqual(4);
-                    var oldMsg = room.timeline[0];
+                    expect(room.timeline.length).toEqual(5);
+                    var joinMsg = room.timeline[0];
+                    expect(joinMsg.sender.name).toEqual("Old Alice");
+                    var oldMsg = room.timeline[1];
                     expect(oldMsg.sender.name).toEqual("Old Alice");
-                    var newMsg = room.timeline[2];
+                    var newMsg = room.timeline[3];
                     expect(newMsg.sender.name).toEqual(userName);
                     done();
                 });
