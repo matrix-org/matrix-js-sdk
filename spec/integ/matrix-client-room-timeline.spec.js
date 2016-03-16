@@ -254,7 +254,7 @@ describe("MatrixClient room timelines", function() {
         it("should set the right event.sender values", function(done) {
             // We're aiming for an eventual timeline of:
             //
-            // 'Old alice' joined the room
+            // 'Old Alice' joined the room
             // <Old Alice> I'm old alice
             // @alice:localhost changed their name from 'Old Alice' to 'Alice'
             // <Alice> I'm alice
