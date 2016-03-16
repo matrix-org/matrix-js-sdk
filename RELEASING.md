@@ -1,3 +1,6 @@
+There is a script `release.sh` which does the following, but if you need to do
+a release manually, here are the steps:
+
 - `git checkout -b release-v0.x.x`
 - Update `CHANGELOG.md`
 - `npm version 0.x.x`
