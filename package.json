@@ -11,7 +11,8 @@
     "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
     "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200,0222,0212 --max_line_length 90 -r spec/ -r lib/",
     "release": "npm run build && mkdir dist/$npm_package_version && uglifyjs -c -m -o dist/$npm_package_version/browser-matrix-$npm_package_version.min.js dist/browser-matrix-dev.js && cp dist/browser-matrix-dev.js dist/$npm_package_version/browser-matrix-$npm_package_version.js",
-    "prepublish": "git rev-parse HEAD > git-revision.txt"
+    "prepublish": "git rev-parse HEAD > git-revision.txt",
+    "version": "npm run release && git add dist/$npm_package_version"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"

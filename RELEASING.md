@@ -1,11 +1,8 @@
 - `git checkout -b release-v0.x.x`
-- Update `CHANGELOG.md` and bump `version` in `package.json`
-- Create `dist` entry by running `npm run release`.
-- `git add dist/0.x.x`
-- Commit your changes.
+- Update `CHANGELOG.md`
+- `npm version 0.x.x`
 - Merge `release-v0.x.x` onto `master`.
 - Push `master`.
-- Tag the commit: `git tag -a -m "v0.x.x" v0.x.x`
 - Push the tag: `git push --tags`
 - `npm publish`
 - Generate documentation: `npm run gendoc` (this outputs HTML to `.jsdoc`)
