@@ -223,6 +223,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
+                    jasmine.Clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -248,6 +249,7 @@ describe("MatrixClient", function() {
                     expect(client.retryImmediately()).toBe(
                         true, "retryImmediately returned false"
                     );
+                    jasmine.Clock.tick(1);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -269,6 +271,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
+                    jasmine.Clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -299,8 +302,8 @@ describe("MatrixClient", function() {
                     client.removeListener("sync", syncListener);
                     done();
                 }
-                // standard retry time is 4s
-                jasmine.Clock.tick(4001);
+                // standard retry time is 5 to 10 seconds
+                jasmine.Clock.tick(10000);
             };
         }
 
