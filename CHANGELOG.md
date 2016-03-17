@@ -1,3 +1,24 @@
+[0.4.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.4.2) (2016-03-17)
+=====================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.4.1...v0.4.2)
+
+ * Try again if a pagination request gives us no new messages
+   [\#98](https://github.com/matrix-org/matrix-js-sdk/pull/98)
+ * Add a delay before we start polling the connectivity check endpoint
+   [\#99](https://github.com/matrix-org/matrix-js-sdk/pull/99)
+ * Clean up a codepath that was only used for crypto messages
+   [\#101](https://github.com/matrix-org/matrix-js-sdk/pull/101)
+ * Add maySendStateEvent method, ported from react-sdk (but fixed).
+   [\#94](https://github.com/matrix-org/matrix-js-sdk/pull/94)
+ * Add Session.logged_out event
+   [\#100](https://github.com/matrix-org/matrix-js-sdk/pull/100)
+ * make presence work when peeking.
+   [\#103](https://github.com/matrix-org/matrix-js-sdk/pull/103)
+ * Add RoomState.mayClientSendStateEvent()
+   [\#104](https://github.com/matrix-org/matrix-js-sdk/pull/104)
+ * Fix displaynames for member join events
+   [\#108](https://github.com/matrix-org/matrix-js-sdk/pull/108)
+
 Changes in 0.4.1
 ================
 
