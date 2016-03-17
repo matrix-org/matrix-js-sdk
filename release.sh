@@ -8,25 +8,35 @@
 
 set -e
 
-USAGE="$0 [-x] vX.Y.Z"
+USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
 help() {
     cat <<EOF
 $USAGE
 
-    -x:  skip updating the changelog
+    -c changelog_file:  specify name of file containing changelog
+    -x:                 skip updating the changelog
+    -z:                 skip generating the jsdoc
 EOF
 }
 
 skip_changelog=
-while getopts hx f; do
+skip_jsdoc=
+changelog_file="CHANGELOG.md"
+while getopts hxc: f; do
     case $f in
         h)
             help
             exit 0
             ;;
+        c)
+            changelog_file="$OPTARG"
+            ;;
         x)
             skip_changelog=1
+            ;;
+        z)
+            skip_jsdoc=1
             ;;
     esac
 done
@@ -52,8 +62,6 @@ esac
 release="${tag#v}"
 rel_branch="release-$tag"
 
-cd `dirname $0`
-
 # we might already be on the release branch, in which case, yay
 if [ $(git symbolic-ref --short HEAD) != "$rel_branch" ]; then
     echo "Creating release branch"
@@ -62,12 +70,12 @@ fi
 
 if [ -z "$skip_changelog" ]; then
     echo "Generating changelog"
-    update_changelog "$release"
-    read -p "Edit CHANGELOG.md manually, or press enter to continue " REPLY
+    update_changelog -f "$changelog_file" "$release"
+    read -p "Edit $changelog_file manually, or press enter to continue " REPLY
 
-    if [ -n "$(git ls-files --modified CHANGELOG.md)" ]; then
+    if [ -n "$(git ls-files --modified $changelog_file)" ]; then
         echo "Committing updated changelog"
-        git commit "CHANGELOG.md" -m "Prepare changelog for $tag"
+        git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
 fi
 
@@ -75,19 +83,20 @@ fi
 echo "npm version"
 npm version "$release"
 
-# generate the docs
-echo "generating jsdocs"
-npm run gendoc
+if [ -z "$skip_jsdoc" ]; then
+    echo "generating jsdocs"
+    npm run gendoc
 
-echo "copying jsdocs to gh-pages branch"
-git checkout gh-pages
-git pull
-cp -ar ".jsdoc/matrix-js-sdk/$release" .
-perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print 
-   "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' \
-       $release index.html
-git add "$release"
-git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
+    echo "copying jsdocs to gh-pages branch"
+    git checkout gh-pages
+    git pull
+    cp -ar ".jsdoc/matrix-js-sdk/$release" .
+    perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
+        "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' \
+        $release index.html
+    git add "$release"
+    git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
+fi
 
 # merge release branch to master
 echo "updating master branch"
@@ -96,7 +105,10 @@ git pull
 git merge --ff-only "$rel_branch"
 
 # push everything to github
-git push origin master "$rel_branch" "$tag" "gh-pages"
+git push origin master "$rel_branch" "$tag"
+if [ -z "$skip_jsdoc" ]; then
+    git push origin gh-pages
+fi
 
 # publish to npmjs
 npm publish
