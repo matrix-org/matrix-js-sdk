@@ -23,7 +23,7 @@ EOF
 skip_changelog=
 skip_jsdoc=
 changelog_file="CHANGELOG.md"
-while getopts hxc: f; do
+while getopts hc:xz f; do
     case $f in
         h)
             help
