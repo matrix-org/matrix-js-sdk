@@ -100,3 +100,9 @@ git push origin master "$rel_branch" "$tag" "gh-pages"
 
 # publish to npmjs
 npm publish
+
+# finally, merge master back onto develop
+git checkout develop
+git pull
+git merge master
+git push origin develop
