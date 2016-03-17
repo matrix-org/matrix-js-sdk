@@ -8,12 +8,36 @@
 
 set -e
 
+USAGE="$0 [-x] vX.Y.Z"
+
+help() {
+    cat <<EOF
+$USAGE
+
+    -x:  skip updating the changelog
+EOF
+}
+
+skip_changelog=
+while getopts hx f; do
+    case $f in
+        h)
+            help
+            exit 0
+            ;;
+        x)
+            skip_changelog=1
+            ;;
+    esac
+done
+shift `expr $OPTIND - 1`
+
 if [ $# -ne 1 ]; then
-    echo 2>&1 "Usage: $0 vX.Y.Z"
+    echo "Usage: $USAGE" >&2
     exit 1
 fi
 
-tag=$1
+tag="$1"
 
 case "$tag" in
     v*) ;;
@@ -36,13 +60,15 @@ if [ $(git symbolic-ref --short HEAD) != "$rel_branch" ]; then
     git checkout -b "$rel_branch"
 fi
 
-echo "Generating changelog"
-update_changelog "$release"
-read -p "Edit CHANGELOG.md manually, or press enter to continue " REPLY
+if [ -z "$skip_changelog" ]; then
+    echo "Generating changelog"
+    update_changelog "$release"
+    read -p "Edit CHANGELOG.md manually, or press enter to continue " REPLY
 
-if [ -n "$(git ls-files --modified CHANGELOG.md)" ]; then
-    echo "Committing updated changelog"
-    git commit "CHANGELOG.md" -m "Prepare changelog for $tag"
+    if [ -n "$(git ls-files --modified CHANGELOG.md)" ]; then
+        echo "Committing updated changelog"
+        git commit "CHANGELOG.md" -m "Prepare changelog for $tag"
+    fi
 fi
 
 # Bump package.json, build the dist, and tag
