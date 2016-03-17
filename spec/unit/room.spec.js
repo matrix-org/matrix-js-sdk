@@ -344,22 +344,37 @@ describe("Room", function() {
             var remoteEventId = remoteEvent.getId();
 
             var callCount = 0;
-            room.on("Room.localEchoUpdated", function(event, emitRoom, oldEventId) {
-                callCount += 1;
-                expect(event.getId()).toEqual(remoteEventId);
-                expect(emitRoom).toEqual(room);
-                expect(oldEventId).toEqual(localEventId);
-            });
+            room.on("Room.localEchoUpdated",
+                function(event, emitRoom, oldEventId, oldStatus) {
+                    switch (callCount) {
+                    case 0:
+                        expect(event.getId()).toEqual(localEventId);
+                        expect(event.status).toEqual(EventStatus.SENDING);
+                        expect(emitRoom).toEqual(room);
+                        expect(oldEventId).toBe(null);
+                        expect(oldStatus).toBe(null);
+                        break;
+                    case 1:
+                        expect(event.getId()).toEqual(remoteEventId);
+                        expect(event.status).toBe(null);
+                        expect(emitRoom).toEqual(room);
+                        expect(oldEventId).toEqual(localEventId);
+                        expect(oldStatus).toBe(EventStatus.SENDING);
+                        break;
+                    }
+                    callCount += 1;
+                }
+            );
 
-            // first add the local echo to the timeline
-            room.addEventsToTimeline([localEvent]);
+            // first add the local echo
+            room.addPendingEvent(localEvent, "TXN_ID");
             expect(room.timeline.length).toEqual(1);
 
             // then the remoteEvent
             room.addEventsToTimeline([remoteEvent]);
             expect(room.timeline.length).toEqual(1);
 
-            expect(callCount).toEqual(1);
+            expect(callCount).toEqual(2);
         });
     });
 
