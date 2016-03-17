@@ -30,8 +30,11 @@ rel_branch="release-$tag"
 
 cd `dirname $0`
 
-echo "Creating release branch"
-git checkout -b "$rel_branch"
+# we might already be on the release branch, in which case, yay
+if [ $(git symbolic-ref --short HEAD) != "$rel_branch" ]; then
+    echo "Creating release branch"
+    git checkout -b "$rel_branch"
+fi
 
 echo "Generating changelog"
 update_changelog "$release"
