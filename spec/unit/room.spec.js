@@ -1155,13 +1155,12 @@ describe("Room", function() {
             var eventB = utils.mkMessage({
                 room: roomId, user: userA, msg: "local 1", event: true
             });
-            eventB._txnId = "TXN1";
             eventB.status = EventStatus.SENDING;
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
             room.addEvents([eventA]);
-            room.addPendingEvent(eventB);
+            room.addPendingEvent(eventB, "TXN1");
             room.addEvents([eventC]);
             expect(room.timeline).toEqual(
                 [eventA, eventC]
@@ -1182,13 +1181,12 @@ describe("Room", function() {
             var eventB = utils.mkMessage({
                 room: roomId, user: userA, msg: "local 1", event: true
             });
-            eventB._txnId = "TXN1";
             eventB.status = EventStatus.SENDING;
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
             room.addEvents([eventA]);
-            room.addPendingEvent(eventB);
+            room.addPendingEvent(eventB, "TXN1");
             room.addEvents([eventC]);
             expect(room.timeline).toEqual(
                 [eventA, eventB, eventC]
