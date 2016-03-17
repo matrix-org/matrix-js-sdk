@@ -40,8 +40,10 @@ echo "Generating changelog"
 update_changelog "$release"
 read -p "Edit CHANGELOG.md manually, or press enter to continue " REPLY
 
-echo "Committing updated changelog"
-git commit "CHANGELOG.md" -m "Prepare changelog for $tag"
+if [ -n "$(git ls-files --modified CHANGELOG.md)" ]; then
+    echo "Committing updated changelog"
+    git commit "CHANGELOG.md" -m "Prepare changelog for $tag"
+fi
 
 # Bump package.json, build the dist, and tag
 echo "npm version"
