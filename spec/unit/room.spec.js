@@ -1193,4 +1193,76 @@ describe("Room", function() {
             );
         });
     });
+
+    describe("updatePendingEvent", function() {
+        it("should remove cancelled events from the pending list", function() {
+            var room = new Room(roomId, {
+                pendingEventOrdering: "detached"
+            });
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, event: true
+            });
+            eventA.status = EventStatus.SENDING;
+            var eventId = eventA.getId();
+
+            room.addPendingEvent(eventA, "TXN1");
+            expect(room.getPendingEvents()).toEqual(
+                [eventA]
+            );
+
+            // the event has to have been failed or queued before it can be
+            // cancelled
+            room.updatePendingEvent(eventA, EventStatus.NOT_SENT);
+
+            var callCount = 0;
+            room.on("Room.localEchoUpdated",
+                function(event, emitRoom, oldEventId, oldStatus) {
+                    expect(event).toEqual(eventA);
+                    expect(event.status).toEqual(EventStatus.CANCELLED);
+                    expect(emitRoom).toEqual(room);
+                    expect(oldEventId).toEqual(eventId);
+                    expect(oldStatus).toEqual(EventStatus.NOT_SENT);
+                    callCount++;
+                });
+
+            room.updatePendingEvent(eventA, EventStatus.CANCELLED);
+            expect(room.getPendingEvents()).toEqual([]);
+            expect(callCount).toEqual(1);
+        });
+
+
+        it("should remove cancelled events from the timeline", function() {
+            var room = new Room(roomId);
+            var eventA = utils.mkMessage({
+                room: roomId, user: userA, event: true
+            });
+            eventA.status = EventStatus.SENDING;
+            var eventId = eventA.getId();
+
+            room.addPendingEvent(eventA, "TXN1");
+            expect(room.getLiveTimeline().getEvents()).toEqual(
+                [eventA]
+            );
+
+            // the event has to have been failed or queued before it can be
+            // cancelled
+            room.updatePendingEvent(eventA, EventStatus.NOT_SENT);
+
+            var callCount = 0;
+            room.on("Room.localEchoUpdated",
+                function(event, emitRoom, oldEventId, oldStatus) {
+                    expect(event).toEqual(eventA);
+                    expect(event.status).toEqual(EventStatus.CANCELLED);
+                    expect(emitRoom).toEqual(room);
+                    expect(oldEventId).toEqual(eventId);
+                    expect(oldStatus).toEqual(EventStatus.NOT_SENT);
+                    callCount++;
+                });
+
+            room.updatePendingEvent(eventA, EventStatus.CANCELLED);
+            expect(room.getLiveTimeline().getEvents()).toEqual([]);
+            expect(callCount).toEqual(1);
+        });
+
+    });
 });
