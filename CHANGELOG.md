@@ -1,3 +1,13 @@
+Unreleased Changes
+==================
+
+**BREAKING CHANGES**:
+ * `opts.pendingEventOrdering`==`end` is no longer supported in the arguments to
+   `MatrixClient.startClient()`. Instead we provide a `detached` option, which
+   puts pending events into a completely separate list in the Room, accessible
+   via `Room.getPendingEvents()`.
+   [\#111](https://github.com/matrix-org/matrix-js-sdk/pull/111)
+   
 Changes in [0.4.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.4.2) (2016-03-17)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.4.1...v0.4.2)
