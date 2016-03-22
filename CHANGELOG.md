@@ -1,5 +1,6 @@
-Unreleased Changes
-==================
+Changes in [0.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.0) (2016-03-22)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.4.2...v0.5.0)
 
 **BREAKING CHANGES**:
  * `opts.pendingEventOrdering`==`end` is no longer supported in the arguments to
@@ -7,7 +8,25 @@ Unreleased Changes
    puts pending events into a completely separate list in the Room, accessible
    via `Room.getPendingEvents()`.
    [\#111](https://github.com/matrix-org/matrix-js-sdk/pull/111)
-   
+
+Other improvements:
+ * Log the stack when we get a sync error
+   [\#109](https://github.com/matrix-org/matrix-js-sdk/pull/109)
+ * Refactor transmitted-messages code
+   [\#110](https://github.com/matrix-org/matrix-js-sdk/pull/110)
+ * Add a method to the js sdk to look up 3pids on the ID server.
+   [\#113](https://github.com/matrix-org/matrix-js-sdk/pull/113)
+ * Support for cancelling pending events
+   [\#112](https://github.com/matrix-org/matrix-js-sdk/pull/112)
+ * API to stop peeking
+   [\#114](https://github.com/matrix-org/matrix-js-sdk/pull/114)
+ * update store user metadata based on membership events rather than presence
+   [\#116](https://github.com/matrix-org/matrix-js-sdk/pull/116)
+ * Include a counter in generated transaction IDs
+   [\#115](https://github.com/matrix-org/matrix-js-sdk/pull/115)
+ * get/setRoomVisibility API
+   [\#117](https://github.com/matrix-org/matrix-js-sdk/pull/117)
+
 Changes in [0.4.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.4.2) (2016-03-17)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.4.1...v0.4.2)
