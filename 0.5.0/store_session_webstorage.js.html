@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: store/session/webstorage.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: store/session/webstorage.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2015, 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+"use strict";
+
+/**
+ * @module store/session/webstorage
+ */
+
+var utils = require("../../utils");
+
+var DEBUG = false;  // set true to enable console logging.
+var E2E_PREFIX = "session.e2e.";
+
+/**
+ * Construct a web storage session store, capable of storing account keys,
+ * session keys and access tokens.
+ * @constructor
+ * @param {WebStorage} webStore A web storage implementation, e.g.
+ * 'window.localStorage' or 'window.sessionStorage' or a custom implementation.
+ * @throws if the supplied 'store' does not meet the Storage interface of the
+ * WebStorage API.
+ */
+function WebStorageSessionStore(webStore) {
+    this.store = webStore;
+    if (!utils.isFunction(webStore.getItem) ||
+        !utils.isFunction(webStore.setItem) ||
+        !utils.isFunction(webStore.removeItem)) {
+        throw new Error(
+            "Supplied webStore does not meet the WebStorage API interface"
+        );
+    }
+}
+
+WebStorageSessionStore.prototype = {
+
+    /**
+     * Store the end to end account for the logged-in user.
+     * @param {string} account Base64 encoded account.
+     */
+    storeEndToEndAccount: function(account) {
+        this.store.setItem(KEY_END_TO_END_ACCOUNT, account);
+    },
+
+    /**
+     * Load the end to end account for the logged-in user.
+     * @return {?string} Base64 encoded account.
+     */
+    getEndToEndAccount: function() {
+        return this.store.getItem(KEY_END_TO_END_ACCOUNT);
+    },
+
+    /**
+     * Stores the known devices for a user.
+     * @param {string} userId The user's ID.
+     * @param {object} devices A map from device ID to keys for the device.
+     */
+    storeEndToEndDevicesForUser: function(userId, devices) {
+        setJsonItem(this.store, keyEndToEndDevicesForUser(userId), devices);
+    },
+
+    /**
+     * Retrieves the known devices for a user.
+     * @param {string} userId The user's ID.
+     * @return {object} A map from device ID to keys for the device.
+     */
+    getEndToEndDevicesForUser: function(userId)  {
+        return getJsonItem(this.store, keyEndToEndDevicesForUser(userId));
+    },
+
+    /**
+     * Store a session between the logged-in user and another device
+     * @param {string} deviceKey The public key of the other device.
+     * @param {string} sessionId The ID for this end-to-end session.
+     * @param {string} session Base64 encoded end-to-end session.
+     */
+    storeEndToEndSession: function(deviceKey, sessionId, session) {
+        var sessions = this.getEndToEndSessions(deviceKey) || {};
+        sessions[sessionId] = session;
+        setJsonItem(
+            this.store, keyEndToEndSessions(deviceKey), sessions
+        );
+    },
+
+    /**
+     * Retrieve the end-to-end sessions between the logged-in user and another
+     * device.
+     * @param {string} deviceKey The public key of the other device.
+     * @return {object} A map from sessionId to Base64 end-to-end session.
+     */
+    getEndToEndSessions: function(deviceKey) {
+        return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+    },
+
+    /**
+     * Store the end-to-end state for a room.
+     * @param {string} roomId The room's ID.
+     * @param {object} roomInfo The end-to-end info for the room.
+     */
+    storeEndToEndRoom: function(roomId, roomInfo) {
+        setJsonItem(this.store, keyEndToEndRoom(roomId), roomInfo);
+    },
+
+    /**
+     * Get the end-to-end state for a room
+     * @param {string} roomId The room's ID.
+     * @return {object} The end-to-end info for the room.
+     */
+    getEndToEndRoom: function(roomId) {
+        return getJsonItem(this.store, keyEndToEndRoom(roomId));
+    }
+};
+
+var KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+
+function keyEndToEndDevicesForUser(userId) {
+    return E2E_PREFIX + "devices/" + userId;
+}
+
+function keyEndToEndSessions(deviceKey) {
+    return E2E_PREFIX + "sessions/" + deviceKey;
+}
+
+function keyEndToEndRoom(roomId) {
+    return E2E_PREFIX + "rooms/" + roomId;
+}
+
+function getJsonItem(store, key) {
+    try {
+        return JSON.parse(store.getItem(key));
+    }
+    catch (e) {
+        debuglog("Failed to get key %s: %s", key, e);
+        debuglog(e.stack);
+    }
+    return null;
+}
+
+function setJsonItem(store, key, val) {
+    store.setItem(key, JSON.stringify(val));
+}
+
+function debuglog() {
+    if (DEBUG) {
+        console.log.apply(console, arguments);
+    }
+}
+
+/** */
+module.exports = WebStorageSessionStore;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-clinet.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Tue Mar 22 2016 17:56:53 GMT+0000 (GMT)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
