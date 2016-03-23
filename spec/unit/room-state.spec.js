@@ -362,4 +362,74 @@ describe("RoomState", function() {
             expect(state.maySendStateEvent('m.room.other_thing', userB)).toEqual(false);
         });
     });
+
+    describe("maySendEvent", function() {
+        it("should say non-joined members may not send events",
+        function() {
+            expect(state.maySendEvent(
+                'm.room.message', "@nobody:nowhere"
+            )).toEqual(false);
+            expect(state.maySendMessage("@nobody:nowhere")).toEqual(false);
+        });
+
+        it("should say any member may send events with no power level event",
+        function() {
+            expect(state.maySendEvent('m.room.message', userA)).toEqual(true);
+            expect(state.maySendMessage(userA)).toEqual(true);
+        });
+
+        it("should obey events_default",
+        function() {
+            var powerLevelEvent = {
+                type: "m.room.power_levels", room: roomId, user: userA, event: true,
+                content: {
+                    users_default: 10,
+                    state_default: 30,
+                    events_default: 25,
+                    users: {
+                    }
+                }
+            };
+            powerLevelEvent.content.users[userA] = 26;
+            powerLevelEvent.content.users[userB] = 24;
+
+            state.setStateEvents([utils.mkEvent(powerLevelEvent)]);
+
+            expect(state.maySendEvent('m.room.message', userA)).toEqual(true);
+            expect(state.maySendEvent('m.room.message', userB)).toEqual(false);
+
+            expect(state.maySendMessage(userA)).toEqual(true);
+            expect(state.maySendMessage(userB)).toEqual(false);
+        });
+
+        it("should honour explicit event power levels in the power_levels event",
+        function() {
+            var powerLevelEvent = {
+                type: "m.room.power_levels", room: roomId, user: userA, event: true,
+                content: {
+                    events: {
+                        "m.room.other_thing": 33
+                    },
+                    users_default: 10,
+                    state_default: 50,
+                    events_default: 25,
+                    users: {
+                    }
+                }
+            };
+            powerLevelEvent.content.users[userA] = 40;
+            powerLevelEvent.content.users[userB] = 30;
+
+            state.setStateEvents([utils.mkEvent(powerLevelEvent)]);
+
+            expect(state.maySendEvent('m.room.message', userA)).toEqual(true);
+            expect(state.maySendEvent('m.room.message', userB)).toEqual(true);
+
+            expect(state.maySendMessage(userA)).toEqual(true);
+            expect(state.maySendMessage(userB)).toEqual(true);
+
+            expect(state.maySendEvent('m.room.other_thing', userA)).toEqual(true);
+            expect(state.maySendEvent('m.room.other_thing', userB)).toEqual(false);
+        });
+    });
 });
