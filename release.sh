@@ -3,7 +3,7 @@
 # Script to perform a release of matrix-js-sdk. Performs the steps documented
 # in RELEASING.md
 #
-# Requires githib-changelog-generator; to install, do 
+# Requires github-changelog-generator; to install, do
 #   pip install git+https://github.com/matrix-org/github-changelog-generator.git
 
 set -e
@@ -47,20 +47,18 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-tag="$1"
-
-case "$tag" in
-    v*) ;;
-    
-    *)
-        echo 2>&1 "Tag $tag must start with v"
-        exit 1
-        ;;
-esac
-
-# strip leading 'v' to get release
-release="${tag#v}"
+# ignore leading v on release
+release="${1#v}"
+tag="v${release}"
 rel_branch="release-$tag"
+
+if [ -z "$skip_changelog" ]; then
+    if ! command -v update_changelog >/dev/null 2>&1; then
+        echo "release.sh requires github-changelog-generator. Try:" >&2
+        echo "    pip install git+https://github.com/matrix-org/github-changelog-generator.git" >&2
+        exit 1
+    fi
+fi
 
 # we might already be on the release branch, in which case, yay
 if [ $(git symbolic-ref --short HEAD) != "$rel_branch" ]; then
@@ -78,6 +76,8 @@ if [ -z "$skip_changelog" ]; then
         git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
 fi
+
+set -x
 
 # Bump package.json, build the dist, and tag
 echo "npm version"
