@@ -1,3 +1,12 @@
+Changes in [0.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.1) (2016-03-30)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.0...v0.5.1)
+
+ * Only count joined members for the member count in notifications.
+   [\#119](https://github.com/matrix-org/matrix-js-sdk/pull/119)
+ * Add maySendEvent to match maySendStateEvent
+   [\#118](https://github.com/matrix-org/matrix-js-sdk/pull/118)
+
 Changes in [0.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.0) (2016-03-22)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.4.2...v0.5.0)
