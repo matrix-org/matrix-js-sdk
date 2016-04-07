@@ -418,5 +418,43 @@ describe("TimelineWindow", function() {
             }).catch(utils.failTest).done(done);
         });
 
+        it("should limit the number of unsuccessful pagination requests",
+        function(done) {
+            var timeline = createTimeline();
+            timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
+
+            var timelineWindow = createWindow(timeline, {windowLimit: 5});
+            var eventId = timeline.getEvents()[1].getId();
+
+            var paginateCount = 0;
+            client.paginateEventTimeline = function(timeline0, opts) {
+                expect(timeline0).toBe(timeline);
+                expect(opts.backwards).toBe(false);
+                expect(opts.limit).toEqual(2);
+                paginateCount += 1
+                return q(true);
+            };
+
+            timelineWindow.load(eventId, 3).then(function() {
+                var expectedEvents = timeline.getEvents();
+                expect(timelineWindow.getEvents()).toEqual(expectedEvents);
+
+                expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
+                    .toBe(false);
+                expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
+                    .toBe(true);
+                return timelineWindow.paginate(EventTimeline.FORWARDS, 2, true, 3);
+            }).then(function(success) {
+                expect(success).toBe(false);
+                expect(paginateCount).toEqual(3);
+                var expectedEvents = timeline.getEvents().slice(0, 3);
+                expect(timelineWindow.getEvents()).toEqual(expectedEvents);
+
+                expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
+                    .toBe(false);
+                expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
+                    .toBe(true);
+            }).catch(utils.failTest).done(done);
+        });
     });
 });
