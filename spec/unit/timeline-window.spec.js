@@ -431,7 +431,7 @@ describe("TimelineWindow", function() {
                 expect(timeline0).toBe(timeline);
                 expect(opts.backwards).toBe(false);
                 expect(opts.limit).toEqual(2);
-                paginateCount += 1
+                paginateCount += 1;
                 return q(true);
             };
 
