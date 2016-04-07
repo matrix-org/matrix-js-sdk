@@ -132,4 +132,72 @@ describe("utils", function() {
             }, ["foo"]); }).not.toThrow();
         });
     });
+
+    describe("deepCompare", function() {
+        var assert = {
+            isTrue: function(x) { expect(x).toBe(true); },
+            isFalse: function(x) { expect(x).toBe(false); },
+        };
+
+        it("should handle primitives", function() {
+            assert.isTrue(utils.deepCompare(null, null));
+            assert.isFalse(utils.deepCompare(null, undefined));
+            assert.isTrue(utils.deepCompare("hi", "hi"));
+            assert.isTrue(utils.deepCompare(5, 5));
+            assert.isFalse(utils.deepCompare(5, 10));
+        });
+
+        it("should handle regexps", function() {
+            assert.isTrue(utils.deepCompare(/abc/, /abc/));
+            assert.isFalse(utils.deepCompare(/abc/, /123/));
+            var r = /abc/;
+            assert.isTrue(utils.deepCompare(r, r));
+        });
+
+        it("should handle dates", function() {
+            assert.isTrue(utils.deepCompare(new Date("2011-03-31"),
+                                            new Date("2011-03-31")));
+            assert.isFalse(utils.deepCompare(new Date("2011-03-31"),
+                                             new Date("1970-01-01")));
+        });
+
+        it("should handle arrays", function() {
+            assert.isTrue(utils.deepCompare([], []));
+            assert.isTrue(utils.deepCompare([1, 2], [1, 2]));
+            assert.isFalse(utils.deepCompare([1, 2], [2, 1]));
+            assert.isFalse(utils.deepCompare([1, 2], [1, 2, 3]));
+        });
+
+        it("should handle simple objects", function() {
+            assert.isTrue(utils.deepCompare({}, {}));
+            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 2}));
+            assert.isTrue(utils.deepCompare({a: 1, b: 2}, {b: 2, a: 1}));
+            assert.isFalse(utils.deepCompare({a: 1, b: 2}, {a: 1, b: 3}));
+
+            assert.isTrue(utils.deepCompare({1: {name: "mhc", age: 28},
+                                             2: {name: "arb", age: 26}},
+                                            {1: {name: "mhc", age: 28},
+                                             2: {name: "arb", age: 26}}));
+
+            assert.isFalse(utils.deepCompare({1: {name: "mhc", age: 28},
+                                              2: {name: "arb", age: 26}},
+                                             {1: {name: "mhc", age: 28},
+                                              2: {name: "arb", age: 27}}));
+
+            assert.isFalse(utils.deepCompare({}, null));
+            assert.isFalse(utils.deepCompare({}, undefined));
+        });
+
+        it("should handle functions", function() {
+            // no two different function is equal really, they capture their
+            // context variables so even if they have same toString(), they
+            // won't have same functionality
+            var func = function(x) { return true; };
+            var func2 = function(x) { return true; };
+            assert.isTrue(utils.deepCompare(func, func));
+            assert.isFalse(utils.deepCompare(func, func2));
+            assert.isTrue(utils.deepCompare({ a: { b: func } }, { a: { b: func } }));
+            assert.isFalse(utils.deepCompare({ a: { b: func } }, { a: { b: func2 } }));
+        });
+    });
 });
