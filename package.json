@@ -4,8 +4,8 @@
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
-    "test": "istanbul cover --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" jasmine-node -- spec --verbose --junitreport --forceexit --captureExceptions",
-    "check": "jasmine-node spec --verbose --junitreport --forceexit --captureExceptions",
+    "test": "istanbul cover --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" jasmine-node -- spec --verbose --junitreport --captureExceptions",
+    "check": "jasmine-node spec --verbose --junitreport --captureExceptions",
     "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
     "build": "jshint -c .jshint lib/ && browserify browser-index.js -o dist/browser-matrix-dev.js --ignore-missing",
     "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",

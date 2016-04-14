@@ -15,6 +15,19 @@ function HttpBackend() {
         realReq.callback = callback;
         console.log("HTTP backend received request: %s %s", opts.method, opts.uri);
         self.requests.push(realReq);
+
+        var abort = function() {
+            var idx = self.requests.indexOf(realReq);
+            if (idx >= 0) {
+                console.log("Aborting HTTP request: %s %s", opts.method,
+                            opts.uri);
+                self.requests.splice(idx, 1);
+                realReq.callback("aborted");
+            }
+        }
+        return {
+            abort: abort
+        };
     };
 }
 HttpBackend.prototype = {
