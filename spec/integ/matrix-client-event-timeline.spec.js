@@ -97,6 +97,7 @@ function startClient(httpBackend, client) {
 
 describe("getEventTimeline support", function() {
     var httpBackend;
+    var client;
 
     beforeEach(function() {
         utils.beforeEach(this);
@@ -104,8 +105,14 @@ describe("getEventTimeline support", function() {
         sdk.request(httpBackend.requestFn);
     });
 
+    afterEach(function() {
+        if (client) {
+            client.stopClient();
+        }
+    });
+
     it("timeline support must be enabled to work", function(done) {
-        var client = sdk.createClient({
+        client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
@@ -120,7 +127,7 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support works when enabled", function(done) {
-        var client = sdk.createClient({
+        client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
@@ -141,7 +148,7 @@ describe("getEventTimeline support", function() {
     it("scrollback should be able to scroll back to before a gappy /sync",
       function(done) {
         // need a client with timelineSupport disabled to make this work
-        var client = sdk.createClient({
+        client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
@@ -229,6 +236,7 @@ describe("MatrixClient event timelines", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        client.stopClient();
     });
 
     describe("getEventTimeline", function() {
