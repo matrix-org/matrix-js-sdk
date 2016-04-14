@@ -24,7 +24,8 @@ function HttpBackend() {
                 self.requests.splice(idx, 1);
                 realReq.callback("aborted");
             }
-        }
+        };
+
         return {
             abort: abort
         };
