@@ -248,7 +248,7 @@ describe("Room", function() {
 
         it("should not be able to add events to the end", function() {
             expect(function() {
-                room.addEventsToTimeline(events, false, room.getLiveTimeline())
+                room.addEventsToTimeline(events, false, room.getLiveTimeline());
             }).toThrow();
         });
 
