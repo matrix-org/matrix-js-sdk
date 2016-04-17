@@ -82,7 +82,7 @@ describe("Room", function() {
         });
     });
 
-    describe("addEvents", function() {
+    describe("addLiveEvents", function() {
         var events = [
             utils.mkMessage({
                 room: roomId, user: userA, msg: "changing room name", event: true
@@ -100,12 +100,12 @@ describe("Room", function() {
                     user_ids: [userA]
                 }
             });
-            room.addEvents([typing]);
+            room.addLiveEvents([typing]);
             expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
         });
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
-            expect(function() { room.addEvents(events, "foo"); }).toThrow();
+            expect(function() { room.addLiveEvents(events, "foo"); }).toThrow();
         });
 
         it("should replace a timeline event if dupe strategy is 'replace'", function() {
@@ -114,9 +114,9 @@ describe("Room", function() {
                 room: roomId, user: userA, msg: "dupe", event: true
             });
             dupe.event.event_id = events[0].getId();
-            room.addEvents(events);
+            room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addEvents([dupe], "replace");
+            room.addLiveEvents([dupe], "replace");
             expect(room.timeline[0]).toEqual(dupe);
         });
 
@@ -126,39 +126,13 @@ describe("Room", function() {
                 room: roomId, user: userA, msg: "dupe", event: true
             });
             dupe.event.event_id = events[0].getId();
-            room.addEvents(events);
+            room.addLiveEvents(events);
             expect(room.timeline[0]).toEqual(events[0]);
-            room.addEvents([dupe], "ignore");
+            room.addLiveEvents([dupe], "ignore");
             expect(room.timeline[0]).toEqual(events[0]);
         });
-    });
 
-    describe("addEventsToTimeline", function() {
-        var events = [
-            utils.mkMessage({
-                room: roomId, user: userA, msg: "changing room name", event: true
-            }),
-            utils.mkEvent({
-                type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
-            })
-        ];
-
-        it("should be able to add events to the end", function() {
-            room.addEventsToTimeline(events);
-            expect(room.timeline.length).toEqual(2);
-            expect(room.timeline[0]).toEqual(events[0]);
-            expect(room.timeline[1]).toEqual(events[1]);
-        });
-
-        it("should be able to add events to the start", function() {
-            room.addEventsToTimeline(events, true);
-            expect(room.timeline.length).toEqual(2);
-            expect(room.timeline[0]).toEqual(events[1]);
-            expect(room.timeline[1]).toEqual(events[0]);
-        });
-
-        it("should emit 'Room.timeline' events when added to the end",
+        it("should emit 'Room.timeline' events",
         function() {
             var callCount = 0;
             room.on("Room.timeline", function(event, emitRoom, toStart) {
@@ -168,97 +142,8 @@ describe("Room", function() {
                 expect(emitRoom).toEqual(room);
                 expect(toStart).toBeFalsy();
             });
-            room.addEventsToTimeline(events);
+            room.addLiveEvents(events);
             expect(callCount).toEqual(2);
-        });
-
-        it("should emit 'Room.timeline' events when added to the start",
-        function() {
-            var callCount = 0;
-            room.on("Room.timeline", function(event, emitRoom, toStart) {
-                callCount += 1;
-                expect(room.timeline.length).toEqual(callCount);
-                expect(event).toEqual(events[callCount - 1]);
-                expect(emitRoom).toEqual(room);
-                expect(toStart).toBe(true);
-            });
-            room.addEventsToTimeline(events, true);
-            expect(callCount).toEqual(2);
-        });
-
-        it("should set event.sender for new and old events", function() {
-            var sentinel = {
-                userId: userA,
-                membership: "join",
-                name: "Alice"
-            };
-            var oldSentinel = {
-                userId: userA,
-                membership: "join",
-                name: "Old Alice"
-            };
-            room.currentState.getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return sentinel;
-                }
-                return null;
-            });
-            room.oldState.getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return oldSentinel;
-                }
-                return null;
-            });
-
-            var newEv = utils.mkEvent({
-                type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
-            });
-            var oldEv = utils.mkEvent({
-                type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "Old Room Name" }
-            });
-            room.addEventsToTimeline([newEv]);
-            expect(newEv.sender).toEqual(sentinel);
-            room.addEventsToTimeline([oldEv], true);
-            expect(oldEv.sender).toEqual(oldSentinel);
-        });
-
-        it("should set event.target for new and old m.room.member events",
-        function() {
-            var sentinel = {
-                userId: userA,
-                membership: "join",
-                name: "Alice"
-            };
-            var oldSentinel = {
-                userId: userA,
-                membership: "join",
-                name: "Old Alice"
-            };
-            room.currentState.getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return sentinel;
-                }
-                return null;
-            });
-            room.oldState.getSentinelMember.andCallFake(function(uid) {
-                if (uid === userA) {
-                    return oldSentinel;
-                }
-                return null;
-            });
-
-            var newEv = utils.mkMembership({
-                room: roomId, mship: "invite", user: userB, skey: userA, event: true
-            });
-            var oldEv = utils.mkMembership({
-                room: roomId, mship: "ban", user: userB, skey: userA, event: true
-            });
-            room.addEventsToTimeline([newEv]);
-            expect(newEv.target).toEqual(sentinel);
-            room.addEventsToTimeline([oldEv], true);
-            expect(oldEv.target).toEqual(oldSentinel);
         });
 
         it("should call setStateEvents on the right RoomState with the right " +
@@ -274,7 +159,7 @@ describe("Room", function() {
                     }
                 })
             ];
-            room.addEventsToTimeline(events);
+            room.addLiveEvents(events);
             expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                 [events[0]]
             );
@@ -284,33 +169,6 @@ describe("Room", function() {
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
             expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
-        });
-
-
-        it("should call setStateEvents on the right RoomState with the right " +
-        "forwardLooking value for old events", function() {
-            var events = [
-                utils.mkMembership({
-                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
-                }),
-                utils.mkEvent({
-                    type: "m.room.name", room: roomId, user: userB, event: true,
-                    content: {
-                        name: "New room"
-                    }
-                })
-            ];
-
-            room.addEventsToTimeline(events, true);
-            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
-                [events[0]]
-            );
-            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
-                [events[1]]
-            );
-            expect(events[0].forwardLooking).toBe(false);
-            expect(events[1].forwardLooking).toBe(false);
-            expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
         });
 
         it("should synthesize read receipts for the senders of events", function() {
@@ -325,7 +183,7 @@ describe("Room", function() {
                 }
                 return null;
             });
-            room.addEventsToTimeline(events);
+            room.addLiveEvents(events);
             expect(room.getEventReadUpTo(userA)).toEqual(events[1].getId());
         });
 
@@ -370,10 +228,152 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
 
             // then the remoteEvent
-            room.addEventsToTimeline([remoteEvent]);
+            room.addLiveEvents([remoteEvent]);
             expect(room.timeline.length).toEqual(1);
 
             expect(callCount).toEqual(2);
+        });
+    });
+
+    describe("addEventsToTimeline", function() {
+        var events = [
+            utils.mkMessage({
+                room: roomId, user: userA, msg: "changing room name", event: true
+            }),
+            utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            })
+        ];
+
+        it("should not be able to add events to the end", function() {
+            expect(function() {
+                room.addEventsToTimeline(events, false, room.getLiveTimeline());
+            }).toThrow();
+        });
+
+        it("should be able to add events to the start", function() {
+            room.addEventsToTimeline(events, true, room.getLiveTimeline());
+            expect(room.timeline.length).toEqual(2);
+            expect(room.timeline[0]).toEqual(events[1]);
+            expect(room.timeline[1]).toEqual(events[0]);
+        });
+
+        it("should emit 'Room.timeline' events when added to the start",
+        function() {
+            var callCount = 0;
+            room.on("Room.timeline", function(event, emitRoom, toStart) {
+                callCount += 1;
+                expect(room.timeline.length).toEqual(callCount);
+                expect(event).toEqual(events[callCount - 1]);
+                expect(emitRoom).toEqual(room);
+                expect(toStart).toBe(true);
+            });
+            room.addEventsToTimeline(events, true, room.getLiveTimeline());
+            expect(callCount).toEqual(2);
+        });
+    });
+
+    describe("event metadata handling", function() {
+        it("should set event.sender for new and old events", function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            var oldSentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Old Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.oldState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return oldSentinel;
+                }
+                return null;
+            });
+
+            var newEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "New Room Name" }
+            });
+            var oldEv = utils.mkEvent({
+                type: "m.room.name", room: roomId, user: userA, event: true,
+                content: { name: "Old Room Name" }
+            });
+            room.addLiveEvents([newEv]);
+            expect(newEv.sender).toEqual(sentinel);
+            room.addEventsToTimeline([oldEv], true, room.getLiveTimeline());
+            expect(oldEv.sender).toEqual(oldSentinel);
+        });
+
+        it("should set event.target for new and old m.room.member events",
+        function() {
+            var sentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Alice"
+            };
+            var oldSentinel = {
+                userId: userA,
+                membership: "join",
+                name: "Old Alice"
+            };
+            room.currentState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return sentinel;
+                }
+                return null;
+            });
+            room.oldState.getSentinelMember.andCallFake(function(uid) {
+                if (uid === userA) {
+                    return oldSentinel;
+                }
+                return null;
+            });
+
+            var newEv = utils.mkMembership({
+                room: roomId, mship: "invite", user: userB, skey: userA, event: true
+            });
+            var oldEv = utils.mkMembership({
+                room: roomId, mship: "ban", user: userB, skey: userA, event: true
+            });
+            room.addLiveEvents([newEv]);
+            expect(newEv.target).toEqual(sentinel);
+            room.addEventsToTimeline([oldEv], true, room.getLiveTimeline());
+            expect(oldEv.target).toEqual(oldSentinel);
+        });
+
+        it("should call setStateEvents on the right RoomState with the right " +
+        "forwardLooking value for old events", function() {
+            var events = [
+                utils.mkMembership({
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userB, event: true,
+                    content: {
+                        name: "New room"
+                    }
+                })
+            ];
+
+            room.addEventsToTimeline(events, true, room.getLiveTimeline());
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[0]]
+            );
+            expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
+                [events[1]]
+            );
+            expect(events[0].forwardLooking).toBe(false);
+            expect(events[1].forwardLooking).toBe(false);
+            expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
         });
     });
 
@@ -397,11 +397,11 @@ describe("Room", function() {
         });
 
         it("should copy state from previous timeline", function() {
-            room.addEventsToTimeline([events[0], events[1]]);
+            room.addLiveEvents([events[0], events[1]]);
             expect(room.getLiveTimeline().getEvents().length).toEqual(2);
             room.resetLiveTimeline();
 
-            room.addEventsToTimeline([events[2]]);
+            room.addLiveEvents([events[2]]);
             var oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
             var newState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
             expect(room.getLiveTimeline().getEvents().length).toEqual(1);
@@ -410,11 +410,11 @@ describe("Room", function() {
         });
 
         it("should reset the legacy timeline fields", function() {
-            room.addEventsToTimeline([events[0], events[1]]);
+            room.addLiveEvents([events[0], events[1]]);
             expect(room.timeline.length).toEqual(2);
             room.resetLiveTimeline();
 
-            room.addEventsToTimeline([events[2]]);
+            room.addLiveEvents([events[2]]);
             var newLiveTimeline = room.getLiveTimeline();
             expect(room.timeline).toEqual(newLiveTimeline.getEvents());
             expect(room.oldState).toEqual(
@@ -443,7 +443,7 @@ describe("Room", function() {
 
         it("should " + (timelineSupport ? "remember" : "forget") +
                 " old timelines", function() {
-            room.addEventsToTimeline([events[0]]);
+            room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
             var firstLiveTimeline = room.getLiveTimeline();
             room.resetLiveTimeline();
@@ -477,7 +477,7 @@ describe("Room", function() {
         ];
 
         it("should handle events in the same timeline", function() {
-            room.addEventsToTimeline(events);
+            room.addLiveEvents(events);
 
             expect(room.compareEventOrdering(events[0].getId(),
                                              events[1].getId()))
@@ -496,7 +496,7 @@ describe("Room", function() {
             room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
 
             room.addEventsToTimeline([events[0]], false, oldTimeline);
-            room.addEventsToTimeline([events[1]]);
+            room.addLiveEvents([events[1]]);
 
             expect(room.compareEventOrdering(events[0].getId(),
                                              events[1].getId()))
@@ -510,7 +510,7 @@ describe("Room", function() {
             var oldTimeline = room.addTimeline();
 
             room.addEventsToTimeline([events[0]], false, oldTimeline);
-            room.addEventsToTimeline([events[1]]);
+            room.addLiveEvents([events[1]]);
 
             expect(room.compareEventOrdering(events[0].getId(),
                                              events[1].getId()))
@@ -521,7 +521,7 @@ describe("Room", function() {
         });
 
         it("should return null for unknown events", function() {
-            room.addEventsToTimeline(events);
+            room.addLiveEvents(events);
 
             expect(room.compareEventOrdering(events[0].getId(), "xxx"))
                 .toBe(null);
@@ -1068,7 +1068,7 @@ describe("Room", function() {
                     }),
                 ];
 
-                room.addEventsToTimeline(events);
+                room.addLiveEvents(events);
                 var ts = 13787898424;
 
                 // check it initialises correctly
@@ -1159,9 +1159,9 @@ describe("Room", function() {
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
-            room.addEvents([eventA]);
+            room.addLiveEvents([eventA]);
             room.addPendingEvent(eventB, "TXN1");
-            room.addEvents([eventC]);
+            room.addLiveEvents([eventC]);
             expect(room.timeline).toEqual(
                 [eventA, eventC]
             );
@@ -1185,9 +1185,9 @@ describe("Room", function() {
             var eventC = utils.mkMessage({
                 room: roomId, user: userA, msg: "remote 2", event: true
             });
-            room.addEvents([eventA]);
+            room.addLiveEvents([eventA]);
             room.addPendingEvent(eventB, "TXN1");
-            room.addEvents([eventC]);
+            room.addLiveEvents([eventC]);
             expect(room.timeline).toEqual(
                 [eventA, eventB, eventC]
             );

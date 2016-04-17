@@ -34,7 +34,7 @@ describe("MatrixClient", function() {
         it("should no-op if you've already joined a room", function() {
             var roomId = "!foo:bar";
             var room = new Room(roomId);
-            room.addEvents([
+            room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true
                 })
