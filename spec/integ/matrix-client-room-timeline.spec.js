@@ -126,6 +126,7 @@ describe("MatrixClient room timelines", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        client.stopClient();
     });
 
     describe("local echo events", function() {
@@ -391,16 +392,16 @@ describe("MatrixClient room timelines", function() {
                 });
 
                 httpBackend.flush("/messages", 1);
-                httpBackend.flush("/sync", 1).done(function() {
+                httpBackend.flush("/sync", 1).then(function() {
                     expect(index).toEqual(2);
-                    expect(room.timeline[room.timeline.length - 1].event).toEqual(
+                    expect(room.timeline.length).toEqual(3);
+                    expect(room.timeline[2].event).toEqual(
                         eventData[1]
                     );
-                    expect(room.timeline[room.timeline.length - 2].event).toEqual(
+                    expect(room.timeline[1].event).toEqual(
                         eventData[0]
                     );
-                    done();
-                });
+                }).catch(utils.failTest).done(done);
             });
             httpBackend.flush("/sync", 1);
         });
@@ -419,13 +420,12 @@ describe("MatrixClient room timelines", function() {
             client.on("sync", function(state) {
                 if (state !== "PREPARED") { return; }
                 var room = client.getRoom(roomId);
-                httpBackend.flush("/sync", 1).done(function() {
+                httpBackend.flush("/sync", 1).then(function() {
                     var preNameEvent = room.timeline[room.timeline.length - 3];
                     var postNameEvent = room.timeline[room.timeline.length - 1];
                     expect(preNameEvent.sender.name).toEqual(userName);
                     expect(postNameEvent.sender.name).toEqual("New Name");
-                    done();
-                });
+                }).catch(utils.failTest).done(done);
             });
             httpBackend.flush("/sync", 1);
         });
@@ -487,7 +487,7 @@ describe("MatrixClient room timelines", function() {
             client.on("sync", function(state) {
                 if (state !== "PREPARED") { return; }
                 var room = client.getRoom(roomId);
-                httpBackend.flush("/sync", 1).done(function() {
+                httpBackend.flush("/sync", 1).then(function() {
                     expect(room.currentState.getMembers().length).toEqual(4);
                     expect(room.currentState.getMember(userC).name).toEqual("C");
                     expect(room.currentState.getMember(userC).membership).toEqual(
@@ -497,8 +497,7 @@ describe("MatrixClient room timelines", function() {
                     expect(room.currentState.getMember(userD).membership).toEqual(
                         "invite"
                     );
-                    done();
-                });
+                }).catch(utils.failTest).done(done);
             });
             httpBackend.flush("/sync", 1);
         });

@@ -73,6 +73,10 @@ describe("MatrixClient opts", function() {
             });
         });
 
+        afterEach(function() {
+            client.stopClient();
+        });
+
         it("should be able to send messages", function(done) {
             var eventId = "$flibble:wibble";
             httpBackend.when("PUT", "/txn1").respond(200, {

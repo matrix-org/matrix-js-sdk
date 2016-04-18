@@ -24,6 +24,7 @@ describe("MatrixClient events", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        client.stopClient();
     });
 
     describe("emissions", function() {
