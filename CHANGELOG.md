@@ -1,3 +1,25 @@
+Changes in [0.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.2) (2016-04-19)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.1...v0.5.2)
+
+ * Track the absolute time that presence events are received, so that the
+   relative lastActiveAgo value is meaningful.
+   [\#128](https://github.com/matrix-org/matrix-js-sdk/pull/128)
+ * Refactor the addition of events to rooms
+   [\#127](https://github.com/matrix-org/matrix-js-sdk/pull/127)
+ * Clean up test shutdown
+   [\#126](https://github.com/matrix-org/matrix-js-sdk/pull/126)
+ * Add methods to get (and set) pushers
+   [\#125](https://github.com/matrix-org/matrix-js-sdk/pull/125)
+ * URL previewing support
+   [\#122](https://github.com/matrix-org/matrix-js-sdk/pull/122)
+ * Avoid paginating forever in private rooms
+   [\#124](https://github.com/matrix-org/matrix-js-sdk/pull/124)
+ * Fix a bug where we recreated sync filters
+   [\#123](https://github.com/matrix-org/matrix-js-sdk/pull/123)
+ * Implement HTTP timeouts in realtime
+   [\#121](https://github.com/matrix-org/matrix-js-sdk/pull/121)
+
 Changes in [0.5.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.1) (2016-03-30)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.0...v0.5.1)
@@ -79,7 +101,7 @@ Improvements:
  * Avoid getting stuck in a pagination loop when the server sends us only
    messages we've already seen
    (https://github.com/matrix-org/matrix-js-sdk/pull/96).
-   
+
 New methods:
  * Add `MatrixClient.setPushRuleActions` to set the actions for a push
    notification rule (https://github.com/matrix-org/matrix-js-sdk/pull/90)
