@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: models/event.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: models/event.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2015, 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+"use strict";
+
+/**
+ * This is an internal module. See {@link MatrixEvent} and {@link RoomEvent} for
+ * the public classes.
+ * @module models/event
+ */
+
+/**
+ * Enum for event statuses.
+ * @readonly
+ * @enum {string}
+ */
+module.exports.EventStatus = {
+    /** The event was not sent and will no longer be retried. */
+    NOT_SENT: "not_sent",
+    /** The event is in the process of being sent. */
+    SENDING: "sending",
+    /** The event is in a queue waiting to be sent. */
+    QUEUED: "queued",
+    /** The event has been sent to the server, but we have not yet received the
+     * echo. */
+    SENT: "sent",
+
+    /** The event was cancelled before it was successfully sent. */
+    CANCELLED: "cancelled",
+};
+
+/**
+ * Construct a Matrix Event object
+ * @constructor
+ * @param {Object} event The raw event to be wrapped in this DAO
+ * @param {boolean} encrypted Was the event encrypted
+ * @prop {Object} event The raw event. &lt;b>Do not access this property&lt;/b>
+ * directly unless you absolutely have to. Prefer the getter methods defined on
+ * this class. Using the getter methods shields your app from
+ * changes to event JSON between Matrix versions.
+ * @prop {RoomMember} sender The room member who sent this event, or null e.g.
+ * this is a presence event.
+ * @prop {RoomMember} target The room member who is the target of this event, e.g.
+ * the invitee, the person being banned, etc.
+ * @prop {EventStatus} status The sending status of the event.
+ * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
+ * that getDirectionalContent() will return event.content and not event.prev_content.
+ * Default: true. &lt;strong>This property is experimental and may change.&lt;/strong>
+ */
+module.exports.MatrixEvent = function MatrixEvent(event, encrypted) {
+    this.event = event || {};
+    this.sender = null;
+    this.target = null;
+    this.status = null;
+    this.forwardLooking = true;
+    this.encrypted = Boolean(encrypted);
+};
+module.exports.MatrixEvent.prototype = {
+
+    /**
+     * Get the event_id for this event.
+     * @return {string} The event ID, e.g. &lt;code>$143350589368169JsLZx:localhost
+     * &lt;/code>
+     */
+    getId: function() {
+        return this.event.event_id;
+    },
+
+    /**
+     * Get the user_id for this event.
+     * @return {string} The user ID, e.g. &lt;code>@alice:matrix.org&lt;/code>
+     */
+    getSender: function() {
+        return this.event.sender || this.event.user_id; // v2 / v1
+    },
+
+    /**
+     * Get the type of event.
+     * @return {string} The event type, e.g. &lt;code>m.room.message&lt;/code>
+     */
+    getType: function() {
+        return this.event.type;
+    },
+
+    /**
+     * Get the type of the event that will be sent to the homeserver.
+     * @return {string} The event type.
+     */
+    getWireType: function() {
+        return this.encryptedType || this.event.type;
+    },
+
+    /**
+     * Get the room_id for this event. This will return &lt;code>undefined&lt;/code>
+     * for &lt;code>m.presence&lt;/code> events.
+     * @return {string} The room ID, e.g. &lt;code>!cURbafjkfsMDVwdRDQ:matrix.org
+     * &lt;/code>
+     */
+    getRoomId: function() {
+        return this.event.room_id;
+    },
+
+    /**
+     * Get the timestamp of this event.
+     * @return {Number} The event timestamp, e.g. &lt;code>1433502692297&lt;/code>
+     */
+    getTs: function() {
+        return this.event.origin_server_ts;
+    },
+
+    /**
+     * Get the event content JSON.
+     * @return {Object} The event content JSON, or an empty object.
+     */
+    getContent: function() {
+        return this.event.content || {};
+    },
+
+    /**
+     * Get the event content JSON that will be sent to the homeserver.
+     * @return {Object} The event content JSON, or an empty object.
+     */
+    getWireContent: function() {
+        return this.encryptedContent || this.event.content || {};
+    },
+
+    /**
+     * Get the previous event content JSON. This will only return something for
+     * state events which exist in the timeline.
+     * @return {Object} The previous event content JSON, or an empty object.
+     */
+    getPrevContent: function() {
+        // v2 then v1 then default
+        return this.getUnsigned().prev_content || this.event.prev_content || {};
+    },
+
+    /**
+     * Get either 'content' or 'prev_content' depending on if this event is
+     * 'forward-looking' or not. This can be modified via event.forwardLooking.
+     * In practice, this means we get the chronologically earlier content value
+     * for this event (this method should surely be called getEarlierContent)
+     * &lt;strong>This method is experimental and may change.&lt;/strong>
+     * @return {Object} event.content if this event is forward-looking, else
+     * event.prev_content.
+     */
+    getDirectionalContent: function() {
+        return this.forwardLooking ? this.getContent() : this.getPrevContent();
+    },
+
+    /**
+     * Get the age of this event. This represents the age of the event when the
+     * event arrived at the device, and not the age of the event when this
+     * function was called.
+     * @return {Number} The age of this event in milliseconds.
+     */
+    getAge: function() {
+        return this.getUnsigned().age || this.event.age; // v2 / v1
+    },
+
+    /**
+     * Get the event state_key if it has one. This will return &lt;code>undefined
+     * &lt;/code> for message events.
+     * @return {string} The event's &lt;code>state_key&lt;/code>.
+     */
+    getStateKey: function() {
+        return this.event.state_key;
+    },
+
+    /**
+     * Check if this event is a state event.
+     * @return {boolean} True if this is a state event.
+     */
+    isState: function() {
+        return this.event.state_key !== undefined;
+    },
+
+    /**
+     * Check if the event is encrypted.
+     * @return {boolean} True if this event is encrypted.
+     */
+    isEncrypted: function() {
+        return this.encrypted;
+    },
+
+    getUnsigned: function() {
+        return this.event.unsigned || {};
+    },
+
+    /**
+     * Update the content of an event in the same way it would be by the server
+     * if it were redacted before it was sent to us
+     *
+     * @param {Object} the raw event causing the redaction
+     */
+    makeRedacted: function(redaction_event) {
+        if (!this.event.unsigned) {
+            this.event.unsigned = {};
+        }
+        this.event.unsigned.redacted_because = redaction_event;
+
+        var key;
+        for (key in this.event) {
+            if (!this.event.hasOwnProperty(key)) { continue; }
+            if (!_REDACT_KEEP_KEY_MAP[key]) {
+                delete this.event[key];
+            }
+        }
+
+        var keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        for (key in this.event.content) {
+            if (!this.event.content.hasOwnProperty(key)) { continue; }
+            if (!keeps[key]) {
+                delete this.event.content[key];
+            }
+        }
+    },
+
+    /**
+     * Check if this event has been redacted
+     *
+     * @return {boolean} True if this event has been redacted
+     */
+    isRedacted: function() {
+        return Boolean(this.getUnsigned().redacted_because);
+    },
+};
+
+
+/* http://matrix.org/docs/spec/r0.0.1/client_server.html#redactions says:
+ *
+ * the server should strip off any keys not in the following list:
+ *    event_id
+ *    type
+ *    room_id
+ *    user_id
+ *    state_key
+ *    prev_state
+ *    content
+ *    [we keep 'unsigned' as well, since that is created by the local server]
+ *
+ * The content object should also be stripped of all keys, unless it is one of
+ * one of the following event types:
+ *    m.room.member allows key membership
+ *    m.room.create allows key creator
+ *    m.room.join_rules allows key join_rule
+ *    m.room.power_levels allows keys ban, events, events_default, kick,
+ *        redact, state_default, users, users_default.
+ *    m.room.aliases allows key aliases
+ */
+// a map giving the keys we keep when an event is redacted
+var _REDACT_KEEP_KEY_MAP = [
+    'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
+    'content', 'unsigned',
+].reduce(function(ret, val) { ret[val] = 1; return ret; }, {});
+
+// a map from event type to the .content keys we keep when an event is redacted
+var _REDACT_KEEP_CONTENT_MAP = {
+    'm.room.member': {'membership': 1},
+    'm.room.create': {'creator': 1},
+    'm.room.join_rules': {'join_rule': 1},
+    'm.room.power_levels': {'ban': 1, 'events': 1, 'events_default': 1,
+                            'kick': 1, 'redact': 1, 'state_default': 1,
+                            'users': 1, 'users_default': 1,
+                           },
+    'm.room.aliases': {'aliases': 1},
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="OlmGroupCryptoClient.html">OlmGroupCryptoClient</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Thu Jun 02 2016 13:35:03 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
