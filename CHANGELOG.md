@@ -1,3 +1,11 @@
+Changes in [0.5.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.4) (2016-06-02)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.3...v0.5.4)
+
+ * Correct fix for https://github.com/vector-im/vector-web/issues/1039
+ * Make release.sh work on OSX
+
+
 Changes in [0.5.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.3) (2016-06-02)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.2...v0.5.3)
@@ -6,6 +14,10 @@ Changes in [0.5.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5
    [\#133](https://github.com/matrix-org/matrix-js-sdk/pull/133)
  * Bugfix for HTTP upload content when running on node
    [\#129](https://github.com/matrix-org/matrix-js-sdk/pull/129)
+ * Ignore missing profile (displayname and avatar_url) fields on
+   presence events, rather than overwriting existing valid profile
+   data from membership events or elsewhere.
+   Fixes https://github.com/vector-im/vector-web/issues/1039
 
 Changes in [0.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.2) (2016-04-19)
 ================================================================================================
