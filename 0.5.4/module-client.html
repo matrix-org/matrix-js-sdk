@@ -1,0 +1,5303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: client</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: client</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description">This is an internal module. See <a href="global.html#MatrixClient">MatrixClient</a> for the public class.</div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line20">line 20</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Classes</h3>
+
+        <dl>
+            <dt><a href="module-client-MatrixClient.html">MatrixClient</a></dt>
+            <dd></dd>
+        </dl>
+    
+
+     
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id=".CRYPTO_ENABLED"><span class="type-signature">(static) </span>CRYPTO_ENABLED<span class="type-signature"></span></h4>
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3435">line 3435</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id=".MatrixClient"><span class="type-signature">(static) </span>MatrixClient<span class="type-signature"></span></h4>
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3433">line 3433</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id="~_membershipChange"><span class="type-signature">(inner) </span>_membershipChange<span class="signature">(client, roomId, userId, membership, reason, callback)</span><span class="type-signature"> &rarr; {<a href="module-client.html#.Promise">module:client.Promise</a>|<a href="module-http-api.MatrixError.html">module:http-api.MatrixError</a>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    This is an internal method.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>client</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixClient">MatrixClient</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>membership</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>reason</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-client.html#.callback">module:client.callback</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1758">line 1758</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+<ul>
+        <li>
+<div class="param-desc">
+    Resolves: TODO
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-client.html#.Promise">module:client.Promise</a></span>
+
+
+    </dd>
+</dl>
+</li>
+    
+        <li>
+<div class="param-desc">
+    Rejects: with an error response.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-http-api.MatrixError.html">module:http-api.MatrixError</a></span>
+
+
+    </dd>
+</dl>
+</li>
+    </ul>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~_setMembershipState"><span class="type-signature">(inner) </span>_setMembershipState<span class="signature">(client, roomId, userId, membershipValue, reason, callback)</span><span class="type-signature"> &rarr; {<a href="module-client.html#.Promise">module:client.Promise</a>|<a href="module-http-api.MatrixError.html">module:http-api.MatrixError</a>}</span></h4>
+
+    
+
+
+
+<div class="description">
+    This is an internal method.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>client</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixClient">MatrixClient</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>membershipValue</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>reason</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-client.html#.callback">module:client.callback</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line1732">line 1732</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+<ul>
+        <li>
+<div class="param-desc">
+    Resolves: TODO
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-client.html#.Promise">module:client.Promise</a></span>
+
+
+    </dd>
+</dl>
+</li>
+    
+        <li>
+<div class="param-desc">
+    Rejects: with an error response.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="module-http-api.MatrixError.html">module:http-api.MatrixError</a></span>
+
+
+    </dd>
+</dl>
+</li>
+    </ul>
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Type Definitions</h3>
+
+        
+                
+
+    
+
+    <h4 class="name" id=".callback"><span class="type-signature"></span>callback<span class="signature">(err, data)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    The standard MatrixClient callback interface. Functions which accept this
+will specify 2 return arguments. These arguments map to the 2 parameters
+specified in this callback.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The error value, the "rejected" value or null.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The data returned, the "resolved" value.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3645">line 3645</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+<h4 class="name" id=".Promise">Promise</h4>
+
+
+
+
+<div class="description">
+    <a href="https://github.com/kriskowal/q">A promise implementation (Q)</a>. Functions
+which return this will specify 2 return arguments. These arguments map to the
+"onFulfilled" and "onRejected" values of the Promise.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Object</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>then</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">promise.then(onFulfilled, onRejected, onProgress)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>catch</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">promise.catch(onRejected)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>finally</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">promise.finally(callback)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>done</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">promise.done(onFulfilled, onRejected, onProgress)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3654">line 3654</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+            
+    
+
+    
+        <h3 class="subsection-title">Events</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Call.incoming%22">MatrixClient"Call.incoming"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever an incoming call arrives.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>call</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-webrtc_call-MatrixCall.html">module:webrtc/call~MatrixCall</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The incoming call.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3548">line 3548</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Call.incoming", function(call){
+  call.answer(); // auto-answer
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22deleteRoom%22">MatrixClient"deleteRoom"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a Room is removed. This will fire when you forget a room.
+<strong>This event is experimental and may change.</strong>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>roomId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The deleted room ID.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3537">line 3537</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("deleteRoom", function(roomId){
+  // update UI from getRooms()
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22event%22">MatrixClient"event"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the SDK receives a new event.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3439">line 3439</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("event", function(event){
+  var sender = event.getSender();
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.accountData%22">MatrixClient"Room.accountData"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a room's account_data is updated.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The account_data event</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose account_data was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1535">line 1535</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room.accountData", function(event, room){
+  if (event.getType() === "m.room.colorscheme") {
+      applyColorScheme(event.getContents());
+  }
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.localEchoUpdated%22">MatrixClient"Room.localEchoUpdated"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires when the status of a transmitted event is updated.
+
+<p>When an event is first transmitted, a temporary copy of the event is
+inserted into the timeline, with a temporary event id, and a status of
+'SENDING'.
+
+<p>Once the echo comes back from the server, the content of the event
+(MatrixEvent.event) is replaced by the complete event from the homeserver,
+thus updating its event id, as well as server-generated fields such as the
+timestamp. Its status is set to null.
+
+<p>Once the /send request completes, if the remote echo has not already
+arrived, the event is updated with a new event id and the status is set to
+'SENT'. The server-generated fields are of course not updated yet.
+
+<p>If the /send fails, In this case, the event's status is set to
+'NOT_SENT'. If it is later resent, the process starts again, setting the
+status to 'SENDING'. Alternatively, the message may be cancelled, which
+removes the event from the room, and sets the status to 'CANCELLED'.
+
+<p>This event is raised to reflect each of the transitions above.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which has been updated</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room containing the redacted event</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>oldEventId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The previous event id (the temporary event id,
+   except when updating a successfully-sent event when its echo arrives)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>oldStatus</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#EventStatus">EventStatus</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The previous event status.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1548">line 1548</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.name%22">MatrixClient"Room.name"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the name of a room is updated.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose Room.name was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1502">line 1502</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room.name", function(room){
+  var newName = room.name;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.receipt%22">MatrixClient"Room.receipt"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a receipt is received for a room
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The receipt event</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose receipts was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1512">line 1512</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room.receipt", function(event, room){
+  var receiptContent = event.getContent();
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.redaction%22">MatrixClient"Room.redaction"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires when an event we had previously received is redacted.
+
+(Note this is *not* fired when the redaction happens before we receive the
+event).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which was redacted</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room containing the redacted event</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1491">line 1491</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.tags%22">MatrixClient"Room.tags"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a room's tags are updated.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The tags event</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose Room.tags was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1523">line 1523</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room.tags", function(event, room){
+  var newTags = event.getContent().tags;
+  if (newTags["favourite"]) showStar(room);
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.timeline%22">MatrixClient"Room.timeline"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the timeline in a room is updated.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose Room.timeline was updated.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>toStartOfTimeline</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">True if this event was added to the start</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>removed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">True if this event has just been removed from the timeline
+(beginning; oldest) of the timeline e.g. due to pagination.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">more data about the event
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>timeline</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">module:event-timeline.EventTimeline</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the timeline the
+event was added to/removed from</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>liveEvent</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">true if the event was a real-time event
+added to the end of the live timeline</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1454">line 1454</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room.timeline", function(event, room, toStartOfTimeline, data){
+  if (!toStartOfTimeline &amp;&amp; data.liveEvent) {
+    var messageToAppend = room.timeline.[room.timeline.length - 1];
+  }
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room.timelineReset%22">MatrixClient"Room.timelineReset"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the live timeline in a room is reset.
+
+When we get a 'limited' sync (for example, after a network outage), we reset
+the live timeline to be empty before adding the recent events to the new
+timeline. This event is fired after the timeline is reset, and before the
+new events are added.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room whose live timeline was reset.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room.js.html">models/room.js</a>, <a href="models_room.js.html#line1479">line 1479</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Room%22">MatrixClient"Room"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a new Room is added. This will fire when you are invited to a
+room, as well as when you join a room. <strong>This event is experimental and
+may change.</strong>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>room</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#Room">Room</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The newly created, fully populated room.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3525">line 3525</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Room", function(room){
+  var roomId = room.roomId;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomMember.membership%22">MatrixClient"RoomMember.membership"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any room member's membership state changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The member whose RoomMember.membership changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line258">line 258</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomMember.membership", function(event, member){
+  var newState = member.membership;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomMember.name%22">MatrixClient"RoomMember.name"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any room member's name changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The member whose RoomMember.name changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line247">line 247</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomMember.name", function(event, member){
+  var newName = member.name;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomMember.powerLevel%22">MatrixClient"RoomMember.powerLevel"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any room member's power level changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The member whose RoomMember.powerLevel changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line280">line 280</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomMember.powerLevel", function(event, member){
+  var newPowerLevel = member.powerLevel;
+  var newNormPowerLevel = member.powerLevelNorm;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomMember.typing%22">MatrixClient"RoomMember.typing"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any room member's typing state changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The member whose RoomMember.typing changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-member.js.html">models/room-member.js</a>, <a href="models_room-member.js.html#line269">line 269</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomMember.typing", function(event, member){
+  var isTyping = member.typing;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomState.events%22">MatrixClient"RoomState.events"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the event dictionary in room state is updated.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>state</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomState">RoomState</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room state whose RoomState.events dictionary
+was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line394">line 394</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomState.events", function(event, state){
+  var newStateEvent = event;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomState.members%22">MatrixClient"RoomState.members"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a member in the members dictionary is updated in any way.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>state</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomState">RoomState</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room state whose RoomState.members dictionary
+was updated.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room member that was updated.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line406">line 406</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomState.members", function(event, state, member){
+  var newMembershipState = member.membership;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22RoomState.newMember%22">MatrixClient"RoomState.newMember"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever a member is added to the members dictionary. The RoomMember
+will not be fully populated yet (e.g. no membership state).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>state</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomState">RoomState</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room state whose RoomState.members dictionary
+was updated with a new entry.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>member</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#RoomMember">RoomMember</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The room member that was added.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_room-state.js.html">models/room-state.js</a>, <a href="models_room-state.js.html#line419">line 419</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("RoomState.newMember", function(event, state, member){
+  // add event listeners on 'member'
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22Session.logged_out%22">MatrixClient"Session.logged_out"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the login session the JS SDK is using is no
+longer valid and the user must log in again.
+NB. This only fires when action is required from the user, not
+when then login session can be renewed by using a refresh token.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3558">line 3558</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("Session.logged_out", function(call){
+  // show the login screen
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22sync%22">MatrixClient"sync"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever the SDK's syncing state is updated. The state can be one of:
+<ul>
+<li>PREPARED : The client has synced with the server at least once and is
+ready for methods to be called on it. This will be immediately followed by
+a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
+previous API.</i></li>
+<li>SYNCING : The client is currently polling for new events from the server.
+This will be called <i>after</i> processing latest events from a sync.</li>
+<li>ERROR : The client has had a problem syncing with the server. If this is
+called <i>before</i> PREPARED then there was a problem performing the initial
+sync. If this is called <i>after</i> PREPARED then there was a problem polling
+the server for updates. This may be called multiple times even if the state is
+already ERROR. <i>This is the equivalent of "syncError" in the previous
+API.</i></li>
+<li>STOPPED: The client has stopped syncing with server due to stopClient
+being called.
+</li>
+</ul>
+State transition diagram:
+<pre>
+                                         +---->STOPPED
+                                         |
+             +----->PREPARED -------> SYNCING <--+
+             |        ^                  |       |
+  null ------+        |  +---------------+       |
+             |        |  V                       |
+             +------->ERROR ---------------------+
+
+NB: 'null' will never be emitted by this event.
+</pre>
+Transitions:
+<ul>
+<li><code>null -> PREPARED</code> : Occurs when the initial sync is completed
+first time. This involves setting up filters and obtaining push rules.
+<li><code>null -> ERROR</code> : Occurs when the initial sync failed first time.
+<li><code>ERROR -> PREPARED</code> : Occurs when the initial sync succeeds
+after previously failing.
+<li><code>PREPARED -> SYNCING</code> : Occurs immediately after transitioning
+to PREPARED. Starts listening for live updates rather than catching up.
+<li><code>SYNCING -> ERROR</code> : Occurs the first time a client cannot perform a
+live update.
+<li><code>ERROR -> SYNCING</code> : Occurs when the client has performed a
+live update after having previously failed.
+<li><code>ERROR -> ERROR</code> : Occurs when the client has failed to sync
+for a second time or more.</li>
+<li><code>SYNCING -> SYNCING</code> : Occurs when the client has performed a live
+update. This is called <i>after</i> processing.</li>
+<li><code>* -> STOPPED</code> : Occurs once the client has stopped syncing or
+trying to sync after stopClient has been called.</li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>state</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">An enum representing the syncing state. One of "PREPARED",
+"SYNCING", "ERROR", "STOPPED".</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>prevState</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">An enum representing the previous syncing state.
+One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Data about this transition.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixError">MatrixError</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix error if <code>state=ERROR</code>.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="client.js.html">client.js</a>, <a href="client.js.html#line3449">line 3449</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("sync", function(state, prevState, data) {
+  switch (state) {
+    case "ERROR":
+      // update UI to say "Connection Lost"
+      break;
+    case "SYNCING":
+      // update UI to remove any "Connection Lost" message
+      break;
+    case "PREPARED":
+      // the client instance is ready to be queried.
+      var rooms = matrixClient.getRooms();
+      break;
+  }
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22User.avatarUrl%22">MatrixClient"User.avatarUrl"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any user's avatar URL changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#User">User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The user whose User.avatarUrl changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_user.js.html">models/user.js</a>, <a href="models_user.js.html#line190">line 190</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("User.avatarUrl", function(event, user){
+  var newUrl = user.avatarUrl;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22User.displayName%22">MatrixClient"User.displayName"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any user's display name changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#User">User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The user whose User.displayName changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_user.js.html">models/user.js</a>, <a href="models_user.js.html#line179">line 179</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("User.displayName", function(event, user){
+  var newName = user.displayName;
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="~event:MatrixClient%22User.presence%22">MatrixClient"User.presence"</h4>
+
+    
+
+
+
+<div class="description">
+    Fires whenever any user's presence changes.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The matrix event which caused this event to fire.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>user</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#User">User</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The user whose User.presence changed.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_user.js.html">models/user.js</a>, <a href="models_user.js.html#line168">line 168</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>matrixClient.on("User.presence", function(event, user){
+  var newPresence = user.presence;
+});</code></pre>
+
+
+
+        
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room-member-RoomMember.html">RoomMember</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_room-Room.html">Room</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Thu Jun 02 2016 18:07:15 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
