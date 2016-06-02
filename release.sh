@@ -90,7 +90,7 @@ if [ -z "$skip_jsdoc" ]; then
     echo "copying jsdocs to gh-pages branch"
     git checkout gh-pages
     git pull
-    cp -ar ".jsdoc/matrix-js-sdk/$release" .
+    cp -a ".jsdoc/matrix-js-sdk/$release" .
     perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
         "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' \
         $release index.html
