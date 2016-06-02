@@ -1,3 +1,12 @@
+Changes in [0.5.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.3) (2016-06-02)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.2...v0.5.3)
+
+ * Add support for the openid interface
+   [\#133](https://github.com/matrix-org/matrix-js-sdk/pull/133)
+ * Bugfix for HTTP upload content when running on node
+   [\#129](https://github.com/matrix-org/matrix-js-sdk/pull/129)
+
 Changes in [0.5.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.2) (2016-04-19)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.1...v0.5.2)
