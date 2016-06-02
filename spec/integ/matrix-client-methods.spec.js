@@ -6,10 +6,11 @@ var Room = publicGlobals.Room;
 var MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
 var Filter = publicGlobals.Filter;
 var utils = require("../test-utils");
+var MockStorageApi = require("../MockStorageApi");
 
 describe("MatrixClient", function() {
     var baseUrl = "http://localhost.or.something";
-    var client, httpBackend, store;
+    var client, httpBackend, store, sessionStore;
     var userId = "@alice:localhost";
     var accessToken = "aseukfgwef";
 
@@ -17,12 +18,17 @@ describe("MatrixClient", function() {
         utils.beforeEach(this);
         httpBackend = new HttpBackend();
         store = new MatrixInMemoryStore();
+
+        var mockStorage = new MockStorageApi();
+        sessionStore = new sdk.WebStorageSessionStore(mockStorage);
+
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
-            store: store
+            store: store,
+            sessionStore: sessionStore,
         });
     });
 
@@ -171,6 +177,47 @@ describe("MatrixClient", function() {
             httpBackend.flush().done(function() {
                 done();
             });
+        });
+    });
+
+
+    describe("downloadKeys", function() {
+        it("should do an HTTP request and then store the keys", function(done) {
+            var borisKeys = {dev1: {a: 1}};
+            var chazKeys = {dev2: {a: 2}};
+
+            httpBackend.when("POST", "/keys/query").check(function(req) {
+                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}}});
+            }).respond(200, {
+                device_keys: {
+                    boris: borisKeys,
+                    chaz: chazKeys,
+                },
+            });
+
+            client.downloadKeys(["boris", "chaz"]).then(function(res) {
+                expect(res).toEqual({
+                    boris: borisKeys,
+                    chaz: chazKeys
+                });
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should return a rejected promise if the request fails", function(done) {
+            httpBackend.when("POST", "/keys/query").respond(400);
+
+            var exceptionThrown;
+            client.downloadKeys(["bottom"]).then(function() {
+                fail("download didn't fail");
+            }, function(err) {
+                exceptionThrown = err;
+            }).then(function() {
+                expect(exceptionThrown).toBeTruthy();
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
         });
     });
 });
