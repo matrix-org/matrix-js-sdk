@@ -1,4 +1,5 @@
 "use strict";
+var q = require("q");
 var sdk = require("../..");
 var HttpBackend = require("../mock-request");
 var utils = require("../test-utils");
@@ -66,21 +67,27 @@ describe("MatrixClient retrying", function() {
         ev2 = tl[1];
 
         expect(ev1.status).toEqual(EventStatus.SENDING);
-        expect(ev2.status).toEqual(EventStatus.QUEUED);
+        expect(ev2.status).toEqual(EventStatus.SENDING);
 
-        // now we can cancel the second and check everything looks sane
-        client.cancelPendingEvent(ev2);
-        expect(ev2.status).toEqual(EventStatus.CANCELLED);
-        expect(tl.length).toEqual(1);
+        // give the reactor a chance to run, so that ev2 gets queued
+        q().then(function() {
+            // ev2 should now have been queued
+            expect(ev2.status).toEqual(EventStatus.QUEUED);
 
-        // shouldn't be able to cancel the first message yet
-        expect(function() { client.cancelPendingEvent(ev1); })
-            .toThrow();
+            // now we can cancel the second and check everything looks sane
+            client.cancelPendingEvent(ev2);
+            expect(ev2.status).toEqual(EventStatus.CANCELLED);
+            expect(tl.length).toEqual(1);
 
-        // fail the first send
-        httpBackend.when("PUT", "/send/m.room.message/")
-            .respond(400);
-        httpBackend.flush().then(function() {
+            // shouldn't be able to cancel the first message yet
+            expect(function() { client.cancelPendingEvent(ev1); })
+                .toThrow();
+
+            // fail the first send
+            httpBackend.when("PUT", "/send/m.room.message/")
+                .respond(400);
+            return httpBackend.flush();
+        }).then(function() {
             expect(ev1.status).toEqual(EventStatus.NOT_SENT);
             expect(tl.length).toEqual(1);
 
