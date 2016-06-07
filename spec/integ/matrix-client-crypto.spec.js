@@ -88,10 +88,6 @@ describe("MatrixClient crypto", function() {
             expect(aliClient.deviceKeys.device_id).toEqual(aliDeviceId);
             done();
         });
-        it("should have a curve25519 key", function(done) {
-            expect(aliClient.deviceCurve25519Key).toBeDefined();
-            done();
-        });
     });
 
     function bobUploadsKeys() {
