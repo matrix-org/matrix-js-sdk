@@ -71,6 +71,11 @@ describe("MatrixClient crypto", function() {
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     });
 
+    afterEach(function() {
+        aliClient.stopClient();
+        bobClient.stopClient();
+    });
+
     describe("Ali account setup", function() {
         it("should have device keys", function(done) {
             expect(aliClient.deviceKeys).toBeDefined();
