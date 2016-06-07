@@ -36,13 +36,15 @@ describe("MatrixClient crypto", function() {
     var bobDeviceId = "bvcxz";
     var bobAccessToken = "fewgfkuesa";
     var bobOneTimeKeys;
+    var aliDeviceKeys;
     var bobDeviceKeys;
     var bobDeviceCurve25519Key;
     var bobDeviceEd25519Key;
     var aliLocalStore;
     var aliStorage;
     var bobStorage;
-    var aliMessage;
+    var aliMessages;
+    var bobMessages;
 
     beforeEach(function() {
         aliLocalStore = new MockStorageApi();
@@ -70,8 +72,8 @@ describe("MatrixClient crypto", function() {
             request: bobHttpBackend.requestFn,
         });
 
-        bobHttpBackend.when("GET", "/pushrules").respond(200, {});
-        bobHttpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+        aliMessages = [];
+        bobMessages = [];
     });
 
     afterEach(function() {
@@ -111,7 +113,7 @@ describe("MatrixClient crypto", function() {
             });
             return {one_time_key_counts: {}};
         });
-        bobClient.uploadKeys(5);
+        bobClient.uploadKeys(5).catch(utils.failTest);
         return bobHttpBackend.flush().then(function() {
             expect(bobDeviceKeys).toBeDefined();
             expect(bobOneTimeKeys).toBeDefined();
@@ -135,13 +137,15 @@ describe("MatrixClient crypto", function() {
             result[bobUserId] = bobKeys;
             return {device_keys: result};
         });
-        aliClient.downloadKeys([bobUserId]).then(function() {
+        var p1 = aliClient.downloadKeys([bobUserId]).then(function() {
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([{
                 id: "bvcxz",
                 key: bobDeviceEd25519Key
             }]);
         });
-        return aliHttpBackend.flush().then(function() {
+        var p2 = aliHttpBackend.flush();
+
+        return q.all([p1, p2]).then(function() {
             var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
             expect(devices).toEqual(bobKeys);
         });
@@ -190,18 +194,30 @@ describe("MatrixClient crypto", function() {
             .catch(utils.failTest).done(done);
     });
 
-    function aliSendsMessage() {
-        var txnId = "a.transaction.id";
-        var path = "/send/m.room.encrypted/" + txnId;
-        aliHttpBackend.when("PUT", path).respond(200, function(path, content) {
-            aliMessage = content;
-            expect(aliMessage.ciphertext[bobDeviceCurve25519Key]).toBeDefined();
-            return {};
+    function sendMessage(httpBackend, client) {
+        var path = "/send/m.room.encrypted/";
+        var sent;
+        httpBackend.when("PUT", path).respond(200, function(path, content) {
+            sent = content;
+            return {
+                event_id: "asdfgh",
+            };
         });
-        aliClient.sendMessage(
-            roomId, {msgtype: "m.text", body: "Hello, World"}, txnId
+        var p1 = client.sendMessage(
+            roomId, {msgtype: "m.text", body: "Hello, World"}
         );
-        return aliHttpBackend.flush();
+        var p2 = httpBackend.flush(path, 1);
+        return q.all([p1, p2]).then(function() {
+            return sent;
+        });
+    }
+
+    function aliSendsMessage() {
+        return sendMessage(aliHttpBackend, aliClient).then(function(content) {
+            aliMessages.push(content);
+            var ciphertext = content.ciphertext[bobDeviceCurve25519Key];
+            expect(ciphertext).toBeDefined();
+        });
     }
 
     it("Ali sends a message", function(done) {
@@ -213,7 +229,13 @@ describe("MatrixClient crypto", function() {
             .catch(utils.failTest).done(done);
     });
 
-    function bobRecvMessage() {
+    function startClient(httpBackend, client) {
+        client.startClient();
+        httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+    }
+
+    function recvMessage(httpBackend, client, message) {
         var syncData = {
             next_batch: "x",
             rooms: {
@@ -228,14 +250,14 @@ describe("MatrixClient crypto", function() {
                     utils.mkEvent({
                         type: "m.room.encrypted",
                         room: roomId,
-                        content: aliMessage
+                        content: message
                     })
                 ]
             }
         };
-        bobHttpBackend.when("GET", "/sync").respond(200, syncData);
+        httpBackend.when("GET", "/sync").respond(200, syncData);
         var deferred = q.defer();
-        bobClient.on("event", function(event) {
+        client.on("event", function(event) {
             expect(event.getType()).toEqual("m.room.message");
             expect(event.getContent()).toEqual({
                 msgtype: "m.text",
@@ -244,9 +266,14 @@ describe("MatrixClient crypto", function() {
             expect(event.isEncrypted()).toBeTruthy();
             deferred.resolve();
         });
-        bobClient.startClient();
-        bobHttpBackend.flush();
+        startClient(httpBackend, client);
+        httpBackend.flush();
         return deferred.promise;
+    }
+
+    function bobRecvMessage() {
+        var message = aliMessages.shift();
+        return recvMessage(bobHttpBackend, bobClient, message);
     }
 
     it("Bob receives a message", function(done) {
@@ -256,6 +283,94 @@ describe("MatrixClient crypto", function() {
             .then(aliEnablesEncryption)
             .then(aliSendsMessage)
             .then(bobRecvMessage)
+            .catch(utils.failTest).done(done);
+    });
+
+    it("Bob receives two pre-key messages", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .then(aliEnablesEncryption)
+            .then(aliSendsMessage)
+            .then(bobRecvMessage)
+            .then(aliSendsMessage)
+            .then(bobRecvMessage)
+            .catch(utils.failTest).done(done);
+    });
+
+
+    function aliUploadsKeys() {
+        var uploadPath = "/keys/upload/" + aliDeviceId;
+        aliHttpBackend.when("POST", uploadPath).respond(200, function(path, content) {
+            expect(content.one_time_keys).toEqual({});
+            aliDeviceKeys = content.device_keys;
+            return {one_time_key_counts: {curve25519: 0}};
+        });
+        return q.all([
+            aliClient.uploadKeys(0),
+            aliHttpBackend.flush(uploadPath, 1),
+        ]).then(function() {
+            console.log("ali uploaded keys");
+        });
+    }
+
+    function bobDownloadsKeys() {
+        var aliKeys = {};
+        aliKeys[aliDeviceId] = aliDeviceKeys;
+        bobHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+            expect(content.device_keys[aliUserId]).toEqual({});
+            var result = {};
+            result[aliUserId] = aliKeys;
+            return {device_keys: result};
+        });
+        return q.all([
+            bobClient.downloadKeys([aliUserId]),
+            bobHttpBackend.flush(),
+        ]);
+    }
+
+    function bobEnablesEncryption() {
+        return bobClient.setRoomEncryption(roomId, {
+            algorithm: "m.olm.v1.curve25519-aes-sha2",
+            members: [aliUserId, bobUserId]
+        }).then(function(res) {
+            console.log("bob enabled encryption");
+            expect(res.missingUsers).toEqual([]);
+            expect(res.missingDevices).toEqual({});
+            expect(bobClient.isRoomEncrypted(roomId)).toBeTruthy();
+        });
+    }
+
+    function bobSendsMessage() {
+        return sendMessage(bobHttpBackend, bobClient).then(function(content) {
+            bobMessages.push(content);
+            var aliKeyId = "curve25519:" + aliDeviceId;
+            var aliDeviceCurve25519Key = aliDeviceKeys.keys[aliKeyId];
+            var ciphertext = content.ciphertext[aliDeviceCurve25519Key];
+            expect(ciphertext).toBeDefined();
+            return ciphertext;
+        });
+    }
+
+    function aliRecvMessage() {
+        var message = bobMessages.shift();
+        return recvMessage(aliHttpBackend, aliClient, message);
+    }
+
+
+    it("Bob replies to the message", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .then(aliEnablesEncryption)
+            .then(aliSendsMessage)
+            .then(bobRecvMessage)
+            .then(aliUploadsKeys)
+            .then(bobDownloadsKeys)
+            .then(bobEnablesEncryption)
+            .then(bobSendsMessage).then(function(ciphertext) {
+                expect(ciphertext.type).toEqual(1);
+            }).then(aliRecvMessage)
             .catch(utils.failTest).done(done);
     });
 });
