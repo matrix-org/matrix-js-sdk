@@ -24,7 +24,8 @@ describe("MatrixClient crypto", function() {
     }
 
     var baseUrl = "http://localhost.or.something";
-    var httpBackend;
+    var aliHttpBackend;
+    var bobHttpBackend;
     var aliClient;
     var roomId = "!room:localhost";
     var aliUserId = "@ali:localhost";
@@ -48,27 +49,29 @@ describe("MatrixClient crypto", function() {
         aliStorage = new sdk.WebStorageSessionStore(aliLocalStore);
         bobStorage = new sdk.WebStorageSessionStore(new MockStorageApi());
         utils.beforeEach(this);
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
 
+        aliHttpBackend = new HttpBackend();
         aliClient = sdk.createClient({
             baseUrl: baseUrl,
             userId: aliUserId,
             accessToken: aliAccessToken,
             deviceId: aliDeviceId,
-            sessionStore: aliStorage
+            sessionStore: aliStorage,
+            request: aliHttpBackend.requestFn,
         });
 
+        bobHttpBackend = new HttpBackend();
         bobClient = sdk.createClient({
             baseUrl: baseUrl,
             userId: bobUserId,
             accessToken: bobAccessToken,
             deviceId: bobDeviceId,
-            sessionStore: bobStorage
+            sessionStore: bobStorage,
+            request: bobHttpBackend.requestFn,
         });
 
-        httpBackend.when("GET", "/pushrules").respond(200, {});
-        httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+        bobHttpBackend.when("GET", "/pushrules").respond(200, {});
+        bobHttpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     });
 
     afterEach(function() {
@@ -91,9 +94,9 @@ describe("MatrixClient crypto", function() {
 
     function bobUploadsKeys() {
         var uploadPath = "/keys/upload/bvcxz";
-        httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
+        bobHttpBackend.when("POST", uploadPath).respond(200, function(path, content) {
             expect(content.one_time_keys).toEqual({});
-            httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
+            bobHttpBackend.when("POST", uploadPath).respond(200, function(path, content) {
                 expect(content.one_time_keys).not.toEqual({});
                 bobDeviceKeys = content.device_keys;
                 bobOneTimeKeys = content.one_time_keys;
@@ -109,7 +112,7 @@ describe("MatrixClient crypto", function() {
             return {one_time_key_counts: {}};
         });
         bobClient.uploadKeys(5);
-        return httpBackend.flush().then(function() {
+        return bobHttpBackend.flush().then(function() {
             expect(bobDeviceKeys).toBeDefined();
             expect(bobOneTimeKeys).toBeDefined();
             bobDeviceCurve25519Key = bobDeviceKeys.keys["curve25519:bvcxz"];
@@ -126,7 +129,7 @@ describe("MatrixClient crypto", function() {
     function aliDownloadsKeys() {
         var bobKeys = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
-        httpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+        aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
             expect(content.device_keys[bobUserId]).toEqual({});
             var result = {};
             result[bobUserId] = bobKeys;
@@ -138,7 +141,7 @@ describe("MatrixClient crypto", function() {
                 key: bobDeviceEd25519Key
             }]);
         });
-        return httpBackend.flush().then(function() {
+        return aliHttpBackend.flush().then(function() {
             var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
             expect(devices).toEqual(bobKeys);
         });
@@ -152,7 +155,7 @@ describe("MatrixClient crypto", function() {
     });
 
     function aliEnablesEncryption() {
-        httpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
+        aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
             expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
             for (var keyId in bobOneTimeKeys) {
                 if (bobOneTimeKeys.hasOwnProperty(keyId)) {
@@ -175,7 +178,7 @@ describe("MatrixClient crypto", function() {
             expect(res.missingDevices).toEqual({});
             expect(aliClient.isRoomEncrypted(roomId)).toBeTruthy();
         });
-        httpBackend.flush();
+        aliHttpBackend.flush();
         return p;
     }
 
@@ -190,7 +193,7 @@ describe("MatrixClient crypto", function() {
     function aliSendsMessage() {
         var txnId = "a.transaction.id";
         var path = "/send/m.room.encrypted/" + txnId;
-        httpBackend.when("PUT", path).respond(200, function(path, content) {
+        aliHttpBackend.when("PUT", path).respond(200, function(path, content) {
             aliMessage = content;
             expect(aliMessage.ciphertext[bobDeviceCurve25519Key]).toBeDefined();
             return {};
@@ -198,7 +201,7 @@ describe("MatrixClient crypto", function() {
         aliClient.sendMessage(
             roomId, {msgtype: "m.text", body: "Hello, World"}, txnId
         );
-        return httpBackend.flush();
+        return aliHttpBackend.flush();
     }
 
     it("Ali sends a message", function(done) {
@@ -230,7 +233,7 @@ describe("MatrixClient crypto", function() {
                 ]
             }
         };
-        httpBackend.when("GET", "/sync").respond(200, syncData);
+        bobHttpBackend.when("GET", "/sync").respond(200, syncData);
         var deferred = q.defer();
         bobClient.on("event", function(event) {
             expect(event.getType()).toEqual("m.room.message");
@@ -242,7 +245,7 @@ describe("MatrixClient crypto", function() {
             deferred.resolve();
         });
         bobClient.startClient();
-        httpBackend.flush();
+        bobHttpBackend.flush();
         return deferred.promise;
     }
 
