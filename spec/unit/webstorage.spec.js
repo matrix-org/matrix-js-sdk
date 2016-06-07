@@ -5,36 +5,7 @@ var Room = sdk.Room;
 var User = sdk.User;
 var utils = require("../test-utils");
 
-function MockStorageApi() {
-    this.data = {};
-    this.keys = [];
-    this.length = 0;
-}
-MockStorageApi.prototype = {
-    setItem: function(k, v) {
-        this.data[k] = v;
-        this._recalc();
-    },
-    getItem: function(k) {
-        return this.data[k] || null;
-    },
-    removeItem: function(k) {
-        delete this.data[k];
-        this._recalc();
-    },
-    key: function(index) {
-        return this.keys[index];
-    },
-    _recalc: function() {
-        var keys = [];
-        for (var k in this.data) {
-            if (!this.data.hasOwnProperty(k)) { continue; }
-            keys.push(k);
-        }
-        this.keys = keys;
-        this.length = keys.length;
-    }
-};
+var MockStorageApi = require("../MockStorageApi");
 
 describe("WebStorageStore", function() {
     var store, room;
