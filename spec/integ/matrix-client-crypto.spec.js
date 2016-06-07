@@ -1,5 +1,6 @@
 "use strict";
 var sdk = require("../..");
+var q = require("q");
 var HttpBackend = require("../mock-request");
 var utils = require("../test-utils");
 function MockStorageApi() {
@@ -83,7 +84,7 @@ describe("MatrixClient crypto", function() {
         });
     });
 
-    function bobUploadsKeys(done) {
+    function bobUploadsKeys() {
         var uploadPath = "/keys/upload/bvcxz";
         httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
             expect(content.one_time_keys).toEqual({});
@@ -103,18 +104,21 @@ describe("MatrixClient crypto", function() {
             return {one_time_key_counts: {}};
         });
         bobClient.uploadKeys(5);
-        httpBackend.flush().done(function() {
+        return httpBackend.flush().then(function() {
             expect(bobDeviceKeys).toBeDefined();
             expect(bobOneTimeKeys).toBeDefined();
             bobDeviceCurve25519Key = bobDeviceKeys.keys["curve25519:bvcxz"];
             bobDeviceEd25519Key = bobDeviceKeys.keys["ed25519:bvcxz"];
-            done();
         });
     }
 
-    it("Bob uploads without one-time keys and with one-time keys", bobUploadsKeys);
+    it("Bob uploads without one-time keys and with one-time keys", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .catch(utils.failTest).done(done);
+    });
 
-    function aliDownloadsKeys(done) {
+    function aliDownloadsKeys() {
         var bobKeys = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         httpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
@@ -129,18 +133,20 @@ describe("MatrixClient crypto", function() {
                 key: bobDeviceEd25519Key
             }]);
         });
-        httpBackend.flush().done(function() {
+        return httpBackend.flush().then(function() {
             var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
             expect(devices).toEqual(bobKeys);
-            done();
         });
     }
 
     it("Ali downloads Bobs keys", function(done) {
-        bobUploadsKeys(function() {aliDownloadsKeys(done);});
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .catch(utils.failTest).done(done);
     });
 
-    function aliEnablesEncryption(done) {
+    function aliEnablesEncryption() {
         httpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
             expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
             for (var keyId in bobOneTimeKeys) {
@@ -156,27 +162,27 @@ describe("MatrixClient crypto", function() {
             result[bobUserId][bobDeviceId][keyId] = bobOneTimeKeys[keyId];
             return {one_time_keys: result};
         });
-        aliClient.setRoomEncryption(roomId, {
+        var p = aliClient.setRoomEncryption(roomId, {
             algorithm: "m.olm.v1.curve25519-aes-sha2",
             members: [aliUserId, bobUserId]
         }).then(function(res) {
             expect(res.missingUsers).toEqual([]);
             expect(res.missingDevices).toEqual({});
             expect(aliClient.isRoomEncrypted(roomId)).toBeTruthy();
-            done();
         });
         httpBackend.flush();
+        return p;
     }
 
     it("Ali enables encryption", function(done) {
-        bobUploadsKeys(function() {
-            aliDownloadsKeys(function() {
-                aliEnablesEncryption(done);
-            });
-        });
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .then(aliEnablesEncryption)
+            .catch(utils.failTest).done(done);
     });
 
-    function aliSendsMessage(done) {
+    function aliSendsMessage() {
         var txnId = "a.transaction.id";
         var path = "/send/m.room.encrypted/" + txnId;
         httpBackend.when("PUT", path).respond(200, function(path, content) {
@@ -187,20 +193,19 @@ describe("MatrixClient crypto", function() {
         aliClient.sendMessage(
             roomId, {msgtype: "m.text", body: "Hello, World"}, txnId
         );
-        httpBackend.flush().done(function() {done();});
+        return httpBackend.flush();
     }
 
     it("Ali sends a message", function(done) {
-        bobUploadsKeys(function() {
-            aliDownloadsKeys(function() {
-                aliEnablesEncryption(function() {
-                    aliSendsMessage(done);
-                });
-            });
-        });
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .then(aliEnablesEncryption)
+            .then(aliSendsMessage)
+            .catch(utils.failTest).done(done);
     });
 
-    function bobRecvMessage(done) {
+    function bobRecvMessage() {
         var syncData = {
             next_batch: "x",
             rooms: {
@@ -221,6 +226,7 @@ describe("MatrixClient crypto", function() {
             }
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
+        var deferred = q.defer();
         bobClient.on("event", function(event) {
             expect(event.getType()).toEqual("m.room.message");
             expect(event.getContent()).toEqual({
@@ -228,22 +234,20 @@ describe("MatrixClient crypto", function() {
                 body: "Hello, World"
             });
             expect(event.isEncrypted()).toBeTruthy();
-            done();
+            deferred.resolve();
         });
         bobClient.startClient();
         httpBackend.flush();
+        return deferred.promise;
     }
 
     it("Bob receives a message", function(done) {
-        bobUploadsKeys(function() {
-            aliDownloadsKeys(function() {
-                aliEnablesEncryption(function() {
-                    aliSendsMessage(function() {
-                        bobRecvMessage(done);
-                    });
-                });
-            });
-        });
-    }, 30000); //timeout after 30s
-
+        q()
+            .then(bobUploadsKeys)
+            .then(aliDownloadsKeys)
+            .then(aliEnablesEncryption)
+            .then(aliSendsMessage)
+            .then(bobRecvMessage)
+            .catch(utils.failTest).done(done);
+    });
 });
