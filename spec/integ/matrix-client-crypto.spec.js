@@ -136,14 +136,16 @@ describe("MatrixClient crypto", function() {
         var p1 = aliClient.downloadKeys([bobUserId]).then(function() {
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([{
                 id: "bvcxz",
-                key: bobDeviceEd25519Key
+                key: bobDeviceEd25519Key,
+                verified: false,
             }]);
         });
         var p2 = aliHttpBackend.flush();
 
         return q.all([p1, p2]).then(function() {
             var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
-            expect(devices).toEqual(bobKeys);
+            expect(devices[bobDeviceId].keys).toEqual(bobDeviceKeys.keys);
+            expect(devices[bobDeviceId].verified).toBe(false);
         });
     }
 
