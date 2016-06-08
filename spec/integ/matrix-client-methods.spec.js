@@ -183,8 +183,8 @@ describe("MatrixClient", function() {
 
     describe("downloadKeys", function() {
         it("should do an HTTP request and then store the keys", function(done) {
-            var borisKeys = {dev1: {a: 1}};
-            var chazKeys = {dev2: {a: 2}};
+            var borisKeys = {dev1: {algorithms: ["1"], keys: { "ed25519:dev1": "k1" }}};
+            var chazKeys = {dev2: {algorithms: ["2"], keys: { "ed25519:dev2": "k2" }}};
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
                 expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}}});
@@ -197,8 +197,20 @@ describe("MatrixClient", function() {
 
             client.downloadKeys(["boris", "chaz"]).then(function(res) {
                 expect(res).toEqual({
-                    boris: borisKeys,
-                    chaz: chazKeys
+                    boris: {
+                        dev1: {
+                            verified: false,
+                            keys: { "ed25519:dev1": "k1" },
+                            algorithms: ["1"],
+                        },
+                    },
+                    chaz: {
+                        dev2: {
+                            verified: false,
+                            keys: { "ed25519:dev2" : "k2" },
+                            algorithms: ["2"],
+                        },
+                    },
                 });
             }).catch(utils.failTest).done(done);
 
