@@ -214,25 +214,25 @@ describe('NotificationService', function() {
 
     it('should bing on a user ID.', function() {
         testEvent.event.content.body = "Hello @ali:matrix.org, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a partial user ID with an @.', function() {
         testEvent.event.content.body = "Hello @ali, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a partial user ID without @.', function() {
         testEvent.event.content.body = "Hello ali, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a case-insensitive user ID.', function() {
         testEvent.event.content.body = "Hello @AlI:matrix.org, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
@@ -240,13 +240,13 @@ describe('NotificationService', function() {
 
     it('should bing on a display name.', function() {
         testEvent.event.content.body = "Hello Alice M, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a case-insensitive display name.', function() {
         testEvent.event.content.body = "Hello ALICE M, how are you?";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
@@ -254,43 +254,43 @@ describe('NotificationService', function() {
 
     it('should bing on a bing word.', function() {
         testEvent.event.content.body = "I really like coffee";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on case-insensitive bing words.', function() {
         testEvent.event.content.body = "Coffee is great";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on wildcard (.*) bing words.', function() {
         testEvent.event.content.body = "It was foomahbar I think.";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character group ([abc]) bing words.', function() {
         testEvent.event.content.body = "Ping!";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
         testEvent.event.content.body = "Pong!";
-        actions = pushProcessor.actionsForEvent(testEvent.event);
+        actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character range ([a-z]) bing words.', function() {
         testEvent.event.content.body = "I ate 6 pies";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character negation ([!a]) bing words.', function() {
         testEvent.event.content.body = "boke";
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
         testEvent.event.content.body = "bake";
-        actions = pushProcessor.actionsForEvent(testEvent.event);
+        actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
     });
 
@@ -298,7 +298,7 @@ describe('NotificationService', function() {
 
     it('should gracefully handle bad input.', function() {
         testEvent.event.content.body = { "foo": "bar" };
-        var actions = pushProcessor.actionsForEvent(testEvent.event);
+        var actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
     });
 });
