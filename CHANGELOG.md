@@ -1,3 +1,8 @@
+Changes in [?](?) (?)
+=====================
+
+ * Add room.getAliases() and room.getCanonicalAlias
+
 Changes in [0.5.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.4) (2016-06-02)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.3...v0.5.4)
