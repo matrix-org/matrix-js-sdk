@@ -1,4 +1,4 @@
-Changes in <unreleased>
+Changes in \<unreleased>
 =======================
 
  * Add room.getAliases() and room.getCanonicalAlias
