@@ -22,7 +22,7 @@
   ],
   "browser": "browser-index.js",
   "author": "matrix.org",
-  "license": "Apache 2.0",
+  "license": "Apache-2.0",
   "dependencies": {
     "browser-request": "^0.3.3",
     "browserify": "^10.2.3",
