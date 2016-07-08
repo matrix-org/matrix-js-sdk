@@ -2,6 +2,7 @@ Changes in \<unreleased>
 =======================
 
  * Add room.getAliases() and room.getCanonicalAlias
+ * Add API calls `/register/email/requestToken`, `/account/password/email/requestToken` and `/account/3pid/email/requestToken`
 
 Changes in [0.5.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.4) (2016-06-02)
 ================================================================================================
