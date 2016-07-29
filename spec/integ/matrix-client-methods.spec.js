@@ -199,14 +199,14 @@ describe("MatrixClient", function() {
                 expect(res).toEqual({
                     boris: {
                         dev1: {
-                            verified: false,
+                            verified: 0, // DeviceVerification.UNVERIFIED
                             keys: { "ed25519:dev1": "k1" },
                             algorithms: ["1"],
                         },
                     },
                     chaz: {
                         dev2: {
-                            verified: false,
+                            verified: 0, // DeviceVerification.UNVERIFIED
                             keys: { "ed25519:dev2" : "k2" },
                             algorithms: ["2"],
                         },

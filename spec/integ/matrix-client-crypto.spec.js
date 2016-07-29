@@ -169,14 +169,18 @@ function aliDownloadsKeys() {
             id: "bvcxz",
             key: bobDeviceEd25519Key,
             verified: false,
+            blocked: false,
         }]);
     });
     var p2 = aliQueryKeys();
 
+    // check that the localStorage is updated as we expect (not sure this is
+    // an integration test, but meh)
     return q.all([p1, p2]).then(function() {
         var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
         expect(devices[bobDeviceId].keys).toEqual(bobDeviceKeys.keys);
-        expect(devices[bobDeviceId].verified).toBe(false);
+        expect(devices[bobDeviceId].verified).
+            toBe(0); // DeviceVerification.UNVERIFIED
     });
 }
 
