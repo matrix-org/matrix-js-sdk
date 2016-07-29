@@ -200,4 +200,64 @@ describe("utils", function() {
             assert.isFalse(utils.deepCompare({ a: { b: func } }, { a: { b: func2 } }));
         });
     });
+
+
+    describe("extend", function() {
+        var SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };
+
+        it("should extend", function() {
+            var target = {
+                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
+            };
+            var merged = {
+                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
+                "newprop": "new",
+            };
+            var source_orig = JSON.stringify(SOURCE);
+
+            utils.extend(target, SOURCE);
+            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
+
+            // check the originial wasn't modified
+            expect(JSON.stringify(SOURCE)).toEqual(source_orig);
+        });
+
+        it("should ignore null", function() {
+            var target = {
+                "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
+            };
+            var merged = {
+                "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
+                "newprop": "new",
+            };
+            var source_orig = JSON.stringify(SOURCE);
+
+            utils.extend(target, null, SOURCE);
+            expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
+
+            // check the originial wasn't modified
+            expect(JSON.stringify(SOURCE)).toEqual(source_orig);
+        });
+
+        it("should handle properties created with defineProperties", function() {
+            var source = Object.defineProperties({}, {
+                "enumerableProp": {
+                    get: function() {
+                        return true;
+                    },
+                    enumerable: true
+                },
+                "nonenumerableProp": {
+                    get: function() {
+                        return true;
+                    }
+                }
+            });
+
+            var target = {};
+            utils.extend(target, source);
+            expect(target.enumerableProp).toBe(true);
+            expect(target.nonenumerableProp).toBe(undefined);
+        });
+    });
 });
