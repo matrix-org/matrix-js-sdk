@@ -48,19 +48,23 @@ var bobMessages;
  * @param {string} deviceId expected device id in upload request
  * @param {object} httpBackend
  *
- * @return {promise} completes once the http requests have completed, returning the
- * content of the upload request.
+ * @return {promise} completes once the http requests have completed, returning combined
+ * {one_time_keys: {}, device_keys: {}}
  */
 function expectKeyUpload(deviceId, httpBackend) {
     var uploadPath = "/keys/upload/" + deviceId;
+    var keys = {};
+
     httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
-        expect(content.one_time_keys).toEqual({});
+        expect(content.one_time_keys).not.toBeDefined();
+        expect(content.device_keys).toBeDefined();
+        keys.device_keys = content.device_keys;
         return {one_time_key_counts: {curve25519: 0}};
     });
 
-    var uploadContent;
     httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
-        uploadContent = content;
+        expect(content.device_keys).not.toBeDefined();
+        expect(content.one_time_keys).toBeDefined();
         expect(content.one_time_keys).not.toEqual({});
         var count = 0;
         for (var key in content.one_time_keys) {
@@ -69,11 +73,12 @@ function expectKeyUpload(deviceId, httpBackend) {
             }
         }
         expect(count).toEqual(5);
+        keys.one_time_keys = content.one_time_keys;
         return {one_time_key_counts: {curve25519: count}};
     });
 
     return httpBackend.flush(uploadPath, 2).then(function() {
-        return uploadContent;
+        return keys;
     });
 }
 
@@ -423,15 +428,6 @@ describe("MatrixClient crypto", function() {
     afterEach(function() {
         aliClient.stopClient();
         bobClient.stopClient();
-    });
-
-    describe("Ali account setup", function() {
-        it("should have device keys", function(done) {
-            expect(aliClient.deviceKeys).toBeDefined();
-            expect(aliClient.deviceKeys.user_id).toEqual(aliUserId);
-            expect(aliClient.deviceKeys.device_id).toEqual(aliDeviceId);
-            done();
-        });
     });
 
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
