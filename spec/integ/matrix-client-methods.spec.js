@@ -184,33 +184,77 @@ describe("MatrixClient", function() {
 
     describe("downloadKeys", function() {
         it("should do an HTTP request and then store the keys", function(done) {
-            var borisKeys = {dev1: {algorithms: ["1"], keys: { "ed25519:dev1": "k1" }}};
-            var chazKeys = {dev2: {algorithms: ["2"], keys: { "ed25519:dev2": "k2" }}};
+            var ed25519key = "wV5E3EUSHpHuoZLljNzojlabjGdXT3Mz7rugG9zgbkI";
+            var borisKeys = {
+                dev1: {
+                    algorithms: ["1"], keys: { "ed25519:dev1": ed25519key },
+                    signatures: {
+                        boris: {
+                           "ed25519:dev1":
+                                "u99n8WZ61G//K6eVgYc+RDLVapmjttxqhjNucIFGEIJ" +
+                                "oA4TUY8FmiGv3zl0EA71zrvPDfnFL5XLNsdc55NGbDg"
+                        }
+                    },
+                    unsigned: { "abc": "def" },
+                }
+            };
+            var chazKeys = {
+                dev2: {
+                    algorithms: ["2"], keys: { "ed25519:dev2": ed25519key },
+                    signatures: {
+                        chaz: {
+                           "ed25519:dev2":
+                                "8eaeXUWy9AQzjaNVOjVLs4FQk+cgobkNS811EjZBCMA" +
+                                "apd8aPOfE26E13nFFOCLC1V6fOH5wVo61hxGR/j4PBA"
+                        }
+                    },
+                    unsigned: { "ghi": "def" },
+                }
+            };
+            var daveKeys = {
+                dev3: {
+                    algorithms: ["3"], keys: { "ed25519:dev2": ed25519key },
+                    signatures: {
+                        dave: {
+                           "ed25519:dev2":
+                                "8eaeXUWy9AQzjaNVOjVLs4FQk+cgobkNS811EjZBCMA" +
+                                "apd8aPOfE26E13nFFOCLC1V6fOH5wVo61hxGR/j4PBA"
+                        }
+                    },
+                    unsigned: { "ghi": "def" },
+                }
+            };
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
-                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}}});
+                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}, dave: {}}});
             }).respond(200, {
                 device_keys: {
                     boris: borisKeys,
                     chaz: chazKeys,
+                    dave: daveKeys,
                 },
             });
 
-            client.downloadKeys(["boris", "chaz"]).then(function(res) {
+            client.downloadKeys(["boris", "chaz", "dave"]).then(function(res) {
                 expect(res).toEqual({
                     boris: {
                         dev1: {
                             verified: 0, // DeviceVerification.UNVERIFIED
-                            keys: { "ed25519:dev1": "k1" },
+                            keys: { "ed25519:dev1": ed25519key },
                             algorithms: ["1"],
+                            unsigned: { "abc": "def" },
                         },
                     },
                     chaz: {
                         dev2: {
                             verified: 0, // DeviceVerification.UNVERIFIED
-                            keys: { "ed25519:dev2" : "k2" },
+                            keys: { "ed25519:dev2" : ed25519key },
                             algorithms: ["2"],
+                            unsigned: { "ghi": "def" },
                         },
+                    },
+                    dave: {
+                        // dave's key fails validation.
                     },
                 });
             }).catch(utils.failTest).done(done);
