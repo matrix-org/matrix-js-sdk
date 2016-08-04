@@ -443,6 +443,24 @@ describe("MatrixClient crypto", function() {
             .catch(utils.failTest).done(done);
     });
 
+    it("Ali gets keys with an invalid signature", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(function() {
+                // tamper bob's keys!
+                expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeDefined();
+                bobDeviceKeys.keys["curve25519:" + bobDeviceId] += "abc";
+
+                return q.all(aliClient.downloadKeys([bobUserId]),
+                             aliQueryKeys());
+            })
+            .then(function() {
+                // should get an empty list
+                expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
+            })
+            .catch(utils.failTest).done(done);
+    });
+
     it("Ali enables encryption", function(done) {
         q()
             .then(bobUploadsKeys)
