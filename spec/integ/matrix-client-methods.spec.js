@@ -26,6 +26,7 @@ describe("MatrixClient", function() {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
+            deviceId: "aliceDevice",
             accessToken: accessToken,
             store: store,
             sessionStore: sessionStore,
