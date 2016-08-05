@@ -102,6 +102,37 @@ describe("RoomMember", function() {
             member.setPowerLevelEvent(event); // no-op
             expect(emitCount).toEqual(1);
         });
+
+        it("should honour power levels of zero.",
+        function() {
+            var event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": 0,
+                    }
+                },
+                event: true
+            });
+            var emitCount = 0;
+
+            // set the power level to something other than zero or we
+            // won't get an event
+            member.powerLevel = 1;
+            member.on("RoomMember.powerLevel", function(emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember.userId).toEqual('@alice:bar');
+                expect(emitMember.powerLevel).toEqual(0);
+                expect(emitEvent).toEqual(event);
+            });
+
+            member.setPowerLevelEvent(event);
+            expect(member.powerLevel).toEqual(0);
+            expect(emitCount).toEqual(1);
+        });
     });
 
     describe("setTypingEvent", function() {
