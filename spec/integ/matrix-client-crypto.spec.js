@@ -175,6 +175,7 @@ function aliDownloadsKeys() {
             key: bobDeviceEd25519Key,
             verified: false,
             blocked: false,
+            display_name: null,
         }]);
     });
     var p2 = aliQueryKeys();
