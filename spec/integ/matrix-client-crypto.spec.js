@@ -213,8 +213,9 @@ function aliEnablesEncryption() {
     var p = aliClient.setRoomEncryption(roomId, {
         algorithm: "m.olm.v1.curve25519-aes-sha2",
     }).then(function(res) {
-        expect(res.missingUsers).toEqual([]);
-        expect(res.missingDevices).toEqual({});
+        expect(res[aliUserId]).toEqual({});
+        expect(res[bobUserId][bobDeviceId].device).toBeDefined();
+        expect(res[bobUserId][bobDeviceId].sessionId).toBeDefined();
         expect(aliClient.isRoomEncrypted(roomId)).toBeTruthy();
     });
     aliHttpBackend.flush();
@@ -226,8 +227,9 @@ function bobEnablesEncryption() {
     return bobClient.setRoomEncryption(roomId, {
         algorithm: "m.olm.v1.curve25519-aes-sha2",
     }).then(function(res) {
-        expect(res.missingUsers).toEqual([]);
-        expect(res.missingDevices).toEqual({});
+        expect(res[aliUserId][aliDeviceId].device).toBeDefined();
+        expect(res[aliUserId][aliDeviceId].sessionId).toBeDefined();
+        expect(res[bobUserId]).toEqual({});
         expect(bobClient.isRoomEncrypted(roomId)).toBeTruthy();
     });
 }
