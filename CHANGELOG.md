@@ -1,3 +1,40 @@
+Changes in [0.5.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.6) (2016-08-28)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.5...v0.5.6)
+
+ * Put all of the megolm keys in one room message
+   [\#182](https://github.com/matrix-org/matrix-js-sdk/pull/182)
+ * Reinstate device blocking for simple Olm
+   [\#181](https://github.com/matrix-org/matrix-js-sdk/pull/181)
+ * support for unpacking megolm keys
+   [\#180](https://github.com/matrix-org/matrix-js-sdk/pull/180)
+ * Send out megolm keys when we start a megolm session
+   [\#179](https://github.com/matrix-org/matrix-js-sdk/pull/179)
+ * Change the result structure for ensureOlmSessionsForUsers
+   [\#178](https://github.com/matrix-org/matrix-js-sdk/pull/178)
+ * Factor out a function for doing olm encryption
+   [\#177](https://github.com/matrix-org/matrix-js-sdk/pull/177)
+ * Move DeviceInfo and DeviceVerification to separate module
+   [\#175](https://github.com/matrix-org/matrix-js-sdk/pull/175)
+ * Make encryption asynchronous
+   [\#176](https://github.com/matrix-org/matrix-js-sdk/pull/176)
+ * Added ability to set and get status_msg for presence.
+   [\#167](https://github.com/matrix-org/matrix-js-sdk/pull/167)
+ * Megolm: don't dereference nullable object
+   [\#174](https://github.com/matrix-org/matrix-js-sdk/pull/174)
+ * Implement megolm encryption/decryption
+   [\#173](https://github.com/matrix-org/matrix-js-sdk/pull/173)
+ * Update our push rules when they come down stream
+   [\#170](https://github.com/matrix-org/matrix-js-sdk/pull/170)
+ * Factor Olm encryption/decryption out to new classes
+   [\#172](https://github.com/matrix-org/matrix-js-sdk/pull/172)
+ * Make DeviceInfo more useful, and refactor crypto methods to use it
+   [\#171](https://github.com/matrix-org/matrix-js-sdk/pull/171)
+ * Move login and register methods into base-apis
+   [\#169](https://github.com/matrix-org/matrix-js-sdk/pull/169)
+ * Remove defaultDeviceDisplayName from MatrixClient options
+   [\#168](https://github.com/matrix-org/matrix-js-sdk/pull/168)
+
 Changes in [0.5.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.5) (2016-08-11)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.4...v0.5.5)
