@@ -1,10 +1,111 @@
-Changes in \<unreleased>
-=======================
+Changes in [0.5.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.6) (2016-08-28)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.5...v0.5.6)
+
+ * Put all of the megolm keys in one room message
+   [\#182](https://github.com/matrix-org/matrix-js-sdk/pull/182)
+ * Reinstate device blocking for simple Olm
+   [\#181](https://github.com/matrix-org/matrix-js-sdk/pull/181)
+ * support for unpacking megolm keys
+   [\#180](https://github.com/matrix-org/matrix-js-sdk/pull/180)
+ * Send out megolm keys when we start a megolm session
+   [\#179](https://github.com/matrix-org/matrix-js-sdk/pull/179)
+ * Change the result structure for ensureOlmSessionsForUsers
+   [\#178](https://github.com/matrix-org/matrix-js-sdk/pull/178)
+ * Factor out a function for doing olm encryption
+   [\#177](https://github.com/matrix-org/matrix-js-sdk/pull/177)
+ * Move DeviceInfo and DeviceVerification to separate module
+   [\#175](https://github.com/matrix-org/matrix-js-sdk/pull/175)
+ * Make encryption asynchronous
+   [\#176](https://github.com/matrix-org/matrix-js-sdk/pull/176)
+ * Added ability to set and get status_msg for presence.
+   [\#167](https://github.com/matrix-org/matrix-js-sdk/pull/167)
+ * Megolm: don't dereference nullable object
+   [\#174](https://github.com/matrix-org/matrix-js-sdk/pull/174)
+ * Implement megolm encryption/decryption
+   [\#173](https://github.com/matrix-org/matrix-js-sdk/pull/173)
+ * Update our push rules when they come down stream
+   [\#170](https://github.com/matrix-org/matrix-js-sdk/pull/170)
+ * Factor Olm encryption/decryption out to new classes
+   [\#172](https://github.com/matrix-org/matrix-js-sdk/pull/172)
+ * Make DeviceInfo more useful, and refactor crypto methods to use it
+   [\#171](https://github.com/matrix-org/matrix-js-sdk/pull/171)
+ * Move login and register methods into base-apis
+   [\#169](https://github.com/matrix-org/matrix-js-sdk/pull/169)
+ * Remove defaultDeviceDisplayName from MatrixClient options
+   [\#168](https://github.com/matrix-org/matrix-js-sdk/pull/168)
+
+Changes in [0.5.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.5) (2016-08-11)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.4...v0.5.5)
 
  * Add room.getAliases() and room.getCanonicalAlias
  * Add API calls `/register/email/requestToken`, `/account/password/email/requestToken` and `/account/3pid/email/requestToken`
  * Add `User.currentlyActive` and `User.lastPresenceTs` events for changes in fields on the User object
  * Add `logout` and `deactivateAccount`
+
+ * Make sure we actually stop the sync loop on logout
+   [\#166](https://github.com/matrix-org/matrix-js-sdk/pull/166)
+ * Zero is a valid power level
+   [\#164](https://github.com/matrix-org/matrix-js-sdk/pull/164)
+ * Verify e2e keys on download
+   [\#163](https://github.com/matrix-org/matrix-js-sdk/pull/163)
+ * Factor crypto stuff out of MatrixClient
+   [\#162](https://github.com/matrix-org/matrix-js-sdk/pull/162)
+ * Refactor device key upload
+   [\#161](https://github.com/matrix-org/matrix-js-sdk/pull/161)
+ * Wrappers for devices API
+   [\#158](https://github.com/matrix-org/matrix-js-sdk/pull/158)
+ * Add deactivate account function
+   [\#160](https://github.com/matrix-org/matrix-js-sdk/pull/160)
+ * client.listDeviceKeys: Expose device display name
+   [\#159](https://github.com/matrix-org/matrix-js-sdk/pull/159)
+ * Add `logout`
+   [\#157](https://github.com/matrix-org/matrix-js-sdk/pull/157)
+ * Fix email registration
+   [\#156](https://github.com/matrix-org/matrix-js-sdk/pull/156)
+ * Factor out MatrixClient methods to MatrixBaseApis
+   [\#155](https://github.com/matrix-org/matrix-js-sdk/pull/155)
+ * Fix some broken tests
+   [\#154](https://github.com/matrix-org/matrix-js-sdk/pull/154)
+ * make jenkins fail the build if the tests fail
+   [\#153](https://github.com/matrix-org/matrix-js-sdk/pull/153)
+ * deviceId-related fixes
+   [\#152](https://github.com/matrix-org/matrix-js-sdk/pull/152)
+ * /login, /register: Add device_id and initial_device_display_name
+   [\#151](https://github.com/matrix-org/matrix-js-sdk/pull/151)
+ * Support global account_data
+   [\#150](https://github.com/matrix-org/matrix-js-sdk/pull/150)
+ * Add more events to User
+   [\#149](https://github.com/matrix-org/matrix-js-sdk/pull/149)
+ * Add API calls for other requestToken endpoints
+   [\#148](https://github.com/matrix-org/matrix-js-sdk/pull/148)
+ * Add register-specific request token endpoint
+   [\#147](https://github.com/matrix-org/matrix-js-sdk/pull/147)
+ * Set a valid SPDX license identifier in package.json
+   [\#139](https://github.com/matrix-org/matrix-js-sdk/pull/139)
+ * Configure encryption on m.room.encryption events
+   [\#145](https://github.com/matrix-org/matrix-js-sdk/pull/145)
+ * Implement device blocking
+   [\#146](https://github.com/matrix-org/matrix-js-sdk/pull/146)
+ * Clearer doc for setRoomDirectoryVisibility
+   [\#144](https://github.com/matrix-org/matrix-js-sdk/pull/144)
+ * crypto: use memberlist to derive recipient list
+   [\#143](https://github.com/matrix-org/matrix-js-sdk/pull/143)
+ * Support for marking devices as unverified
+   [\#142](https://github.com/matrix-org/matrix-js-sdk/pull/142)
+ * Add Olm as an optionalDependency
+   [\#141](https://github.com/matrix-org/matrix-js-sdk/pull/141)
+ * Add room.getAliases() and room.getCanonicalAlias()
+   [\#140](https://github.com/matrix-org/matrix-js-sdk/pull/140)
+ * Change how MatrixEvent manages encrypted events
+   [\#138](https://github.com/matrix-org/matrix-js-sdk/pull/138)
+ * Catch exceptions when encrypting events
+   [\#137](https://github.com/matrix-org/matrix-js-sdk/pull/137)
+ * Support for marking devices as verified
+   [\#136](https://github.com/matrix-org/matrix-js-sdk/pull/136)
+ * Various matrix-client refactorings and fixes
+   [\#134](https://github.com/matrix-org/matrix-js-sdk/pull/134)
 
 Changes in [0.5.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.4) (2016-06-02)
 ================================================================================================

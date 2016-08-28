@@ -236,27 +236,22 @@ describe("MatrixClient", function() {
             });
 
             client.downloadKeys(["boris", "chaz", "dave"]).then(function(res) {
-                expect(res).toEqual({
-                    boris: {
-                        dev1: {
-                            verified: 0, // DeviceVerification.UNVERIFIED
-                            keys: { "ed25519:dev1": ed25519key },
-                            algorithms: ["1"],
-                            unsigned: { "abc": "def" },
-                        },
-                    },
-                    chaz: {
-                        dev2: {
-                            verified: 0, // DeviceVerification.UNVERIFIED
-                            keys: { "ed25519:dev2" : ed25519key },
-                            algorithms: ["2"],
-                            unsigned: { "ghi": "def" },
-                        },
-                    },
-                    dave: {
-                        // dave's key fails validation.
-                    },
+                assertObjectContains(res.boris.dev1, {
+                    verified: 0, // DeviceVerification.UNVERIFIED
+                    keys: { "ed25519:dev1": ed25519key },
+                    algorithms: ["1"],
+                    unsigned: { "abc": "def" },
                 });
+
+                assertObjectContains(res.chaz.dev2, {
+                    verified: 0, // DeviceVerification.UNVERIFIED
+                    keys: { "ed25519:dev2" : ed25519key },
+                    algorithms: ["2"],
+                    unsigned: { "ghi": "def" },
+                });
+
+                // dave's key fails validation.
+                expect(res.dave).toEqual({});
             }).catch(utils.failTest).done(done);
 
             httpBackend.flush();
@@ -278,3 +273,11 @@ describe("MatrixClient", function() {
         });
     });
 });
+
+function assertObjectContains(obj, expected) {
+    for (var k in expected) {
+        if (expected.hasOwnProperty(k)) {
+            expect(obj[k]).toEqual(expected[k]);
+        }
+    }
+}

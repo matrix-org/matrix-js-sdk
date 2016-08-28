@@ -2,7 +2,9 @@
 var sdk = require("../..");
 var q = require("q");
 var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
+var utils = require("../../lib/utils");
+var test_utils = require("../test-utils");
+
 function MockStorageApi() {
     this.data = {};
 }
@@ -119,7 +121,7 @@ function expectBobKeyUpload() {
 }
 
 function bobUploadsKeys() {
-    bobClient.uploadKeys(5).catch(utils.failTest);
+    bobClient.uploadKeys(5).catch(test_utils.failTest);
     return expectBobKeyUpload();
 }
 
@@ -175,6 +177,7 @@ function aliDownloadsKeys() {
             key: bobDeviceEd25519Key,
             verified: false,
             blocked: false,
+            display_name: null,
         }]);
     });
     var p2 = aliQueryKeys();
@@ -193,7 +196,7 @@ function aliEnablesEncryption() {
     // can't query keys before bob has uploaded them
     expect(bobOneTimeKeys).toBeDefined();
 
-    aliQueryKeys().catch(utils.failTest);
+    aliQueryKeys().catch(test_utils.failTest);
     aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
         expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
         for (var keyId in bobOneTimeKeys) {
@@ -212,8 +215,9 @@ function aliEnablesEncryption() {
     var p = aliClient.setRoomEncryption(roomId, {
         algorithm: "m.olm.v1.curve25519-aes-sha2",
     }).then(function(res) {
-        expect(res.missingUsers).toEqual([]);
-        expect(res.missingDevices).toEqual({});
+        expect(res[aliUserId]).toEqual({});
+        expect(res[bobUserId][bobDeviceId].device).toBeDefined();
+        expect(res[bobUserId][bobDeviceId].sessionId).toBeDefined();
         expect(aliClient.isRoomEncrypted(roomId)).toBeTruthy();
     });
     aliHttpBackend.flush();
@@ -221,12 +225,13 @@ function aliEnablesEncryption() {
 }
 
 function bobEnablesEncryption() {
-    bobQueryKeys().catch(utils.failTest);
+    bobQueryKeys().catch(test_utils.failTest);
     return bobClient.setRoomEncryption(roomId, {
         algorithm: "m.olm.v1.curve25519-aes-sha2",
     }).then(function(res) {
-        expect(res.missingUsers).toEqual([]);
-        expect(res.missingDevices).toEqual({});
+        expect(res[aliUserId][aliDeviceId].device).toBeDefined();
+        expect(res[aliUserId][aliDeviceId].sessionId).toBeDefined();
+        expect(res[bobUserId]).toEqual({});
         expect(bobClient.isRoomEncrypted(roomId)).toBeTruthy();
     });
 }
@@ -234,6 +239,7 @@ function bobEnablesEncryption() {
 function aliSendsMessage() {
     return sendMessage(aliHttpBackend, aliClient).then(function(content) {
         aliMessages.push(content);
+        expect(utils.keys(content.ciphertext)).toEqual([bobDeviceCurve25519Key]);
         var ciphertext = content.ciphertext[bobDeviceCurve25519Key];
         expect(ciphertext).toBeDefined();
     });
@@ -244,6 +250,7 @@ function bobSendsMessage() {
         bobMessages.push(content);
         var aliKeyId = "curve25519:" + aliDeviceId;
         var aliDeviceCurve25519Key = aliDeviceKeys.keys[aliKeyId];
+        expect(utils.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
         var ciphertext = content.ciphertext[aliDeviceCurve25519Key];
         expect(ciphertext).toBeDefined();
         return ciphertext;
@@ -290,7 +297,7 @@ function recvMessage(httpBackend, client, message) {
     syncData.rooms.join[roomId] = {
         timeline: {
             events: [
-                utils.mkEvent({
+                test_utils.mkEvent({
                     type: "m.room.encrypted",
                     room: roomId,
                     content: message
@@ -328,7 +335,7 @@ function recvMessage(httpBackend, client, message) {
 
 
 function aliStartClient() {
-    expectAliKeyUpload().catch(utils.failTest);
+    expectAliKeyUpload().catch(test_utils.failTest);
     startClient(aliHttpBackend, aliClient);
     return aliHttpBackend.flush().then(function() {
         console.log("Ali client started");
@@ -336,7 +343,7 @@ function aliStartClient() {
 }
 
 function bobStartClient() {
-    expectBobKeyUpload().catch(utils.failTest);
+    expectBobKeyUpload().catch(test_utils.failTest);
     startClient(bobHttpBackend, bobClient);
     return bobHttpBackend.flush().then(function() {
         console.log("Bob client started");
@@ -365,11 +372,11 @@ function startClient(httpBackend, client) {
     syncData.rooms.join[roomId] = {
         state: {
             events: [
-                utils.mkMembership({
+                test_utils.mkMembership({
                     mship: "join",
                     user: aliUserId,
                 }),
-                utils.mkMembership({
+                test_utils.mkMembership({
                     mship: "join",
                     user: bobUserId,
                 }),
@@ -394,7 +401,7 @@ describe("MatrixClient crypto", function() {
         aliLocalStore = new MockStorageApi();
         aliStorage = new sdk.WebStorageSessionStore(aliLocalStore);
         bobStorage = new sdk.WebStorageSessionStore(new MockStorageApi());
-        utils.beforeEach(this);
+        test_utils.beforeEach(this);
 
         aliHttpBackend = new HttpBackend();
         aliClient = sdk.createClient({
@@ -433,14 +440,14 @@ describe("MatrixClient crypto", function() {
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
         q()
             .then(bobUploadsKeys)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Ali downloads Bobs keys", function(done) {
         q()
             .then(bobUploadsKeys)
             .then(aliDownloadsKeys)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Ali gets keys with an invalid signature", function(done) {
@@ -458,7 +465,7 @@ describe("MatrixClient crypto", function() {
                 // should get an empty list
                 expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
             })
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Ali enables encryption", function(done) {
@@ -466,7 +473,7 @@ describe("MatrixClient crypto", function() {
             .then(bobUploadsKeys)
             .then(aliStartClient)
             .then(aliEnablesEncryption)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Ali sends a message", function(done) {
@@ -475,7 +482,7 @@ describe("MatrixClient crypto", function() {
             .then(aliStartClient)
             .then(aliEnablesEncryption)
             .then(aliSendsMessage)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Bob receives a message", function(done) {
@@ -486,7 +493,21 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsMessage)
             .then(bobStartClient)
             .then(bobRecvMessage)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
+    });
+
+    it("Ali blocks Bob's device", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliStartClient)
+            .then(aliEnablesEncryption)
+            .then(function() {
+                aliClient.setDeviceBlocked(bobUserId, bobDeviceId, true);
+                return sendMessage(aliHttpBackend, aliClient);
+            }).then(function(sentContent) {
+                // no unblocked devices, so the ciphertext should be empty
+                expect(sentContent.ciphertext).toEqual({});
+            }).catch(test_utils.failTest).done(done);
     });
 
     it("Bob receives two pre-key messages", function(done) {
@@ -499,7 +520,7 @@ describe("MatrixClient crypto", function() {
             .then(bobRecvMessage)
             .then(aliSendsMessage)
             .then(bobRecvMessage)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 
     it("Bob replies to the message", function(done) {
@@ -514,6 +535,6 @@ describe("MatrixClient crypto", function() {
             .then(bobSendsMessage).then(function(ciphertext) {
                 expect(ciphertext.type).toEqual(1);
             }).then(aliRecvMessage)
-            .catch(utils.failTest).done(done);
+            .catch(test_utils.failTest).done(done);
     });
 });
