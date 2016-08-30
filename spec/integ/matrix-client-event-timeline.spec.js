@@ -655,4 +655,70 @@ describe("MatrixClient event timelines", function() {
             }).catch(utils.failTest);
         });
     });
+
+
+    it("should handle gappy syncs after redactions", function(done) {
+        // https://github.com/vector-im/vector-web/issues/1389
+
+        // a state event, followed by a redaction thereof
+        var event = utils.mkMembership({
+            room: roomId, mship: "join", user: otherUserId
+        });
+        var redaction = utils.mkEvent({
+            type: "m.room.redaction",
+            room_id: roomId,
+            sender: otherUserId,
+            content: {}
+        });
+        redaction.redacts = event.event_id;
+
+        var syncData = {
+            next_batch: "batch1",
+            rooms: {
+                join: {},
+            },
+        };
+        syncData.rooms.join[roomId] = {
+            timeline: {
+                events: [
+                    event,
+                    redaction,
+                ],
+                limited: false,
+            },
+        };
+        httpBackend.when("GET", "/sync").respond(200, syncData);
+
+        httpBackend.flush().then(function() {
+            var room = client.getRoom(roomId);
+            var tl = room.getLiveTimeline();
+            expect(tl.getEvents().length).toEqual(3);
+            expect(tl.getEvents()[1].isRedacted()).toBe(true);
+
+            var sync2 = {
+                next_batch: "batch2",
+                rooms: {
+                    join: {},
+                },
+            };
+            sync2.rooms.join[roomId] = {
+                timeline: {
+                    events: [
+                        utils.mkMessage({
+                            room: roomId, user: otherUserId, msg: "world"
+                        }),
+                    ],
+                    limited: true,
+                    prev_batch: "newerTok",
+                },
+            };
+            httpBackend.when("GET", "/sync").respond(200, sync2);
+
+            return httpBackend.flush();
+        }).then(function() {
+            var room = client.getRoom(roomId);
+            var tl = room.getLiveTimeline();
+            expect(tl.getEvents().length).toEqual(1);
+        }).catch(utils.failTest).done(done);
+    });
 });
