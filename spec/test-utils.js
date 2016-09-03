@@ -48,7 +48,7 @@ module.exports.mock = function(constr, name) {
  * @param {Object} opts Values for the event.
  * @param {string} opts.type The event.type
  * @param {string} opts.room The event.room_id
- * @param {string} opts.user The event.user_id
+ * @param {string} opts.sender The event.sender
  * @param {string} opts.skey Optional. The state key (auto inserts empty string)
  * @param {Object} opts.content The event.content
  * @param {boolean} opts.event True to make a MatrixEvent.
@@ -61,7 +61,7 @@ module.exports.mkEvent = function(opts) {
     var event = {
         type: opts.type,
         room_id: opts.room,
-        sender: opts.user,
+        sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
@@ -88,7 +88,7 @@ module.exports.mkPresence = function(opts) {
     var event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
-        sender: opts.user,
+        sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: {
             avatar_url: opts.url,
             displayname: opts.name,
@@ -104,8 +104,8 @@ module.exports.mkPresence = function(opts) {
  * @param {Object} opts Values for the membership.
  * @param {string} opts.room The room ID for the event.
  * @param {string} opts.mship The content.membership for the event.
- * @param {string} opts.user The user ID for the event.
- * @param {string} opts.skey The other user ID for the event if applicable
+ * @param {string} opts.sender The sender user ID for the event.
+ * @param {string} opts.skey The target user ID for the event if applicable
  * e.g. for invites/bans.
  * @param {string} opts.name The content.displayname for the event.
  * @param {string} opts.url The content.avatar_url for the event.
@@ -115,7 +115,7 @@ module.exports.mkPresence = function(opts) {
 module.exports.mkMembership = function(opts) {
     opts.type = "m.room.member";
     if (!opts.skey) {
-        opts.skey = opts.user;
+        opts.skey = opts.sender || opts.user;
     }
     if (!opts.mship) {
         throw new Error("Missing .mship => " + JSON.stringify(opts));
