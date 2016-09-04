@@ -133,19 +133,19 @@ describe("TimelineIndex", function() {
 
 describe("TimelineWindow", function() {
     /**
-     * create a dummy room and client, and a TimelineWindow
+     * create a dummy eventTimelineSet and client, and a TimelineWindow
      * attached to them.
      */
-    var room, client;
+    var timelineSet, client;
     function createWindow(timeline, opts) {
-        room = {};
+        timelineSet = {};
         client = {};
-        client.getEventTimeline = function(room0, eventId0) {
-            expect(room0).toBe(room);
+        client.getEventTimeline = function(timelineSet0, eventId0) {
+            expect(timelineSet0).toBe(timelineSet);
             return q(timeline);
         };
 
-        return new TimelineWindow(client, room, opts);
+        return new TimelineWindow(client, timelineSet, opts);
     }
 
     beforeEach(function() {
@@ -169,15 +169,15 @@ describe("TimelineWindow", function() {
             var timeline = createTimeline();
             var eventId = timeline.getEvents()[1].getId();
 
-            var room = {};
+            var timelineSet = {};
             var client = {};
-            client.getEventTimeline = function(room0, eventId0) {
-                expect(room0).toBe(room);
+            client.getEventTimeline = function(timelineSet0, eventId0) {
+                expect(timelineSet0).toBe(timelineSet);
                 expect(eventId0).toEqual(eventId);
                 return q(timeline);
             };
 
-            var timelineWindow = new TimelineWindow(client, room);
+            var timelineWindow = new TimelineWindow(client, timelineSet);
             timelineWindow.load(eventId, 3).then(function() {
                 var expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
@@ -192,12 +192,12 @@ describe("TimelineWindow", function() {
 
             var eventId = timeline.getEvents()[1].getId();
 
-            var room = {};
+            var timelineSet = {};
             var client = {};
 
-            var timelineWindow = new TimelineWindow(client, room);
+            var timelineWindow = new TimelineWindow(client, timelineSet);
 
-            client.getEventTimeline = function(room0, eventId0) {
+            client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
                     .toBe(false);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
