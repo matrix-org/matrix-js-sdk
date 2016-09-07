@@ -18,7 +18,7 @@ function createTimeline(numEvents, baseIndex) {
     if (numEvents === undefined) { numEvents = 3; }
     if (baseIndex === undefined) { baseIndex = 1; }
 
-    var timeline = new EventTimeline(ROOM_ID);
+    var timeline = new EventTimeline({ roomId : ROOM_ID });
 
     // add the events after the baseIndex first
     addEventsToTimeline(timeline, numEvents - baseIndex, false);
