@@ -14,7 +14,7 @@ Copy ``dist/$VERSION/browser-matrix-$VERSION.js`` and add that as a ``<script>``
 your page. There will be a global variable ``matrixcs`` attached to
 ``window`` through which you can access the SDK.
 
-Please check [the working browser example](examples/browser) for more information. 
+Please check [the working browser example](examples/browser) for more information.
 
 In Node.js
 ----------
@@ -78,7 +78,7 @@ are updated.
   client.on("event", function(event) {
     console.log(event.getType());
   });
-  
+
   // Listen for typing changes
   client.on("RoomMember.typing", function(event, member) {
     if (member.typing) {
@@ -88,38 +88,43 @@ are updated.
       console.log(member.name + " stopped typing.");
     }
   });
-  
+
   // start the client to setup the connection to the server
   client.startClient();
 ```
 
-### Promises or Callbacks
+### Promises and Callbacks
 
-The SDK supports *both* callbacks and Promises (Q). The convention
-you'll see used is:
+Most of the methods in the SDK are asynchronous: they do not directly return a
+result, but instead return a [Promise](http://documentup.com/kriskowal/q/)
+which will be fulfilled in the future.
 
-```javascript
-  var promise = matrixClient.someMethod(arg1, arg2, callback);
-```
-  
-The ``callback`` parameter is optional, so you could do:
+The typical usage is something like:
 
 ```javascript
-  matrixClient.someMethod(arg1, arg2).then(function(err, result) {
+  matrixClient.someMethod(arg1, arg2).done(function(result) {
     ...
   });
 ```
 
-Alternatively, you could do:
+Alternatively, if you have a Node.js-style ``callback(err, result)`` function,
+you can pass the result of the promise into it with something like:
 
 ```javascript
-  matrixClient.someMethod(arg1, arg2, function(result) {
-    ...
-  });
+  matrixClient.someMethod(arg1, arg2).nodeify(callback);
 ```
-  
-Methods which support this will be clearly marked as returning
-``Promises``.
+
+The main thing to note is that it is an error to discard the result of a
+promise-returning function, as that will cause exceptions to go unobserved. If
+you have nothing better to do with the result, just call ``.done()`` on it. See
+http://documentup.com/kriskowal/q/#the-end for more information.
+
+Methods which return a promise show this in their documentation.
+
+Many methods in the SDK support *both* Node.js-style callbacks *and* Promises,
+via an optional ``callback`` argument. The callback support is now deprecated:
+new methods do not include a ``callback`` argument, and in the future it may be
+removed from existing methods.
 
 Examples
 --------
@@ -147,10 +152,10 @@ core functionality of the SDK. These examples assume the SDK is setup like this:
            });
        }
    });
-   
+
    matrixClient.startClient();
 ```
-   
+
 ### Print out messages for all rooms
 
 ```javascript
@@ -166,7 +171,7 @@ core functionality of the SDK. These examples assume the SDK is setup like this:
            "(%s) %s :: %s", room.name, event.getSender(), event.getContent().body
        );
    });
-   
+
    matrixClient.startClient();
 ```
 
@@ -198,10 +203,10 @@ Output:
            );
        }
    });
-   
+
    matrixClient.startClient();
 ```
-   
+
 Output:
 ```
   My Room
@@ -211,7 +216,7 @@ Output:
   (join) Bob
   (invite) @charlie:localhost
 ```
-  
+
 API Reference
 =============
 
@@ -226,7 +231,7 @@ host the API reference from the source files like this:
   $ cd .jsdoc
   $ python -m SimpleHTTPServer 8005
 ```
-  
+
 Then visit ``http://localhost:8005`` to see the API docs.
 
 Contributing
@@ -256,7 +261,7 @@ To run tests (Jasmine)::
 ```
  $ npm test
 ```
- 
+
 To run linting:
 ```
  $ npm run lint
