@@ -16,7 +16,7 @@ describe("EventTimeline", function() {
 
     beforeEach(function() {
         utils.beforeEach(this);
-        timeline = new EventTimeline({ roomId : roomId });
+        timeline = new EventTimeline({ roomId: roomId });
     });
 
     describe("construction", function() {
