@@ -523,13 +523,15 @@ describe("Room", function() {
         it("should return null for unknown events", function() {
             room.addLiveEvents(events);
 
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(), "xxx"))
-                .toBe(null);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering("xxx", events[0].getId()))
-                .toBe(null);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
-                                             events[0].getId()))
-                .toBe(0);
+            expect(room.getUnfilteredTimelineSet()
+                       .compareEventOrdering(events[0].getId(), "xxx"))
+                       .toBe(null);
+            expect(room.getUnfilteredTimelineSet()
+                       .compareEventOrdering("xxx", events[0].getId()))
+                       .toBe(null);
+            expect(room.getUnfilteredTimelineSet()
+                       .compareEventOrdering(events[0].getId(), events[0].getId()))
+                       .toBe(0);
         });
     });
 
