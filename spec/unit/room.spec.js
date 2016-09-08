@@ -479,13 +479,13 @@ describe("Room", function() {
         it("should handle events in the same timeline", function() {
             room.addLiveEvents(events);
 
-            expect(room._timelineSets[0].compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
                                                                events[1].getId()))
                 .toBeLessThan(0);
-            expect(room._timelineSets[0].compareEventOrdering(events[2].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[2].getId(),
                                                                events[1].getId()))
                 .toBeGreaterThan(0);
-            expect(room._timelineSets[0].compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
                                                                events[1].getId()))
                 .toEqual(0);
         });
@@ -498,10 +498,10 @@ describe("Room", function() {
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
 
-            expect(room._timelineSets[0].compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
                                                                events[1].getId()))
                 .toBeLessThan(0);
-            expect(room._timelineSets[0].compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
                                                                events[0].getId()))
                 .toBeGreaterThan(0);
         });
@@ -512,10 +512,10 @@ describe("Room", function() {
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
 
-            expect(room._timelineSets[0].compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
                                                                events[1].getId()))
                 .toBe(null);
-            expect(room._timelineSets[0].compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
                                                                events[0].getId()))
                 .toBe(null);
         });
@@ -523,11 +523,11 @@ describe("Room", function() {
         it("should return null for unknown events", function() {
             room.addLiveEvents(events);
 
-            expect(room._timelineSets[0].compareEventOrdering(events[0].getId(), "xxx"))
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(), "xxx"))
                 .toBe(null);
-            expect(room._timelineSets[0].compareEventOrdering("xxx", events[0].getId()))
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering("xxx", events[0].getId()))
                 .toBe(null);
-            expect(room._timelineSets[0].compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
                                              events[0].getId()))
                 .toBe(0);
         });
