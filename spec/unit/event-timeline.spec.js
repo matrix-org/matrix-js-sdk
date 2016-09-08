@@ -16,7 +16,9 @@ describe("EventTimeline", function() {
 
     beforeEach(function() {
         utils.beforeEach(this);
-        timeline = new EventTimeline({ roomId: roomId });
+        // XXX: this is a horrid hack; should use sinon or something instead
+        var timelineSet = { room: { roomId: roomId }};
+        timeline = new EventTimeline(timelineSet);
     });
 
     describe("construction", function() {

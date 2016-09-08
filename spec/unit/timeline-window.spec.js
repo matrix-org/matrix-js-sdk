@@ -18,7 +18,9 @@ function createTimeline(numEvents, baseIndex) {
     if (numEvents === undefined) { numEvents = 3; }
     if (baseIndex === undefined) { baseIndex = 1; }
 
-    var timeline = new EventTimeline({ roomId: ROOM_ID });
+    // XXX: this is a horrid hack
+    var timelineSet = { room: { roomId: ROOM_ID }};
+    var timeline = new EventTimeline(timelineSet);
 
     // add the events after the baseIndex first
     addEventsToTimeline(timeline, numEvents - baseIndex, false);
