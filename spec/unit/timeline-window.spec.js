@@ -20,6 +20,8 @@ function createTimeline(numEvents, baseIndex) {
 
     // XXX: this is a horrid hack
     var timelineSet = { room: { roomId: ROOM_ID }};
+    timelineSet.room.getUnfilteredTimelineSet = function() { return timelineSet; };
+
     var timeline = new EventTimeline(timelineSet);
 
     // add the events after the baseIndex first
