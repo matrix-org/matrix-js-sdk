@@ -16,7 +16,12 @@ describe("EventTimeline", function() {
 
     beforeEach(function() {
         utils.beforeEach(this);
-        timeline = new EventTimeline(roomId);
+
+        // XXX: this is a horrid hack; should use sinon or something instead to mock
+        var timelineSet = { room: { roomId: roomId }};
+        timelineSet.room.getUnfilteredTimelineSet = function() { return timelineSet; };
+
+        timeline = new EventTimeline(timelineSet);
     });
 
     describe("construction", function() {
