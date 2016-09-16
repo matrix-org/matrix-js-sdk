@@ -39,6 +39,6 @@
     "uglifyjs": "^2.4.10"
   },
   "optionalDependencies": {
-    "olm": "https://matrix.org/packages/npm/olm/olm-1.2.0.tgz"
+    "olm": "https://matrix.org/packages/npm/olm/olm-1.3.0.tgz"
   }
 }
