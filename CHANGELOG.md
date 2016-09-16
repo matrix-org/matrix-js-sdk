@@ -1,3 +1,10 @@
+Unreleased Changed:
+===================
+
+**BREAKING CHANGES**:
+ * /publicRooms now uses the new POST API. This is only present
+   on synapse versions 0.18.0-rc1 and later.
+
 Changes in [0.5.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.6) (2016-08-28)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.5...v0.5.6)
