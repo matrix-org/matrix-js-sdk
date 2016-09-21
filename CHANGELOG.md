@@ -1,3 +1,70 @@
+Changes in [0.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.0) (2016-09-21)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.6...v0.6.0)
+
+ * Pull user device list on join
+   [\#212](https://github.com/matrix-org/matrix-js-sdk/pull/212)
+ * Fix sending of oh_hais on bad sessions
+   [\#213](https://github.com/matrix-org/matrix-js-sdk/pull/213)
+ * Support /publicRooms pagination
+   [\#211](https://github.com/matrix-org/matrix-js-sdk/pull/211)
+ * Update the olm library version to 1.3.0
+   [\#205](https://github.com/matrix-org/matrix-js-sdk/pull/205)
+ * Comment what the logic in uploadKeys does
+   [\#209](https://github.com/matrix-org/matrix-js-sdk/pull/209)
+ * Include keysProved and keysClaimed in the local echo for events we send.
+   [\#210](https://github.com/matrix-org/matrix-js-sdk/pull/210)
+ * Check if we need to upload new one-time keys every 10 minutes
+   [\#208](https://github.com/matrix-org/matrix-js-sdk/pull/208)
+ * Reset oneTimeKey to null on each loop iteration.
+   [\#207](https://github.com/matrix-org/matrix-js-sdk/pull/207)
+ * Add getKeysProved and getKeysClaimed methods to MatrixEvent.
+   [\#206](https://github.com/matrix-org/matrix-js-sdk/pull/206)
+ * Send a 'm.new_device' when we get a message for an unknown group session
+   [\#204](https://github.com/matrix-org/matrix-js-sdk/pull/204)
+ * Introduce EventTimelineSet, filtered timelines and global notif timeline.
+   [\#196](https://github.com/matrix-org/matrix-js-sdk/pull/196)
+ * Wrap the crypto event handlers in try/catch blocks
+   [\#203](https://github.com/matrix-org/matrix-js-sdk/pull/203)
+ * Show warnings on to-device decryption fail
+   [\#202](https://github.com/matrix-org/matrix-js-sdk/pull/202)
+ * s/Displayname/DisplayName/
+   [\#201](https://github.com/matrix-org/matrix-js-sdk/pull/201)
+ * OH HAI
+   [\#200](https://github.com/matrix-org/matrix-js-sdk/pull/200)
+ * Share the current ratchet with new members
+   [\#199](https://github.com/matrix-org/matrix-js-sdk/pull/199)
+ * Move crypto bits into a subdirectory
+   [\#198](https://github.com/matrix-org/matrix-js-sdk/pull/198)
+ * Refactor event handling in Crypto
+   [\#197](https://github.com/matrix-org/matrix-js-sdk/pull/197)
+ * Don't create Olm sessions proactively
+   [\#195](https://github.com/matrix-org/matrix-js-sdk/pull/195)
+ * Use to-device events for key sharing
+   [\#194](https://github.com/matrix-org/matrix-js-sdk/pull/194)
+ * README: callbacks deprecated
+   [\#193](https://github.com/matrix-org/matrix-js-sdk/pull/193)
+ * Fix sender verification for megolm messages
+   [\#192](https://github.com/matrix-org/matrix-js-sdk/pull/192)
+ * Use `ciphertext` instead of `body` in megolm events
+   [\#191](https://github.com/matrix-org/matrix-js-sdk/pull/191)
+ * Add debug methods to get the state of OlmSessions
+   [\#189](https://github.com/matrix-org/matrix-js-sdk/pull/189)
+ * MatrixClient.getStoredDevicesForUser
+   [\#190](https://github.com/matrix-org/matrix-js-sdk/pull/190)
+ * Olm-related cleanups
+   [\#188](https://github.com/matrix-org/matrix-js-sdk/pull/188)
+ * Update to fixed olmlib
+   [\#187](https://github.com/matrix-org/matrix-js-sdk/pull/187)
+ * always play audio out of the remoteAudioElement if it exists.
+   [\#186](https://github.com/matrix-org/matrix-js-sdk/pull/186)
+ * Fix exceptions where HTMLMediaElement loads and plays race
+   [\#185](https://github.com/matrix-org/matrix-js-sdk/pull/185)
+ * Reset megolm session when people join/leave the room
+   [\#183](https://github.com/matrix-org/matrix-js-sdk/pull/183)
+ * Fix exceptions when dealing with redactions
+   [\#184](https://github.com/matrix-org/matrix-js-sdk/pull/184)
+
 Changes in [0.5.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.5.6) (2016-08-28)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.5...v0.5.6)
