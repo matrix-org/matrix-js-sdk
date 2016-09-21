@@ -1,3 +1,12 @@
+Changes in [0.6.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.1) (2016-09-21)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.0...v0.6.1)
+
+ * Fix the ed25519 key checking
+   [\#215](https://github.com/matrix-org/matrix-js-sdk/pull/215)
+ * Add MatrixClient.getEventSenderDeviceInfo()
+   [\#214](https://github.com/matrix-org/matrix-js-sdk/pull/214)
+
 Changes in [0.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.0) (2016-09-21)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.5.6...v0.6.0)
