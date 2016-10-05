@@ -1,3 +1,20 @@
+Changes in [0.6.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.2) (2016-10-05)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.1...v0.6.2)
+
+ * Check dependencies aren't on develop in release.sh
+   [\#221](https://github.com/matrix-org/matrix-js-sdk/pull/221)
+ * Fix checkTurnServers leak on logout
+   [\#220](https://github.com/matrix-org/matrix-js-sdk/pull/220)
+ * Fix leak of file upload objects
+   [\#219](https://github.com/matrix-org/matrix-js-sdk/pull/219)
+ * crypto: remove duplicate code
+   [\#218](https://github.com/matrix-org/matrix-js-sdk/pull/218)
+ * Add API for 3rd party location lookup
+   [\#217](https://github.com/matrix-org/matrix-js-sdk/pull/217)
+ * Handle the first /sync failure differently.
+   [\#216](https://github.com/matrix-org/matrix-js-sdk/pull/216)
+
 Changes in [0.6.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.1) (2016-09-21)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.0...v0.6.1)
