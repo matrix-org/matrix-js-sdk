@@ -3,8 +3,10 @@
 # Script to perform a release of matrix-js-sdk. Performs the steps documented
 # in RELEASING.md
 #
-# Requires github-changelog-generator; to install, do
-#   pip install git+https://github.com/matrix-org/github-changelog-generator.git
+# Requires:
+#   github-changelog-generator; to install, do
+#     pip install git+https://github.com/matrix-org/github-changelog-generator.git
+#   jq; install from your distibution's package manager (https://stedolan.github.io/jq/)
 
 set -e
 
@@ -19,6 +21,13 @@ $USAGE
     -z:                 skip generating the jsdoc
 EOF
 }
+
+ret=0
+cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+if [ "$ret" -eq 0 ]; then
+    echo "package.json contains develop dependencies. Refusing to release."
+    exit
+fi
 
 skip_changelog=
 skip_jsdoc=
