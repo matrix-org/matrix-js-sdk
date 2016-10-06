@@ -332,12 +332,8 @@ describe("MatrixClient", function() {
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
-            // We fail twice since the SDK ignores the first error.
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" }
-            });
-            httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE2" }
             });
             httpLookups.push({
                 method: "GET", path: "/sync", data: SYNC_DATA
@@ -359,12 +355,8 @@ describe("MatrixClient", function() {
 
         it("should transition SYNCING -> ERROR after a failed /sync", function(done) {
             var expectedStates = [];
-            // We fail twice since the SDK ignores the first error.
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
-            });
-            httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO2" }
             });
 
             expectedStates.push(["PREPARED", null]);
@@ -404,10 +396,6 @@ describe("MatrixClient", function() {
 
         it("should transition ERROR -> ERROR if multiple /sync fails", function(done) {
             var expectedStates = [];
-            // We fail twice since the SDK ignores the first error.
-            httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
-            });
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
             });
