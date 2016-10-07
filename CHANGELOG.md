@@ -1,3 +1,11 @@
+Unreleased Changes
+==================
+
+Breaking Changes
+----------------
+ * Add a 'RECONNECTING' state to the sync states. This is an additional state
+   between 'SYNCING' and 'ERROR', so most clients should not notice.
+
 Changes in [0.6.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.2) (2016-10-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.1...v0.6.2)

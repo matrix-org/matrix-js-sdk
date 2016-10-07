@@ -253,6 +253,8 @@ describe("MatrixClient", function() {
                         true, "retryImmediately returned false"
                     );
                     jasmine.Clock.tick(1);
+                } else if (state === "RECONNECTING" && httpLookups.length > 0) {
+                    jasmine.Clock.tick(10000);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -349,7 +351,8 @@ describe("MatrixClient", function() {
                 method: "GET", path: "/sync", data: SYNC_DATA
             });
 
-            expectedStates.push(["ERROR", null]);
+            expectedStates.push(["RECONNECTING", null]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["PREPARED", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
@@ -375,7 +378,8 @@ describe("MatrixClient", function() {
 
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["ERROR", "SYNCING"]);
+            expectedStates.push(["RECONNECTING", "SYNCING"]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
@@ -423,7 +427,8 @@ describe("MatrixClient", function() {
 
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["ERROR", "SYNCING"]);
+            expectedStates.push(["RECONNECTING", "SYNCING"]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
