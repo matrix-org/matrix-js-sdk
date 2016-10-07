@@ -51,9 +51,10 @@ describe("MatrixClient", function() {
         // }
         // items are popped off when processed and block if no items left.
     ];
+    var accept_keepalives;
     var pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
-        if (path === KEEP_ALIVE_PATH) {
+        if (path === KEEP_ALIVE_PATH && accept_keepalives) {
             return q();
         }
         var next = httpLookups.shift();
@@ -143,8 +144,10 @@ describe("MatrixClient", function() {
         client._http.authedRequest.andCallFake(httpReq);
         client._http.authedRequestWithPrefix.andCallFake(httpReq);
         client._http.requestWithPrefix.andCallFake(httpReq);
+        client._http.request.andCallFake(httpReq);
 
         // set reasonable working defaults
+        accept_keepalives = true;
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
@@ -250,6 +253,8 @@ describe("MatrixClient", function() {
                         true, "retryImmediately returned false"
                     );
                     jasmine.Clock.tick(1);
+                } else if (state === "RECONNECTING" && httpLookups.length > 0) {
+                    jasmine.Clock.tick(10000);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -329,6 +334,7 @@ describe("MatrixClient", function() {
         it("should transition ERROR -> PREPARED after /sync if prev failed",
         function(done) {
             var expectedStates = [];
+            accept_keepalives = false;
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
@@ -336,10 +342,17 @@ describe("MatrixClient", function() {
                 method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" }
             });
             httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+            });
+            httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH, data: {}
+            });
+            httpLookups.push({
                 method: "GET", path: "/sync", data: SYNC_DATA
             });
 
-            expectedStates.push(["ERROR", null]);
+            expectedStates.push(["RECONNECTING", null]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["PREPARED", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
@@ -354,14 +367,19 @@ describe("MatrixClient", function() {
         });
 
         it("should transition SYNCING -> ERROR after a failed /sync", function(done) {
+            accept_keepalives = false;
             var expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
             });
+            httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+            });
 
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["ERROR", "SYNCING"]);
+            expectedStates.push(["RECONNECTING", "SYNCING"]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
@@ -394,18 +412,23 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        it("should transition ERROR -> ERROR if multiple /sync fails", function(done) {
+        it("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
+            accept_keepalives = false;
             var expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
             });
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
+                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+            });
+            httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
             });
 
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            expectedStates.push(["ERROR", "SYNCING"]);
+            expectedStates.push(["RECONNECTING", "SYNCING"]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
