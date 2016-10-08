@@ -11,18 +11,17 @@ function HttpBackend() {
     var self = this;
     // the request function dependency that the SDK needs.
     this.requestFn = function(opts, callback) {
-        var realReq = new Request(opts.method, opts.uri, opts.body, opts.qs);
-        realReq.callback = callback;
-        console.log("HTTP backend received request: %s %s", opts.method, opts.uri);
-        self.requests.push(realReq);
+        var req = new Request(opts, callback);
+        console.log("HTTP backend received request: %s", req);
+        self.requests.push(req);
 
         var abort = function() {
-            var idx = self.requests.indexOf(realReq);
+            var idx = self.requests.indexOf(req);
             if (idx >= 0) {
                 console.log("Aborting HTTP request: %s %s", opts.method,
                             opts.uri);
                 self.requests.splice(idx, 1);
-                realReq.callback("aborted");
+                req.callback("aborted");
             }
         };
 
@@ -161,22 +160,32 @@ HttpBackend.prototype = {
      * @return {Request} An expected request.
      */
     when: function(method, path, data) {
-        var pendingReq = new Request(method, path, data);
+        var pendingReq = new ExpectedRequest(method, path, data);
         this.expectedRequests.push(pendingReq);
         return pendingReq;
     }
 };
 
-function Request(method, path, data, queryParams) {
+/**
+ * Represents the expectation of a request.
+ *
+ * <p>Includes the conditions to be matched against, the checks to be made,
+ * and the response to be returned.
+ *
+ * @constructor
+ * @param {string} method
+ * @param {string} path
+ * @param {object?} data
+ */
+function ExpectedRequest(method, path, data) {
     this.method = method;
     this.path = path;
     this.data = data;
-    this.queryParams = queryParams;
-    this.callback = null;
     this.response = null;
     this.checks = [];
 }
-Request.prototype = {
+
+ExpectedRequest.prototype = {
     /**
      * Execute a check when this request has been satisfied.
      * @param {Function} fn The function to execute.
@@ -219,6 +228,44 @@ Request.prototype = {
             err: err
         };
     }
+};
+
+/**
+ * Represents a request made by the app.
+ *
+ * @constructor
+ * @param {object} opts opts passed to request()
+ * @param {function} callback
+ */
+function Request(opts, callback) {
+    this.opts = opts;
+    this.callback = callback;
+
+    Object.defineProperty(this, 'method', {
+        get: function() { return opts.method; }
+    });
+
+    Object.defineProperty(this, 'path', {
+        get: function() { return opts.uri; }
+    });
+
+    Object.defineProperty(this, 'data', {
+        get: function() { return opts.body; }
+    });
+
+    Object.defineProperty(this, 'queryParams', {
+        get: function() { return opts.qs; }
+    });
+
+    Object.defineProperty(this, 'headers', {
+        get: function() { return opts.headers || {}; }
+    });
+}
+
+Request.prototype = {
+    toString: function() {
+        return this.method + " " + this.path;
+    },
 };
 
 /**

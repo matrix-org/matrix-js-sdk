@@ -37,6 +37,74 @@ describe("MatrixClient", function() {
         httpBackend.verifyNoOutstandingExpectation();
     });
 
+    describe("uploadContent", function() {
+        var buf = new Buffer('hello world');
+        it("should upload the file", function(done) {
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                console.log("Request", req);
+
+                expect(req.data).toEqual(buf);
+                expect(req.queryParams.filename).toEqual("hi.txt");
+                expect(req.queryParams.access_token).toEqual(accessToken);
+                expect(req.headers["Content-Type"]).toEqual("text/plain");
+                expect(req.opts.json).toBeFalsy();
+                expect(req.opts.timeout).toBe(undefined);
+            }).respond(200, {
+                "content_uri": "uri"
+            });
+
+            var prom = client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            });
+
+            expect(prom).toBeDefined();
+
+            var uploads = client.getCurrentUploads();
+            expect(uploads.length).toEqual(1);
+            expect(uploads[0].promise).toBe(prom);
+            expect(uploads[0].loaded).toEqual(0);
+
+            prom.then(function(response) {
+                console.log("Response", response);
+                expect(response.content_uri).toEqual("uri");
+
+                var uploads = client.getCurrentUploads();
+                expect(uploads.length).toEqual(0);
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should return a promise which can be cancelled", function(done) {
+            var prom = client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            });
+
+            var uploads = client.getCurrentUploads();
+            expect(uploads.length).toEqual(1);
+            expect(uploads[0].promise).toBe(prom);
+            expect(uploads[0].loaded).toEqual(0);
+
+            prom.then(function(response) {
+                throw Error("request not aborted");
+            }, function(error) {
+                expect(error).toEqual("aborted");
+
+                var uploads = client.getCurrentUploads();
+                expect(uploads.length).toEqual(0);
+            }).catch(utils.failTest).done(done);
+
+            var r = client.cancelUpload(prom);
+            expect(r).toBe(true);
+        });
+    });
+
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
             var roomId = "!foo:bar";
