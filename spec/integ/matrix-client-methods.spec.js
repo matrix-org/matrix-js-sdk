@@ -383,6 +383,23 @@ describe("MatrixClient", function() {
             httpBackend.flush();
         });
     });
+
+    describe("deleteDevice", function() {
+        var auth = {a: 1};
+        it("should pass through an auth dict", function(done) {
+            httpBackend.when(
+                "DELETE", "/_matrix/client/unstable/devices/my_device"
+            ).check(function(req) {
+                expect(req.data).toEqual({auth: auth});
+            }).respond(200);
+
+            client.deleteDevice(
+                "my_device", auth
+            ).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+    });
 });
 
 function assertObjectContains(obj, expected) {
