@@ -103,6 +103,7 @@ describe("MatrixClient", function() {
             if (next.error) {
                 return q.reject({
                     errcode: next.error.errcode,
+                    httpStatus: next.error.httpStatus,
                     name: next.error.errcode,
                     message: "Expected testing error",
                     data: next.error
@@ -201,6 +202,44 @@ describe("MatrixClient", function() {
                 }
             });
             client.startClient();
+        });
+    });
+
+    describe("getOrCreateFilter", function() {
+        it("should POST createFilter if no id is present in localStorage", function() {
+        });
+        it("should use an existing filter if id is present in localStorage", function() {
+        });
+        it("should handle localStorage filterId missing from the server", function(done) {
+            function getFilterName(userId, suffix) {
+                // scope this on the user ID because people may login on many accounts
+                // and they all need to be stored!
+                return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
+            }
+            var invalidFilterId = 'invalidF1lt3r';
+            httpLookups = [];
+            httpLookups.push({
+                method: "GET",
+                path: FILTER_PATH + '/' + invalidFilterId,
+                error: {
+                    errcode: "M_UNKNOWN",
+                    name: "M_UNKNOWN",
+                    message: "No row found",
+                    data: { errcode: "M_UNKNOWN", error: "No row found" },
+                    httpStatus: 404
+                }
+            });
+            httpLookups.push(FILTER_RESPONSE);
+            store.getFilterIdByName.andReturn(invalidFilterId);
+
+            var filterName = getFilterName(client.credentials.userId);
+            client.store.setFilterIdByName(filterName, invalidFilterId);
+            var filter = new sdk.Filter(client.credentials.userId);
+
+            client.getOrCreateFilter(filterName, filter).then(function(filterId) {
+                expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
+                done();
+            });
         });
     });
 
