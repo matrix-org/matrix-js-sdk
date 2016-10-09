@@ -75,6 +75,26 @@ describe("MatrixClient", function() {
             httpBackend.flush();
         });
 
+        it("should parse the response if rawResponse=false", function(done) {
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                expect(req.opts.json).toBeFalsy();
+            }).respond(200, JSON.stringify({ "content_uri": "uri" }));
+
+            client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            }, {
+                rawResponse: false,
+            }).then(function(response) {
+                expect(response.content_uri).toEqual("uri");
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
         it("should parse errors into a MatrixError", function(done) {
             // opts.json is false, so request returns unparsed json.
             httpBackend.when(
