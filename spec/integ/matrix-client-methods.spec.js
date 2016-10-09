@@ -43,17 +43,13 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload"
             ).check(function(req) {
-                console.log("Request", req);
-
                 expect(req.data).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
                 expect(req.queryParams.access_token).toEqual(accessToken);
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 expect(req.opts.json).toBeFalsy();
                 expect(req.opts.timeout).toBe(undefined);
-            }).respond(200, {
-                "content_uri": "uri"
-            });
+            }).respond(200, "content");
 
             var prom = client.uploadContent({
                 stream: buf,
@@ -69,11 +65,38 @@ describe("MatrixClient", function() {
             expect(uploads[0].loaded).toEqual(0);
 
             prom.then(function(response) {
-                console.log("Response", response);
-                expect(response.content_uri).toEqual("uri");
+                // for backwards compatibility, we return the raw JSON
+                expect(response).toEqual("content");
 
                 var uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should parse errors into a MatrixError", function(done) {
+            // opts.json is false, so request returns unparsed json.
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                expect(req.data).toEqual(buf);
+                expect(req.opts.json).toBeFalsy();
+            }).respond(400, JSON.stringify({
+                "errcode": "M_SNAFU",
+                "error": "broken",
+            }));
+
+            client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            }).then(function(response) {
+                throw Error("request not failed");
+            }, function(error) {
+                expect(error.httpStatus).toEqual(400);
+                expect(error.errcode).toEqual("M_SNAFU");
+                expect(error.message).toEqual("broken");
             }).catch(utils.failTest).done(done);
 
             httpBackend.flush();
