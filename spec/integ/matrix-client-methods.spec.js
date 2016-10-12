@@ -37,6 +37,117 @@ describe("MatrixClient", function() {
         httpBackend.verifyNoOutstandingExpectation();
     });
 
+    describe("uploadContent", function() {
+        var buf = new Buffer('hello world');
+        it("should upload the file", function(done) {
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                expect(req.data).toEqual(buf);
+                expect(req.queryParams.filename).toEqual("hi.txt");
+                expect(req.queryParams.access_token).toEqual(accessToken);
+                expect(req.headers["Content-Type"]).toEqual("text/plain");
+                expect(req.opts.json).toBeFalsy();
+                expect(req.opts.timeout).toBe(undefined);
+            }).respond(200, "content");
+
+            var prom = client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            });
+
+            expect(prom).toBeDefined();
+
+            var uploads = client.getCurrentUploads();
+            expect(uploads.length).toEqual(1);
+            expect(uploads[0].promise).toBe(prom);
+            expect(uploads[0].loaded).toEqual(0);
+
+            prom.then(function(response) {
+                // for backwards compatibility, we return the raw JSON
+                expect(response).toEqual("content");
+
+                var uploads = client.getCurrentUploads();
+                expect(uploads.length).toEqual(0);
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should parse the response if rawResponse=false", function(done) {
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                expect(req.opts.json).toBeFalsy();
+            }).respond(200, JSON.stringify({ "content_uri": "uri" }));
+
+            client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            }, {
+                rawResponse: false,
+            }).then(function(response) {
+                expect(response.content_uri).toEqual("uri");
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should parse errors into a MatrixError", function(done) {
+            // opts.json is false, so request returns unparsed json.
+            httpBackend.when(
+                "POST", "/_matrix/media/v1/upload"
+            ).check(function(req) {
+                expect(req.data).toEqual(buf);
+                expect(req.opts.json).toBeFalsy();
+            }).respond(400, JSON.stringify({
+                "errcode": "M_SNAFU",
+                "error": "broken",
+            }));
+
+            client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            }).then(function(response) {
+                throw Error("request not failed");
+            }, function(error) {
+                expect(error.httpStatus).toEqual(400);
+                expect(error.errcode).toEqual("M_SNAFU");
+                expect(error.message).toEqual("broken");
+            }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+
+        it("should return a promise which can be cancelled", function(done) {
+            var prom = client.uploadContent({
+                stream: buf,
+                name: "hi.txt",
+                type: "text/plain",
+            });
+
+            var uploads = client.getCurrentUploads();
+            expect(uploads.length).toEqual(1);
+            expect(uploads[0].promise).toBe(prom);
+            expect(uploads[0].loaded).toEqual(0);
+
+            prom.then(function(response) {
+                throw Error("request not aborted");
+            }, function(error) {
+                expect(error).toEqual("aborted");
+
+                var uploads = client.getCurrentUploads();
+                expect(uploads.length).toEqual(0);
+            }).catch(utils.failTest).done(done);
+
+            var r = client.cancelUpload(prom);
+            expect(r).toBe(true);
+        });
+    });
+
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
             var roomId = "!foo:bar";

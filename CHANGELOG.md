@@ -1,3 +1,31 @@
+Changes in [0.6.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.3) (2016-10-12)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.2...v0.6.3)
+
+Breaking Changes
+----------------
+ * Add a 'RECONNECTING' state to the sync states. This is an additional state
+   between 'SYNCING' and 'ERROR', so most clients should not notice.
+
+Other Changes
+----------------
+ * Fix params getting replaced on register calls
+   [\#233](https://github.com/matrix-org/matrix-js-sdk/pull/233)
+ * Fix potential 30s delay on reconnect
+   [\#232](https://github.com/matrix-org/matrix-js-sdk/pull/232)
+ * uploadContent: Attempt some consistency between browser and node
+   [\#230](https://github.com/matrix-org/matrix-js-sdk/pull/230)
+ * Fix error handling on uploadContent
+   [\#229](https://github.com/matrix-org/matrix-js-sdk/pull/229)
+ * Fix uploadContent for node.js
+   [\#226](https://github.com/matrix-org/matrix-js-sdk/pull/226)
+ * Don't emit ERROR until a keepalive poke fails
+   [\#223](https://github.com/matrix-org/matrix-js-sdk/pull/223)
+ * Function to get the fallback url for interactive auth
+   [\#224](https://github.com/matrix-org/matrix-js-sdk/pull/224)
+ * Revert "Handle the first /sync failure differently."
+   [\#222](https://github.com/matrix-org/matrix-js-sdk/pull/222)
+
 Changes in [0.6.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.2) (2016-10-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.1...v0.6.2)
