@@ -28,4 +28,6 @@ rm -f matrix-js-sdk-*.tgz
 npm pack ||
     fail "npm pack finished with return code $?"
 
+npm run gendoc || fail "JSDoc failed with code $?"
+
 exit $RC
