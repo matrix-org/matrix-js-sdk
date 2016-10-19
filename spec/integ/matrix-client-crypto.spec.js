@@ -529,6 +529,77 @@ describe("MatrixClient crypto", function() {
             .catch(test_utils.failTest).done(done);
     });
 
+    it("Ali gets keys with an incorrect userId", function(done) {
+        var eveUserId = "@eve:localhost";
+
+        var bobDeviceKeys = {
+            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+            device_id: 'bvcxz',
+            keys: {
+                'ed25519:bvcxz': 'pYuWKMCVuaDLRTM/eWuB8OlXEb61gZhfLVJ+Y54tl0Q',
+                'curve25519:bvcxz': '7Gni0loo/nzF0nFp9847RbhElGewzwUXHPrljjBGPTQ',
+            },
+            user_id: '@eve:localhost',
+            signatures: {
+                '@eve:localhost': {
+                    'ed25519:bvcxz': 'CliUPZ7dyVPBxvhSA1d+X+LYa5b2AYdjcTwG' +
+                        '0stXcIxjaJNemQqtdgwKDtBFl3pN2I13SEijRDCf1A8bYiQMDg',
+                },
+            },
+        };
+
+        var bobKeys = {};
+        bobKeys[bobDeviceId] = bobDeviceKeys;
+        aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+            var result = {};
+            result[bobUserId] = bobKeys;
+            return {device_keys: result};
+        });
+
+        q.all(
+            aliClient.downloadKeys([bobUserId, eveUserId]),
+            aliHttpBackend.flush("/keys/query", 1)
+        ).then(function() {
+            // should get an empty list
+            expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
+            expect(aliClient.listDeviceKeys(eveUserId)).toEqual([]);
+        }).catch(test_utils.failTest).done(done);
+    });
+
+    it("Ali gets keys with an incorrect deviceId", function(done) {
+        var bobDeviceKeys = {
+            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+            device_id: 'bad_device',
+            keys: {
+                'ed25519:bad_device': 'e8XlY5V8x2yJcwa5xpSzeC/QVOrU+D5qBgyTK0ko+f0',
+                'curve25519:bad_device': 'YxuuLG/4L5xGeP8XPl5h0d7DzyYVcof7J7do+OXz0xc',
+            },
+            user_id: '@bob:localhost',
+            signatures: {
+                '@bob:localhost': {
+                    'ed25519:bad_device': 'fEFTq67RaSoIEVBJ8DtmRovbwUBKJ0A' +
+                        'me9m9PDzM9azPUwZ38Xvf6vv1A7W1PSafH4z3Y2ORIyEnZgHaNby3CQ',
+                },
+            },
+        };
+
+        var bobKeys = {};
+        bobKeys[bobDeviceId] = bobDeviceKeys;
+        aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+            var result = {};
+            result[bobUserId] = bobKeys;
+            return {device_keys: result};
+        });
+
+        q.all(
+            aliClient.downloadKeys([bobUserId]),
+            aliHttpBackend.flush("/keys/query", 1)
+        ).then(function() {
+            // should get an empty list
+            expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
+        }).catch(test_utils.failTest).done(done);
+    });
+
     it("Ali enables encryption", function(done) {
         q()
             .then(bobUploadsKeys)
