@@ -338,15 +338,15 @@ function expectSendMessageRequest(httpBackend) {
 
 function aliRecvMessage() {
     var message = bobMessages.shift();
-    return recvMessage(aliHttpBackend, aliClient, message);
+    return recvMessage(aliHttpBackend, aliClient, bobUserId, message);
 }
 
 function bobRecvMessage() {
     var message = aliMessages.shift();
-    return recvMessage(bobHttpBackend, bobClient, message);
+    return recvMessage(bobHttpBackend, bobClient, aliUserId, message);
 }
 
-function recvMessage(httpBackend, client, message) {
+function recvMessage(httpBackend, client, sender, message) {
     var syncData = {
         next_batch: "x",
         rooms: {
@@ -361,7 +361,8 @@ function recvMessage(httpBackend, client, message) {
                 test_utils.mkEvent({
                     type: "m.room.encrypted",
                     room: roomId,
-                    content: message
+                    content: message,
+                    sender: sender,
                 })
             ]
         }
@@ -554,6 +555,63 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobStartClient)
             .then(bobRecvMessage)
+            .catch(test_utils.failTest).done(done);
+    });
+
+    it("Bob receives a message with a bogus sender", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliStartClient)
+            .then(aliEnablesEncryption)
+            .then(aliSendsFirstMessage)
+            .then(bobStartClient)
+            .then(function() {
+                var message = aliMessages.shift();
+                var syncData = {
+                    next_batch: "x",
+                    rooms: {
+                        join: {
+
+                        }
+                    }
+                };
+                syncData.rooms.join[roomId] = {
+                    timeline: {
+                        events: [
+                            test_utils.mkEvent({
+                                type: "m.room.encrypted",
+                                room: roomId,
+                                content: message,
+                                sender: "@bogus:sender",
+                            })
+                        ]
+                    }
+                };
+                bobHttpBackend.when("GET", "/sync").respond(200, syncData);
+
+                var deferred = q.defer();
+                var onEvent = function(event) {
+                    console.log(bobClient.credentials.userId + " received event",
+                                event);
+
+                    // ignore the m.room.member events
+                    if (event.getType() == "m.room.member") {
+                        return;
+                    }
+
+                    expect(event.getType()).toEqual("m.room.message");
+                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
+                    expect(event.isEncrypted()).toBeTruthy();
+
+                    bobClient.removeListener("event", onEvent);
+                    deferred.resolve();
+                };
+
+                bobClient.on("event", onEvent);
+
+                bobHttpBackend.flush();
+                return deferred.promise;
+            })
             .catch(test_utils.failTest).done(done);
     });
 
