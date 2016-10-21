@@ -61,7 +61,7 @@ function expectKeyUpload(deviceId, httpBackend) {
         expect(content.one_time_keys).not.toBeDefined();
         expect(content.device_keys).toBeDefined();
         keys.device_keys = content.device_keys;
-        return {one_time_key_counts: {curve25519: 0}};
+        return {one_time_key_counts: {signed_curve25519: 0}};
     });
 
     httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
@@ -76,7 +76,7 @@ function expectKeyUpload(deviceId, httpBackend) {
         }
         expect(count).toEqual(5);
         keys.one_time_keys = content.one_time_keys;
-        return {one_time_key_counts: {curve25519: count}};
+        return {one_time_key_counts: {signed_curve25519: count}};
     });
 
     return httpBackend.flush(uploadPath, 2).then(function() {
@@ -176,10 +176,11 @@ function expectAliClaimKeys() {
     expect(bobOneTimeKeys).toBeDefined();
 
     aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
-        expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
+        var claimType = content.one_time_keys[bobUserId][bobDeviceId];
+        expect(claimType).toEqual("signed_curve25519");
         for (var keyId in bobOneTimeKeys) {
             if (bobOneTimeKeys.hasOwnProperty(keyId)) {
-                if (keyId.indexOf("curve25519:") === 0) {
+                if (keyId.indexOf(claimType + ":") === 0) {
                     break;
                 }
             }
