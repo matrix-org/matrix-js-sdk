@@ -33,6 +33,7 @@
     "git-hooks",
     "git-revision.txt",
     "index.js",
+    "browser-index.js",
     "jenkins.sh",
     "lib",
     "package.json",
