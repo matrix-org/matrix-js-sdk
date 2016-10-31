@@ -6,7 +6,7 @@ coverage
 lib-cov
 out
 reports
-dist/browser-matrix-dev.js
+dist
 
 # version file and tarball created by 'npm pack'
 /git-revision.txt
