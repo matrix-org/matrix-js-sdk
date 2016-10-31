@@ -1,5 +1,3 @@
-# Keep this file in sync with .npmignore.
-
 .jsdoc
 node_modules
 .lock-wscript

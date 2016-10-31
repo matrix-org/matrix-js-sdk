@@ -23,6 +23,23 @@
   "browser": "browser-index.js",
   "author": "matrix.org",
   "license": "Apache-2.0",
+  "files": [
+    "CHANGELOG.md",
+    "CONTRIBUTING.rst",
+    "LICENSE",
+    "README.md",
+    "RELEASING.md",
+    "examples",
+    "git-hooks",
+    "git-revision.txt",
+    "index.js",
+    "browser-index.js",
+    "jenkins.sh",
+    "lib",
+    "package.json",
+    "release.sh",
+    "spec"
+  ],
   "dependencies": {
     "another-json": "^0.2.0",
     "browser-request": "^0.3.3",
