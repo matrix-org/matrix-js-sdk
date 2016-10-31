@@ -1,3 +1,13 @@
+Unreleased changes
+==================
+
+Breaking Changes
+----------------
+ * Bundled version of the JS SDK are no longer versioned along with
+   source files in the dist/ directory. As of this release, they
+   will be included in the release tarball, but not the source
+   repository.
+
 Changes in [0.6.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.3) (2016-10-12)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.2...v0.6.3)

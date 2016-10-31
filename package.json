@@ -7,12 +7,10 @@
     "test": "istanbul cover --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" jasmine-node -- spec --verbose --junitreport --captureExceptions",
     "check": "jasmine-node spec --verbose --junitreport --captureExceptions",
     "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
-    "build": "jshint -c .jshint lib/ && browserify browser-index.js -o dist/browser-matrix-dev.js --ignore-missing",
-    "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
+    "build": "jshint -c .jshint lib/ && rimraf dist && mkdir dist && browserify --exclude olm browser-index.js -o dist/browser-matrix.js --ignore-missing && uglifyjs -c -m -o dist/browser-matrix.min.js dist/browser-matrix.js",
+    "watch": "watchify --exclude olm browser-index.js -o dist/browser-matrix-dev.js -v",
     "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200,0222,0212 --max_line_length 90 -r spec/ -r lib/",
-    "release": "npm run build && mkdir -p dist/$npm_package_version && uglifyjs -c -m -o dist/$npm_package_version/browser-matrix-$npm_package_version.min.js dist/browser-matrix-dev.js && cp dist/browser-matrix-dev.js dist/$npm_package_version/browser-matrix-$npm_package_version.js",
-    "prepublish": "git rev-parse HEAD > git-revision.txt",
-    "version": "npm run release && git add dist/$npm_package_version"
+    "prepublish": "git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
@@ -48,12 +46,13 @@
     "request": "^2.53.0"
   },
   "devDependencies": {
-    "watchify": "^3.2.1",
     "istanbul": "^0.3.13",
     "jasmine-node": "^1.14.5",
-    "jshint": "^2.8.0",
     "jsdoc": "^3.4.0",
-    "uglifyjs": "^2.4.10"
+    "jshint": "^2.8.0",
+    "rimraf": "^2.5.4",
+    "uglifyjs": "^2.4.10",
+    "watchify": "^3.2.1"
   },
   "optionalDependencies": {
     "olm": "https://matrix.org/packages/npm/olm/olm-1.3.0.tgz"
