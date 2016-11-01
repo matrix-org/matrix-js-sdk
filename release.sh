@@ -10,6 +10,9 @@
 
 set -e
 
+jq --version > /dev/null || (echo "jq is required: please install it"; exit)
+hub --version > /dev/null || (echo "hub is required: please install it"; exit)
+
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
 help() {
@@ -54,6 +57,10 @@ shift `expr $OPTIND - 1`
 if [ $# -ne 1 ]; then
     echo "Usage: $USAGE" >&2
     exit 1
+fi
+
+if [ -z "$skip_changelog" ]; then
+	update_changelog --version > /dev/null || echo "github-changelog-generator is required: please install it"; exit
 fi
 
 # ignore leading v on release
