@@ -64,7 +64,7 @@ rel_branch="release-$tag"
 prerelease=0
 # We check if this build is a prerelease by looking to
 # see if the version has a hyphen in it. Crude,
-# but semver doesn't support postreleaseses so anything
+# but semver doesn't support postreleases so anything
 # with a hyphen is a prerelease.
 echo $release | grep -q '-' && prerelease=1
 
