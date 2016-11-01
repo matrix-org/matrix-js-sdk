@@ -11,9 +11,9 @@ Quickstart
 In a browser
 ------------
 Download either the full or minified version from
-https://github.com/dbkr/test/releases/latest and add that as a ``<script>`` to
-your page. There will be a global variable ``matrixcs`` attached to ``window``
-through which you can access the SDK.
+https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
+``<script>`` to your page. There will be a global variable ``matrixcs``
+attached to ``window`` through which you can access the SDK.
 
 Please check [the working browser example](examples/browser) for more information.
 
