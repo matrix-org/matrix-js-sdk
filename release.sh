@@ -98,6 +98,7 @@ if [[ "$curbranch" != release* ]]; then
     git checkout -b "$rel_branch"
 else
     echo "Using current branch ($curbranch) for release"
+    rel_branch=$curbranch
 fi
 
 if [ -z "$skip_changelog" ]; then
