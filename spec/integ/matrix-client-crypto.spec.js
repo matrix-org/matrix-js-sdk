@@ -61,7 +61,7 @@ function expectKeyUpload(deviceId, httpBackend) {
         expect(content.one_time_keys).not.toBeDefined();
         expect(content.device_keys).toBeDefined();
         keys.device_keys = content.device_keys;
-        return {one_time_key_counts: {curve25519: 0}};
+        return {one_time_key_counts: {signed_curve25519: 0}};
     });
 
     httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
@@ -76,7 +76,7 @@ function expectKeyUpload(deviceId, httpBackend) {
         }
         expect(count).toEqual(5);
         keys.one_time_keys = content.one_time_keys;
-        return {one_time_key_counts: {curve25519: count}};
+        return {one_time_key_counts: {signed_curve25519: count}};
     });
 
     return httpBackend.flush(uploadPath, 2).then(function() {
@@ -176,10 +176,11 @@ function expectAliClaimKeys() {
     expect(bobOneTimeKeys).toBeDefined();
 
     aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
-        expect(content.one_time_keys[bobUserId][bobDeviceId]).toEqual("curve25519");
+        var claimType = content.one_time_keys[bobUserId][bobDeviceId];
+        expect(claimType).toEqual("signed_curve25519");
         for (var keyId in bobOneTimeKeys) {
             if (bobOneTimeKeys.hasOwnProperty(keyId)) {
-                if (keyId.indexOf("curve25519:") === 0) {
+                if (keyId.indexOf(claimType + ":") === 0) {
                     break;
                 }
             }
@@ -338,15 +339,15 @@ function expectSendMessageRequest(httpBackend) {
 
 function aliRecvMessage() {
     var message = bobMessages.shift();
-    return recvMessage(aliHttpBackend, aliClient, message);
+    return recvMessage(aliHttpBackend, aliClient, bobUserId, message);
 }
 
 function bobRecvMessage() {
     var message = aliMessages.shift();
-    return recvMessage(bobHttpBackend, bobClient, message);
+    return recvMessage(bobHttpBackend, bobClient, aliUserId, message);
 }
 
-function recvMessage(httpBackend, client, message) {
+function recvMessage(httpBackend, client, sender, message) {
     var syncData = {
         next_batch: "x",
         rooms: {
@@ -361,7 +362,8 @@ function recvMessage(httpBackend, client, message) {
                 test_utils.mkEvent({
                     type: "m.room.encrypted",
                     room: roomId,
-                    content: message
+                    content: message,
+                    sender: sender,
                 })
             ]
         }
@@ -529,6 +531,77 @@ describe("MatrixClient crypto", function() {
             .catch(test_utils.failTest).done(done);
     });
 
+    it("Ali gets keys with an incorrect userId", function(done) {
+        var eveUserId = "@eve:localhost";
+
+        var bobDeviceKeys = {
+            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+            device_id: 'bvcxz',
+            keys: {
+                'ed25519:bvcxz': 'pYuWKMCVuaDLRTM/eWuB8OlXEb61gZhfLVJ+Y54tl0Q',
+                'curve25519:bvcxz': '7Gni0loo/nzF0nFp9847RbhElGewzwUXHPrljjBGPTQ',
+            },
+            user_id: '@eve:localhost',
+            signatures: {
+                '@eve:localhost': {
+                    'ed25519:bvcxz': 'CliUPZ7dyVPBxvhSA1d+X+LYa5b2AYdjcTwG' +
+                        '0stXcIxjaJNemQqtdgwKDtBFl3pN2I13SEijRDCf1A8bYiQMDg',
+                },
+            },
+        };
+
+        var bobKeys = {};
+        bobKeys[bobDeviceId] = bobDeviceKeys;
+        aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+            var result = {};
+            result[bobUserId] = bobKeys;
+            return {device_keys: result};
+        });
+
+        q.all(
+            aliClient.downloadKeys([bobUserId, eveUserId]),
+            aliHttpBackend.flush("/keys/query", 1)
+        ).then(function() {
+            // should get an empty list
+            expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
+            expect(aliClient.listDeviceKeys(eveUserId)).toEqual([]);
+        }).catch(test_utils.failTest).done(done);
+    });
+
+    it("Ali gets keys with an incorrect deviceId", function(done) {
+        var bobDeviceKeys = {
+            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+            device_id: 'bad_device',
+            keys: {
+                'ed25519:bad_device': 'e8XlY5V8x2yJcwa5xpSzeC/QVOrU+D5qBgyTK0ko+f0',
+                'curve25519:bad_device': 'YxuuLG/4L5xGeP8XPl5h0d7DzyYVcof7J7do+OXz0xc',
+            },
+            user_id: '@bob:localhost',
+            signatures: {
+                '@bob:localhost': {
+                    'ed25519:bad_device': 'fEFTq67RaSoIEVBJ8DtmRovbwUBKJ0A' +
+                        'me9m9PDzM9azPUwZ38Xvf6vv1A7W1PSafH4z3Y2ORIyEnZgHaNby3CQ',
+                },
+            },
+        };
+
+        var bobKeys = {};
+        bobKeys[bobDeviceId] = bobDeviceKeys;
+        aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+            var result = {};
+            result[bobUserId] = bobKeys;
+            return {device_keys: result};
+        });
+
+        q.all(
+            aliClient.downloadKeys([bobUserId]),
+            aliHttpBackend.flush("/keys/query", 1)
+        ).then(function() {
+            // should get an empty list
+            expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
+        }).catch(test_utils.failTest).done(done);
+    });
+
     it("Ali enables encryption", function(done) {
         q()
             .then(bobUploadsKeys)
@@ -554,6 +627,63 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobStartClient)
             .then(bobRecvMessage)
+            .catch(test_utils.failTest).done(done);
+    });
+
+    it("Bob receives a message with a bogus sender", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliStartClient)
+            .then(aliEnablesEncryption)
+            .then(aliSendsFirstMessage)
+            .then(bobStartClient)
+            .then(function() {
+                var message = aliMessages.shift();
+                var syncData = {
+                    next_batch: "x",
+                    rooms: {
+                        join: {
+
+                        }
+                    }
+                };
+                syncData.rooms.join[roomId] = {
+                    timeline: {
+                        events: [
+                            test_utils.mkEvent({
+                                type: "m.room.encrypted",
+                                room: roomId,
+                                content: message,
+                                sender: "@bogus:sender",
+                            })
+                        ]
+                    }
+                };
+                bobHttpBackend.when("GET", "/sync").respond(200, syncData);
+
+                var deferred = q.defer();
+                var onEvent = function(event) {
+                    console.log(bobClient.credentials.userId + " received event",
+                                event);
+
+                    // ignore the m.room.member events
+                    if (event.getType() == "m.room.member") {
+                        return;
+                    }
+
+                    expect(event.getType()).toEqual("m.room.message");
+                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
+                    expect(event.isEncrypted()).toBeTruthy();
+
+                    bobClient.removeListener("event", onEvent);
+                    deferred.resolve();
+                };
+
+                bobClient.on("event", onEvent);
+
+                bobHttpBackend.flush();
+                return deferred.promise;
+            })
             .catch(test_utils.failTest).done(done);
     });
 

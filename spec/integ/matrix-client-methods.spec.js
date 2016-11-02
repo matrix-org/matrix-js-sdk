@@ -295,58 +295,65 @@ describe("MatrixClient", function() {
 
     describe("downloadKeys", function() {
         it("should do an HTTP request and then store the keys", function(done) {
-            var ed25519key = "wV5E3EUSHpHuoZLljNzojlabjGdXT3Mz7rugG9zgbkI";
+            var ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
+            // ed25519key = client.getDeviceEd25519Key();
             var borisKeys = {
                 dev1: {
-                    algorithms: ["1"], keys: { "ed25519:dev1": ed25519key },
+                    algorithms: ["1"],
+                    device_id: "dev1",
+                    keys: { "ed25519:dev1": ed25519key },
                     signatures: {
                         boris: {
-                           "ed25519:dev1":
-                                "u99n8WZ61G//K6eVgYc+RDLVapmjttxqhjNucIFGEIJ" +
-                                "oA4TUY8FmiGv3zl0EA71zrvPDfnFL5XLNsdc55NGbDg"
+                            "ed25519:dev1":
+                                "RAhmbNDq1efK3hCpBzZDsKoGSsrHUxb25NW5/WbEV9R" +
+                                "JVwLdP032mg5QsKt/pBDUGtggBcnk43n3nBWlA88WAw"
                         }
                     },
                     unsigned: { "abc": "def" },
+                    user_id: "boris",
                 }
             };
             var chazKeys = {
                 dev2: {
-                    algorithms: ["2"], keys: { "ed25519:dev2": ed25519key },
+                    algorithms: ["2"],
+                    device_id: "dev2",
+                    keys: { "ed25519:dev2": ed25519key },
                     signatures: {
                         chaz: {
                            "ed25519:dev2":
-                                "8eaeXUWy9AQzjaNVOjVLs4FQk+cgobkNS811EjZBCMA" +
-                                "apd8aPOfE26E13nFFOCLC1V6fOH5wVo61hxGR/j4PBA"
+                                "FwslH/Q7EYSb7swDJbNB5PSzcbEO1xRRBF1riuijqvL" +
+                                "EkrK9/XVN8jl4h7thGuRITQ01siBQnNmMK9t45QfcCQ"
                         }
                     },
                     unsigned: { "ghi": "def" },
-                }
-            };
-            var daveKeys = {
-                dev3: {
-                    algorithms: ["3"], keys: { "ed25519:dev2": ed25519key },
-                    signatures: {
-                        dave: {
-                           "ed25519:dev2":
-                                "8eaeXUWy9AQzjaNVOjVLs4FQk+cgobkNS811EjZBCMA" +
-                                "apd8aPOfE26E13nFFOCLC1V6fOH5wVo61hxGR/j4PBA"
-                        }
-                    },
-                    unsigned: { "ghi": "def" },
+                    user_id: "chaz",
                 }
             };
 
+            /*
+            function sign(o) {
+                var anotherjson = require('another-json');
+                var b = JSON.parse(JSON.stringify(o));
+                delete(b.signatures);
+                delete(b.unsigned);
+                return client._crypto._olmDevice.sign(anotherjson.stringify(b));
+            };
+
+            console.log("Ed25519: " + ed25519key);
+            console.log("boris:", sign(borisKeys.dev1));
+            console.log("chaz:", sign(chazKeys.dev2));
+            */
+
             httpBackend.when("POST", "/keys/query").check(function(req) {
-                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}, dave: {}}});
+                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}}});
             }).respond(200, {
                 device_keys: {
                     boris: borisKeys,
                     chaz: chazKeys,
-                    dave: daveKeys,
                 },
             });
 
-            client.downloadKeys(["boris", "chaz", "dave"]).then(function(res) {
+            client.downloadKeys(["boris", "chaz"]).then(function(res) {
                 assertObjectContains(res.boris.dev1, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
@@ -360,9 +367,6 @@ describe("MatrixClient", function() {
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
-
-                // dave's key fails validation.
-                expect(res.dave).toEqual({});
             }).catch(utils.failTest).done(done);
 
             httpBackend.flush();
@@ -379,6 +383,23 @@ describe("MatrixClient", function() {
             }).then(function() {
                 expect(exceptionThrown).toBeTruthy();
             }).catch(utils.failTest).done(done);
+
+            httpBackend.flush();
+        });
+    });
+
+    describe("deleteDevice", function() {
+        var auth = {a: 1};
+        it("should pass through an auth dict", function(done) {
+            httpBackend.when(
+                "DELETE", "/_matrix/client/unstable/devices/my_device"
+            ).check(function(req) {
+                expect(req.data).toEqual({auth: auth});
+            }).respond(200);
+
+            client.deleteDevice(
+                "my_device", auth
+            ).catch(utils.failTest).done(done);
 
             httpBackend.flush();
         });
