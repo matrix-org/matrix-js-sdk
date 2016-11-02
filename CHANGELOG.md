@@ -1,5 +1,6 @@
-Unreleased changes
-==================
+Changes in [0.6.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.4-rc.1) (2016-11-02)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.3...v0.6.4-rc.1)
 
 Breaking Changes
 ----------------
@@ -7,6 +8,33 @@ Breaking Changes
    source files in the dist/ directory. As of this release, they
    will be included in the release tarball, but not the source
    repository.
+
+Other Changes
+-------------
+ * More fixes to the release script
+   [\#272](https://github.com/matrix-org/matrix-js-sdk/pull/272)
+ * Update the release process to use github releases
+   [\#271](https://github.com/matrix-org/matrix-js-sdk/pull/271)
+ * Don't package the world when we release
+   [\#270](https://github.com/matrix-org/matrix-js-sdk/pull/270)
+ * Add ability to set a filter prior to the first /sync
+   [\#269](https://github.com/matrix-org/matrix-js-sdk/pull/269)
+ * Sign one-time keys, and verify their signatures
+   [\#243](https://github.com/matrix-org/matrix-js-sdk/pull/243)
+ * Check for duplicate message indexes for group messages
+   [\#241](https://github.com/matrix-org/matrix-js-sdk/pull/241)
+ * Rotate megolm sessions
+   [\#240](https://github.com/matrix-org/matrix-js-sdk/pull/240)
+ * Check recipient and sender in Olm messages
+   [\#239](https://github.com/matrix-org/matrix-js-sdk/pull/239)
+ * Consistency checks for E2E device downloads
+   [\#237](https://github.com/matrix-org/matrix-js-sdk/pull/237)
+ * Support User-Interactive auth for delete device
+   [\#235](https://github.com/matrix-org/matrix-js-sdk/pull/235)
+ * Utility to help with interactive auth
+   [\#234](https://github.com/matrix-org/matrix-js-sdk/pull/234)
+ * Fix sync breaking when an invalid filterId is in localStorage
+   [\#228](https://github.com/matrix-org/matrix-js-sdk/pull/228)
 
 Changes in [0.6.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.3) (2016-10-12)
 ================================================================================================
