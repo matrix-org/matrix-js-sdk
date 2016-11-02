@@ -142,7 +142,9 @@ if [ $dodist -eq 0 ]; then
     git clone "$projdir" .
     git co "$rel_branch"
     npm install
-    npm run dist
+    # We haven't tagged yet, so tell the dist script what version
+    # it's building
+    npm run dist "$tag"
     popd
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
