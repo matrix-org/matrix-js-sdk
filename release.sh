@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Script to perform a release of matrix-js-sdk. Performs the steps documented
 # in RELEASING.md
@@ -60,7 +60,8 @@ if [ $# -ne 1 ]; then
 fi
 
 if [ -z "$skip_changelog" ]; then
-	update_changelog --version > /dev/null || echo "github-changelog-generator is required: please install it"; exit
+    # update_changelog doesn't have a --version flag
+    update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
 fi
 
 # ignore leading v on release
@@ -88,9 +89,15 @@ if [ -z "$skip_changelog" ]; then
 fi
 
 # we might already be on the release branch, in which case, yay
-if [ $(git symbolic-ref --short HEAD) != "$rel_branch" ]; then
+# If we're on any branch starting with 'release', we don't create
+# a separate release branch (this allows us to use the same
+# release branch for releases and release candidates).
+curbranch=$(git symbolic-ref --short HEAD)
+if [[ "$curbranch" != release* ]]; then
     echo "Creating release branch"
     git checkout -b "$rel_branch"
+else
+    echo "Using current branch ($curbranch) for release"
 fi
 
 if [ -z "$skip_changelog" ]; then
