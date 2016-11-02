@@ -1,3 +1,10 @@
+Changes in [0.6.4-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.4-rc.2) (2016-11-02)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.4-rc.1...v0.6.4-rc.2)
+
+ * Add getRoomTags method to client
+   [\#236](https://github.com/matrix-org/matrix-js-sdk/pull/236)
+
 Changes in [0.6.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.4-rc.1) (2016-11-02)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.3...v0.6.4-rc.1)
