@@ -144,7 +144,7 @@ if [ $dodist -eq 0 ]; then
     npm install
     # We haven't tagged yet, so tell the dist script what version
     # it's building
-    npm run dist "$tag"
+    DIST_VERSION="$tag" npm run dist
     popd
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
