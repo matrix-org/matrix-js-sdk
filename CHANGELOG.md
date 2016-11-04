@@ -2,7 +2,7 @@ Changes in [0.6.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.4-rc.2...v0.6.4)
 
- * No changes
+ * Change release script to pass version by environment variable
 
 
 Changes in [0.6.4-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.4-rc.2) (2016-11-02)
