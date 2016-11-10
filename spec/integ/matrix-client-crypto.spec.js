@@ -5,21 +5,6 @@ var HttpBackend = require("../mock-request");
 var utils = require("../../lib/utils");
 var test_utils = require("../test-utils");
 
-function MockStorageApi() {
-    this.data = {};
-}
-MockStorageApi.prototype = {
-    setItem: function(k, v) {
-        this.data[k] = v;
-    },
-    getItem: function(k) {
-        return this.data[k] || null;
-    },
-    removeItem: function(k) {
-        delete this.data[k];
-    }
-};
-
 var aliHttpBackend;
 var bobHttpBackend;
 var aliClient;
@@ -36,7 +21,6 @@ var aliDeviceKeys;
 var bobDeviceKeys;
 var bobDeviceCurve25519Key;
 var bobDeviceEd25519Key;
-var aliLocalStore;
 var aliStorage;
 var bobStorage;
 var aliMessages;
@@ -461,11 +445,9 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(function() {
-        aliLocalStore = new MockStorageApi();
-        aliStorage = new sdk.WebStorageSessionStore(aliLocalStore);
-        bobStorage = new sdk.WebStorageSessionStore(new MockStorageApi());
         test_utils.beforeEach(this);
 
+        aliStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
         aliHttpBackend = new HttpBackend();
         aliClient = sdk.createClient({
             baseUrl: "http://alis.server",
@@ -476,6 +458,7 @@ describe("MatrixClient crypto", function() {
             request: aliHttpBackend.requestFn,
         });
 
+        bobStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
         bobHttpBackend = new HttpBackend();
         bobClient = sdk.createClient({
             baseUrl: "http://bobs.server",

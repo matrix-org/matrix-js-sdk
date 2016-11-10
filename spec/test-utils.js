@@ -159,7 +159,7 @@ module.exports.mkMessage = function(opts) {
  * <p>This is useful for use with integration tests which use asyncronous
  * methods: it can be added as a 'catch' handler in a promise chain.
  *
- * @param {Error} error   exception to be reported
+ * @param {Error} err   exception to be reported
  *
  * @example
  * it("should not throw", function(done) {
@@ -168,6 +168,48 @@ module.exports.mkMessage = function(opts) {
  *    }).catch(utils.failTest).done(done);
  * });
  */
-module.exports.failTest = function(error) {
-    expect(error.stack).toBe(null);
+module.exports.failTest = function(err) {
+    expect(true).toBe(false, "Testfunc threw: " + err.stack);
+};
+
+/**
+ * Wrap a test function which returns a promise into a format which
+ * jasmine will understand.
+ *
+ * @param {Function} testfunc test function, which should return a promise
+ *
+ * @return {Function}
+ *
+ * @example
+ * it("should not throw", asyncTest(function() {
+ *    return asynchronousMethod().then(function() {
+ *       // some tests
+ *    });
+ * }));
+ */
+module.exports.asyncTest = function(testfunc) {
+    return function(done) {
+        testfunc.call(this).catch(module.exports.failTest).done(done);
+    };
+};
+
+
+/**
+ * A mock implementation of webstorage
+ *
+ * @constructor
+ */
+module.exports.MockStorageApi = function() {
+    this.data = {};
+};
+module.exports.MockStorageApi.prototype = {
+    setItem: function(k, v) {
+        this.data[k] = v;
+    },
+    getItem: function(k) {
+        return this.data[k] || null;
+    },
+    removeItem: function(k) {
+        delete this.data[k];
+    }
 };
