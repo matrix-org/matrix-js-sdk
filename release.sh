@@ -98,6 +98,7 @@ if [[ "$curbranch" != release* ]]; then
     git checkout -b "$rel_branch"
 else
     echo "Using current branch ($curbranch) for release"
+    rel_branch=$curbranch
 fi
 
 if [ -z "$skip_changelog" ]; then
@@ -141,7 +142,9 @@ if [ $dodist -eq 0 ]; then
     git clone "$projdir" .
     git co "$rel_branch"
     npm install
-    npm run dist
+    # We haven't tagged yet, so tell the dist script what version
+    # it's building
+    DIST_VERSION="$tag" npm run dist
     popd
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
