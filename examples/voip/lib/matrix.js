@@ -1,1 +1,1 @@
-../../../dist/browser-matrix-dev.js
+../../../dist/browser-matrix.js

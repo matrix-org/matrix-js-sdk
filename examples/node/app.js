@@ -135,11 +135,15 @@ rl.on('line', function(line) {
 // ==== END User input
 
 // show the room list after syncing.
-matrixClient.on("syncComplete", function() {
-    setRoomList();
-    printRoomList();
-    printHelp();
-    rl.prompt();
+matrixClient.on("sync", function(state, prevState, data) {
+    switch (state) {
+        case "PREPARED":
+          setRoomList();
+          printRoomList();
+          printHelp();
+          rl.prompt();
+        break;
+   }
 });
 
 matrixClient.on("Room", function() {
