@@ -483,6 +483,27 @@ describe("MatrixClient crypto", function() {
         bobClient.stopClient();
     });
 
+    it('Ali knows the difference between a new user and one with no devices',
+        function(done) {
+            aliHttpBackend.when('POST', '/keys/query').respond(200, {
+                device_keys: {
+                    '@bob:id': {},
+                }
+            });
+
+            var p1 = aliClient.downloadKeys(['@bob:id']);
+            var p2 = aliHttpBackend.flush('/keys/query', 1);
+
+            q.all([p1, p2]).then(function() {
+                var devices = aliStorage.getEndToEndDevicesForUser('@bob:id');
+                expect(utils.keys(devices).length).toEqual(0);
+
+                // request again: should be no more requests
+                return aliClient.downloadKeys(['@bob:id']);
+            }).nodeify(done);
+        }
+    );
+
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
         q()
             .then(bobUploadsKeys)

@@ -65,7 +65,7 @@ module.exports.mkEvent = function(opts) {
         content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
-    if (opts.skey) {
+    if (opts.skey !== undefined) {
         event.state_key = opts.skey;
     }
     else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
@@ -161,6 +161,15 @@ module.exports.mkMessage = function(opts) {
  *
  * @param {Error} err   exception to be reported
  *
+ * @deprecated
+ * It turns out there are easier ways of doing this. Just use nodeify():
+ *
+ * it("should not throw", function(done) {
+ *    asynchronousMethod().then(function() {
+ *       // some tests
+ *    }).nodeify(done);
+ * });
+ *
  * @example
  * it("should not throw", function(done) {
  *    asynchronousMethod().then(function() {
@@ -170,27 +179,6 @@ module.exports.mkMessage = function(opts) {
  */
 module.exports.failTest = function(err) {
     expect(true).toBe(false, "Testfunc threw: " + err.stack);
-};
-
-/**
- * Wrap a test function which returns a promise into a format which
- * jasmine will understand.
- *
- * @param {Function} testfunc test function, which should return a promise
- *
- * @return {Function}
- *
- * @example
- * it("should not throw", asyncTest(function() {
- *    return asynchronousMethod().then(function() {
- *       // some tests
- *    });
- * }));
- */
-module.exports.asyncTest = function(testfunc) {
-    return function(done) {
-        testfunc.call(this).catch(module.exports.failTest).done(done);
-    };
 };
 
 
