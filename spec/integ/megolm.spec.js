@@ -541,4 +541,77 @@ describe("megolm", function() {
         }).nodeify(done);
     });
 
+
+    it("We shouldn't attempt to send to blocked devices", function(done) {
+        // establish an olm session with alice
+        var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+
+        var olmEvent = encryptOlmEvent({
+            senderKey: testSenderKey,
+            recipient: aliceTestClient,
+            p2pSession: p2pSession,
+        });
+
+        var syncResponse = {
+            next_batch: 1,
+            to_device: {
+                events: [olmEvent],
+            },
+            rooms: {
+                join: {},
+            },
+        };
+
+        syncResponse.rooms.join[ROOM_ID] = {
+            state: {
+                events: [
+                    test_utils.mkEvent({
+                        type: 'm.room.encryption',
+                        skey: '',
+                        content: {
+                            algorithm: 'm.megolm.v1.aes-sha2',
+                        },
+                    }),
+                    test_utils.mkMembership({
+                        mship: 'join',
+                        sender: '@bob:xyz',
+                    }),
+                ],
+            },
+        };
+        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+
+        return aliceTestClient.httpBackend.flush('/sync', 1).then(function() {
+            console.log('Forcing alice to download our device keys');
+
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
+                device_keys: {
+                    '@bob:xyz': {
+                        'DEVICE_ID': testDeviceKeys,
+                    },
+                }
+            });
+
+            return q.all([
+                aliceTestClient.client.downloadKeys(['@bob:xyz']),
+                aliceTestClient.httpBackend.flush('/keys/query', 1),
+            ]);
+        }).then(function() {
+            console.log('Telling alice to block our device');
+            aliceTestClient.client.setDeviceBlocked('@bob:xyz', 'DEVICE_ID');
+
+            console.log('Telling alice to send a megolm message');
+            aliceTestClient.httpBackend.when(
+                'PUT', '/send/'
+            ).respond(200, {
+                event_id: '$event_id',
+            });
+
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).nodeify(done);
+    });
+
 });
