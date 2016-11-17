@@ -739,4 +739,31 @@ describe("MatrixClient crypto", function() {
             }).then(aliRecvMessage)
             .catch(test_utils.failTest).done(done);
     });
+
+
+    it("Ali does a key query when she gets a new_device event", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliStartClient)
+            .then(function() {
+                var syncData = {
+                    next_batch: '2',
+                    to_device: {
+                        events: [
+                            test_utils.mkEvent({
+                                content: {
+                                    device_id: 'TEST_DEVICE',
+                                    rooms: [],
+                                },
+                                sender: bobUserId,
+                                type: 'm.new_device',
+                            }),
+                        ],
+                    },
+                };
+                aliHttpBackend.when('GET', '/sync').respond(200, syncData);
+                return aliHttpBackend.flush('/sync', 1);
+            }).then(expectAliQueryKeys)
+            .nodeify(done);
+    });
 });

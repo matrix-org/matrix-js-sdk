@@ -371,21 +371,6 @@ describe("MatrixClient", function() {
 
             httpBackend.flush();
         });
-
-        it("should return a rejected promise if the request fails", function(done) {
-            httpBackend.when("POST", "/keys/query").respond(400);
-
-            var exceptionThrown;
-            client.downloadKeys(["bottom"]).then(function() {
-                fail("download didn't fail");
-            }, function(err) {
-                exceptionThrown = err;
-            }).then(function() {
-                expect(exceptionThrown).toBeTruthy();
-            }).catch(utils.failTest).done(done);
-
-            httpBackend.flush();
-        });
     });
 
     describe("deleteDevice", function() {
