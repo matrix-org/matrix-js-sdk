@@ -5,21 +5,6 @@ var HttpBackend = require("../mock-request");
 var utils = require("../../lib/utils");
 var test_utils = require("../test-utils");
 
-function MockStorageApi() {
-    this.data = {};
-}
-MockStorageApi.prototype = {
-    setItem: function(k, v) {
-        this.data[k] = v;
-    },
-    getItem: function(k) {
-        return this.data[k] || null;
-    },
-    removeItem: function(k) {
-        delete this.data[k];
-    }
-};
-
 var aliHttpBackend;
 var bobHttpBackend;
 var aliClient;
@@ -36,7 +21,6 @@ var aliDeviceKeys;
 var bobDeviceKeys;
 var bobDeviceCurve25519Key;
 var bobDeviceEd25519Key;
-var aliLocalStore;
 var aliStorage;
 var bobStorage;
 var aliMessages;
@@ -461,11 +445,9 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(function() {
-        aliLocalStore = new MockStorageApi();
-        aliStorage = new sdk.WebStorageSessionStore(aliLocalStore);
-        bobStorage = new sdk.WebStorageSessionStore(new MockStorageApi());
         test_utils.beforeEach(this);
 
+        aliStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
         aliHttpBackend = new HttpBackend();
         aliClient = sdk.createClient({
             baseUrl: "http://alis.server",
@@ -476,6 +458,7 @@ describe("MatrixClient crypto", function() {
             request: aliHttpBackend.requestFn,
         });
 
+        bobStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
         bobHttpBackend = new HttpBackend();
         bobClient = sdk.createClient({
             baseUrl: "http://bobs.server",
@@ -499,6 +482,27 @@ describe("MatrixClient crypto", function() {
         aliClient.stopClient();
         bobClient.stopClient();
     });
+
+    it('Ali knows the difference between a new user and one with no devices',
+        function(done) {
+            aliHttpBackend.when('POST', '/keys/query').respond(200, {
+                device_keys: {
+                    '@bob:id': {},
+                }
+            });
+
+            var p1 = aliClient.downloadKeys(['@bob:id']);
+            var p2 = aliHttpBackend.flush('/keys/query', 1);
+
+            q.all([p1, p2]).then(function() {
+                var devices = aliStorage.getEndToEndDevicesForUser('@bob:id');
+                expect(utils.keys(devices).length).toEqual(0);
+
+                // request again: should be no more requests
+                return aliClient.downloadKeys(['@bob:id']);
+            }).nodeify(done);
+        }
+    );
 
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
         q()
@@ -734,5 +738,32 @@ describe("MatrixClient crypto", function() {
                 expect(ciphertext.type).toEqual(1);
             }).then(aliRecvMessage)
             .catch(test_utils.failTest).done(done);
+    });
+
+
+    it("Ali does a key query when she gets a new_device event", function(done) {
+        q()
+            .then(bobUploadsKeys)
+            .then(aliStartClient)
+            .then(function() {
+                var syncData = {
+                    next_batch: '2',
+                    to_device: {
+                        events: [
+                            test_utils.mkEvent({
+                                content: {
+                                    device_id: 'TEST_DEVICE',
+                                    rooms: [],
+                                },
+                                sender: bobUserId,
+                                type: 'm.new_device',
+                            }),
+                        ],
+                    },
+                };
+                aliHttpBackend.when('GET', '/sync').respond(200, syncData);
+                return aliHttpBackend.flush('/sync', 1);
+            }).then(expectAliQueryKeys)
+            .nodeify(done);
     });
 });

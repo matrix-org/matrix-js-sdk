@@ -65,7 +65,7 @@ module.exports.mkEvent = function(opts) {
         content: opts.content,
         event_id: "$" + Math.random() + "-" + Math.random()
     };
-    if (opts.skey) {
+    if (opts.skey !== undefined) {
         event.state_key = opts.skey;
     }
     else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
@@ -159,7 +159,16 @@ module.exports.mkMessage = function(opts) {
  * <p>This is useful for use with integration tests which use asyncronous
  * methods: it can be added as a 'catch' handler in a promise chain.
  *
- * @param {Error} error   exception to be reported
+ * @param {Error} err   exception to be reported
+ *
+ * @deprecated
+ * It turns out there are easier ways of doing this. Just use nodeify():
+ *
+ * it("should not throw", function(done) {
+ *    asynchronousMethod().then(function() {
+ *       // some tests
+ *    }).nodeify(done);
+ * });
  *
  * @example
  * it("should not throw", function(done) {
@@ -168,6 +177,27 @@ module.exports.mkMessage = function(opts) {
  *    }).catch(utils.failTest).done(done);
  * });
  */
-module.exports.failTest = function(error) {
-    expect(error.stack).toBe(null);
+module.exports.failTest = function(err) {
+    expect(true).toBe(false, "Testfunc threw: " + err.stack);
+};
+
+
+/**
+ * A mock implementation of webstorage
+ *
+ * @constructor
+ */
+module.exports.MockStorageApi = function() {
+    this.data = {};
+};
+module.exports.MockStorageApi.prototype = {
+    setItem: function(k, v) {
+        this.data[k] = v;
+    },
+    getItem: function(k) {
+        return this.data[k] || null;
+    },
+    removeItem: function(k) {
+        delete this.data[k];
+    }
 };

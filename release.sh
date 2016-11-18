@@ -10,8 +10,8 @@
 
 set -e
 
-jq --version > /dev/null || (echo "jq is required: please install it"; exit)
-hub --version > /dev/null || (echo "hub is required: please install it"; exit)
+jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
+hub --version > /dev/null || (echo "hub is required: please install it"; kill $$)
 
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
@@ -140,7 +140,7 @@ if [ $dodist -eq 0 ]; then
     echo "Building distribution copy in $builddir"
     pushd "$builddir"
     git clone "$projdir" .
-    git co "$rel_branch"
+    git checkout "$rel_branch"
     npm install
     # We haven't tagged yet, so tell the dist script what version
     # it's building

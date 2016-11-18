@@ -44,7 +44,15 @@ window.onload = function() {
     disableButtons(true, true, true);
 };
 
-client.on("syncComplete", function () {
+matrixClient.on("sync", function(state, prevState, data) {
+    switch (state) {
+        case "PREPARED":
+          syncComplete();
+        break;
+   }
+});
+
+function syncComplete() {
     document.getElementById("result").innerHTML = "<p>Ready for calls.</p>";
     disableButtons(false, true, true);
 
@@ -85,5 +93,5 @@ client.on("syncComplete", function () {
         call = c;
         addListeners(call);
     });
-});
+}
 client.startClient();
