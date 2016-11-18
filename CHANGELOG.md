@@ -1,3 +1,38 @@
+Changes in [0.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.0) (2016-11-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.4...v0.7.0)
+
+ * Avoid a packetstorm of device queries on startup
+   [\#297](https://github.com/matrix-org/matrix-js-sdk/pull/297)
+ * E2E: Check devices to share keys with on each send
+   [\#295](https://github.com/matrix-org/matrix-js-sdk/pull/295)
+ * Apply unknown-keyshare mitigations
+   [\#296](https://github.com/matrix-org/matrix-js-sdk/pull/296)
+ * distinguish unknown users from deviceless users
+   [\#294](https://github.com/matrix-org/matrix-js-sdk/pull/294)
+ * Allow starting client with initialSyncLimit = 0
+   [\#293](https://github.com/matrix-org/matrix-js-sdk/pull/293)
+ * Make timeline-window _unpaginate public and rename to unpaginate
+   [\#289](https://github.com/matrix-org/matrix-js-sdk/pull/289)
+ * Send a STOPPED sync updated after call to stopClient
+   [\#286](https://github.com/matrix-org/matrix-js-sdk/pull/286)
+ * Fix bug in verifying megolm event senders
+   [\#292](https://github.com/matrix-org/matrix-js-sdk/pull/292)
+ * Handle decryption of events after they arrive
+   [\#288](https://github.com/matrix-org/matrix-js-sdk/pull/288)
+ * Fix examples.
+   [\#287](https://github.com/matrix-org/matrix-js-sdk/pull/287)
+ * Add a travis.yml
+   [\#278](https://github.com/matrix-org/matrix-js-sdk/pull/278)
+ * Encrypt all events, including 'm.call.*'
+   [\#277](https://github.com/matrix-org/matrix-js-sdk/pull/277)
+ * Ignore reshares of known megolm sessions
+   [\#276](https://github.com/matrix-org/matrix-js-sdk/pull/276)
+ * Log to the console on unknown session
+   [\#274](https://github.com/matrix-org/matrix-js-sdk/pull/274)
+ * Make it easier for SDK users to wrap prevailing the 'request' function
+   [\#273](https://github.com/matrix-org/matrix-js-sdk/pull/273)
+
 Changes in [0.6.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.6.4) (2016-11-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.4-rc.2...v0.6.4)
