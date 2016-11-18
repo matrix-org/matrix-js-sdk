@@ -140,7 +140,7 @@ if [ $dodist -eq 0 ]; then
     echo "Building distribution copy in $builddir"
     pushd "$builddir"
     git clone "$projdir" .
-    git co "$rel_branch"
+    git checkout "$rel_branch"
     npm install
     # We haven't tagged yet, so tell the dist script what version
     # it's building
