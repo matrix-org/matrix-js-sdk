@@ -10,8 +10,8 @@
 
 set -e
 
-jq --version > /dev/null || (echo "jq is required: please install it"; exit)
-hub --version > /dev/null || (echo "hub is required: please install it"; exit)
+jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
+hub --version > /dev/null || (echo "hub is required: please install it"; kill $$)
 
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
