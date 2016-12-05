@@ -1,3 +1,16 @@
+Changes in [0.7.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.1-rc.1) (2016-12-05)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.0...v0.7.1-rc.1)
+
+ * Avoid NPE when no sessionStore is given
+   [\#300](https://github.com/matrix-org/matrix-js-sdk/pull/300)
+ * Improve decryption error messages
+   [\#299](https://github.com/matrix-org/matrix-js-sdk/pull/299)
+ * Revert "Use native Array.isArray when available."
+   [\#283](https://github.com/matrix-org/matrix-js-sdk/pull/283)
+ * Use native Array.isArray when available.
+   [\#282](https://github.com/matrix-org/matrix-js-sdk/pull/282)
+
 Changes in [0.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.0) (2016-11-18)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.6.4...v0.7.0)
