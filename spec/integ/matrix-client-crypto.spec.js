@@ -383,6 +383,15 @@ function recvMessage(httpBackend, client, sender, message) {
 
 function aliStartClient() {
     expectAliKeyUpload().catch(test_utils.failTest);
+
+    // ali will try to query her own keys on start
+    aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+        expect(content.device_keys[aliUserId]).toEqual({});
+        var result = {};
+        result[aliUserId] = {};
+        return {device_keys: result};
+    });
+
     startClient(aliHttpBackend, aliClient);
     return aliHttpBackend.flush().then(function() {
         console.log("Ali client started");
@@ -391,6 +400,15 @@ function aliStartClient() {
 
 function bobStartClient() {
     expectBobKeyUpload().catch(test_utils.failTest);
+
+    // bob will try to query his own keys on start
+    bobHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
+        expect(content.device_keys[bobUserId]).toEqual({});
+        var result = {};
+        result[bobUserId] = {};
+        return {device_keys: result};
+    });
+
     startClient(bobHttpBackend, bobClient);
     return bobHttpBackend.flush().then(function() {
         console.log("Bob client started");

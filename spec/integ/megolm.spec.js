@@ -59,12 +59,25 @@ function TestClient(userId, deviceId, accessToken) {
 /**
  * start the client, and wait for it to initialise.
  *
+ * @param {object?} deviceQueryResponse  the list of our existing devices to return from
+ *    the /query request. Defaults to empty device list
  * @return {Promise}
  */
-TestClient.prototype.start = function() {
+TestClient.prototype.start = function(existingDevices) {
     var self = this;
+
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+
+    this.httpBackend.when('POST', '/keys/query').respond(200, function(path, content) {
+        expect(content.device_keys[self.userId]).toEqual({});
+        var res = existingDevices;
+        if (!res) {
+            res = { device_keys: {} };
+            res.device_keys[self.userId] = {};
+        }
+        return res;
+    });
     this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
         expect(content.one_time_keys).not.toBeDefined();
         expect(content.device_keys).toBeDefined();
