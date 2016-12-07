@@ -266,9 +266,71 @@ describe("megolm", function() {
     var testOlmAccount;
     var testSenderKey;
     var aliceTestClient;
-    var testDeviceKeys;
 
-    beforeEach(function(done) {
+    /**
+     * Get the device keys for testOlmAccount in a format suitable for a
+     * response to /keys/query
+     */
+    function getTestKeysQueryResponse(userId) {
+        var testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
+        var testDeviceKeys = {
+            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+            device_id: 'DEVICE_ID',
+            keys: {
+                'curve25519:DEVICE_ID': testE2eKeys.curve25519,
+                'ed25519:DEVICE_ID': testE2eKeys.ed25519,
+            },
+            user_id: userId,
+        };
+        var j = anotherjson.stringify(testDeviceKeys);
+        var sig = testOlmAccount.sign(j);
+        testDeviceKeys.signatures = {};
+        testDeviceKeys.signatures[userId] = {
+            'ed25519:DEVICE_ID': sig,
+        };
+
+        var queryResponse = {
+            device_keys: {},
+        };
+
+        queryResponse.device_keys[userId] = {
+            'DEVICE_ID': testDeviceKeys,
+        };
+
+        return queryResponse;
+    }
+
+    /**
+     * Get a one-time key for testOlmAccount in a format suitable for a
+     * response to /keys/claim
+     */
+    function getTestKeysClaimResponse(userId) {
+        testOlmAccount.generate_one_time_keys(1);
+        var testOneTimeKeys = JSON.parse(testOlmAccount.one_time_keys());
+        testOlmAccount.mark_keys_as_published();
+
+        var keyId = utils.keys(testOneTimeKeys.curve25519)[0];
+        var oneTimeKey = testOneTimeKeys.curve25519[keyId];
+        var keyResult = {
+            'key': oneTimeKey,
+        };
+        var j = anotherjson.stringify(keyResult);
+        var sig = testOlmAccount.sign(j);
+        keyResult.signatures = {};
+        keyResult.signatures[userId] = {
+            'ed25519:DEVICE_ID': sig,
+        };
+
+        var claimResponse = {one_time_keys: {}};
+        claimResponse.one_time_keys[userId] = {
+            'DEVICE_ID': {},
+        };
+        claimResponse.one_time_keys[userId].DEVICE_ID['signed_curve25519:' + keyId] =
+            keyResult;
+        return claimResponse;
+    }
+
+    beforeEach(function() {
         test_utils.beforeEach(this);
 
         aliceTestClient = new TestClient(
@@ -279,25 +341,6 @@ describe("megolm", function() {
         testOlmAccount.create();
         var testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
         testSenderKey = testE2eKeys.curve25519;
-
-        testDeviceKeys = {
-            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
-            device_id: 'DEVICE_ID',
-            keys: {
-                'curve25519:DEVICE_ID': testE2eKeys.curve25519,
-                'ed25519:DEVICE_ID': testE2eKeys.ed25519,
-            },
-            user_id: '@bob:xyz',
-        };
-        var j = anotherjson.stringify(testDeviceKeys);
-        var sig = testOlmAccount.sign(j);
-        testDeviceKeys.signatures = {
-            '@bob:xyz': {
-                'ed25519:DEVICE_ID': sig,
-            },
-        };
-
-        return aliceTestClient.start().nodeify(done);
     });
 
     afterEach(function() {
@@ -305,44 +348,47 @@ describe("megolm", function() {
     });
 
     it("Alice receives a megolm message", function(done) {
-        var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+        return aliceTestClient.start().then(function() {
+            var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
-        var groupSession = new Olm.OutboundGroupSession();
-        groupSession.create();
+            var groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
 
-        // make the room_key event
-        var roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
+            // make the room_key event
+            var roomKeyEncrypted = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        // encrypt a message with the group session
-        var messageEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
+            // encrypt a message with the group session
+            var messageEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        // Alice gets both the events in a single sync
-        var syncResponse = {
-            next_batch: 1,
-            to_device: {
-                events: [roomKeyEncrypted],
-            },
-            rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
-            },
-        };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        return aliceTestClient.httpBackend.flush("/sync", 1).then(function() {
+            // Alice gets both the events in a single sync
+            var syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                timeline: {
+                    events: [messageEncrypted],
+                },
+            };
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            return aliceTestClient.httpBackend.flush("/sync", 1);
+        }).then(function() {
             var room = aliceTestClient.client.getRoom(ROOM_ID);
             var event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
@@ -350,65 +396,67 @@ describe("megolm", function() {
     });
 
     it("Alice gets a second room_key message", function(done) {
-        var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+        return aliceTestClient.start().then(function() {
+            var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
-        var groupSession = new Olm.OutboundGroupSession();
-        groupSession.create();
+            var groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
 
-        // make the room_key event
-        var roomKeyEncrypted1 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
+            // make the room_key event
+            var roomKeyEncrypted1 = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        // encrypt a message with the group session
-        var messageEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
+            // encrypt a message with the group session
+            var messageEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        // make a second room_key event now that we have advanced the group
-        // session.
-        var roomKeyEncrypted2 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
+            // make a second room_key event now that we have advanced the group
+            // session.
+            var roomKeyEncrypted2 = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
 
-        // on the first sync, send the best room key
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
-            next_batch: 1,
-            to_device: {
-                events: [roomKeyEncrypted1],
-            },
-        });
+            // on the first sync, send the best room key
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted1],
+                },
+            });
 
-        // on the second sync, send the advanced room key, along with the
-        // message.  This simulates the situation where Alice has been sent a
-        // later copy of the room key and is reloading the client.
-        var syncResponse2 = {
-            next_batch: 2,
-            to_device: {
-                events: [roomKeyEncrypted2],
-            },
-            rooms: {
-                join: {},
-            },
-        };
-        syncResponse2.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [messageEncrypted],
-            },
-        };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse2);
+            // on the second sync, send the advanced room key, along with the
+            // message.  This simulates the situation where Alice has been sent a
+            // later copy of the room key and is reloading the client.
+            var syncResponse2 = {
+                next_batch: 2,
+                to_device: {
+                    events: [roomKeyEncrypted2],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse2.rooms.join[ROOM_ID] = {
+                timeline: {
+                    events: [messageEncrypted],
+                },
+            };
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse2);
 
-        return aliceTestClient.httpBackend.flush("/sync", 2).then(function() {
+            return aliceTestClient.httpBackend.flush("/sync", 2);
+        }).then(function() {
             var room = aliceTestClient.client.getRoom(ROOM_ID);
             var event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
@@ -416,53 +464,51 @@ describe("megolm", function() {
     });
 
     it('Alice sends a megolm message', function(done) {
-        // establish an olm session with alice
-        var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+        var p2pSession;
 
-        var olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
+        return aliceTestClient.start().then(function() {
+            // establish an olm session with alice
+            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
-        var syncResponse = {
-            next_batch: 1,
-            to_device: {
-                events: [olmEvent],
-            },
-            rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            state: {
-                events: [
-                    test_utils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.megolm.v1.aes-sha2',
-                        },
-                    }),
-                    test_utils.mkMembership({
-                        mship: 'join',
-                        sender: '@bob:xyz',
-                    }),
-                ],
-            },
-        };
-        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
-
-        var inboundGroupSession;
-
-        return aliceTestClient.httpBackend.flush('/sync', 1).then(function() {
-            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
-                device_keys: {
-                    '@bob:xyz': {
-                        'DEVICE_ID': testDeviceKeys,
-                    },
-                }
+            var olmEvent = encryptOlmEvent({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
             });
+
+            var syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [olmEvent],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                state: {
+                    events: [
+                        test_utils.mkEvent({
+                            type: 'm.room.encryption',
+                            skey: '',
+                            content: {
+                                algorithm: 'm.megolm.v1.aes-sha2',
+                            },
+                        }),
+                        test_utils.mkMembership({
+                            mship: 'join',
+                            sender: '@bob:xyz',
+                        }),
+                    ],
+                },
+            };
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+            return aliceTestClient.httpBackend.flush('/sync', 1);
+        }).then(function() {
+            var inboundGroupSession;
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, getTestKeysQueryResponse('@bob:xyz')
+            );
 
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room.encrypted/'
@@ -500,32 +546,34 @@ describe("megolm", function() {
     });
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function(done) {
-        var syncResponse = {
-            next_batch: 1,
-            rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            state: {
-                events: [
-                    test_utils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.megolm.v1.aes-sha2',
-                        },
-                    }),
-                    test_utils.mkMembership({
-                        mship: 'join',
-                        sender: '@bob:xyz',
-                    }),
-                ],
-            },
-        };
-        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+        return aliceTestClient.start().then(function() {
+            var syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                state: {
+                    events: [
+                        test_utils.mkEvent({
+                            type: 'm.room.encryption',
+                            skey: '',
+                            content: {
+                                algorithm: 'm.megolm.v1.aes-sha2',
+                            },
+                        }),
+                        test_utils.mkMembership({
+                            mship: 'join',
+                            sender: '@bob:xyz',
+                        }),
+                    ],
+                },
+            };
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-        return aliceTestClient.httpBackend.flush('/sync', 1).then(function() {
+            return aliceTestClient.httpBackend.flush('/sync', 1);
+        }).then(function() {
             console.log("Forcing alice to download our device keys");
 
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
@@ -556,54 +604,52 @@ describe("megolm", function() {
 
 
     it("We shouldn't attempt to send to blocked devices", function(done) {
-        // establish an olm session with alice
-        var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+        return aliceTestClient.start().then(function() {
+            // establish an olm session with alice
+            var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
-        var olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
+            var olmEvent = encryptOlmEvent({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+            });
 
-        var syncResponse = {
-            next_batch: 1,
-            to_device: {
-                events: [olmEvent],
-            },
-            rooms: {
-                join: {},
-            },
-        };
+            var syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [olmEvent],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
 
-        syncResponse.rooms.join[ROOM_ID] = {
-            state: {
-                events: [
-                    test_utils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.megolm.v1.aes-sha2',
-                        },
-                    }),
-                    test_utils.mkMembership({
-                        mship: 'join',
-                        sender: '@bob:xyz',
-                    }),
-                ],
-            },
-        };
-        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+            syncResponse.rooms.join[ROOM_ID] = {
+                state: {
+                    events: [
+                        test_utils.mkEvent({
+                            type: 'm.room.encryption',
+                            skey: '',
+                            content: {
+                                algorithm: 'm.megolm.v1.aes-sha2',
+                            },
+                        }),
+                        test_utils.mkMembership({
+                            mship: 'join',
+                            sender: '@bob:xyz',
+                        }),
+                    ],
+                },
+            };
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-        return aliceTestClient.httpBackend.flush('/sync', 1).then(function() {
+            return aliceTestClient.httpBackend.flush('/sync', 1);
+        }).then(function() {
             console.log('Forcing alice to download our device keys');
 
-            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
-                device_keys: {
-                    '@bob:xyz': {
-                        'DEVICE_ID': testDeviceKeys,
-                    },
-                }
-            });
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, getTestKeysQueryResponse('@bob:xyz')
+            );
 
             return q.all([
                 aliceTestClient.client.downloadKeys(['@bob:xyz']),
@@ -627,4 +673,91 @@ describe("megolm", function() {
         }).nodeify(done);
     });
 
+
+    // https://github.com/vector-im/riot-web/issues/2676
+    it("Alice should send to her other devices", function(done) {
+        // for this test, we make the testOlmAccount be another of Alice's devices.
+        // it ought to get include in messages Alice sends.
+
+        var p2pSession;
+        var inboundGroupSession;
+        var decrypted;
+
+        return aliceTestClient.start(
+            getTestKeysQueryResponse(aliceTestClient.userId)
+        ).then(function() {
+            // an encrypted room with just alice
+            var syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                state: {
+                    events: [
+                        test_utils.mkEvent({
+                            type: 'm.room.encryption',
+                            skey: '',
+                            content: {
+                                algorithm: 'm.megolm.v1.aes-sha2',
+                            },
+                        }),
+                        test_utils.mkMembership({
+                            mship: 'join',
+                            sender: aliceTestClient.userId,
+                        }),
+                    ],
+                },
+            };
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+
+            return aliceTestClient.httpBackend.flush();
+        }).then(function() {
+            aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
+                200, function(path, content)
+            {
+                expect(content.one_time_keys[aliceTestClient.userId].DEVICE_ID)
+                    .toEqual("signed_curve25519");
+                return getTestKeysClaimResponse(aliceTestClient.userId);
+            });
+
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/m.room.encrypted/'
+            ).respond(200, function(path, content) {
+                console.log("sendToDevice: ", content);
+                var m = content.messages[aliceTestClient.userId].DEVICE_ID;
+                var ct = m.ciphertext[testSenderKey];
+                expect(ct.type).toEqual(0); // pre-key message
+
+                p2pSession = new Olm.Session();
+                p2pSession.create_inbound(testOlmAccount, ct.body);
+                var decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
+
+                expect(decrypted.type).toEqual('m.room_key');
+                inboundGroupSession = new Olm.InboundGroupSession();
+                inboundGroupSession.create(decrypted.content.session_key);
+                return {};
+            });
+
+            aliceTestClient.httpBackend.when(
+                'PUT', '/send/'
+            ).respond(200, function(path, content) {
+                var ct = content.ciphertext;
+                decrypted = JSON.parse(inboundGroupSession.decrypt(ct));
+                console.log('Decrypted received megolm message', decrypted);
+                return {
+                    event_id: '$event_id',
+                };
+            });
+
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).then(function() {
+            expect(decrypted.type).toEqual('m.room.message');
+            expect(decrypted.content.body).toEqual('test');
+        }).nodeify(done);
+    });
 });
