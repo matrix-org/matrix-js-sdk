@@ -29,6 +29,8 @@ var utils = require('../../lib/utils');
 var test_utils = require('../test-utils');
 var MockHttpBackend = require('../mock-request');
 
+var ROOM_ID = "!room:id";
+
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
  *
@@ -256,12 +258,53 @@ function encryptGroupSessionKey(opts) {
     });
 }
 
+/**
+ * get a /sync response which contains a single room (ROOM_ID),
+ * with the members given
+ *
+ * @param {string[]} roomMembers
+ *
+ * @return {object} event
+ */
+function getSyncResponse(roomMembers) {
+    var roomResponse = {
+        state: {
+            events: [
+                test_utils.mkEvent({
+                    type: 'm.room.encryption',
+                    skey: '',
+                    content: {
+                        algorithm: 'm.megolm.v1.aes-sha2',
+                    },
+                }),
+            ],
+        }
+    };
+
+    for (var i = 0; i < roomMembers.length; i++) {
+        roomResponse.state.events.push(
+            test_utils.mkMembership({
+                mship: 'join',
+                sender: roomMembers[i],
+            })
+        );
+    }
+
+    var syncResponse = {
+        next_batch: 1,
+        rooms: {
+            join: {},
+        },
+    };
+    syncResponse.rooms.join[ROOM_ID] = roomResponse;
+    return syncResponse;
+}
+
+
 describe("megolm", function() {
     if (!sdk.CRYPTO_ENABLED) {
         return;
     }
-
-    var ROOM_ID = "!room:id";
 
     var testOlmAccount;
     var testSenderKey;
@@ -467,6 +510,8 @@ describe("megolm", function() {
         var p2pSession;
 
         return aliceTestClient.start().then(function() {
+            var syncResponse = getSyncResponse(['@bob:xyz']);
+
             // establish an olm session with alice
             p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
@@ -476,32 +521,8 @@ describe("megolm", function() {
                 p2pSession: p2pSession,
             });
 
-            var syncResponse = {
-                next_batch: 1,
-                to_device: {
-                    events: [olmEvent],
-                },
-                rooms: {
-                    join: {},
-                },
-            };
-            syncResponse.rooms.join[ROOM_ID] = {
-                state: {
-                    events: [
-                        test_utils.mkEvent({
-                            type: 'm.room.encryption',
-                            skey: '',
-                            content: {
-                                algorithm: 'm.megolm.v1.aes-sha2',
-                            },
-                        }),
-                        test_utils.mkMembership({
-                            mship: 'join',
-                            sender: '@bob:xyz',
-                        }),
-                    ],
-                },
-            };
+            syncResponse.to_device = { events: [olmEvent] };
+
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
             return aliceTestClient.httpBackend.flush('/sync', 1);
         }).then(function() {
@@ -547,29 +568,7 @@ describe("megolm", function() {
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function(done) {
         return aliceTestClient.start().then(function() {
-            var syncResponse = {
-                next_batch: 1,
-                rooms: {
-                    join: {},
-                },
-            };
-            syncResponse.rooms.join[ROOM_ID] = {
-                state: {
-                    events: [
-                        test_utils.mkEvent({
-                            type: 'm.room.encryption',
-                            skey: '',
-                            content: {
-                                algorithm: 'm.megolm.v1.aes-sha2',
-                            },
-                        }),
-                        test_utils.mkMembership({
-                            mship: 'join',
-                            sender: '@bob:xyz',
-                        }),
-                    ],
-                },
-            };
+            var syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
             return aliceTestClient.httpBackend.flush('/sync', 1);
@@ -605,6 +604,8 @@ describe("megolm", function() {
 
     it("We shouldn't attempt to send to blocked devices", function(done) {
         return aliceTestClient.start().then(function() {
+            var syncResponse = getSyncResponse(['@bob:xyz']);
+
             // establish an olm session with alice
             var p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
 
@@ -614,33 +615,7 @@ describe("megolm", function() {
                 p2pSession: p2pSession,
             });
 
-            var syncResponse = {
-                next_batch: 1,
-                to_device: {
-                    events: [olmEvent],
-                },
-                rooms: {
-                    join: {},
-                },
-            };
-
-            syncResponse.rooms.join[ROOM_ID] = {
-                state: {
-                    events: [
-                        test_utils.mkEvent({
-                            type: 'm.room.encryption',
-                            skey: '',
-                            content: {
-                                algorithm: 'm.megolm.v1.aes-sha2',
-                            },
-                        }),
-                        test_utils.mkMembership({
-                            mship: 'join',
-                            sender: '@bob:xyz',
-                        }),
-                    ],
-                },
-            };
+            syncResponse.to_device = { events: [olmEvent] };
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
             return aliceTestClient.httpBackend.flush('/sync', 1);
@@ -673,6 +648,82 @@ describe("megolm", function() {
         }).nodeify(done);
     });
 
+    it("We should start a new megolm session when a device is blocked", function(done) {
+        var p2pSession;
+        var megolmSessionId;
+
+        return aliceTestClient.start().then(function() {
+            var syncResponse = getSyncResponse(['@bob:xyz']);
+
+            // establish an olm session with alice
+            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+
+            var olmEvent = encryptOlmEvent({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+            });
+
+            syncResponse.to_device = { events: [olmEvent] };
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+
+            return aliceTestClient.httpBackend.flush('/sync', 1);
+        }).then(function() {
+            console.log('Telling alice to send a megolm message');
+
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, getTestKeysQueryResponse('@bob:xyz')
+            );
+
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/m.room.encrypted/'
+            ).respond(200, function(path, content) {
+                console.log('sendToDevice: ', content);
+                var m = content.messages['@bob:xyz'].DEVICE_ID;
+                var ct = m.ciphertext[testSenderKey];
+                expect(ct.type).toEqual(1); // normal message
+                var decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
+                console.log('decrypted sendToDevice:', decrypted);
+                expect(decrypted.type).toEqual('m.room_key');
+                megolmSessionId = decrypted.content.session_id;
+                return {};
+            });
+
+            aliceTestClient.httpBackend.when(
+                'PUT', '/send/'
+            ).respond(200, function(path, content) {
+                console.log('/send:', content);
+                expect(content.session_id).toEqual(megolmSessionId);
+                return {
+                    event_id: '$event_id',
+                };
+            });
+
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).then(function() {
+            console.log('Telling alice to block our device');
+            aliceTestClient.client.setDeviceBlocked('@bob:xyz', 'DEVICE_ID');
+
+            console.log('Telling alice to send another megolm message');
+            aliceTestClient.httpBackend.when(
+                'PUT', '/send/'
+            ).respond(200, function(path, content) {
+                console.log('/send:', content);
+                expect(content.session_id).not.toEqual(megolmSessionId);
+                return {
+                    event_id: '$event_id',
+                };
+            });
+
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test2'),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).nodeify(done);
+    });
 
     // https://github.com/vector-im/riot-web/issues/2676
     it("Alice should send to her other devices", function(done) {
