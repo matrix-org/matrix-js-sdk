@@ -811,4 +811,77 @@ describe("megolm", function() {
             expect(decrypted.content.body).toEqual('test');
         }).nodeify(done);
     });
+
+
+    it('Alice should wait for device list to complete when sending a megolm message',
+    function(done) {
+        var p2pSession;
+        var inboundGroupSession;
+
+        var downloadPromise;
+        var sendPromise;
+
+        aliceTestClient.httpBackend.when(
+            'PUT', '/sendToDevice/m.room.encrypted/'
+        ).respond(200, function(path, content) {
+            var m = content.messages['@bob:xyz'].DEVICE_ID;
+            var ct = m.ciphertext[testSenderKey];
+            var decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
+
+            expect(decrypted.type).toEqual('m.room_key');
+            inboundGroupSession = new Olm.InboundGroupSession();
+            inboundGroupSession.create(decrypted.content.session_key);
+            return {};
+        });
+
+        aliceTestClient.httpBackend.when(
+            'PUT', '/send/'
+        ).respond(200, function(path, content) {
+            var ct = content.ciphertext;
+            var decrypted = JSON.parse(inboundGroupSession.decrypt(ct));
+
+            console.log('Decrypted received megolm message', decrypted);
+            expect(decrypted.type).toEqual('m.room.message');
+            expect(decrypted.content.body).toEqual('test');
+
+            return {
+                event_id: '$event_id',
+            };
+        });
+
+        return aliceTestClient.start().then(function() {
+            var syncResponse = getSyncResponse(['@bob:xyz']);
+
+            // establish an olm session with alice
+            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+
+            var olmEvent = encryptOlmEvent({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+            });
+
+            syncResponse.to_device = { events: [olmEvent] };
+
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+            return aliceTestClient.httpBackend.flush('/sync', 1);
+        }).then(function() {
+            console.log('Forcing alice to download our device keys');
+
+            // this will block
+            downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
+        }).then(function() {
+
+            // so will this.
+            sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test');
+        }).then(function() {
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, getTestKeysQueryResponse('@bob:xyz')
+            );
+
+            return aliceTestClient.httpBackend.flush();
+        }).then(function() {
+            return q.all([downloadPromise, sendPromise]);
+        }).nodeify(done);
+    });
 });
