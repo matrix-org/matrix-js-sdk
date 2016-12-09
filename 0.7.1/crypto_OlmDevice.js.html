@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: crypto/OlmDevice.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: crypto/OlmDevice.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+"use strict";
+
+/**
+ * olm.js wrapper
+ *
+ * @module crypto/OlmDevice
+ */
+
+var Olm = require("olm");
+var utils = require("../utils");
+
+/**
+ * Manages the olm cryptography functions. Each OlmDevice has a single
+ * OlmAccount and a number of OlmSessions.
+ *
+ * Accounts and sessions are kept pickled in a sessionStore.
+ *
+ * @constructor
+ * @alias module:crypto/OlmDevice
+ *
+ * @param {Object} sessionStore A store to be used for data in end-to-end
+ *    crypto
+ *
+ * @property {string} deviceCurve25519Key   Curve25519 key for the account
+ * @property {string} deviceEd25519Key      Ed25519 key for the account
+ */
+function OlmDevice(sessionStore) {
+    this._sessionStore = sessionStore;
+    this._pickleKey = "DEFAULT_KEY";
+
+    var e2eKeys;
+    var account = new Olm.Account();
+    try {
+        _initialise_account(this._sessionStore, this._pickleKey, account);
+        e2eKeys = JSON.parse(account.identity_keys());
+    } finally {
+        account.free();
+    }
+
+    this.deviceCurve25519Key = e2eKeys.curve25519;
+    this.deviceEd25519Key = e2eKeys.ed25519;
+
+    // we don't bother stashing outboundgroupsessions in the sessionstore -
+    // instead we keep them here.
+    this._outboundGroupSessionStore = {};
+
+    // Store a set of decrypted message indexes for each group session.
+    // This partially mitigates a replay attack where a MITM resends a group
+    // message into the room.
+    //
+    // TODO: If we ever remove an event from memory we will also need to remove
+    // it from this map. Otherwise if we download the event from the server we
+    // will think that it is a duplicate.
+    //
+    // Keys are strings of form "&lt;senderKey>|&lt;session_id>|&lt;message_index>"
+    // Values are true.
+    this._inboundGroupSessionMessageIndexes = {};
+}
+
+function _initialise_account(sessionStore, pickleKey, account) {
+    var e2eAccount = sessionStore.getEndToEndAccount();
+    if (e2eAccount !== null) {
+        account.unpickle(pickleKey, e2eAccount);
+        return;
+    }
+
+    account.create();
+    var pickled = account.pickle(pickleKey);
+    sessionStore.storeEndToEndAccount(pickled);
+}
+
+/**
+ * @return {array} The version of Olm.
+ */
+OlmDevice.getOlmVersion = function() {
+    return Olm.get_library_version();
+};
+
+
+/**
+ * extract our OlmAccount from the session store and call the given function
+ *
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getAccount = function(func) {
+    var account = new Olm.Account();
+    try {
+        var pickledAccount = this._sessionStore.getEndToEndAccount();
+        account.unpickle(this._pickleKey, pickledAccount);
+        return func(account);
+    } finally {
+        account.free();
+    }
+};
+
+
+/**
+ * store our OlmAccount in the session store
+ *
+ * @param {OlmAccount} account
+ * @private
+ */
+OlmDevice.prototype._saveAccount = function(account) {
+    var pickledAccount = account.pickle(this._pickleKey);
+    this._sessionStore.storeEndToEndAccount(pickledAccount);
+};
+
+
+/**
+ * extract an OlmSession from the session store and call the given function
+ *
+ * @param {string} deviceKey
+ * @param {string} sessionId
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getSession = function(deviceKey, sessionId, func) {
+    var sessions = this._sessionStore.getEndToEndSessions(deviceKey);
+    var pickledSession = sessions[sessionId];
+
+    var session = new Olm.Session();
+    try {
+        session.unpickle(this._pickleKey, pickledSession);
+        return func(session);
+    } finally {
+        session.free();
+    }
+};
+
+
+/**
+ * store our OlmSession in the session store
+ *
+ * @param {string} deviceKey
+ * @param {OlmSession} session
+ * @private
+ */
+OlmDevice.prototype._saveSession = function(deviceKey, session) {
+    var pickledSession = session.pickle(this._pickleKey);
+    this._sessionStore.storeEndToEndSession(
+        deviceKey, session.session_id(), pickledSession
+    );
+};
+
+
+/**
+ * get an OlmUtility and call the given function
+ *
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getUtility = function(func) {
+    var utility = new Olm.Utility();
+    try {
+        return func(utility);
+    } finally {
+        utility.free();
+    }
+};
+
+
+/**
+ * Signs a message with the ed25519 key for this account.
+ *
+ * @param {string} message  message to be signed
+ * @return {string} base64-encoded signature
+ */
+OlmDevice.prototype.sign = function(message) {
+    return this._getAccount(function(account) {
+        return account.sign(message);
+    });
+};
+
+/**
+ * Get the current (unused, unpublished) one-time keys for this account.
+ *
+ * @return {object} one time keys; an object with the single property
+ * &lt;tt>curve25519&lt;/tt>, which is itself an object mapping key id to Curve25519
+ * key.
+ */
+OlmDevice.prototype.getOneTimeKeys = function() {
+    return this._getAccount(function(account) {
+        return JSON.parse(account.one_time_keys());
+    });
+};
+
+
+/**
+ * Get the maximum number of one-time keys we can store.
+ *
+ * @return {number} number of keys
+ */
+OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
+    return this._getAccount(function(account) {
+        return account.max_number_of_one_time_keys();
+    });
+};
+
+/**
+ * Marks all of the one-time keys as published.
+ */
+OlmDevice.prototype.markKeysAsPublished = function() {
+    var self = this;
+    this._getAccount(function(account) {
+        account.mark_keys_as_published();
+        self._saveAccount(account);
+    });
+};
+
+/**
+ * Generate some new one-time keys
+ *
+ * @param {number} numKeys number of keys to generate
+ */
+OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
+    var self = this;
+    this._getAccount(function(account) {
+        account.generate_one_time_keys(numKeys);
+        self._saveAccount(account);
+    });
+};
+
+/**
+ * Generate a new outbound session
+ *
+ * The new session will be stored in the sessionStore.
+ *
+ * @param {string} theirIdentityKey remote user's Curve25519 identity key
+ * @param {string} theirOneTimeKey  remote user's one-time Curve25519 key
+ * @return {string} sessionId for the outbound session.
+ */
+OlmDevice.prototype.createOutboundSession = function(
+    theirIdentityKey, theirOneTimeKey
+) {
+    var self = this;
+    return this._getAccount(function(account) {
+        var session = new Olm.Session();
+        try {
+            session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
+            self._saveSession(theirIdentityKey, session);
+            return session.session_id();
+        } finally {
+            session.free();
+        }
+    });
+};
+
+
+/**
+ * Generate a new inbound session, given an incoming message
+ *
+ * @param {string} theirDeviceIdentityKey remote user's Curve25519 identity key
+ * @param {number} message_type  message_type field from the received message (must be 0)
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {{payload: string, session_id: string}} decrypted payload, and
+ *     session id of new session
+ *
+ * @raises {Error} if the received message was not valid (for instance, it
+ *     didn't use a valid one-time key).
+ */
+OlmDevice.prototype.createInboundSession = function(
+    theirDeviceIdentityKey, message_type, ciphertext
+) {
+    if (message_type !== 0) {
+        throw new Error("Need message_type == 0 to create inbound session");
+    }
+
+    var self = this;
+    return this._getAccount(function(account) {
+        var session = new Olm.Session();
+        try {
+            session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
+            account.remove_one_time_keys(session);
+            self._saveAccount(account);
+
+            var payloadString = session.decrypt(message_type, ciphertext);
+
+            self._saveSession(theirDeviceIdentityKey, session);
+
+            return {
+                payload: payloadString,
+                session_id: session.session_id(),
+            };
+        } finally {
+            session.free();
+        }
+    });
+};
+
+
+/**
+ * Get a list of known session IDs for the given device
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @return {string[]}  a list of known session ids for the device
+ */
+OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
+    var sessions = this._sessionStore.getEndToEndSessions(
+        theirDeviceIdentityKey
+    );
+    return utils.keys(sessions);
+};
+
+/**
+ * Get the right olm session id for encrypting messages to the given identity key
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @return {string?}  session id, or null if no established session
+ */
+OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
+    var sessionIds = this.getSessionIdsForDevice(theirDeviceIdentityKey);
+    if (sessionIds.length === 0) {
+        return null;
+    }
+    // Use the session with the lowest ID.
+    sessionIds.sort();
+    return sessionIds[0];
+};
+
+/**
+ * Get information on the active Olm sessions for a device.
+ * &lt;p>
+ * Returns an array, with an entry for each active session. The first entry in
+ * the result will be the one used for outgoing messages. Each entry contains
+ * the keys 'hasReceivedMessage' (true if the session has received an incoming
+ * message and is therefore past the pre-key stage), and 'sessionId'.
+ *
+ * @param {string} deviceIdentityKey Curve25519 identity key for the device
+ * @return {Array.&lt;{sessionId: string, hasReceivedMessage: Boolean}>}
+ */
+OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
+    var sessionIds = this.getSessionIdsForDevice(deviceIdentityKey);
+    sessionIds.sort();
+
+    var info = [];
+
+    function getSessionInfo(session) {
+        return {
+            hasReceivedMessage: session.has_received_message()
+        };
+    }
+
+    for (var i = 0; i &lt; sessionIds.length; i++) {
+        var sessionId = sessionIds[i];
+        var res = this._getSession(deviceIdentityKey, sessionId, getSessionInfo);
+        res.sessionId = sessionId;
+        info.push(res);
+    }
+    return info;
+};
+
+/**
+ * Encrypt an outgoing message using an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {string} payloadString  payload to be encrypted and sent
+ *
+ * @return {string} ciphertext
+ */
+OlmDevice.prototype.encryptMessage = function(
+    theirDeviceIdentityKey, sessionId, payloadString
+) {
+    var self = this;
+
+    if (payloadString === undefined) {
+        throw new Error("payloadString undefined");
+    }
+
+    return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
+        var res = session.encrypt(payloadString);
+        self._saveSession(theirDeviceIdentityKey, session);
+        return res;
+    });
+};
+
+/**
+ * Decrypt an incoming message using an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {number} message_type  message_type field from the received message
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {string} decrypted payload.
+ */
+OlmDevice.prototype.decryptMessage = function(
+    theirDeviceIdentityKey, sessionId, message_type, ciphertext
+) {
+    var self = this;
+
+    return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
+        var payloadString = session.decrypt(message_type, ciphertext);
+        self._saveSession(theirDeviceIdentityKey, session);
+
+        return payloadString;
+    });
+};
+
+/**
+ * Determine if an incoming messages is a prekey message matching an existing session
+ *
+ * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
+ *     remote device
+ * @param {string} sessionId  the id of the active session
+ * @param {number} message_type  message_type field from the received message
+ * @param {string} ciphertext base64-encoded body from the received message
+ *
+ * @return {boolean} true if the received message is a prekey message which matches
+ *    the given session.
+ */
+OlmDevice.prototype.matchesSession = function(
+    theirDeviceIdentityKey, sessionId, message_type, ciphertext
+) {
+    if (message_type !== 0) {
+        return false;
+    }
+
+    return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
+        return session.matches_inbound(ciphertext);
+    });
+};
+
+
+
+// Outbound group session
+// ======================
+
+/**
+ * store an OutboundGroupSession in _outboundGroupSessionStore
+ *
+ * @param {Olm.OutboundGroupSession} session
+ * @private
+ */
+OlmDevice.prototype._saveOutboundGroupSession = function(session) {
+    var pickledSession = session.pickle(this._pickleKey);
+    this._outboundGroupSessionStore[session.session_id()] = pickledSession;
+};
+
+
+/**
+ * extract an OutboundGroupSession from _outboundGroupSessionStore and call the
+ * given function
+ *
+ * @param {string} sessionId
+ * @param {function} func
+ * @return {object} result of func
+ * @private
+ */
+OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
+    var pickled = this._outboundGroupSessionStore[sessionId];
+    if (pickled === null) {
+        throw new Error("Unknown outbound group session " + sessionId);
+    }
+
+    var session = new Olm.OutboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, pickled);
+        return func(session);
+    } finally {
+        session.free();
+    }
+};
+
+
+/**
+ * Generate a new outbound group session
+ *
+ * @return {string} sessionId for the outbound session.
+ */
+OlmDevice.prototype.createOutboundGroupSession = function() {
+    var session = new Olm.OutboundGroupSession();
+    try {
+        session.create();
+        this._saveOutboundGroupSession(session);
+        return session.session_id();
+    } finally {
+        session.free();
+    }
+};
+
+
+/**
+ * Encrypt an outgoing message with an outbound group session
+ *
+ * @param {string} sessionId  the id of the outboundgroupsession
+ * @param {string} payloadString  payload to be encrypted and sent
+ *
+ * @return {string} ciphertext
+ */
+OlmDevice.prototype.encryptGroupMessage = function(sessionId, payloadString) {
+    var self = this;
+
+    return this._getOutboundGroupSession(sessionId, function(session) {
+        var res = session.encrypt(payloadString);
+        self._saveOutboundGroupSession(session);
+        return res;
+    });
+};
+
+/**
+ * Get the session keys for an outbound group session
+ *
+ * @param {string} sessionId  the id of the outbound group session
+ *
+ * @return {{chain_index: number, key: string}} current chain index, and
+ *     base64-encoded secret key.
+ */
+OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
+    return this._getOutboundGroupSession(sessionId, function(session) {
+        return {
+            chain_index: session.message_index(),
+            key: session.session_key(),
+        };
+    });
+};
+
+
+// Inbound group session
+// =====================
+
+/**
+ * store an InboundGroupSession in the session store
+ *
+ * @param {string} roomId
+ * @param {string} senderCurve25519Key
+ * @param {string} sessionId
+ * @param {Olm.InboundGroupSession} session
+ * @param {object} keysClaimed Other keys the sender claims.
+ * @private
+ */
+OlmDevice.prototype._saveInboundGroupSession = function(
+    roomId, senderCurve25519Key, sessionId, session, keysClaimed
+) {
+    var r = {
+        room_id: roomId,
+        session: session.pickle(this._pickleKey),
+        keysClaimed: keysClaimed,
+    };
+
+    this._sessionStore.storeEndToEndInboundGroupSession(
+        senderCurve25519Key, sessionId, JSON.stringify(r)
+    );
+};
+
+/**
+ * extract an InboundGroupSession from the session store and call the given function
+ *
+ * @param {string} roomId
+ * @param {string} senderKey
+ * @param {string} sessionId
+ * @param {function(Olm.InboundGroupSession, Object&lt;string, string>): T} func
+ *   function to call. Second argument is the map of keys claimed by the session.
+ *
+ * @return {null} the sessionId is unknown
+ *
+ * @return {T} result of func
+ *
+ * @private
+ * @template {T}
+ */
+OlmDevice.prototype._getInboundGroupSession = function(
+    roomId, senderKey, sessionId, func
+) {
+    var r = this._sessionStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId
+    );
+
+    if (r === null) {
+        return null;
+    }
+
+    r = JSON.parse(r);
+
+    // check that the room id matches the original one for the session. This stops
+    // the HS pretending a message was targeting a different room.
+    if (roomId !== r.room_id) {
+        throw new Error(
+            "Mismatched room_id for inbound group session (expected " + r.room_id +
+                ", was " + roomId + ")"
+        );
+    }
+
+    var session = new Olm.InboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, r.session);
+        return func(session, r.keysClaimed || {});
+    } finally {
+        session.free();
+    }
+};
+
+/**
+ * Add an inbound group session to the session store
+ *
+ * @param {string} roomId     room in which this session will be used
+ * @param {string} senderKey  base64-encoded curve25519 key of the sender
+ * @param {string} sessionId  session identifier
+ * @param {string} sessionKey base64-encoded secret key
+ * @param {Object&lt;string, string>} keysClaimed Other keys the sender claims.
+ */
+OlmDevice.prototype.addInboundGroupSession = function(
+    roomId, senderKey, sessionId, sessionKey, keysClaimed
+) {
+    var self = this;
+
+    /* if we already have this session, consider updating it */
+    function updateSession(session) {
+        console.log("Update for megolm session " + senderKey + "/" + sessionId);
+        // for now we just ignore updates. TODO: implement something here
+
+        return true;
+    }
+
+    var r = this._getInboundGroupSession(
+        roomId, senderKey, sessionId, updateSession
+    );
+
+    if (r !== null) {
+        return;
+    }
+
+    // new session.
+    var session = new Olm.InboundGroupSession();
+    try {
+        session.create(sessionKey);
+        if (sessionId != session.session_id()) {
+            throw new Error(
+                "Mismatched group session ID from senderKey: " + senderKey
+            );
+        }
+        self._saveInboundGroupSession(
+            roomId, senderKey, sessionId, session, keysClaimed
+        );
+    } finally {
+        session.free();
+    }
+};
+
+/**
+ * Decrypt a received message with an inbound group session
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ * @param {string} body      base64-encoded body of the encrypted message
+ *
+ * @return {null} the sessionId is unknown
+ *
+ * @return {{result: string, keysProved: Object&lt;string, string>, keysClaimed:
+ *    Object&lt;string, string>}} result
+ */
+OlmDevice.prototype.decryptGroupMessage = function(
+    roomId, senderKey, sessionId, body
+) {
+    var self = this;
+
+    function decrypt(session, keysClaimed) {
+        var res = session.decrypt(body);
+
+        var plaintext = res.plaintext;
+        if (plaintext === undefined) {
+            // Compatibility for older olm versions.
+            plaintext = res;
+        } else {
+            // Check if we have seen this message index before to detect replay attacks.
+            var messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
+            if (messageIndexKey in self._inboundGroupSessionMessageIndexes) {
+                throw new Error(
+                    "Duplicate message index, possible replay attack: " +
+                    messageIndexKey
+                );
+            }
+            self._inboundGroupSessionMessageIndexes[messageIndexKey] = true;
+        }
+
+        // the sender must have had the senderKey to persuade us to save the
+        // session.
+        var keysProved = {curve25519: senderKey};
+
+        self._saveInboundGroupSession(
+            roomId, senderKey, sessionId, session, keysClaimed
+        );
+        return {
+            result: plaintext,
+            keysClaimed: keysClaimed,
+            keysProved: keysProved,
+        };
+    }
+
+    return this._getInboundGroupSession(
+        roomId, senderKey, sessionId, decrypt
+    );
+};
+
+
+// Utilities
+// =========
+
+/**
+ * Verify an ed25519 signature.
+ *
+ * @param {string} key ed25519 key
+ * @param {string} message message which was signed
+ * @param {string} signature base64-encoded signature to be checked
+ *
+ * @raises {Error} if there is a problem with the verification. If the key was
+ * too small then the message will be "OLM.INVALID_BASE64". If the signature
+ * was invalid then the message will be "OLM.BAD_MESSAGE_MAC".
+ */
+OlmDevice.prototype.verifySignature = function(
+    key, message, signature
+) {
+    this._getUtility(function(util) {
+        util.ed25519_verify(key, message, signature);
+    });
+};
+
+/** */
+module.exports = OlmDevice;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.html#.DecryptionAlgorithm">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.html#.EncryptionAlgorithm">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#WebStorageStore">WebStorageStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Fri Dec 09 2016 19:29:54 GMT+0000 (GMT)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
