@@ -114,15 +114,23 @@ fi
 
 set -x
 
-# Bump package.json, build the dist, and tag
+# Bump package.json and build the dist
 echo "npm version"
 # npm version will automatically commit its modification
 # and make a release tag. We don't want it to create the tag
-# because github will do that, but we can only turn off both
-# of these behaviours, so we have to manually commit the
-# result.
+# because it can only sign with the default key, but we can
+# only turn off both of these behaviours, so we have to
+# manually commit the result.
 npm version --no-git-tag-version "$release"
 git commit package.json -m "$tag"
+
+
+# figure out if we should be signing this release
+signing_id=
+if [ -f release_config.yaml ]; then
+    signing_id=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']"`
+fi
+
 
 # If there is a 'dist' script in the package.json,
 # run it in a separate checkout of the project, then
@@ -145,9 +153,16 @@ if [ $dodist -eq 0 ]; then
     # We haven't tagged yet, so tell the dist script what version
     # it's building
     DIST_VERSION="$tag" npm run dist
+
+    `dirname $0`/scripts/changelog_head.py > latest_changes.md
     popd
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
+        if [ -n "$signing_id" ]
+        then
+            gpg -u "$signing_id" --armor --output "$i".asc --detach-sig "$i"
+            assets="$assets -a $i.asc"
+        fi
     done
 fi
 
@@ -155,11 +170,26 @@ fi
 # a branch it doesn't have)
 git push origin "$rel_branch"
 
+if [ -n "$signing_id" ]; then
+    # make a signed tag
+    # gnupg seems to fail to get the right tty device unless we set it here
+    GPG_TTY=`tty` git tag -u "$signing_id" -F "${builddir}/latest_changes.md" "$tag"
+else
+    git tag -a -F "${builddir}/latest_changes.md" "$tag"
+fi
+
+# push the tag
+git push origin "$tag"
+
 hubflags=''
 if [ $prerelease -eq 1 ]; then
     hubflags='-p'
 fi
-hub release create $hubflags $assets -m "$tag" "$tag"
+
+echo "$tag" > "${builddir}/release_text.md"
+echo >> "${builddir}/release_text.md"
+cat "${builddir}/latest_changes.md" >> "${builddir}/release_text.md"
+hub release create $hubflags $assets -f "${builddir}/release_text.md" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
