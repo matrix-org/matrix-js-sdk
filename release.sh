@@ -63,6 +63,8 @@ if [ -z "$skip_changelog" ]; then
     # update_changelog doesn't have a --version flag
     update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
 fi
+latest_changes=`mktemp`
+cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_changes}"
 
 # ignore leading v on release
 release="${1#v}"
@@ -156,7 +158,6 @@ if [ $dodist -eq 0 ]; then
 
     popd
 
-    cat "${builddir}/CHANGELOG.md" | `dirname $0`/scripts/changelog_head.py > "${builddir}/latest_changes.md"
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
         if [ -n "$signing_id" ]
@@ -174,9 +175,9 @@ git push origin "$rel_branch"
 if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
-    GPG_TTY=`tty` git tag -u "$signing_id" -F "${builddir}/latest_changes.md" "$tag"
+    GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
 else
-    git tag -a -F "${builddir}/latest_changes.md" "$tag"
+    git tag -a -F "${latest_changes}" "$tag"
 fi
 
 # push the tag
@@ -187,14 +188,17 @@ if [ $prerelease -eq 1 ]; then
     hubflags='-p'
 fi
 
-echo "$tag" > "${builddir}/release_text.md"
-echo >> "${builddir}/release_text.md"
-cat "${builddir}/latest_changes.md" >> "${builddir}/release_text.md"
-hub release create $hubflags $assets -f "${builddir}/release_text.md" "$tag"
+release_text=`mktemp`
+echo "$tag" > "${release_text}"
+echo >> "${release_text}"
+cat "${latest_changes}" >> "${release_text}"
+hub release create $hubflags $assets -f "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
 fi
+rm "${release_text}"
+rm "${latest_changes}"
 
 if [ -z "$skip_jsdoc" ]; then
     echo "generating jsdocs"
