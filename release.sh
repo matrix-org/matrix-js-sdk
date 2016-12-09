@@ -154,8 +154,9 @@ if [ $dodist -eq 0 ]; then
     # it's building
     DIST_VERSION="$tag" npm run dist
 
-    `dirname $0`/scripts/changelog_head.py > latest_changes.md
     popd
+
+    cat "${builddir}/CHANGELOG.md" | `dirname $0`/scripts/changelog_head.py > "${builddir}/latest_changes.md"
     for i in "$builddir"/dist/*; do
         assets="$assets -a $i"
         if [ -n "$signing_id" ]
