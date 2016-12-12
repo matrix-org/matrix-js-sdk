@@ -175,7 +175,7 @@ git push origin "$rel_branch"
 if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
-    GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
+    GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
 else
     git tag -a -F "${latest_changes}" "$tag"
 fi
