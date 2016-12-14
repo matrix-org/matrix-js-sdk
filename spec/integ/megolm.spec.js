@@ -548,9 +548,11 @@ describe("megolm", function() {
                 'PUT', '/send/'
             ).respond(200, function(path, content) {
                 var ct = content.ciphertext;
-                var decrypted = JSON.parse(inboundGroupSession.decrypt(ct));
+                var r = inboundGroupSession.decrypt(ct);
+                console.log('Decrypted received megolm message', r);
 
-                console.log('Decrypted received megolm message', decrypted);
+                expect(r.message_index).toEqual(0);
+                var decrypted = JSON.parse(r.plaintext);
                 expect(decrypted.type).toEqual('m.room.message');
                 expect(decrypted.content.body).toEqual('test');
 
@@ -795,8 +797,10 @@ describe("megolm", function() {
                 'PUT', '/send/'
             ).respond(200, function(path, content) {
                 var ct = content.ciphertext;
-                decrypted = JSON.parse(inboundGroupSession.decrypt(ct));
-                console.log('Decrypted received megolm message', decrypted);
+                var r = inboundGroupSession.decrypt(ct);
+                console.log('Decrypted received megolm message', r);
+                decrypted = JSON.parse(r.plaintext);
+
                 return {
                     event_id: '$event_id',
                 };
@@ -838,9 +842,11 @@ describe("megolm", function() {
             'PUT', '/send/'
         ).respond(200, function(path, content) {
             var ct = content.ciphertext;
-            var decrypted = JSON.parse(inboundGroupSession.decrypt(ct));
+            var r = inboundGroupSession.decrypt(ct);
+            console.log('Decrypted received megolm message', r);
 
-            console.log('Decrypted received megolm message', decrypted);
+            expect(r.message_index).toEqual(0);
+            var decrypted = JSON.parse(r.plaintext);
             expect(decrypted.type).toEqual('m.room.message');
             expect(decrypted.content.body).toEqual('test');
 
