@@ -1,3 +1,24 @@
+Changes in [0.7.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.2) (2016-12-15)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.1...v0.7.2)
+
+ * Bump to Olm 2.0
+   [\#309](https://github.com/matrix-org/matrix-js-sdk/pull/309)
+ * Sanity check payload length before encrypting
+   [\#307](https://github.com/matrix-org/matrix-js-sdk/pull/307)
+ * Remove dead _sendPingToDevice function
+   [\#308](https://github.com/matrix-org/matrix-js-sdk/pull/308)
+ * Add setRoomDirectoryVisibilityAppService
+   [\#306](https://github.com/matrix-org/matrix-js-sdk/pull/306)
+ * Update release script to do signed releases
+   [\#305](https://github.com/matrix-org/matrix-js-sdk/pull/305)
+ * e2e: Wait for pending device lists
+   [\#304](https://github.com/matrix-org/matrix-js-sdk/pull/304)
+ * Start a new megolm session when devices are blacklisted
+   [\#303](https://github.com/matrix-org/matrix-js-sdk/pull/303)
+ * E2E: Download our own devicelist on startup
+   [\#302](https://github.com/matrix-org/matrix-js-sdk/pull/302)
+
 Changes in [0.7.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.1) (2016-12-09)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.1-rc.1...v0.7.1)
