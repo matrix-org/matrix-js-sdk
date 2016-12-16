@@ -63,8 +63,6 @@ if [ -z "$skip_changelog" ]; then
     # update_changelog doesn't have a --version flag
     update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
 fi
-latest_changes=`mktemp`
-cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_changes}"
 
 # ignore leading v on release
 release="${1#v}"
@@ -113,6 +111,8 @@ if [ -z "$skip_changelog" ]; then
         git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
 fi
+latest_changes=`mktemp`
+cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_changes}"
 
 set -x
 
