@@ -9,6 +9,6 @@ describe("Crypto", function() {
     }
 
     it("Crypto exposes the correct olm library version", function() {
-        expect(Crypto.getOlmVersion()).toEqual([2, 0, 0]);
+        expect(Crypto.getOlmVersion()[0]).toEqual(2);
     });
 });
