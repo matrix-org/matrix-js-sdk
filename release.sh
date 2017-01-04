@@ -32,6 +32,18 @@ if [ "$ret" -eq 0 ]; then
     exit
 fi
 
+git diff-index --quiet --cached HEAD || ret=$?
+if [ "$ret" -eq 1 ]; then
+    echo "this git checkout has staged (uncommitted) changes. Refusing to release."
+    exit
+fi
+
+git diff-files --quiet || ret=$?
+if [ "$ret" -eq 1 ]; then
+    echo "this git checkout has uncommitted changes. Refusing to release."
+    exit
+fi
+
 skip_changelog=
 skip_jsdoc=
 changelog_file="CHANGELOG.md"
