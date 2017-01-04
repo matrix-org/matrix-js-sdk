@@ -3,9 +3,10 @@
 # Script to perform a release of matrix-js-sdk.
 #
 # Requires:
-#   github-changelog-generator; to install, do
+#   github-changelog-generator; install via:
 #     pip install git+https://github.com/matrix-org/github-changelog-generator.git
-#   jq; install from your distibution's package manager (https://stedolan.github.io/jq/)
+#   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
+#   hub; install via brew (OSX) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
 
 set -e
 
