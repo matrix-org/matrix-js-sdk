@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Script to perform a release of matrix-js-sdk. Performs the steps documented
-# in RELEASING.md
+# Script to perform a release of matrix-js-sdk.
 #
 # Requires:
 #   github-changelog-generator; to install, do
