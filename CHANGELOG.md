@@ -1,3 +1,14 @@
+Changes in [0.7.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.3) (2017-01-04)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.2...v0.7.3)
+
+ * User presence list feature
+   [\#310](https://github.com/matrix-org/matrix-js-sdk/pull/310)
+ * Allow clients the ability to set a default local timeout
+   [\#313](https://github.com/matrix-org/matrix-js-sdk/pull/313)
+ * Add API to delete threepid
+   [\#312](https://github.com/matrix-org/matrix-js-sdk/pull/312)
+
 Changes in [0.7.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.2) (2016-12-15)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.1...v0.7.2)
