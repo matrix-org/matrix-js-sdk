@@ -32,15 +32,12 @@ if [ "$ret" -eq 0 ]; then
     exit
 fi
 
-ret=0
-git diff-index --quiet --cached HEAD || ret=$?
-if [ "$ret" -eq 1 ]; then
+if ! git diff-index --quiet --cached HEAD; then
     echo "this git checkout has staged (uncommitted) changes. Refusing to release."
     exit
 fi
 
-git diff-files --quiet || ret=$?
-if [ "$ret" -eq 1 ]; then
+if ! git diff-files --quiet; then
     echo "this git checkout has uncommitted changes. Refusing to release."
     exit
 fi
