@@ -11,5 +11,7 @@ module.exports = {
             ignoreComments: true,
         }],
         curly: ["error", "multi-line"],
+        "require-jsdoc": ["warn"],
+        "valid-jsdoc": ["warn"],
     }
 }
