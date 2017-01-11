@@ -522,17 +522,14 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         }, 0);
     }
 
+    this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
+    stream = this.screenSharingStream;
+
     this.localAVStream = stream;
     // why do we enable audio (and only audio) tracks here? -- matthew
     setTracksEnabled(stream.getAudioTracks(), true);
     this.peerConn = _createPeerConnection(this);
     this.peerConn.addStream(stream);
-    if (this.screenSharingStream) {
-        console.log("Adding screen-sharing stream to peer connection");
-        this.peerConn.addStream(this.screenSharingStream);
-        // let's use this for the local preview...
-        this.localAVStream = this.screenSharingStream;
-    }
     this.peerConn.createOffer(
         hookCallback(self, self._gotLocalOffer),
         hookCallback(self, self._getLocalOfferFailed)
@@ -1141,14 +1138,6 @@ var _getChromeScreenSharingConstraints = function(call) {
         call.emit("error", callError(
             MatrixCall.ERR_NO_USER_MEDIA,
             "Couldn't determine screen sharing constaints."
-        ));
-        return;
-    }
-    // it won't work at all if you're not on HTTPS so whine whine whine
-    if (!global.window || global.window.location.protocol !== "https:") {
-        call.emit("error", callError(
-            MatrixCall.ERR_NO_USER_MEDIA,
-            "You need to be using HTTPS to place a screen-sharing call."
         ));
         return;
     }
