@@ -14,12 +14,12 @@ function fail {
 
 npm test || fail "npm test finished with return code $?"
 
-jshint --reporter=checkstyle -c .jshint lib spec > jshint.xml ||
+jshint --reporter=checkstyle -c .jshint src spec > jshint.xml ||
     fail "jshint finished with return code $?"
 
 gjslint --unix_mode --disable 0131,0211,0200,0222,0212 \
         --max_line_length 90 \
-        -r lib/ -r spec/ > gjslint.log ||
+        -r src/ -r spec/ > gjslint.log ||
     fail "gjslint finished with return code $?"
 
 # delete the old tarball, if it exists

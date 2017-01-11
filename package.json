@@ -11,7 +11,7 @@
     "build": "jshint -c .jshint lib/ && rimraf dist && mkdir dist && browserify --exclude olm browser-index.js -o dist/browser-matrix.js --ignore-missing && uglifyjs -c -m -o dist/browser-matrix.min.js dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify --exclude olm browser-index.js -o dist/browser-matrix-dev.js -v",
-    "lint": "jshint -c .jshint lib spec && gjslint --unix_mode --disable 0131,0211,0200,0222,0212 --max_line_length 90 -r spec/ -r lib/",
+    "lint": "jshint -c .jshint src spec && gjslint --unix_mode --disable 0131,0211,0200,0222,0212 --max_line_length 90 -r spec/ -r src/",
     "prepublish": "npm run compile && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
