@@ -8,6 +8,7 @@
     "check": "jasmine-node spec --verbose --junitreport --captureExceptions",
     "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
     "compile": "babel -s -d lib src",
+    "start": "babel -s -w -d lib src",
     "build": "jshint -c .jshint lib/ && rimraf dist && mkdir dist && browserify --exclude olm browser-index.js -o dist/browser-matrix.js --ignore-missing && uglifyjs -c -m -o dist/browser-matrix.min.js dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify --exclude olm browser-index.js -o dist/browser-matrix-dev.js -v",
