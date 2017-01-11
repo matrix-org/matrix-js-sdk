@@ -7,6 +7,7 @@ lib-cov
 out
 reports
 /dist
+/lib
 
 # version file and tarball created by 'npm pack'
 /git-revision.txt
