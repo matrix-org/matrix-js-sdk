@@ -59,6 +59,10 @@ describe("MatrixClient events", function() {
                                     content: {
                                         creator: "@foo:bar"
                                     }
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.topic",
+                                    content: { topic: "Topic" }
                                 })
                             ]
                         }
@@ -161,7 +165,9 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             var roomInvokeCount = 0;
             var roomNameInvokeCount = 0;
+            var roomTopicInvokeCount = 0;
             var timelineFireCount = 0;
+
             client.on("Room", function(room) {
                 roomInvokeCount++;
                 expect(room.roomId).toEqual("!erufh:bar");
@@ -174,6 +180,10 @@ describe("MatrixClient events", function() {
                 roomNameInvokeCount++;
             });
 
+            client.on("Room.topic", function(room) {
+                roomTopicInvokeCount++;
+            });
+
             client.startClient();
 
             httpBackend.flush().done(function() {
@@ -182,6 +192,9 @@ describe("MatrixClient events", function() {
                 );
                 expect(roomNameInvokeCount).toEqual(
                     1, "Room.name fired wrong number of times."
+                );
+                expect(roomTopicInvokeCount).toEqual(
+                    1, "Room.topic fired wrong number of times."
                 );
                 expect(timelineFireCount).toEqual(
                     3, "Room.timeline fired the wrong number of times"
@@ -195,7 +208,7 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             var roomStateEventTypes = [
-                "m.room.member", "m.room.create"
+                "m.room.member", "m.room.create", "m.room.topic"
             ];
             var eventsInvokeCount = 0;
             var membersInvokeCount = 0;
@@ -233,7 +246,7 @@ describe("MatrixClient events", function() {
                     1, "RoomState.newMember fired wrong number of times"
                 );
                 expect(eventsInvokeCount).toEqual(
-                    2, "RoomState.events fired wrong number of times"
+                    3, "RoomState.events fired wrong number of times"
                 );
                 done();
             });

@@ -16,6 +16,7 @@ describe("MatrixClient syncing", function() {
     var userC = "@claire:bar";
     var roomOne = "!foo:localhost";
     var roomTwo = "!bar:localhost";
+    var roomOneTopic = "Room One Topic";
 
     beforeEach(function() {
         utils.beforeEach(this);
@@ -329,7 +330,12 @@ describe("MatrixClient syncing", function() {
                     utils.mkEvent({
                         type: "m.room.name", room: roomOne, user: selfUserId,
                         content: { name: "A new room name" }
+                    }),
+                    utils.mkEvent({
+                        type: "m.room.topic", room: roomOne, user: selfUserId,
+                        content: { topic: roomOneTopic } 
                     })
+
                 ]
             }
         };
@@ -418,8 +424,19 @@ describe("MatrixClient syncing", function() {
 
         });
 
-        xit("should update the room topic", function() {
+        it("should update the room topic", function(done) {
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                var room = client.getRoom(roomOne);
+                
+                expect(room.topic).toEqual(roomOneTopic);
+                expect(room.summary.info.desc).toEqual(roomOneTopic);
+                done();
+            });
         });
     });
 
