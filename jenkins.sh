@@ -2,7 +2,7 @@
 
 export NVM_DIR="/home/jenkins/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-nvm use 0.10
+nvm use 4
 npm install
 
 RC=0
