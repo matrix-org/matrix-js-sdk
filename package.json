@@ -43,7 +43,6 @@
   ],
   "dependencies": {
     "another-json": "^0.2.0",
-    "babel-polyfill": "^6.20.0",
     "browser-request": "^0.3.3",
     "browserify": "^10.2.3",
     "q": "^1.4.1",
