@@ -439,6 +439,7 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
 // =========================
 
 /**
+ * @param {Object} options Options for this request
  * @param {string} options.server The remote server to query for the room list.
  *                                Optional. If unspecified, get the local home
  *                                server's public room list.
@@ -1022,7 +1023,7 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, callback) {
 /**
  * Claim one-time keys
  *
- * @param {string[][]} devices  a list of [userId, deviceId] pairs
+ * @param {string[]} devices  a list of [userId, deviceId] pairs
  *
  * @param {string} [key_algorithm = signed_curve25519]  desired key type
  *

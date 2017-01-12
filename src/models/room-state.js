@@ -253,7 +253,7 @@ RoomState.prototype.maySendMessage = function(userId) {
 /**
  * Returns true if the given user ID has permission to send a normal
  * event of type `eventType` into this room.
- * @param {string} type The type of event to test
+ * @param {string} eventType The type of event to test
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given user ID should be permitted to send
  *                        the given type of event into this room,
@@ -267,8 +267,8 @@ RoomState.prototype.maySendEvent = function(eventType, userId) {
 /**
  * Returns true if the given MatrixClient has permission to send a state
  * event of type `stateEventType` into this room.
- * @param {string} type The type of state events to test
- * @param {MatrixClient}  The client to test permission for
+ * @param {string} stateEventType The type of state events to test
+ * @param {MatrixClient} cli The client to test permission for
  * @return {boolean} true if the given client should be permitted to send
  *                        the given type of state event into this room,
  *                        according to the room's state.
@@ -283,7 +283,7 @@ RoomState.prototype.mayClientSendStateEvent = function(stateEventType, cli) {
 /**
  * Returns true if the given user ID has permission to send a state
  * event of type `stateEventType` into this room.
- * @param {string} type The type of state events to test
+ * @param {string} stateEventType The type of state events to test
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given user ID should be permitted to send
  *                        the given type of state event into this room,
@@ -296,7 +296,7 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
 /**
  * Returns true if the given user ID has permission to send a normal or state
  * event of type `eventType` into this room.
- * @param {string} type The type of event to test
+ * @param {string} eventType The type of event to test
  * @param {string} userId The user ID of the user to test permission for
  * @param {boolean} state If true, tests if the user may send a state
                           event of this type. Otherwise tests whether

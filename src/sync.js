@@ -1016,7 +1016,7 @@ SyncApi.prototype._resolveInvites = function(room) {
  * @param {Room} room
  * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
  * at the *START* of the timeline list if it is supplied.
- * @param {?MatrixEvent[]} timelineEventList A list of timeline events. Lower index
+ * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
  * is earlier in time. Higher index is later.
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,

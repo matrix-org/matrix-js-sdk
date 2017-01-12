@@ -348,7 +348,7 @@ Crypto.prototype._getDevicesFromStore = function(userIds) {
 /**
  * @param {string[]} downloadUsers list of userIds
  *
- * @return {Object a map from userId to a promise for a result for that user
+ * @return {Object} a map from userId to a promise for a result for that user
  */
 Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
     var self = this;
@@ -546,7 +546,7 @@ function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
  *
  * @param {string} userId the user to list keys for.
  *
- * @return {module:crypto/deviceinfo[]?} list of devices, or null if we haven't
+ * @return {module:crypto/deviceinfo[]|null} list of devices, or null if we haven't
  * managed to get a list of devices for this user yet.
  */
 Crypto.prototype.getStoredDevicesForUser = function(userId) {

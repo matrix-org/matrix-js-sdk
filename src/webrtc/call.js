@@ -153,7 +153,7 @@ MatrixCall.prototype.placeScreenSharingCall =
 /**
  * Play the given HTMLMediaElement, serialising the operation into a chain
  * of promises to avoid racing access to the element
- * @param {Element} HTMLMediaElement element to play
+ * @param {Element} element HTMLMediaElement element to play
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.playElement = function(element, queueId) {
@@ -183,7 +183,7 @@ MatrixCall.prototype.playElement = function(element, queueId) {
 /**
  * Pause the given HTMLMediaElement, serialising the operation into a chain
  * of promises to avoid racing access to the element
- * @param {Element} HTMLMediaElement element to pause
+ * @param {Element} element HTMLMediaElement element to pause
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.pauseElement = function(element, queueId) {
@@ -209,7 +209,7 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
  * Assign the given HTMLMediaElement by setting the .src attribute on it,
  * serialising the operation into a chain of promises to avoid racing access
  * to the element
- * @param {Element} HTMLMediaElement element to pause
+ * @param {Element} element HTMLMediaElement element to pause
  * @param {string} src the src attribute value to assign to the element
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
