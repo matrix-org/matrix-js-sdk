@@ -44,7 +44,7 @@ function _matches_wildcard(actual_value, filter_value) {
  * 'Filters' are referred to as 'FilterCollections'.
  *
  * @constructor
- * @param {Object} the definition of this filter JSON, e.g. { 'contains_url': true }
+ * @param {Object} filter_json the definition of this filter JSON, e.g. { 'contains_url': true }
  */
 function FilterComponent(filter_json) {
     this.filter_json = filter_json;

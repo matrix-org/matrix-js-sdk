@@ -79,7 +79,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
  *
  * @param {module:models/room} room
  * @param {string} eventType
- * @param {object} plaintext event content
+ * @param {object} content plaintext event content
  *
  * @return {module:client.Promise} Promise which resolves to the new event body
  */

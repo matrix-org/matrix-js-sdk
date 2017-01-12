@@ -89,8 +89,8 @@ InteractiveAuth.prototype = {
     /**
      * get the server params for a given stage
      *
-     * @param {string}  login type for the stage
-     * @return {object?}  any parameters from the server for this stage
+     * @param {string} loginType login type for the stage
+     * @return {object?} any parameters from the server for this stage
      */
     getStageParams: function(loginType) {
         var params = {};

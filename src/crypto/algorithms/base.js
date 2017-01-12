@@ -130,7 +130,7 @@ module.exports.DecryptionAlgorithm = DecryptionAlgorithm;
  *
  * @method module:crypto/algorithms/base.DecryptionAlgorithm#onRoomKeyEvent
  *
- * @param {module:models/event.MatrixEvent} event key event
+ * @param {module:models/event.MatrixEvent} params event key event
  */
 DecryptionAlgorithm.prototype.onRoomKeyEvent = function(params) {
     // ignore by default

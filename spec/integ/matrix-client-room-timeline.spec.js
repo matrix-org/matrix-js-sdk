@@ -101,7 +101,7 @@ describe("MatrixClient room timelines", function() {
     }
 
     beforeEach(function(done) {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({

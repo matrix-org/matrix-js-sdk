@@ -24,11 +24,12 @@ var EventTimeline = require("./event-timeline");
 // var DEBUG = false;
 var DEBUG = true;
 
+var debuglog;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
-    var debuglog = console.log.bind(console);
+    debuglog = console.log.bind(console);
 } else {
-    var debuglog = function() {};
+    debuglog = function() {};
 }
 
 /**

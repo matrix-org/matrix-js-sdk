@@ -467,7 +467,6 @@ OlmDevice.prototype.matchesSession = function(
 };
 
 
-
 // Outbound group session
 // ======================
 

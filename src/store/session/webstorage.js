@@ -92,7 +92,7 @@ WebStorageSessionStore.prototype = {
      * @param {string} userId The user's ID.
      * @return {object} A map from device ID to keys for the device.
      */
-    getEndToEndDevicesForUser: function(userId)  {
+    getEndToEndDevicesForUser: function(userId) {
         return getJsonItem(this.store, keyEndToEndDevicesForUser(userId));
     },
 

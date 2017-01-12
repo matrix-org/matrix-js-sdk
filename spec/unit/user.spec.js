@@ -8,7 +8,7 @@ describe("User", function() {
     var user;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         user = new User(userId);
     });
 

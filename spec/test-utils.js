@@ -28,7 +28,7 @@ module.exports.mock = function(constr, name) {
     result.jasmineToString = function() {
         return "mock" + (name ? " of " + name : "");
     };
-    for (var key in constr.prototype) { // jshint ignore:line
+    for (var key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jasmine.createSpy((name || "mock") + '.' + key);

@@ -438,8 +438,6 @@ var _REDACT_KEEP_CONTENT_MAP = {
 };
 
 
-
-
 /**
  * Fires when an event is decrypted
  *

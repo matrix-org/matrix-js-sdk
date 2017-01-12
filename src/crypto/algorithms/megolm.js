@@ -150,7 +150,7 @@ utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
 /**
  * @private
  *
- * @param {module:models/room} room
+ * @param {Object} devicesInRoom The devices in this room, indexed by user ID
  *
  * @return {module:client.Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
@@ -378,7 +378,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
  *
  * @param {module:models/room} room
  * @param {string} eventType
- * @param {object} plaintext event content
+ * @param {object} content plaintext event content
  *
  * @return {module:client.Promise} Promise which resolves to the new event body
  */
@@ -474,9 +474,6 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  * @inheritdoc
  *
  * @param {MatrixEvent} event
- *
- * @return {null} The event referred to an unknown megolm session
- * @return {module:crypto.DecryptionResult} decryption result
  *
  * @throws {module:crypto/algorithms/base.DecryptionError} if there is a
  *   problem decrypting the event

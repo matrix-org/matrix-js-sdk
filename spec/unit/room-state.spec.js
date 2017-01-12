@@ -11,7 +11,7 @@ describe("RoomState", function() {
     var state;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         state = new RoomState(roomId);
         state.setStateEvents([
             utils.mkMembership({  // userA joined

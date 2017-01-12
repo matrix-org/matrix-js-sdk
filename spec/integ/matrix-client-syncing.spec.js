@@ -18,7 +18,7 @@ describe("MatrixClient syncing", function() {
     var roomTwo = "!bar:localhost";
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({

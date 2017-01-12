@@ -1,4 +1,6 @@
-"use strict";
+// This file had a function whose name is all caps, which displeases eslint
+/* eslint new-cap: "off" */
+
 var q = require("q");
 var sdk = require("../..");
 var MatrixScheduler = sdk.MatrixScheduler;
@@ -18,7 +20,7 @@ describe("MatrixScheduler", function() {
     });
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         jasmine.Clock.useMock();
         scheduler = new MatrixScheduler(function(ev, attempts, err) {
             if (retryFn) {

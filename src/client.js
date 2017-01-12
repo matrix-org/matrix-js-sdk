@@ -357,8 +357,6 @@ MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
     return this._crypto.getStoredDevicesForUser(userId) || [];
 };
 
-
-
 /**
  * Mark the given device as verified
  *
@@ -376,7 +374,6 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
     }
     _setDeviceVerification(this, userId, deviceId, verified, null);
 };
-
 
 /**
  * Mark the given device as blocked/unblocked
@@ -542,7 +539,7 @@ MatrixClient.prototype.getUsers = function() {
 /**
  * Set account data event for the current user.
  * @param {string} eventType The event type
- * @param {Object} content the contents object for the event
+ * @param {Object} contents the contents object for the event
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -1500,7 +1497,7 @@ MatrixClient.prototype.getPresenceList = function(callback) {
 * @return {module:http-api.MatrixError} Rejects: with an error response.
 */
 MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
-  var opts = {"invite" : userIds};
+  var opts = {"invite": userIds};
   return _presenceList(callback, this, opts, "POST");
 };
 
@@ -1512,7 +1509,7 @@ MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
 * @return {module:http-api.MatrixError} Rejects: with an error response.
 **/
 MatrixClient.prototype.dropFromPresenceList = function(callback, userIds) {
-  var opts = {"drop" : userIds};
+  var opts = {"drop": userIds};
   return _presenceList(callback, this, opts, "POST");
 };
 

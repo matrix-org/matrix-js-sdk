@@ -61,7 +61,7 @@ function TestClient(userId, deviceId, accessToken) {
 /**
  * start the client, and wait for it to initialise.
  *
- * @param {object?} deviceQueryResponse  the list of our existing devices to return from
+ * @param {object?} existingDevices  the list of our existing devices to return from
  *    the /query request. Defaults to empty device list
  * @return {Promise}
  */
@@ -313,6 +313,9 @@ describe("megolm", function() {
     /**
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
+     *
+     * @param {string} userId The user ID to query for
+     * @returns {Object} The fake query response
      */
     function getTestKeysQueryResponse(userId) {
         var testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
@@ -346,6 +349,9 @@ describe("megolm", function() {
     /**
      * Get a one-time key for testOlmAccount in a format suitable for a
      * response to /keys/claim
+
+     * @param {string} userId The user ID to query for
+     * @returns {Object} The fake key claim response
      */
     function getTestKeysClaimResponse(userId) {
         testOlmAccount.generate_one_time_keys(1);
@@ -374,7 +380,7 @@ describe("megolm", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this);
+        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs"

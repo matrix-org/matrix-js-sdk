@@ -11,7 +11,7 @@ describe("RoomMember", function() {
     var member;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         member = new RoomMember(roomId, userA);
     });
 

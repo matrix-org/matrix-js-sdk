@@ -4,7 +4,7 @@ var testUtils = require("../test-utils");
 
 describe("utils", function() {
     beforeEach(function() {
-        testUtils.beforeEach(this);
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
     });
 
     describe("encodeParams", function() {

@@ -24,7 +24,7 @@ var MatrixError = sdk.MatrixError;
 
 describe("InteractiveAuth", function() {
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
     });
 
     it("should start an auth stage and complete it", function(done) {

@@ -16,7 +16,7 @@ describe("Room", function() {
     var room;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         room = new Room(roomId);
         // mock RoomStates
         room.oldState = room.getLiveTimeline()._startState =
@@ -1110,7 +1110,7 @@ describe("Room", function() {
     describe("tags", function() {
 
         function mkTags(roomId, tags) {
-            var content = { "tags" : tags };
+            var content = { "tags": tags };
             return new MatrixEvent({
                 content: content,
                 room_id: roomId,
