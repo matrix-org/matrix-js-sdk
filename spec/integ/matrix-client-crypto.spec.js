@@ -463,7 +463,7 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this);
+        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
         aliHttpBackend = new HttpBackend();

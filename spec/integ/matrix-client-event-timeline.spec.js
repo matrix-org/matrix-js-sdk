@@ -100,7 +100,7 @@ describe("getEventTimeline support", function() {
     var client;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
     });
@@ -221,7 +221,7 @@ describe("MatrixClient event timelines", function() {
     var client, httpBackend;
 
     beforeEach(function(done) {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
 
@@ -415,7 +415,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            var tl0, tl2, tl3;
+            var tl0, tl3;
             client.getEventTimeline(timelineSet, EVENTS[0].event_id
             ).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);
@@ -423,7 +423,6 @@ describe("MatrixClient event timelines", function() {
                 return client.getEventTimeline(timelineSet, EVENTS[2].event_id);
             }).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);
-                tl2 = tl;
                 return client.getEventTimeline(timelineSet, EVENTS[3].event_id);
             }).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);

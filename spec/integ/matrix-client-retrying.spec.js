@@ -14,7 +14,7 @@ describe("MatrixClient retrying", function() {
     var room;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         scheduler = new sdk.MatrixScheduler();

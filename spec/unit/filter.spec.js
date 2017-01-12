@@ -9,7 +9,7 @@ describe("Filter", function() {
     var filter;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         filter = new Filter(userId);
     });
 

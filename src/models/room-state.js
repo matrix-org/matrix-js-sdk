@@ -314,17 +314,11 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
     var power_levels;
     var events_levels = {};
 
-    var default_user_level = 0;
-    var user_levels = [];
-
     var state_default = 0;
     var events_default = 0;
     if (power_levels_event) {
         power_levels = power_levels_event.getContent();
         events_levels = power_levels.events || {};
-
-        default_user_level = parseInt(power_levels.users_default || 0);
-        user_levels = power_levels.users || {};
 
         if (power_levels.state_default !== undefined) {
             state_default = power_levels.state_default;

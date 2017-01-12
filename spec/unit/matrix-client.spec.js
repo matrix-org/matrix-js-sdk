@@ -117,7 +117,7 @@ describe("MatrixClient", function() {
     }
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         jasmine.Clock.useMock();
         scheduler = jasmine.createSpyObj("scheduler", [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",

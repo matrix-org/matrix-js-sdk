@@ -33,7 +33,7 @@ describe("WebStorageStore", function() {
     );
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         mockStorageApi = new MockStorageApi();
         store = new WebStorageStore(mockStorageApi, batchNum);
         room = new Room(roomId);

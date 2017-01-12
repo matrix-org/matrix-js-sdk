@@ -348,16 +348,12 @@ var deepCompare = module.exports.deepCompare = function(x, y) {
  */
 module.exports.extend = function() {
     var target = arguments[0] || {};
-    // disable jshint "The body of a for in should be wrapped in an if
-    // statement"
-    /* jshint -W089 */
     for (var i = 1; i < arguments.length; i++) {
         var source = arguments[i];
-        for (var propName in source) {
+        for (var propName in source) { // eslint-disable-line guard-for-in
             target[propName] = source[propName];
         }
     }
-    /* jshint +W089 */
     return target;
 };
 

@@ -906,8 +906,6 @@ Room.prototype.recalculate = function(userId) {
         });
     }
 
-
-
     var oldName = this.name;
     this.name = calculateRoomName(this, userId);
     this.summary = new RoomSummary(this.roomId, {

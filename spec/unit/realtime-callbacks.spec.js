@@ -14,7 +14,7 @@ describe("realtime-callbacks", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this);
+        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
         clock.useMock();
         fakeDate = Date.now();
         callbacks.setNow(function() { return fakeDate; });
@@ -54,8 +54,8 @@ describe("realtime-callbacks", function() {
         it("should set 'this' to the global object", function() {
             var callback = jasmine.createSpy();
             callback.andCallFake(function() {
-                expect(this).toBe(global);
-                expect(this.console).toBeDefined();
+                expect(this).toBe(global); // eslint-disable-line no-invalid-this
+                expect(this.console).toBeDefined(); // eslint-disable-line no-invalid-this
             });
             callbacks.setTimeout(callback);
             tick(0);

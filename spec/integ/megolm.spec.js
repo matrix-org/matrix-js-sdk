@@ -380,7 +380,7 @@ describe("megolm", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this);
+        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs"

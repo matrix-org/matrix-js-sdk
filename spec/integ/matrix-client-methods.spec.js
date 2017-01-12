@@ -15,7 +15,7 @@ describe("MatrixClient", function() {
     var accessToken = "aseukfgwef";
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         store = new MatrixInMemoryStore();
 
@@ -363,7 +363,7 @@ describe("MatrixClient", function() {
 
                 assertObjectContains(res.chaz.dev2, {
                     verified: 0, // DeviceVerification.UNVERIFIED
-                    keys: { "ed25519:dev2" : ed25519key },
+                    keys: { "ed25519:dev2": ed25519key },
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
