@@ -12,7 +12,7 @@
     "dist": "npm run build",
     "watch": "watchify --exclude olm browser-index.js -o dist/browser-matrix-dev.js -v",
     "lint": "eslint src spec",
-    "prepublish": "npm run compile && git rev-parse HEAD > git-revision.txt"
+    "prepublish": "npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
