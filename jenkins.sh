@@ -14,7 +14,7 @@ function fail {
 
 npm test || fail "npm test finished with return code $?"
 
-npm run lint -- -f checkstyle > eslint.xml ||
+npm run -s lint -- -f checkstyle > eslint.xml ||
     fail "eslint finished with return code $?"
 
 # delete the old tarball, if it exists
