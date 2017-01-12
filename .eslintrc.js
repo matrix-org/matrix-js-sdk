@@ -6,17 +6,17 @@ module.exports = {
         }
     },
     rules: {
-        "max-len": ["warn", {
+        "max-len": ["error", {
             code: 90,
             ignoreComments: true,
         }],
         curly: ["error", "multi-line"],
-        "require-jsdoc": ["warn", {
+        "require-jsdoc": ["error", {
             require: {
                 FunctionDeclaration: false,
             }
         }],
-        "valid-jsdoc": ["warn", {
+        "valid-jsdoc": ["error", {
             requireParamDescription: false,
             requireReturn: false,
             requireReturnDescription: false,
