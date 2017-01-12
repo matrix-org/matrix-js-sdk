@@ -5,7 +5,11 @@ module.exports = {
         ecmaFeatures: {
         }
     },
-    extends: ["google"],
+    env: {
+        browser: true,
+        node: true,
+    },
+    extends: ["eslint:recommended", "google"],
     rules: {
         // rules we've always adhered to
         "max-len": ["error", {
@@ -25,6 +29,11 @@ module.exports = {
             requireReturn: false,
             requireReturnDescription: false,
         }],
+
+        // rules we do not want from eslint-recommended
+        "no-console": ["off"],
+        "no-constant-condition": ["off"],
+        "no-empty": ["error", { "allowEmptyCatch": true }],
 
         // rules we do not want from the google styleguide
         "object-curly-spacing": ["off"],
