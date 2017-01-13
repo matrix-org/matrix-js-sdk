@@ -8,7 +8,9 @@ describe("MatrixClient", function() {
     let userId = "@alice:bar";
     let identityServerUrl = "https://identity.server";
     let identityServerDomain = "identity.server";
-    let client, store, scheduler;
+    let client;
+    let store;
+    let scheduler;
 
     let KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
@@ -51,10 +53,10 @@ describe("MatrixClient", function() {
         // }
         // items are popped off when processed and block if no items left.
     ];
-    let accept_keepalives;
+    let acceptKeepalives;
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
-        if (path === KEEP_ALIVE_PATH && accept_keepalives) {
+        if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return q();
         }
         let next = httpLookups.shift();
@@ -148,7 +150,7 @@ describe("MatrixClient", function() {
         client._http.request.andCallFake(httpReq);
 
         // set reasonable working defaults
-        accept_keepalives = true;
+        acceptKeepalives = true;
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
@@ -371,7 +373,7 @@ describe("MatrixClient", function() {
         it("should transition ERROR -> PREPARED after /sync if prev failed",
         function(done) {
             let expectedStates = [];
-            accept_keepalives = false;
+            acceptKeepalives = false;
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
@@ -379,7 +381,8 @@ describe("MatrixClient", function() {
                 method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" },
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
             httpLookups.push({
                 method: "GET", path: KEEP_ALIVE_PATH, data: {},
@@ -404,13 +407,14 @@ describe("MatrixClient", function() {
         });
 
         it("should transition SYNCING -> ERROR after a failed /sync", function(done) {
-            accept_keepalives = false;
+            acceptKeepalives = false;
             let expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" },
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
 
             expectedStates.push(["PREPARED", null]);
@@ -450,16 +454,18 @@ describe("MatrixClient", function() {
         });
 
         it("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
-            accept_keepalives = false;
+            acceptKeepalives = false;
             let expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" },
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" },
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
 
             expectedStates.push(["PREPARED", null]);

@@ -5,7 +5,8 @@ let utils = require("../test-utils");
 
 describe("MatrixClient events", function() {
     let baseUrl = "http://localhost.or.something";
-    let client, httpBackend;
+    let client;
+    let httpBackend;
     let selfUserId = "@alice:localhost";
     let selfAccessToken = "aseukfgwef";
 
@@ -74,7 +75,8 @@ describe("MatrixClient events", function() {
                         timeline: {
                             events: [
                                 utils.mkMessage({
-                                    room: "!erufh:bar", user: "@foo:bar", msg: "ello ello",
+                                    room: "!erufh:bar", user: "@foo:bar",
+                                    msg: "ello ello",
                                 }),
                                 utils.mkMessage({
                                     room: "!erufh:bar", user: "@foo:bar", msg: ":D",
