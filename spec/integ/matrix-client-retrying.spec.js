@@ -1,17 +1,17 @@
 "use strict";
-var sdk = require("../..");
-var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
-var EventStatus = sdk.EventStatus;
+let sdk = require("../..");
+let HttpBackend = require("../mock-request");
+let utils = require("../test-utils");
+let EventStatus = sdk.EventStatus;
 
 describe("MatrixClient retrying", function() {
-    var baseUrl = "http://localhost.or.something";
-    var client, httpBackend;
-    var scheduler;
-    var userId = "@alice:localhost";
-    var accessToken = "aseukfgwef";
-    var roomId = "!room:here";
-    var room;
+    let baseUrl = "http://localhost.or.something";
+    let client, httpBackend;
+    let scheduler;
+    let userId = "@alice:localhost";
+    let accessToken = "aseukfgwef";
+    let roomId = "!room:here";
+    let room;
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -49,9 +49,8 @@ describe("MatrixClient retrying", function() {
     });
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function(done) {
-
         // send a couple of events; the second will be queued
-        var ev1, ev2;
+        let ev1, ev2;
         client.sendMessage(roomId, "m1").then(function(ev) {
             expect(ev).toEqual(ev1);
         });
@@ -60,7 +59,7 @@ describe("MatrixClient retrying", function() {
         });
 
         // both events should be in the timeline at this point
-        var tl = room.getLiveTimeline().getEvents();
+        let tl = room.getLiveTimeline().getEvents();
         expect(tl.length).toEqual(2);
         ev1 = tl[0];
         ev2 = tl[1];
@@ -79,7 +78,9 @@ describe("MatrixClient retrying", function() {
             expect(tl.length).toEqual(1);
 
             // shouldn't be able to cancel the first message yet
-            expect(function() { client.cancelPendingEvent(ev1); })
+            expect(function() {
+ client.cancelPendingEvent(ev1);
+})
                 .toThrow();
         }).respond(400); // fail the first message
 

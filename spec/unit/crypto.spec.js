@@ -1,7 +1,7 @@
 
 "use strict";
-var Crypto = require("../../lib/crypto");
-var sdk = require("../..");
+let Crypto = require("../../lib/crypto");
+let sdk = require("../..");
 
 describe("Crypto", function() {
     if (!sdk.CRYPTO_ENABLED) {
