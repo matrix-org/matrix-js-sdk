@@ -1,3 +1,20 @@
+Changes in [0.7.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.4-rc.1) (2017-01-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.3...v0.7.4-rc.1)
+
+ * Remove babel-polyfill
+   [\#321](https://github.com/matrix-org/matrix-js-sdk/pull/321)
+ * Update build process for ES6
+   [\#320](https://github.com/matrix-org/matrix-js-sdk/pull/320)
+ * 'babel' is not a babel package anymore
+   [\#319](https://github.com/matrix-org/matrix-js-sdk/pull/319)
+ * Add Babel for ES6 support
+   [\#318](https://github.com/matrix-org/matrix-js-sdk/pull/318)
+ * Move screen sharing check/error
+   [\#317](https://github.com/matrix-org/matrix-js-sdk/pull/317)
+ * release.sh: Bail early if there are uncommitted changes
+   [\#316](https://github.com/matrix-org/matrix-js-sdk/pull/316)
+
 Changes in [0.7.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.3) (2017-01-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.2...v0.7.3)
