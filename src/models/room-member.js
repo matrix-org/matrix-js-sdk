@@ -17,10 +17,10 @@ limitations under the License.
 /**
  * @module models/room-member
  */
-var EventEmitter = require("events").EventEmitter;
-var ContentRepo = require("../content-repo");
+let EventEmitter = require("events").EventEmitter;
+let ContentRepo = require("../content-repo");
 
-var utils = require("../utils");
+let utils = require("../utils");
 
 /**
  * Construct a new room member.
@@ -52,7 +52,7 @@ function RoomMember(roomId, userId) {
     this.user = null;
     this.membership = null;
     this.events = {
-        member: null
+        member: null,
     };
     this._updateModifiedTime();
 }
@@ -73,10 +73,10 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
     }
     this.events.member = event;
 
-    var oldMembership = this.membership;
+    let oldMembership = this.membership;
     this.membership = event.getDirectionalContent().membership;
 
-    var oldName = this.name;
+    let oldName = this.name;
     this.name = calculateDisplayName(this, event, roomState);
     if (oldMembership !== this.membership) {
         this._updateModifiedTime();
@@ -99,12 +99,12 @@ RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
     if (powerLevelEvent.getType() !== "m.room.power_levels") {
         return;
     }
-    var maxLevel = powerLevelEvent.getContent().users_default || 0;
+    let maxLevel = powerLevelEvent.getContent().users_default || 0;
     utils.forEach(utils.values(powerLevelEvent.getContent().users), function(lvl) {
         maxLevel = Math.max(maxLevel, lvl);
     });
-    var oldPowerLevel = this.powerLevel;
-    var oldPowerLevelNorm = this.powerLevelNorm;
+    let oldPowerLevel = this.powerLevel;
+    let oldPowerLevelNorm = this.powerLevelNorm;
 
     if (powerLevelEvent.getContent().users[this.userId] !== undefined) {
         this.powerLevel = powerLevelEvent.getContent().users[this.userId];
@@ -136,9 +136,9 @@ RoomMember.prototype.setTypingEvent = function(event) {
     if (event.getType() !== "m.typing") {
         return;
     }
-    var oldTyping = this.typing;
+    let oldTyping = this.typing;
     this.typing = false;
-    var typingList = event.getContent().user_ids;
+    let typingList = event.getContent().user_ids;
     if (!utils.isArray(typingList)) {
         // malformed event :/ bail early. TODO: whine?
         return;
@@ -189,18 +189,19 @@ RoomMember.prototype.getLastModifiedTime = function() {
  */
 RoomMember.prototype.getAvatarUrl =
         function(baseUrl, width, height, resizeMethod, allowDefault, allowDirectLinks) {
-    if (allowDefault === undefined) { allowDefault = true; }
+    if (allowDefault === undefined) {
+        allowDefault = true;
+    }
     if (!this.events.member && !allowDefault) {
         return null;
     }
-    var rawUrl = this.events.member ? this.events.member.getContent().avatar_url : null;
-    var httpUrl = ContentRepo.getHttpUriForMxc(
+    let rawUrl = this.events.member ? this.events.member.getContent().avatar_url : null;
+    let httpUrl = ContentRepo.getHttpUriForMxc(
         baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks
     );
     if (httpUrl) {
         return httpUrl;
-    }
-    else if (allowDefault) {
+    } else if (allowDefault) {
         return ContentRepo.getIdenticonUri(
             baseUrl, this.userId, width, height
         );
@@ -209,8 +210,8 @@ RoomMember.prototype.getAvatarUrl =
 };
 
 function calculateDisplayName(member, event, roomState) {
-    var displayName = event.getDirectionalContent().displayname;
-    var selfUserId = member.userId;
+    let displayName = event.getDirectionalContent().displayname;
+    let selfUserId = member.userId;
 
     if (!displayName) {
         return selfUserId;
@@ -220,8 +221,8 @@ function calculateDisplayName(member, event, roomState) {
         return displayName;
     }
 
-    var userIds = roomState.getUserIdsWithDisplayName(displayName);
-    var otherUsers = userIds.filter(function(u) {
+    let userIds = roomState.getUserIdsWithDisplayName(displayName);
+    let otherUsers = userIds.filter(function(u) {
         return u !== selfUserId;
     });
     if (otherUsers.length > 0) {

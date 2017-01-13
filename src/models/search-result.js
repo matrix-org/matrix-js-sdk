@@ -19,8 +19,8 @@ limitations under the License.
  * @module models/search-result
  */
 
-var EventContext = require("./event-context");
-var utils = require("../utils");
+let EventContext = require("./event-context");
+let utils = require("../utils");
 
 /**
  * Construct a new SearchResult
@@ -45,11 +45,11 @@ function SearchResult(rank, eventContext) {
  */
 
 SearchResult.fromJson = function(jsonObj, eventMapper) {
-    var jsonContext = jsonObj.context || {};
-    var events_before = jsonContext.events_before || [];
-    var events_after = jsonContext.events_after || [];
+    let jsonContext = jsonObj.context || {};
+    let events_before = jsonContext.events_before || [];
+    let events_after = jsonContext.events_after || [];
 
-    var context = new EventContext(eventMapper(jsonObj.result));
+    let context = new EventContext(eventMapper(jsonObj.result));
 
     context.setPaginateToken(jsonContext.start, true);
     context.addEvents(utils.map(events_before, eventMapper), true);

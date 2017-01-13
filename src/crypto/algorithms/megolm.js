@@ -21,11 +21,11 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-var q = require("q");
+let q = require("q");
 
-var utils = require("../../utils");
-var olmlib = require("../olmlib");
-var base = require("./base");
+let utils = require("../../utils");
+let olmlib = require("../olmlib");
+let base = require("./base");
 
 /**
  * @private
@@ -59,7 +59,7 @@ function OutboundSessionInfo(sessionId) {
 OutboundSessionInfo.prototype.needsRotation = function(
     rotationPeriodMsgs, rotationPeriodMs
 ) {
-    var sessionLifetime = new Date().getTime() - this.creationTime;
+    let sessionLifetime = new Date().getTime() - this.creationTime;
 
     if (this.useCount >= rotationPeriodMsgs ||
         sessionLifetime >= rotationPeriodMs
@@ -88,16 +88,17 @@ OutboundSessionInfo.prototype.needsRotation = function(
 OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
     devicesInRoom
 ) {
-
-    for (var userId in this.sharedWithDevices) {
-        if (!this.sharedWithDevices.hasOwnProperty(userId)) { continue; }
+    for (let userId in this.sharedWithDevices) {
+        if (!this.sharedWithDevices.hasOwnProperty(userId)) {
+            continue;
+        }
 
         if (!devicesInRoom.hasOwnProperty(userId)) {
             console.log("Starting new session because we shared with " + userId);
             return true;
         }
 
-        for (var deviceId in this.sharedWithDevices[userId]) {
+        for (let deviceId in this.sharedWithDevices[userId]) {
             if (!this.sharedWithDevices[userId].hasOwnProperty(deviceId)) {
                 continue;
             }
@@ -156,9 +157,9 @@ utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
  *    OutboundSessionInfo when setup is complete.
  */
 MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
-    var self = this;
+    let self = this;
 
-    var session;
+    let session;
 
     // takes the previous OutboundSessionInfo, and considers whether to create
     // a new one. Also shares the key with any (new) devices in the room.
@@ -186,23 +187,23 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         }
 
         // now check if we need to share with any devices
-        var shareMap = {};
+        let shareMap = {};
 
-        for (var userId in devicesInRoom) {
+        for (let userId in devicesInRoom) {
             if (!devicesInRoom.hasOwnProperty(userId)) {
                 continue;
             }
 
-            var userDevices = devicesInRoom[userId];
+            let userDevices = devicesInRoom[userId];
 
-            for (var deviceId in userDevices) {
+            for (let deviceId in userDevices) {
                 if (!userDevices.hasOwnProperty(deviceId)) {
                     continue;
                 }
 
-                var deviceInfo = userDevices[deviceId];
+                let deviceInfo = userDevices[deviceId];
 
-                var key = deviceInfo.getIdentityKey();
+                let key = deviceInfo.getIdentityKey();
                 if (key == self._olmDevice.deviceCurve25519Key) {
                     // don't bother sending to ourself
                     continue;
@@ -224,10 +225,12 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
     }
 
     // helper which returns the session prepared by prepareSession
-    function returnSession() { return session; }
+    function returnSession() {
+        return session;
+    }
 
     // first wait for the previous share to complete
-    var prom = this._setupPromise.then(prepareSession);
+    let prom = this._setupPromise.then(prepareSession);
 
     // _setupPromise resolves to `session` whether or not the share succeeds
     this._setupPromise = prom.then(returnSession, returnSession);
@@ -242,8 +245,8 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
  * @return {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  */
 MegolmEncryption.prototype._prepareNewSession = function() {
-    var session_id = this._olmDevice.createOutboundGroupSession();
-    var key = this._olmDevice.getOutboundGroupSessionKey(session_id);
+    let session_id = this._olmDevice.createOutboundGroupSession();
+    let key = this._olmDevice.getOutboundGroupSessionKey(session_id);
 
     this._olmDevice.addInboundGroupSession(
         this._roomId, this._olmDevice.deviceCurve25519Key, session_id,
@@ -265,10 +268,10 @@ MegolmEncryption.prototype._prepareNewSession = function() {
  *     message has been sent.
  */
 MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUser) {
-    var self = this;
+    let self = this;
 
-    var key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
-    var payload = {
+    let key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
+    let payload = {
         type: "m.room_key",
         content: {
             algorithm: olmlib.MEGOLM_ALGORITHM,
@@ -276,29 +279,29 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
             session_id: session.sessionId,
             session_key: key.key,
             chain_index: key.chain_index,
-        }
+        },
     };
 
-    var contentMap = {};
+    let contentMap = {};
 
     return olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser
     ).then(function(devicemap) {
-        var haveTargets = false;
+        let haveTargets = false;
 
-        for (var userId in devicesByUser) {
+        for (let userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
                 continue;
             }
 
-            var devicesToShareWith = devicesByUser[userId];
-            var sessionResults = devicemap[userId];
+            let devicesToShareWith = devicesByUser[userId];
+            let sessionResults = devicemap[userId];
 
-            for (var i = 0; i < devicesToShareWith.length; i++) {
-                var deviceInfo = devicesToShareWith[i];
-                var deviceId = deviceInfo.deviceId;
+            for (let i = 0; i < devicesToShareWith.length; i++) {
+                let deviceInfo = devicesToShareWith[i];
+                let deviceId = deviceInfo.deviceId;
 
-                var sessionResult = sessionResults[deviceId];
+                let sessionResult = sessionResults[deviceId];
                 if (!sessionResult.sessionId) {
                     // no session with this device, probably because there
                     // were no one-time keys.
@@ -318,7 +321,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                     "sharing keys with device " + userId + ":" + deviceId
                 );
 
-                var encryptedContent = {
+                let encryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
                     sender_key: self._olmDevice.deviceCurve25519Key,
                     ciphertext: {},
@@ -356,16 +359,16 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         // attempted to share with) rather than the contentMap (those we did
         // share with), because we don't want to try to claim a one-time-key
         // for dead devices on every message.
-        for (var userId in devicesByUser) {
+        for (let userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
                 continue;
             }
             if (!session.sharedWithDevices[userId]) {
                 session.sharedWithDevices[userId] = {};
             }
-            var devicesToShareWith = devicesByUser[userId];
-            for (var i = 0; i < devicesToShareWith.length; i++) {
-                var deviceInfo = devicesToShareWith[i];
+            let devicesToShareWith = devicesByUser[userId];
+            for (let i = 0; i < devicesToShareWith.length; i++) {
+                let deviceInfo = devicesToShareWith[i];
                 session.sharedWithDevices[userId][deviceInfo.deviceId] =
                     key.chain_index;
             }
@@ -383,21 +386,21 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
  * @return {module:client.Promise} Promise which resolves to the new event body
  */
 MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
-    var self = this;
+    let self = this;
     return this._getDevicesInRoom(room).then(function(devicesInRoom) {
         return self._ensureOutboundSession(devicesInRoom);
     }).then(function(session) {
-        var payloadJson = {
+        let payloadJson = {
             room_id: self._roomId,
             type: eventType,
-            content: content
+            content: content,
         };
 
-        var ciphertext = self._olmDevice.encryptGroupMessage(
+        let ciphertext = self._olmDevice.encryptGroupMessage(
             session.sessionId, JSON.stringify(payloadJson)
         );
 
-        var encryptedContent = {
+        let encryptedContent = {
             algorithm: olmlib.MEGOLM_ALGORITHM,
             sender_key: self._olmDevice.deviceCurve25519Key,
             ciphertext: ciphertext,
@@ -422,7 +425,7 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
  */
 MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // XXX what about rooms where invitees can see the content?
-    var roomMembers = utils.map(room.getJoinedMembers(), function(u) {
+    let roomMembers = utils.map(room.getJoinedMembers(), function(u) {
         return u.userId;
     });
 
@@ -432,13 +435,13 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // an m.new_device.
     return this._crypto.downloadKeys(roomMembers, false).then(function(devices) {
         // remove any blocked devices
-        for (var userId in devices) {
+        for (let userId in devices) {
             if (!devices.hasOwnProperty(userId)) {
                 continue;
             }
 
-            var userDevices = devices[userId];
-            for (var deviceId in userDevices) {
+            let userDevices = devices[userId];
+            for (let deviceId in userDevices) {
                 if (!userDevices.hasOwnProperty(deviceId)) {
                     continue;
                 }
@@ -479,7 +482,7 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *   problem decrypting the event
  */
 MegolmDecryption.prototype.decryptEvent = function(event) {
-    var content = event.getWireContent();
+    let content = event.getWireContent();
 
     if (!content.sender_key || !content.session_id ||
         !content.ciphertext
@@ -487,7 +490,7 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
         throw new base.DecryptionError("Missing fields in input");
     }
 
-    var res;
+    let res;
     try {
         res = this._olmDevice.decryptGroupMessage(
             event.getRoomId(), content.sender_key, content.session_id, content.ciphertext
@@ -507,7 +510,7 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
         );
     }
 
-    var payload = JSON.parse(res.result);
+    let payload = JSON.parse(res.result);
 
     // belt-and-braces check that the room id matches that indicated by the HS
     // (this is somewhat redundant, since the megolm session is scoped to the
@@ -531,8 +534,8 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
  * @param {module:models/event.MatrixEvent} event
  */
 MegolmDecryption.prototype._addEventToPendingList = function(event) {
-    var content = event.getWireContent();
-    var k = content.sender_key + "|" + content.session_id;
+    let content = event.getWireContent();
+    let k = content.sender_key + "|" + content.session_id;
     if (!this._pendingEvents[k]) {
         this._pendingEvents[k] = [];
     }
@@ -546,7 +549,7 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
  */
 MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     console.log("Adding key from ", event);
-    var content = event.getContent();
+    let content = event.getContent();
 
     if (!content.room_id ||
         !content.session_id ||
@@ -561,13 +564,13 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         content.session_key, event.getKeysClaimed()
     );
 
-    var k = event.getSenderKey() + "|" + content.session_id;
-    var pending = this._pendingEvents[k];
+    let k = event.getSenderKey() + "|" + content.session_id;
+    let pending = this._pendingEvents[k];
     if (pending) {
         // have another go at decrypting events sent with this session.
         delete this._pendingEvents[k];
 
-        for (var i = 0; i < pending.length; i++) {
+        for (let i = 0; i < pending.length; i++) {
             try {
                 this.decryptEvent(pending[i]);
                 console.log("successful re-decryption of", pending[i]);

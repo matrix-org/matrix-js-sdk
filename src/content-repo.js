@@ -16,7 +16,7 @@ limitations under the License.
 /**
  * @module content-repo
  */
-var utils = require("./utils");
+let utils = require("./utils");
 
 /** Content Repo utility functions */
 module.exports = {
@@ -46,9 +46,9 @@ module.exports = {
                 return '';
             }
         }
-        var serverAndMediaId = mxc.slice(6); // strips mxc://
-        var prefix = "/_matrix/media/v1/download/";
-        var params = {};
+        let serverAndMediaId = mxc.slice(6); // strips mxc://
+        let prefix = "/_matrix/media/v1/download/";
+        let params = {};
 
         if (width) {
             params.width = width;
@@ -65,7 +65,7 @@ module.exports = {
             prefix = "/_matrix/media/v1/thumbnail/";
         }
 
-        var fragmentOffset = serverAndMediaId.indexOf("#"),
+        let fragmentOffset = serverAndMediaId.indexOf("#"),
             fragment = "";
         if (fragmentOffset >= 0) {
             fragment = serverAndMediaId.substr(fragmentOffset);
@@ -88,18 +88,22 @@ module.exports = {
         if (!identiconString) {
             return null;
         }
-        if (!width) { width = 96; }
-        if (!height) { height = 96; }
-        var params = {
+        if (!width) {
+            width = 96;
+        }
+        if (!height) {
+            height = 96;
+        }
+        let params = {
             width: width,
-            height: height
+            height: height,
         };
 
-        var path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
-            $ident: identiconString
+        let path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
+            $ident: identiconString,
         });
         return baseUrl + path +
             (utils.keys(params).length === 0 ? "" :
                 ("?" + utils.encodeParams(params)));
-    }
+    },
 };

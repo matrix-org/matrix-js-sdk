@@ -19,10 +19,10 @@ limitations under the License.
  * @module store/session/webstorage
  */
 
-var utils = require("../../utils");
+let utils = require("../../utils");
 
-var DEBUG = false;  // set true to enable console logging.
-var E2E_PREFIX = "session.e2e.";
+let DEBUG = false;  // set true to enable console logging.
+let E2E_PREFIX = "session.e2e.";
 
 /**
  * Construct a web storage session store, capable of storing account keys,
@@ -103,7 +103,7 @@ WebStorageSessionStore.prototype = {
      * @param {string} session Base64 encoded end-to-end session.
      */
     storeEndToEndSession: function(deviceKey, sessionId, session) {
-        var sessions = this.getEndToEndSessions(deviceKey) || {};
+        let sessions = this.getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = session;
         setJsonItem(
             this.store, keyEndToEndSessions(deviceKey), sessions
@@ -121,12 +121,12 @@ WebStorageSessionStore.prototype = {
     },
 
     getEndToEndInboundGroupSession: function(senderKey, sessionId) {
-        var key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.getItem(key);
     },
 
     storeEndToEndInboundGroupSession: function(senderKey, sessionId, pickledSession) {
-        var key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.setItem(key, pickledSession);
     },
 
@@ -146,11 +146,11 @@ WebStorageSessionStore.prototype = {
      */
     getEndToEndRoom: function(roomId) {
         return getJsonItem(this.store, keyEndToEndRoom(roomId));
-    }
+    },
 };
 
-var KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
-var KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
+let KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+let KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
 
 function keyEndToEndDevicesForUser(userId) {
     return E2E_PREFIX + "devices/" + userId;
@@ -171,8 +171,7 @@ function keyEndToEndRoom(roomId) {
 function getJsonItem(store, key) {
     try {
         return JSON.parse(store.getItem(key));
-    }
-    catch (e) {
+    } catch (e) {
         debuglog("Failed to get key %s: %s", key, e);
         debuglog(e.stack);
     }
@@ -185,7 +184,7 @@ function setJsonItem(store, key, val) {
 
 function debuglog() {
     if (DEBUG) {
-        console.log.apply(console, arguments);
+        console.log(...arguments);
     }
 }
 

@@ -1,19 +1,19 @@
 "use strict";
-var sdk = require("../..");
-var Room = sdk.Room;
-var RoomState = sdk.RoomState;
-var MatrixEvent = sdk.MatrixEvent;
-var EventStatus = sdk.EventStatus;
-var EventTimeline = sdk.EventTimeline;
-var utils = require("../test-utils");
+let sdk = require("../..");
+let Room = sdk.Room;
+let RoomState = sdk.RoomState;
+let MatrixEvent = sdk.MatrixEvent;
+let EventStatus = sdk.EventStatus;
+let EventTimeline = sdk.EventTimeline;
+let utils = require("../test-utils");
 
 describe("Room", function() {
-    var roomId = "!foo:bar";
-    var userA = "@alice:bar";
-    var userB = "@bertha:bar";
-    var userC = "@clarissa:bar";
-    var userD = "@dorothy:bar";
-    var room;
+    let roomId = "!foo:bar";
+    let userA = "@alice:bar";
+    let userB = "@bertha:bar";
+    let userC = "@clarissa:bar";
+    let userD = "@dorothy:bar";
+    let room;
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -26,7 +26,7 @@ describe("Room", function() {
     });
 
     describe("getAvatarUrl", function() {
-        var hsUrl = "https://my.home.server";
+        let hsUrl = "https://my.home.server";
 
         it("should return the URL from m.room.avatar preferentially", function() {
             room.currentState.getStateEvents.andCallFake(function(type, key) {
@@ -38,12 +38,12 @@ describe("Room", function() {
                         room: roomId,
                         user: userA,
                         content: {
-                            url: "mxc://flibble/wibble"
-                        }
+                            url: "mxc://flibble/wibble",
+                        },
                     });
                 }
             });
-            var url = room.getAvatarUrl(hsUrl);
+            let url = room.getAvatarUrl(hsUrl);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
             expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
@@ -51,13 +51,13 @@ describe("Room", function() {
 
         it("should return an identicon HTTP URL if allowDefault was set and there " +
         "was no m.room.avatar event", function() {
-            var url = room.getAvatarUrl(hsUrl, 64, 64, "crop", true);
+            let url = room.getAvatarUrl(hsUrl, 64, 64, "crop", true);
             expect(url.indexOf("http")).toEqual(0); // don't care about form
         });
 
         it("should return nothing if there is no m.room.avatar and allowDefault=false",
         function() {
-            var url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
+            let url = room.getAvatarUrl(hsUrl, 64, 64, "crop", false);
             expect(url).toEqual(null);
         });
     });
@@ -68,8 +68,8 @@ describe("Room", function() {
             room.currentState.members = {
                 "@alice:bar": {
                     userId: userA,
-                    roomId: roomId
-                }
+                    roomId: roomId,
+                },
             };
         });
 
@@ -83,35 +83,37 @@ describe("Room", function() {
     });
 
     describe("addLiveEvents", function() {
-        var events = [
+        let events = [
             utils.mkMessage({
-                room: roomId, user: userA, msg: "changing room name", event: true
+                room: roomId, user: userA, msg: "changing room name", event: true,
             }),
             utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
-            })
+                content: { name: "New Room Name" },
+            }),
         ];
 
         it("should call RoomState.setTypingEvent on m.typing events", function() {
             room.currentState = utils.mock(RoomState);
-            var typing = utils.mkEvent({
+            let typing = utils.mkEvent({
                 room: roomId, type: "m.typing", event: true, content: {
-                    user_ids: [userA]
-                }
+                    user_ids: [userA],
+                },
             });
             room.addLiveEvents([typing]);
             expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
         });
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
-            expect(function() { room.addLiveEvents(events, "foo"); }).toThrow();
+            expect(function() {
+                room.addLiveEvents(events, "foo");
+            }).toThrow();
         });
 
         it("should replace a timeline event if dupe strategy is 'replace'", function() {
             // make a duplicate
-            var dupe = utils.mkMessage({
-                room: roomId, user: userA, msg: "dupe", event: true
+            let dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true,
             });
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
@@ -122,8 +124,8 @@ describe("Room", function() {
 
         it("should ignore a given dupe event if dupe strategy is 'ignore'", function() {
             // make a duplicate
-            var dupe = utils.mkMessage({
-                room: roomId, user: userA, msg: "dupe", event: true
+            let dupe = utils.mkMessage({
+                room: roomId, user: userA, msg: "dupe", event: true,
             });
             dupe.event.event_id = events[0].getId();
             room.addLiveEvents(events);
@@ -134,7 +136,7 @@ describe("Room", function() {
 
         it("should emit 'Room.timeline' events",
         function() {
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.timeline", function(event, emitRoom, toStart) {
                 callCount += 1;
                 expect(room.timeline.length).toEqual(callCount);
@@ -148,16 +150,16 @@ describe("Room", function() {
 
         it("should call setStateEvents on the right RoomState with the right " +
         "forwardLooking value for new events", function() {
-            var events = [
+            let events = [
                 utils.mkMembership({
-                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true,
                 }),
                 utils.mkEvent({
                     type: "m.room.name", room: roomId, user: userB, event: true,
                     content: {
-                        name: "New room"
-                    }
-                })
+                        name: "New room",
+                    },
+                }),
             ];
             room.addLiveEvents(events);
             expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
@@ -172,10 +174,10 @@ describe("Room", function() {
         });
 
         it("should synthesize read receipts for the senders of events", function() {
-            var sentinel = {
+            let sentinel = {
                 userId: userA,
                 membership: "join",
-                name: "Alice"
+                name: "Alice",
             };
             room.currentState.getSentinelMember.andCallFake(function(uid) {
                 if (uid === userA) {
@@ -188,19 +190,19 @@ describe("Room", function() {
         });
 
         it("should emit Room.localEchoUpdated when a local echo is updated", function() {
-            var localEvent = utils.mkMessage({
+            let localEvent = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
             localEvent.status = EventStatus.SENDING;
-            var localEventId = localEvent.getId();
+            let localEventId = localEvent.getId();
 
-            var remoteEvent = utils.mkMessage({
+            let remoteEvent = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
             remoteEvent.event.unsigned = {transaction_id: "TXN_ID"};
-            var remoteEventId = remoteEvent.getId();
+            let remoteEventId = remoteEvent.getId();
 
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.localEchoUpdated",
                 function(event, emitRoom, oldEventId, oldStatus) {
                     switch (callCount) {
@@ -236,14 +238,14 @@ describe("Room", function() {
     });
 
     describe("addEventsToTimeline", function() {
-        var events = [
+        let events = [
             utils.mkMessage({
-                room: roomId, user: userA, msg: "changing room name", event: true
+                room: roomId, user: userA, msg: "changing room name", event: true,
             }),
             utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
-            })
+                content: { name: "New Room Name" },
+            }),
         ];
 
         it("should not be able to add events to the end", function() {
@@ -261,7 +263,7 @@ describe("Room", function() {
 
         it("should emit 'Room.timeline' events when added to the start",
         function() {
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.timeline", function(event, emitRoom, toStart) {
                 callCount += 1;
                 expect(room.timeline.length).toEqual(callCount);
@@ -276,15 +278,15 @@ describe("Room", function() {
 
     describe("event metadata handling", function() {
         it("should set event.sender for new and old events", function() {
-            var sentinel = {
+            let sentinel = {
                 userId: userA,
                 membership: "join",
-                name: "Alice"
+                name: "Alice",
             };
-            var oldSentinel = {
+            let oldSentinel = {
                 userId: userA,
                 membership: "join",
-                name: "Old Alice"
+                name: "Old Alice",
             };
             room.currentState.getSentinelMember.andCallFake(function(uid) {
                 if (uid === userA) {
@@ -299,13 +301,13 @@ describe("Room", function() {
                 return null;
             });
 
-            var newEv = utils.mkEvent({
+            let newEv = utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
+                content: { name: "New Room Name" },
             });
-            var oldEv = utils.mkEvent({
+            let oldEv = utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "Old Room Name" }
+                content: { name: "Old Room Name" },
             });
             room.addLiveEvents([newEv]);
             expect(newEv.sender).toEqual(sentinel);
@@ -315,15 +317,15 @@ describe("Room", function() {
 
         it("should set event.target for new and old m.room.member events",
         function() {
-            var sentinel = {
+            let sentinel = {
                 userId: userA,
                 membership: "join",
-                name: "Alice"
+                name: "Alice",
             };
-            var oldSentinel = {
+            let oldSentinel = {
                 userId: userA,
                 membership: "join",
-                name: "Old Alice"
+                name: "Old Alice",
             };
             room.currentState.getSentinelMember.andCallFake(function(uid) {
                 if (uid === userA) {
@@ -338,11 +340,11 @@ describe("Room", function() {
                 return null;
             });
 
-            var newEv = utils.mkMembership({
-                room: roomId, mship: "invite", user: userB, skey: userA, event: true
+            let newEv = utils.mkMembership({
+                room: roomId, mship: "invite", user: userB, skey: userA, event: true,
             });
-            var oldEv = utils.mkMembership({
-                room: roomId, mship: "ban", user: userB, skey: userA, event: true
+            let oldEv = utils.mkMembership({
+                room: roomId, mship: "ban", user: userB, skey: userA, event: true,
             });
             room.addLiveEvents([newEv]);
             expect(newEv.target).toEqual(sentinel);
@@ -352,16 +354,16 @@ describe("Room", function() {
 
         it("should call setStateEvents on the right RoomState with the right " +
         "forwardLooking value for old events", function() {
-            var events = [
+            let events = [
                 utils.mkMembership({
-                    room: roomId, mship: "invite", user: userB, skey: userA, event: true
+                    room: roomId, mship: "invite", user: userB, skey: userA, event: true,
                 }),
                 utils.mkEvent({
                     type: "m.room.name", room: roomId, user: userB, event: true,
                     content: {
-                        name: "New room"
-                    }
-                })
+                        name: "New room",
+                    },
+                }),
             ];
 
             room.addEventsToTimeline(events, true, room.getLiveTimeline());
@@ -377,18 +379,18 @@ describe("Room", function() {
         });
     });
 
-    var resetTimelineTests = function(timelineSupport) {
-        var events = [
+    let resetTimelineTests = function(timelineSupport) {
+        let events = [
             utils.mkMessage({
-                room: roomId, user: userA, msg: "A message", event: true
+                room: roomId, user: userA, msg: "A message", event: true,
             }),
             utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" }
+                content: { name: "New Room Name" },
             }),
             utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "Another New Name" }
+                content: { name: "Another New Name" },
             }),
         ];
 
@@ -402,8 +404,8 @@ describe("Room", function() {
             room.resetLiveTimeline();
 
             room.addLiveEvents([events[2]]);
-            var oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
-            var newState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+            let oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
+            let newState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
             expect(room.getLiveTimeline().getEvents().length).toEqual(1);
             expect(oldState.getStateEvents("m.room.name", "")).toEqual(events[1]);
             expect(newState.getStateEvents("m.room.name", "")).toEqual(events[2]);
@@ -415,7 +417,7 @@ describe("Room", function() {
             room.resetLiveTimeline();
 
             room.addLiveEvents([events[2]]);
-            var newLiveTimeline = room.getLiveTimeline();
+            let newLiveTimeline = room.getLiveTimeline();
             expect(room.timeline).toEqual(newLiveTimeline.getEvents());
             expect(room.oldState).toEqual(
                 newLiveTimeline.getState(EventTimeline.BACKWARDS));
@@ -425,14 +427,14 @@ describe("Room", function() {
 
         it("should emit Room.timelineReset event and set the correct " +
                  "pagination token", function() {
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.timelineReset", function(emitRoom) {
                 callCount += 1;
                 expect(emitRoom).toEqual(room);
 
                 // make sure that the pagination token has been set before the
                 // event is emitted.
-                var tok = emitRoom.getLiveTimeline()
+                let tok = emitRoom.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
 
                 expect(tok).toEqual("pagToken");
@@ -445,13 +447,12 @@ describe("Room", function() {
                 " old timelines", function() {
             room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
-            var firstLiveTimeline = room.getLiveTimeline();
+            let firstLiveTimeline = room.getLiveTimeline();
             room.resetLiveTimeline();
 
-            var tl = room.getTimelineForEvent(events[0].getId());
+            let tl = room.getTimelineForEvent(events[0].getId());
             expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
         });
-
     };
 
     describe("resetLiveTimeline with timelinesupport enabled",
@@ -464,15 +465,15 @@ describe("Room", function() {
             room = new Room(roomId, {timelineSupport: true});
         });
 
-        var events = [
+        let events = [
             utils.mkMessage({
-                room: roomId, user: userA, msg: "1111", event: true
+                room: roomId, user: userA, msg: "1111", event: true,
             }),
             utils.mkMessage({
-                room: roomId, user: userA, msg: "2222", event: true
+                room: roomId, user: userA, msg: "2222", event: true,
             }),
             utils.mkMessage({
-                room: roomId, user: userA, msg: "3333", event: true
+                room: roomId, user: userA, msg: "3333", event: true,
             }),
         ];
 
@@ -491,7 +492,7 @@ describe("Room", function() {
         });
 
         it("should handle events in adjacent timelines", function() {
-            var oldTimeline = room.addTimeline();
+            let oldTimeline = room.addTimeline();
             oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), 'f');
             room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
 
@@ -507,7 +508,7 @@ describe("Room", function() {
         });
 
         it("should return null for events in non-adjacent timelines", function() {
-            var oldTimeline = room.addTimeline();
+            let oldTimeline = room.addTimeline();
 
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
@@ -536,16 +537,15 @@ describe("Room", function() {
     });
 
     describe("getJoinedMembers", function() {
-
         it("should return members whose membership is 'join'", function() {
             room.currentState.getMembers.andCallFake(function() {
                 return [
                     { userId: "@alice:bar", membership: "join" },
                     { userId: "@bob:bar", membership: "invite" },
-                    { userId: "@cleo:bar", membership: "leave" }
+                    { userId: "@cleo:bar", membership: "leave" },
                 ];
             });
-            var res = room.getJoinedMembers();
+            let res = room.getJoinedMembers();
             expect(res.length).toEqual(1);
             expect(res[0].userId).toEqual("@alice:bar");
         });
@@ -553,21 +553,20 @@ describe("Room", function() {
         it("should return an empty list if no membership is 'join'", function() {
             room.currentState.getMembers.andCallFake(function() {
                 return [
-                    { userId: "@bob:bar", membership: "invite" }
+                    { userId: "@bob:bar", membership: "invite" },
                 ];
             });
-            var res = room.getJoinedMembers();
+            let res = room.getJoinedMembers();
             expect(res.length).toEqual(0);
         });
     });
 
     describe("hasMembershipState", function() {
-
         it("should return true for a matching userId and membership",
         function() {
             room.currentState.members = {
                 "@alice:bar": { userId: "@alice:bar", membership: "join" },
-                "@bob:bar": { userId: "@bob:bar", membership: "invite" }
+                "@bob:bar": { userId: "@bob:bar", membership: "invite" },
             };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
@@ -575,7 +574,7 @@ describe("Room", function() {
         it("should return false if match membership but no match userId",
         function() {
             room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
             };
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
@@ -583,7 +582,7 @@ describe("Room", function() {
         it("should return false if match userId but no match membership",
         function() {
             room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
             };
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
@@ -591,7 +590,7 @@ describe("Room", function() {
         it("should return false if no match membership or userId",
         function() {
             room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" }
+                "@alice:bar": { userId: "@alice:bar", membership: "join" },
             };
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
@@ -604,34 +603,38 @@ describe("Room", function() {
     });
 
     describe("recalculate", function() {
-        var stateLookup = {
+        let stateLookup = {
             // event.type + "$" event.state_key : MatrixEvent
         };
 
-        var setJoinRule = function(rule) {
+        let setJoinRule = function(rule) {
             stateLookup["m.room.join_rules$"] = utils.mkEvent({
                 type: "m.room.join_rules", room: roomId, user: userA, content: {
-                    join_rule: rule
-                }, event: true
+                    join_rule: rule,
+                }, event: true,
             });
         };
-        var setAliases = function(aliases, stateKey) {
-            if (!stateKey) { stateKey = "flibble"; }
+        let setAliases = function(aliases, stateKey) {
+            if (!stateKey) {
+                stateKey = "flibble";
+            }
             stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
                 type: "m.room.aliases", room: roomId, skey: stateKey, content: {
-                    aliases: aliases
-                }, event: true
+                    aliases: aliases,
+                }, event: true,
             });
         };
-        var setRoomName = function(name) {
+        let setRoomName = function(name) {
             stateLookup["m.room.name$"] = utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, content: {
-                    name: name
-                }, event: true
+                    name: name,
+                }, event: true,
             });
         };
-        var addMember = function(userId, state, opts) {
-            if (!state) { state = "join"; }
+        let addMember = function(userId, state, opts) {
+            if (!state) {
+                state = "join";
+            }
             opts = opts || {};
             opts.room = roomId;
             opts.mship = state;
@@ -645,37 +648,38 @@ describe("Room", function() {
             stateLookup = {};
             room.currentState.getStateEvents.andCallFake(function(type, key) {
                 if (key === undefined) {
-                    var prefix = type + "$";
-                    var list = [];
-                    for (var stateBlob in stateLookup) {
-                        if (!stateLookup.hasOwnProperty(stateBlob)) { continue; }
+                    let prefix = type + "$";
+                    let list = [];
+                    for (let stateBlob in stateLookup) {
+                        if (!stateLookup.hasOwnProperty(stateBlob)) {
+                            continue;
+                        }
                         if (stateBlob.indexOf(prefix) === 0) {
                             list.push(stateLookup[stateBlob]);
                         }
                     }
                     return list;
-                }
-                else {
+                } else {
                     return stateLookup[type + "$" + key];
                 }
             });
             room.currentState.getMembers.andCallFake(function() {
-                var memberEvents = room.currentState.getStateEvents("m.room.member");
-                var members = [];
-                for (var i = 0; i < memberEvents.length; i++) {
+                let memberEvents = room.currentState.getStateEvents("m.room.member");
+                let members = [];
+                for (let i = 0; i < memberEvents.length; i++) {
                     members.push({
                         name: memberEvents[i].event.content &&
                                 memberEvents[i].event.content.displayname ?
                                 memberEvents[i].event.content.displayname :
                                 memberEvents[i].getStateKey(),
                         userId: memberEvents[i].getStateKey(),
-                        events: { member: memberEvents[i] }
+                        events: { member: memberEvents[i] },
                     });
                 }
                 return members;
             });
             room.currentState.getMember.andCallFake(function(userId) {
-                var memberEvent = room.currentState.getStateEvents(
+                let memberEvent = room.currentState.getStateEvents(
                     "m.room.member", userId
                 );
                 return {
@@ -684,7 +688,7 @@ describe("Room", function() {
                             memberEvent.event.content.displayname :
                             memberEvent.getStateKey(),
                     userId: memberEvent.getStateKey(),
-                    events: { member: memberEvent }
+                    events: { member: memberEvent },
                 };
             });
         });
@@ -692,7 +696,7 @@ describe("Room", function() {
         describe("Room.recalculate => Stripped State Events", function() {
             it("should set stripped state events as actual state events if the " +
             "room is an invite room", function() {
-                var roomName = "flibble";
+                let roomName = "flibble";
 
                 addMember(userA, "invite");
                 stateLookup["m.room.member$" + userA].event.invite_room_state = [
@@ -700,17 +704,17 @@ describe("Room", function() {
                         type: "m.room.name",
                         state_key: "",
                         content: {
-                            name: roomName
-                        }
-                    }
+                            name: roomName,
+                        },
+                    },
                 ];
 
                 room.recalculate(userA);
                 expect(room.currentState.setStateEvents).toHaveBeenCalled();
                 // first call, first arg (which is an array), first element in array
-                var fakeEvent = room.currentState.setStateEvents.calls[0].args[0][0];
+                let fakeEvent = room.currentState.setStateEvents.calls[0].args[0][0];
                 expect(fakeEvent.getContent()).toEqual({
-                    name: roomName
+                    name: roomName,
                 });
             });
 
@@ -721,9 +725,9 @@ describe("Room", function() {
                         type: "m.room.name",
                         state_key: "",
                         content: {
-                            name: "flibble"
-                        }
-                    }
+                            name: "flibble",
+                        },
+                    },
                 ];
 
                 room.recalculate(userA);
@@ -732,7 +736,6 @@ describe("Room", function() {
         });
 
         describe("Room.recalculate => Room Name", function() {
-
             it("should return the names of members in a private (invite join_rules)" +
             " room if a room name and alias don't exist and there are >3 members.",
             function() {
@@ -742,11 +745,11 @@ describe("Room", function() {
                 addMember(userC);
                 addMember(userD);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 // we expect at least 1 member to be mentioned
-                var others = [userB, userC, userD];
-                var found = false;
-                for (var i = 0; i < others.length; i++) {
+                let others = [userB, userC, userD];
+                let found = false;
+                for (let i = 0; i < others.length; i++) {
                     if (name.indexOf(others[i]) !== -1) {
                         found = true;
                         break;
@@ -763,7 +766,7 @@ describe("Room", function() {
                 addMember(userB);
                 addMember(userC);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name.indexOf(userB)).not.toEqual(-1, name);
                 expect(name.indexOf(userC)).not.toEqual(-1, name);
             });
@@ -776,7 +779,7 @@ describe("Room", function() {
                 addMember(userB);
                 addMember(userC);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name.indexOf(userB)).not.toEqual(-1, name);
                 expect(name.indexOf(userC)).not.toEqual(-1, name);
             });
@@ -788,7 +791,7 @@ describe("Room", function() {
                 addMember(userA);
                 addMember(userB);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name.indexOf(userB)).not.toEqual(-1, name);
             });
 
@@ -799,7 +802,7 @@ describe("Room", function() {
                 addMember(userA);
                 addMember(userB);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name.indexOf(userB)).not.toEqual(-1, name);
             });
 
@@ -809,47 +812,47 @@ describe("Room", function() {
                 addMember(userA, "invite", {user: userB});
                 addMember(userB);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name.indexOf(userB)).not.toEqual(-1, name);
             });
 
             it("should show the room alias if one exists for private " +
             "(invite join_rules) rooms if a room name doesn't exist.", function() {
-                var alias = "#room_alias:here";
+                let alias = "#room_alias:here";
                 setJoinRule("invite");
                 setAliases([alias, "#another:one"]);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual(alias);
             });
 
             it("should show the room alias if one exists for public " +
             "(public join_rules) rooms if a room name doesn't exist.", function() {
-                var alias = "#room_alias:here";
+                let alias = "#room_alias:here";
                 setJoinRule("public");
                 setAliases([alias, "#another:one"]);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual(alias);
             });
 
             it("should show the room name if one exists for private " +
             "(invite join_rules) rooms.", function() {
-                var roomName = "A mighty name indeed";
+                let roomName = "A mighty name indeed";
                 setJoinRule("invite");
                 setRoomName(roomName);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual(roomName);
             });
 
             it("should show the room name if one exists for public " +
             "(public join_rules) rooms.", function() {
-                var roomName = "A mighty name indeed";
+                let roomName = "A mighty name indeed";
                 setJoinRule("public");
                 setRoomName(roomName);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual(roomName);
             });
 
@@ -858,7 +861,7 @@ describe("Room", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual("Empty room");
             });
 
@@ -867,7 +870,7 @@ describe("Room", function() {
                 setJoinRule("public");
                 addMember(userA);
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual("Empty room");
             });
 
@@ -875,7 +878,7 @@ describe("Room", function() {
                "alias or members in the room.",
             function() {
                 room.recalculate(userA);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual("Empty room");
             });
 
@@ -886,7 +889,7 @@ describe("Room", function() {
                 addMember(userA, 'join', {name: "Alice"});
                 addMember(userB, "invite", {user: userA});
                 room.recalculate(userB);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual("Invite from Alice");
             });
 
@@ -896,33 +899,35 @@ describe("Room", function() {
                 addMember(userA);
                 addMember(userB, "invite", {user: userA});
                 room.recalculate(userB);
-                var name = room.name;
+                let name = room.name;
                 expect(name).toEqual("Invite from " + userA);
             });
-
         });
     });
 
     describe("receipts", function() {
-
-        var eventToAck = utils.mkMessage({
+        let eventToAck = utils.mkMessage({
             room: roomId, user: userA, msg: "PLEASE ACKNOWLEDGE MY EXISTENCE",
-            event: true
+            event: true,
         });
 
         function mkReceipt(roomId, records) {
-            var content = {};
+            let content = {};
             records.forEach(function(r) {
-                if (!content[r.eventId]) { content[r.eventId] = {}; }
-                if (!content[r.eventId][r.type]) { content[r.eventId][r.type] = {}; }
+                if (!content[r.eventId]) {
+                    content[r.eventId] = {};
+                }
+                if (!content[r.eventId][r.type]) {
+                    content[r.eventId][r.type] = {};
+                }
                 content[r.eventId][r.type][r.userId] = {
-                    ts: r.ts
+                    ts: r.ts,
                 };
             });
             return new MatrixEvent({
                 content: content,
                 room_id: roomId,
-                type: "m.receipt"
+                type: "m.receipt",
             });
         }
 
@@ -932,36 +937,35 @@ describe("Room", function() {
                 eventId: eventId,
                 type: type,
                 userId: userId,
-                ts: ts
+                ts: ts,
             };
         }
 
         describe("addReceipt", function() {
-
             it("should store the receipt so it can be obtained via getReceiptsForEvent",
             function() {
-                var ts = 13787898424;
+                let ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
                 ]));
                 expect(room.getReceiptsForEvent(eventToAck)).toEqual([{
                     type: "m.read",
                     userId: userB,
                     data: {
-                        ts: ts
-                    }
+                        ts: ts,
+                    },
                 }]);
             });
 
             it("should emit an event when a receipt is added",
             function() {
-                var listener = jasmine.createSpy('spy');
+                let listener = jasmine.createSpy('spy');
                 room.on("Room.receipt", listener);
 
-                var ts = 13787898424;
+                let ts = 13787898424;
 
-                var receiptEvent = mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                let receiptEvent = mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
                 ]);
 
                 room.addReceipt(receiptEvent);
@@ -969,34 +973,34 @@ describe("Room", function() {
             });
 
             it("should clobber receipts based on type and user ID", function() {
-                var nextEventToAck = utils.mkMessage({
+                let nextEventToAck = utils.mkMessage({
                     room: roomId, user: userA, msg: "I AM HERE YOU KNOW",
-                    event: true
+                    event: true,
                 });
-                var ts = 13787898424;
+                let ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
                 ]));
-                var ts2 = 13787899999;
+                let ts2 = 13787899999;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(nextEventToAck.getId(), "m.read", userB, ts2)
+                    mkRecord(nextEventToAck.getId(), "m.read", userB, ts2),
                 ]));
                 expect(room.getReceiptsForEvent(eventToAck)).toEqual([]);
                 expect(room.getReceiptsForEvent(nextEventToAck)).toEqual([{
                     type: "m.read",
                     userId: userB,
                     data: {
-                        ts: ts2
-                    }
+                        ts: ts2,
+                    },
                 }]);
             });
 
             it("should persist multiple receipts for a single event ID", function() {
-                var ts = 13787898424;
+                let ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
                     mkRecord(eventToAck.getId(), "m.read", userB, ts),
                     mkRecord(eventToAck.getId(), "m.read", userC, ts),
-                    mkRecord(eventToAck.getId(), "m.read", userD, ts)
+                    mkRecord(eventToAck.getId(), "m.read", userD, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual(
                     [userB, userC, userD]
@@ -1004,19 +1008,19 @@ describe("Room", function() {
             });
 
             it("should persist multiple receipts for a single receipt type", function() {
-                var eventTwo = utils.mkMessage({
+                let eventTwo = utils.mkMessage({
                     room: roomId, user: userA, msg: "2222",
-                    event: true
+                    event: true,
                 });
-                var eventThree = utils.mkMessage({
+                let eventThree = utils.mkMessage({
                     room: roomId, user: userA, msg: "3333",
-                    event: true
+                    event: true,
                 });
-                var ts = 13787898424;
+                let ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
                     mkRecord(eventToAck.getId(), "m.read", userB, ts),
                     mkRecord(eventTwo.getId(), "m.read", userC, ts),
-                    mkRecord(eventThree.getId(), "m.read", userD, ts)
+                    mkRecord(eventThree.getId(), "m.read", userD, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
                 expect(room.getUsersReadUpTo(eventTwo)).toEqual([userC]);
@@ -1034,44 +1038,44 @@ describe("Room", function() {
                     type: "m.delivered",
                     userId: userB,
                     data: {
-                        ts: 13787898424
-                    }
+                        ts: 13787898424,
+                    },
                 },
                 {
                     type: "m.read",
                     userId: userB,
                     data: {
-                        ts: 22222222
-                    }
+                        ts: 22222222,
+                    },
                 },
                 {
                     type: "m.seen",
                     userId: userB,
                     data: {
-                        ts: 33333333
-                    }
-                }
+                        ts: 33333333,
+                    },
+                },
                 ]);
             });
 
             it("should prioritise the most recent event", function() {
-                var events = [
+                let events = [
                     utils.mkMessage({
                         room: roomId, user: userA, msg: "1111",
-                        event: true
+                        event: true,
                     }),
                     utils.mkMessage({
                         room: roomId, user: userA, msg: "2222",
-                        event: true
+                        event: true,
                     }),
                     utils.mkMessage({
                         room: roomId, user: userA, msg: "3333",
-                        event: true
+                        event: true,
                     }),
                 ];
 
                 room.addLiveEvents(events);
-                var ts = 13787898424;
+                let ts = 13787898424;
 
                 // check it initialises correctly
                 room.addReceipt(mkReceipt(roomId, [
@@ -1094,36 +1098,31 @@ describe("Room", function() {
         });
 
         describe("getUsersReadUpTo", function() {
-
             it("should return user IDs read up to the given event", function() {
-                var ts = 13787898424;
+                let ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts)
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
             });
-
         });
-
     });
 
     describe("tags", function() {
-
         function mkTags(roomId, tags) {
-            var content = { "tags": tags };
+            let content = { "tags": tags };
             return new MatrixEvent({
                 content: content,
                 room_id: roomId,
-                type: "m.tag"
+                type: "m.tag",
             });
         }
 
         describe("addTag", function() {
-
             it("should set tags on rooms from event stream so " +
                "they can be obtained by the tags property",
             function() {
-                var tags = { "m.foo": { "order": 0.5 } };
+                let tags = { "m.foo": { "order": 0.5 } };
                 room.addTags(mkTags(roomId, tags));
                 expect(room.tags).toEqual(tags);
             });
@@ -1131,11 +1130,11 @@ describe("Room", function() {
             it("should emit Room.tags event when new tags are " +
                "received on the event stream",
             function() {
-                var listener = jasmine.createSpy('spy');
+                let listener = jasmine.createSpy('spy');
                 room.on("Room.tags", listener);
 
-                var tags = { "m.foo": { "order": 0.5 } };
-                var event = mkTags(roomId, tags);
+                let tags = { "m.foo": { "order": 0.5 } };
+                let event = mkTags(roomId, tags);
                 room.addTags(event);
                 expect(listener).toHaveBeenCalledWith(event, room);
             });
@@ -1148,18 +1147,18 @@ describe("Room", function() {
     describe("addPendingEvent", function() {
         it("should add pending events to the pendingEventList if " +
                       "pendingEventOrdering == 'detached'", function() {
-            var room = new Room(roomId, {
-                pendingEventOrdering: "detached"
+            let room = new Room(roomId, {
+                pendingEventOrdering: "detached",
             });
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 1", event: true
+            let eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true,
             });
-            var eventB = utils.mkMessage({
-                room: roomId, user: userA, msg: "local 1", event: true
+            let eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true,
             });
             eventB.status = EventStatus.SENDING;
-            var eventC = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 2", event: true
+            let eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true,
             });
             room.addLiveEvents([eventA]);
             room.addPendingEvent(eventB, "TXN1");
@@ -1175,17 +1174,17 @@ describe("Room", function() {
         it("should add pending events to the timeline if " +
                       "pendingEventOrdering == 'chronological'", function() {
             room = new Room(roomId, {
-                pendingEventOrdering: "chronological"
+                pendingEventOrdering: "chronological",
             });
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 1", event: true
+            let eventA = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 1", event: true,
             });
-            var eventB = utils.mkMessage({
-                room: roomId, user: userA, msg: "local 1", event: true
+            let eventB = utils.mkMessage({
+                room: roomId, user: userA, msg: "local 1", event: true,
             });
             eventB.status = EventStatus.SENDING;
-            var eventC = utils.mkMessage({
-                room: roomId, user: userA, msg: "remote 2", event: true
+            let eventC = utils.mkMessage({
+                room: roomId, user: userA, msg: "remote 2", event: true,
             });
             room.addLiveEvents([eventA]);
             room.addPendingEvent(eventB, "TXN1");
@@ -1198,14 +1197,14 @@ describe("Room", function() {
 
     describe("updatePendingEvent", function() {
         it("should remove cancelled events from the pending list", function() {
-            var room = new Room(roomId, {
-                pendingEventOrdering: "detached"
+            let room = new Room(roomId, {
+                pendingEventOrdering: "detached",
             });
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, event: true
+            let eventA = utils.mkMessage({
+                room: roomId, user: userA, event: true,
             });
             eventA.status = EventStatus.SENDING;
-            var eventId = eventA.getId();
+            let eventId = eventA.getId();
 
             room.addPendingEvent(eventA, "TXN1");
             expect(room.getPendingEvents()).toEqual(
@@ -1216,7 +1215,7 @@ describe("Room", function() {
             // cancelled
             room.updatePendingEvent(eventA, EventStatus.NOT_SENT);
 
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.localEchoUpdated",
                 function(event, emitRoom, oldEventId, oldStatus) {
                     expect(event).toEqual(eventA);
@@ -1234,12 +1233,12 @@ describe("Room", function() {
 
 
         it("should remove cancelled events from the timeline", function() {
-            var room = new Room(roomId);
-            var eventA = utils.mkMessage({
-                room: roomId, user: userA, event: true
+            let room = new Room(roomId);
+            let eventA = utils.mkMessage({
+                room: roomId, user: userA, event: true,
             });
             eventA.status = EventStatus.SENDING;
-            var eventId = eventA.getId();
+            let eventId = eventA.getId();
 
             room.addPendingEvent(eventA, "TXN1");
             expect(room.getLiveTimeline().getEvents()).toEqual(
@@ -1250,7 +1249,7 @@ describe("Room", function() {
             // cancelled
             room.updatePendingEvent(eventA, EventStatus.NOT_SENT);
 
-            var callCount = 0;
+            let callCount = 0;
             room.on("Room.localEchoUpdated",
                 function(event, emitRoom, oldEventId, oldStatus) {
                     expect(event).toEqual(eventA);
@@ -1265,6 +1264,5 @@ describe("Room", function() {
             expect(room.getLiveTimeline().getEvents()).toEqual([]);
             expect(callCount).toEqual(1);
         });
-
     });
 });

@@ -1,30 +1,30 @@
 "use strict";
-var sdk = require("../..");
-var q = require("q");
-var HttpBackend = require("../mock-request");
-var utils = require("../../lib/utils");
-var test_utils = require("../test-utils");
+let sdk = require("../..");
+let q = require("q");
+let HttpBackend = require("../mock-request");
+let utils = require("../../lib/utils");
+let test_utils = require("../test-utils");
 
-var aliHttpBackend;
-var bobHttpBackend;
-var aliClient;
-var roomId = "!room:localhost";
-var aliUserId = "@ali:localhost";
-var aliDeviceId = "zxcvb";
-var aliAccessToken = "aseukfgwef";
-var bobClient;
-var bobUserId = "@bob:localhost";
-var bobDeviceId = "bvcxz";
-var bobAccessToken = "fewgfkuesa";
-var bobOneTimeKeys;
-var aliDeviceKeys;
-var bobDeviceKeys;
-var bobDeviceCurve25519Key;
-var bobDeviceEd25519Key;
-var aliStorage;
-var bobStorage;
-var aliMessages;
-var bobMessages;
+let aliHttpBackend;
+let bobHttpBackend;
+let aliClient;
+let roomId = "!room:localhost";
+let aliUserId = "@ali:localhost";
+let aliDeviceId = "zxcvb";
+let aliAccessToken = "aseukfgwef";
+let bobClient;
+let bobUserId = "@bob:localhost";
+let bobDeviceId = "bvcxz";
+let bobAccessToken = "fewgfkuesa";
+let bobOneTimeKeys;
+let aliDeviceKeys;
+let bobDeviceKeys;
+let bobDeviceCurve25519Key;
+let bobDeviceEd25519Key;
+let aliStorage;
+let bobStorage;
+let aliMessages;
+let bobMessages;
 
 
 /**
@@ -38,8 +38,8 @@ var bobMessages;
  * {one_time_keys: {}, device_keys: {}}
  */
 function expectKeyUpload(deviceId, httpBackend) {
-    var uploadPath = "/keys/upload/" + deviceId;
-    var keys = {};
+    let uploadPath = "/keys/upload/" + deviceId;
+    let keys = {};
 
     httpBackend.when("POST", uploadPath).respond(200, function(path, content) {
         expect(content.one_time_keys).not.toBeDefined();
@@ -52,8 +52,8 @@ function expectKeyUpload(deviceId, httpBackend) {
         expect(content.device_keys).not.toBeDefined();
         expect(content.one_time_keys).toBeDefined();
         expect(content.one_time_keys).not.toEqual({});
-        var count = 0;
-        for (var key in content.one_time_keys) {
+        let count = 0;
+        for (let key in content.one_time_keys) {
             if (content.one_time_keys.hasOwnProperty(key)) {
                 count++;
             }
@@ -119,11 +119,11 @@ function expectAliQueryKeys() {
     // can't query keys before bob has uploaded them
     expect(bobDeviceKeys).toBeDefined();
 
-    var bobKeys = {};
+    let bobKeys = {};
     bobKeys[bobDeviceId] = bobDeviceKeys;
     aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
         expect(content.device_keys[bobUserId]).toEqual({});
-        var result = {};
+        let result = {};
         result[bobUserId] = bobKeys;
         return {device_keys: result};
     });
@@ -139,11 +139,11 @@ function expectBobQueryKeys() {
     // can't query keys before ali has uploaded them
     expect(aliDeviceKeys).toBeDefined();
 
-    var aliKeys = {};
+    let aliKeys = {};
     aliKeys[aliDeviceId] = aliDeviceKeys;
     bobHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
         expect(content.device_keys[aliUserId]).toEqual({});
-        var result = {};
+        let result = {};
         result[aliUserId] = aliKeys;
         return {device_keys: result};
     });
@@ -160,7 +160,7 @@ function expectAliClaimKeys() {
     expect(bobOneTimeKeys).toBeDefined();
 
     aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
-        var claimType = content.one_time_keys[bobUserId][bobDeviceId];
+        let claimType = content.one_time_keys[bobUserId][bobDeviceId];
         expect(claimType).toEqual("signed_curve25519");
         for (var keyId in bobOneTimeKeys) {
             if (bobOneTimeKeys.hasOwnProperty(keyId)) {
@@ -169,7 +169,7 @@ function expectAliClaimKeys() {
                 }
             }
         }
-        var result = {};
+        let result = {};
         result[bobUserId] = {};
         result[bobUserId][bobDeviceId] = {};
         result[bobUserId][bobDeviceId][keyId] = bobOneTimeKeys[keyId];
@@ -184,7 +184,7 @@ function aliDownloadsKeys() {
     // can't query keys before bob has uploaded them
     expect(bobDeviceEd25519Key).toBeDefined();
 
-    var p1 = aliClient.downloadKeys([bobUserId]).then(function() {
+    let p1 = aliClient.downloadKeys([bobUserId]).then(function() {
         expect(aliClient.listDeviceKeys(bobUserId)).toEqual([{
             id: "bvcxz",
             key: bobDeviceEd25519Key,
@@ -193,12 +193,12 @@ function aliDownloadsKeys() {
             display_name: null,
         }]);
     });
-    var p2 = expectAliQueryKeys();
+    let p2 = expectAliQueryKeys();
 
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
     return q.all([p1, p2]).then(function() {
-        var devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
+        let devices = aliStorage.getEndToEndDevicesForUser(bobUserId);
         expect(devices[bobDeviceId].keys).toEqual(bobDeviceKeys.keys);
         expect(devices[bobDeviceId].verified).
             toBe(0); // DeviceVerification.UNVERIFIED
@@ -232,7 +232,7 @@ function aliSendsFirstMessage() {
         sendMessage(aliClient),
         expectAliQueryKeys()
             .then(expectAliClaimKeys)
-            .then(expectAliSendMessageRequest)
+            .then(expectAliSendMessageRequest),
     ]).spread(function(_, ciphertext) {
         return ciphertext;
     });
@@ -247,7 +247,7 @@ function aliSendsFirstMessage() {
 function aliSendsMessage() {
     return q.all([
         sendMessage(aliClient),
-        expectAliSendMessageRequest()
+        expectAliSendMessageRequest(),
     ]).spread(function(_, ciphertext) {
         return ciphertext;
     });
@@ -263,7 +263,7 @@ function bobSendsReplyMessage() {
     return q.all([
         sendMessage(bobClient),
         expectBobQueryKeys()
-            .then(expectBobSendMessageRequest)
+            .then(expectBobSendMessageRequest),
     ]).spread(function(_, ciphertext) {
         return ciphertext;
     });
@@ -278,7 +278,7 @@ function expectAliSendMessageRequest() {
     return expectSendMessageRequest(aliHttpBackend).then(function(content) {
         aliMessages.push(content);
         expect(utils.keys(content.ciphertext)).toEqual([bobDeviceCurve25519Key]);
-        var ciphertext = content.ciphertext[bobDeviceCurve25519Key];
+        let ciphertext = content.ciphertext[bobDeviceCurve25519Key];
         expect(ciphertext).toBeDefined();
         return ciphertext;
     });
@@ -292,10 +292,10 @@ function expectAliSendMessageRequest() {
 function expectBobSendMessageRequest() {
     return expectSendMessageRequest(bobHttpBackend).then(function(content) {
         bobMessages.push(content);
-        var aliKeyId = "curve25519:" + aliDeviceId;
-        var aliDeviceCurve25519Key = aliDeviceKeys.keys[aliKeyId];
+        let aliKeyId = "curve25519:" + aliDeviceId;
+        let aliDeviceCurve25519Key = aliDeviceKeys.keys[aliKeyId];
         expect(utils.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
-        var ciphertext = content.ciphertext[aliDeviceCurve25519Key];
+        let ciphertext = content.ciphertext[aliDeviceCurve25519Key];
         expect(ciphertext).toBeDefined();
         return ciphertext;
     });
@@ -308,8 +308,8 @@ function sendMessage(client) {
 }
 
 function expectSendMessageRequest(httpBackend) {
-    var path = "/send/m.room.encrypted/";
-    var sent;
+    let path = "/send/m.room.encrypted/";
+    let sent;
     httpBackend.when("PUT", path).respond(200, function(path, content) {
         sent = content;
         return {
@@ -322,23 +322,23 @@ function expectSendMessageRequest(httpBackend) {
 }
 
 function aliRecvMessage() {
-    var message = bobMessages.shift();
+    let message = bobMessages.shift();
     return recvMessage(aliHttpBackend, aliClient, bobUserId, message);
 }
 
 function bobRecvMessage() {
-    var message = aliMessages.shift();
+    let message = aliMessages.shift();
     return recvMessage(bobHttpBackend, bobClient, aliUserId, message);
 }
 
 function recvMessage(httpBackend, client, sender, message) {
-    var syncData = {
+    let syncData = {
         next_batch: "x",
         rooms: {
             join: {
 
-            }
-        }
+            },
+        },
     };
     syncData.rooms.join[roomId] = {
         timeline: {
@@ -348,13 +348,13 @@ function recvMessage(httpBackend, client, sender, message) {
                     room: roomId,
                     content: message,
                     sender: sender,
-                })
-            ]
-        }
+                }),
+            ],
+        },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
-    var deferred = q.defer();
-    var onEvent = function(event) {
+    let deferred = q.defer();
+    let onEvent = function(event) {
         console.log(client.credentials.userId + " received event",
                     event);
 
@@ -366,7 +366,7 @@ function recvMessage(httpBackend, client, sender, message) {
         expect(event.getType()).toEqual("m.room.message");
         expect(event.getContent()).toEqual({
             msgtype: "m.text",
-            body: "Hello, World"
+            body: "Hello, World",
         });
         expect(event.isEncrypted()).toBeTruthy();
 
@@ -387,7 +387,7 @@ function aliStartClient() {
     // ali will try to query her own keys on start
     aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
         expect(content.device_keys[aliUserId]).toEqual({});
-        var result = {};
+        let result = {};
         result[aliUserId] = {};
         return {device_keys: result};
     });
@@ -404,7 +404,7 @@ function bobStartClient() {
     // bob will try to query his own keys on start
     bobHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
         expect(content.device_keys[bobUserId]).toEqual({});
-        var result = {};
+        let result = {};
         result[bobUserId] = {};
         return {device_keys: result};
     });
@@ -428,11 +428,11 @@ function startClient(httpBackend, client) {
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
 
     // send a sync response including our test room.
-    var syncData = {
+    let syncData = {
         next_batch: "x",
         rooms: {
-            join: { }
-        }
+            join: { },
+        },
     };
     syncData.rooms.join[roomId] = {
         state: {
@@ -445,11 +445,11 @@ function startClient(httpBackend, client) {
                     mship: "join",
                     user: bobUserId,
                 }),
-            ]
+            ],
         },
         timeline: {
-            events: []
-        }
+            events: [],
+        },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
 
@@ -506,14 +506,14 @@ describe("MatrixClient crypto", function() {
             aliHttpBackend.when('POST', '/keys/query').respond(200, {
                 device_keys: {
                     '@bob:id': {},
-                }
+                },
             });
 
-            var p1 = aliClient.downloadKeys(['@bob:id']);
-            var p2 = aliHttpBackend.flush('/keys/query', 1);
+            let p1 = aliClient.downloadKeys(['@bob:id']);
+            let p2 = aliHttpBackend.flush('/keys/query', 1);
 
             q.all([p1, p2]).then(function() {
-                var devices = aliStorage.getEndToEndDevicesForUser('@bob:id');
+                let devices = aliStorage.getEndToEndDevicesForUser('@bob:id');
                 expect(utils.keys(devices).length).toEqual(0);
 
                 // request again: should be no more requests
@@ -554,9 +554,9 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali gets keys with an incorrect userId", function(done) {
-        var eveUserId = "@eve:localhost";
+        let eveUserId = "@eve:localhost";
 
-        var bobDeviceKeys = {
+        let bobDeviceKeys = {
             algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
             device_id: 'bvcxz',
             keys: {
@@ -572,10 +572,10 @@ describe("MatrixClient crypto", function() {
             },
         };
 
-        var bobKeys = {};
+        let bobKeys = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
-            var result = {};
+            let result = {};
             result[bobUserId] = bobKeys;
             return {device_keys: result};
         });
@@ -591,7 +591,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali gets keys with an incorrect deviceId", function(done) {
-        var bobDeviceKeys = {
+        let bobDeviceKeys = {
             algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
             device_id: 'bad_device',
             keys: {
@@ -607,10 +607,10 @@ describe("MatrixClient crypto", function() {
             },
         };
 
-        var bobKeys = {};
+        let bobKeys = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
-            var result = {};
+            let result = {};
             result[bobUserId] = bobKeys;
             return {device_keys: result};
         });
@@ -660,14 +660,14 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobStartClient)
             .then(function() {
-                var message = aliMessages.shift();
-                var syncData = {
+                let message = aliMessages.shift();
+                let syncData = {
                     next_batch: "x",
                     rooms: {
                         join: {
 
-                        }
-                    }
+                        },
+                    },
                 };
                 syncData.rooms.join[roomId] = {
                     timeline: {
@@ -677,14 +677,14 @@ describe("MatrixClient crypto", function() {
                                 room: roomId,
                                 content: message,
                                 sender: "@bogus:sender",
-                            })
-                        ]
-                    }
+                            }),
+                        ],
+                    },
                 };
                 bobHttpBackend.when("GET", "/sync").respond(200, syncData);
 
-                var deferred = q.defer();
-                var onEvent = function(event) {
+                let deferred = q.defer();
+                let onEvent = function(event) {
                     console.log(bobClient.credentials.userId + " received event",
                                 event);
 
@@ -717,8 +717,8 @@ describe("MatrixClient crypto", function() {
             .then(aliDownloadsKeys)
             .then(function() {
                 aliClient.setDeviceBlocked(bobUserId, bobDeviceId, true);
-                var p1 = sendMessage(aliClient);
-                var p2 = expectAliQueryKeys()
+                let p1 = sendMessage(aliClient);
+                let p2 = expectAliQueryKeys()
                     .then(expectAliClaimKeys)
                     .then(function() {
                         return expectSendMessageRequest(aliHttpBackend);
@@ -764,7 +764,7 @@ describe("MatrixClient crypto", function() {
             .then(bobUploadsKeys)
             .then(aliStartClient)
             .then(function() {
-                var syncData = {
+                let syncData = {
                     next_batch: '2',
                     to_device: {
                         events: [

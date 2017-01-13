@@ -20,7 +20,7 @@ limitations under the License.
  *
  * @module crypto/algorithms/base
  */
-var utils = require("../../utils");
+let utils = require("../../utils");
 
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
@@ -53,7 +53,7 @@ module.exports.DECRYPTION_CLASSES = {};
  * @param {string} params.roomId  The ID of the room we will be sending to
  * @param {object} params.config  The body of the m.room.encryption event
  */
-var EncryptionAlgorithm = function(params) {
+let EncryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._deviceId = params.deviceId;
     this._crypto = params.crypto;
@@ -101,7 +101,7 @@ EncryptionAlgorithm.prototype.onRoomMembership = function(
  * @param {string=} params.roomId The ID of the room we will be receiving
  *     from. Null for to-device events.
  */
-var DecryptionAlgorithm = function(params) {
+let DecryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._crypto = params.crypto;
     this._olmDevice = params.olmDevice;

@@ -1,29 +1,29 @@
 "use strict";
-var q = require("q");
-var sdk = require("../..");
-var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
-var EventTimeline = sdk.EventTimeline;
+let q = require("q");
+let sdk = require("../..");
+let HttpBackend = require("../mock-request");
+let utils = require("../test-utils");
+let EventTimeline = sdk.EventTimeline;
 
-var baseUrl = "http://localhost.or.something";
-var userId = "@alice:localhost";
-var userName = "Alice";
-var accessToken = "aseukfgwef";
-var roomId = "!foo:bar";
-var otherUserId = "@bob:localhost";
+let baseUrl = "http://localhost.or.something";
+let userId = "@alice:localhost";
+let userName = "Alice";
+let accessToken = "aseukfgwef";
+let roomId = "!foo:bar";
+let otherUserId = "@bob:localhost";
 
-var USER_MEMBERSHIP_EVENT = utils.mkMembership({
-    room: roomId, mship: "join", user: userId, name: userName
+let USER_MEMBERSHIP_EVENT = utils.mkMembership({
+    room: roomId, mship: "join", user: userId, name: userName,
 });
 
-var ROOM_NAME_EVENT = utils.mkEvent({
+let ROOM_NAME_EVENT = utils.mkEvent({
     type: "m.room.name", room: roomId, user: otherUserId,
     content: {
-        name: "Old room name"
-    }
+        name: "Old room name",
+    },
 });
 
-var INITIAL_SYNC_DATA = {
+let INITIAL_SYNC_DATA = {
     next_batch: "s_5_3",
     rooms: {
         join: {
@@ -31,33 +31,33 @@ var INITIAL_SYNC_DATA = {
                 timeline: {
                     events: [
                         utils.mkMessage({
-                            room: roomId, user: otherUserId, msg: "hello"
-                        })
+                            room: roomId, user: otherUserId, msg: "hello",
+                        }),
                     ],
-                    prev_batch: "f_1_1"
+                    prev_batch: "f_1_1",
                 },
                 state: {
                     events: [
                         ROOM_NAME_EVENT,
                         utils.mkMembership({
                             room: roomId, mship: "join",
-                            user: otherUserId, name: "Bob"
+                            user: otherUserId, name: "Bob",
                         }),
                         USER_MEMBERSHIP_EVENT,
                         utils.mkEvent({
                             type: "m.room.create", room: roomId, user: userId,
                             content: {
-                                creator: userId
-                            }
-                        })
-                    ]
-                }
-            }
-        }
-    }
+                                creator: userId,
+                            },
+                        }),
+                    ],
+                },
+            },
+        },
+    },
 };
 
-var EVENTS = [
+let EVENTS = [
     utils.mkMessage({
         room: roomId, user: userId, msg: "we",
     }),
@@ -81,7 +81,7 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    var deferred = q.defer();
+    let deferred = q.defer();
     client.on("sync", function(state) {
         console.log("sync", state);
         if (state != "SYNCING") {
@@ -96,8 +96,8 @@ function startClient(httpBackend, client) {
 
 
 describe("getEventTimeline support", function() {
-    var httpBackend;
-    var client;
+    let httpBackend;
+    let client;
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -120,10 +120,11 @@ describe("getEventTimeline support", function() {
 
         startClient(httpBackend, client
         ).then(function() {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
-            expect(function() { client.getEventTimeline(timelineSet, "event"); })
-                .toThrow();
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
+            expect(function() {
+                client.getEventTimeline(timelineSet, "event");
+            }).toThrow();
         }).catch(utils.failTest).done(done);
     });
 
@@ -137,10 +138,11 @@ describe("getEventTimeline support", function() {
 
         startClient(httpBackend, client
         ).then(function() {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
-            expect(function() { client.getEventTimeline(timelineSet, "event"); })
-                .not.toThrow();
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
+            expect(function() {
+                client.getEventTimeline(timelineSet, "event");
+            }).not.toThrow();
         }).catch(utils.failTest).done(done);
 
         httpBackend.flush().catch(utils.failTest);
@@ -155,7 +157,7 @@ describe("getEventTimeline support", function() {
             userId: userId,
             accessToken: accessToken,
         });
-        var room;
+        let room;
 
         startClient(httpBackend, client
         ).then(function() {
@@ -218,7 +220,7 @@ describe("getEventTimeline support", function() {
 });
 
 describe("MatrixClient event timelines", function() {
-    var client, httpBackend;
+    let client, httpBackend;
 
     beforeEach(function(done) {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -243,8 +245,8 @@ describe("MatrixClient event timelines", function() {
 
     describe("getEventTimeline", function() {
         it("should create a new timeline for new events", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/event1%3Abar")
                 .respond(200, function() {
                     return {
@@ -262,7 +264,7 @@ describe("MatrixClient event timelines", function() {
 
             client.getEventTimeline(timelineSet, "event1:bar").then(function(tl) {
                 expect(tl.getEvents().length).toEqual(4);
-                for (var i = 0; i < 4; i++) {
+                for (let i = 0; i < 4; i++) {
                     expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
                     expect(tl.getEvents()[i].sender.name).toEqual(userName);
                 }
@@ -276,8 +278,8 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should return existing timeline for known events", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
                 rooms: {
@@ -308,8 +310,8 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should update timelines where they overlap a previous /sync", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
                 rooms: {
@@ -358,8 +360,8 @@ describe("MatrixClient event timelines", function() {
 
         it("should join timelines where they overlap a previous /context",
           function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
 
             // we fetch event 0, then 2, then 3, and finally 1. 1 is returned
             // with context which joins them all up.
@@ -415,7 +417,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            var tl0, tl3;
+            let tl0, tl3;
             client.getEventTimeline(timelineSet, EVENTS[0].event_id
             ).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);
@@ -451,8 +453,8 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should fail gracefully if there is no event field", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
             // we fetch event 0, then 2, then 3, and finally 1. 1 is returned
             // with context which joins them all up.
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/event1")
@@ -480,8 +482,8 @@ describe("MatrixClient event timelines", function() {
 
     describe("paginateEventTimeline", function() {
         it("should allow you to paginate backwards", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
                              encodeURIComponent(EVENTS[0].event_id))
@@ -498,7 +500,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .check(function(req) {
-                    var params = req.queryParams;
+                    let params = req.queryParams;
                     expect(params.dir).toEqual("b");
                     expect(params.from).toEqual("start_token0");
                     expect(params.limit).toEqual(30);
@@ -509,7 +511,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            var tl;
+            let tl;
             client.getEventTimeline(timelineSet, EVENTS[0].event_id
             ).then(function(tl0) {
                 tl = tl0;
@@ -531,8 +533,8 @@ describe("MatrixClient event timelines", function() {
 
 
         it("should allow you to paginate forwards", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
                              encodeURIComponent(EVENTS[0].event_id))
@@ -549,7 +551,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .check(function(req) {
-                    var params = req.queryParams;
+                    let params = req.queryParams;
                     expect(params.dir).toEqual("f");
                     expect(params.from).toEqual("end_token0");
                     expect(params.limit).toEqual(20);
@@ -560,7 +562,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            var tl;
+            let tl;
             client.getEventTimeline(timelineSet, EVENTS[0].event_id
             ).then(function(tl0) {
                 tl = tl0;
@@ -583,8 +585,8 @@ describe("MatrixClient event timelines", function() {
     });
 
     describe("event timeline for sent events", function() {
-        var TXN_ID = "txn1";
-        var event = utils.mkMessage({
+        let TXN_ID = "txn1";
+        let event = utils.mkMessage({
             room: roomId, user: userId, msg: "a body",
         });
         event.unsigned = {transaction_id: TXN_ID};
@@ -603,7 +605,7 @@ describe("MatrixClient event timelines", function() {
                         "!foo:bar": {
                             timeline: {
                                 events: [
-                                    event
+                                    event,
                                 ],
                                 prev_batch: "f_1_1",
                             },
@@ -614,8 +616,8 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should work when /send returns before /sync", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
 
             client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
                 expect(res.event_id).toEqual(event.event_id);
@@ -638,8 +640,8 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should work when /send returns after /sync", function(done) {
-            var room = client.getRoom(roomId);
-            var timelineSet = room.getTimelineSets()[0];
+            let room = client.getRoom(roomId);
+            let timelineSet = room.getTimelineSets()[0];
 
             // initiate the send, and set up checks to be done when it completes
             // - but note that it won't complete until after the /sync does, below.
@@ -671,18 +673,18 @@ describe("MatrixClient event timelines", function() {
         // https://github.com/vector-im/vector-web/issues/1389
 
         // a state event, followed by a redaction thereof
-        var event = utils.mkMembership({
-            room: roomId, mship: "join", user: otherUserId
+        let event = utils.mkMembership({
+            room: roomId, mship: "join", user: otherUserId,
         });
-        var redaction = utils.mkEvent({
+        let redaction = utils.mkEvent({
             type: "m.room.redaction",
             room_id: roomId,
             sender: otherUserId,
-            content: {}
+            content: {},
         });
         redaction.redacts = event.event_id;
 
-        var syncData = {
+        let syncData = {
             next_batch: "batch1",
             rooms: {
                 join: {},
@@ -700,12 +702,12 @@ describe("MatrixClient event timelines", function() {
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
         httpBackend.flush().then(function() {
-            var room = client.getRoom(roomId);
-            var tl = room.getLiveTimeline();
+            let room = client.getRoom(roomId);
+            let tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(3);
             expect(tl.getEvents()[1].isRedacted()).toBe(true);
 
-            var sync2 = {
+            let sync2 = {
                 next_batch: "batch2",
                 rooms: {
                     join: {},
@@ -715,7 +717,7 @@ describe("MatrixClient event timelines", function() {
                 timeline: {
                     events: [
                         utils.mkMessage({
-                            room: roomId, user: otherUserId, msg: "world"
+                            room: roomId, user: otherUserId, msg: "world",
                         }),
                     ],
                     limited: true,
@@ -726,8 +728,8 @@ describe("MatrixClient event timelines", function() {
 
             return httpBackend.flush();
         }).then(function() {
-            var room = client.getRoom(roomId);
-            var tl = room.getLiveTimeline();
+            let room = client.getRoom(roomId);
+            let tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(1);
         }).catch(utils.failTest).done(done);
     });

@@ -20,13 +20,13 @@ limitations under the License.
  *
  * @module crypto/OlmDevice
  */
-var Olm = require("olm");
-var utils = require("../utils");
+let Olm = require("olm");
+let utils = require("../utils");
 
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
-var MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
+let MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
 
 function checkPayloadLength(payloadString) {
     if (payloadString === undefined) {
@@ -66,8 +66,8 @@ function OlmDevice(sessionStore) {
     this._sessionStore = sessionStore;
     this._pickleKey = "DEFAULT_KEY";
 
-    var e2eKeys;
-    var account = new Olm.Account();
+    let e2eKeys;
+    let account = new Olm.Account();
     try {
         _initialise_account(this._sessionStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
@@ -96,14 +96,14 @@ function OlmDevice(sessionStore) {
 }
 
 function _initialise_account(sessionStore, pickleKey, account) {
-    var e2eAccount = sessionStore.getEndToEndAccount();
+    let e2eAccount = sessionStore.getEndToEndAccount();
     if (e2eAccount !== null) {
         account.unpickle(pickleKey, e2eAccount);
         return;
     }
 
     account.create();
-    var pickled = account.pickle(pickleKey);
+    let pickled = account.pickle(pickleKey);
     sessionStore.storeEndToEndAccount(pickled);
 }
 
@@ -123,9 +123,9 @@ OlmDevice.getOlmVersion = function() {
  * @private
  */
 OlmDevice.prototype._getAccount = function(func) {
-    var account = new Olm.Account();
+    let account = new Olm.Account();
     try {
-        var pickledAccount = this._sessionStore.getEndToEndAccount();
+        let pickledAccount = this._sessionStore.getEndToEndAccount();
         account.unpickle(this._pickleKey, pickledAccount);
         return func(account);
     } finally {
@@ -141,7 +141,7 @@ OlmDevice.prototype._getAccount = function(func) {
  * @private
  */
 OlmDevice.prototype._saveAccount = function(account) {
-    var pickledAccount = account.pickle(this._pickleKey);
+    let pickledAccount = account.pickle(this._pickleKey);
     this._sessionStore.storeEndToEndAccount(pickledAccount);
 };
 
@@ -156,10 +156,10 @@ OlmDevice.prototype._saveAccount = function(account) {
  * @private
  */
 OlmDevice.prototype._getSession = function(deviceKey, sessionId, func) {
-    var sessions = this._sessionStore.getEndToEndSessions(deviceKey);
-    var pickledSession = sessions[sessionId];
+    let sessions = this._sessionStore.getEndToEndSessions(deviceKey);
+    let pickledSession = sessions[sessionId];
 
-    var session = new Olm.Session();
+    let session = new Olm.Session();
     try {
         session.unpickle(this._pickleKey, pickledSession);
         return func(session);
@@ -177,7 +177,7 @@ OlmDevice.prototype._getSession = function(deviceKey, sessionId, func) {
  * @private
  */
 OlmDevice.prototype._saveSession = function(deviceKey, session) {
-    var pickledSession = session.pickle(this._pickleKey);
+    let pickledSession = session.pickle(this._pickleKey);
     this._sessionStore.storeEndToEndSession(
         deviceKey, session.session_id(), pickledSession
     );
@@ -192,7 +192,7 @@ OlmDevice.prototype._saveSession = function(deviceKey, session) {
  * @private
  */
 OlmDevice.prototype._getUtility = function(func) {
-    var utility = new Olm.Utility();
+    let utility = new Olm.Utility();
     try {
         return func(utility);
     } finally {
@@ -242,7 +242,7 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
  * Marks all of the one-time keys as published.
  */
 OlmDevice.prototype.markKeysAsPublished = function() {
-    var self = this;
+    let self = this;
     this._getAccount(function(account) {
         account.mark_keys_as_published();
         self._saveAccount(account);
@@ -255,7 +255,7 @@ OlmDevice.prototype.markKeysAsPublished = function() {
  * @param {number} numKeys number of keys to generate
  */
 OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
-    var self = this;
+    let self = this;
     this._getAccount(function(account) {
         account.generate_one_time_keys(numKeys);
         self._saveAccount(account);
@@ -274,9 +274,9 @@ OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
 OlmDevice.prototype.createOutboundSession = function(
     theirIdentityKey, theirOneTimeKey
 ) {
-    var self = this;
+    let self = this;
     return this._getAccount(function(account) {
-        var session = new Olm.Session();
+        let session = new Olm.Session();
         try {
             session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
             self._saveSession(theirIdentityKey, session);
@@ -308,15 +308,15 @@ OlmDevice.prototype.createInboundSession = function(
         throw new Error("Need message_type == 0 to create inbound session");
     }
 
-    var self = this;
+    let self = this;
     return this._getAccount(function(account) {
-        var session = new Olm.Session();
+        let session = new Olm.Session();
         try {
             session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
             account.remove_one_time_keys(session);
             self._saveAccount(account);
 
-            var payloadString = session.decrypt(message_type, ciphertext);
+            let payloadString = session.decrypt(message_type, ciphertext);
 
             self._saveSession(theirDeviceIdentityKey, session);
 
@@ -339,7 +339,7 @@ OlmDevice.prototype.createInboundSession = function(
  * @return {string[]}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
-    var sessions = this._sessionStore.getEndToEndSessions(
+    let sessions = this._sessionStore.getEndToEndSessions(
         theirDeviceIdentityKey
     );
     return utils.keys(sessions);
@@ -353,7 +353,7 @@ OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
  * @return {string?}  session id, or null if no established session
  */
 OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
-    var sessionIds = this.getSessionIdsForDevice(theirDeviceIdentityKey);
+    let sessionIds = this.getSessionIdsForDevice(theirDeviceIdentityKey);
     if (sessionIds.length === 0) {
         return null;
     }
@@ -374,20 +374,20 @@ OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
 OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
-    var sessionIds = this.getSessionIdsForDevice(deviceIdentityKey);
+    let sessionIds = this.getSessionIdsForDevice(deviceIdentityKey);
     sessionIds.sort();
 
-    var info = [];
+    let info = [];
 
     function getSessionInfo(session) {
         return {
-            hasReceivedMessage: session.has_received_message()
+            hasReceivedMessage: session.has_received_message(),
         };
     }
 
-    for (var i = 0; i < sessionIds.length; i++) {
-        var sessionId = sessionIds[i];
-        var res = this._getSession(deviceIdentityKey, sessionId, getSessionInfo);
+    for (let i = 0; i < sessionIds.length; i++) {
+        let sessionId = sessionIds[i];
+        let res = this._getSession(deviceIdentityKey, sessionId, getSessionInfo);
         res.sessionId = sessionId;
         info.push(res);
     }
@@ -407,12 +407,12 @@ OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
 OlmDevice.prototype.encryptMessage = function(
     theirDeviceIdentityKey, sessionId, payloadString
 ) {
-    var self = this;
+    let self = this;
 
     checkPayloadLength(payloadString);
 
     return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
-        var res = session.encrypt(payloadString);
+        let res = session.encrypt(payloadString);
         self._saveSession(theirDeviceIdentityKey, session);
         return res;
     });
@@ -432,10 +432,10 @@ OlmDevice.prototype.encryptMessage = function(
 OlmDevice.prototype.decryptMessage = function(
     theirDeviceIdentityKey, sessionId, message_type, ciphertext
 ) {
-    var self = this;
+    let self = this;
 
     return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
-        var payloadString = session.decrypt(message_type, ciphertext);
+        let payloadString = session.decrypt(message_type, ciphertext);
         self._saveSession(theirDeviceIdentityKey, session);
 
         return payloadString;
@@ -477,7 +477,7 @@ OlmDevice.prototype.matchesSession = function(
  * @private
  */
 OlmDevice.prototype._saveOutboundGroupSession = function(session) {
-    var pickledSession = session.pickle(this._pickleKey);
+    let pickledSession = session.pickle(this._pickleKey);
     this._outboundGroupSessionStore[session.session_id()] = pickledSession;
 };
 
@@ -492,12 +492,12 @@ OlmDevice.prototype._saveOutboundGroupSession = function(session) {
  * @private
  */
 OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
-    var pickled = this._outboundGroupSessionStore[sessionId];
+    let pickled = this._outboundGroupSessionStore[sessionId];
     if (pickled === null) {
         throw new Error("Unknown outbound group session " + sessionId);
     }
 
-    var session = new Olm.OutboundGroupSession();
+    let session = new Olm.OutboundGroupSession();
     try {
         session.unpickle(this._pickleKey, pickled);
         return func(session);
@@ -513,7 +513,7 @@ OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
  * @return {string} sessionId for the outbound session.
  */
 OlmDevice.prototype.createOutboundGroupSession = function() {
-    var session = new Olm.OutboundGroupSession();
+    let session = new Olm.OutboundGroupSession();
     try {
         session.create();
         this._saveOutboundGroupSession(session);
@@ -533,12 +533,12 @@ OlmDevice.prototype.createOutboundGroupSession = function() {
  * @return {string} ciphertext
  */
 OlmDevice.prototype.encryptGroupMessage = function(sessionId, payloadString) {
-    var self = this;
+    let self = this;
 
     checkPayloadLength(payloadString);
 
     return this._getOutboundGroupSession(sessionId, function(session) {
-        var res = session.encrypt(payloadString);
+        let res = session.encrypt(payloadString);
         self._saveOutboundGroupSession(session);
         return res;
     });
@@ -578,7 +578,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
 OlmDevice.prototype._saveInboundGroupSession = function(
     roomId, senderCurve25519Key, sessionId, session, keysClaimed
 ) {
-    var r = {
+    let r = {
         room_id: roomId,
         session: session.pickle(this._pickleKey),
         keysClaimed: keysClaimed,
@@ -608,7 +608,7 @@ OlmDevice.prototype._saveInboundGroupSession = function(
 OlmDevice.prototype._getInboundGroupSession = function(
     roomId, senderKey, sessionId, func
 ) {
-    var r = this._sessionStore.getEndToEndInboundGroupSession(
+    let r = this._sessionStore.getEndToEndInboundGroupSession(
         senderKey, sessionId
     );
 
@@ -627,7 +627,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
         );
     }
 
-    var session = new Olm.InboundGroupSession();
+    let session = new Olm.InboundGroupSession();
     try {
         session.unpickle(this._pickleKey, r.session);
         return func(session, r.keysClaimed || {});
@@ -648,7 +648,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
 OlmDevice.prototype.addInboundGroupSession = function(
     roomId, senderKey, sessionId, sessionKey, keysClaimed
 ) {
-    var self = this;
+    let self = this;
 
     /* if we already have this session, consider updating it */
     function updateSession(session) {
@@ -658,7 +658,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
         return true;
     }
 
-    var r = this._getInboundGroupSession(
+    let r = this._getInboundGroupSession(
         roomId, senderKey, sessionId, updateSession
     );
 
@@ -667,7 +667,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
     }
 
     // new session.
-    var session = new Olm.InboundGroupSession();
+    let session = new Olm.InboundGroupSession();
     try {
         session.create(sessionKey);
         if (sessionId != session.session_id()) {
@@ -699,18 +699,18 @@ OlmDevice.prototype.addInboundGroupSession = function(
 OlmDevice.prototype.decryptGroupMessage = function(
     roomId, senderKey, sessionId, body
 ) {
-    var self = this;
+    let self = this;
 
     function decrypt(session, keysClaimed) {
-        var res = session.decrypt(body);
+        let res = session.decrypt(body);
 
-        var plaintext = res.plaintext;
+        let plaintext = res.plaintext;
         if (plaintext === undefined) {
             // Compatibility for older olm versions.
             plaintext = res;
         } else {
             // Check if we have seen this message index before to detect replay attacks.
-            var messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
+            let messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
             if (messageIndexKey in self._inboundGroupSessionMessageIndexes) {
                 throw new Error(
                     "Duplicate message index, possible replay attack: " +
@@ -722,7 +722,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
 
         // the sender must have had the senderKey to persuade us to save the
         // session.
-        var keysProved = {curve25519: senderKey};
+        let keysProved = {curve25519: senderKey};
 
         self._saveInboundGroupSession(
             roomId, senderKey, sessionId, session, keysClaimed

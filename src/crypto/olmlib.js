@@ -20,10 +20,10 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-var q = require('q');
-var anotherjson = require('another-json');
+let q = require('q');
+let anotherjson = require('another-json');
 
-var utils = require("../utils");
+let utils = require("../utils");
 
 /**
  * matrix algorithm tag for olm
@@ -54,8 +54,8 @@ module.exports.encryptMessageForDevice = function(
     ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
     payloadFields
 ) {
-    var deviceKey = recipientDevice.getIdentityKey();
-    var sessionId = olmDevice.getSessionIdForDevice(deviceKey);
+    let deviceKey = recipientDevice.getIdentityKey();
+    let sessionId = olmDevice.getSessionIdForDevice(deviceKey);
     if (sessionId === null) {
         // If we don't have a session for a device then
         // we can't encrypt a message for it.
@@ -67,7 +67,7 @@ module.exports.encryptMessageForDevice = function(
             recipientUserId + ":" + recipientDevice.deviceId
     );
 
-    var payload = {
+    let payload = {
         sender: ourUserId,
         sender_device: ourDeviceId,
 
@@ -121,20 +121,22 @@ module.exports.encryptMessageForDevice = function(
 module.exports.ensureOlmSessionsForDevices = function(
     olmDevice, baseApis, devicesByUser
 ) {
-    var devicesWithoutSession = [
+    let devicesWithoutSession = [
         // [userId, deviceId], ...
     ];
-    var result = {};
+    let result = {};
 
-    for (var userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) { continue; }
+    for (let userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
         result[userId] = {};
-        var devices = devicesByUser[userId];
-        for (var j = 0; j < devices.length; j++) {
-            var deviceInfo = devices[j];
-            var deviceId = deviceInfo.deviceId;
-            var key = deviceInfo.getIdentityKey();
-            var sessionId = olmDevice.getSessionIdForDevice(key);
+        let devices = devicesByUser[userId];
+        for (let j = 0; j < devices.length; j++) {
+            let deviceInfo = devices[j];
+            let deviceId = deviceInfo.deviceId;
+            let key = deviceInfo.getIdentityKey();
+            let sessionId = olmDevice.getSessionIdForDevice(key);
             if (sessionId === null) {
                 devicesWithoutSession.push([userId, deviceId]);
             }
@@ -155,26 +157,28 @@ module.exports.ensureOlmSessionsForDevices = function(
     //
     // That should eventually resolve itself, but it's poor form.
 
-    var oneTimeKeyAlgorithm = "signed_curve25519";
+    let oneTimeKeyAlgorithm = "signed_curve25519";
     return baseApis.claimOneTimeKeys(
         devicesWithoutSession, oneTimeKeyAlgorithm
     ).then(function(res) {
-        var otk_res = res.one_time_keys || {};
-        for (var userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) { continue; }
-            var userRes = otk_res[userId] || {};
-            var devices = devicesByUser[userId];
-            for (var j = 0; j < devices.length; j++) {
-                var deviceInfo = devices[j];
-                var deviceId = deviceInfo.deviceId;
+        let otk_res = res.one_time_keys || {};
+        for (let userId in devicesByUser) {
+            if (!devicesByUser.hasOwnProperty(userId)) {
+                continue;
+            }
+            let userRes = otk_res[userId] || {};
+            let devices = devicesByUser[userId];
+            for (let j = 0; j < devices.length; j++) {
+                let deviceInfo = devices[j];
+                let deviceId = deviceInfo.deviceId;
                 if (result[userId][deviceId].sessionId) {
                     // we already have a result for this device
                     continue;
                 }
 
-                var deviceRes = userRes[deviceId] || {};
-                var oneTimeKey = null;
-                for (var keyId in deviceRes) {
+                let deviceRes = userRes[deviceId] || {};
+                let oneTimeKey = null;
+                for (let keyId in deviceRes) {
                     if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
                         oneTimeKey = deviceRes[keyId];
                     }
@@ -188,7 +192,7 @@ module.exports.ensureOlmSessionsForDevices = function(
                     continue;
                 }
 
-                var sid = _verifyKeyAndStartSession(
+                let sid = _verifyKeyAndStartSession(
                     olmDevice, oneTimeKey, userId, deviceInfo
                 );
                 result[userId][deviceId].sessionId = sid;
@@ -200,7 +204,7 @@ module.exports.ensureOlmSessionsForDevices = function(
 
 
 function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
-    var deviceId = deviceInfo.deviceId;
+    let deviceId = deviceInfo.deviceId;
     try {
         _verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
@@ -214,7 +218,7 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
         return null;
     }
 
-    var sid;
+    let sid;
     try {
         sid = olmDevice.createOutboundSession(
             deviceInfo.getIdentityKey(), oneTimeKey.key
@@ -246,13 +250,13 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
  *
  * @param {string} signingKey   base64-ed ed25519 public key
  */
-var _verifySignature = module.exports.verifySignature = function(
+let _verifySignature = module.exports.verifySignature = function(
     olmDevice, obj, signingUserId, signingDeviceId, signingKey
 ) {
-    var signKeyId = "ed25519:" + signingDeviceId;
-    var signatures = obj.signatures || {};
-    var userSigs = signatures[signingUserId] || {};
-    var signature = userSigs[signKeyId];
+    let signKeyId = "ed25519:" + signingDeviceId;
+    let signatures = obj.signatures || {};
+    let userSigs = signatures[signingUserId] || {};
+    let signature = userSigs[signKeyId];
     if (!signature) {
         throw Error("No signature");
     }
@@ -261,7 +265,7 @@ var _verifySignature = module.exports.verifySignature = function(
     // anotherjson
     delete obj.unsigned;
     delete obj.signatures;
-    var json = anotherjson.stringify(obj);
+    let json = anotherjson.stringify(obj);
 
     olmDevice.verifySignature(
         signingKey, json, signature

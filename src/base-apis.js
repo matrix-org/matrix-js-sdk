@@ -22,8 +22,8 @@ limitations under the License.
  * @module base-apis
  */
 
-var httpApi = require("./http-api");
-var utils = require("./utils");
+let httpApi = require("./http-api");
+let utils = require("./utils");
 
 /**
  * Low-level wrappers for the Matrix APIs
@@ -60,7 +60,7 @@ function MatrixBaseApis(opts) {
     this.baseUrl = opts.baseUrl;
     this.idBaseUrl = opts.idBaseUrl;
 
-    var httpOpts = {
+    let httpOpts = {
         baseUrl: opts.baseUrl,
         idBaseUrl: opts.idBaseUrl,
         accessToken: opts.accessToken,
@@ -68,7 +68,7 @@ function MatrixBaseApis(opts) {
         prefix: httpApi.PREFIX_R0,
         onlyData: true,
         extraParams: opts.queryParams,
-        localTimeoutMs: opts.localTimeoutMs
+        localTimeoutMs: opts.localTimeoutMs,
     };
     this._http = new httpApi.MatrixHttpApi(this, httpOpts);
 
@@ -135,15 +135,25 @@ MatrixBaseApis.prototype.register = function(
     sessionId, auth, bindEmail, guestAccessToken,
     callback
 ) {
-    if (auth === undefined) { auth = {}; }
-    if (sessionId) { auth.session = sessionId; }
+    if (auth === undefined) {
+        auth = {};
+    }
+    if (sessionId) {
+        auth.session = sessionId;
+    }
 
-    var params = {
-        auth: auth
+    let params = {
+        auth: auth,
     };
-    if (username !== undefined && username !== null) { params.username = username; }
-    if (password !== undefined && password !== null) { params.password = password; }
-    if (bindEmail !== undefined && bindEmail !== null) { params.bind_email = bindEmail; }
+    if (username !== undefined && username !== null) {
+        params.username = username;
+    }
+    if (password !== undefined && password !== null) {
+        params.password = password;
+    }
+    if (bindEmail !== undefined && bindEmail !== null) {
+        params.bind_email = bindEmail;
+    }
     if (guestAccessToken !== undefined && guestAccessToken !== null) {
         params.guest_access_token = guestAccessToken;
     }
@@ -173,8 +183,10 @@ MatrixBaseApis.prototype.registerGuest = function(opts, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.registerRequest = function(data, kind, callback) {
-    var params = {};
-    if (kind) { params.kind = kind; }
+    let params = {};
+    if (kind) {
+        params.kind = kind;
+    }
 
     return this._http.request(
         callback, "POST", "/register", params, data
@@ -198,7 +210,7 @@ MatrixBaseApis.prototype.loginFlows = function(callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.login = function(loginType, data, callback) {
-    var login_data = {
+    let login_data = {
         type: loginType,
     };
 
@@ -220,7 +232,7 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
 MatrixBaseApis.prototype.loginWithPassword = function(user, password, callback) {
     return this.login("m.login.password", {
         user: user,
-        password: password
+        password: password,
     }, callback);
 };
 
@@ -232,7 +244,7 @@ MatrixBaseApis.prototype.loginWithPassword = function(user, password, callback) 
  */
 MatrixBaseApis.prototype.loginWithSAML2 = function(relayState, callback) {
     return this.login("m.login.saml2", {
-        relay_state: relayState
+        relay_state: relayState,
     }, callback);
 };
 
@@ -243,7 +255,7 @@ MatrixBaseApis.prototype.loginWithSAML2 = function(relayState, callback) {
  */
 MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
     return this._http.getUrl("/login/cas/redirect", {
-        "redirectUrl": redirectUrl
+        "redirectUrl": redirectUrl,
     }, httpApi.PREFIX_UNSTABLE);
 };
 
@@ -255,7 +267,7 @@ MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
  */
 MatrixBaseApis.prototype.loginWithToken = function(token, callback) {
     return this.login("m.login.token", {
-        token: token
+        token: token,
     }, callback);
 };
 
@@ -286,7 +298,7 @@ MatrixBaseApis.prototype.logout = function(callback) {
  * @return {module:client.Promise} Resolves: On success, the empty object
  */
 MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
-    var body = {};
+    let body = {};
     if (auth) {
         body = {
             auth: auth,
@@ -306,7 +318,7 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
  * @return {string} HS URL to hit to for the fallback interface
  */
 MatrixBaseApis.prototype.getFallbackAuthUrl = function(loginType, authSessionId) {
-    var path = utils.encodeUri("/auth/$loginType/fallback/web", {
+    let path = utils.encodeUri("/auth/$loginType/fallback/web", {
         $loginType: loginType,
     });
 
@@ -346,7 +358,7 @@ MatrixBaseApis.prototype.createRoom = function(options, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.roomState = function(roomId, callback) {
-    var path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
+    let path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
     return this._http.authedRequest(callback, "GET", path);
 };
 
@@ -360,12 +372,12 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getStateEvent = function(roomId, eventType, stateKey, callback) {
-    var pathParams = {
+    let pathParams = {
         $roomId: roomId,
         $eventType: eventType,
-        $stateKey: stateKey
+        $stateKey: stateKey,
     };
-    var path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+    let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
     if (stateKey !== undefined) {
         path = utils.encodeUri(path + "/$stateKey", pathParams);
     }
@@ -385,12 +397,12 @@ MatrixBaseApis.prototype.getStateEvent = function(roomId, eventType, stateKey, c
  */
 MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, stateKey,
                                                  callback) {
-    var pathParams = {
+    let pathParams = {
         $roomId: roomId,
         $eventType: eventType,
-        $stateKey: stateKey
+        $stateKey: stateKey,
     };
-    var path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+    let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
     if (stateKey !== undefined) {
         path = utils.encodeUri(path + "/$stateKey", pathParams);
     }
@@ -407,9 +419,9 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.redactEvent = function(roomId, eventId, callback) {
-    var path = utils.encodeUri("/rooms/$roomId/redact/$eventId", {
+    let path = utils.encodeUri("/rooms/$roomId/redact/$eventId", {
         $roomId: roomId,
-        $eventId: eventId
+        $eventId: eventId,
     });
     return this._http.authedRequest(callback, "POST", path, undefined, {});
 };
@@ -422,8 +434,10 @@ MatrixBaseApis.prototype.redactEvent = function(roomId, eventId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
-    if (utils.isFunction(limit)) { callback = limit; limit = undefined; }
-    var path = utils.encodeUri("/rooms/$roomId/initialSync",
+    if (utils.isFunction(limit)) {
+        callback = limit; limit = undefined;
+    }
+    let path = utils.encodeUri("/rooms/$roomId/initialSync",
         {$roomId: roomId}
     );
     if (!limit) {
@@ -460,7 +474,7 @@ MatrixBaseApis.prototype.publicRooms = function(options, callback) {
         options = {};
     }
 
-    var query_params = {};
+    let query_params = {};
     if (options.server) {
         query_params.server = options.server;
         delete options.server;
@@ -484,11 +498,11 @@ MatrixBaseApis.prototype.publicRooms = function(options, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.createAlias = function(alias, roomId, callback) {
-    var path = utils.encodeUri("/directory/room/$alias", {
-        $alias: alias
+    let path = utils.encodeUri("/directory/room/$alias", {
+        $alias: alias,
     });
-    var data = {
-        room_id: roomId
+    let data = {
+        room_id: roomId,
     };
     return this._http.authedRequest(
         callback, "PUT", path, undefined, data
@@ -504,8 +518,8 @@ MatrixBaseApis.prototype.createAlias = function(alias, roomId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.deleteAlias = function(alias, callback) {
-    var path = utils.encodeUri("/directory/room/$alias", {
-        $alias: alias
+    let path = utils.encodeUri("/directory/room/$alias", {
+        $alias: alias,
     });
     return this._http.authedRequest(
         callback, "DELETE", path, undefined, undefined
@@ -521,8 +535,8 @@ MatrixBaseApis.prototype.deleteAlias = function(alias, callback) {
  */
 MatrixBaseApis.prototype.getRoomIdForAlias = function(alias, callback) {
     // TODO: deprecate this or resolveRoomAlias
-    var path = utils.encodeUri("/directory/room/$alias", {
-        $alias: alias
+    let path = utils.encodeUri("/directory/room/$alias", {
+        $alias: alias,
     });
     return this._http.authedRequest(
         callback, "GET", path
@@ -537,7 +551,7 @@ MatrixBaseApis.prototype.getRoomIdForAlias = function(alias, callback) {
  */
 MatrixBaseApis.prototype.resolveRoomAlias = function(roomAlias, callback) {
     // TODO: deprecate this or getRoomIdForAlias
-    var path = utils.encodeUri("/directory/room/$alias", {$alias: roomAlias});
+    let path = utils.encodeUri("/directory/room/$alias", {$alias: roomAlias});
     return this._http.request(callback, "GET", path);
 };
 
@@ -550,8 +564,8 @@ MatrixBaseApis.prototype.resolveRoomAlias = function(roomAlias, callback) {
  */
 MatrixBaseApis.prototype.getRoomDirectoryVisibility =
                                 function(roomId, callback) {
-    var path = utils.encodeUri("/directory/list/room/$roomId", {
-        $roomId: roomId
+    let path = utils.encodeUri("/directory/list/room/$roomId", {
+        $roomId: roomId,
     });
     return this._http.authedRequest(callback, "GET", path);
 };
@@ -568,8 +582,8 @@ MatrixBaseApis.prototype.getRoomDirectoryVisibility =
  */
 MatrixBaseApis.prototype.setRoomDirectoryVisibility =
                                 function(roomId, visibility, callback) {
-    var path = utils.encodeUri("/directory/list/room/$roomId", {
-        $roomId: roomId
+    let path = utils.encodeUri("/directory/list/room/$roomId", {
+        $roomId: roomId,
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, { "visibility": visibility }
@@ -591,9 +605,9 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibility =
  */
 MatrixBaseApis.prototype.setRoomDirectoryVisibilityAppService =
                                 function(networkId, roomId, visibility, callback) {
-    var path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
+    let path = utils.encodeUri("/directory/list/appservice/$networkId/$roomId", {
         $networkId: networkId,
-        $roomId: roomId
+        $roomId: roomId,
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, { "visibility": visibility }
@@ -674,9 +688,11 @@ MatrixBaseApis.prototype.getCurrentUploads = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getProfileInfo = function(userId, info, callback) {
-    if (utils.isFunction(info)) { callback = info; info = undefined; }
+    if (utils.isFunction(info)) {
+        callback = info; info = undefined;
+    }
 
-    var path = info ?
+    let path = info ?
     utils.encodeUri("/profile/$userId/$info",
              { $userId: userId, $info: info }) :
     utils.encodeUri("/profile/$userId",
@@ -694,7 +710,7 @@ MatrixBaseApis.prototype.getProfileInfo = function(userId, info, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getThreePids = function(callback) {
-    var path = "/account/3pid";
+    let path = "/account/3pid";
     return this._http.authedRequest(
         callback, "GET", path, undefined, undefined
     );
@@ -708,10 +724,10 @@ MatrixBaseApis.prototype.getThreePids = function(callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
-    var path = "/account/3pid";
-    var data = {
+    let path = "/account/3pid";
+    let data = {
         'threePidCreds': creds,
-        'bind': bind
+        'bind': bind,
     };
     return this._http.authedRequest(
         callback, "POST", path, null, data
@@ -727,10 +743,10 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.deleteThreePid = function(medium, address) {
-    var path = "/account/3pid/delete";
-    var data = {
+    let path = "/account/3pid/delete";
+    let data = {
         'medium': medium,
-        'address': address
+        'address': address,
     };
     return this._http.authedRequestWithPrefix(
         undefined, "POST", path, null, data, httpApi.PREFIX_UNSTABLE
@@ -746,10 +762,10 @@ MatrixBaseApis.prototype.deleteThreePid = function(medium, address) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback) {
-    var path = "/account/password";
-    var data = {
+    let path = "/account/password";
+    let data = {
         'auth': authDict,
-        'new_password': newPassword
+        'new_password': newPassword,
     };
 
     return this._http.authedRequest(
@@ -767,7 +783,7 @@ MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getDevices = function() {
-    var path = "/devices";
+    let path = "/devices";
     return this._http.authedRequestWithPrefix(
         undefined, "GET", path, undefined, undefined,
         httpApi.PREFIX_UNSTABLE
@@ -783,7 +799,7 @@ MatrixBaseApis.prototype.getDevices = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
-    var path = utils.encodeUri("/devices/$device_id", {
+    let path = utils.encodeUri("/devices/$device_id", {
         $device_id: device_id,
     });
 
@@ -803,11 +819,11 @@ MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
-    var path = utils.encodeUri("/devices/$device_id", {
+    let path = utils.encodeUri("/devices/$device_id", {
         $device_id: device_id,
     });
 
-    var body = {};
+    let body = {};
 
     if (auth) {
         body.auth = auth;
@@ -831,7 +847,7 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getPushers = function(callback) {
-    var path = "/pushers";
+    let path = "/pushers";
     return this._http.authedRequest(
         callback, "GET", path, undefined, undefined
     );
@@ -846,7 +862,7 @@ MatrixBaseApis.prototype.getPushers = function(callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setPusher = function(pusher, callback) {
-    var path = "/pushers/set";
+    let path = "/pushers/set";
     return this._http.authedRequest(
         callback, "POST", path, null, pusher
     );
@@ -872,9 +888,9 @@ MatrixBaseApis.prototype.getPushRules = function(callback) {
  */
 MatrixBaseApis.prototype.addPushRule = function(scope, kind, ruleId, body, callback) {
     // NB. Scope not uri encoded because devices need the '/'
-    var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+    let path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
         $kind: kind,
-        $ruleId: ruleId
+        $ruleId: ruleId,
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, body
@@ -891,9 +907,9 @@ MatrixBaseApis.prototype.addPushRule = function(scope, kind, ruleId, body, callb
  */
 MatrixBaseApis.prototype.deletePushRule = function(scope, kind, ruleId, callback) {
     // NB. Scope not uri encoded because devices need the '/'
-    var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
+    let path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId", {
         $kind: kind,
-        $ruleId: ruleId
+        $ruleId: ruleId,
     });
     return this._http.authedRequest(callback, "DELETE", path);
 };
@@ -910,9 +926,9 @@ MatrixBaseApis.prototype.deletePushRule = function(scope, kind, ruleId, callback
  */
 MatrixBaseApis.prototype.setPushRuleEnabled = function(scope, kind,
                                                      ruleId, enabled, callback) {
-    var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
+    let path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/enabled", {
         $kind: kind,
-        $ruleId: ruleId
+        $ruleId: ruleId,
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, {"enabled": enabled}
@@ -931,9 +947,9 @@ MatrixBaseApis.prototype.setPushRuleEnabled = function(scope, kind,
  */
 MatrixBaseApis.prototype.setPushRuleActions = function(scope, kind,
                                                      ruleId, actions, callback) {
-    var path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
+    let path = utils.encodeUri("/pushrules/" + scope + "/$kind/$ruleId/actions", {
         $kind: kind,
-        $ruleId: ruleId
+        $ruleId: ruleId,
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, {"actions": actions}
@@ -954,7 +970,7 @@ MatrixBaseApis.prototype.setPushRuleActions = function(scope, kind,
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.search = function(opts, callback) {
-    var queryparams = {};
+    let queryparams = {};
     if (opts.next_batch) {
         queryparams.next_batch = opts.next_batch;
     }
@@ -983,8 +999,8 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
  */
 MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     opts = opts || {};
-    var deviceId = opts.device_id;
-    var path;
+    let deviceId = opts.device_id;
+    let path;
     if (deviceId) {
         path = utils.encodeUri("/keys/upload/$deviceId", {
             $deviceId: deviceId,
@@ -1008,12 +1024,12 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
  *     an error response ({@link module:http-api.MatrixError}).
  */
 MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, callback) {
-    var downloadQuery = {};
+    let downloadQuery = {};
 
-    for (var i = 0; i < userIds.length; ++i) {
+    for (let i = 0; i < userIds.length; ++i) {
         downloadQuery[userIds[i]] = {};
     }
-    var content = {device_keys: downloadQuery};
+    let content = {device_keys: downloadQuery};
     return this._http.authedRequestWithPrefix(
         callback, "POST", "/keys/query", undefined, content,
         httpApi.PREFIX_UNSTABLE
@@ -1031,20 +1047,20 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, callback) {
  *     an error response ({@link module:http-api.MatrixError}).
  */
 MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
-    var queries = {};
+    let queries = {};
 
     if (key_algorithm === undefined) {
         key_algorithm = "signed_curve25519";
     }
 
-    for (var i = 0; i < devices.length; ++i) {
-        var userId = devices[i][0];
-        var deviceId = devices[i][1];
-        var query = queries[userId] || {};
+    for (let i = 0; i < devices.length; ++i) {
+        let userId = devices[i][0];
+        let deviceId = devices[i][1];
+        let query = queries[userId] || {};
         queries[userId] = query;
         query[deviceId] = key_algorithm;
     }
-    var content = {one_time_keys: queries};
+    let content = {one_time_keys: queries};
     return this._http.authedRequestWithPrefix(
         undefined, "POST", "/keys/claim", undefined, content,
         httpApi.PREFIX_UNSTABLE
@@ -1077,11 +1093,11 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
  */
 MatrixBaseApis.prototype.requestEmailToken = function(email, clientSecret,
                                                     sendAttempt, nextLink, callback) {
-    var params = {
+    let params = {
         client_secret: clientSecret,
         email: email,
         send_attempt: sendAttempt,
-        next_link: nextLink
+        next_link: nextLink,
     };
     return this._http.idServerRequest(
         callback, "POST", "/validate/email/requestToken",
@@ -1101,7 +1117,7 @@ MatrixBaseApis.prototype.requestEmailToken = function(email, clientSecret,
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
-    var params = {
+    let params = {
         medium: medium,
         address: address,
     };
@@ -1128,12 +1144,12 @@ MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
 MatrixBaseApis.prototype.sendToDevice = function(
     eventType, contentMap, txnId
 ) {
-    var path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
+    let path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
         $eventType: eventType,
         $txnId: txnId ? txnId : this.makeTxnId(),
     });
 
-    var body = {
+    let body = {
         messages: contentMap,
     };
 
@@ -1167,8 +1183,8 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
  * @return {module:client.Promise} Resolves to the result object
  */
 MatrixBaseApis.prototype.getThirdpartyLocation = function(protocol, params) {
-    var path = utils.encodeUri("/thirdparty/location/$protocol", {
-        $protocol: protocol
+    let path = utils.encodeUri("/thirdparty/location/$protocol", {
+        $protocol: protocol,
     });
 
     return this._http.authedRequestWithPrefix(

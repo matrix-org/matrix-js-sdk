@@ -18,13 +18,13 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  * @module http-api
  */
-var q = require("q");
-var utils = require("./utils");
+let q = require("q");
+let utils = require("./utils");
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
 // waiting for the delay to elapse.
-var callbacks = require("./realtime-callbacks");
+let callbacks = require("./realtime-callbacks");
 
 /*
 TODO:
@@ -91,13 +91,13 @@ module.exports.MatrixHttpApi.prototype = {
      *          path and query parameters respectively.
      */
     getContentUri: function() {
-        var params = {
-            access_token: this.opts.accessToken
+        let params = {
+            access_token: this.opts.accessToken,
         };
         return {
             base: this.opts.baseUrl,
             path: "/_matrix/media/v1/upload",
-            params: params
+            params: params,
         };
     },
 
@@ -145,16 +145,16 @@ module.exports.MatrixHttpApi.prototype = {
 
         // if the file doesn't have a mime type, use a default since
         // the HS errors if we don't supply one.
-        var contentType = opts.type || file.type || 'application/octet-stream';
-        var fileName = opts.name || file.name;
+        let contentType = opts.type || file.type || 'application/octet-stream';
+        let fileName = opts.name || file.name;
 
         // we used to recommend setting file.stream to the thing to upload on
         // nodejs.
-        var body = file.stream ? file.stream : file;
+        let body = file.stream ? file.stream : file;
 
         // backwards-compatibility hacks where we used to do different things
         // between browser and node.
-        var rawResponse = opts.rawResponse;
+        let rawResponse = opts.rawResponse;
         if (rawResponse === undefined) {
             if (global.XMLHttpRequest) {
                 rawResponse = false;
@@ -169,7 +169,7 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        var onlyContentUri = opts.onlyContentUri;
+        let onlyContentUri = opts.onlyContentUri;
         if (!rawResponse && onlyContentUri === undefined) {
             if (global.XMLHttpRequest) {
                 console.warn(
@@ -192,17 +192,17 @@ module.exports.MatrixHttpApi.prototype = {
         // (browser-request doesn't support progress either, which is also kind
         // of important here)
 
-        var upload = { loaded: 0, total: 0 };
-        var promise;
+        let upload = { loaded: 0, total: 0 };
+        let promise;
 
         // XMLHttpRequest doesn't parse JSON for us. request normally does, but
         // we're setting opts.json=false so that it doesn't JSON-encode the
         // request, which also means it doesn't JSON-decode the response. Either
         // way, we have to JSON-parse the response ourselves.
-        var bodyParser = null;
+        let bodyParser = null;
         if (!rawResponse) {
             bodyParser = function(rawBody) {
-                var body = JSON.parse(rawBody);
+                let body = JSON.parse(rawBody);
                 if (onlyContentUri) {
                     body = body.content_uri;
                     if (body === undefined) {
@@ -214,12 +214,12 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         if (global.XMLHttpRequest) {
-            var defer = q.defer();
-            var xhr = new global.XMLHttpRequest();
+            let defer = q.defer();
+            let xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
-            var cb = requestCallback(defer, opts.callback, this.opts.onlyData);
+            let cb = requestCallback(defer, opts.callback, this.opts.onlyData);
 
-            var timeout_fn = function() {
+            let timeout_fn = function() {
                 xhr.abort();
                 cb(new Error('Timeout'));
             };
@@ -257,7 +257,7 @@ module.exports.MatrixHttpApi.prototype = {
                 xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
                 defer.notify(ev);
             });
-            var url = this.opts.baseUrl + "/_matrix/media/v1/upload";
+            let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
             url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
             url += "&filename=" + encodeURIComponent(fileName);
 
@@ -269,7 +269,7 @@ module.exports.MatrixHttpApi.prototype = {
             // dirty hack (as per _request) to allow the upload to be cancelled.
             promise.abort = xhr.abort.bind(xhr);
         } else {
-            var queryParams = {
+            let queryParams = {
                 filename: fileName,
             };
 
@@ -283,11 +283,11 @@ module.exports.MatrixHttpApi.prototype = {
             );
         }
 
-        var self = this;
+        let self = this;
 
         // remove the upload from the list on completion
-        var promise0 = promise.finally(function() {
-            for (var i = 0; i < self.uploads.length; ++i) {
+        let promise0 = promise.finally(function() {
+            for (let i = 0; i < self.uploads.length; ++i) {
                 if (self.uploads[i] === upload) {
                     self.uploads.splice(i, 1);
                     return;
@@ -317,7 +317,7 @@ module.exports.MatrixHttpApi.prototype = {
     },
 
     idServerRequest: function(callback, method, path, params, prefix) {
-        var fullUri = this.opts.idBaseUrl + prefix + path;
+        let fullUri = this.opts.idBaseUrl + prefix + path;
 
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
@@ -325,12 +325,12 @@ module.exports.MatrixHttpApi.prototype = {
             );
         }
 
-        var opts = {
+        let opts = {
             uri: fullUri,
             method: method,
             withCredentials: false,
             json: false,
-            _matrix_opts: this.opts
+            _matrix_opts: this.opts,
         };
         if (method == 'GET') {
             opts.qs = params;
@@ -338,7 +338,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts.form = params;
         }
 
-        var defer = q.defer();
+        let defer = q.defer();
         this.opts.request(
             opts,
             requestCallback(defer, callback, this.opts.onlyData)
@@ -389,11 +389,11 @@ module.exports.MatrixHttpApi.prototype = {
             queryParams.access_token = this.opts.accessToken;
         }
 
-        var request_promise = this.request(
+        let request_promise = this.request(
             callback, method, path, queryParams, data, opts
         );
 
-        var self = this;
+        let self = this;
         request_promise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
@@ -437,8 +437,8 @@ module.exports.MatrixHttpApi.prototype = {
      */
     request: function(callback, method, path, queryParams, data, opts) {
         opts = opts || {};
-        var prefix = opts.prefix !== undefined ? opts.prefix : this.opts.prefix;
-        var fullUri = this.opts.baseUrl + prefix + path;
+        let prefix = opts.prefix !== undefined ? opts.prefix : this.opts.prefix;
+        let fullUri = this.opts.baseUrl + prefix + path;
 
         return this.requestOtherUrl(
             callback, method, fullUri, queryParams, data, opts
@@ -551,7 +551,7 @@ module.exports.MatrixHttpApi.prototype = {
         } else if (isFinite(opts)) {
             // opts used to be localTimeoutMs
             opts = {
-                localTimeoutMs: opts
+                localTimeoutMs: opts,
             };
         }
 
@@ -572,7 +572,7 @@ module.exports.MatrixHttpApi.prototype = {
      * @return {string} URL
      */
     getUrl: function(path, queryParams, prefix) {
-        var queryString = "";
+        let queryString = "";
         if (queryParams) {
             queryString = "?" + utils.encodeParams(queryParams);
         }
@@ -613,22 +613,24 @@ module.exports.MatrixHttpApi.prototype = {
         }
         opts = opts || {};
 
-        var self = this;
+        let self = this;
         if (this.opts.extraParams) {
-            for (var key in this.opts.extraParams) {
-                if (!this.opts.extraParams.hasOwnProperty(key)) { continue; }
+            for (let key in this.opts.extraParams) {
+                if (!this.opts.extraParams.hasOwnProperty(key)) {
+                    continue;
+                }
                 queryParams[key] = this.opts.extraParams[key];
             }
         }
 
-        var json = opts.json === undefined ? true : opts.json;
+        let json = opts.json === undefined ? true : opts.json;
 
-        var defer = q.defer();
+        let defer = q.defer();
 
-        var timeoutId;
-        var timedOut = false;
-        var req;
-        var localTimeoutMs = opts.localTimeoutMs || this.opts.localTimeoutMs;
+        let timeoutId;
+        let timedOut = false;
+        let req;
+        let localTimeoutMs = opts.localTimeoutMs || this.opts.localTimeoutMs;
         if (localTimeoutMs) {
             timeoutId = callbacks.setTimeout(function() {
                 timedOut = true;
@@ -638,12 +640,12 @@ module.exports.MatrixHttpApi.prototype = {
                 defer.reject(new module.exports.MatrixError({
                     error: "Locally timed out waiting for a response",
                     errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-                    timeout: localTimeoutMs
+                    timeout: localTimeoutMs,
                 }));
             }, localTimeoutMs);
         }
 
-        var reqPromise = defer.promise;
+        let reqPromise = defer.promise;
 
         try {
             req = this.opts.request(
@@ -656,7 +658,7 @@ module.exports.MatrixHttpApi.prototype = {
                     json: json,
                     timeout: localTimeoutMs,
                     headers: opts.headers || {},
-                    _matrix_opts: this.opts
+                    _matrix_opts: this.opts,
                 },
                 function(err, response, body) {
                     if (localTimeoutMs) {
@@ -668,8 +670,8 @@ module.exports.MatrixHttpApi.prototype = {
 
                     // if json is falsy, we won't parse any error response, so need
                     // to do so before turning it into a MatrixError
-                    var parseErrorJson = !json;
-                    var handlerFn = requestCallback(
+                    let parseErrorJson = !json;
+                    let handlerFn = requestCallback(
                         defer, callback, self.opts.onlyData,
                         parseErrorJson,
                         opts.bodyParser
@@ -682,15 +684,14 @@ module.exports.MatrixHttpApi.prototype = {
                 // abort() operations on underlying HTTP requests :(
                 reqPromise.abort = req.abort.bind(req);
             }
-        }
-        catch (ex) {
+        } catch (ex) {
             defer.reject(ex);
             if (callback) {
                 callback(ex);
             }
         }
         return reqPromise;
-    }
+    },
 };
 
 /*
@@ -704,7 +705,7 @@ module.exports.MatrixHttpApi.prototype = {
  * If parseErrorJson is true, we will JSON.parse the body if we get a 4xx error.
  *
  */
-var requestCallback = function(
+let requestCallback = function(
     defer, userDefinedCallback, onlyData,
     parseErrorJson, bodyParser
 ) {
@@ -733,12 +734,11 @@ var requestCallback = function(
         if (err) {
             defer.reject(err);
             userDefinedCallback(err);
-        }
-        else {
-            var res = {
+        } else {
+            let res = {
                 code: response.statusCode,
                 headers: response.headers,
-                data: body
+                data: body,
             };
             defer.resolve(onlyData ? body : res);
             userDefinedCallback(null, onlyData ? body : res);

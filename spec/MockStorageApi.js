@@ -40,14 +40,16 @@ MockStorageApi.prototype = {
         return this.keys[index];
     },
     _recalc: function() {
-        var keys = [];
-        for (var k in this.data) {
-            if (!this.data.hasOwnProperty(k)) { continue; }
+        let keys = [];
+        for (let k in this.data) {
+            if (!this.data.hasOwnProperty(k)) {
+                continue;
+            }
             keys.push(k);
         }
         this.keys = keys;
         this.length = keys.length;
-    }
+    },
 };
 
 /** */

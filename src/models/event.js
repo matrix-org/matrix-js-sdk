@@ -21,9 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-var EventEmitter = require("events").EventEmitter;
+let EventEmitter = require("events").EventEmitter;
 
-var utils = require('../utils.js');
+let utils = require('../utils.js');
 
 /**
  * Enum for event statuses.
@@ -340,18 +340,22 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         this.event.unsigned.redacted_because = redaction_event.event;
 
-        var key;
+        let key;
         for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) { continue; }
+            if (!this.event.hasOwnProperty(key)) {
+                continue;
+            }
             if (!_REDACT_KEEP_KEY_MAP[key]) {
                 delete this.event[key];
             }
         }
 
-        var keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
-        var content = this.getContent();
+        let keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        let content = this.getContent();
         for (key in content) {
-            if (!content.hasOwnProperty(key)) { continue; }
+            if (!content.hasOwnProperty(key)) {
+                continue;
+            }
             if (!keeps[key]) {
                 delete content[key];
             }
@@ -394,7 +398,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         // successfully sent.
         this.status = null;
         this._date = new Date(this.event.origin_server_ts);
-     }
+     },
 });
 
 
@@ -420,13 +424,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
  *    m.room.aliases allows key aliases
  */
 // a map giving the keys we keep when an event is redacted
-var _REDACT_KEEP_KEY_MAP = [
+let _REDACT_KEEP_KEY_MAP = [
     'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
     'content', 'unsigned',
-].reduce(function(ret, val) { ret[val] = 1; return ret; }, {});
+].reduce(function(ret, val) {
+    ret[val] = 1; return ret;
+}, {});
 
 // a map from event type to the .content keys we keep when an event is redacted
-var _REDACT_KEEP_CONTENT_MAP = {
+let _REDACT_KEEP_CONTENT_MAP = {
     'm.room.member': {'membership': 1},
     'm.room.create': {'creator': 1},
     'm.room.join_rules': {'join_rule': 1},

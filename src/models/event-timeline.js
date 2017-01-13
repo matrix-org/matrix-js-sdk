@@ -4,9 +4,9 @@
  * @module models/event-timeline
  */
 
-var RoomState = require("./room-state");
-var utils = require("../utils");
-var MatrixEvent = require("./event").MatrixEvent;
+let RoomState = require("./room-state");
+let utils = require("../utils");
+let MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct a new EventTimeline
@@ -75,10 +75,15 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
 
     // we deep-copy the events here, in case they get changed later - we don't
     // want changes to the start state leaking through to the end state.
-    var oldStateEvents = utils.map(
+    let oldStateEvents = utils.map(
         utils.deepCopy(
-            stateEvents.map(function(mxEvent) { return mxEvent.event; })
-        ), function(ev) { return new MatrixEvent(ev); });
+            stateEvents.map(function(mxEvent) {
+                return mxEvent.event;
+            })
+        ),
+    function(ev) {
+        return new MatrixEvent(ev);
+    });
 
     this._startState.setStateEvents(oldStateEvents);
     this._endState.setStateEvents(stateEvents);
@@ -232,13 +237,12 @@ EventTimeline.prototype.setNeighbouringTimeline = function(neighbour, direction)
  * @param {boolean}  atStart     true to insert new event at the start
  */
 EventTimeline.prototype.addEvent = function(event, atStart) {
-    var stateContext = atStart ? this._startState : this._endState;
+    let stateContext = atStart ? this._startState : this._endState;
 
     // only call setEventMetadata on the unfiltered timelineSets
-    var timelineSet = this.getTimelineSet();
+    let timelineSet = this.getTimelineSet();
     if (timelineSet.room &&
-        timelineSet.room.getUnfilteredTimelineSet() === timelineSet)
-    {
+        timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
 
         // modify state
@@ -260,7 +264,7 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
         }
     }
 
-    var insertIndex;
+    let insertIndex;
 
     if (atStart) {
         insertIndex = 0;
@@ -309,8 +313,8 @@ EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline
  * @return {?MatrixEvent} removed event, or null if not found
  */
 EventTimeline.prototype.removeEvent = function(eventId) {
-    for (var i = this._events.length - 1; i >= 0; i--) {
-        var ev = this._events[i];
+    for (let i = this._events.length - 1; i >= 0; i--) {
+        let ev = this._events[i];
         if (ev.getId() == eventId) {
             this._events.splice(i, 1);
             if (i < this._baseIndex) {

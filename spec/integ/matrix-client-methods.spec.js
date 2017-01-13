@@ -1,25 +1,25 @@
 "use strict";
-var sdk = require("../..");
-var HttpBackend = require("../mock-request");
-var publicGlobals = require("../../lib/matrix");
-var Room = publicGlobals.Room;
-var MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
-var Filter = publicGlobals.Filter;
-var utils = require("../test-utils");
-var MockStorageApi = require("../MockStorageApi");
+let sdk = require("../..");
+let HttpBackend = require("../mock-request");
+let publicGlobals = require("../../lib/matrix");
+let Room = publicGlobals.Room;
+let MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
+let Filter = publicGlobals.Filter;
+let utils = require("../test-utils");
+let MockStorageApi = require("../MockStorageApi");
 
 describe("MatrixClient", function() {
-    var baseUrl = "http://localhost.or.something";
-    var client, httpBackend, store, sessionStore;
-    var userId = "@alice:localhost";
-    var accessToken = "aseukfgwef";
+    let baseUrl = "http://localhost.or.something";
+    let client, httpBackend, store, sessionStore;
+    let userId = "@alice:localhost";
+    let accessToken = "aseukfgwef";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         store = new MatrixInMemoryStore();
 
-        var mockStorage = new MockStorageApi();
+        let mockStorage = new MockStorageApi();
         sessionStore = new sdk.WebStorageSessionStore(mockStorage);
 
         sdk.request(httpBackend.requestFn);
@@ -38,7 +38,7 @@ describe("MatrixClient", function() {
     });
 
     describe("uploadContent", function() {
-        var buf = new Buffer('hello world');
+        let buf = new Buffer('hello world');
         it("should upload the file", function(done) {
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload"
@@ -51,7 +51,7 @@ describe("MatrixClient", function() {
                 expect(req.opts.timeout).toBe(undefined);
             }).respond(200, "content");
 
-            var prom = client.uploadContent({
+            let prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
@@ -59,7 +59,7 @@ describe("MatrixClient", function() {
 
             expect(prom).toBeDefined();
 
-            var uploads = client.getCurrentUploads();
+            let uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
@@ -68,7 +68,7 @@ describe("MatrixClient", function() {
                 // for backwards compatibility, we return the raw JSON
                 expect(response).toEqual("content");
 
-                var uploads = client.getCurrentUploads();
+                let uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
             }).catch(utils.failTest).done(done);
 
@@ -123,13 +123,13 @@ describe("MatrixClient", function() {
         });
 
         it("should return a promise which can be cancelled", function(done) {
-            var prom = client.uploadContent({
+            let prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
             });
 
-            var uploads = client.getCurrentUploads();
+            let uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
@@ -139,23 +139,23 @@ describe("MatrixClient", function() {
             }, function(error) {
                 expect(error).toEqual("aborted");
 
-                var uploads = client.getCurrentUploads();
+                let uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
             }).catch(utils.failTest).done(done);
 
-            var r = client.cancelUpload(prom);
+            let r = client.cancelUpload(prom);
             expect(r).toBe(true);
         });
     });
 
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
-            var roomId = "!foo:bar";
-            var room = new Room(roomId);
+            let roomId = "!foo:bar";
+            let room = new Room(roomId);
             room.addLiveEvents([
                 utils.mkMembership({
-                    user: userId, room: roomId, mship: "join", event: true
-                })
+                    user: userId, room: roomId, mship: "join", event: true,
+                }),
             ]);
             store.storeRoom(room);
             client.joinRoom(roomId);
@@ -164,11 +164,11 @@ describe("MatrixClient", function() {
     });
 
     describe("getFilter", function() {
-        var filterId = "f1lt3r1d";
+        let filterId = "f1lt3r1d";
 
         it("should return a filter from the store if allowCached", function(done) {
-            var filter = Filter.fromJson(userId, filterId, {
-                event_format: "client"
+            let filter = Filter.fromJson(userId, filterId, {
+                event_format: "client",
             });
             store.storeFilter(filter);
             client.getFilter(userId, filterId, true).done(function(gotFilter) {
@@ -180,16 +180,16 @@ describe("MatrixClient", function() {
 
         it("should do an HTTP request if !allowCached even if one exists",
         function(done) {
-            var httpFilterDefinition = {
-                event_format: "federation"
+            let httpFilterDefinition = {
+                event_format: "federation",
             };
 
             httpBackend.when(
                 "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId
             ).respond(200, httpFilterDefinition);
 
-            var storeFilter = Filter.fromJson(userId, filterId, {
-                event_format: "client"
+            let storeFilter = Filter.fromJson(userId, filterId, {
+                event_format: "client",
             });
             store.storeFilter(storeFilter);
             client.getFilter(userId, filterId, false).done(function(gotFilter) {
@@ -202,8 +202,8 @@ describe("MatrixClient", function() {
 
         it("should do an HTTP request if nothing is in the cache and then store it",
         function(done) {
-            var httpFilterDefinition = {
-                event_format: "federation"
+            let httpFilterDefinition = {
+                event_format: "federation",
             };
             expect(store.getFilter(userId, filterId)).toBeNull();
 
@@ -221,13 +221,13 @@ describe("MatrixClient", function() {
     });
 
     describe("createFilter", function() {
-        var filterId = "f1llllllerid";
+        let filterId = "f1llllllerid";
 
         it("should do an HTTP request and then store the filter", function(done) {
             expect(store.getFilter(userId, filterId)).toBeNull();
 
-            var filterDefinition = {
-                event_format: "client"
+            let filterDefinition = {
+                event_format: "client",
             };
 
             httpBackend.when(
@@ -235,7 +235,7 @@ describe("MatrixClient", function() {
             ).check(function(req) {
                 expect(req.data).toEqual(filterDefinition);
             }).respond(200, {
-                filter_id: filterId
+                filter_id: filterId,
             });
 
             client.createFilter(filterDefinition).done(function(gotFilter) {
@@ -249,8 +249,7 @@ describe("MatrixClient", function() {
     });
 
     describe("searching", function() {
-
-        var response = {
+        let response = {
             search_categories: {
                 room_events: {
                     count: 24,
@@ -263,26 +262,26 @@ describe("MatrixClient", function() {
                                 room_id: "!feuiwhf:localhost",
                                 content: {
                                     body: "a result",
-                                    msgtype: "m.text"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                    msgtype: "m.text",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         };
 
         it("searchMessageText should perform a /search for room_events", function(done) {
             client.searchMessageText({
-                query: "monkeys"
+                query: "monkeys",
             });
             httpBackend.when("POST", "/search").check(function(req) {
                 expect(req.data).toEqual({
                     search_categories: {
                         room_events: {
-                            search_term: "monkeys"
-                        }
-                    }
+                            search_term: "monkeys",
+                        },
+                    },
                 });
             }).respond(200, response);
 
@@ -295,9 +294,9 @@ describe("MatrixClient", function() {
 
     describe("downloadKeys", function() {
         it("should do an HTTP request and then store the keys", function(done) {
-            var ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
+            let ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
             // ed25519key = client.getDeviceEd25519Key();
-            var borisKeys = {
+            let borisKeys = {
                 dev1: {
                     algorithms: ["1"],
                     device_id: "dev1",
@@ -306,14 +305,14 @@ describe("MatrixClient", function() {
                         boris: {
                             "ed25519:dev1":
                                 "RAhmbNDq1efK3hCpBzZDsKoGSsrHUxb25NW5/WbEV9R" +
-                                "JVwLdP032mg5QsKt/pBDUGtggBcnk43n3nBWlA88WAw"
-                        }
+                                "JVwLdP032mg5QsKt/pBDUGtggBcnk43n3nBWlA88WAw",
+                        },
                     },
                     unsigned: { "abc": "def" },
                     user_id: "boris",
-                }
+                },
             };
-            var chazKeys = {
+            let chazKeys = {
                 dev2: {
                     algorithms: ["2"],
                     device_id: "dev2",
@@ -322,12 +321,12 @@ describe("MatrixClient", function() {
                         chaz: {
                            "ed25519:dev2":
                                 "FwslH/Q7EYSb7swDJbNB5PSzcbEO1xRRBF1riuijqvL" +
-                                "EkrK9/XVN8jl4h7thGuRITQ01siBQnNmMK9t45QfcCQ"
-                        }
+                                "EkrK9/XVN8jl4h7thGuRITQ01siBQnNmMK9t45QfcCQ",
+                        },
                     },
                     unsigned: { "ghi": "def" },
                     user_id: "chaz",
-                }
+                },
             };
 
             /*
@@ -374,7 +373,7 @@ describe("MatrixClient", function() {
     });
 
     describe("deleteDevice", function() {
-        var auth = {a: 1};
+        let auth = {a: 1};
         it("should pass through an auth dict", function(done) {
             httpBackend.when(
                 "DELETE", "/_matrix/client/unstable/devices/my_device"
@@ -392,7 +391,7 @@ describe("MatrixClient", function() {
 });
 
 function assertObjectContains(obj, expected) {
-    for (var k in expected) {
+    for (let k in expected) {
         if (expected.hasOwnProperty(k)) {
             expect(obj[k]).toEqual(expected[k]);
         }
