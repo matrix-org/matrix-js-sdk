@@ -170,12 +170,12 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
     let events = [];
     for (let evtype in evMap) {
         if (!evMap.hasOwnProperty(evtype)) {
- continue;
-}
+            continue;
+        }
         for (let stateKey in evMap[evtype]) {
             if (!evMap[evtype].hasOwnProperty(stateKey)) {
- continue;
-}
+                continue;
+            }
             events.push(evMap[evtype][stateKey]);
         }
     }
@@ -213,10 +213,9 @@ EventTimelineSet.prototype.findEventById = function(eventId) {
     if (!tl) {
         return undefined;
     }
-    return utils.findElement(tl.getEvents(),
-                             function(ev) {
- return ev.getId() == eventId;
-});
+    return utils.findElement(tl.getEvents(), function(ev) {
+        return ev.getId() == eventId;
+    });
 };
 
 /**

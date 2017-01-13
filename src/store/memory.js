@@ -203,8 +203,8 @@ module.exports.MatrixInMemoryStore.prototype = {
      */
     storeFilter: function(filter) {
         if (!filter) {
- return;
-}
+            return;
+        }
         if (!this.filters[filter.userId]) {
             this.filters[filter.userId] = {};
         }

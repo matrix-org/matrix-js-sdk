@@ -43,8 +43,8 @@ MockStorageApi.prototype = {
         let keys = [];
         for (let k in this.data) {
             if (!this.data.hasOwnProperty(k)) {
- continue;
-}
+                continue;
+            }
             keys.push(k);
         }
         this.keys = keys;

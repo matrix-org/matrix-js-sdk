@@ -122,11 +122,11 @@ module.exports.mkMembership = function(opts) {
         membership: opts.mship,
     };
     if (opts.name) {
- opts.content.displayname = opts.name;
-}
+        opts.content.displayname = opts.name;
+    }
     if (opts.url) {
- opts.content.avatar_url = opts.url;
-}
+        opts.content.avatar_url = opts.url;
+    }
     return module.exports.mkEvent(opts);
 };
 

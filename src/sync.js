@@ -46,8 +46,8 @@ function getFilterName(userId, suffix) {
 
 function debuglog() {
     if (!DEBUG) {
- return;
-}
+        return;
+    }
     console.log(...arguments);
 }
 
@@ -437,8 +437,8 @@ SyncApi.prototype.stop = function() {
     }
     this._running = false;
     if (this._currentSyncRequest) {
- this._currentSyncRequest.abort();
-}
+        this._currentSyncRequest.abort();
+    }
     if (this._keepAliveTimer) {
         clearTimeout(this._keepAliveTimer);
         this._keepAliveTimer = null;
@@ -452,8 +452,8 @@ SyncApi.prototype.stop = function() {
  */
 SyncApi.prototype.retryImmediately = function() {
     if (!this._connectionReturnedDefer) {
- return false;
-}
+        return false;
+    }
     this._startKeepAlives(0);
     return true;
 };
@@ -703,8 +703,8 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.emit("Room", room);
         }
         stateEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
     });
 
     // Handle joins
@@ -803,17 +803,17 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.emit("Room", room);
         }
         stateEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
         timelineEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
         ephemeralEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
         accountDataEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -836,14 +836,14 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         }
 
         stateEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
         timelineEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
         accountDataEvents.forEach(function(e) {
- client.emit("event", e);
-});
+            client.emit("event", e);
+        });
     });
 
     // update the notification timeline, if appropriate.
@@ -1044,8 +1044,8 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     let oldStateEvents = utils.map(
         utils.deepCopy(
             stateEventList.map(function(mxEvent) {
- return mxEvent.event;
-})
+                return mxEvent.event;
+            })
         ), client.getEventMapper()
     );
     let stateEvents = stateEventList;

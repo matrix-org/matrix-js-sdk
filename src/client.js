@@ -212,8 +212,8 @@ MatrixClient.prototype.supportsVoip = function() {
  */
 MatrixClient.prototype.getSyncState = function() {
     if (!this._syncApi) {
- return null;
-}
+        return null;
+    }
     return this._syncApi.getSyncState();
 };
 
@@ -589,8 +589,8 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
     }
     opts = opts || {};
     if (opts.syncRoom === undefined) {
- opts.syncRoom = true;
-}
+        opts.syncRoom = true;
+    }
 
     let room = this.getRoom(roomIdOrAlias);
     if (room && room.hasMembershipState(this.credentials.userId, "join")) {
@@ -807,8 +807,8 @@ MatrixClient.prototype.setPowerLevel = function(roomId, userId, powerLevel,
 MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
                                             callback) {
     if (utils.isFunction(txnId)) {
- callback = txnId; txnId = undefined;
-}
+        callback = txnId; txnId = undefined;
+    }
 
     if (!txnId) {
         txnId = this.makeTxnId();
@@ -950,8 +950,8 @@ function _sendEventHttpRequest(client, event) {
  */
 MatrixClient.prototype.sendMessage = function(roomId, content, txnId, callback) {
     if (utils.isFunction(txnId)) {
- callback = txnId; txnId = undefined;
-}
+        callback = txnId; txnId = undefined;
+    }
     return this.sendEvent(
         roomId, "m.room.message", content, txnId, callback
     );
@@ -1016,11 +1016,11 @@ MatrixClient.prototype.sendEmoteMessage = function(roomId, body, txnId, callback
  */
 MatrixClient.prototype.sendImageMessage = function(roomId, url, info, text, callback) {
     if (utils.isFunction(text)) {
- callback = text; text = undefined;
-}
+        callback = text; text = undefined;
+    }
     if (!text) {
- text = "Image";
-}
+        text = "Image";
+    }
     let content = {
          msgtype: "m.image",
          url: url,
@@ -1340,8 +1340,8 @@ MatrixClient.prototype.kick = function(roomId, userId, reason, callback) {
 function _setMembershipState(client, roomId, userId, membershipValue, reason,
                              callback) {
     if (utils.isFunction(reason)) {
- callback = reason; reason = undefined;
-}
+        callback = reason; reason = undefined;
+    }
 
     let path = utils.encodeUri(
         "/rooms/$roomId/state/m.room.member/$userId",
@@ -1367,8 +1367,8 @@ function _setMembershipState(client, roomId, userId, membershipValue, reason,
  */
 function _membershipChange(client, roomId, userId, membership, reason, callback) {
     if (utils.isFunction(reason)) {
- callback = reason; reason = undefined;
-}
+        callback = reason; reason = undefined;
+    }
 
     let path = utils.encodeUri("/rooms/$room_id/$membership", {
         $room_id: roomId,
@@ -1547,8 +1547,8 @@ MatrixClient.prototype.dropFromPresenceList = function(callback, userIds) {
  */
 MatrixClient.prototype.scrollback = function(room, limit, callback) {
     if (utils.isFunction(limit)) {
- callback = limit; limit = undefined;
-}
+        callback = limit; limit = undefined;
+    }
     limit = limit || 30;
     let timeToWaitMs = 0;
 
@@ -2326,11 +2326,11 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
     // to avoid O(N^2) fail
     let highlights = {};
     room_events.highlights.forEach(function(hl) {
- highlights[hl] = 1;
-});
+        highlights[hl] = 1;
+    });
     searchResults.highlights.forEach(function(hl) {
- highlights[hl] = 1;
-});
+        highlights[hl] = 1;
+    });
 
     // turn it back into a list.
     searchResults.highlights = Object.keys(highlights);
@@ -2842,12 +2842,9 @@ function checkTurnServers(client) {
             };
             client._turnServers = [servers];
             // re-fetch when we're about to reach the TTL
-            client._checkTurnServersTimeoutID =
-                setTimeout(function() {
- checkTurnServers(client);
-},
-                           (res.ttl || (60 * 60)) * 1000 * 0.9
-                          );
+            client._checkTurnServersTimeoutID = setTimeout(() => {
+                checkTurnServers(client);
+            }, (res.ttl || (60 * 60)) * 1000 * 0.9);
         }
     }, function(err) {
         console.error("Failed to get TURN URIs");

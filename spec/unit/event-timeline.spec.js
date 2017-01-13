@@ -20,8 +20,8 @@ describe("EventTimeline", function() {
         // XXX: this is a horrid hack; should use sinon or something instead to mock
         let timelineSet = { room: { roomId: roomId }};
         timelineSet.room.getUnfilteredTimelineSet = function() {
- return timelineSet;
-};
+            return timelineSet;
+        };
 
         timeline = new EventTimeline(timelineSet);
     });
@@ -74,12 +74,12 @@ describe("EventTimeline", function() {
             ];
 
             expect(function() {
- timeline.initialiseState(state);
-}).not.toThrow();
+                timeline.initialiseState(state);
+            }).not.toThrow();
             timeline.addEvent(event, false);
             expect(function() {
- timeline.initialiseState(state);
-}).toThrow();
+                timeline.initialiseState(state);
+            }).toThrow();
         });
     });
 

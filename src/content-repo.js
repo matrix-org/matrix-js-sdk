@@ -89,11 +89,11 @@ module.exports = {
             return null;
         }
         if (!width) {
- width = 96;
-}
+            width = 96;
+        }
         if (!height) {
- height = 96;
-}
+            height = 96;
+        }
         let params = {
             width: width,
             height: height,

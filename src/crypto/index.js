@@ -363,8 +363,8 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
         let promise = deferred.promise.finally(function() {
             let inProgress = self._keyDownloadsInProgressByUser[u];
             utils.removeElement(inProgress, function(e) {
- return e === promise;
-});
+                return e === promise;
+            });
             if (inProgress.length === 0) {
                 // no more downloads for this user; remove the element
                 delete self._keyDownloadsInProgressByUser[u];
@@ -614,11 +614,11 @@ Crypto.prototype.listDeviceKeys = function(userId) {
     // sort by deviceid
     result.sort(function(a, b) {
         if (a.deviceId < b.deviceId) {
- return -1;
-}
+            return -1;
+        }
         if (a.deviceId > b.deviceId) {
- return 1;
-}
+            return 1;
+        }
         return 0;
     });
 

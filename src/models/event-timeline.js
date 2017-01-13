@@ -78,11 +78,12 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
     let oldStateEvents = utils.map(
         utils.deepCopy(
             stateEvents.map(function(mxEvent) {
- return mxEvent.event;
-})
-        ), function(ev) {
- return new MatrixEvent(ev);
-});
+                return mxEvent.event;
+            })
+        ),
+    function(ev) {
+        return new MatrixEvent(ev);
+    });
 
     this._startState.setStateEvents(oldStateEvents);
     this._endState.setStateEvents(stateEvents);

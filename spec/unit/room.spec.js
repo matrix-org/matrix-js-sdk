@@ -106,8 +106,8 @@ describe("Room", function() {
 
         it("should throw if duplicateStrategy isn't 'replace' or 'ignore'", function() {
             expect(function() {
- room.addLiveEvents(events, "foo");
-}).toThrow();
+                room.addLiveEvents(events, "foo");
+            }).toThrow();
         });
 
         it("should replace a timeline event if dupe strategy is 'replace'", function() {
@@ -616,8 +616,8 @@ describe("Room", function() {
         };
         let setAliases = function(aliases, stateKey) {
             if (!stateKey) {
- stateKey = "flibble";
-}
+                stateKey = "flibble";
+            }
             stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
                 type: "m.room.aliases", room: roomId, skey: stateKey, content: {
                     aliases: aliases,
@@ -633,8 +633,8 @@ describe("Room", function() {
         };
         let addMember = function(userId, state, opts) {
             if (!state) {
- state = "join";
-}
+                state = "join";
+            }
             opts = opts || {};
             opts.room = roomId;
             opts.mship = state;
@@ -652,8 +652,8 @@ describe("Room", function() {
                     let list = [];
                     for (let stateBlob in stateLookup) {
                         if (!stateLookup.hasOwnProperty(stateBlob)) {
- continue;
-}
+                            continue;
+                        }
                         if (stateBlob.indexOf(prefix) === 0) {
                             list.push(stateLookup[stateBlob]);
                         }
@@ -915,11 +915,11 @@ describe("Room", function() {
             let content = {};
             records.forEach(function(r) {
                 if (!content[r.eventId]) {
- content[r.eventId] = {};
-}
+                    content[r.eventId] = {};
+                }
                 if (!content[r.eventId][r.type]) {
- content[r.eventId][r.type] = {};
-}
+                    content[r.eventId][r.type] = {};
+                }
                 content[r.eventId][r.type][r.userId] = {
                     ts: r.ts,
                 };

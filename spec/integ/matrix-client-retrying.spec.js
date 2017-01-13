@@ -79,9 +79,8 @@ describe("MatrixClient retrying", function() {
 
             // shouldn't be able to cancel the first message yet
             expect(function() {
- client.cancelPendingEvent(ev1);
-})
-                .toThrow();
+                client.cancelPendingEvent(ev1);
+            }).toThrow();
         }).respond(400); // fail the first message
 
         httpBackend.flush().then(function() {

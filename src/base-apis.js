@@ -136,24 +136,24 @@ MatrixBaseApis.prototype.register = function(
     callback
 ) {
     if (auth === undefined) {
- auth = {};
-}
+        auth = {};
+    }
     if (sessionId) {
- auth.session = sessionId;
-}
+        auth.session = sessionId;
+    }
 
     let params = {
         auth: auth,
     };
     if (username !== undefined && username !== null) {
- params.username = username;
-}
+        params.username = username;
+    }
     if (password !== undefined && password !== null) {
- params.password = password;
-}
+        params.password = password;
+    }
     if (bindEmail !== undefined && bindEmail !== null) {
- params.bind_email = bindEmail;
-}
+        params.bind_email = bindEmail;
+    }
     if (guestAccessToken !== undefined && guestAccessToken !== null) {
         params.guest_access_token = guestAccessToken;
     }
@@ -185,8 +185,8 @@ MatrixBaseApis.prototype.registerGuest = function(opts, callback) {
 MatrixBaseApis.prototype.registerRequest = function(data, kind, callback) {
     let params = {};
     if (kind) {
- params.kind = kind;
-}
+        params.kind = kind;
+    }
 
     return this._http.request(
         callback, "POST", "/register", params, data
@@ -435,8 +435,8 @@ MatrixBaseApis.prototype.redactEvent = function(roomId, eventId, callback) {
  */
 MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
     if (utils.isFunction(limit)) {
- callback = limit; limit = undefined;
-}
+        callback = limit; limit = undefined;
+    }
     let path = utils.encodeUri("/rooms/$roomId/initialSync",
         {$roomId: roomId}
     );
@@ -689,8 +689,8 @@ MatrixBaseApis.prototype.getCurrentUploads = function() {
  */
 MatrixBaseApis.prototype.getProfileInfo = function(userId, info, callback) {
     if (utils.isFunction(info)) {
- callback = info; info = undefined;
-}
+        callback = info; info = undefined;
+    }
 
     let path = info ?
     utils.encodeUri("/profile/$userId/$info",

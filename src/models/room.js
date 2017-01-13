@@ -310,8 +310,8 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
                                        allowDefault) {
     let roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
     if (allowDefault === undefined) {
- allowDefault = true;
-}
+        allowDefault = true;
+    }
     if (!roomAvatarEvent && !allowDefault) {
         return null;
     }
@@ -668,9 +668,8 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
         utils.removeElement(
             this._pendingEventList,
             function(ev) {
- return ev.getId() == oldEventId;
-},
-            false
+                return ev.getId() == oldEventId;
+            }, false
         );
     }
 
@@ -778,9 +777,8 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
             utils.removeElement(
                 this._pendingEventList,
                 function(ev) {
- return ev.getId() == oldEventId;
-},
-                false
+                    return ev.getId() == oldEventId;
+                }, false
             );
         }
         this.removeEvent(oldEventId);
@@ -985,8 +983,8 @@ Room.prototype.addReceipt = function(event, fake) {
     //   }
     // }
     if (fake === undefined) {
- fake = false;
-}
+        fake = false;
+    }
     if (!fake) {
         this._addReceiptsToStructure(event, this._realReceipts);
         // we don't bother caching real receipts by event ID

@@ -617,8 +617,8 @@ module.exports.MatrixHttpApi.prototype = {
         if (this.opts.extraParams) {
             for (let key in this.opts.extraParams) {
                 if (!this.opts.extraParams.hasOwnProperty(key)) {
- continue;
-}
+                    continue;
+                }
                 queryParams[key] = this.opts.extraParams[key];
             }
         }

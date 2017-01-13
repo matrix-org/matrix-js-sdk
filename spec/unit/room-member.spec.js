@@ -221,8 +221,8 @@ describe("RoomMember", function() {
             let roomState = {
                 getStateEvents: function(type) {
                     if (type !== "m.room.member") {
- return [];
-}
+                        return [];
+                    }
                     return [
                         utils.mkMembership({
                             event: true, mship: "join", room: roomId,

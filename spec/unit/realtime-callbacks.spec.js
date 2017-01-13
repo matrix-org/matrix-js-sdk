@@ -18,8 +18,8 @@ describe("realtime-callbacks", function() {
         clock.useMock();
         fakeDate = Date.now();
         callbacks.setNow(function() {
- return fakeDate;
-});
+            return fakeDate;
+        });
     });
 
     afterEach(function() {

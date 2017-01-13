@@ -16,17 +16,17 @@ let USER_ID = "userId";
  */
 function createTimeline(numEvents, baseIndex) {
     if (numEvents === undefined) {
- numEvents = 3;
-}
+        numEvents = 3;
+    }
     if (baseIndex === undefined) {
- baseIndex = 1;
-}
+        baseIndex = 1;
+    }
 
     // XXX: this is a horrid hack
     let timelineSet = { room: { roomId: ROOM_ID }};
     timelineSet.room.getUnfilteredTimelineSet = function() {
- return timelineSet;
-};
+        return timelineSet;
+    };
 
     let timeline = new EventTimeline(timelineSet);
 
@@ -167,8 +167,8 @@ describe("TimelineWindow", function() {
             let liveTimeline = createTimeline();
             let room = {};
             room.getLiveTimeline = function() {
- return liveTimeline;
-};
+                return liveTimeline;
+            };
 
             let timelineWindow = new TimelineWindow(undefined, room);
             timelineWindow.load(undefined, 2).then(function() {

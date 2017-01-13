@@ -29,8 +29,8 @@ module.exports.encodeParams = function(params) {
     let qs = "";
     for (let key in params) {
         if (!params.hasOwnProperty(key)) {
- continue;
-}
+            continue;
+        }
         qs += "&" + encodeURIComponent(key) + "=" +
                 encodeURIComponent(params[key]);
     }
@@ -48,8 +48,8 @@ module.exports.encodeParams = function(params) {
 module.exports.encodeUri = function(pathTemplate, variables) {
     for (let key in variables) {
         if (!variables.hasOwnProperty(key)) {
- continue;
-}
+            continue;
+        }
         pathTemplate = pathTemplate.replace(
             key, encodeURIComponent(variables[key])
         );
@@ -99,8 +99,8 @@ module.exports.keys = function(obj) {
     let keys = [];
     for (let key in obj) {
         if (!obj.hasOwnProperty(key)) {
- continue;
-}
+            continue;
+        }
         keys.push(key);
     }
     return keys;
@@ -115,8 +115,8 @@ module.exports.values = function(obj) {
     let values = [];
     for (let key in obj) {
         if (!obj.hasOwnProperty(key)) {
- continue;
-}
+            continue;
+        }
         values.push(obj[key]);
     }
     return values;
@@ -237,8 +237,8 @@ module.exports.checkObjectHasKeys = function(obj, keys) {
 module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
     for (let key in obj) {
         if (!obj.hasOwnProperty(key)) {
- continue;
-}
+            continue;
+        }
         if (allowedKeys.indexOf(key) === -1) {
             throw new Error("Unknown key: " + key);
         }

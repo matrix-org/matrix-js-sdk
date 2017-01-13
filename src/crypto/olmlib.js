@@ -128,8 +128,8 @@ module.exports.ensureOlmSessionsForDevices = function(
 
     for (let userId in devicesByUser) {
         if (!devicesByUser.hasOwnProperty(userId)) {
- continue;
-}
+            continue;
+        }
         result[userId] = {};
         let devices = devicesByUser[userId];
         for (let j = 0; j < devices.length; j++) {
@@ -164,8 +164,8 @@ module.exports.ensureOlmSessionsForDevices = function(
         let otk_res = res.one_time_keys || {};
         for (let userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
- continue;
-}
+                continue;
+            }
             let userRes = otk_res[userId] || {};
             let devices = devicesByUser[userId];
             for (let j = 0; j < devices.length; j++) {

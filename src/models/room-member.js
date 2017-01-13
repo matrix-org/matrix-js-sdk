@@ -190,8 +190,8 @@ RoomMember.prototype.getLastModifiedTime = function() {
 RoomMember.prototype.getAvatarUrl =
         function(baseUrl, width, height, resizeMethod, allowDefault, allowDirectLinks) {
     if (allowDefault === undefined) {
- allowDefault = true;
-}
+        allowDefault = true;
+    }
     if (!this.events.member && !allowDefault) {
         return null;
     }

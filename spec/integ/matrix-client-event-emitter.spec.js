@@ -144,8 +144,8 @@ describe("MatrixClient events", function() {
                 expect(user).toBeDefined();
                 expect(event).toBeDefined();
                 if (!user || !event) {
- return;
-}
+                    return;
+                }
 
                 expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(

@@ -76,8 +76,8 @@ describe("MatrixScheduler", function() {
             return waitTimeMs;
         };
         queueFn = function() {
- return "yep";
-};
+            return "yep";
+        };
 
         let procCount = 0;
         scheduler.setProcessFunction(function(ev) {

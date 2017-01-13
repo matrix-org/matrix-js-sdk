@@ -45,22 +45,22 @@ describe("utils", function() {
     describe("findElement", function() {
         it("should find only 1 element if there is a match", function() {
             let matchFn = function() {
- return true;
-};
+                return true;
+            };
             let arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn)).toEqual(55);
         });
         it("should be able to find in reverse order", function() {
             let matchFn = function() {
- return true;
-};
+                return true;
+            };
             let arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn, true)).toEqual(77);
         });
         it("should find nothing if the function never returns true", function() {
             let matchFn = function() {
- return false;
-};
+                return false;
+            };
             let arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn)).toBeFalsy();
         });
@@ -69,24 +69,24 @@ describe("utils", function() {
     describe("removeElement", function() {
         it("should remove only 1 element if there is a match", function() {
             let matchFn = function() {
- return true;
-};
+                return true;
+            };
             let arr = [55, 66, 77];
             utils.removeElement(arr, matchFn);
             expect(arr).toEqual([66, 77]);
         });
         it("should be able to remove in reverse order", function() {
             let matchFn = function() {
- return true;
-};
+                return true;
+            };
             let arr = [55, 66, 77];
             utils.removeElement(arr, matchFn, true);
             expect(arr).toEqual([55, 66]);
         });
         it("should remove nothing if the function never returns true", function() {
             let matchFn = function() {
- return false;
-};
+                return false;
+            };
             let arr = [55, 66, 77];
             utils.removeElement(arr, matchFn);
             expect(arr).toEqual(arr);
@@ -126,41 +126,41 @@ describe("utils", function() {
     describe("checkObjectHasKeys", function() {
         it("should throw for missing keys", function() {
             expect(function() {
- utils.checkObjectHasKeys({}, ["foo"]);
-}).toThrow();
+                utils.checkObjectHasKeys({}, ["foo"]);
+            }).toThrow();
             expect(function() {
- utils.checkObjectHasKeys({
-                foo: "bar",
-            }, ["foo"]);
-}).not.toThrow();
+                utils.checkObjectHasKeys({
+                    foo: "bar",
+                }, ["foo"]);
+            }).not.toThrow();
         });
     });
 
     describe("checkObjectHasNoAdditionalKeys", function() {
         it("should throw for extra keys", function() {
             expect(function() {
- utils.checkObjectHasNoAdditionalKeys({
-                foo: "bar",
-                baz: 4,
-            }, ["foo"]);
-}).toThrow();
+                utils.checkObjectHasNoAdditionalKeys({
+                            foo: "bar",
+                            baz: 4,
+                        }, ["foo"]);
+            }).toThrow();
 
             expect(function() {
- utils.checkObjectHasNoAdditionalKeys({
-                foo: "bar",
-            }, ["foo"]);
-}).not.toThrow();
+                utils.checkObjectHasNoAdditionalKeys({
+                            foo: "bar",
+                        }, ["foo"]);
+            }).not.toThrow();
         });
     });
 
     describe("deepCompare", function() {
         let assert = {
             isTrue: function(x) {
- expect(x).toBe(true);
-},
+                expect(x).toBe(true);
+            },
             isFalse: function(x) {
- expect(x).toBe(false);
-},
+                expect(x).toBe(false);
+            },
         };
 
         it("should handle primitives", function() {
@@ -217,11 +217,11 @@ describe("utils", function() {
             // context variables so even if they have same toString(), they
             // won't have same functionality
             let func = function(x) {
- return true;
-};
+                return true;
+            };
             let func2 = function(x) {
- return true;
-};
+                return true;
+            };
             assert.isTrue(utils.deepCompare(func, func));
             assert.isFalse(utils.deepCompare(func, func2));
             assert.isTrue(utils.deepCompare({ a: { b: func } }, { a: { b: func } }));

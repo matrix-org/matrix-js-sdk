@@ -90,8 +90,8 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
 ) {
     for (let userId in this.sharedWithDevices) {
         if (!this.sharedWithDevices.hasOwnProperty(userId)) {
- continue;
-}
+            continue;
+        }
 
         if (!devicesInRoom.hasOwnProperty(userId)) {
             console.log("Starting new session because we shared with " + userId);
@@ -226,8 +226,8 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
 
     // helper which returns the session prepared by prepareSession
     function returnSession() {
- return session;
-}
+        return session;
+    }
 
     // first wait for the previous share to complete
     let prom = this._setupPromise.then(prepareSession);

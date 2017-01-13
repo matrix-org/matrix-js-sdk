@@ -86,14 +86,14 @@ FilterComponent.prototype._checkFields =
     function(room_id, sender, event_type, contains_url) {
     let literal_keys = {
         "rooms": function(v) {
- return room_id === v;
-},
+            return room_id === v;
+        },
         "senders": function(v) {
- return sender === v;
-},
+            return sender === v;
+        },
         "types": function(v) {
- return _matches_wildcard(event_type, v);
-},
+            return _matches_wildcard(event_type, v);
+        },
     };
 
     let self = this;

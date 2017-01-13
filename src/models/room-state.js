@@ -121,11 +121,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
     // update the core event dict
     utils.forEach(stateEvents, function(event) {
         if (event.getRoomId() !== self.roomId) {
- return;
-}
+            return;
+        }
         if (!event.isState()) {
- return;
-}
+            return;
+        }
 
         if (self.events[event.getType()] === undefined) {
             self.events[event.getType()] = {};
@@ -146,11 +146,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
     // clashing names rather than progressively which only catches 1 of them).
     utils.forEach(stateEvents, function(event) {
         if (event.getRoomId() !== self.roomId) {
- return;
-}
+            return;
+        }
         if (!event.isState()) {
- return;
-}
+            return;
+        }
 
         if (event.getType() === "m.room.member") {
             let userId = event.getStateKey();
@@ -314,8 +314,8 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
 RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
     let member = this.getMember(userId);
     if (!member || member.membership == 'leave') {
- return false;
-}
+        return false;
+    }
 
     let power_levels_event = this.getStateEvents('m.room.power_levels', '');
 

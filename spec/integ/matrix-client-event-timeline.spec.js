@@ -123,9 +123,8 @@ describe("getEventTimeline support", function() {
             let room = client.getRoom(roomId);
             let timelineSet = room.getTimelineSets()[0];
             expect(function() {
- client.getEventTimeline(timelineSet, "event");
-})
-                .toThrow();
+                client.getEventTimeline(timelineSet, "event");
+            }).toThrow();
         }).catch(utils.failTest).done(done);
     });
 
@@ -142,9 +141,8 @@ describe("getEventTimeline support", function() {
             let room = client.getRoom(roomId);
             let timelineSet = room.getTimelineSets()[0];
             expect(function() {
- client.getEventTimeline(timelineSet, "event");
-})
-                .not.toThrow();
+                client.getEventTimeline(timelineSet, "event");
+            }).not.toThrow();
         }).catch(utils.failTest).done(done);
 
         httpBackend.flush().catch(utils.failTest);

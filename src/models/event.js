@@ -343,8 +343,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         let key;
         for (key in this.event) {
             if (!this.event.hasOwnProperty(key)) {
- continue;
-}
+                continue;
+            }
             if (!_REDACT_KEEP_KEY_MAP[key]) {
                 delete this.event[key];
             }
@@ -354,8 +354,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         let content = this.getContent();
         for (key in content) {
             if (!content.hasOwnProperty(key)) {
- continue;
-}
+                continue;
+            }
             if (!keeps[key]) {
                 delete content[key];
             }
@@ -428,7 +428,7 @@ let _REDACT_KEEP_KEY_MAP = [
     'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
     'content', 'unsigned',
 ].reduce(function(ret, val) {
- ret[val] = 1; return ret;
+    ret[val] = 1; return ret;
 }, {});
 
 // a map from event type to the .content keys we keep when an event is redacted

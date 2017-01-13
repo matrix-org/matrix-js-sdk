@@ -38,13 +38,13 @@ function PushProcessor(client) {
             for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
                 let rule = ruleset[ruleIndex];
                 if (!rule.enabled) {
- continue;
-}
+                    continue;
+                }
 
                 let rawrule = templateRuleToRaw(kind, rule, device);
                 if (!rawrule) {
- continue;
-}
+                    continue;
+                }
 
                 if (ruleMatchesEvent(rawrule, ev)) {
                     rule.kind = kind;
@@ -68,8 +68,8 @@ function PushProcessor(client) {
                 break;
             case 'room':
                 if (!tprule.rule_id) {
- return null;
-}
+                    return null;
+                }
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'room_id',
@@ -78,8 +78,8 @@ function PushProcessor(client) {
                 break;
             case 'sender':
                 if (!tprule.rule_id) {
- return null;
-}
+                    return null;
+                }
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'user_id',
@@ -88,8 +88,8 @@ function PushProcessor(client) {
                 break;
             case 'content':
                 if (!tprule.pattern) {
- return null;
-}
+                    return null;
+                }
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'content.body',
@@ -131,13 +131,13 @@ function PushProcessor(client) {
 
     let eventFulfillsRoomMemberCountCondition = function(cond, ev) {
         if (!cond.is) {
- return false;
-}
+            return false;
+        }
 
         let room = client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members) {
- return false;
-}
+            return false;
+        }
 
         let memberCount = Object.keys(room.currentState.members).filter(function(m) {
             return room.currentState.members[m].membership == 'join';
@@ -145,13 +145,13 @@ function PushProcessor(client) {
 
         let m = cond.is.match(/^([=<>]*)([0-9]*)$/);
         if (!m) {
- return false;
-}
+            return false;
+        }
         let ineq = m[1];
         let rhs = parseInt(m[2]);
         if (isNaN(rhs)) {
- return false;
-}
+            return false;
+        }
         switch (ineq) {
             case '':
             case '==':
@@ -178,8 +178,8 @@ function PushProcessor(client) {
         let room = client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members ||
             !room.currentState.getMember(client.credentials.userId)) {
- return false;
-}
+            return false;
+        }
 
         let displayName = room.currentState.getMember(client.credentials.userId).name;
 
@@ -196,8 +196,8 @@ function PushProcessor(client) {
     let eventFulfillsEventMatchCondition = function(cond, ev) {
         let val = valueForDottedKey(cond.key, ev);
         if (!val || typeof val != 'string') {
- return false;
-}
+            return false;
+        }
 
         let pat;
         if (cond.key == 'content.body') {
@@ -245,8 +245,8 @@ function PushProcessor(client) {
         while (parts.length > 0) {
             let thispart = parts.shift();
             if (!val[thispart]) {
- return null;
-}
+                return null;
+            }
             val = val[thispart];
         }
         return val;
@@ -254,11 +254,11 @@ function PushProcessor(client) {
 
     let matchingRuleForEventWithRulesets = function(ev, rulesets) {
         if (!rulesets || !rulesets.device) {
- return null;
-}
+            return null;
+        }
         if (ev.getSender() == client.credentials.userId) {
- return null;
-}
+            return null;
+        }
 
         let allDevNames = Object.keys(rulesets.device);
         for (let i = 0; i < allDevNames.length; ++i) {
@@ -267,8 +267,8 @@ function PushProcessor(client) {
 
             let matchingRule = matchingRuleFromKindSet(devrules, devname);
             if (matchingRule) {
- return matchingRule;
-}
+                return matchingRule;
+            }
         }
         return matchingRuleFromKindSet(ev, rulesets.global);
     };
@@ -276,8 +276,8 @@ function PushProcessor(client) {
     let pushActionsForEventAndRulesets = function(ev, rulesets) {
         let rule = matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
- return {};
-}
+            return {};
+        }
 
         let actionObj = PushProcessor.actionListToActionsObject(rule.actions);
 
@@ -319,8 +319,8 @@ PushProcessor.actionListToActionsObject = function(actionlist) {
             actionobj.notify = true;
         } else if (typeof action === 'object') {
             if (action.value === undefined) {
- action.value = true;
-}
+                action.value = true;
+            }
             actionobj.tweaks[action.set_tweak] = action.value;
         }
     }

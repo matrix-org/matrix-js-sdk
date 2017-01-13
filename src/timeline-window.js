@@ -162,12 +162,12 @@ TimelineWindow.prototype.canPaginate = function(direction) {
 
     if (direction == EventTimeline.BACKWARDS) {
         if (tl.index > tl.minIndex()) {
- return true;
-}
+            return true;
+        }
     } else {
         if (tl.index < tl.maxIndex()) {
- return true;
-}
+            return true;
+        }
     }
 
     return Boolean(tl.timeline.getNeighbouringTimeline(direction) ||

@@ -91,8 +91,8 @@ HttpBackend.prototype = {
             for (j = 0; j < this.expectedRequests.length; j++) {
                 expectedReq = this.expectedRequests[j];
                 if (path && path !== expectedReq.path) {
- continue;
-}
+                    continue;
+                }
                 if (expectedReq.method === req.method &&
                         req.path.indexOf(expectedReq.path) !== -1) {
                     if (!expectedReq.data || (JSON.stringify(expectedReq.data) ===
@@ -242,32 +242,32 @@ function Request(opts, callback) {
 
     Object.defineProperty(this, 'method', {
         get: function() {
- return opts.method;
-},
+            return opts.method;
+        },
     });
 
     Object.defineProperty(this, 'path', {
         get: function() {
- return opts.uri;
-},
+            return opts.uri;
+        },
     });
 
     Object.defineProperty(this, 'data', {
         get: function() {
- return opts.body;
-},
+            return opts.body;
+        },
     });
 
     Object.defineProperty(this, 'queryParams', {
         get: function() {
- return opts.qs;
-},
+            return opts.qs;
+        },
     });
 
     Object.defineProperty(this, 'headers', {
         get: function() {
- return opts.headers || {};
-},
+            return opts.headers || {};
+        },
     });
 }
 
