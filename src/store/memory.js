@@ -26,8 +26,7 @@ limitations under the License.
  * @constructor
  * @param {Object=} opts Config options
  * @param {LocalStorage} opts.localStorage The local storage instance to persist
- * some forms of data such as tokens. Rooms will NOT be stored. See
- * {@link WebStorageStore} to persist rooms.
+ * some forms of data such as tokens. Rooms will NOT be stored.
  */
 module.exports.MatrixInMemoryStore = function MatrixInMemoryStore(opts) {
     opts = opts || {};
