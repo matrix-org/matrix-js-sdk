@@ -45,7 +45,7 @@ module.exports.IndexedDBStore.prototype = {
         }
         const req = this.indexedDB.open("matrix-js-sdk", VERSION);
         req.onupgradeneeded = (ev) => {
-            const db = req.result;
+            const db = ev.target.result;
             const oldVersion = ev.oldVersion;
             if (oldVersion < 1) { // The database did not previously exist.
                 createDatabase(db);
