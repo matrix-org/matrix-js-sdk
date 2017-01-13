@@ -274,10 +274,4 @@ module.exports.MatrixInMemoryStore.prototype = {
     getAccountData: function(eventType) {
         return this.accountData[eventType];
     },
-
-    // TODO
-    //setMaxHistoryPerRoom: function(maxHistory) {},
-
-    // TODO
-    //reapOldMessages: function() {},
 };

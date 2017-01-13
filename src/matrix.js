@@ -21,6 +21,8 @@ module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 module.exports.EventStatus = require("./models/event").EventStatus;
 /** The {@link module:store/memory.MatrixInMemoryStore|MatrixInMemoryStore} class. */
 module.exports.MatrixInMemoryStore = require("./store/memory").MatrixInMemoryStore;
+/** The {@link module:store/indexeddb.IndexedDBStore|IndexedDBStore} class. */
+module.exports.IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
 /** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
 module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
 /** The {@link module:http-api.MatrixError|MatrixError} class. */

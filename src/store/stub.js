@@ -179,12 +179,6 @@ StubStore.prototype = {
     getAccountData: function(eventType) {
 
     },
-
-    // TODO
-    //setMaxHistoryPerRoom: function(maxHistory) {},
-
-    // TODO
-    //reapOldMessages: function() {},
 };
 
 /** Stub Store class. */
