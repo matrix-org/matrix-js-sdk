@@ -1,7 +1,5 @@
 "use strict";
-let sdk = require("../..");
 let PushProcessor = require("../../lib/pushprocessor");
-let MatrixEvent = sdk.MatrixEvent;
 let utils = require("../test-utils");
 
 describe('NotificationService', function() {
