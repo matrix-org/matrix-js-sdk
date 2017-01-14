@@ -739,6 +739,41 @@ OlmDevice.prototype.decryptGroupMessage = function(
     );
 };
 
+/**
+ * Export an inbound group session
+ *
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ * @return {object} exported session data
+ */
+OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
+    const s = this._sessionStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId
+    );
+
+    if (s === null) {
+        throw new Error("Unknown inbound group session [" + senderKey + "," +
+                        sessionId + "]");
+    }
+    const r = JSON.parse(s);
+
+    const session = new Olm.InboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, r.session);
+
+        const messageIndex = session.first_known_index();
+
+        return {
+            "sender_key": senderKey,
+            "sender_claimed_keys": r.keysClaimed,
+            "room_id": r.room_id,
+            "session_id": sessionId,
+            "session_key": session.export_session(messageIndex),
+        };
+    } finally {
+        session.free();
+    }
+};
 
 // Utilities
 // =========
