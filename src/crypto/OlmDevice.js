@@ -48,6 +48,18 @@ function checkPayloadLength(payloadString) {
 
 
 /**
+ * The type of object we use for importing and exporting megolm session data.
+ *
+ * @typedef {Object} module:crypto/OlmDevice.MegolmSessionData
+ * @property {String} sender_key  Sender's Curve25519 device key
+ * @property {Object<string, string>} sender_claimed_keys Other keys the sender claims.
+ * @property {String} room_id     Room this session is used in
+ * @property {String} session_id  Unique id for the session
+ * @property {String} session_key Base64'ed key data
+ */
+
+
+/**
  * Manages the olm cryptography functions. Each OlmDevice has a single
  * OlmAccount and a number of OlmSessions.
  *
@@ -683,6 +695,48 @@ OlmDevice.prototype.addInboundGroupSession = function(
     }
 };
 
+
+/**
+ * Add a previously-exported inbound group session to the session store
+ *
+ * @param {module:crypto/OlmDevice.MegolmSessionData} data  session data
+ */
+OlmDevice.prototype.importInboundGroupSession = function(data) {
+    /* if we already have this session, consider updating it */
+    function updateSession(session) {
+        console.log("Update for megolm session " + data.sender_key + "|" +
+                    data.session_id);
+        // for now we just ignore updates. TODO: implement something here
+
+        return true;
+    }
+
+    const r = this._getInboundGroupSession(
+        data.room_id, data.sender_key, data.session_id, updateSession
+    );
+
+    if (r !== null) {
+        return;
+    }
+
+    // new session.
+    const session = new Olm.InboundGroupSession();
+    try {
+        session.import_session(data.session_key);
+        if (data.session_id != session.session_id()) {
+            throw new Error(
+                "Mismatched group session ID from senderKey: " + data.sender_key
+            );
+        }
+        this._saveInboundGroupSession(
+            data.room_id, data.sender_key, data.session_id, session,
+            data.sender_claimed_keys
+        );
+    } finally {
+        session.free();
+    }
+};
+
 /**
  * Decrypt a received message with an inbound group session
  *
@@ -744,7 +798,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
- * @return {object} exported session data
+ * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
  */
 OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(

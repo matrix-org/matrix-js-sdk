@@ -920,6 +920,23 @@ Crypto.prototype.exportRoomKeys = function() {
 };
 
 /**
+ * Import a list of room keys previously exported by exportRoomKeys
+ *
+ * @param {Object[]} keys a list of session export objects
+ */
+Crypto.prototype.importRoomKeys = function(keys) {
+    keys.map((session) => {
+        if (!session.room_id || !session.algorithm) {
+            console.warn("ignoring session entry with missing fields", session);
+            return;
+        }
+
+        const alg = this._getRoomDecryptor(session.room_id, session.algorithm);
+        alg.importRoomKey(session);
+    });
+};
+
+/**
  * Encrypt an event according to the configuration of the room, if necessary.
  *
  * @param {module:models/event.MatrixEvent} event  event to be sent

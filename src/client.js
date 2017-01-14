@@ -477,6 +477,18 @@ MatrixClient.prototype.exportRoomKeys = function() {
 };
 
 /**
+ * Import a list of room keys previously exported by exportRoomKeys
+ *
+ * @param {Object[]} keys a list of session export objects
+ */
+MatrixClient.prototype.importRoomKeys = function(keys) {
+    if (!this._crypto) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.importRoomKeys(keys);
+};
+
+/**
  * Decrypt a received event according to the algorithm specified in the event.
  *
  * @param {MatrixClient} client

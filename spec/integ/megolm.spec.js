@@ -894,4 +894,89 @@ describe("megolm", function() {
             return q.all([downloadPromise, sendPromise]);
         }).nodeify(done);
     });
+
+
+    it("Alice exports megolm keys and imports them to a new device", function(done) {
+        let messageEncrypted;
+
+        return aliceTestClient.start().then(() => {
+            const p2pSession = createOlmSession(
+                testOlmAccount, aliceTestClient
+            );
+
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+
+            // make the room_key event
+            const roomKeyEncrypted = encryptGroupSessionKey({
+                senderKey: testSenderKey,
+                recipient: aliceTestClient,
+                p2pSession: p2pSession,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // encrypt a message with the group session
+            messageEncrypted = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // Alice gets both the events in a single sync
+            const syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [roomKeyEncrypted],
+                },
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                timeline: {
+                    events: [messageEncrypted],
+                },
+            };
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            return aliceTestClient.httpBackend.flush("/sync", 1);
+        }).then(function() {
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.getContent().body).toEqual('42');
+
+            return aliceTestClient.client.exportRoomKeys();
+        }).then(function(exported) {
+            // start a new client
+            aliceTestClient.stop();
+
+            aliceTestClient = new TestClient(
+                "@alice:localhost", "device2", "access_token2"
+            );
+
+            aliceTestClient.client.importRoomKeys(exported);
+
+            return aliceTestClient.start();
+        }).then(function() {
+            const syncResponse = {
+                next_batch: 1,
+                rooms: {
+                    join: {},
+                },
+            };
+            syncResponse.rooms.join[ROOM_ID] = {
+                timeline: {
+                    events: [messageEncrypted],
+                },
+            };
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            return aliceTestClient.httpBackend.flush("/sync", 1);
+        }).then(function() {
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.getContent().body).toEqual('42');
+        }).nodeify(done);
+    });
 });
