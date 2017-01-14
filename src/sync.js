@@ -32,12 +32,6 @@ let EventTimeline = require("./models/event-timeline");
 
 let DEBUG = true;
 
-// /sync requests allow you to set a timeout= but the request may continue
-// beyond that and wedge forever, so we need to track how long we are willing
-// to keep open the connection. This constant is *ADDED* to the timeout= value
-// to determine the max time we're willing to wait.
-let BUFFER_PERIOD_MS = 80 * 1000;
-
 function getFilterName(userId, suffix) {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
@@ -152,17 +146,17 @@ SyncApi.prototype.syncLeftRooms = function() {
     filter.setTimelineLimit(1);
     filter.setIncludeLeaveRooms(true);
 
-    let localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-    let qps = {
-        timeout: 0, // don't want to block since this is a single isolated req
+    var qps = {
+        timeout: 0 // don't want to block since this is a single isolated req
     };
 
     return client.getOrCreateFilter(
         getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter
     ).then(function(filterId) {
         qps.filter = filterId;
+        // Don't set a timeout on Sync because there is no strategy to handle repeated timeouts on sync
         return client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, localTimeoutMs
+            undefined, "GET", "/sync", qps, undefined, undefined
         );
     }).then(function(data) {
         let leaveRooms = [];
@@ -507,11 +501,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         qps.timeout = 0;
     }
 
-    // normal timeout= plus buffer time
-    let clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-
+    // Don't set a timeout on Sync because there is no strategy to handle repeated timeouts on sync
     this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs
+        undefined, "GET", "/sync", qps, undefined, undefined
     );
 
     this._currentSyncRequest.done(function(data) {
