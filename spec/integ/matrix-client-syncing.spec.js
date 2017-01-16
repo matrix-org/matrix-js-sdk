@@ -20,7 +20,7 @@ describe("MatrixClient syncing", function() {
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
-        httpBackend = new HttpBackend();
+        httpBackend = new HttpBackend(true);
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
             baseUrl: baseUrl,
@@ -43,12 +43,25 @@ describe("MatrixClient syncing", function() {
             presence: {},
         };
 
+        it("should start keepalives if a /sync hits a timeout error", function(done) {
+            httpBackend.when("GET", "/sync").respond(200, syncData).waitFor((30+80+1)*1000);
+            client.startClient();
+            spyOn(client._syncApi, '_startKeepAlives').andCallThrough();
+            // Work-around since
+            // Jasmine expect(<method>).toThrow() seems to break self-references in
+            // that method.
+            httpBackend.flush().done(function() {
+                expect(client._syncApi._startKeepAlives).toHaveBeenCalled();
+                done();
+            });
+        });
+
         it("should /sync after /pushrules and /filter.", function(done) {
             httpBackend.when("GET", "/sync").respond(200, syncData);
-
             client.startClient();
-
+            spyOn(client._syncApi, '_startKeepAlives').andCallThrough();
             httpBackend.flush().done(function() {
+                expect(client._syncApi._startKeepAlives).not.toHaveBeenCalled();
                 done();
             });
         });
@@ -59,7 +72,6 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").check(function(req) {
                 expect(req.queryParams.since).toEqual(syncData.next_batch);
             }).respond(200, syncData);
-
             client.startClient();
 
             httpBackend.flush().done(function() {
@@ -76,7 +88,6 @@ describe("MatrixClient syncing", function() {
             },
             rooms: {
                 join: {
-
                 },
             },
         };
