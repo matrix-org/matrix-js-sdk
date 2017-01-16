@@ -1,3 +1,9 @@
+Changes in [0.7.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.4) (2017-01-16)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.4-rc.1...v0.7.4)
+
+ * Fix non-conference calling
+
 Changes in [0.7.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.4-rc.1) (2017-01-13)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.3...v0.7.4-rc.1)
