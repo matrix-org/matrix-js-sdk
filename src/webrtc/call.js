@@ -522,8 +522,10 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         }, 0);
     }
 
-    this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
-    stream = this.screenSharingStream;
+    if (this.screenSharingStream) {
+        this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
+        stream = this.screenSharingStream;
+    }
 
     this.localAVStream = stream;
     // why do we enable audio (and only audio) tracks here? -- matthew
