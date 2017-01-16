@@ -3,7 +3,7 @@ let sdk = require("../..");
 let q = require("q");
 let HttpBackend = require("../mock-request");
 let utils = require("../../lib/utils");
-let test_utils = require("../test-utils");
+let testUtils = require("../test-utils");
 
 let aliHttpBackend;
 let bobHttpBackend;
@@ -105,7 +105,7 @@ function expectBobKeyUpload() {
 }
 
 function bobUploadsKeys() {
-    bobClient.uploadKeys(5).catch(test_utils.failTest);
+    bobClient.uploadKeys(5).catch(testUtils.failTest);
     return expectBobKeyUpload();
 }
 
@@ -162,7 +162,8 @@ function expectAliClaimKeys() {
     aliHttpBackend.when("POST", "/keys/claim").respond(200, function(path, content) {
         let claimType = content.one_time_keys[bobUserId][bobDeviceId];
         expect(claimType).toEqual("signed_curve25519");
-        for (var keyId in bobOneTimeKeys) {
+        let keyId = null;
+        for (keyId in bobOneTimeKeys) {
             if (bobOneTimeKeys.hasOwnProperty(keyId)) {
                 if (keyId.indexOf(claimType + ":") === 0) {
                     break;
@@ -343,7 +344,7 @@ function recvMessage(httpBackend, client, sender, message) {
     syncData.rooms.join[roomId] = {
         timeline: {
             events: [
-                test_utils.mkEvent({
+                testUtils.mkEvent({
                     type: "m.room.encrypted",
                     room: roomId,
                     content: message,
@@ -382,7 +383,7 @@ function recvMessage(httpBackend, client, sender, message) {
 
 
 function aliStartClient() {
-    expectAliKeyUpload().catch(test_utils.failTest);
+    expectAliKeyUpload().catch(testUtils.failTest);
 
     // ali will try to query her own keys on start
     aliHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
@@ -399,7 +400,7 @@ function aliStartClient() {
 }
 
 function bobStartClient() {
-    expectBobKeyUpload().catch(test_utils.failTest);
+    expectBobKeyUpload().catch(testUtils.failTest);
 
     // bob will try to query his own keys on start
     bobHttpBackend.when("POST", "/keys/query").respond(200, function(path, content) {
@@ -437,11 +438,11 @@ function startClient(httpBackend, client) {
     syncData.rooms.join[roomId] = {
         state: {
             events: [
-                test_utils.mkMembership({
+                testUtils.mkMembership({
                     mship: "join",
                     user: aliUserId,
                 }),
-                test_utils.mkMembership({
+                testUtils.mkMembership({
                     mship: "join",
                     user: bobUserId,
                 }),
@@ -463,9 +464,9 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
-        aliStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
+        aliStorage = new sdk.WebStorageSessionStore(new testUtils.MockStorageApi());
         aliHttpBackend = new HttpBackend();
         aliClient = sdk.createClient({
             baseUrl: "http://alis.server",
@@ -476,7 +477,7 @@ describe("MatrixClient crypto", function() {
             request: aliHttpBackend.requestFn,
         });
 
-        bobStorage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
+        bobStorage = new sdk.WebStorageSessionStore(new testUtils.MockStorageApi());
         bobHttpBackend = new HttpBackend();
         bobClient = sdk.createClient({
             baseUrl: "http://bobs.server",
@@ -525,14 +526,14 @@ describe("MatrixClient crypto", function() {
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
         q()
             .then(bobUploadsKeys)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Ali downloads Bobs keys", function(done) {
         q()
             .then(bobUploadsKeys)
             .then(aliDownloadsKeys)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Ali gets keys with an invalid signature", function(done) {
@@ -550,7 +551,7 @@ describe("MatrixClient crypto", function() {
                 // should get an empty list
                 expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
             })
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Ali gets keys with an incorrect userId", function(done) {
@@ -587,7 +588,7 @@ describe("MatrixClient crypto", function() {
             // should get an empty list
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
             expect(aliClient.listDeviceKeys(eveUserId)).toEqual([]);
-        }).catch(test_utils.failTest).done(done);
+        }).catch(testUtils.failTest).done(done);
     });
 
     it("Ali gets keys with an incorrect deviceId", function(done) {
@@ -621,7 +622,7 @@ describe("MatrixClient crypto", function() {
         ).then(function() {
             // should get an empty list
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
-        }).catch(test_utils.failTest).done(done);
+        }).catch(testUtils.failTest).done(done);
     });
 
     it("Ali enables encryption", function(done) {
@@ -629,7 +630,7 @@ describe("MatrixClient crypto", function() {
             .then(bobUploadsKeys)
             .then(aliStartClient)
             .then(aliEnablesEncryption)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Ali sends a message", function(done) {
@@ -638,7 +639,7 @@ describe("MatrixClient crypto", function() {
             .then(aliStartClient)
             .then(aliEnablesEncryption)
             .then(aliSendsFirstMessage)
-            .catch(test_utils.failTest).nodeify(done);
+            .catch(testUtils.failTest).nodeify(done);
     });
 
     it("Bob receives a message", function(done) {
@@ -649,7 +650,7 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobStartClient)
             .then(bobRecvMessage)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Bob receives a message with a bogus sender", function(done) {
@@ -672,7 +673,7 @@ describe("MatrixClient crypto", function() {
                 syncData.rooms.join[roomId] = {
                     timeline: {
                         events: [
-                            test_utils.mkEvent({
+                            testUtils.mkEvent({
                                 type: "m.room.encrypted",
                                 room: roomId,
                                 content: message,
@@ -706,7 +707,7 @@ describe("MatrixClient crypto", function() {
                 bobHttpBackend.flush();
                 return deferred.promise;
             })
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Ali blocks Bob's device", function(done) {
@@ -727,7 +728,7 @@ describe("MatrixClient crypto", function() {
                         expect(sentContent.ciphertext).toEqual({});
                     });
                 return q.all([p1, p2]);
-            }).catch(test_utils.failTest).nodeify(done);
+            }).catch(testUtils.failTest).nodeify(done);
     });
 
     it("Bob receives two pre-key messages", function(done) {
@@ -740,7 +741,7 @@ describe("MatrixClient crypto", function() {
             .then(bobRecvMessage)
             .then(aliSendsMessage)
             .then(bobRecvMessage)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
     it("Bob replies to the message", function(done) {
@@ -755,7 +756,7 @@ describe("MatrixClient crypto", function() {
             .then(bobSendsReplyMessage).then(function(ciphertext) {
                 expect(ciphertext.type).toEqual(1);
             }).then(aliRecvMessage)
-            .catch(test_utils.failTest).done(done);
+            .catch(testUtils.failTest).done(done);
     });
 
 
@@ -768,7 +769,7 @@ describe("MatrixClient crypto", function() {
                     next_batch: '2',
                     to_device: {
                         events: [
-                            test_utils.mkEvent({
+                            testUtils.mkEvent({
                                 content: {
                                     device_id: 'TEST_DEVICE',
                                     rooms: [],

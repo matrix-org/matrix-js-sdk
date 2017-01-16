@@ -17,8 +17,9 @@ limitations under the License.
 "use strict";
 
 
+let Olm = null;
 try {
-    var Olm = require('olm');
+    Olm = require('olm');
 } catch (e) {}
 
 let anotherjson = require('another-json');
@@ -26,7 +27,7 @@ let q = require('q');
 
 let sdk = require('../..');
 let utils = require('../../lib/utils');
-let test_utils = require('../test-utils');
+let testUtils = require('../test-utils');
 let MockHttpBackend = require('../mock-request');
 
 let ROOM_ID = "!room:id";
@@ -43,7 +44,7 @@ function TestClient(userId, deviceId, accessToken) {
     this.userId = userId;
     this.deviceId = deviceId;
 
-    this.storage = new sdk.WebStorageSessionStore(new test_utils.MockStorageApi());
+    this.storage = new sdk.WebStorageSessionStore(new testUtils.MockStorageApi());
     this.httpBackend = new MockHttpBackend();
     this.client = sdk.createClient({
         baseUrl: "http://test.server",
@@ -114,8 +115,8 @@ TestClient.prototype.stop = function() {
  * @return {string} base64 device key
  */
 TestClient.prototype.getDeviceKey = function() {
-    let key_id = 'curve25519:' + this.deviceId;
-    return this.deviceKeys.keys[key_id];
+    let keyId = 'curve25519:' + this.deviceId;
+    return this.deviceKeys.keys[keyId];
 };
 
 
@@ -125,8 +126,8 @@ TestClient.prototype.getDeviceKey = function() {
  * @return {string} base64 device key
  */
 TestClient.prototype.getSigningKey = function() {
-    let key_id = 'ed25519:' + this.deviceId;
-    return this.deviceKeys.keys[key_id];
+    let keyId = 'ed25519:' + this.deviceId;
+    return this.deviceKeys.keys[keyId];
 };
 
 /**
@@ -137,8 +138,8 @@ TestClient.prototype.getSigningKey = function() {
  * @return {Olm.Session}
  */
 function createOlmSession(olmAccount, recipientTestClient) {
-    let otk_id = utils.keys(recipientTestClient.oneTimeKeys)[0];
-    let otk = recipientTestClient.oneTimeKeys[otk_id];
+    let otkId = utils.keys(recipientTestClient.oneTimeKeys)[0];
+    let otk = recipientTestClient.oneTimeKeys[otkId];
 
     let session = new Olm.Session();
     session.create_outbound(
@@ -270,7 +271,7 @@ function getSyncResponse(roomMembers) {
     let roomResponse = {
         state: {
             events: [
-                test_utils.mkEvent({
+                testUtils.mkEvent({
                     type: 'm.room.encryption',
                     skey: '',
                     content: {
@@ -283,7 +284,7 @@ function getSyncResponse(roomMembers) {
 
     for (let i = 0; i < roomMembers.length; i++) {
         roomResponse.state.events.push(
-            test_utils.mkMembership({
+            testUtils.mkMembership({
                 mship: 'join',
                 sender: roomMembers[i],
             })
@@ -380,7 +381,7 @@ describe("megolm", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs"
@@ -755,14 +756,14 @@ describe("megolm", function() {
             syncResponse.rooms.join[ROOM_ID] = {
                 state: {
                     events: [
-                        test_utils.mkEvent({
+                        testUtils.mkEvent({
                             type: 'm.room.encryption',
                             skey: '',
                             content: {
                                 algorithm: 'm.megolm.v1.aes-sha2',
                             },
                         }),
-                        test_utils.mkMembership({
+                        testUtils.mkMembership({
                             mship: 'join',
                             sender: aliceTestClient.userId,
                         }),

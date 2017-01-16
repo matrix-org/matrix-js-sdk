@@ -241,13 +241,13 @@ describe("utils", function() {
                 "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
                 "newprop": "new",
             };
-            let source_orig = JSON.stringify(SOURCE);
+            let sourceOrig = JSON.stringify(SOURCE);
 
             utils.extend(target, SOURCE);
             expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
 
             // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(source_orig);
+            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
         });
 
         it("should ignore null", function() {
@@ -258,13 +258,13 @@ describe("utils", function() {
                 "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
                 "newprop": "new",
             };
-            let source_orig = JSON.stringify(SOURCE);
+            let sourceOrig = JSON.stringify(SOURCE);
 
             utils.extend(target, null, SOURCE);
             expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
 
             // check the originial wasn't modified
-            expect(JSON.stringify(SOURCE)).toEqual(source_orig);
+            expect(JSON.stringify(SOURCE)).toEqual(sourceOrig);
         });
 
         it("should handle properties created with defineProperties", function() {

@@ -84,8 +84,11 @@ HttpBackend.prototype = {
      */
     _takeFromQueue: function(path) {
         let req = null;
-        let i, j;
-        let matchingReq, expectedReq, testResponse = null;
+        let i;
+        let j;
+        let matchingReq = null;
+        let expectedReq = null;
+        let testResponse = null;
         for (i = 0; i < this.requests.length; i++) {
             req = this.requests[i];
             for (j = 0; j < this.expectedRequests.length; j++) {

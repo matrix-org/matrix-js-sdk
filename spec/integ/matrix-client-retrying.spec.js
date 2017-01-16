@@ -6,7 +6,8 @@ let EventStatus = sdk.EventStatus;
 
 describe("MatrixClient retrying", function() {
     let baseUrl = "http://localhost.or.something";
-    let client, httpBackend;
+    let client = null;
+    let httpBackend = null;
     let scheduler;
     let userId = "@alice:localhost";
     let accessToken = "aseukfgwef";
@@ -50,7 +51,8 @@ describe("MatrixClient retrying", function() {
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function(done) {
         // send a couple of events; the second will be queued
-        let ev1, ev2;
+        let ev1;
+        let ev2;
         client.sendMessage(roomId, "m1").then(function(ev) {
             expect(ev).toEqual(ev1);
         });
