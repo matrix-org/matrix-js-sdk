@@ -1,7 +1,7 @@
 "use strict";
 
 let callbacks = require("../../lib/realtime-callbacks");
-let test_utils = require("../test-utils.js");
+let testUtils = require("../test-utils.js");
 
 describe("realtime-callbacks", function() {
     let clock = jasmine.Clock;
@@ -14,7 +14,7 @@ describe("realtime-callbacks", function() {
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
         clock.useMock();
         fakeDate = Date.now();
         callbacks.setNow(function() {

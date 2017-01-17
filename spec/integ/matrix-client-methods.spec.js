@@ -10,7 +10,10 @@ let MockStorageApi = require("../MockStorageApi");
 
 describe("MatrixClient", function() {
     let baseUrl = "http://localhost.or.something";
-    let client, httpBackend, store, sessionStore;
+    let client = null;
+    let httpBackend = null;
+    let store = null;
+    let sessionStore = null;
     let userId = "@alice:localhost";
     let accessToken = "aseukfgwef";
 

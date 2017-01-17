@@ -7,7 +7,8 @@ let EventTimeline = sdk.EventTimeline;
 
 describe("MatrixClient syncing", function() {
     let baseUrl = "http://localhost.or.something";
-    let client, httpBackend;
+    let client = null;
+    let httpBackend = null;
     let selfUserId = "@alice:localhost";
     let selfAccessToken = "aseukfgwef";
     let otherUserId = "@bob:localhost";

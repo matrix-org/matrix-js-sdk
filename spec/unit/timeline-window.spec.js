@@ -100,7 +100,8 @@ describe("TimelineIndex", function() {
 
         it("should advance into the next timeline", function() {
             let timelines = createLinkedTimelines();
-            let tl1 = timelines[0], tl2 = timelines[1];
+            let tl1 = timelines[0];
+            let tl2 = timelines[1];
 
             // initialise the index pointing at the end of the first timeline
             let timelineIndex = new TimelineIndex(tl1, 2);
@@ -117,7 +118,8 @@ describe("TimelineIndex", function() {
 
         it("should retreat into the previous timeline", function() {
             let timelines = createLinkedTimelines();
-            let tl1 = timelines[0], tl2 = timelines[1];
+            let tl1 = timelines[0];
+            let tl2 = timelines[1];
 
             // initialise the index pointing at the start of the second
             // timeline
@@ -146,7 +148,8 @@ describe("TimelineWindow", function() {
      * create a dummy eventTimelineSet and client, and a TimelineWindow
      * attached to them.
      */
-    let timelineSet, client;
+    let timelineSet;
+    let client;
     function createWindow(timeline, opts) {
         timelineSet = {};
         client = {};

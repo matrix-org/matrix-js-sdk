@@ -6,7 +6,8 @@ let utils = require("../test-utils");
 
 describe("MatrixClient opts", function() {
     let baseUrl = "http://localhost.or.something";
-    let client, httpBackend;
+    let client = null;
+    let httpBackend = null;
     let userId = "@alice:localhost";
     let userB = "@bob:localhost";
     let accessToken = "aseukfgwef";

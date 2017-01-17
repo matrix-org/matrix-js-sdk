@@ -220,7 +220,8 @@ describe("getEventTimeline support", function() {
 });
 
 describe("MatrixClient event timelines", function() {
-    let client, httpBackend;
+    let client = null;
+    let httpBackend = null;
 
     beforeEach(function(done) {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -417,7 +418,8 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            let tl0, tl3;
+            let tl0;
+            let tl3;
             client.getEventTimeline(timelineSet, EVENTS[0].event_id
             ).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);

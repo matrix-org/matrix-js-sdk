@@ -9,7 +9,8 @@ let utils = require("../test-utils");
 
 describe("MatrixScheduler", function() {
     let scheduler;
-    let retryFn, queueFn;
+    let retryFn;
+    let queueFn;
     let defer;
     let roomId = "!foo:bar";
     let eventA = utils.mkMessage({
