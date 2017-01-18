@@ -55,5 +55,7 @@ module.exports = {
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
+        "prefer-const": ["warn"],
+
     }
 }
