@@ -23,25 +23,25 @@ limitations under the License.
  * @param {Object} client The Matrix client object to use
  */
 function PushProcessor(client) {
-    let escapeRegExp = function(string) {
+    const escapeRegExp = function(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     };
 
-    let matchingRuleFromKindSet = function(ev, kindset, device) {
-        let rulekinds_in_order = ['override', 'content', 'room', 'sender', 'underride'];
+    const matchingRuleFromKindSet = function(ev, kindset, device) {
+        const rulekinds_in_order = ['override', 'content', 'room', 'sender', 'underride'];
         for (let ruleKindIndex = 0;
                 ruleKindIndex < rulekinds_in_order.length;
                 ++ruleKindIndex) {
-            let kind = rulekinds_in_order[ruleKindIndex];
-            let ruleset = kindset[kind];
+            const kind = rulekinds_in_order[ruleKindIndex];
+            const ruleset = kindset[kind];
 
             for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
-                let rule = ruleset[ruleIndex];
+                const rule = ruleset[ruleIndex];
                 if (!rule.enabled) {
                     continue;
                 }
 
-                let rawrule = templateRuleToRaw(kind, rule, device);
+                const rawrule = templateRuleToRaw(kind, rule, device);
                 if (!rawrule) {
                     continue;
                 }
@@ -55,8 +55,8 @@ function PushProcessor(client) {
         return null;
     };
 
-    let templateRuleToRaw = function(kind, tprule, device) {
-        let rawrule = {
+    const templateRuleToRaw = function(kind, tprule, device) {
+        const rawrule = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
             'conditions': [],
@@ -106,18 +106,18 @@ function PushProcessor(client) {
         return rawrule;
     };
 
-    let ruleMatchesEvent = function(rule, ev) {
+    const ruleMatchesEvent = function(rule, ev) {
         let ret = true;
         for (let i = 0; i < rule.conditions.length; ++i) {
-            let cond = rule.conditions[i];
+            const cond = rule.conditions[i];
             ret &= eventFulfillsCondition(cond, ev);
         }
         //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
         return ret;
     };
 
-    let eventFulfillsCondition = function(cond, ev) {
-        let condition_functions = {
+    const eventFulfillsCondition = function(cond, ev) {
+        const condition_functions = {
             "event_match": eventFulfillsEventMatchCondition,
             "device": eventFulfillsDeviceCondition,
             "contains_display_name": eventFulfillsDisplayNameCondition,
@@ -129,26 +129,26 @@ function PushProcessor(client) {
         return true;
     };
 
-    let eventFulfillsRoomMemberCountCondition = function(cond, ev) {
+    const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
         if (!cond.is) {
             return false;
         }
 
-        let room = client.getRoom(ev.getRoomId());
+        const room = client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members) {
             return false;
         }
 
-        let memberCount = Object.keys(room.currentState.members).filter(function(m) {
+        const memberCount = Object.keys(room.currentState.members).filter(function(m) {
             return room.currentState.members[m].membership == 'join';
         }).length;
 
-        let m = cond.is.match(/^([=<>]*)([0-9]*)$/);
+        const m = cond.is.match(/^([=<>]*)([0-9]*)$/);
         if (!m) {
             return false;
         }
-        let ineq = m[1];
-        let rhs = parseInt(m[2]);
+        const ineq = m[1];
+        const rhs = parseInt(m[2]);
         if (isNaN(rhs)) {
             return false;
         }
@@ -169,32 +169,32 @@ function PushProcessor(client) {
         }
     };
 
-    let eventFulfillsDisplayNameCondition = function(cond, ev) {
-        let content = ev.getContent();
+    const eventFulfillsDisplayNameCondition = function(cond, ev) {
+        const content = ev.getContent();
         if (!content || !content.body || typeof content.body != 'string') {
             return false;
         }
 
-        let room = client.getRoom(ev.getRoomId());
+        const room = client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members ||
             !room.currentState.getMember(client.credentials.userId)) {
             return false;
         }
 
-        let displayName = room.currentState.getMember(client.credentials.userId).name;
+        const displayName = room.currentState.getMember(client.credentials.userId).name;
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
-        let pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
+        const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
         return content.body.search(pat) > -1;
     };
 
-    let eventFulfillsDeviceCondition = function(cond, ev) {
+    const eventFulfillsDeviceCondition = function(cond, ev) {
         return false; // XXX: Allow a profile tag to be set for the web client instance
     };
 
-    let eventFulfillsEventMatchCondition = function(cond, ev) {
-        let val = valueForDottedKey(cond.key, ev);
+    const eventFulfillsEventMatchCondition = function(cond, ev) {
+        const val = valueForDottedKey(cond.key, ev);
         if (!val || typeof val != 'string') {
             return false;
         }
@@ -205,11 +205,11 @@ function PushProcessor(client) {
         } else {
             pat = '^' + globToRegexp(cond.pattern) + '$';
         }
-        let regex = new RegExp(pat, 'i');
+        const regex = new RegExp(pat, 'i');
         return !!val.match(regex);
     };
 
-    let globToRegexp = function(glob) {
+    const globToRegexp = function(glob) {
         // From
         // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
         // Because micromatch is about 130KB with dependencies,
@@ -218,19 +218,19 @@ function PushProcessor(client) {
         pat = pat.replace(/\\\*/, '.*');
         pat = pat.replace(/\?/, '.');
         pat = pat.replace(/\\\[(!|)(.*)\\]/, function(match, p1, p2, offset, string) {
-            let first = p1 && '^' || '';
-            let second = p2.replace(/\\\-/, '-');
+            const first = p1 && '^' || '';
+            const second = p2.replace(/\\\-/, '-');
             return '[' + first + second + ']';
         });
         return pat;
     };
 
-    let valueForDottedKey = function(key, ev) {
-        let parts = key.split('.');
+    const valueForDottedKey = function(key, ev) {
+        const parts = key.split('.');
         let val;
 
         // special-case the first component to deal with encrypted messages
-        let firstPart = parts[0];
+        const firstPart = parts[0];
         if (firstPart == 'content') {
             val = ev.getContent();
             parts.shift();
@@ -243,7 +243,7 @@ function PushProcessor(client) {
         }
 
         while (parts.length > 0) {
-            let thispart = parts.shift();
+            const thispart = parts.shift();
             if (!val[thispart]) {
                 return null;
             }
@@ -252,7 +252,7 @@ function PushProcessor(client) {
         return val;
     };
 
-    let matchingRuleForEventWithRulesets = function(ev, rulesets) {
+    const matchingRuleForEventWithRulesets = function(ev, rulesets) {
         if (!rulesets || !rulesets.device) {
             return null;
         }
@@ -260,12 +260,12 @@ function PushProcessor(client) {
             return null;
         }
 
-        let allDevNames = Object.keys(rulesets.device);
+        const allDevNames = Object.keys(rulesets.device);
         for (let i = 0; i < allDevNames.length; ++i) {
-            let devname = allDevNames[i];
-            let devrules = rulesets.device[devname];
+            const devname = allDevNames[i];
+            const devrules = rulesets.device[devname];
 
-            let matchingRule = matchingRuleFromKindSet(devrules, devname);
+            const matchingRule = matchingRuleFromKindSet(devrules, devname);
             if (matchingRule) {
                 return matchingRule;
             }
@@ -273,13 +273,13 @@ function PushProcessor(client) {
         return matchingRuleFromKindSet(ev, rulesets.global);
     };
 
-    let pushActionsForEventAndRulesets = function(ev, rulesets) {
-        let rule = matchingRuleForEventWithRulesets(ev, rulesets);
+    const pushActionsForEventAndRulesets = function(ev, rulesets) {
+        const rule = matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
             return {};
         }
 
-        let actionObj = PushProcessor.actionListToActionsObject(rule.actions);
+        const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
 
         // Some actions are implicit in some situations: we add those here
         if (actionObj.tweaks.highlight === undefined) {
@@ -312,9 +312,9 @@ function PushProcessor(client) {
  * @return {object} A object with key 'notify' (true or false) and an object of actions
  */
 PushProcessor.actionListToActionsObject = function(actionlist) {
-    let actionobj = { 'notify': false, 'tweaks': {} };
+    const actionobj = { 'notify': false, 'tweaks': {} };
     for (let i = 0; i < actionlist.length; ++i) {
-        let action = actionlist[i];
+        const action = actionlist[i];
         if (action === 'notify') {
             actionobj.notify = true;
         } else if (typeof action === 'object') {

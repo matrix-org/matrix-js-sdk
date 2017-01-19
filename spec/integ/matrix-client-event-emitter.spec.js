@@ -1,14 +1,14 @@
 "use strict";
-let sdk = require("../..");
-let HttpBackend = require("../mock-request");
-let utils = require("../test-utils");
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
 
 describe("MatrixClient events", function() {
-    let baseUrl = "http://localhost.or.something";
+    const baseUrl = "http://localhost.or.something";
     let client;
     let httpBackend;
-    let selfUserId = "@alice:localhost";
-    let selfAccessToken = "aseukfgwef";
+    const selfUserId = "@alice:localhost";
+    const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -29,7 +29,7 @@ describe("MatrixClient events", function() {
     });
 
     describe("emissions", function() {
-        let SYNC_DATA = {
+        const SYNC_DATA = {
             next_batch: "s_5_3",
             presence: {
                 events: [
@@ -67,7 +67,7 @@ describe("MatrixClient events", function() {
                 },
             },
         };
-        let NEXT_SYNC_DATA = {
+        const NEXT_SYNC_DATA = {
             next_batch: "e_6_7",
             rooms: {
                 join: {
@@ -198,7 +198,7 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            let roomStateEventTypes = [
+            const roomStateEventTypes = [
                 "m.room.member", "m.room.create",
             ];
             let eventsInvokeCount = 0;
@@ -206,7 +206,7 @@ describe("MatrixClient events", function() {
             let newMemberInvokeCount = 0;
             client.on("RoomState.events", function(event, state) {
                 eventsInvokeCount++;
-                let index = roomStateEventTypes.indexOf(event.getType());
+                const index = roomStateEventTypes.indexOf(event.getType());
                 expect(index).not.toEqual(
                     -1, "Unexpected room state event type: " + event.getType()
                 );

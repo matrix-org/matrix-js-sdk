@@ -18,8 +18,8 @@ limitations under the License.
  * This is an internal module. See {@link MatrixInMemoryStore} for the public class.
  * @module store/memory
  */
- let utils = require("../utils");
- let User = require("../models/user");
+ const utils = require("../utils");
+ const User = require("../models/user");
 
 /**
  * Construct a new in-memory data store for the Matrix Client.
@@ -77,7 +77,7 @@ module.exports.MatrixInMemoryStore.prototype = {
         // map up-to-date.
         room.currentState.on("RoomState.members", this._onRoomMember.bind(this));
         // add existing members
-        let self = this;
+        const self = this;
         room.currentState.getMembers().forEach(function(m) {
             self._onRoomMember(null, room.currentState, m);
         });
@@ -97,7 +97,7 @@ module.exports.MatrixInMemoryStore.prototype = {
             return;
         }
 
-        let user = this.users[member.userId] || new User(member.userId);
+        const user = this.users[member.userId] || new User(member.userId);
         if (member.name) {
             user.setDisplayName(member.name);
             if (member.events.member) {
@@ -260,7 +260,7 @@ module.exports.MatrixInMemoryStore.prototype = {
      * @param {Array<MatrixEvent>} events The events to store.
      */
     storeAccountDataEvents: function(events) {
-        let self = this;
+        const self = this;
         events.forEach(function(event) {
             self.accountData[event.getType()] = event;
         });

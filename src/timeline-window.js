@@ -17,25 +17,25 @@ limitations under the License.
 
 /** @module timeline-window */
 
-let q = require("q");
-let EventTimeline = require("./models/event-timeline");
+const q = require("q");
+const EventTimeline = require("./models/event-timeline");
 
 /**
  * @private
  */
-let DEBUG = false;
+const DEBUG = false;
 
 /**
  * @private
  */
-let debuglog = DEBUG ? console.log.bind(console) : function() {};
+const debuglog = DEBUG ? console.log.bind(console) : function() {};
 
 /**
  * the number of times we ask the server for more events before giving up
  *
  * @private
  */
-let DEFAULT_PAGINATE_LOOP_LIMIT = 5;
+const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
 
 /**
  * Construct a TimelineWindow.
@@ -92,15 +92,15 @@ function TimelineWindow(client, timelineSet, opts) {
  * @return {module:client.Promise}
  */
 TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
-    let self = this;
+    const self = this;
     initialWindowSize = initialWindowSize || 20;
 
     // given an EventTimeline, and an event index within it, initialise our
     // fields so that the event in question is in the middle of the window.
-    let initFields = function(timeline, eventIndex) {
-        let endIndex = Math.min(timeline.getEvents().length,
+    const initFields = function(timeline, eventIndex) {
+        const endIndex = Math.min(timeline.getEvents().length,
                                 eventIndex + Math.ceil(initialWindowSize / 2));
-        let startIndex = Math.max(0, endIndex - initialWindowSize);
+        const startIndex = Math.max(0, endIndex - initialWindowSize);
         self._start = new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
         self._end = new TimelineIndex(timeline, endIndex - timeline.getBaseIndex());
         self._eventCount = endIndex - startIndex;
@@ -126,7 +126,7 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
             });
     } else {
         // start with the most recent events
-        let tl = this._timelineSet.getLiveTimeline();
+        const tl = this._timelineSet.getLiveTimeline();
         initFields(tl, tl.getEvents().length);
         return q();
     }
@@ -228,7 +228,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     }
 
     // try moving the cap
-    let count = (direction == EventTimeline.BACKWARDS) ?
+    const count = (direction == EventTimeline.BACKWARDS) ?
         tl.retreat(size) : tl.advance(size);
 
     if (count) {
@@ -236,7 +236,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
         debuglog("TimelineWindow: increased cap by " + count +
                  " (now " + this._eventCount + ")");
         // remove some events from the other end, if necessary
-        let excess = this._eventCount - this._windowLimit;
+        const excess = this._eventCount - this._windowLimit;
         if (excess > 0) {
             this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
         }
@@ -250,16 +250,16 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     }
 
     // try making a pagination request
-    let token = tl.timeline.getPaginationToken(direction);
+    const token = tl.timeline.getPaginationToken(direction);
     if (!token) {
         debuglog("TimelineWindow: no token");
         return q(false);
     }
 
     debuglog("TimelineWindow: starting request");
-    let self = this;
+    const self = this;
 
-    let prom = this._client.paginateEventTimeline(tl.timeline, {
+    const prom = this._client.paginateEventTimeline(tl.timeline, {
         backwards: direction == EventTimeline.BACKWARDS,
         limit: size,
     }).finally(function() {
@@ -298,7 +298,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
  *     of the timeline.
  */
 TimelineWindow.prototype.unpaginate = function(delta, startOfTimeline) {
-    let tl = startOfTimeline ? this._start : this._end;
+    const tl = startOfTimeline ? this._start : this._end;
 
     // sanity-check the delta
     if (delta > this._eventCount || delta < 0) {
@@ -307,7 +307,7 @@ TimelineWindow.prototype.unpaginate = function(delta, startOfTimeline) {
     }
 
     while (delta > 0) {
-        let count = startOfTimeline ? tl.advance(delta) : tl.retreat(delta);
+        const count = startOfTimeline ? tl.advance(delta) : tl.retreat(delta);
         if (count <= 0) {
             // sadness. This shouldn't be possible.
             throw new Error(
@@ -334,13 +334,13 @@ TimelineWindow.prototype.getEvents = function() {
         return [];
     }
 
-    let result = [];
+    const result = [];
 
     // iterate through each timeline between this._start and this._end
     // (inclusive).
     let timeline = this._start.timeline;
     while (true) {
-        let events = timeline.getEvents();
+        const events = timeline.getEvents();
 
         // For the first timeline in the chain, we want to start at
         // this._start.index. For the last timeline in the chain, we want to
@@ -447,7 +447,7 @@ TimelineIndex.prototype.advance = function(delta) {
     // the index is already at the start/end of the current timeline.
     //
     // next see if there is a neighbouring timeline to switch to.
-    let neighbour = this.timeline.getNeighbouringTimeline(
+    const neighbour = this.timeline.getNeighbouringTimeline(
         delta < 0 ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS);
     if (neighbour) {
         this.timeline = neighbour;

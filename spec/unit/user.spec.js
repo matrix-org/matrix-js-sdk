@@ -1,10 +1,10 @@
 "use strict";
-let sdk = require("../..");
-let User = sdk.User;
-let utils = require("../test-utils");
+const sdk = require("../..");
+const User = sdk.User;
+const utils = require("../test-utils");
 
 describe("User", function() {
-    let userId = "@alice:bar";
+    const userId = "@alice:bar";
     let user;
 
     beforeEach(function() {
@@ -13,7 +13,7 @@ describe("User", function() {
     });
 
     describe("setPresenceEvent", function() {
-        let event = utils.mkEvent({
+        const event = utils.mkEvent({
             type: "m.presence", content: {
                 presence: "online",
                 user_id: userId,

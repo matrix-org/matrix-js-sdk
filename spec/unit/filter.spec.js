@@ -1,11 +1,11 @@
 "use strict";
-let sdk = require("../..");
-let Filter = sdk.Filter;
-let utils = require("../test-utils");
+const sdk = require("../..");
+const Filter = sdk.Filter;
+const utils = require("../test-utils");
 
 describe("Filter", function() {
-    let filterId = "f1lt3ring15g00d4ursoul";
-    let userId = "@sir_arthur_david:humming.tiger";
+    const filterId = "f1lt3ring15g00d4ursoul";
+    const userId = "@sir_arthur_david:humming.tiger";
     let filter;
 
     beforeEach(function() {
@@ -15,10 +15,10 @@ describe("Filter", function() {
 
     describe("fromJson", function() {
         it("create a new Filter from the provided values", function() {
-            let definition = {
+            const definition = {
                 event_fields: ["type", "content"],
             };
-            let f = Filter.fromJson(userId, filterId, definition);
+            const f = Filter.fromJson(userId, filterId, definition);
             expect(f.getDefinition()).toEqual(definition);
             expect(f.userId).toEqual(userId);
             expect(f.filterId).toEqual(filterId);
@@ -40,7 +40,7 @@ describe("Filter", function() {
 
     describe("setDefinition/getDefinition", function() {
         it("should set and get the filter body", function() {
-            let definition = {
+            const definition = {
                 event_format: "client",
             };
             filter.setDefinition(definition);

@@ -17,12 +17,12 @@ limitations under the License.
 /**
  * @module models/event-timeline-set
  */
-let EventEmitter = require("events").EventEmitter;
-let utils = require("../utils");
-let EventTimeline = require("./event-timeline");
+const EventEmitter = require("events").EventEmitter;
+const utils = require("../utils");
+const EventTimeline = require("./event-timeline");
 
 // var DEBUG = false;
-let DEBUG = true;
+const DEBUG = true;
 
 let debuglog;
 if (DEBUG) {
@@ -136,7 +136,7 @@ EventTimelineSet.prototype.eventIdToTimeline = function(eventId) {
  * @param {String} newEventId  event ID of the replacement event
  */
 EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
-    let existingTimeline = this._eventIdToTimeline[oldEventId];
+    const existingTimeline = this._eventIdToTimeline[oldEventId];
     if (existingTimeline) {
         delete this._eventIdToTimeline[oldEventId];
         this._eventIdToTimeline[newEventId] = existingTimeline;
@@ -166,13 +166,13 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
     }
 
     // initialise the state in the new timeline from our last known state
-    let evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
-    let events = [];
-    for (let evtype in evMap) {
+    const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
+    const events = [];
+    for (const evtype in evMap) {
         if (!evMap.hasOwnProperty(evtype)) {
             continue;
         }
-        for (let stateKey in evMap[evtype]) {
+        for (const stateKey in evMap[evtype]) {
             if (!evMap[evtype].hasOwnProperty(stateKey)) {
                 continue;
             }
@@ -198,7 +198,7 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
  * the given event, or null if unknown
  */
 EventTimelineSet.prototype.getTimelineForEvent = function(eventId) {
-    let res = this._eventIdToTimeline[eventId];
+    const res = this._eventIdToTimeline[eventId];
     return (res === undefined) ? null : res;
 };
 
@@ -209,7 +209,7 @@ EventTimelineSet.prototype.getTimelineForEvent = function(eventId) {
  * @return {?module:models/event~MatrixEvent} the given event, or undefined if unknown
  */
 EventTimelineSet.prototype.findEventById = function(eventId) {
-    let tl = this.getTimelineForEvent(eventId);
+    const tl = this.getTimelineForEvent(eventId);
     if (!tl) {
         return undefined;
     }
@@ -230,7 +230,7 @@ EventTimelineSet.prototype.addTimeline = function() {
                         " it.");
     }
 
-    let timeline = new EventTimeline(this);
+    const timeline = new EventTimeline(this);
     this._timelines.push(timeline);
     return timeline;
 };
@@ -277,9 +277,9 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         }
     }
 
-    let direction = toStartOfTimeline ? EventTimeline.BACKWARDS :
+    const direction = toStartOfTimeline ? EventTimeline.BACKWARDS :
         EventTimeline.FORWARDS;
-    let inverseDirection = toStartOfTimeline ? EventTimeline.FORWARDS :
+    const inverseDirection = toStartOfTimeline ? EventTimeline.FORWARDS :
         EventTimeline.BACKWARDS;
 
     // Adding events to timelines can be quite complicated. The following
@@ -354,10 +354,10 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     let didUpdate = false;
     let lastEventWasNew = false;
     for (let i = 0; i < events.length; i++) {
-        let event = events[i];
-        let eventId = event.getId();
+        const event = events[i];
+        const eventId = event.getId();
 
-        let existingTimeline = this._eventIdToTimeline[eventId];
+        const existingTimeline = this._eventIdToTimeline[eventId];
 
         if (!existingTimeline) {
             // we don't know about this event yet. Just add it to the timeline.
@@ -374,7 +374,7 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
             continue;
         }
 
-        let neighbour = timeline.getNeighbouringTimeline(direction);
+        const neighbour = timeline.getNeighbouringTimeline(direction);
         if (neighbour) {
             // this timeline already has a neighbour in the relevant direction;
             // let's assume the timelines are already correctly linked up, and
@@ -422,18 +422,18 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
  */
 EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
     if (this._filter) {
-        let events = this._filter.filterRoomTimeline([event]);
+        const events = this._filter.filterRoomTimeline([event]);
         if (!events.length) {
             return;
         }
     }
 
-    let timeline = this._eventIdToTimeline[event.getId()];
+    const timeline = this._eventIdToTimeline[event.getId()];
     if (timeline) {
         if (duplicateStrategy === "replace") {
             debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " +
                      event.getId());
-            let tlEvents = timeline.getEvents();
+            const tlEvents = timeline.getEvents();
             for (let j = 0; j < tlEvents.length; j++) {
                 if (tlEvents[j].getId() === event.getId()) {
                     // still need to set the right metadata on this event
@@ -475,11 +475,11 @@ EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
  */
 EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
                                                          toStartOfTimeline) {
-    let eventId = event.getId();
+    const eventId = event.getId();
     timeline.addEvent(event, toStartOfTimeline);
     this._eventIdToTimeline[eventId] = timeline;
 
-    let data = {
+    const data = {
         timeline: timeline,
         liveEvent: !toStartOfTimeline && timeline == this._liveTimeline,
     };
@@ -500,7 +500,7 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
 EventTimelineSet.prototype.handleRemoteEcho = function(localEvent, oldEventId,
                                                         newEventId) {
     // XXX: why don't we infer newEventId from localEvent?
-    let existingTimeline = this._eventIdToTimeline[oldEventId];
+    const existingTimeline = this._eventIdToTimeline[oldEventId];
     if (existingTimeline) {
         delete this._eventIdToTimeline[oldEventId];
         this._eventIdToTimeline[newEventId] = existingTimeline;
@@ -524,15 +524,15 @@ EventTimelineSet.prototype.handleRemoteEcho = function(localEvent, oldEventId,
  * in this room.
  */
 EventTimelineSet.prototype.removeEvent = function(eventId) {
-    let timeline = this._eventIdToTimeline[eventId];
+    const timeline = this._eventIdToTimeline[eventId];
     if (!timeline) {
         return null;
     }
 
-    let removed = timeline.removeEvent(eventId);
+    const removed = timeline.removeEvent(eventId);
     if (removed) {
         delete this._eventIdToTimeline[eventId];
-        let data = {
+        const data = {
             timeline: timeline,
         };
         this.emit("Room.timeline", removed, this.room, undefined, true, data);
@@ -558,8 +558,8 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
         return 0;
     }
 
-    let timeline1 = this._eventIdToTimeline[eventId1];
-    let timeline2 = this._eventIdToTimeline[eventId2];
+    const timeline1 = this._eventIdToTimeline[eventId1];
+    const timeline2 = this._eventIdToTimeline[eventId2];
 
     if (timeline1 === undefined) {
         return null;
@@ -572,10 +572,10 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
         // both events are in the same timeline - figure out their
         // relative indices
         let idx1, idx2;
-        let events = timeline1.getEvents();
+        const events = timeline1.getEvents();
         for (let idx = 0; idx < events.length &&
              (idx1 === undefined || idx2 === undefined); idx++) {
-            let evId = events[idx].getId();
+            const evId = events[idx].getId();
             if (evId == eventId1) {
                 idx1 = idx;
             }

@@ -1,6 +1,6 @@
 "use strict";
-let utils = require("../../lib/utils");
-let testUtils = require("../test-utils");
+const utils = require("../../lib/utils");
+const testUtils = require("../test-utils");
 
 describe("utils", function() {
     beforeEach(function() {
@@ -9,7 +9,7 @@ describe("utils", function() {
 
     describe("encodeParams", function() {
         it("should url encode and concat with &s", function() {
-            let params = {
+            const params = {
                 foo: "bar",
                 baz: "beer@",
             };
@@ -21,8 +21,8 @@ describe("utils", function() {
 
     describe("encodeUri", function() {
         it("should replace based on object keys and url encode", function() {
-            let path = "foo/bar/%something/%here";
-            let vals = {
+            const path = "foo/bar/%something/%here";
+            const vals = {
                 "%something": "baz",
                 "%here": "beer@",
             };
@@ -34,7 +34,7 @@ describe("utils", function() {
 
     describe("forEach", function() {
         it("should be invoked for each element", function() {
-            let arr = [];
+            const arr = [];
             utils.forEach([55, 66, 77], function(element) {
                 arr.push(element);
             });
@@ -44,50 +44,50 @@ describe("utils", function() {
 
     describe("findElement", function() {
         it("should find only 1 element if there is a match", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return true;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn)).toEqual(55);
         });
         it("should be able to find in reverse order", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return true;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn, true)).toEqual(77);
         });
         it("should find nothing if the function never returns true", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return false;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             expect(utils.findElement(arr, matchFn)).toBeFalsy();
         });
     });
 
     describe("removeElement", function() {
         it("should remove only 1 element if there is a match", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return true;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             utils.removeElement(arr, matchFn);
             expect(arr).toEqual([66, 77]);
         });
         it("should be able to remove in reverse order", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return true;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             utils.removeElement(arr, matchFn, true);
             expect(arr).toEqual([55, 66]);
         });
         it("should remove nothing if the function never returns true", function() {
-            let matchFn = function() {
+            const matchFn = function() {
                 return false;
             };
-            let arr = [55, 66, 77];
+            const arr = [55, 66, 77];
             utils.removeElement(arr, matchFn);
             expect(arr).toEqual(arr);
         });
@@ -104,7 +104,7 @@ describe("utils", function() {
             expect(utils.isFunction(555)).toBe(false);
 
             expect(utils.isFunction(function() {})).toBe(true);
-            let s = { foo: function() {} };
+            const s = { foo: function() {} };
             expect(utils.isFunction(s.foo)).toBe(true);
         });
     });
@@ -154,7 +154,7 @@ describe("utils", function() {
     });
 
     describe("deepCompare", function() {
-        let assert = {
+        const assert = {
             isTrue: function(x) {
                 expect(x).toBe(true);
             },
@@ -174,7 +174,7 @@ describe("utils", function() {
         it("should handle regexps", function() {
             assert.isTrue(utils.deepCompare(/abc/, /abc/));
             assert.isFalse(utils.deepCompare(/abc/, /123/));
-            let r = /abc/;
+            const r = /abc/;
             assert.isTrue(utils.deepCompare(r, r));
         });
 
@@ -216,10 +216,10 @@ describe("utils", function() {
             // no two different function is equal really, they capture their
             // context variables so even if they have same toString(), they
             // won't have same functionality
-            let func = function(x) {
+            const func = function(x) {
                 return true;
             };
-            let func2 = function(x) {
+            const func2 = function(x) {
                 return true;
             };
             assert.isTrue(utils.deepCompare(func, func));
@@ -231,17 +231,17 @@ describe("utils", function() {
 
 
     describe("extend", function() {
-        let SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };
+        const SOURCE = { "prop2": 1, "string2": "x", "newprop": "new" };
 
         it("should extend", function() {
-            let target = {
+            const target = {
                 "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
             };
-            let merged = {
+            const merged = {
                 "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
                 "newprop": "new",
             };
-            let sourceOrig = JSON.stringify(SOURCE);
+            const sourceOrig = JSON.stringify(SOURCE);
 
             utils.extend(target, SOURCE);
             expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
@@ -251,14 +251,14 @@ describe("utils", function() {
         });
 
         it("should ignore null", function() {
-            let target = {
+            const target = {
                 "prop1": 5, "prop2": 7, "string1": "baz", "string2": "foo",
             };
-            let merged = {
+            const merged = {
                 "prop1": 5, "prop2": 1, "string1": "baz", "string2": "x",
                 "newprop": "new",
             };
-            let sourceOrig = JSON.stringify(SOURCE);
+            const sourceOrig = JSON.stringify(SOURCE);
 
             utils.extend(target, null, SOURCE);
             expect(JSON.stringify(target)).toEqual(JSON.stringify(merged));
@@ -268,7 +268,7 @@ describe("utils", function() {
         });
 
         it("should handle properties created with defineProperties", function() {
-            let source = Object.defineProperties({}, {
+            const source = Object.defineProperties({}, {
                 "enumerableProp": {
                     get: function() {
                         return true;
@@ -282,7 +282,7 @@ describe("utils", function() {
                 },
             });
 
-            let target = {};
+            const target = {};
             utils.extend(target, source);
             expect(target.enumerableProp).toBe(true);
             expect(target.nonenumerableProp).toBe(undefined);

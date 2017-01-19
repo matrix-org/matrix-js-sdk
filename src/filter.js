@@ -18,7 +18,7 @@ limitations under the License.
  * @module filter
  */
 
-let FilterComponent = require("./filter-component");
+const FilterComponent = require("./filter-component");
 
 /**
  * @param {Object} obj
@@ -26,7 +26,7 @@ let FilterComponent = require("./filter-component");
  * @param {*} val
  */
 function setProp(obj, keyNesting, val) {
-    let nestedKeys = keyNesting.split(".");
+    const nestedKeys = keyNesting.split(".");
     let currentObj = obj;
     for (let i = 0; i < (nestedKeys.length - 1); i++) {
         if (!currentObj[nestedKeys[i]]) {
@@ -106,10 +106,10 @@ Filter.prototype.setDefinition = function(definition) {
     //   "event_fields": ["type", "content", "sender"]
     // }
 
-    let room_filter_json = definition.room;
+    const room_filter_json = definition.room;
 
     // consider the top level rooms/not_rooms filter
-    let room_filter_fields = {};
+    const room_filter_fields = {};
     if (room_filter_json) {
         if (room_filter_json.rooms) {
             room_filter_fields.rooms = room_filter_json.rooms;
@@ -183,7 +183,7 @@ Filter.prototype.setIncludeLeaveRooms = function(includeLeave) {
  * @return {Filter}
  */
 Filter.fromJson = function(userId, filterId, jsonObj) {
-    let filter = new Filter(userId, filterId);
+    const filter = new Filter(userId, filterId);
     filter.setDefinition(jsonObj);
     return filter;
 };

@@ -19,10 +19,10 @@ limitations under the License.
  * @module store/session/webstorage
  */
 
-let utils = require("../../utils");
+const utils = require("../../utils");
 
-let DEBUG = false;  // set true to enable console logging.
-let E2E_PREFIX = "session.e2e.";
+const DEBUG = false;  // set true to enable console logging.
+const E2E_PREFIX = "session.e2e.";
 
 /**
  * Construct a web storage session store, capable of storing account keys,
@@ -106,7 +106,7 @@ WebStorageSessionStore.prototype = {
      * @param {string} session Base64 encoded end-to-end session.
      */
     storeEndToEndSession: function(deviceKey, sessionId, session) {
-        let sessions = this.getEndToEndSessions(deviceKey) || {};
+        const sessions = this.getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = session;
         setJsonItem(
             this.store, keyEndToEndSessions(deviceKey), sessions
@@ -150,12 +150,12 @@ WebStorageSessionStore.prototype = {
     },
 
     getEndToEndInboundGroupSession: function(senderKey, sessionId) {
-        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        const key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.getItem(key);
     },
 
     storeEndToEndInboundGroupSession: function(senderKey, sessionId, pickledSession) {
-        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        const key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.setItem(key, pickledSession);
     },
 
@@ -178,8 +178,8 @@ WebStorageSessionStore.prototype = {
     },
 };
 
-let KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
-let KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
+const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
 
 function keyEndToEndDevicesForUser(userId) {
     return E2E_PREFIX + "devices/" + userId;

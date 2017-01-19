@@ -11,12 +11,13 @@ module.exports = {
     },
     extends: ["eslint:recommended", "google"],
     rules: {
-        // rules we've always adhered to
+        // rules we've always adhered to or now do
         "max-len": ["error", {
             code: 90,
             ignoreComments: true,
         }],
         curly: ["error", "multi-line"],
+        "prefer-const": ["error"],
 
         // loosen jsdoc requirements a little
         "require-jsdoc": ["error", {
@@ -55,5 +56,6 @@ module.exports = {
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
+
     }
 }

@@ -20,15 +20,15 @@ limitations under the License.
  *
  * @module crypto/algorithms/olm
  */
-let q = require('q');
+const q = require('q');
 
-let utils = require("../../utils");
-let olmlib = require("../olmlib");
-let DeviceInfo = require("../deviceinfo");
-let DeviceVerification = DeviceInfo.DeviceVerification;
+const utils = require("../../utils");
+const olmlib = require("../olmlib");
+const DeviceInfo = require("../deviceinfo");
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 
-let base = require("./base");
+const base = require("./base");
 
 /**
  * Olm encryption implementation
@@ -63,7 +63,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
         return q();
     }
 
-    let self = this;
+    const self = this;
     this._prepPromise = self._crypto.downloadKeys(roomMembers, true).then(function(res) {
         return self._crypto.ensureOlmSessionsForUsers(roomMembers);
     }).then(function() {
@@ -89,31 +89,31 @@ OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     // TODO: there is a race condition here! What if a new user turns up
     // just as you are sending a secret message?
 
-    let users = utils.map(room.getJoinedMembers(), function(u) {
+    const users = utils.map(room.getJoinedMembers(), function(u) {
         return u.userId;
     });
 
-    let self = this;
+    const self = this;
     return this._ensureSession(users).then(function() {
-        let payloadFields = {
+        const payloadFields = {
             room_id: room.roomId,
             type: eventType,
             content: content,
         };
 
-        let encryptedContent = {
+        const encryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
             sender_key: self._olmDevice.deviceCurve25519Key,
             ciphertext: {},
         };
 
         for (let i = 0; i < users.length; ++i) {
-            let userId = users[i];
-            let devices = self._crypto.getStoredDevicesForUser(userId);
+            const userId = users[i];
+            const devices = self._crypto.getStoredDevicesForUser(userId);
 
             for (let j = 0; j < devices.length; ++j) {
-                let deviceInfo = devices[j];
-                let key = deviceInfo.getIdentityKey();
+                const deviceInfo = devices[j];
+                const key = deviceInfo.getIdentityKey();
                 if (key == self._olmDevice.deviceCurve25519Key) {
                     // don't bother sending to ourself
                     continue;
@@ -157,9 +157,9 @@ utils.inherits(OlmDecryption, base.DecryptionAlgorithm);
  *   problem decrypting the event
  */
 OlmDecryption.prototype.decryptEvent = function(event) {
-    let content = event.getWireContent();
-    let deviceKey = content.sender_key;
-    let ciphertext = content.ciphertext;
+    const content = event.getWireContent();
+    const deviceKey = content.sender_key;
+    const ciphertext = content.ciphertext;
 
     if (!ciphertext) {
         throw new base.DecryptionError("Missing ciphertext");
@@ -168,7 +168,7 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     if (!(this._olmDevice.deviceCurve25519Key in ciphertext)) {
         throw new base.DecryptionError("Not included in recipients");
     }
-    let message = ciphertext[this._olmDevice.deviceCurve25519Key];
+    const message = ciphertext[this._olmDevice.deviceCurve25519Key];
     let payloadString;
 
     try {
@@ -182,7 +182,7 @@ OlmDecryption.prototype.decryptEvent = function(event) {
         throw new base.DecryptionError("Bad Encrypted Message");
     }
 
-    let payload = JSON.parse(payloadString);
+    const payload = JSON.parse(payloadString);
 
     // check that we were the intended recipient, to avoid unknown-key attack
     // https://github.com/vector-im/vector-web/issues/2483
@@ -243,14 +243,14 @@ OlmDecryption.prototype.decryptEvent = function(event) {
  * @return {string} payload, if decrypted successfully.
  */
 OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, message) {
-    let sessionIds = this._olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
+    const sessionIds = this._olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
 
     // try each session in turn.
-    let decryptionErrors = {};
+    const decryptionErrors = {};
     for (let i = 0; i < sessionIds.length; i++) {
-        let sessionId = sessionIds[i];
+        const sessionId = sessionIds[i];
         try {
-            let payload = this._olmDevice.decryptMessage(
+            const payload = this._olmDevice.decryptMessage(
                 theirDeviceIdentityKey, sessionId, message.type, message.body
             );
             console.log(
@@ -259,7 +259,7 @@ OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, messa
             );
             return payload;
         } catch (e) {
-            let foundSession = this._olmDevice.matchesSession(
+            const foundSession = this._olmDevice.matchesSession(
                 theirDeviceIdentityKey, sessionId, message.type, message.body
             );
 

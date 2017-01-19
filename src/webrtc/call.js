@@ -18,9 +18,9 @@ limitations under the License.
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  * @module webrtc/call
  */
-let utils = require("../utils");
-let EventEmitter = require("events").EventEmitter;
-let DEBUG = true;  // set true to enable console logging.
+const utils = require("../utils");
+const EventEmitter = require("events").EventEmitter;
+const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -125,17 +125,17 @@ MatrixCall.prototype.placeScreenSharingCall =
     function(remoteVideoElement, localVideoElement) {
     debuglog("placeScreenSharingCall");
     checkForErrorListener(this);
-    let screenConstraints = _getChromeScreenSharingConstraints(this);
+    const screenConstraints = _getChromeScreenSharingConstraints(this);
     if (!screenConstraints) {
         return;
     }
     this.localVideoElement = localVideoElement;
     this.remoteVideoElement = remoteVideoElement;
-    let self = this;
+    const self = this;
     this.webRtc.getUserMedia(screenConstraints, function(stream) {
         self.screenSharingStream = stream;
         debuglog("Got screen stream, requesting audio stream...");
-        let audioConstraints = _getUserMediaVideoContraints('voice');
+        const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
     }, function(err) {
         self.emit("error",
@@ -266,9 +266,9 @@ MatrixCall.prototype.setLocalVideoElement = function(element) {
                            this.URL.createObjectURL(this.localAVStream),
                            "localVideo");
         element.muted = true;
-        let self = this;
+        const self = this;
         setTimeout(function() {
-            let vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
@@ -306,7 +306,7 @@ MatrixCall.prototype.setRemoteAudioElement = function(element) {
 MatrixCall.prototype._initWithInvite = function(event) {
     this.msg = event.getContent();
     this.peerConn = _createPeerConnection(this);
-    let self = this;
+    const self = this;
     if (this.peerConn) {
         this.peerConn.setRemoteDescription(
             new this.webRtc.RtcSessionDescription(this.msg.offer),
@@ -364,7 +364,7 @@ MatrixCall.prototype._initWithHangup = function(event) {
  */
 MatrixCall.prototype.answer = function() {
     debuglog("Answering call %s of type %s", this.callId, this.type);
-    let self = this;
+    const self = this;
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
         this.webRtc.getUserMedia(
@@ -416,7 +416,7 @@ MatrixCall.prototype._replacedBy = function(newCall) {
 MatrixCall.prototype.hangup = function(reason, suppressEvent) {
     debuglog("Ending call " + this.callId);
     terminate(this, "local", reason, !suppressEvent);
-    let content = {
+    const content = {
         version: 0,
         call_id: this.callId,
         reason: reason,
@@ -492,8 +492,8 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         return;
     }
     debuglog("_gotUserMediaForInvite -> " + this.type);
-    let self = this;
-    let videoEl = this.getLocalVideoElement();
+    const self = this;
+    const videoEl = this.getLocalVideoElement();
 
     if (videoEl && this.type == 'video') {
         videoEl.autoplay = true;
@@ -509,7 +509,7 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         }
         videoEl.muted = true;
         setTimeout(function() {
-            let vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
@@ -539,11 +539,11 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
  * @param {Object} stream
  */
 MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
-    let self = this;
+    const self = this;
     if (self.state == 'ended') {
         return;
     }
-    let localVidEl = self.getLocalVideoElement();
+    const localVidEl = self.getLocalVideoElement();
 
     if (localVidEl && self.type == 'video') {
         localVidEl.autoplay = true;
@@ -552,7 +552,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
                "localVideo");
         localVidEl.muted = true;
         setTimeout(function() {
-            let vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
@@ -563,7 +563,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
     setTracksEnabled(stream.getAudioTracks(), true);
     self.peerConn.addStream(stream);
 
-    let constraints = {
+    const constraints = {
         'mandatory': {
             'OfferToReceiveAudio': true,
             'OfferToReceiveVideo': self.type == 'video',
@@ -572,7 +572,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
     self.peerConn.createAnswer(function(description) {
         debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
-            let content = {
+            const content = {
                 version: 0,
                 call_id: self.callId,
                 answer: {
@@ -604,7 +604,7 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
         );
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
-        let c = {
+        const c = {
             candidate: event.candidate.candidate,
             sdpMid: event.candidate.sdpMid,
             sdpMLineIndex: event.candidate.sdpMLineIndex,
@@ -641,7 +641,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
         return;
     }
 
-    let self = this;
+    const self = this;
     this.peerConn.setRemoteDescription(
         new this.webRtc.RtcSessionDescription(msg.answer),
         hookCallback(self, self._onSetRemoteDescriptionSuccess),
@@ -656,7 +656,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
  * @param {Object} description
  */
 MatrixCall.prototype._gotLocalOffer = function(description) {
-    let self = this;
+    const self = this;
     debuglog("Created offer: " + description);
 
     if (self.state == 'ended') {
@@ -666,7 +666,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
     }
 
     self.peerConn.setLocalDescription(description, function() {
-        let content = {
+        const content = {
             version: 0,
             call_id: self.callId,
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
@@ -784,7 +784,7 @@ MatrixCall.prototype._onSetRemoteDescriptionError = function(e) {
 MatrixCall.prototype._onAddStream = function(event) {
     debuglog("Stream id " + event.stream.id + " added");
 
-    let s = event.stream;
+    const s = event.stream;
 
     if (s.getVideoTracks().length > 0) {
         this.type = 'video';
@@ -795,7 +795,7 @@ MatrixCall.prototype._onAddStream = function(event) {
         this.remoteAStream = s;
     }
 
-    let self = this;
+    const self = this;
     forAllTracksOnStream(s, function(t) {
         debuglog("Track id " + t.id + " added");
         // not currently implemented in chrome
@@ -874,13 +874,13 @@ MatrixCall.prototype._onAnsweredElsewhere = function(msg) {
     terminate(this, "remote", "answered_elsewhere", true);
 };
 
-let setTracksEnabled = function(tracks, enabled) {
+const setTracksEnabled = function(tracks, enabled) {
     for (let i = 0; i < tracks.length; i++) {
         tracks[i].enabled = enabled;
     }
 };
 
-let isTracksEnabled = function(tracks) {
+const isTracksEnabled = function(tracks) {
     for (let i = 0; i < tracks.length; i++) {
         if (tracks[i].enabled) {
             return true; // at least one track is enabled
@@ -889,8 +889,8 @@ let isTracksEnabled = function(tracks) {
     return false;
 };
 
-let setState = function(self, state) {
-    let oldState = self.state;
+const setState = function(self, state) {
+    const oldState = self.state;
     self.state = state;
     self.emit("state", state, oldState);
 };
@@ -902,11 +902,11 @@ let setState = function(self, state) {
  * @param {Object} content
  * @return {Promise}
  */
-let sendEvent = function(self, eventType, content) {
+const sendEvent = function(self, eventType, content) {
     return self.client.sendEvent(self.roomId, eventType, content);
 };
 
-let sendCandidate = function(self, content) {
+const sendCandidate = function(self, content) {
     // Sends candidates with are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
@@ -917,7 +917,7 @@ let sendCandidate = function(self, content) {
     }
 };
 
-let terminate = function(self, hangupParty, hangupReason, shouldEmit) {
+const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
     if (self.getRemoteVideoElement()) {
         if (self.getRemoteVideoElement().pause) {
             self.pauseElement(self.getRemoteVideoElement(), "remoteVideo");
@@ -948,7 +948,7 @@ let terminate = function(self, hangupParty, hangupReason, shouldEmit) {
     }
 };
 
-let stopAllMedia = function(self) {
+const stopAllMedia = function(self) {
     debuglog("stopAllMedia (stream=%s)", self.localAVStream);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
@@ -988,15 +988,15 @@ let stopAllMedia = function(self) {
     }
 };
 
-let _tryPlayRemoteStream = function(self) {
+const _tryPlayRemoteStream = function(self) {
     if (self.getRemoteVideoElement() && self.remoteAVStream) {
-        let player = self.getRemoteVideoElement();
+        const player = self.getRemoteVideoElement();
         player.autoplay = true;
         self.assignElement(player,
                            self.URL.createObjectURL(self.remoteAVStream),
                            "remoteVideo");
         setTimeout(function() {
-            let vel = self.getRemoteVideoElement();
+            const vel = self.getRemoteVideoElement();
             if (vel.play) {
                 self.playElement(vel, "remoteVideo");
             }
@@ -1008,15 +1008,15 @@ let _tryPlayRemoteStream = function(self) {
     }
 };
 
-let _tryPlayRemoteAudioStream = function(self) {
+const _tryPlayRemoteAudioStream = function(self) {
     if (self.getRemoteAudioElement() && self.remoteAStream) {
-        let player = self.getRemoteAudioElement();
+        const player = self.getRemoteAudioElement();
         player.autoplay = true;
         self.assignElement(player,
                            self.URL.createObjectURL(self.remoteAStream),
                            "remoteAudio");
         setTimeout(function() {
-            let ael = self.getRemoteAudioElement();
+            const ael = self.getRemoteAudioElement();
             if (ael.play) {
                 self.playElement(ael, "remoteAudio");
             }
@@ -1028,7 +1028,7 @@ let _tryPlayRemoteAudioStream = function(self) {
     }
 };
 
-let checkForErrorListener = function(self) {
+const checkForErrorListener = function(self) {
     if (self.listeners("error").length === 0) {
         throw new Error(
             "You MUST attach an error listener using call.on('error', function() {})"
@@ -1036,27 +1036,27 @@ let checkForErrorListener = function(self) {
     }
 };
 
-let callError = function(code, msg) {
-    let e = new Error(msg);
+const callError = function(code, msg) {
+    const e = new Error(msg);
     e.code = code;
     return e;
 };
 
-let debuglog = function() {
+const debuglog = function() {
     if (DEBUG) {
         console.log(...arguments);
     }
 };
 
-let _sendCandidateQueue = function(self) {
+const _sendCandidateQueue = function(self) {
     if (self.candidateSendQueue.length === 0) {
         return;
     }
 
-    let cands = self.candidateSendQueue;
+    const cands = self.candidateSendQueue;
     self.candidateSendQueue = [];
     ++self.candidateSendTries;
-    let content = {
+    const content = {
         version: 0,
         call_id: self.callId,
         candidates: cands,
@@ -1079,7 +1079,7 @@ let _sendCandidateQueue = function(self) {
             return;
         }
 
-        let delayMs = 500 * Math.pow(2, self.candidateSendTries);
+        const delayMs = 500 * Math.pow(2, self.candidateSendTries);
         ++self.candidateSendTries;
         debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
         setTimeout(function() {
@@ -1088,7 +1088,7 @@ let _sendCandidateQueue = function(self) {
     });
 };
 
-let _placeCallWithConstraints = function(self, constraints) {
+const _placeCallWithConstraints = function(self, constraints) {
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
@@ -1100,7 +1100,7 @@ let _placeCallWithConstraints = function(self, constraints) {
     self.config = constraints;
 };
 
-let _createPeerConnection = function(self) {
+const _createPeerConnection = function(self) {
     let servers = self.turnServers;
     if (self.webRtc.vendor === "mozilla") {
         // modify turnServers struct to match what mozilla expects.
@@ -1116,7 +1116,7 @@ let _createPeerConnection = function(self) {
         }
     }
 
-    let pc = new self.webRtc.RtcPeerConnection({
+    const pc = new self.webRtc.RtcPeerConnection({
         iceServers: servers,
     });
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
@@ -1126,8 +1126,8 @@ let _createPeerConnection = function(self) {
     return pc;
 };
 
-let _getChromeScreenSharingConstraints = function(call) {
-    let screen = global.screen;
+const _getChromeScreenSharingConstraints = function(call) {
+    const screen = global.screen;
     if (!screen) {
         call.emit("error", callError(
             MatrixCall.ERR_NO_USER_MEDIA,
@@ -1150,7 +1150,7 @@ let _getChromeScreenSharingConstraints = function(call) {
     };
 };
 
-let _getUserMediaVideoContraints = function(callType) {
+const _getUserMediaVideoContraints = function(callType) {
     switch (callType) {
         case 'voice':
             return ({audio: true, video: false});
@@ -1166,27 +1166,27 @@ let _getUserMediaVideoContraints = function(callType) {
     }
 };
 
-let hookCallback = function(call, fn) {
+const hookCallback = function(call, fn) {
     return function() {
         return fn.apply(call, arguments);
     };
 };
 
-let forAllVideoTracksOnStream = function(s, f) {
-    let tracks = s.getVideoTracks();
+const forAllVideoTracksOnStream = function(s, f) {
+    const tracks = s.getVideoTracks();
     for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-let forAllAudioTracksOnStream = function(s, f) {
-    let tracks = s.getAudioTracks();
+const forAllAudioTracksOnStream = function(s, f) {
+    const tracks = s.getAudioTracks();
     for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-let forAllTracksOnStream = function(s, f) {
+const forAllTracksOnStream = function(s, f) {
     forAllVideoTracksOnStream(s, f);
     forAllAudioTracksOnStream(s, f);
 };
@@ -1202,14 +1202,14 @@ module.exports.MatrixCall = MatrixCall;
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
 module.exports.createNewMatrixCall = function(client, roomId) {
-    let w = global.window;
-    let doc = global.document;
+    const w = global.window;
+    const doc = global.document;
     if (!w || !doc) {
         return null;
     }
-    let webRtc = {};
+    const webRtc = {};
     webRtc.isOpenWebRTC = function() {
-        let scripts = doc.getElementById("script");
+        const scripts = doc.getElementById("script");
         if (!scripts || !scripts.length) {
             return false;
         }
@@ -1220,7 +1220,7 @@ module.exports.createNewMatrixCall = function(client, roomId) {
         }
         return false;
     };
-    let getUserMedia = (
+    const getUserMedia = (
         w.navigator.getUserMedia || w.navigator.webkitGetUserMedia ||
         w.navigator.mozGetUserMedia
     );
@@ -1251,7 +1251,7 @@ module.exports.createNewMatrixCall = function(client, roomId) {
             !webRtc.RtcPeerConnection || !webRtc.getUserMedia) {
         return null; // WebRTC is not supported.
     }
-    let opts = {
+    const opts = {
         webRtc: webRtc,
         client: client,
         URL: w.URL,
