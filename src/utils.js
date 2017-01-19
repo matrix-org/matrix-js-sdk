@@ -414,7 +414,7 @@ module.exports.runPolyfills = function() {
     // Reference: http://es5.github.io/#x15.4.4.19
     if (!Array.prototype.map) {
       Array.prototype.map = function(callback, thisArg) {
-        let T, A, k;
+        let T, k;
 
         if (this === null || this === undefined) {
           throw new TypeError(' this is null or not defined');
@@ -443,7 +443,7 @@ module.exports.runPolyfills = function() {
         // 6. Let A be a new array created as if by the expression new Array(len)
         //    where Array is the standard built-in constructor with that name and
         //    len is the value of len.
-        A = new Array(len);
+        const A = new Array(len);
 
         // 7. Let k be 0
         k = 0;
