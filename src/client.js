@@ -462,6 +462,33 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
 };
 
 /**
+ * Get a list containing all of the room keys
+ *
+ * This should be encrypted before returning it to the user.
+ *
+ * @return {module:client.Promise} a promise which resolves to a list of
+ *    session export objects
+ */
+MatrixClient.prototype.exportRoomKeys = function() {
+    if (!this._crypto) {
+        return q.reject(new Error("End-to-end encryption disabled"));
+    }
+    return this._crypto.exportRoomKeys();
+};
+
+/**
+ * Import a list of room keys previously exported by exportRoomKeys
+ *
+ * @param {Object[]} keys a list of session export objects
+ */
+MatrixClient.prototype.importRoomKeys = function(keys) {
+    if (!this._crypto) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.importRoomKeys(keys);
+};
+
+/**
  * Decrypt a received event according to the algorithm specified in the event.
  *
  * @param {MatrixClient} client

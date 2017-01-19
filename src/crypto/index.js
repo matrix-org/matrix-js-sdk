@@ -897,6 +897,45 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
     return Boolean(this._roomEncryptors[roomId]);
 };
 
+
+/**
+ * Get a list containing all of the room keys
+ *
+ * @return {module:client.Promise} a promise which resolves to a list of
+ *    session export objects
+ */
+Crypto.prototype.exportRoomKeys = function() {
+    return q(
+        this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
+            (s) => {
+                const sess = this._olmDevice.exportInboundGroupSession(
+                    s.senderKey, s.sessionId
+                );
+
+                sess.algorithm = olmlib.MEGOLM_ALGORITHM;
+                return sess;
+            }
+        )
+    );
+};
+
+/**
+ * Import a list of room keys previously exported by exportRoomKeys
+ *
+ * @param {Object[]} keys a list of session export objects
+ */
+Crypto.prototype.importRoomKeys = function(keys) {
+    keys.map((session) => {
+        if (!session.room_id || !session.algorithm) {
+            console.warn("ignoring session entry with missing fields", session);
+            return;
+        }
+
+        const alg = this._getRoomDecryptor(session.room_id, session.algorithm);
+        alg.importRoomKey(session);
+    });
+};
+
 /**
  * Encrypt an event according to the configuration of the room, if necessary.
  *
