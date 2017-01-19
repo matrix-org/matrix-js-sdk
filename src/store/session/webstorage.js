@@ -37,7 +37,10 @@ function WebStorageSessionStore(webStore) {
     this.store = webStore;
     if (!utils.isFunction(webStore.getItem) ||
         !utils.isFunction(webStore.setItem) ||
-        !utils.isFunction(webStore.removeItem)) {
+        !utils.isFunction(webStore.removeItem) ||
+        !utils.isFunction(webStore.key) ||
+        typeof(webStore.length) !== 'number'
+       ) {
         throw new Error(
             "Supplied webStore does not meet the WebStorage API interface"
         );
@@ -118,6 +121,32 @@ WebStorageSessionStore.prototype = {
      */
     getEndToEndSessions: function(deviceKey) {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+    },
+
+    /**
+     * Retrieve a list of all known inbound group sessions
+     *
+     * @return {{senderKey: string, sessionId: string}}
+     */
+    getAllEndToEndInboundGroupSessionKeys: function() {
+        const prefix = E2E_PREFIX + 'inboundgroupsessions/';
+        const result = [];
+        for (let i = 0; i < this.store.length; i++) {
+            const key = this.store.key(i);
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            // we can't use split, as the components we are trying to split out
+            // might themselves contain '/' characters. We rely on the
+            // senderKey being a (32-byte) curve25519 key, base64-encoded
+            // (hence 43 characters long).
+
+            result.push({
+                senderKey: key.substr(prefix.length, 43),
+                sessionId: key.substr(prefix.length + 44),
+            });
+        }
+        return result;
     },
 
     getEndToEndInboundGroupSession: function(senderKey, sessionId) {

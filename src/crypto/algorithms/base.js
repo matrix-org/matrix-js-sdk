@@ -137,6 +137,15 @@ DecryptionAlgorithm.prototype.onRoomKeyEvent = function(params) {
 };
 
 /**
+ * Import a room key
+ *
+ * @param {module:crypto/OlmDevice.MegolmSessionData} session
+ */
+DecryptionAlgorithm.prototype.importRoomKey = function(session) {
+    // ignore by default
+};
+
+/**
  * Exception thrown when decryption fails
  *
  * @constructor

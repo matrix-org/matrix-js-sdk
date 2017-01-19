@@ -193,6 +193,12 @@ module.exports.MockStorageApi = function() {
     this.data = {};
 };
 module.exports.MockStorageApi.prototype = {
+    get length() {
+        return Object.keys(this.data).length;
+    },
+    key: function(i) {
+        return Object.keys(this.data)[i];
+    },
     setItem: function(k, v) {
         this.data[k] = v;
     },

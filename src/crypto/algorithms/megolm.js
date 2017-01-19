@@ -564,19 +564,45 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         content.session_key, event.getKeysClaimed()
     );
 
-    let k = event.getSenderKey() + "|" + content.session_id;
-    let pending = this._pendingEvents[k];
-    if (pending) {
-        // have another go at decrypting events sent with this session.
-        delete this._pendingEvents[k];
+    // have another go at decrypting events sent with this session.
+    this._retryDecryption(event.getSenderKey, content.session_id);
+};
 
-        for (let i = 0; i < pending.length; i++) {
-            try {
-                this.decryptEvent(pending[i]);
-                console.log("successful re-decryption of", pending[i]);
-            } catch (e) {
-                console.log("Still can't decrypt", pending[i], e.stack || e);
-            }
+
+/**
+ * @inheritdoc
+ *
+ * @param {module:crypto/OlmDevice.MegolmSessionData} session
+ */
+MegolmDecryption.prototype.importRoomKey = function(session) {
+    this._olmDevice.importInboundGroupSession(session);
+
+    // have another go at decrypting events sent with this session.
+    this._retryDecryption(session.sender_key, session.session_id);
+};
+
+/**
+ * Have another go at decrypting events after we receive a key
+ *
+ * @private
+ * @param {String} senderKey
+ * @param {String} sessionId
+ */
+MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
+    const k = senderKey + "|" + sessionId;
+    const pending = this._pendingEvents[k];
+    if (!pending) {
+        return;
+    }
+
+    delete this._pendingEvents[k];
+
+    for (let i = 0; i < pending.length; i++) {
+        try {
+            this.decryptEvent(pending[i]);
+            console.log("successful re-decryption of", pending[i]);
+        } catch (e) {
+            console.log("Still can't decrypt", pending[i], e.stack || e);
         }
     }
 };
