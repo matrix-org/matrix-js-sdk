@@ -62,8 +62,8 @@ function DeviceInfo(deviceId) {
  * @return {module:crypto~DeviceInfo} new DeviceInfo
  */
 DeviceInfo.fromStorage = function(obj, deviceId) {
-    let res = new DeviceInfo(deviceId);
-    for (let prop in obj) {
+    const res = new DeviceInfo(deviceId);
+    for (const prop in obj) {
         if (obj.hasOwnProperty(prop)) {
             res[prop] = obj[prop];
         }
@@ -139,7 +139,7 @@ DeviceInfo.DeviceVerification = {
     BLOCKED: -1,
 };
 
-let DeviceVerification = DeviceInfo.DeviceVerification;
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 /** */
 module.exports = DeviceInfo;

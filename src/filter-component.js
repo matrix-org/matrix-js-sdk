@@ -27,7 +27,7 @@ limitations under the License.
  */
 function _matches_wildcard(actual_value, filter_value) {
     if (filter_value.endsWith("*")) {
-        let type_prefix = filter_value.slice(0, -1);
+        const type_prefix = filter_value.slice(0, -1);
         return actual_value.substr(0, type_prefix.length) === type_prefix;
     } else {
         return actual_value === filter_value;
@@ -84,7 +84,7 @@ FilterComponent.prototype.check = function(event) {
  */
 FilterComponent.prototype._checkFields =
     function(room_id, sender, event_type, contains_url) {
-    let literal_keys = {
+    const literal_keys = {
         "rooms": function(v) {
             return room_id === v;
         },
@@ -96,16 +96,16 @@ FilterComponent.prototype._checkFields =
         },
     };
 
-    let self = this;
+    const self = this;
     Object.keys(literal_keys).forEach(function(name) {
-        let match_func = literal_keys[name];
-        let not_name = "not_" + name;
-        let disallowed_values = self[not_name];
+        const match_func = literal_keys[name];
+        const not_name = "not_" + name;
+        const disallowed_values = self[not_name];
         if (disallowed_values.map(match_func)) {
             return false;
         }
 
-        let allowed_values = self[name];
+        const allowed_values = self[name];
         if (allowed_values) {
             if (!allowed_values.map(match_func)) {
                 return false;
@@ -113,7 +113,7 @@ FilterComponent.prototype._checkFields =
         }
     });
 
-    let contains_url_filter = this.filter_json.contains_url;
+    const contains_url_filter = this.filter_json.contains_url;
     if (contains_url_filter !== undefined) {
         if (contains_url_filter !== contains_url) {
             return false;

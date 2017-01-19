@@ -40,8 +40,8 @@ MockStorageApi.prototype = {
         return this.keys[index];
     },
     _recalc: function() {
-        let keys = [];
-        for (let k in this.data) {
+        const keys = [];
+        for (const k in this.data) {
             if (!this.data.hasOwnProperty(k)) {
                 continue;
             }

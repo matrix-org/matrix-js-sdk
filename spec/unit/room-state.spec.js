@@ -1,13 +1,13 @@
 "use strict";
-let sdk = require("../..");
-let RoomState = sdk.RoomState;
-let RoomMember = sdk.RoomMember;
-let utils = require("../test-utils");
+const sdk = require("../..");
+const RoomState = sdk.RoomState;
+const RoomMember = sdk.RoomMember;
+const utils = require("../test-utils");
 
 describe("RoomState", function() {
-    let roomId = "!foo:bar";
-    let userA = "@alice:bar";
-    let userB = "@bob:bar";
+    const roomId = "!foo:bar";
+    const userA = "@alice:bar";
+    const userB = "@bob:bar";
     let state;
 
     beforeEach(function() {
@@ -40,7 +40,7 @@ describe("RoomState", function() {
         });
 
         it("should return a member for each m.room.member event", function() {
-            let members = state.getMembers();
+            const members = state.getMembers();
             expect(members.length).toEqual(2);
             // ordering unimportant
             expect([userA, userB].indexOf(members[0].userId)).not.toEqual(-1);
@@ -58,7 +58,7 @@ describe("RoomState", function() {
         });
 
         it("should return a member which changes as state changes", function() {
-            let member = state.getMember(userB);
+            const member = state.getMember(userB);
             expect(member.membership).toEqual("join");
             expect(member.name).toEqual(userB);
 
@@ -81,14 +81,14 @@ describe("RoomState", function() {
 
         it("should return a member which doesn't change when the state is updated",
         function() {
-            let preLeaveUser = state.getSentinelMember(userA);
+            const preLeaveUser = state.getSentinelMember(userA);
             state.setStateEvents([
                 utils.mkMembership({
                     room: roomId, user: userA, mship: "leave", event: true,
                     name: "AliceIsGone",
                 }),
             ]);
-            let postLeaveUser = state.getSentinelMember(userA);
+            const postLeaveUser = state.getSentinelMember(userA);
 
             expect(preLeaveUser.membership).toEqual("join");
             expect(preLeaveUser.name).toEqual(userA);
@@ -111,7 +111,7 @@ describe("RoomState", function() {
 
         it("should return a list of matching events if no state_key was specified",
         function() {
-            let events = state.getStateEvents("m.room.member");
+            const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
             expect([userA, userB].indexOf(events[0].getStateKey())).not.toEqual(-1);
@@ -120,7 +120,7 @@ describe("RoomState", function() {
 
         it("should return a single MatrixEvent if a state_key was specified",
         function() {
-            let event = state.getStateEvents("m.room.member", userA);
+            const event = state.getStateEvents("m.room.member", userA);
             expect(event.getContent()).toEqual({
                 membership: "join",
             });
@@ -129,7 +129,7 @@ describe("RoomState", function() {
 
     describe("setStateEvents", function() {
         it("should emit 'RoomState.members' for each m.room.member event", function() {
-            let memberEvents = [
+            const memberEvents = [
                 utils.mkMembership({
                     user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
@@ -149,7 +149,7 @@ describe("RoomState", function() {
         });
 
         it("should emit 'RoomState.newMember' for each new member added", function() {
-            let memberEvents = [
+            const memberEvents = [
                 utils.mkMembership({
                     user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
@@ -168,7 +168,7 @@ describe("RoomState", function() {
         });
 
         it("should emit 'RoomState.events' for each state event", function() {
-            let events = [
+            const events = [
                 utils.mkMembership({
                     user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
@@ -198,7 +198,7 @@ describe("RoomState", function() {
             state.members[userA] = utils.mock(RoomMember);
             state.members[userB] = utils.mock(RoomMember);
 
-            let powerLevelEvent = utils.mkEvent({
+            const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
@@ -219,11 +219,11 @@ describe("RoomState", function() {
 
         it("should call setPowerLevelEvent on a new RoomMember if power levels exist",
         function() {
-            let userC = "@cleo:bar";
-            let memberEvent = utils.mkMembership({
+            const userC = "@cleo:bar";
+            const memberEvent = utils.mkMembership({
                 mship: "join", user: userC, room: roomId, event: true,
             });
-            let powerLevelEvent = utils.mkEvent({
+            const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
@@ -247,7 +247,7 @@ describe("RoomState", function() {
             state.members[userA] = utils.mock(RoomMember);
             state.members[userB] = utils.mock(RoomMember);
 
-            let memberEvent = utils.mkMembership({
+            const memberEvent = utils.mkMembership({
                 user: userB, mship: "leave", room: roomId, event: true,
             });
             state.setStateEvents([memberEvent]);
@@ -261,7 +261,7 @@ describe("RoomState", function() {
 
     describe("setTypingEvent", function() {
         it("should call setTypingEvent on each RoomMember", function() {
-            let typingEvent = utils.mkEvent({
+            const typingEvent = utils.mkEvent({
                 type: "m.typing", room: roomId, event: true, content: {
                     user_ids: [userA],
                 },
@@ -296,7 +296,7 @@ describe("RoomState", function() {
         it("should say members with power >=50 may send state with power level event " +
         "but no state default",
         function() {
-            let powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
@@ -316,7 +316,7 @@ describe("RoomState", function() {
 
         it("should obey state_default",
         function() {
-            let powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
@@ -337,7 +337,7 @@ describe("RoomState", function() {
 
         it("should honour explicit event power levels in the power_levels event",
         function() {
-            let powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     events: {
@@ -380,7 +380,7 @@ describe("RoomState", function() {
 
         it("should obey events_default",
         function() {
-            let powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
@@ -404,7 +404,7 @@ describe("RoomState", function() {
 
         it("should honour explicit event power levels in the power_levels event",
         function() {
-            let powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     events: {

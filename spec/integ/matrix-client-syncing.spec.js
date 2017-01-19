@@ -1,22 +1,22 @@
 "use strict";
-let sdk = require("../..");
-let HttpBackend = require("../mock-request");
-let utils = require("../test-utils");
-let MatrixEvent = sdk.MatrixEvent;
-let EventTimeline = sdk.EventTimeline;
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
+const MatrixEvent = sdk.MatrixEvent;
+const EventTimeline = sdk.EventTimeline;
 
 describe("MatrixClient syncing", function() {
-    let baseUrl = "http://localhost.or.something";
+    const baseUrl = "http://localhost.or.something";
     let client = null;
     let httpBackend = null;
-    let selfUserId = "@alice:localhost";
-    let selfAccessToken = "aseukfgwef";
-    let otherUserId = "@bob:localhost";
-    let userA = "@alice:bar";
-    let userB = "@bob:bar";
-    let userC = "@claire:bar";
-    let roomOne = "!foo:localhost";
-    let roomTwo = "!bar:localhost";
+    const selfUserId = "@alice:localhost";
+    const selfAccessToken = "aseukfgwef";
+    const otherUserId = "@bob:localhost";
+    const userA = "@alice:bar";
+    const userB = "@bob:bar";
+    const userC = "@claire:bar";
+    const roomOne = "!foo:localhost";
+    const roomTwo = "!bar:localhost";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -37,7 +37,7 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("startClient", function() {
-        let syncData = {
+        const syncData = {
             next_batch: "batch_token",
             rooms: {},
             presence: {},
@@ -69,7 +69,7 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("resolving invites to profile info", function() {
-        let syncData = {
+        const syncData = {
             next_batch: "s_5_3",
             presence: {
                 events: [],
@@ -130,7 +130,7 @@ describe("MatrixClient syncing", function() {
             });
 
             httpBackend.flush().done(function() {
-                let member = client.getRoom(roomOne).getMember(userC);
+                const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Boss");
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false)
@@ -158,7 +158,7 @@ describe("MatrixClient syncing", function() {
             });
 
             httpBackend.flush().done(function() {
-                let member = client.getRoom(roomOne).getMember(userC);
+                const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Ghost");
                 done();
             });
@@ -207,7 +207,7 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                let member = client.getRoom(roomOne).getMember(userC);
+                const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual(userC);
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false)
@@ -218,7 +218,7 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("users", function() {
-        let syncData = {
+        const syncData = {
             next_batch: "nb",
             presence: {
                 events: [
@@ -247,10 +247,10 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("room state", function() {
-        let msgText = "some text here";
-        let otherDisplayName = "Bob Smith";
+        const msgText = "some text here";
+        const otherDisplayName = "Bob Smith";
 
-        let syncData = {
+        const syncData = {
             rooms: {
                 join: {
 
@@ -315,7 +315,7 @@ describe("MatrixClient syncing", function() {
             },
         };
 
-        let nextSyncData = {
+        const nextSyncData = {
             rooms: {
                 join: {
 
@@ -359,7 +359,7 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                let room = client.getRoom(roomOne);
+                const room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(
                     nextSyncData.rooms.join[roomOne].state.events[0].content.name
@@ -375,7 +375,7 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                let room = client.getRoom(roomTwo);
+                const room = client.getRoom(roomTwo);
                 // should have added the message from /events
                 expect(room.timeline.length).toEqual(2);
                 expect(room.timeline[1].getContent().body).toEqual(msgText);
@@ -389,7 +389,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
             httpBackend.flush().done(function() {
-                let room = client.getRoom(roomTwo);
+                const room = client.getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
                 done();
@@ -403,7 +403,7 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                let room = client.getRoom(roomTwo);
+                const room = client.getRoom(roomTwo);
                 let member = room.getMember(otherUserId);
                 expect(member).toBeDefined();
                 expect(member.typing).toEqual(true);
@@ -425,7 +425,7 @@ describe("MatrixClient syncing", function() {
 
     describe("timeline", function() {
         beforeEach(function() {
-            let syncData = {
+            const syncData = {
                 next_batch: "batch_token",
                 rooms: {
                     join: {},
@@ -449,7 +449,7 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should set the back-pagination token on new rooms", function(done) {
-            let syncData = {
+            const syncData = {
                 next_batch: "batch_token",
                 rooms: {
                     join: {},
@@ -469,8 +469,8 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             httpBackend.flush().then(function() {
-                let room = client.getRoom(roomTwo);
-                let tok = room.getLiveTimeline()
+                const room = client.getRoom(roomTwo);
+                const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
                 done();
@@ -478,7 +478,7 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should set the back-pagination token on gappy syncs", function(done) {
-            let syncData = {
+            const syncData = {
                 next_batch: "batch_token",
                 rooms: {
                     join: {},
@@ -502,15 +502,15 @@ describe("MatrixClient syncing", function() {
             client.on("Room.timelineReset", function(room) {
                 resetCallCount++;
 
-                let tl = room.getLiveTimeline();
+                const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(0);
-                let tok = tl.getPaginationToken(EventTimeline.BACKWARDS);
+                const tok = tl.getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("newerTok");
             });
 
             httpBackend.flush().then(function() {
-                let room = client.getRoom(roomOne);
-                let tl = room.getLiveTimeline();
+                const room = client.getRoom(roomOne);
+                const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
                 expect(resetCallCount).toEqual(1);
                 done();
@@ -519,7 +519,7 @@ describe("MatrixClient syncing", function() {
     });
 
     describe("receipts", function() {
-        let syncData = {
+        const syncData = {
             rooms: {
                 join: {
 
@@ -568,8 +568,8 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should sync receipts from /sync.", function(done) {
-            let ackEvent = syncData.rooms.join[roomOne].timeline.events[0];
-            let receipt = {};
+            const ackEvent = syncData.rooms.join[roomOne].timeline.events[0];
+            const receipt = {};
             receipt[ackEvent.event_id] = {
                 "m.read": {},
             };
@@ -586,7 +586,7 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                let room = client.getRoom(roomOne);
+                const room = client.getRoom(roomOne);
                 expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
                     type: "m.read",
                     userId: userC,
@@ -647,7 +647,7 @@ describe("MatrixClient syncing", function() {
         });
 
         it("should set the back-pagination token on left rooms", function(done) {
-            let syncData = {
+            const syncData = {
                 next_batch: "batch_token",
                 rooms: {
                     leave: {},
@@ -672,8 +672,8 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.syncLeftRooms().then(function() {
-                let room = client.getRoom(roomTwo);
-                let tok = room.getLiveTimeline().getPaginationToken(
+                const room = client.getRoom(roomTwo);
+                const tok = room.getLiveTimeline().getPaginationToken(
                     EventTimeline.BACKWARDS);
 
                 expect(tok).toEqual("pagTok");

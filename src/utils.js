@@ -27,7 +27,7 @@ limitations under the License.
  */
 module.exports.encodeParams = function(params) {
     let qs = "";
-    for (let key in params) {
+    for (const key in params) {
         if (!params.hasOwnProperty(key)) {
             continue;
         }
@@ -46,7 +46,7 @@ module.exports.encodeParams = function(params) {
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
 module.exports.encodeUri = function(pathTemplate, variables) {
-    for (let key in variables) {
+    for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
         }
@@ -65,7 +65,7 @@ module.exports.encodeUri = function(pathTemplate, variables) {
  * @return {Array} A new array with the results of the function.
  */
 module.exports.map = function(array, fn) {
-    let results = new Array(array.length);
+    const results = new Array(array.length);
     for (let i = 0; i < array.length; i++) {
         results[i] = fn(array[i]);
     }
@@ -81,7 +81,7 @@ module.exports.map = function(array, fn) {
  * @return {Array} A new array with the results of the function.
  */
 module.exports.filter = function(array, fn) {
-    let results = [];
+    const results = [];
     for (let i = 0; i < array.length; i++) {
         if (fn(array[i], i, array)) {
             results.push(array[i]);
@@ -96,8 +96,8 @@ module.exports.filter = function(array, fn) {
  * @return {string[]} The keys of the object.
  */
 module.exports.keys = function(obj) {
-    let keys = [];
-    for (let key in obj) {
+    const keys = [];
+    for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
@@ -112,8 +112,8 @@ module.exports.keys = function(obj) {
  * @return {Array<*>} The values of the object.
  */
 module.exports.values = function(obj) {
-    let values = [];
-    for (let key in obj) {
+    const values = [];
+    for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
@@ -235,7 +235,7 @@ module.exports.checkObjectHasKeys = function(obj, keys) {
  * @throws If there are extra keys.
  */
 module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
-    for (let key in obj) {
+    for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
@@ -263,7 +263,7 @@ module.exports.deepCopy = function(obj) {
  *
  * @return {boolean} true if the two objects are equal
  */
-let deepCompare = module.exports.deepCompare = function(x, y) {
+const deepCompare = module.exports.deepCompare = function(x, y) {
     // Inspired by
     // http://stackoverflow.com/questions/1068834/object-comparison-in-javascript#1144249
 
@@ -355,10 +355,10 @@ let deepCompare = module.exports.deepCompare = function(x, y) {
  * @return {Object} target
  */
 module.exports.extend = function() {
-    let target = arguments[0] || {};
+    const target = arguments[0] || {};
     for (let i = 1; i < arguments.length; i++) {
-        let source = arguments[i];
-        for (let propName in source) { // eslint-disable-line guard-for-in
+        const source = arguments[i];
+        for (const propName in source) { // eslint-disable-line guard-for-in
             target[propName] = source[propName];
         }
     }
@@ -379,17 +379,17 @@ module.exports.runPolyfills = function() {
           throw new TypeError();
         }
 
-        let t = Object(this);
-        let len = t.length >>> 0;
+        const t = Object(this);
+        const len = t.length >>> 0;
         if (typeof fun !== 'function') {
           throw new TypeError();
         }
 
-        let res = [];
-        let thisArg = arguments.length >= 2 ? arguments[1] : void 0;
+        const res = [];
+        const thisArg = arguments.length >= 2 ? arguments[1] : void 0;
         for (let i = 0; i < len; i++) {
           if (i in t) {
-            let val = t[i];
+            const val = t[i];
 
             // NOTE: Technically this should Object.defineProperty at
             //       the next index, as push can be affected by
@@ -422,12 +422,12 @@ module.exports.runPolyfills = function() {
 
         // 1. Let O be the result of calling ToObject passing the |this|
         //    value as the argument.
-        let O = Object(this);
+        const O = Object(this);
 
         // 2. Let lenValue be the result of calling the Get internal
         //    method of O with the argument "length".
         // 3. Let len be ToUint32(lenValue).
-        let len = O.length >>> 0;
+        const len = O.length >>> 0;
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         // See: http://es5.github.com/#x9.11
@@ -512,12 +512,12 @@ module.exports.runPolyfills = function() {
 
         // 1. Let O be the result of calling ToObject passing the |this| value as the
         // argument.
-        let O = Object(this);
+        const O = Object(this);
 
         // 2. Let lenValue be the result of calling the Get internal method of O with the
         // argument "length".
         // 3. Let len be ToUint32(lenValue).
-        let len = O.length >>> 0;
+        const len = O.length >>> 0;
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
         // See: http://es5.github.com/#x9.11
@@ -582,7 +582,7 @@ module.exports.inherits = function(ctor, superCtor) {
         function Temp() {}
 
         // make a safe reference to Object.prototype.hasOwnProperty
-        let hasOwn = Object.prototype.hasOwnProperty;
+        const hasOwn = Object.prototype.hasOwnProperty;
 
         return function(O) {
           // 1. If Type(O) is not Object or Null throw a TypeError exception.
@@ -595,7 +595,7 @@ module.exports.inherits = function(ctor, superCtor) {
           //    constructor with that name
           // 3. Set the [[Prototype]] internal property of obj to O.
           Temp.prototype = O;
-          let obj = new Temp();
+          const obj = new Temp();
           Temp.prototype = null; // Let's not keep a stray reference to O...
 
           // 4. If the argument Properties is present and not undefined, add
@@ -604,8 +604,8 @@ module.exports.inherits = function(ctor, superCtor) {
           //    Properties.
           if (arguments.length > 1) {
             // Object.defineProperties does ToObject on its first argument.
-            let Properties = Object(arguments[1]);
-            for (let prop in Properties) {
+            const Properties = Object(arguments[1]);
+            for (const prop in Properties) {
               if (hasOwn.call(Properties, prop)) {
                 obj[prop] = Properties[prop];
               }

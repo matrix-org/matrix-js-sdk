@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/algorithms
  */
 
-let base = require("./base");
+const base = require("./base");
 
 require("./olm");
 require("./megolm");

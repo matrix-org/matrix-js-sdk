@@ -19,10 +19,10 @@ limitations under the License.
  * of requests.
  * @module scheduler
  */
-let utils = require("./utils");
-let q = require("q");
+const utils = require("./utils");
+const q = require("q");
 
-let DEBUG = false;  // set true to enable console logging.
+const DEBUG = false;  // set true to enable console logging.
 
 /**
  * Construct a scheduler for Matrix. Requires
@@ -60,7 +60,7 @@ function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
  * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
  */
 MatrixScheduler.prototype.getQueueForEvent = function(event) {
-    let name = this.queueAlgorithm(event);
+    const name = this.queueAlgorithm(event);
     if (!name || !this._queues[name]) {
         return null;
     }
@@ -76,7 +76,7 @@ MatrixScheduler.prototype.getQueueForEvent = function(event) {
  * @return {boolean} True if this event was removed.
  */
 MatrixScheduler.prototype.removeEventFromQueue = function(event) {
-    let name = this.queueAlgorithm(event);
+    const name = this.queueAlgorithm(event);
     if (!name || !this._queues[name]) {
         return false;
     }
@@ -110,7 +110,7 @@ MatrixScheduler.prototype.setProcessFunction = function(fn) {
  * resolved or rejected in due time, else null.
  */
 MatrixScheduler.prototype.queueEvent = function(event) {
-    let queueName = this.queueAlgorithm(event);
+    const queueName = this.queueAlgorithm(event);
     if (!queueName) {
         return null;
     }
@@ -118,7 +118,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    let defer = q.defer();
+    const defer = q.defer();
     this._queues[queueName].push({
         event: event,
         defer: defer,
@@ -155,7 +155,7 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
     }
 
     if (err.name === "M_LIMIT_EXCEEDED") {
-        let waitTime = err.data.retry_after_ms;
+        const waitTime = err.data.retry_after_ms;
         if (waitTime) {
             return waitTime;
         }
@@ -201,10 +201,10 @@ function _startProcessingQueues(scheduler) {
 
 function _processQueue(scheduler, queueName) {
     // get head of queue
-    let obj = _peekNextEvent(scheduler, queueName);
+    const obj = _peekNextEvent(scheduler, queueName);
     if (!obj) {
         // queue is empty. Mark as inactive and stop recursing.
-        let index = scheduler._activeQueues.indexOf(queueName);
+        const index = scheduler._activeQueues.indexOf(queueName);
         if (index >= 0) {
             scheduler._activeQueues.splice(index, 1);
         }
@@ -227,7 +227,7 @@ function _processQueue(scheduler, queueName) {
     }, function(err) {
         obj.attempts += 1;
         // ask the retry algorithm when/if we should try again
-        let waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
+        const waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
         debuglog(
             "retry(%s) err=%s event_id=%s waitTime=%s",
             obj.attempts, err, obj.event.getId(), waitTimeMs
@@ -250,7 +250,7 @@ function _processQueue(scheduler, queueName) {
 }
 
 function _peekNextEvent(scheduler, queueName) {
-    let queue = scheduler._queues[queueName];
+    const queue = scheduler._queues[queueName];
     if (!utils.isArray(queue)) {
         return null;
     }
@@ -258,7 +258,7 @@ function _peekNextEvent(scheduler, queueName) {
 }
 
 function _removeNextEvent(scheduler, queueName) {
-    let queue = scheduler._queues[queueName];
+    const queue = scheduler._queues[queueName];
     if (!utils.isArray(queue)) {
         return null;
     }

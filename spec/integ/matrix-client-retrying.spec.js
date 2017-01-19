@@ -1,17 +1,17 @@
 "use strict";
-let sdk = require("../..");
-let HttpBackend = require("../mock-request");
-let utils = require("../test-utils");
-let EventStatus = sdk.EventStatus;
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
+const EventStatus = sdk.EventStatus;
 
 describe("MatrixClient retrying", function() {
-    let baseUrl = "http://localhost.or.something";
+    const baseUrl = "http://localhost.or.something";
     let client = null;
     let httpBackend = null;
     let scheduler;
-    let userId = "@alice:localhost";
-    let accessToken = "aseukfgwef";
-    let roomId = "!room:here";
+    const userId = "@alice:localhost";
+    const accessToken = "aseukfgwef";
+    const roomId = "!room:here";
     let room;
 
     beforeEach(function() {
@@ -61,7 +61,7 @@ describe("MatrixClient retrying", function() {
         });
 
         // both events should be in the timeline at this point
-        let tl = room.getLiveTimeline().getEvents();
+        const tl = room.getLiveTimeline().getEvents();
         expect(tl.length).toEqual(2);
         ev1 = tl[0];
         ev2 = tl[1];

@@ -94,7 +94,7 @@ module.exports.getRequest = function() {
  * @param {requestWrapperFunction} wrapper The wrapping function.
  */
 module.exports.wrapRequest = function(wrapper) {
-    let origRequest = request;
+    const origRequest = request;
     request = function(options, callback) {
         return wrapper(origRequest, options, callback);
     };

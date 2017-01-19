@@ -1,5 +1,5 @@
 "use strict";
-let q = require("q");
+const q = require("q");
 
 /**
  * Construct a mock HTTP backend, heavily inspired by Angular.js.
@@ -8,15 +8,15 @@ let q = require("q");
 function HttpBackend() {
     this.requests = [];
     this.expectedRequests = [];
-    let self = this;
+    const self = this;
     // the request function dependency that the SDK needs.
     this.requestFn = function(opts, callback) {
-        let req = new Request(opts, callback);
+        const req = new Request(opts, callback);
         console.log("HTTP backend received request: %s", req);
         self.requests.push(req);
 
-        let abort = function() {
-            let idx = self.requests.indexOf(req);
+        const abort = function() {
+            const idx = self.requests.indexOf(req);
             if (idx >= 0) {
                 console.log("Aborting HTTP request: %s %s", opts.method,
                             opts.uri);
@@ -38,14 +38,14 @@ HttpBackend.prototype = {
      * @return {Promise} resolved when there is nothing left to flush.
      */
     flush: function(path, numToFlush) {
-        let defer = q.defer();
-        let self = this;
+        const defer = q.defer();
+        const self = this;
         let flushed = 0;
         let triedWaiting = false;
         console.log(
             "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
         );
-        let tryFlush = function() {
+        const tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
                 "  trying to flush queue => reqs=%s expected=%s [%s]",
@@ -137,7 +137,7 @@ HttpBackend.prototype = {
      * Makes sure that the SDK hasn't sent any more requests to the backend.
      */
     verifyNoOutstandingRequests: function() {
-        let firstOutstandingReq = this.requests[0] || {};
+        const firstOutstandingReq = this.requests[0] || {};
         expect(this.requests.length).toEqual(0,
             "Expected no more HTTP requests but received request to " +
             firstOutstandingReq.path
@@ -148,7 +148,7 @@ HttpBackend.prototype = {
      * Makes sure that the test doesn't have any unresolved requests.
      */
     verifyNoOutstandingExpectation: function() {
-        let firstOutstandingExpectation = this.expectedRequests[0] || {};
+        const firstOutstandingExpectation = this.expectedRequests[0] || {};
         expect(this.expectedRequests.length).toEqual(0,
             "Expected to see HTTP request for " + firstOutstandingExpectation.path
         );
@@ -162,7 +162,7 @@ HttpBackend.prototype = {
      * @return {Request} An expected request.
      */
     when: function(method, path, data) {
-        let pendingReq = new ExpectedRequest(method, path, data);
+        const pendingReq = new ExpectedRequest(method, path, data);
         this.expectedRequests.push(pendingReq);
         return pendingReq;
     },

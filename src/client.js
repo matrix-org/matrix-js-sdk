@@ -15,31 +15,31 @@ limitations under the License.
 */
 "use strict";
 
-let PushProcessor = require('./pushprocessor');
+const PushProcessor = require('./pushprocessor');
 
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
  * @module client
  */
-let EventEmitter = require("events").EventEmitter;
-let q = require("q");
-let url = require('url');
+const EventEmitter = require("events").EventEmitter;
+const q = require("q");
+const url = require('url');
 
-let httpApi = require("./http-api");
-let MatrixEvent = require("./models/event").MatrixEvent;
-let EventStatus = require("./models/event").EventStatus;
-let EventTimeline = require("./models/event-timeline");
-let SearchResult = require("./models/search-result");
-let StubStore = require("./store/stub");
-let webRtcCall = require("./webrtc/call");
-let utils = require("./utils");
-let contentRepo = require("./content-repo");
-let Filter = require("./filter");
-let SyncApi = require("./sync");
-let MatrixBaseApis = require("./base-apis");
-let MatrixError = httpApi.MatrixError;
+const httpApi = require("./http-api");
+const MatrixEvent = require("./models/event").MatrixEvent;
+const EventStatus = require("./models/event").EventStatus;
+const EventTimeline = require("./models/event-timeline");
+const SearchResult = require("./models/search-result");
+const StubStore = require("./store/stub");
+const webRtcCall = require("./webrtc/call");
+const utils = require("./utils");
+const contentRepo = require("./content-repo");
+const Filter = require("./filter");
+const SyncApi = require("./sync");
+const MatrixBaseApis = require("./base-apis");
+const MatrixError = httpApi.MatrixError;
 
-let SCROLLBACK_DELAY_MS = 3000;
+const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
 try {
@@ -111,16 +111,16 @@ function MatrixClient(opts) {
 
     this.deviceId = opts.deviceId || null;
 
-    let userId = (opts.userId || null);
+    const userId = (opts.userId || null);
     this.credentials = {
         userId: userId,
     };
 
     this.scheduler = opts.scheduler;
     if (this.scheduler) {
-        let self = this;
+        const self = this;
         this.scheduler.setProcessFunction(function(eventToSend) {
-            let room = self.getRoom(eventToSend.getRoomId());
+            const room = self.getRoom(eventToSend.getRoomId());
             if (eventToSend.status !== EventStatus.SENDING) {
                 _updatePendingEventStatus(room, eventToSend,
                                           EventStatus.SENDING);
@@ -136,7 +136,7 @@ function MatrixClient(opts) {
 
     // try constructing a MatrixCall to see if we are running in an environment
     // which has WebRTC. If we are, listen for and handle m.call.* events.
-    let call = webRtcCall.createNewMatrixCall(this);
+    const call = webRtcCall.createNewMatrixCall(this);
     this._supportsVoip = false;
     if (call) {
         setupCallEventHandler(this);
@@ -427,7 +427,7 @@ MatrixClient.prototype.getEventSenderDeviceInfo = function(event) {
  * {@link module:client~MatrixClient#setDeviceVerified|setDeviceVerified}.
  */
 MatrixClient.prototype.isEventSenderVerified = function(event) {
-    let device = this.getEventSenderDeviceInfo(event);
+    const device = this.getEventSenderDeviceInfo(event);
     if (!device) {
         return false;
     }
@@ -574,7 +574,7 @@ MatrixClient.prototype.getUsers = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setAccountData = function(eventType, contents, callback) {
-    let path = utils.encodeUri("/user/$userId/account_data/$type", {
+    const path = utils.encodeUri("/user/$userId/account_data/$type", {
         $userId: this.credentials.userId,
         $type: eventType,
     });
@@ -619,7 +619,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         opts.syncRoom = true;
     }
 
-    let room = this.getRoom(roomIdOrAlias);
+    const room = this.getRoom(roomIdOrAlias);
     if (room && room.hasMembershipState(this.credentials.userId, "join")) {
         return q(room);
     }
@@ -633,21 +633,21 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         );
     }
 
-    let defer = q.defer();
+    const defer = q.defer();
 
-    let self = this;
+    const self = this;
     sign_promise.then(function(signed_invite_object) {
-        let data = {};
+        const data = {};
         if (signed_invite_object) {
             data.third_party_signed = signed_invite_object;
         }
 
-        let path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
+        const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
         return self._http.authedRequest(undefined, "POST", path, undefined, data);
     }).then(function(res) {
-        let roomId = res.room_id;
-        let syncApi = new SyncApi(self, self._clientOpts);
-        let room = syncApi.createRoom(roomId);
+        const roomId = res.room_id;
+        const syncApi = new SyncApi(self, self._clientOpts);
+        const room = syncApi.createRoom(roomId);
         if (opts.syncRoom) {
             // v2 will do this for us
             // return syncApi.syncRoom(room);
@@ -692,7 +692,7 @@ MatrixClient.prototype.cancelPendingEvent = function(event) {
 
     // then tell the room about the change of state, which will remove it
     // from the room's list of pending events.
-    let room = this.getRoom(event.getRoomId());
+    const room = this.getRoom(event.getRoomId());
     _updatePendingEventStatus(room, event, EventStatus.CANCELLED);
 };
 
@@ -727,7 +727,7 @@ MatrixClient.prototype.setRoomTopic = function(roomId, topic, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.getRoomTags = function(roomId, callback) {
-    let path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/", {
+    const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/", {
         $userId: this.credentials.userId,
         $roomId: roomId,
     });
@@ -745,7 +745,7 @@ MatrixClient.prototype.getRoomTags = function(roomId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setRoomTag = function(roomId, tagName, metadata, callback) {
-    let path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
+    const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
         $userId: this.credentials.userId,
         $roomId: roomId,
         $tag: tagName,
@@ -763,7 +763,7 @@ MatrixClient.prototype.setRoomTag = function(roomId, tagName, metadata, callback
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.deleteRoomTag = function(roomId, tagName, callback) {
-    let path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
+    const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
         $userId: this.credentials.userId,
         $roomId: roomId,
         $tag: tagName,
@@ -783,7 +783,7 @@ MatrixClient.prototype.deleteRoomTag = function(roomId, tagName, callback) {
  */
 MatrixClient.prototype.setRoomAccountData = function(roomId, eventType,
                                                      content, callback) {
-    let path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
+    const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
         $userId: this.credentials.userId,
         $roomId: roomId,
         $type: eventType,
@@ -814,7 +814,7 @@ MatrixClient.prototype.setPowerLevel = function(roomId, userId, powerLevel,
         content = utils.deepCopy(event.getContent());
     }
     content.users[userId] = powerLevel;
-    let path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
+    const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
         $roomId: roomId,
     });
     return this._http.authedRequest(
@@ -844,8 +844,8 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
     // the client has no scheduler or store.
-    let room = this.getRoom(roomId);
-    let localEvent = new MatrixEvent({
+    const room = this.getRoom(roomId);
+    const localEvent = new MatrixEvent({
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
         room_id: roomId,
@@ -939,9 +939,9 @@ function _updatePendingEventStatus(room, event, newStatus) {
 }
 
 function _sendEventHttpRequest(client, event) {
-    let txnId = event._txnId ? event._txnId : client.makeTxnId();
+    const txnId = event._txnId ? event._txnId : client.makeTxnId();
 
-    let pathParams = {
+    const pathParams = {
         $roomId: event.getRoomId(),
         $eventType: event.getWireType(),
         $stateKey: event.getStateKey(),
@@ -993,7 +993,7 @@ MatrixClient.prototype.sendMessage = function(roomId, content, txnId, callback) 
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback) {
-    let content = {
+    const content = {
          msgtype: "m.text",
          body: body,
     };
@@ -1009,7 +1009,7 @@ MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
-    let content = {
+    const content = {
          msgtype: "m.notice",
          body: body,
     };
@@ -1025,7 +1025,7 @@ MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendEmoteMessage = function(roomId, body, txnId, callback) {
-    let content = {
+    const content = {
          msgtype: "m.emote",
          body: body,
     };
@@ -1048,7 +1048,7 @@ MatrixClient.prototype.sendImageMessage = function(roomId, url, info, text, call
     if (!text) {
         text = "Image";
     }
-    let content = {
+    const content = {
          msgtype: "m.image",
          url: url,
          info: info,
@@ -1066,7 +1066,7 @@ MatrixClient.prototype.sendImageMessage = function(roomId, url, info, text, call
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callback) {
-    let content = {
+    const content = {
         msgtype: "m.text",
         format: "org.matrix.custom.html",
         body: body,
@@ -1084,7 +1084,7 @@ MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callba
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callback) {
-    let content = {
+    const content = {
         msgtype: "m.notice",
         format: "org.matrix.custom.html",
         body: body,
@@ -1102,7 +1102,7 @@ MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callbac
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlEmote = function(roomId, body, htmlBody, callback) {
-    let content = {
+    const content = {
         msgtype: "m.emote",
         format: "org.matrix.custom.html",
         body: body,
@@ -1124,16 +1124,16 @@ MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
         return q({}); // guests cannot send receipts so don't bother.
     }
 
-    let path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+    const path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
         $roomId: event.getRoomId(),
         $receiptType: receiptType,
         $eventId: event.getId(),
     });
-    let promise = this._http.authedRequest(
+    const promise = this._http.authedRequest(
         callback, "POST", path, undefined, {}
     );
 
-    let room = this.getRoom(event.getRoomId());
+    const room = this.getRoom(event.getRoomId());
     if (room) {
         room._addLocalEchoReceipt(this.credentials.userId, event, receiptType);
     }
@@ -1168,13 +1168,13 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
  * May return synthesized attributes if the URL lacked OG meta.
  */
 MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
-    let key = ts + "_" + url;
-    let og = this.urlPreviewCache[key];
+    const key = ts + "_" + url;
+    const og = this.urlPreviewCache[key];
     if (og) {
         return q(og);
     }
 
-    let self = this;
+    const self = this;
     return this._http.authedRequestWithPrefix(
         callback, "GET", "/preview_url", {
             url: url,
@@ -1200,11 +1200,11 @@ MatrixClient.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callba
         return q({}); // guests cannot send typing notifications so don't bother.
     }
 
-    let path = utils.encodeUri("/rooms/$roomId/typing/$userId", {
+    const path = utils.encodeUri("/rooms/$roomId/typing/$userId", {
         $roomId: roomId,
         $userId: this.credentials.userId,
     });
-    let data = {
+    const data = {
         typing: isTyping,
     };
     if (isTyping) {
@@ -1251,7 +1251,7 @@ MatrixClient.prototype.inviteByEmail = function(roomId, email, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, callback) {
-    let path = utils.encodeUri(
+    const path = utils.encodeUri(
         "/rooms/$roomId/invite",
         { $roomId: roomId }
     );
@@ -1312,12 +1312,12 @@ MatrixClient.prototype.forget = function(roomId, deleteRoom, callback) {
     if (deleteRoom === undefined) {
         deleteRoom = true;
     }
-    let promise = _membershipChange(this, roomId, undefined, "forget", undefined,
+    const promise = _membershipChange(this, roomId, undefined, "forget", undefined,
         callback);
     if (!deleteRoom) {
         return promise;
     }
-    let self = this;
+    const self = this;
     return promise.then(function(response) {
         self.store.removeRoom(roomId);
         self.emit("deleteRoom", roomId);
@@ -1370,7 +1370,7 @@ function _setMembershipState(client, roomId, userId, membershipValue, reason,
         callback = reason; reason = undefined;
     }
 
-    let path = utils.encodeUri(
+    const path = utils.encodeUri(
         "/rooms/$roomId/state/m.room.member/$userId",
         { $roomId: roomId, $userId: userId}
     );
@@ -1397,7 +1397,7 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
         callback = reason; reason = undefined;
     }
 
-    let path = utils.encodeUri("/rooms/$room_id/$membership", {
+    const path = utils.encodeUri("/rooms/$room_id/$membership", {
         $room_id: roomId,
         $membership: membership,
     });
@@ -1417,7 +1417,7 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
  */
 MatrixClient.prototype.getPushActionsForEvent = function(event) {
     if (!event.getPushActions()) {
-        let pushProcessor = new PushProcessor(this);
+        const pushProcessor = new PushProcessor(this);
         event.setPushActions(pushProcessor.actionsForEvent(event));
     }
     return event.getPushActions();
@@ -1434,7 +1434,7 @@ MatrixClient.prototype.getPushActionsForEvent = function(event) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
-    let path = utils.encodeUri("/profile/$userId/$info", {
+    const path = utils.encodeUri("/profile/$userId/$info", {
         $userId: this.credentials.userId,
         $info: info,
     });
@@ -1497,7 +1497,7 @@ MatrixClient.prototype.mxcUrlToHttp =
  * @throws If 'presence' isn't a valid presence enum value.
  */
 MatrixClient.prototype.setPresence = function(opts, callback) {
-    let path = utils.encodeUri("/presence/$userId/status", {
+    const path = utils.encodeUri("/presence/$userId/status", {
         $userId: this.credentials.userId,
     });
 
@@ -1505,7 +1505,7 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
       opts = { presence: opts };
     }
 
-    let validStates = ["offline", "online", "unavailable"];
+    const validStates = ["offline", "online", "unavailable"];
     if (validStates.indexOf(opts.presence) == -1) {
         throw new Error("Bad presence value: " + opts.presence);
     }
@@ -1515,7 +1515,7 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
 };
 
 function _presenceList(callback, client, opts, method) {
-  let path = utils.encodeUri("/presence/list/$userId", {
+  const path = utils.encodeUri("/presence/list/$userId", {
       $userId: client.credentials.userId,
   });
   return client._http.authedRequest(callback, method, path, undefined, opts);
@@ -1539,7 +1539,7 @@ MatrixClient.prototype.getPresenceList = function(callback) {
 * @return {module:http-api.MatrixError} Rejects: with an error response.
 */
 MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
-  let opts = {"invite": userIds};
+  const opts = {"invite": userIds};
   return _presenceList(callback, this, opts, "POST");
 };
 
@@ -1551,7 +1551,7 @@ MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
 * @return {module:http-api.MatrixError} Rejects: with an error response.
 **/
 MatrixClient.prototype.dropFromPresenceList = function(callback, userIds) {
-  let opts = {"drop": userIds};
+  const opts = {"drop": userIds};
   return _presenceList(callback, this, opts, "POST");
 };
 
@@ -1583,7 +1583,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     if (info.promise) {
         return info.promise;
     } else if (info.errorTs) {
-        let timeWaitedMs = Date.now() - info.errorTs;
+        const timeWaitedMs = Date.now() - info.errorTs;
         timeToWaitMs = Math.max(SCROLLBACK_DELAY_MS - timeWaitedMs, 0);
     }
 
@@ -1591,7 +1591,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
         return q(room); // already at the start.
     }
     // attempt to grab more events from the store first
-    let numAdded = this.store.scrollback(room, limit).length;
+    const numAdded = this.store.scrollback(room, limit).length;
     if (numAdded === limit) {
         // store contained everything we needed.
         return q(room);
@@ -1599,26 +1599,26 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    let path = utils.encodeUri(
+    const path = utils.encodeUri(
         "/rooms/$roomId/messages", {$roomId: room.roomId}
     );
-    let params = {
+    const params = {
         from: room.oldState.paginationToken,
         limit: limit,
         dir: 'b',
     };
-    let defer = q.defer();
+    const defer = q.defer();
     info = {
         promise: defer.promise,
         errorTs: null,
     };
-    let self = this;
+    const self = this;
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
     q.delay(timeToWaitMs).then(function() {
         return self._http.authedRequest(callback, "GET", path, params);
     }).done(function(res) {
-        let matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+        const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
         if (res.chunk.length === 0) {
@@ -1653,40 +1653,40 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     opts = opts || {};
-    let backwards = opts.backwards || false;
+    const backwards = opts.backwards || false;
 
-    let token = eventContext.getPaginateToken(backwards);
+    const token = eventContext.getPaginateToken(backwards);
     if (!token) {
         // no more results.
         return q.reject(new Error("No paginate token"));
     }
 
-    let dir = backwards ? 'b' : 'f';
-    let pendingRequest = eventContext._paginateRequests[dir];
+    const dir = backwards ? 'b' : 'f';
+    const pendingRequest = eventContext._paginateRequests[dir];
 
     if (pendingRequest) {
         // already a request in progress - return the existing promise
         return pendingRequest;
     }
 
-    let path = utils.encodeUri(
+    const path = utils.encodeUri(
         "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()}
     );
-    let params = {
+    const params = {
         from: token,
         limit: ('limit' in opts) ? opts.limit : 30,
         dir: dir,
     };
 
-    let self = this;
-    let promise =
+    const self = this;
+    const promise =
         self._http.authedRequest(undefined, "GET", path, params
     ).then(function(res) {
         let token = res.end;
         if (res.chunk.length === 0) {
             token = null;
         } else {
-            let matrixEvents = utils.map(res.chunk, self.getEventMapper());
+            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             if (backwards) {
                 // eventContext expects the events in timeline order, but
                 // back-pagination returns them in reverse order.
@@ -1730,7 +1730,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         return q(timelineSet.getTimelineForEvent(eventId));
     }
 
-    let path = utils.encodeUri(
+    const path = utils.encodeUri(
         "/rooms/$roomId/context/$eventId", {
             $roomId: timelineSet.room.roomId,
             $eventId: eventId,
@@ -1739,8 +1739,8 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
-    let self = this;
-    let promise =
+    const self = this;
+    const promise =
         self._http.authedRequest(undefined, "GET", path
     ).then(function(res) {
         if (!res.event) {
@@ -1757,10 +1757,10 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         // have known state.
         // events_after is already backwards; events_before is forwards.
         res.events_after.reverse();
-        let events = res.events_after
+        const events = res.events_after
             .concat([res.event])
             .concat(res.events_before);
-        let matrixEvents = utils.map(events, self.getEventMapper());
+        const matrixEvents = utils.map(events, self.getEventMapper());
 
         let timeline = timelineSet.getTimelineForEvent(matrixEvents[0].getId());
         if (!timeline) {
@@ -1776,7 +1776,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         // room's index again. On the other hand, there's no guarantee the
         // event ended up anywhere, if it was later redacted, so we just
         // return the timeline we first thought of.
-        let tl = timelineSet.getTimelineForEvent(eventId) || timeline;
+        const tl = timelineSet.getTimelineForEvent(eventId) || timeline;
         return tl;
     });
     return promise;
@@ -1797,12 +1797,12 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
  *    events and we reached either end of the timeline; else true.
  */
 MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
-    let isNotifTimeline = (eventTimeline.getTimelineSet() === this._notifTimelineSet);
+    const isNotifTimeline = (eventTimeline.getTimelineSet() === this._notifTimelineSet);
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     opts = opts || {};
-    let backwards = opts.backwards || false;
+    const backwards = opts.backwards || false;
 
     if (isNotifTimeline) {
         if (!backwards) {
@@ -1810,15 +1810,15 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         }
     }
 
-    let dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
+    const dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
 
-    let token = eventTimeline.getPaginationToken(dir);
+    const token = eventTimeline.getPaginationToken(dir);
     if (!token) {
         // no token - no results.
         return q(false);
     }
 
-    let pendingRequest = eventTimeline._paginationRequests[dir];
+    const pendingRequest = eventTimeline._paginationRequests[dir];
 
     if (pendingRequest) {
         // already a request in progress - return the existing promise
@@ -1826,7 +1826,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
     }
 
     let path, params, promise;
-    let self = this;
+    const self = this;
 
     if (isNotifTimeline) {
         path = "/notifications";
@@ -1843,12 +1843,12 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             this._http.authedRequestWithPrefix(undefined, "GET", path, params,
                 undefined, httpApi.PREFIX_UNSTABLE
         ).then(function(res) {
-            let token = res.next_token;
-            let matrixEvents = [];
+            const token = res.next_token;
+            const matrixEvents = [];
 
             for (let i = 0; i < res.notifications.length; i++) {
-                let notification = res.notifications[i];
-                let event = self.getEventMapper()(notification.event);
+                const notification = res.notifications[i];
+                const event = self.getEventMapper()(notification.event);
                 event.setPushActions(
                     PushProcessor.actionListToActionsObject(notification.actions)
                 );
@@ -1871,7 +1871,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         });
         eventTimeline._paginationRequests[dir] = promise;
     } else {
-        let room = this.getRoom(eventTimeline.getRoomId());
+        const room = this.getRoom(eventTimeline.getRoomId());
         if (!room) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
@@ -1885,7 +1885,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             dir: dir,
         };
 
-        let filter = eventTimeline.getFilter();
+        const filter = eventTimeline.getFilter();
         if (filter) {
             // XXX: it's horrific that /messages' filter parameter doesn't match
             // /sync's one - see https://matrix.org/jira/browse/SPEC-451
@@ -1895,8 +1895,8 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         promise =
             this._http.authedRequest(undefined, "GET", path, params
         ).then(function(res) {
-            let token = res.end;
-            let matrixEvents = utils.map(res.chunk, self.getEventMapper());
+            const token = res.end;
+            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()
                 .addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
 
@@ -1988,7 +1988,7 @@ MatrixClient.prototype.stopPeeking = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
-    let writePromise = this.sendStateEvent(roomId, "m.room.guest_access", {
+    const writePromise = this.sendStateEvent(roomId, "m.room.guest_access", {
         guest_access: opts.allowJoin ? "can_join" : "forbidden",
     });
 
@@ -2103,12 +2103,12 @@ MatrixClient.prototype.requestPasswordEmailToken = function(email, clientSecret,
 MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint,
                                                     email, clientSecret,
                                                     sendAttempt, nextLink, callback) {
-    let id_server_url = url.parse(this.idBaseUrl);
+    const id_server_url = url.parse(this.idBaseUrl);
     if (id_server_url.host === null) {
         throw new Error("Invalid ID server URL: " + this.idBaseUrl);
     }
 
-    let params = {
+    const params = {
         client_secret: clientSecret,
         email: email,
         send_attempt: sendAttempt,
@@ -2136,7 +2136,7 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
     // and its id is the room id.
     if (this.pushRules) {
         for (let i = 0; i < this.pushRules[scope].room.length; i++) {
-            let rule = this.pushRules[scope].room[i];
+            const rule = this.pushRules[scope].room[i];
             if (rule.rule_id === roomId) {
                 return rule;
             }
@@ -2158,11 +2158,11 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
-    let self = this;
+    const self = this;
     let deferred, hasDontNotifyRule;
 
     // Get the existing room-kind push rule if any
-    let roomPushRule = this.getRoomPushRule(scope, roomId);
+    const roomPushRule = this.getRoomPushRule(scope, roomId);
     if (roomPushRule) {
         if (0 <= roomPushRule.actions.indexOf("dont_notify")) {
             hasDontNotifyRule = true;
@@ -2202,7 +2202,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
 
     if (deferred) {
         // Update this.pushRules when the operation completes
-        let ruleRefreshDeferred = q.defer();
+        const ruleRefreshDeferred = q.defer();
         deferred.done(function() {
             self.getPushRules().done(function(result) {
                 self.pushRules = result;
@@ -2273,7 +2273,7 @@ MatrixClient.prototype.searchMessageText = function(opts, callback) {
 MatrixClient.prototype.searchRoomEvents = function(opts) {
     // TODO: support groups
 
-    let body = {
+    const body = {
         search_categories: {
             room_events: {
                 search_term: opts.term,
@@ -2288,7 +2288,7 @@ MatrixClient.prototype.searchRoomEvents = function(opts) {
         },
     };
 
-    let searchResults = {
+    const searchResults = {
         _query: body,
         results: [],
         highlights: [],
@@ -2319,12 +2319,12 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
         return searchResults.pendingRequest;
     }
 
-    let searchOpts = {
+    const searchOpts = {
         body: searchResults._query,
         next_batch: searchResults.next_batch,
     };
 
-    let promise = this.search(searchOpts).then(
+    const promise = this.search(searchOpts).then(
         this._processRoomEventsSearch.bind(this, searchResults)
     ).finally(function() {
         searchResults.pendingRequest = null;
@@ -2344,14 +2344,14 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
  * @private
  */
 MatrixClient.prototype._processRoomEventsSearch = function(searchResults, response) {
-    let room_events = response.search_categories.room_events;
+    const room_events = response.search_categories.room_events;
 
     searchResults.count = room_events.count;
     searchResults.next_batch = room_events.next_batch;
 
     // combine the highlight list with our existing list; build an object
     // to avoid O(N^2) fail
-    let highlights = {};
+    const highlights = {};
     room_events.highlights.forEach(function(hl) {
         highlights[hl] = 1;
     });
@@ -2364,7 +2364,7 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
 
     // append the new results to our existing results
     for (let i = 0; i < room_events.results.length; i++) {
-        let sr = SearchResult.fromJson(room_events.results[i], this.getEventMapper());
+        const sr = SearchResult.fromJson(room_events.results[i], this.getEventMapper());
         searchResults.results.push(sr);
     }
     return searchResults;
@@ -2385,8 +2385,8 @@ MatrixClient.prototype.syncLeftRooms = function() {
     if (this._syncLeftRoomsPromise) {
         return this._syncLeftRoomsPromise; // return the ongoing request
     }
-    let self = this;
-    let syncApi = new SyncApi(this, this._clientOpts);
+    const self = this;
+    const syncApi = new SyncApi(this, this._clientOpts);
     this._syncLeftRoomsPromise = syncApi.syncLeftRooms();
 
     // cleanup locks
@@ -2410,15 +2410,15 @@ MatrixClient.prototype.syncLeftRooms = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.createFilter = function(content) {
-    let self = this;
-    let path = utils.encodeUri("/user/$userId/filter", {
+    const self = this;
+    const path = utils.encodeUri("/user/$userId/filter", {
         $userId: this.credentials.userId,
     });
     return this._http.authedRequest(
         undefined, "POST", path, undefined, content
     ).then(function(response) {
         // persist the filter
-        let filter = Filter.fromJson(
+        const filter = Filter.fromJson(
             self.credentials.userId, response.filter_id, content
         );
         self.store.storeFilter(filter);
@@ -2437,14 +2437,14 @@ MatrixClient.prototype.createFilter = function(content) {
  */
 MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
     if (allowCached) {
-        let filter = this.store.getFilter(userId, filterId);
+        const filter = this.store.getFilter(userId, filterId);
         if (filter) {
             return q(filter);
         }
     }
 
-    let self = this;
-    let path = utils.encodeUri("/user/$userId/filter/$filterId", {
+    const self = this;
+    const path = utils.encodeUri("/user/$userId/filter/$filterId", {
         $userId: userId,
         $filterId: filterId,
     });
@@ -2453,7 +2453,7 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
         undefined, "GET", path, undefined, undefined
     ).then(function(response) {
         // persist the filter
-        let filter = Filter.fromJson(
+        const filter = Filter.fromJson(
             userId, filterId, response
         );
         self.store.storeFilter(filter);
@@ -2467,17 +2467,17 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
  * @return {Promise<String>} Filter ID
  */
 MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
-    let filterId = this.store.getFilterIdByName(filterName);
+    const filterId = this.store.getFilterIdByName(filterName);
     let promise = q();
-    let self = this;
+    const self = this;
 
     if (filterId) {
         // check that the existing filter matches our expectations
         promise = self.getFilter(self.credentials.userId,
                          filterId, true
         ).then(function(existingFilter) {
-            let oldDef = existingFilter.getDefinition();
-            let newDef = filter.getDefinition();
+            const oldDef = existingFilter.getDefinition();
+            const newDef = filter.getDefinition();
 
             if (utils.deepCompare(oldDef, newDef)) {
                 // super, just use that.
@@ -2535,7 +2535,7 @@ MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.getOpenIdToken = function() {
-    let path = utils.encodeUri("/user/$userId/openid/request_token", {
+    const path = utils.encodeUri("/user/$userId/openid/request_token", {
         $userId: this.credentials.userId,
     });
 
@@ -2624,8 +2624,8 @@ MatrixClient.prototype.startClient = function(opts) {
 
     if (this._crypto) {
         this._crypto.uploadKeys(5).done();
-        let tenMinutes = 1000 * 60 * 10;
-        let self = this;
+        const tenMinutes = 1000 * 60 * 10;
+        const self = this;
         this._uploadIntervalID = global.setInterval(function() {
             self._crypto.uploadKeys(5).done();
         }, tenMinutes);
@@ -2661,7 +2661,7 @@ MatrixClient.prototype.stopClient = function() {
 };
 
 function setupCallEventHandler(client) {
-    let candidatesByCall = {
+    const candidatesByCall = {
         // callId: [Candidate]
     };
 
@@ -2674,11 +2674,11 @@ function setupCallEventHandler(client) {
     client.on("sync", function(state) {
         if (state === "PREPARED") {
             isClientPrepared = true;
-            let ignoreCallIds = {}; // Set<String>
+            const ignoreCallIds = {}; // Set<String>
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
             for (let i = callEventBuffer.length - 1; i >= 0; i--) {
-                let ev = callEventBuffer[i];
+                const ev = callEventBuffer[i];
                 if (ev.getType() === "m.call.answer" ||
                         ev.getType() === "m.call.hangup") {
                     ignoreCallIds[ev.getContent().call_id] = "yep";
@@ -2709,7 +2709,7 @@ function setupCallEventHandler(client) {
         if (event.getType().indexOf("m.call.") !== 0) {
             return; // not a call event
         }
-        let content = event.getContent();
+        const content = event.getContent();
         let call = content.call_id ? client.callList[content.call_id] : undefined;
         let i;
         //console.log("RECV %s content=%s", event.getType(), JSON.stringify(content));
@@ -2761,9 +2761,9 @@ function setupCallEventHandler(client) {
 
             // Were we trying to call that user (room)?
             let existingCall;
-            let existingCalls = utils.values(client.callList);
+            const existingCalls = utils.values(client.callList);
             for (i = 0; i < existingCalls.length; ++i) {
-                let thisCall = existingCalls[i];
+                const thisCall = existingCalls[i];
                 if (call.room_id === thisCall.room_id &&
                         thisCall.direction === 'outbound' &&
                         (["wait_local_media", "create_offer", "invite_sent"].indexOf(
@@ -2862,7 +2862,7 @@ function checkTurnServers(client) {
                 res.ttl + " secs");
             // map the response to a format that can be fed to
             // RTCPeerConnection
-            let servers = {
+            const servers = {
                 urls: res.uris,
                 username: res.username,
                 credential: res.password,
@@ -2898,7 +2898,7 @@ function _resolve(callback, defer, res) {
 
 function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
-        let event = new MatrixEvent(plainOldJsObject);
+        const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
             _decryptEvent(client, event);
         }
@@ -2924,7 +2924,7 @@ MatrixClient.prototype.getEventMapper = function() {
  */
 MatrixClient.prototype.generateClientSecret = function() {
     let ret = "";
-    let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     for (let i = 0; i < 32; i++) {
         ret += chars.charAt(Math.floor(Math.random() * chars.length));

@@ -16,9 +16,9 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-let q = require("q");
+const q = require("q");
 
-let utils = require("./utils");
+const utils = require("./utils");
 
 /**
  * Abstracts the logic used to drive the interactive auth process.
@@ -115,7 +115,7 @@ InteractiveAuth.prototype = {
         }
 
         // use the sessionid from the last request.
-        let auth = {
+        const auth = {
             session: this._data.session,
         };
         utils.extend(auth, authData);
@@ -131,7 +131,7 @@ InteractiveAuth.prototype = {
      * @param {object?} auth new auth dict, including session id
      */
     _doRequest: function(auth) {
-        let self = this;
+        const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
         // handler (without the additional event loop entailed by q.fcall or an
@@ -164,7 +164,7 @@ InteractiveAuth.prototype = {
      * @private
      */
     _startNextAuthStage: function() {
-        let nextStage = this._chooseStage();
+        const nextStage = this._chooseStage();
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
@@ -186,9 +186,9 @@ InteractiveAuth.prototype = {
      * @return {string?} login type
      */
     _chooseStage: function() {
-        let flow = this._chooseFlow();
+        const flow = this._chooseFlow();
         console.log("Active flow => %s", JSON.stringify(flow));
-        let nextStage = this._firstUncompletedStage(flow);
+        const nextStage = this._firstUncompletedStage(flow);
         console.log("Next stage: %s", nextStage);
         return nextStage;
     },
@@ -200,7 +200,7 @@ InteractiveAuth.prototype = {
      * @return {object} flow
      */
     _chooseFlow: function() {
-        let flows = this._data.flows || [];
+        const flows = this._data.flows || [];
         // always use the first flow for now
         return flows[0];
     },
@@ -213,9 +213,9 @@ InteractiveAuth.prototype = {
      * @return {string} login type
      */
     _firstUncompletedStage: function(flow) {
-        let completed = (this._data || {}).completed || [];
+        const completed = (this._data || {}).completed || [];
         for (let i = 0; i < flow.stages.length; ++i) {
-            let stageType = flow.stages[i];
+            const stageType = flow.stages[i];
             if (completed.indexOf(stageType) === -1) {
                 return stageType;
             }

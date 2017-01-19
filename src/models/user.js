@@ -17,8 +17,8 @@ limitations under the License.
 /**
  * @module models/user
  */
- let EventEmitter = require("events").EventEmitter;
- let utils = require("../utils");
+ const EventEmitter = require("events").EventEmitter;
+ const utils = require("../utils");
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -73,10 +73,10 @@ User.prototype.setPresenceEvent = function(event) {
     if (event.getType() !== "m.presence") {
         return;
     }
-    let firstFire = this.events.presence === null;
+    const firstFire = this.events.presence === null;
     this.events.presence = event;
 
-    let eventsToFire = [];
+    const eventsToFire = [];
     if (event.getContent().presence !== this.presence || firstFire) {
         eventsToFire.push("User.presence");
     }
@@ -122,7 +122,7 @@ User.prototype.setPresenceEvent = function(event) {
  * @param {string} name The new display name.
  */
 User.prototype.setDisplayName = function(name) {
-    let oldName = this.displayName;
+    const oldName = this.displayName;
     this.displayName = name;
     if (name !== oldName) {
         this._updateModifiedTime();
@@ -146,7 +146,7 @@ User.prototype.setRawDisplayName = function(name) {
  * @param {string} url The new avatar URL.
  */
 User.prototype.setAvatarUrl = function(url) {
-    let oldUrl = this.avatarUrl;
+    const oldUrl = this.avatarUrl;
     this.avatarUrl = url;
     if (url !== oldUrl) {
         this._updateModifiedTime();

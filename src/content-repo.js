@@ -16,7 +16,7 @@ limitations under the License.
 /**
  * @module content-repo
  */
-let utils = require("./utils");
+const utils = require("./utils");
 
 /** Content Repo utility functions */
 module.exports = {
@@ -48,7 +48,7 @@ module.exports = {
         }
         let serverAndMediaId = mxc.slice(6); // strips mxc://
         let prefix = "/_matrix/media/v1/download/";
-        let params = {};
+        const params = {};
 
         if (width) {
             params.width = width;
@@ -94,12 +94,12 @@ module.exports = {
         if (!height) {
             height = 96;
         }
-        let params = {
+        const params = {
             width: width,
             height: height,
         };
 
-        let path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
+        const path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
             $ident: identiconString,
         });
         return baseUrl + path +
