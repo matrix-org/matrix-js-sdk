@@ -11,7 +11,7 @@
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify --exclude olm browser-index.js -o dist/browser-matrix.js --ignore-missing && uglifyjs -c -m -o dist/browser-matrix.min.js dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify --exclude olm browser-index.js -o dist/browser-matrix-dev.js -v",
-    "lint": "eslint --max-warnings 1860 src spec",
+    "lint": "eslint --max-warnings 126 src spec",
     "prepublish": "npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
