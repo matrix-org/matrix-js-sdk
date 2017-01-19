@@ -65,8 +65,8 @@ module.exports = {
             prefix = "/_matrix/media/v1/thumbnail/";
         }
 
-        let fragmentOffset = serverAndMediaId.indexOf("#"),
-            fragment = "";
+        const fragmentOffset = serverAndMediaId.indexOf("#");
+        let fragment = "";
         if (fragmentOffset >= 0) {
             fragment = serverAndMediaId.substr(fragmentOffset);
             serverAndMediaId = serverAndMediaId.substr(0, fragmentOffset);

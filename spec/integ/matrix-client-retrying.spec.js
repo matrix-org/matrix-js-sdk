@@ -51,8 +51,6 @@ describe("MatrixClient retrying", function() {
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function(done) {
         // send a couple of events; the second will be queued
-        let ev1;
-        let ev2;
         client.sendMessage(roomId, "m1").then(function(ev) {
             expect(ev).toEqual(ev1);
         });
@@ -63,8 +61,8 @@ describe("MatrixClient retrying", function() {
         // both events should be in the timeline at this point
         const tl = room.getLiveTimeline().getEvents();
         expect(tl.length).toEqual(2);
-        ev1 = tl[0];
-        ev2 = tl[1];
+        const ev1 = tl[0];
+        const ev2 = tl[1];
 
         expect(ev1.status).toEqual(EventStatus.SENDING);
         expect(ev2.status).toEqual(EventStatus.SENDING);
