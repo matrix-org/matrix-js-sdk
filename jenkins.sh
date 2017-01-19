@@ -1,9 +1,12 @@
 #!/bin/bash -l
 
+set -x
+
 export NVM_DIR="/home/jenkins/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-nvm use 6
-npm install
+
+nvm use 6 || exit $?
+npm install || exit $?
 
 RC=0
 
