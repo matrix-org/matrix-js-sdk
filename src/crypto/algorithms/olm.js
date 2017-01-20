@@ -126,7 +126,7 @@ OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
                 olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
                     self._userId, self._deviceId, self._olmDevice,
-                    userId, deviceInfo, payloadFields
+                    userId, deviceInfo, payloadFields,
                 );
             }
         }
@@ -177,7 +177,7 @@ OlmDecryption.prototype.decryptEvent = function(event) {
         console.warn(
             "Failed to decrypt Olm event (id=" +
                 event.getId() + ") from " + deviceKey +
-                ": " + e.message
+                ": " + e.message,
         );
         throw new base.DecryptionError("Bad Encrypted Message");
     }
@@ -189,10 +189,10 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     if (payload.recipient != this._userId) {
         console.warn(
             "Event " + event.getId() + ": Intended recipient " +
-            payload.recipient + " does not match our id " + this._userId
+            payload.recipient + " does not match our id " + this._userId,
         );
         throw new base.DecryptionError(
-            "Message was intented for " + payload.recipient
+            "Message was intented for " + payload.recipient,
         );
     }
 
@@ -200,7 +200,7 @@ OlmDecryption.prototype.decryptEvent = function(event) {
                this._olmDevice.deviceEd25519Key) {
         console.warn(
             "Event " + event.getId() + ": Intended recipient ed25519 key " +
-            payload.recipient_keys.ed25519 + " did not match ours"
+            payload.recipient_keys.ed25519 + " did not match ours",
         );
         throw new base.DecryptionError("Message not intended for this device");
     }
@@ -212,10 +212,10 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     if (payload.sender != event.getSender()) {
         console.warn(
             "Event " + event.getId() + ": original sender " + payload.sender +
-            " does not match reported sender " + event.getSender()
+            " does not match reported sender " + event.getSender(),
         );
         throw new base.DecryptionError(
-            "Message forwarded from " + payload.sender
+            "Message forwarded from " + payload.sender,
         );
     }
 
@@ -223,10 +223,10 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     if (payload.room_id !== event.getRoomId()) {
         console.warn(
             "Event " + event.getId() + ": original room " + payload.room_id +
-            " does not match reported room " + event.room_id
+            " does not match reported room " + event.room_id,
         );
         throw new base.DecryptionError(
-            "Message intended for room " + payload.room_id
+            "Message intended for room " + payload.room_id,
         );
     }
 
@@ -251,16 +251,16 @@ OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, messa
         const sessionId = sessionIds[i];
         try {
             const payload = this._olmDevice.decryptMessage(
-                theirDeviceIdentityKey, sessionId, message.type, message.body
+                theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
             console.log(
                 "Decrypted Olm message from " + theirDeviceIdentityKey +
-                    " with session " + sessionId
+                    " with session " + sessionId,
             );
             return payload;
         } catch (e) {
             const foundSession = this._olmDevice.matchesSession(
-                theirDeviceIdentityKey, sessionId, message.type, message.body
+                theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
 
             if (foundSession) {
@@ -268,7 +268,7 @@ OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, messa
                 // session, so it should have worked.
                 throw new Error(
                     "Error decrypting prekey message with existing session id " +
-                        sessionId + ": " + e.message
+                        sessionId + ": " + e.message,
                 );
             }
 
@@ -288,7 +288,7 @@ OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, messa
 
         throw new Error(
             "Error decrypting non-prekey message with existing sessions: " +
-                JSON.stringify(decryptionErrors)
+                JSON.stringify(decryptionErrors),
         );
     }
 
@@ -298,19 +298,19 @@ OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, messa
     let res;
     try {
         res = this._olmDevice.createInboundSession(
-            theirDeviceIdentityKey, message.type, message.body
+            theirDeviceIdentityKey, message.type, message.body,
         );
     } catch (e) {
         decryptionErrors["(new)"] = e.message;
         throw new Error(
             "Error decrypting prekey message: " +
-                JSON.stringify(decryptionErrors)
+                JSON.stringify(decryptionErrors),
         );
     }
 
     console.log(
         "created new inbound Olm session ID " +
-            res.session_id + " with " + theirDeviceIdentityKey
+            res.session_id + " with " + theirDeviceIdentityKey,
     );
     return res.payload;
 };

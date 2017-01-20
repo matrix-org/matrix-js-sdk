@@ -70,7 +70,7 @@ module.exports.EventStatus = {
  * Default: true. <strong>This property is experimental and may change.</strong>
  */
 module.exports.MatrixEvent = function MatrixEvent(
-    event
+    event,
 ) {
     this.event = event || {};
     this.sender = null;

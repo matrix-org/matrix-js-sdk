@@ -85,7 +85,7 @@ module.exports.EncryptionAlgorithm = EncryptionAlgorithm;
  * @param {string=} oldMembership  previous membership
  */
 EncryptionAlgorithm.prototype.onRoomMembership = function(
-    event, member, oldMembership
+    event, member, oldMembership,
 ) {};
 
 /**

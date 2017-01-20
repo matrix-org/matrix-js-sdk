@@ -114,7 +114,7 @@ describe("MatrixClient syncing", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
-                })
+                }),
             );
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -122,7 +122,7 @@ describe("MatrixClient syncing", function() {
                 200, {
                     avatar_url: "mxc://flibble/wibble",
                     displayname: "The Boss",
-                }
+                },
             );
 
             client.startClient({
@@ -133,7 +133,7 @@ describe("MatrixClient syncing", function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Boss");
                 expect(
-                    member.getAvatarUrl("home.server.url", null, null, null, false)
+                    member.getAvatarUrl("home.server.url", null, null, null, false),
                 ).toBeDefined();
                 done();
             });
@@ -148,7 +148,7 @@ describe("MatrixClient syncing", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
-                })
+                }),
             );
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -173,7 +173,7 @@ describe("MatrixClient syncing", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
-                })
+                }),
             );
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -199,7 +199,7 @@ describe("MatrixClient syncing", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
-                })
+                }),
             );
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -210,7 +210,7 @@ describe("MatrixClient syncing", function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual(userC);
                 expect(
-                    member.getAvatarUrl("home.server.url", null, null, null, false)
+                    member.getAvatarUrl("home.server.url", null, null, null, false),
                 ).toBeNull();
                 done();
             });
@@ -362,7 +362,7 @@ describe("MatrixClient syncing", function() {
                 const room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(
-                    nextSyncData.rooms.join[roomOne].state.events[0].content.name
+                    nextSyncData.rooms.join[roomOne].state.events[0].content.name,
                 );
                 done();
             });

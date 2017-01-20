@@ -52,10 +52,10 @@ describe("EventTimeline", function() {
             ];
             timeline.initialiseState(events);
             expect(timeline._startState.setStateEvents).toHaveBeenCalledWith(
-                events
+                events,
             );
             expect(timeline._endState.setStateEvents).toHaveBeenCalledWith(
-                events
+                events,
             );
         });
 

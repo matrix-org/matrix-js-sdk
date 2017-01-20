@@ -197,13 +197,13 @@ RoomMember.prototype.getAvatarUrl =
     }
     const rawUrl = this.events.member ? this.events.member.getContent().avatar_url : null;
     const httpUrl = ContentRepo.getHttpUriForMxc(
-        baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks
+        baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
     );
     if (httpUrl) {
         return httpUrl;
     } else if (allowDefault) {
         return ContentRepo.getIdenticonUri(
-            baseUrl, this.userId, width, height
+            baseUrl, this.userId, width, height,
         );
     }
     return null;

@@ -163,10 +163,10 @@ describe("Room", function() {
             ];
             room.addLiveEvents(events);
             expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
-                [events[0]]
+                [events[0]],
             );
             expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
-                [events[1]]
+                [events[1]],
             );
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
@@ -222,7 +222,7 @@ describe("Room", function() {
                         break;
                     }
                     callCount += 1;
-                }
+                },
             );
 
             // first add the local echo
@@ -368,10 +368,10 @@ describe("Room", function() {
 
             room.addEventsToTimeline(events, true, room.getLiveTimeline());
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
-                [events[0]]
+                [events[0]],
             );
             expect(room.oldState.setStateEvents).toHaveBeenCalledWith(
-                [events[1]]
+                [events[1]],
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
@@ -680,7 +680,7 @@ describe("Room", function() {
             });
             room.currentState.getMember.andCallFake(function(userId) {
                 const memberEvent = room.currentState.getStateEvents(
-                    "m.room.member", userId
+                    "m.room.member", userId,
                 );
                 return {
                     name: memberEvent.event.content &&
@@ -1003,7 +1003,7 @@ describe("Room", function() {
                     mkRecord(eventToAck.getId(), "m.read", userD, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual(
-                    [userB, userC, userD]
+                    [userB, userC, userD],
                 );
             });
 
@@ -1164,10 +1164,10 @@ describe("Room", function() {
             room.addPendingEvent(eventB, "TXN1");
             room.addLiveEvents([eventC]);
             expect(room.timeline).toEqual(
-                [eventA, eventC]
+                [eventA, eventC],
             );
             expect(room.getPendingEvents()).toEqual(
-                [eventB]
+                [eventB],
             );
         });
 
@@ -1190,7 +1190,7 @@ describe("Room", function() {
             room.addPendingEvent(eventB, "TXN1");
             room.addLiveEvents([eventC]);
             expect(room.timeline).toEqual(
-                [eventA, eventB, eventC]
+                [eventA, eventB, eventC],
             );
         });
     });
@@ -1208,7 +1208,7 @@ describe("Room", function() {
 
             room.addPendingEvent(eventA, "TXN1");
             expect(room.getPendingEvents()).toEqual(
-                [eventA]
+                [eventA],
             );
 
             // the event has to have been failed or queued before it can be
@@ -1242,7 +1242,7 @@ describe("Room", function() {
 
             room.addPendingEvent(eventA, "TXN1");
             expect(room.getLiveTimeline().getEvents()).toEqual(
-                [eventA]
+                [eventA],
             );
 
             // the event has to have been failed or queued before it can be

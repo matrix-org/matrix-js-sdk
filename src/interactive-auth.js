@@ -154,7 +154,7 @@ InteractiveAuth.prototype = {
                 }
                 self._data = error.data;
                 self._startNextAuthStage();
-            }
+            },
         ).catch(this._completionDeferred.reject).done();
     },
 

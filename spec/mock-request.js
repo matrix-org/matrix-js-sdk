@@ -43,13 +43,13 @@ HttpBackend.prototype = {
         let flushed = 0;
         let triedWaiting = false;
         console.log(
-            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
+            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush,
         );
         const tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
                 "  trying to flush queue => reqs=%s expected=%s [%s]",
-                self.requests.length, self.expectedRequests.length, path
+                self.requests.length, self.expectedRequests.length, path,
             );
             if (self._takeFromQueue(path)) {
                 // try again on the next tick.
@@ -122,7 +122,7 @@ HttpBackend.prototype = {
                     body = body(req.path, req.data);
                 }
                 req.callback(
-                    testResponse.err, testResponse.response, body
+                    testResponse.err, testResponse.response, body,
                 );
                 matchingReq = null;
             }
@@ -140,7 +140,7 @@ HttpBackend.prototype = {
         const firstOutstandingReq = this.requests[0] || {};
         expect(this.requests.length).toEqual(0,
             "Expected no more HTTP requests but received request to " +
-            firstOutstandingReq.path
+            firstOutstandingReq.path,
         );
     },
 
@@ -150,7 +150,7 @@ HttpBackend.prototype = {
     verifyNoOutstandingExpectation: function() {
         const firstOutstandingExpectation = this.expectedRequests[0] || {};
         expect(this.expectedRequests.length).toEqual(0,
-            "Expected to see HTTP request for " + firstOutstandingExpectation.path
+            "Expected to see HTTP request for " + firstOutstandingExpectation.path,
         );
     },
 
