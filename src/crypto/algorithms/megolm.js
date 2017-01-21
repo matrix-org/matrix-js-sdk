@@ -433,8 +433,8 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
             if (device.isUnverified() && !device.isKnown()) {
                 // mark the devices as known to the user, given we're about to
                 // yell at them.
-                //this._crypto.setDeviceVerification(userId, device.deviceId,
-                //                                   undefined, undefined, true);
+                this._crypto.setDeviceVerification(userId, device.deviceId,
+                                                  undefined, undefined, true);
                 if (!unknownDevices[userId]) {
                     unknownDevices[userId] = {};
                 }
