@@ -163,6 +163,8 @@ utils.inherits(module.exports.DecryptionError, Error);
  *
  * @constructor
  * @param {string} msg message describing the problem
+ * @param {Object} devices userId -> {deviceId -> object}
+ *      set of unknown devices per user we're warning about
  * @extends Error
  */
 module.exports.UnknownDeviceError = function(msg, devices) {

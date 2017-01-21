@@ -423,12 +423,15 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
  * Checks the devices we're about to send to and see if any are entirely
  * unknown to the user.  If so, warn the user, and mark them as known to
  * give the user a chance to go verify them before re-sending this message.
+ *
+ * @param {Object} devicesInRoom userId -> {deviceId -> object}
+ *   devices we should shared the session with.
  */
 MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
     const unknownDevices = {};
 
-    Object.keys(devicesInRoom).forEach(userId=>{
-        Object.keys(devicesInRoom[userId]).forEach(deviceId=>{
+    Object.keys(devicesInRoom).forEach((userId)=>{
+        Object.keys(devicesInRoom[userId]).forEach((deviceId)=>{
             const device = devicesInRoom[userId][deviceId];
             if (device.isUnverified() && !device.isKnown()) {
                 // mark the devices as known to the user, given we're about to
