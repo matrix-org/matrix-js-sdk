@@ -93,6 +93,7 @@ SyncApi.prototype.createRoom = function(roomId) {
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
+
     reEmit(client, room, ["Room.name", "Room.timeline", "Room.redaction",
                           "Room.receipt", "Room.tags",
                           "Room.timelineReset",

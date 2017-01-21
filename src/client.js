@@ -404,6 +404,21 @@ function _setDeviceVerification(client, userId, deviceId, verified, blocked) {
 }
 
 /**
+ * Set the global override for whether the client should ever send encrypted
+ * messages to unverified devices.  If false, it can still be overridden
+ * per-room.  If true, it overrides the per-room settings.
+ *
+ * @param {boolean} value whether to unilaterally blacklist all
+ * unverified devices
+ */
+MatrixClient.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.setGlobalBlacklistUnverifiedDevices(value);
+};
+
+/**
  * Get e2e information on the device that sent an event
  *
  * @param {MatrixEvent} event event to be checked
