@@ -490,7 +490,8 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
 
                 if (userDevices[deviceId].isBlocked() ||
                     (userDevices[deviceId].isUnverified() &&
-                     room.getBlacklistUnverifiedDevices()))
+                     (room.getBlacklistUnverifiedDevices() ||
+                      this._crypto.getGlobalBlacklistUnverifiedDevices())))
                 {
                     delete userDevices[deviceId];
                 }
