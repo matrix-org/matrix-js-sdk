@@ -684,8 +684,12 @@ Crypto.prototype.getDeviceByIdentityKey = function(userId, algorithm, sender_key
  *
  * @param {?boolean} blocked whether to mark the device as blocked. Null to
  *      leave unchanged.
+ *
+ * @param {?boolean} known whether to mark that the user has been made aware of
+ *      the existence of this device. Null to leave unchanged
  */
-Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, blocked) {
+Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
+                                                  blocked, known) {
     const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
@@ -706,10 +710,16 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, bl
         verificationStatus = DeviceVerification.UNVERIFIED;
     }
 
-    if (dev.verified === verificationStatus) {
+    let knownStatus = dev.known;
+    if (known !== null) {
+        knownStatus = known;
+    }
+
+    if (dev.verified === verificationStatus && dev.known === knownStatus) {
         return;
     }
     dev.verified = verificationStatus;
+    dev.known = knownStatus;
     this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
 };
 
