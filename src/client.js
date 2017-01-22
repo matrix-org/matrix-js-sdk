@@ -419,6 +419,17 @@ MatrixClient.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
 };
 
 /**
+ * @return {boolean} whether to unilaterally blacklist all
+ * unverified devices
+ */
+MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getGlobalBlacklistUnverifiedDevices();
+};
+
+/**
  * Get e2e information on the device that sent an event
  *
  * @param {MatrixEvent} event event to be checked

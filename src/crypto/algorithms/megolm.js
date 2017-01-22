@@ -475,7 +475,8 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     //
     // XXX: what if the cache is stale, and the user left the room we had in common
     // and then added new devices before joining this one? --Matthew
-    return this._crypto.downloadKeys(roomMembers, false).then(function(devices) {
+    var self = this;
+    return self._crypto.downloadKeys(roomMembers, false).then(function(devices) {
         // remove any blocked (aka blacklisted) devices
         for (const userId in devices) {
             if (!devices.hasOwnProperty(userId)) {
@@ -491,7 +492,7 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
                 if (userDevices[deviceId].isBlocked() ||
                     (userDevices[deviceId].isUnverified() &&
                      (room.getBlacklistUnverifiedDevices() ||
-                      this._crypto.getGlobalBlacklistUnverifiedDevices())))
+                      self._crypto.getGlobalBlacklistUnverifiedDevices())))
                 {
                     delete userDevices[deviceId];
                 }
