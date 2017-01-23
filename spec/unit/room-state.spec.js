@@ -210,10 +210,10 @@ describe("RoomState", function() {
             state.setStateEvents([powerLevelEvent]);
 
             expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent
+                powerLevelEvent,
             );
             expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent
+                powerLevelEvent,
             );
         });
 
@@ -254,7 +254,7 @@ describe("RoomState", function() {
 
             expect(state.members[userA].setMembershipEvent).not.toHaveBeenCalled();
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
-                memberEvent, state
+                memberEvent, state,
             );
         });
     });
@@ -272,10 +272,10 @@ describe("RoomState", function() {
             state.setTypingEvent(typingEvent);
 
             expect(state.members[userA].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent
+                typingEvent,
             );
             expect(state.members[userB].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent
+                typingEvent,
             );
         });
     });
@@ -284,7 +284,7 @@ describe("RoomState", function() {
         it("should say non-joined members may not send state",
         function() {
             expect(state.maySendStateEvent(
-                'm.room.name', "@nobody:nowhere"
+                'm.room.name', "@nobody:nowhere",
             )).toEqual(false);
         });
 
@@ -367,7 +367,7 @@ describe("RoomState", function() {
         it("should say non-joined members may not send events",
         function() {
             expect(state.maySendEvent(
-                'm.room.message', "@nobody:nowhere"
+                'm.room.message', "@nobody:nowhere",
             )).toEqual(false);
             expect(state.maySendMessage("@nobody:nowhere")).toEqual(false);
         });

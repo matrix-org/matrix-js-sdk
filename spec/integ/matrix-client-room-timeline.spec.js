@@ -82,7 +82,7 @@ describe("MatrixClient room timelines", function() {
                 if (e.__prev_event === undefined) {
                     throw new Error(
                         "setNextSyncData needs the prev state set to '__prev_event' " +
-                        "for " + e.type
+                        "for " + e.type,
                     );
                 }
                 if (e.__prev_event !== null) {
@@ -409,10 +409,10 @@ describe("MatrixClient room timelines", function() {
                     expect(index).toEqual(2);
                     expect(room.timeline.length).toEqual(3);
                     expect(room.timeline[2].event).toEqual(
-                        eventData[1]
+                        eventData[1],
                     );
                     expect(room.timeline[1].event).toEqual(
-                        eventData[0]
+                        eventData[0],
                     );
                 }).catch(utils.failTest).done(done);
             });
@@ -510,11 +510,11 @@ describe("MatrixClient room timelines", function() {
                     expect(room.currentState.getMembers().length).toEqual(4);
                     expect(room.currentState.getMember(userC).name).toEqual("C");
                     expect(room.currentState.getMember(userC).membership).toEqual(
-                        "join"
+                        "join",
                     );
                     expect(room.currentState.getMember(userD).name).toEqual(userD);
                     expect(room.currentState.getMember(userD).membership).toEqual(
-                        "invite"
+                        "invite",
                     );
                 }).catch(utils.failTest).done(done);
             });
@@ -543,11 +543,11 @@ describe("MatrixClient room timelines", function() {
                     expect(room.currentState.getMembers().length).toEqual(2);
                     expect(room.currentState.getMember(userId).name).toEqual(userName);
                     expect(room.currentState.getMember(userId).membership).toEqual(
-                        "join"
+                        "join",
                     );
                     expect(room.currentState.getMember(otherUserId).name).toEqual("Bob");
                     expect(room.currentState.getMember(otherUserId).membership).toEqual(
-                        "join"
+                        "join",
                     );
                     done();
                 });

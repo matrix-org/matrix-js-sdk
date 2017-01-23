@@ -88,7 +88,7 @@ module.exports.setTimeout = function(func, delayMs) {
     const idx = binarySearch(
         _callbackList, function(el) {
             return el.runAt - runAt;
-        }
+        },
     );
 
     _callbackList.splice(idx, 0, data);

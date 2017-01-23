@@ -304,7 +304,7 @@ function expectBobSendMessageRequest() {
 
 function sendMessage(client) {
     return client.sendMessage(
-        roomId, {msgtype: "m.text", body: "Hello, World"}
+        roomId, {msgtype: "m.text", body: "Hello, World"},
     );
 }
 
@@ -520,7 +520,7 @@ describe("MatrixClient crypto", function() {
                 // request again: should be no more requests
                 return aliClient.downloadKeys(['@bob:id']);
             }).nodeify(done);
-        }
+        },
     );
 
     it("Bob uploads without one-time keys and with one-time keys", function(done) {
@@ -583,7 +583,7 @@ describe("MatrixClient crypto", function() {
 
         q.all(
             aliClient.downloadKeys([bobUserId, eveUserId]),
-            aliHttpBackend.flush("/keys/query", 1)
+            aliHttpBackend.flush("/keys/query", 1),
         ).then(function() {
             // should get an empty list
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);
@@ -618,7 +618,7 @@ describe("MatrixClient crypto", function() {
 
         q.all(
             aliClient.downloadKeys([bobUserId]),
-            aliHttpBackend.flush("/keys/query", 1)
+            aliHttpBackend.flush("/keys/query", 1),
         ).then(function() {
             // should get an empty list
             expect(aliClient.listDeviceKeys(bobUserId)).toEqual([]);

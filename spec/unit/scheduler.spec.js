@@ -234,7 +234,7 @@ describe("MatrixScheduler", function() {
             expect(queue).toEqual([eventA, eventB]);
             // modify the queue
             const eventC = utils.mkMessage(
-                {user: "@a:bar", room: roomId, event: true}
+                {user: "@a:bar", room: roomId, event: true},
             );
             queue.push(eventC);
             const queueAgain = scheduler.getQueueForEvent(eventA);
@@ -313,7 +313,7 @@ describe("MatrixScheduler", function() {
             expect(MatrixScheduler.QUEUE_MESSAGES(
                 utils.mkMembership({
                     user: "@alice:bar", room: roomId, mship: "join", event: true,
-                })
+                }),
             )).toEqual(null);
         });
     });
@@ -323,30 +323,30 @@ describe("MatrixScheduler", function() {
             const res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
                 eventA, 1, new MatrixError({
                     errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 5000,
-                })
+                }),
             );
             expect(res >= 500).toBe(true, "Didn't wait long enough.");
         });
 
         it("should give up after 5 attempts", function() {
             const res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 5, {}
+                eventA, 5, {},
             );
             expect(res).toBe(-1, "Didn't give up.");
         });
 
         it("should do exponential backoff", function() {
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 1, {}
+                eventA, 1, {},
             )).toEqual(2000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 2, {}
+                eventA, 2, {},
             )).toEqual(4000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 3, {}
+                eventA, 3, {},
             )).toEqual(8000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 4, {}
+                eventA, 4, {},
             )).toEqual(16000);
         });
     });

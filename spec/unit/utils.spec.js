@@ -14,7 +14,7 @@ describe("utils", function() {
                 baz: "beer@",
             };
             expect(utils.encodeParams(params)).toEqual(
-                "foo=bar&baz=beer%40"
+                "foo=bar&baz=beer%40",
             );
         });
     });
@@ -27,7 +27,7 @@ describe("utils", function() {
                 "%here": "beer@",
             };
             expect(utils.encodeUri(path, vals)).toEqual(
-                "foo/bar/baz/beer%40"
+                "foo/bar/baz/beer%40",
             );
         });
     });

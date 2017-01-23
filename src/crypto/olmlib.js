@@ -52,7 +52,7 @@ module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
 module.exports.encryptMessageForDevice = function(
     resultsObject,
     ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
-    payloadFields
+    payloadFields,
 ) {
     const deviceKey = recipientDevice.getIdentityKey();
     const sessionId = olmDevice.getSessionIdForDevice(deviceKey);
@@ -64,7 +64,7 @@ module.exports.encryptMessageForDevice = function(
 
     console.log(
         "Using sessionid " + sessionId + " for device " +
-            recipientUserId + ":" + recipientDevice.deviceId
+            recipientUserId + ":" + recipientDevice.deviceId,
     );
 
     const payload = {
@@ -100,7 +100,7 @@ module.exports.encryptMessageForDevice = function(
     utils.extend(payload, payloadFields);
 
     resultsObject[deviceKey] = olmDevice.encryptMessage(
-        deviceKey, sessionId, JSON.stringify(payload)
+        deviceKey, sessionId, JSON.stringify(payload),
     );
 };
 
@@ -119,7 +119,7 @@ module.exports.encryptMessageForDevice = function(
  *    {@link module:crypto~OlmSessionResult}
  */
 module.exports.ensureOlmSessionsForDevices = function(
-    olmDevice, baseApis, devicesByUser
+    olmDevice, baseApis, devicesByUser,
 ) {
     const devicesWithoutSession = [
         // [userId, deviceId], ...
@@ -159,7 +159,7 @@ module.exports.ensureOlmSessionsForDevices = function(
 
     const oneTimeKeyAlgorithm = "signed_curve25519";
     return baseApis.claimOneTimeKeys(
-        devicesWithoutSession, oneTimeKeyAlgorithm
+        devicesWithoutSession, oneTimeKeyAlgorithm,
     ).then(function(res) {
         const otk_res = res.one_time_keys || {};
         for (const userId in devicesByUser) {
@@ -187,13 +187,13 @@ module.exports.ensureOlmSessionsForDevices = function(
                 if (!oneTimeKey) {
                     console.warn(
                         "No one-time keys (alg=" + oneTimeKeyAlgorithm +
-                            ") for device " + userId + ":" + deviceId
+                            ") for device " + userId + ":" + deviceId,
                     );
                     continue;
                 }
 
                 const sid = _verifyKeyAndStartSession(
-                    olmDevice, oneTimeKey, userId, deviceInfo
+                    olmDevice, oneTimeKey, userId, deviceInfo,
                 );
                 result[userId][deviceId].sessionId = sid;
             }
@@ -208,12 +208,12 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     try {
         _verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
-            deviceInfo.getFingerprint()
+            deviceInfo.getFingerprint(),
         );
     } catch (e) {
         console.error(
             "Unable to verify signature on one-time key for device " +
-                userId + ":" + deviceId + ":", e
+                userId + ":" + deviceId + ":", e,
         );
         return null;
     }
@@ -221,7 +221,7 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     let sid;
     try {
         sid = olmDevice.createOutboundSession(
-            deviceInfo.getIdentityKey(), oneTimeKey.key
+            deviceInfo.getIdentityKey(), oneTimeKey.key,
         );
     } catch (e) {
         // possibly a bad key
@@ -251,7 +251,7 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
  * @param {string} signingKey   base64-ed ed25519 public key
  */
 const _verifySignature = module.exports.verifySignature = function(
-    olmDevice, obj, signingUserId, signingDeviceId, signingKey
+    olmDevice, obj, signingUserId, signingDeviceId, signingKey,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;
     const signatures = obj.signatures || {};
@@ -268,6 +268,6 @@ const _verifySignature = module.exports.verifySignature = function(
     const json = anotherjson.stringify(obj);
 
     olmDevice.verifySignature(
-        signingKey, json, signature
+        signingKey, json, signature,
     );
 };

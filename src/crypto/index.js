@@ -69,7 +69,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     this._roomDecryptors = {};
 
     this._supportedAlgorithms = utils.keys(
-        algorithms.DECRYPTION_CLASSES
+        algorithms.DECRYPTION_CLASSES,
     );
 
     // build our device keys: these will later be uploaded
@@ -80,7 +80,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
         this._olmDevice.deviceCurve25519Key;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
-        this._userId
+        this._userId,
     );
 
     if (!myDevices) {
@@ -100,7 +100,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
 
         myDevices[this._deviceId] = deviceInfo;
         this._sessionStore.storeEndToEndDevicesForUser(
-            this._userId, myDevices
+            this._userId, myDevices,
         );
     }
 
@@ -381,7 +381,7 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
     });
 
     this._baseApis.downloadKeysForUsers(
-        downloadUsers
+        downloadUsers,
     ).done(function(res) {
         const dk = res.device_keys || {};
 
@@ -412,7 +412,7 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
             }
 
             _updateStoredDeviceKeysForUser(
-                self._olmDevice, userId, userStore, dk[userId]
+                self._olmDevice, userId, userStore, dk[userId],
             );
 
             // update the session store
@@ -425,7 +425,7 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
                 storage[deviceId] = userStore[deviceId].toStorage();
             }
             self._sessionStore.storeEndToEndDevicesForUser(
-                userId, storage
+                userId, storage,
             );
 
             deferMap[userId].resolve();
@@ -765,7 +765,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     // identity key of the device which set up the Megolm session.
 
     const device = this.getDeviceByIdentityKey(
-        event.getSender(), algorithm, sender_key
+        event.getSender(), algorithm, sender_key,
     );
 
     if (device === null) {
@@ -884,7 +884,7 @@ Crypto.prototype.ensureOlmSessionsForUsers = function(users) {
     }
 
     return olmlib.ensureOlmSessionsForDevices(
-        this._olmDevice, this._baseApis, devicesByUser
+        this._olmDevice, this._baseApis, devicesByUser,
     );
 };
 
@@ -909,13 +909,13 @@ Crypto.prototype.exportRoomKeys = function() {
         this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
             (s) => {
                 const sess = this._olmDevice.exportInboundGroupSession(
-                    s.senderKey, s.sessionId
+                    s.senderKey, s.sessionId,
                 );
 
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 return sess;
-            }
-        )
+            },
+        ),
     );
 };
 
@@ -970,7 +970,7 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
             throw new Error(
                 "Room was previously configured to use encryption, but is " +
                 "no longer. Perhaps the homeserver is hiding the " +
-                "configuration event."
+                "configuration event.",
             );
         }
         return null;
@@ -985,7 +985,7 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
     };
 
     return alg.encryptMessage(
-        room, event.getType(), event.getContent()
+        room, event.getType(), event.getContent(),
     ).then(function(encryptedContent) {
         event.makeEncrypted("m.room.encrypted", encryptedContent, myKeys);
     });
@@ -1088,7 +1088,7 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     const self = this;
     this._baseApis.sendToDevice(
         "m.new_device", // OH HAI!
-        content
+        content,
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
     });
@@ -1196,7 +1196,7 @@ Crypto.prototype._flushNewDeviceRequests = function() {
     users.map(function(u) {
         r[u] = r[u].catch(function(e) {
             console.error(
-                'Error updating device keys for user ' + u + ':', e
+                'Error updating device keys for user ' + u + ':', e,
             );
 
             // reinstate the pending flags on any users which failed; this will
@@ -1248,7 +1248,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
     const AlgClass = algorithms.DECRYPTION_CLASSES[algorithm];
     if (!AlgClass) {
         throw new algorithms.DecryptionError(
-            'Unknown encryption algorithm "' + algorithm + '".'
+            'Unknown encryption algorithm "' + algorithm + '".',
         );
     }
     alg = new AlgClass({
