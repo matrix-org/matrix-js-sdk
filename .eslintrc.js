@@ -56,7 +56,7 @@ module.exports = {
         // we set these to warnings, and assert that the number
         // of warnings doesn't exceed a given threshold
         "no-var": ["warn"],
-        "brace-style": ["warn"],
+        "brace-style": ["warn", "1tbs", {"allowSingleLine": true}],
         "prefer-rest-params": ["warn"],
         "prefer-spread": ["warn"],
         "one-var": ["warn"],
