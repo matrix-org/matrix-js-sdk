@@ -19,6 +19,13 @@ module.exports = {
         }],
         curly: ["error", "multi-line"],
         "prefer-const": ["error"],
+        "comma-dangle": ["error", {
+            arrays: "always-multiline",
+            objects: "always-multiline",
+            imports: "always-multiline",
+            exports: "always-multiline",
+            functions: "always-multiline",
+        }],
 
         // loosen jsdoc requirements a little
         "require-jsdoc": ["error", {
@@ -56,13 +63,5 @@ module.exports = {
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
-
-        "comma-dangle": ["warn", {
-            arrays: "always-multiline",
-            objects: "always-multiline",
-            imports: "always-multiline",
-            exports: "always-multiline",
-            functions: "always-multiline",
-        }],
     }
 }
