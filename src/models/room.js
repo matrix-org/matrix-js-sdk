@@ -108,7 +108,7 @@ function Room(roomId, opts) {
     if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
         throw new Error(
             "opts.pendingEventOrdering MUST be either 'chronological' or " +
-            "'detached'. Got: '" + opts.pendingEventOrdering + "'"
+            "'detached'. Got: '" + opts.pendingEventOrdering + "'",
         );
     }
 
@@ -319,11 +319,11 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
     const mainUrl = roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
     if (mainUrl) {
         return ContentRepo.getHttpUriForMxc(
-            baseUrl, mainUrl, width, height, resizeMethod
+            baseUrl, mainUrl, width, height, resizeMethod,
         );
     } else if (allowDefault) {
         return ContentRepo.getIdenticonUri(
-            baseUrl, this.roomId, width, height
+            baseUrl, this.roomId, width, height,
         );
     }
 
@@ -345,7 +345,7 @@ Room.prototype.getAliases = function() {
             const alias_event = alias_events[i];
             if (utils.isArray(alias_event.getContent().aliases)) {
                 Array.prototype.push.apply(
-                    alias_strings, alias_event.getContent().aliases
+                    alias_strings, alias_event.getContent().aliases,
                 );
             }
         }
@@ -390,7 +390,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
                                               timeline, paginationToken) {
     timeline.getTimelineSet().addEventsToTimeline(
         events, toStartOfTimeline,
-        timeline, paginationToken
+        timeline, paginationToken,
     );
 };
 
@@ -488,7 +488,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
 
     timelineSet.getLiveTimeline().setPaginationToken(
         timeline.getPaginationToken(EventTimeline.BACKWARDS),
-        EventTimeline.BACKWARDS
+        EventTimeline.BACKWARDS,
     );
 
     // alternatively, we could try to do something like this to try and re-paginate
@@ -569,7 +569,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     // pointing to an event that wasn't yet in the timeline
     if (event.sender) {
         this.addReceipt(synthesizeReceipt(
-            event.sender.userId, event, "m.read"
+            event.sender.userId, event, "m.read",
         ), true);
 
         // Any live events from a user could be taken as implicit
@@ -616,7 +616,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     EventTimeline.setEventMetadata(
         event,
         this.getLiveTimeline().getState(EventTimeline.FORWARDS),
-        false
+        false,
     );
 
     this._txnToEvent[txnId] = event;
@@ -669,7 +669,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
             this._pendingEventList,
             function(ev) {
                 return ev.getId() == oldEventId;
-            }, false
+            }, false,
         );
     }
 
@@ -778,7 +778,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
                 this._pendingEventList,
                 function(ev) {
                     return ev.getId() == oldEventId;
-                }, false
+                }, false,
             );
         }
         this.removeEvent(oldEventId);
@@ -816,13 +816,13 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
         if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
             throw new Error(
                 "live timeline " + i + " is no longer live - it has a pagination token " +
-                "(" + liveTimeline.getPaginationToken(EventTimeline.FORWARDS) + ")"
+                "(" + liveTimeline.getPaginationToken(EventTimeline.FORWARDS) + ")",
             );
         }
         if (liveTimeline.getNeighbouringTimeline(EventTimeline.FORWARDS)) {
             throw new Error(
                 "live timeline " + i + " is no longer live - " +
-                "it has a neighbouring timeline"
+                "it has a neighbouring timeline",
             );
         }
     }
@@ -884,13 +884,13 @@ Room.prototype.recalculate = function(userId) {
     // consistent elsewhere.
     const self = this;
     const membershipEvent = this.currentState.getStateEvents(
-        "m.room.member", userId
+        "m.room.member", userId,
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
         const strippedStateEvents = membershipEvent.event.invite_room_state || [];
         utils.forEach(strippedStateEvents, function(strippedEvent) {
             const existingEvent = self.currentState.getStateEvents(
-                strippedEvent.type, strippedEvent.state_key
+                strippedEvent.type, strippedEvent.state_key,
             );
             if (!existingEvent) {
                 // set the fake stripped event instead
@@ -1173,7 +1173,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         if (room.currentState.getMember(myMemberEvent.sender)) {
             // extract who invited us to the room
             return "Invite from " + room.currentState.getMember(
-                myMemberEvent.sender
+                myMemberEvent.sender,
             ).name;
         } else if (allMembers[0].events.member) {
             // use the sender field from the invite event, although this only

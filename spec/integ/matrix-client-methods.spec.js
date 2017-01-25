@@ -44,7 +44,7 @@ describe("MatrixClient", function() {
         const buf = new Buffer('hello world');
         it("should upload the file", function(done) {
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload"
+                "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
                 expect(req.data).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
@@ -80,7 +80,7 @@ describe("MatrixClient", function() {
 
         it("should parse the response if rawResponse=false", function(done) {
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload"
+                "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
                 expect(req.opts.json).toBeFalsy();
             }).respond(200, JSON.stringify({ "content_uri": "uri" }));
@@ -101,7 +101,7 @@ describe("MatrixClient", function() {
         it("should parse errors into a MatrixError", function(done) {
             // opts.json is false, so request returns unparsed json.
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload"
+                "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
                 expect(req.data).toEqual(buf);
                 expect(req.opts.json).toBeFalsy();
@@ -188,7 +188,7 @@ describe("MatrixClient", function() {
             };
 
             httpBackend.when(
-                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId
+                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
             ).respond(200, httpFilterDefinition);
 
             const storeFilter = Filter.fromJson(userId, filterId, {
@@ -211,7 +211,7 @@ describe("MatrixClient", function() {
             expect(store.getFilter(userId, filterId)).toBeNull();
 
             httpBackend.when(
-                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId
+                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
             ).respond(200, httpFilterDefinition);
             client.getFilter(userId, filterId, true).done(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
@@ -234,7 +234,7 @@ describe("MatrixClient", function() {
             };
 
             httpBackend.when(
-                "POST", "/user/" + encodeURIComponent(userId) + "/filter"
+                "POST", "/user/" + encodeURIComponent(userId) + "/filter",
             ).check(function(req) {
                 expect(req.data).toEqual(filterDefinition);
             }).respond(200, {
@@ -379,13 +379,13 @@ describe("MatrixClient", function() {
         const auth = {a: 1};
         it("should pass through an auth dict", function(done) {
             httpBackend.when(
-                "DELETE", "/_matrix/client/unstable/devices/my_device"
+                "DELETE", "/_matrix/client/unstable/devices/my_device",
             ).check(function(req) {
                 expect(req.data).toEqual({auth: auth});
             }).respond(200);
 
             client.deleteDevice(
-                "my_device", auth
+                "my_device", auth,
             ).catch(utils.failTest).done(done);
 
             httpBackend.flush();

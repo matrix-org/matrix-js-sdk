@@ -122,7 +122,7 @@ SyncApi.prototype._registerStateListeners = function(room) {
             [
                 "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
                 "RoomMember.membership",
-            ]
+            ],
         );
     });
 };
@@ -158,11 +158,11 @@ SyncApi.prototype.syncLeftRooms = function() {
     };
 
     return client.getOrCreateFilter(
-        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter
+        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
     ).then(function(filterId) {
         qps.filter = filterId;
         return client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, localTimeoutMs
+            undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
         );
     }).then(function(data) {
         let leaveRooms = [];
@@ -226,13 +226,13 @@ SyncApi.prototype.peek = function(roomId) {
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
         const oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper()
+            utils.deepCopy(response.state), client.getEventMapper(),
         );
         const stateEvents = utils.map(
-            response.state, client.getEventMapper()
+            response.state, client.getEventMapper(),
         );
         const messages = utils.map(
-            response.messages.chunk, client.getEventMapper()
+            response.messages.chunk, client.getEventMapper(),
         );
 
         // XXX: copypasted from /sync until we kill off this
@@ -401,7 +401,7 @@ SyncApi.prototype.sync = function() {
         }
 
         client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter
+            getFilterName(client.credentials.userId), filter,
         ).done(function(filterId) {
             // reset the notifications timeline to prepare it to paginate from
             // the current point in time.
@@ -511,7 +511,7 @@ SyncApi.prototype._sync = function(syncOptions) {
     const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
     this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs
+        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
     );
 
     this._currentSyncRequest.done(function(data) {
@@ -644,7 +644,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 }
                 client.emit("accountData", accountDataEvent);
                 return accountDataEvent;
-            }
+            },
         );
     }
 
@@ -660,13 +660,13 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                             content.msgtype == "m.bad.encrypted"
                     ) {
                         console.warn(
-                            "Unable to decrypt to-device event: " + content.body
+                            "Unable to decrypt to-device event: " + content.body,
                         );
                         return;
                     }
 
                     client.emit("toDeviceEvent", toDeviceEvent);
-                }
+                },
             );
     }
 
@@ -718,10 +718,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
-                'total', joinObj.unread_notifications.notification_count
+                'total', joinObj.unread_notifications.notification_count,
             );
             room.setUnreadNotificationCount(
-                'highlight', joinObj.unread_notifications.highlight_count
+                'highlight', joinObj.unread_notifications.highlight_count,
             );
         }
 
@@ -880,7 +880,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
     if (delay > 0) {
         self._keepAliveTimer = setTimeout(
             self._pokeKeepAlive.bind(self),
-            delay
+            delay,
         );
     } else {
         self._pokeKeepAlive();
@@ -912,7 +912,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         {
             prefix: '',
             localTimeoutMs: 15 * 1000,
-        }
+        },
     ).done(function() {
         success();
     }, function(err) {
@@ -926,7 +926,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         } else {
             self._keepAliveTimer = setTimeout(
                 self._pokeKeepAlive.bind(self),
-                5000 + Math.floor(Math.random() * 5000)
+                5000 + Math.floor(Math.random() * 5000),
             );
             // A keepalive has failed, so we emit the
             // error state (whether or not this is the
@@ -1045,8 +1045,8 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
         utils.deepCopy(
             stateEventList.map(function(mxEvent) {
                 return mxEvent.event;
-            })
-        ), client.getEventMapper()
+            }),
+        ), client.getEventMapper(),
     );
     const stateEvents = stateEventList;
 

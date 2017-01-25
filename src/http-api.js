@@ -163,7 +163,7 @@ module.exports.MatrixHttpApi.prototype = {
                     "Returning the raw JSON from uploadContent(). Future " +
                     "versions of the js-sdk will change this default, to " +
                     "return the parsed object. Set opts.rawResponse=false " +
-                    "to change this behaviour now."
+                    "to change this behaviour now.",
                 );
                 rawResponse = true;
             }
@@ -176,7 +176,7 @@ module.exports.MatrixHttpApi.prototype = {
                     "Returning only the content-uri from uploadContent(). " +
                     "Future versions of the js-sdk will change this " +
                     "default, to return the whole response object. Set " +
-                    "opts.onlyContentUri=false to change this behaviour now."
+                    "opts.onlyContentUri=false to change this behaviour now.",
                 );
                 onlyContentUri = true;
             } else {
@@ -279,7 +279,7 @@ module.exports.MatrixHttpApi.prototype = {
                     headers: {"Content-Type": contentType},
                     json: false,
                     bodyParser: bodyParser,
-                }
+                },
             );
         }
 
@@ -321,7 +321,7 @@ module.exports.MatrixHttpApi.prototype = {
 
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
-                "Expected callback to be a function but got " + typeof callback
+                "Expected callback to be a function but got " + typeof callback,
             );
         }
 
@@ -341,7 +341,7 @@ module.exports.MatrixHttpApi.prototype = {
         const defer = q.defer();
         this.opts.request(
             opts,
-            requestCallback(defer, callback, this.opts.onlyData)
+            requestCallback(defer, callback, this.opts.onlyData),
         );
         // ID server does not always take JSON, so we can't use requests' 'json'
         // option as we do with the home server, but it does return JSON, so
@@ -390,7 +390,7 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         const request_promise = this.request(
-            callback, method, path, queryParams, data, opts
+            callback, method, path, queryParams, data, opts,
         );
 
         const self = this;
@@ -441,7 +441,7 @@ module.exports.MatrixHttpApi.prototype = {
         const fullUri = this.opts.baseUrl + prefix + path;
 
         return this.requestOtherUrl(
-            callback, method, fullUri, queryParams, data, opts
+            callback, method, fullUri, queryParams, data, opts,
         );
     },
 
@@ -476,7 +476,7 @@ module.exports.MatrixHttpApi.prototype = {
             callback, method, path, queryParams, data, {
                 localTimeoutMs: localTimeoutMs,
                 prefix: prefix,
-            }
+            },
         );
     },
 
@@ -511,7 +511,7 @@ module.exports.MatrixHttpApi.prototype = {
             callback, method, path, queryParams, data, {
                 localTimeoutMs: localTimeoutMs,
                 prefix: prefix,
-            }
+            },
         );
     },
 
@@ -556,7 +556,7 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         return this._request(
-            callback, method, uri, queryParams, data, opts
+            callback, method, uri, queryParams, data, opts,
         );
     },
 
@@ -608,7 +608,7 @@ module.exports.MatrixHttpApi.prototype = {
     _request: function(callback, method, uri, queryParams, data, opts) {
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
-                "Expected callback to be a function but got " + typeof callback
+                "Expected callback to be a function but got " + typeof callback,
             );
         }
         opts = opts || {};
@@ -674,10 +674,10 @@ module.exports.MatrixHttpApi.prototype = {
                     const handlerFn = requestCallback(
                         defer, callback, self.opts.onlyData,
                         parseErrorJson,
-                        opts.bodyParser
+                        opts.bodyParser,
                     );
                     handlerFn(err, response, body);
-                }
+                },
             );
             if (req && req.abort) {
                 // FIXME: This is EVIL, but I can't think of a better way to expose
@@ -707,7 +707,7 @@ module.exports.MatrixHttpApi.prototype = {
  */
 const requestCallback = function(
     defer, userDefinedCallback, onlyData,
-    parseErrorJson, bodyParser
+    parseErrorJson, bodyParser,
 ) {
     userDefinedCallback = userDefinedCallback || function() {};
 

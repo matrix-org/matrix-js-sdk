@@ -79,7 +79,7 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
         utils.deepCopy(
             stateEvents.map(function(mxEvent) {
                 return mxEvent.event;
-            })
+            }),
         ),
     function(ev) {
         return new MatrixEvent(ev);
@@ -288,11 +288,11 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
 EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline) {
     // set sender and target properties
     event.sender = stateContext.getSentinelMember(
-        event.getSender()
+        event.getSender(),
     );
     if (event.getType() === "m.room.member") {
         event.target = stateContext.getSentinelMember(
-            event.getStateKey()
+            event.getStateKey(),
         );
     }
     if (event.isState()) {

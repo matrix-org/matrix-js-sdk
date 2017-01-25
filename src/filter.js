@@ -123,7 +123,7 @@ Filter.prototype.setDefinition = function(definition) {
 
     this._room_filter = new FilterComponent(room_filter_fields);
     this._room_timeline_filter = new FilterComponent(
-        room_filter_json ? (room_filter_json.timeline || {}) : {}
+        room_filter_json ? (room_filter_json.timeline || {}) : {},
     );
 
     // don't bother porting this from synapse yet:
