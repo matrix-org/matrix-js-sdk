@@ -259,14 +259,14 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
                                               timeline, paginationToken) {
     if (!timeline) {
         throw new Error(
-            "'timeline' not specified for EventTimelineSet.addEventsToTimeline"
+            "'timeline' not specified for EventTimelineSet.addEventsToTimeline",
         );
     }
 
     if (!toStartOfTimeline && timeline == this._liveTimeline) {
         throw new Error(
             "EventTimelineSet.addEventsToTimeline cannot be used for adding events to " +
-            "the live timeline - use Room.addLiveEvents instead"
+            "the live timeline - use Room.addLiveEvents instead",
         );
     }
 
@@ -440,7 +440,7 @@ EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
                     EventTimeline.setEventMetadata(
                         event,
                         timeline.getState(EventTimeline.FORWARDS),
-                        false
+                        false,
                     );
 
                     if (!tlEvents[j].encryptedType) {

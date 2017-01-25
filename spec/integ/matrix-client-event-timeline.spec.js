@@ -118,7 +118,7 @@ describe("getEventTimeline support", function() {
             accessToken: accessToken,
         });
 
-        startClient(httpBackend, client
+        startClient(httpBackend, client,
         ).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -136,7 +136,7 @@ describe("getEventTimeline support", function() {
             timelineSupport: true,
         });
 
-        startClient(httpBackend, client
+        startClient(httpBackend, client,
         ).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -159,7 +159,7 @@ describe("getEventTimeline support", function() {
         });
         let room;
 
-        startClient(httpBackend, client
+        startClient(httpBackend, client,
         ).then(function() {
             room = client.getRoom(roomId);
 
@@ -343,7 +343,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             client.on("sync", function() {
-                client.getEventTimeline(timelineSet, EVENTS[2].event_id
+                client.getEventTimeline(timelineSet, EVENTS[2].event_id,
                 ).then(function(tl) {
                     expect(tl.getEvents().length).toEqual(4);
                     expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
@@ -420,7 +420,7 @@ describe("MatrixClient event timelines", function() {
 
             let tl0;
             let tl3;
-            client.getEventTimeline(timelineSet, EVENTS[0].event_id
+            client.getEventTimeline(timelineSet, EVENTS[0].event_id,
             ).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(1);
                 tl0 = tl;
@@ -470,7 +470,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            client.getEventTimeline(timelineSet, "event1"
+            client.getEventTimeline(timelineSet, "event1",
             ).then(function(tl) {
                 // could do with a fail()
                 expect(true).toBeFalsy();
@@ -514,7 +514,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             let tl;
-            client.getEventTimeline(timelineSet, EVENTS[0].event_id
+            client.getEventTimeline(timelineSet, EVENTS[0].event_id,
             ).then(function(tl0) {
                 tl = tl0;
                 return client.paginateEventTimeline(tl, {backwards: true});
@@ -565,7 +565,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             let tl;
-            client.getEventTimeline(timelineSet, EVENTS[0].event_id
+            client.getEventTimeline(timelineSet, EVENTS[0].event_id,
             ).then(function(tl0) {
                 tl = tl0;
                 return client.paginateEventTimeline(

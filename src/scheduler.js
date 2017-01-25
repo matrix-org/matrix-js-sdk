@@ -126,7 +126,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     });
     debuglog(
         "Queue algorithm dumped event %s into queue '%s'",
-        event.getId(), queueName
+        event.getId(), queueName,
     );
     _startProcessingQueues(this);
     return defer.promise;
@@ -213,7 +213,7 @@ function _processQueue(scheduler, queueName) {
     }
     debuglog(
         "Queue '%s' has %s pending events",
-        queueName, scheduler._queues[queueName].length
+        queueName, scheduler._queues[queueName].length,
     );
     // fire the process function and if it resolves, resolve the deferred. Else
     // invoke the retry algorithm.
@@ -230,11 +230,11 @@ function _processQueue(scheduler, queueName) {
         const waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
         debuglog(
             "retry(%s) err=%s event_id=%s waitTime=%s",
-            obj.attempts, err, obj.event.getId(), waitTimeMs
+            obj.attempts, err, obj.event.getId(), waitTimeMs,
         );
         if (waitTimeMs === -1) {  // give up (you quitter!)
             debuglog(
-                "Queue '%s' giving up on event %s", queueName, obj.event.getId()
+                "Queue '%s' giving up on event %s", queueName, obj.event.getId(),
             );
             // remove this from the queue
             _removeNextEvent(scheduler, queueName);

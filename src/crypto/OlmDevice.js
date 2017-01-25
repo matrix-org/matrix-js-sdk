@@ -191,7 +191,7 @@ OlmDevice.prototype._getSession = function(deviceKey, sessionId, func) {
 OlmDevice.prototype._saveSession = function(deviceKey, session) {
     const pickledSession = session.pickle(this._pickleKey);
     this._sessionStore.storeEndToEndSession(
-        deviceKey, session.session_id(), pickledSession
+        deviceKey, session.session_id(), pickledSession,
     );
 };
 
@@ -284,7 +284,7 @@ OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
  * @return {string} sessionId for the outbound session.
  */
 OlmDevice.prototype.createOutboundSession = function(
-    theirIdentityKey, theirOneTimeKey
+    theirIdentityKey, theirOneTimeKey,
 ) {
     const self = this;
     return this._getAccount(function(account) {
@@ -314,7 +314,7 @@ OlmDevice.prototype.createOutboundSession = function(
  *     didn't use a valid one-time key).
  */
 OlmDevice.prototype.createInboundSession = function(
-    theirDeviceIdentityKey, message_type, ciphertext
+    theirDeviceIdentityKey, message_type, ciphertext,
 ) {
     if (message_type !== 0) {
         throw new Error("Need message_type == 0 to create inbound session");
@@ -352,7 +352,7 @@ OlmDevice.prototype.createInboundSession = function(
  */
 OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
     const sessions = this._sessionStore.getEndToEndSessions(
-        theirDeviceIdentityKey
+        theirDeviceIdentityKey,
     );
     return utils.keys(sessions);
 };
@@ -417,7 +417,7 @@ OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
  * @return {string} ciphertext
  */
 OlmDevice.prototype.encryptMessage = function(
-    theirDeviceIdentityKey, sessionId, payloadString
+    theirDeviceIdentityKey, sessionId, payloadString,
 ) {
     const self = this;
 
@@ -442,7 +442,7 @@ OlmDevice.prototype.encryptMessage = function(
  * @return {string} decrypted payload.
  */
 OlmDevice.prototype.decryptMessage = function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext
+    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     const self = this;
 
@@ -467,7 +467,7 @@ OlmDevice.prototype.decryptMessage = function(
  *    the given session.
  */
 OlmDevice.prototype.matchesSession = function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext
+    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     if (message_type !== 0) {
         return false;
@@ -588,7 +588,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  * @private
  */
 OlmDevice.prototype._saveInboundGroupSession = function(
-    roomId, senderCurve25519Key, sessionId, session, keysClaimed
+    roomId, senderCurve25519Key, sessionId, session, keysClaimed,
 ) {
     const r = {
         room_id: roomId,
@@ -597,7 +597,7 @@ OlmDevice.prototype._saveInboundGroupSession = function(
     };
 
     this._sessionStore.storeEndToEndInboundGroupSession(
-        senderCurve25519Key, sessionId, JSON.stringify(r)
+        senderCurve25519Key, sessionId, JSON.stringify(r),
     );
 };
 
@@ -618,10 +618,10 @@ OlmDevice.prototype._saveInboundGroupSession = function(
  * @template {T}
  */
 OlmDevice.prototype._getInboundGroupSession = function(
-    roomId, senderKey, sessionId, func
+    roomId, senderKey, sessionId, func,
 ) {
     let r = this._sessionStore.getEndToEndInboundGroupSession(
-        senderKey, sessionId
+        senderKey, sessionId,
     );
 
     if (r === null) {
@@ -635,7 +635,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
     if (roomId !== r.room_id) {
         throw new Error(
             "Mismatched room_id for inbound group session (expected " + r.room_id +
-                ", was " + roomId + ")"
+                ", was " + roomId + ")",
         );
     }
 
@@ -658,7 +658,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {Object<string, string>} keysClaimed Other keys the sender claims.
  */
 OlmDevice.prototype.addInboundGroupSession = function(
-    roomId, senderKey, sessionId, sessionKey, keysClaimed
+    roomId, senderKey, sessionId, sessionKey, keysClaimed,
 ) {
     const self = this;
 
@@ -671,7 +671,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
     }
 
     const r = this._getInboundGroupSession(
-        roomId, senderKey, sessionId, updateSession
+        roomId, senderKey, sessionId, updateSession,
     );
 
     if (r !== null) {
@@ -684,11 +684,11 @@ OlmDevice.prototype.addInboundGroupSession = function(
         session.create(sessionKey);
         if (sessionId != session.session_id()) {
             throw new Error(
-                "Mismatched group session ID from senderKey: " + senderKey
+                "Mismatched group session ID from senderKey: " + senderKey,
             );
         }
         self._saveInboundGroupSession(
-            roomId, senderKey, sessionId, session, keysClaimed
+            roomId, senderKey, sessionId, session, keysClaimed,
         );
     } finally {
         session.free();
@@ -712,7 +712,7 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
     }
 
     const r = this._getInboundGroupSession(
-        data.room_id, data.sender_key, data.session_id, updateSession
+        data.room_id, data.sender_key, data.session_id, updateSession,
     );
 
     if (r !== null) {
@@ -725,12 +725,12 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
         session.import_session(data.session_key);
         if (data.session_id != session.session_id()) {
             throw new Error(
-                "Mismatched group session ID from senderKey: " + data.sender_key
+                "Mismatched group session ID from senderKey: " + data.sender_key,
             );
         }
         this._saveInboundGroupSession(
             data.room_id, data.sender_key, data.session_id, session,
-            data.sender_claimed_keys
+            data.sender_claimed_keys,
         );
     } finally {
         session.free();
@@ -751,7 +751,7 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
  *    Object<string, string>}} result
  */
 OlmDevice.prototype.decryptGroupMessage = function(
-    roomId, senderKey, sessionId, body
+    roomId, senderKey, sessionId, body,
 ) {
     const self = this;
 
@@ -768,7 +768,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
             if (messageIndexKey in self._inboundGroupSessionMessageIndexes) {
                 throw new Error(
                     "Duplicate message index, possible replay attack: " +
-                    messageIndexKey
+                    messageIndexKey,
                 );
             }
             self._inboundGroupSessionMessageIndexes[messageIndexKey] = true;
@@ -779,7 +779,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
         const keysProved = {curve25519: senderKey};
 
         self._saveInboundGroupSession(
-            roomId, senderKey, sessionId, session, keysClaimed
+            roomId, senderKey, sessionId, session, keysClaimed,
         );
         return {
             result: plaintext,
@@ -789,7 +789,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
     }
 
     return this._getInboundGroupSession(
-        roomId, senderKey, sessionId, decrypt
+        roomId, senderKey, sessionId, decrypt,
     );
 };
 
@@ -802,7 +802,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
  */
 OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(
-        senderKey, sessionId
+        senderKey, sessionId,
     );
 
     if (s === null) {
@@ -844,7 +844,7 @@ OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
  * was invalid then the message will be "OLM.BAD_MESSAGE_MAC".
  */
 OlmDevice.prototype.verifySignature = function(
-    key, message, signature
+    key, message, signature,
 ) {
     this._getUtility(function(util) {
         util.ed25519_verify(key, message, signature);

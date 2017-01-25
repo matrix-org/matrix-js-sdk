@@ -75,7 +75,7 @@ describe("MatrixClient", function() {
                 expect(false).toBe(
                     true, ">1 pending request. You should probably handle them. " +
                     "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
-                    method + " " + path
+                    method + " " + path,
                 );
             }
             pendingLookup = {
@@ -88,7 +88,7 @@ describe("MatrixClient", function() {
         if (next.path === path && next.method === method) {
             console.log(
                 "MatrixClient[UT] Matched. Returning " +
-                (next.error ? "BAD" : "GOOD") + " response"
+                (next.error ? "BAD" : "GOOD") + " response",
             );
             if (next.expectBody) {
                 expect(next.expectBody).toEqual(data);
@@ -290,7 +290,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
                     expect(client.retryImmediately()).toBe(
-                        true, "retryImmediately returned false"
+                        true, "retryImmediately returned false",
                     );
                     jasmine.Clock.tick(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
@@ -334,7 +334,7 @@ describe("MatrixClient", function() {
             return function syncListener(state, old) {
                 const expected = expectedStates.shift();
                 console.log(
-                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected
+                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
                 );
                 if (!expected) {
                     done();

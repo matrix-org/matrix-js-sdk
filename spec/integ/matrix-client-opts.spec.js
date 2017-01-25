@@ -97,10 +97,10 @@ describe("MatrixClient opts", function() {
             ];
             client.on("event", function(event) {
                 expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
-                    -1, "Recv unexpected event type: " + event.getType()
+                    -1, "Recv unexpected event type: " + event.getType(),
                 );
                 expectedEventTypes.splice(
-                    expectedEventTypes.indexOf(event.getType()), 1
+                    expectedEventTypes.indexOf(event.getType()), 1,
                 );
             });
             httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -113,7 +113,7 @@ describe("MatrixClient opts", function() {
                 return httpBackend.flush("/sync", 1);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
-                    0, "Expected to see event types: " + expectedEventTypes
+                    0, "Expected to see event types: " + expectedEventTypes,
                 );
                 done();
             });

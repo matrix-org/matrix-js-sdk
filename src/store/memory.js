@@ -102,7 +102,7 @@ module.exports.MatrixInMemoryStore.prototype = {
             user.setDisplayName(member.name);
             if (member.events.member) {
                 user.setRawDisplayName(
-                    member.events.member.getDirectionalContent().displayname
+                    member.events.member.getDirectionalContent().displayname,
                 );
             }
         }
