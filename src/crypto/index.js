@@ -711,7 +711,7 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
     }
 
     let knownStatus = dev.known;
-    if (known !== null) {
+    if (known !== null && known !== undefined) {
         knownStatus = known;
     }
 

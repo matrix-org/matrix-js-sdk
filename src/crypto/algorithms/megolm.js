@@ -473,8 +473,10 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // with them, which means that they will have announced any new devices via
     // an m.new_device.
     //
-    // XXX: what if the cache is stale, and the user left the room we had in common
-    // and then added new devices before joining this one? --Matthew
+    // XXX: what if the cache is stale, and the user left the room we had in
+    // common and then added new devices before joining this one? --Matthew
+    //
+    // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
     return this._crypto.downloadKeys(roomMembers, false).then(function(devices) {
         // remove any blocked devices
         for (const userId in devices) {
