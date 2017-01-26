@@ -141,8 +141,8 @@ MatrixCall.prototype.placeScreenSharingCall =
         self.emit("error",
             callError(
                 MatrixCall.ERR_NO_USER_MEDIA,
-                "Failed to get screen-sharing stream: " + err
-            )
+                "Failed to get screen-sharing stream: " + err,
+            ),
         );
     });
     this.type = 'video';
@@ -311,7 +311,7 @@ MatrixCall.prototype._initWithInvite = function(event) {
         this.peerConn.setRemoteDescription(
             new this.webRtc.RtcSessionDescription(this.msg.offer),
             hookCallback(self, self._onSetRemoteDescriptionSuccess),
-            hookCallback(self, self._onSetRemoteDescriptionError)
+            hookCallback(self, self._onSetRemoteDescriptionError),
         );
     }
     setState(this, 'ringing');
@@ -370,7 +370,7 @@ MatrixCall.prototype.answer = function() {
         this.webRtc.getUserMedia(
             _getUserMediaVideoContraints(this.type),
             hookCallback(self, self._gotUserMediaForAnswer),
-            hookCallback(self, self._getUserMediaFailed)
+            hookCallback(self, self._getUserMediaFailed),
         );
         setState(this, 'wait_local_media');
     } else if (this.localAVStream) {
@@ -528,7 +528,7 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
     this.peerConn.addStream(stream);
     this.peerConn.createOffer(
         hookCallback(self, self._gotLocalOffer),
-        hookCallback(self, self._getLocalOfferFailed)
+        hookCallback(self, self._getLocalOfferFailed),
     );
     setState(self, 'create_offer');
 };
@@ -600,7 +600,7 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
     if (event.candidate) {
         debuglog(
             "Got local ICE " + event.candidate.sdpMid + " candidate: " +
-            event.candidate.candidate
+            event.candidate.candidate,
         );
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
@@ -627,7 +627,7 @@ MatrixCall.prototype._gotRemoteIceCandidate = function(cand) {
     this.peerConn.addIceCandidate(
         new this.webRtc.RtcIceCandidate(cand),
         function() {},
-        function(e) {}
+        function(e) {},
     );
 };
 
@@ -645,7 +645,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
     this.peerConn.setRemoteDescription(
         new this.webRtc.RtcSessionDescription(msg.answer),
         hookCallback(self, self._onSetRemoteDescriptionSuccess),
-        hookCallback(self, self._onSetRemoteDescriptionError)
+        hookCallback(self, self._onSetRemoteDescriptionError),
     );
     setState(self, 'connecting');
 };
@@ -705,7 +705,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
 MatrixCall.prototype._getLocalOfferFailed = function(error) {
     this.emit(
         "error",
-        callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!")
+        callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!"),
     );
 };
 
@@ -720,8 +720,8 @@ MatrixCall.prototype._getUserMediaFailed = function(error) {
         callError(
             MatrixCall.ERR_NO_USER_MEDIA,
             "Couldn't start capturing media! Is your microphone set up and " +
-            "does this app have permission?"
-        )
+            "does this app have permission?",
+        ),
     );
     this.hangup("user_media_failed");
 };
@@ -735,7 +735,7 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
         return; // because ICE can still complete as we're ending the call
     }
     debuglog(
-        "Ice connection state changed to: " + this.peerConn.iceConnectionState
+        "Ice connection state changed to: " + this.peerConn.iceConnectionState,
     );
     // ideally we'd consider the call to be connected when we get media but
     // chrome doesn't implement any of the 'onstarted' events yet
@@ -755,7 +755,7 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
 MatrixCall.prototype._onSignallingStateChanged = function() {
     debuglog(
         "call " + this.callId + ": Signalling state changed to: " +
-        this.peerConn.signalingState
+        this.peerConn.signalingState,
     );
 };
 
@@ -1031,7 +1031,7 @@ const _tryPlayRemoteAudioStream = function(self) {
 const checkForErrorListener = function(self) {
     if (self.listeners("error").length === 0) {
         throw new Error(
-            "You MUST attach an error listener using call.on('error', function() {})"
+            "You MUST attach an error listener using call.on('error', function() {})",
         );
     }
 };
@@ -1073,7 +1073,7 @@ const _sendCandidateQueue = function(self) {
         if (self.candidateSendTries > 5) {
             debuglog(
                 "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries
+                self.candidateSendTries,
             );
             self.candidateSendTries = 0;
             return;
@@ -1093,7 +1093,7 @@ const _placeCallWithConstraints = function(self, constraints) {
     self.webRtc.getUserMedia(
         constraints,
         hookCallback(self, self._gotUserMediaForInvite),
-        hookCallback(self, self._getUserMediaFailed)
+        hookCallback(self, self._getUserMediaFailed),
     );
     setState(self, 'wait_local_media');
     self.direction = 'outbound';
@@ -1131,7 +1131,7 @@ const _getChromeScreenSharingConstraints = function(call) {
     if (!screen) {
         call.emit("error", callError(
             MatrixCall.ERR_NO_USER_MEDIA,
-            "Couldn't determine screen sharing constaints."
+            "Couldn't determine screen sharing constaints.",
         ));
         return;
     }

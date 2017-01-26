@@ -133,7 +133,7 @@ MatrixBaseApis.prototype.makeTxnId = function() {
 MatrixBaseApis.prototype.register = function(
     username, password,
     sessionId, auth, bindEmail, guestAccessToken,
-    callback
+    callback,
 ) {
     if (auth === undefined) {
         auth = {};
@@ -189,7 +189,7 @@ MatrixBaseApis.prototype.registerRequest = function(data, kind, callback) {
     }
 
     return this._http.request(
-        callback, "POST", "/register", params, data
+        callback, "POST", "/register", params, data,
     );
 };
 
@@ -218,7 +218,7 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
     utils.extend(login_data, data);
 
     return this._http.authedRequest(
-        callback, "POST", "/login", undefined, login_data
+        callback, "POST", "/login", undefined, login_data,
     );
 };
 
@@ -283,7 +283,7 @@ MatrixBaseApis.prototype.loginWithToken = function(token, callback) {
  */
 MatrixBaseApis.prototype.logout = function(callback) {
     return this._http.authedRequest(
-        callback, "POST", '/logout'
+        callback, "POST", '/logout',
     );
 };
 
@@ -305,7 +305,7 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
         };
     }
     return this._http.authedRequestWithPrefix(
-        callback, "POST", '/account/deactivate', undefined, body, httpApi.PREFIX_UNSTABLE
+        callback, "POST", '/account/deactivate', undefined, body, httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -347,7 +347,7 @@ MatrixBaseApis.prototype.getFallbackAuthUrl = function(loginType, authSessionId)
 MatrixBaseApis.prototype.createRoom = function(options, callback) {
     // valid options include: room_alias_name, visibility, invite
     return this._http.authedRequest(
-        callback, "POST", "/createRoom", undefined, options
+        callback, "POST", "/createRoom", undefined, options,
     );
 };
 
@@ -382,7 +382,7 @@ MatrixBaseApis.prototype.getStateEvent = function(roomId, eventType, stateKey, c
         path = utils.encodeUri(path + "/$stateKey", pathParams);
     }
     return this._http.authedRequest(
-        callback, "GET", path
+        callback, "GET", path,
     );
 };
 
@@ -407,7 +407,7 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
         path = utils.encodeUri(path + "/$stateKey", pathParams);
     }
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, content
+        callback, "PUT", path, undefined, content,
     );
 };
 
@@ -438,13 +438,13 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
         callback = limit; limit = undefined;
     }
     const path = utils.encodeUri("/rooms/$roomId/initialSync",
-        {$roomId: roomId}
+        {$roomId: roomId},
     );
     if (!limit) {
         limit = 30;
     }
     return this._http.authedRequest(
-        callback, "GET", path, { limit: limit }
+        callback, "GET", path, { limit: limit },
     );
 };
 
@@ -484,7 +484,7 @@ MatrixBaseApis.prototype.publicRooms = function(options, callback) {
         return this._http.authedRequest(callback, "GET", "/publicRooms");
     } else {
         return this._http.authedRequest(
-            callback, "POST", "/publicRooms", query_params, options
+            callback, "POST", "/publicRooms", query_params, options,
         );
     }
 };
@@ -505,7 +505,7 @@ MatrixBaseApis.prototype.createAlias = function(alias, roomId, callback) {
         room_id: roomId,
     };
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, data
+        callback, "PUT", path, undefined, data,
     );
 };
 
@@ -522,7 +522,7 @@ MatrixBaseApis.prototype.deleteAlias = function(alias, callback) {
         $alias: alias,
     });
     return this._http.authedRequest(
-        callback, "DELETE", path, undefined, undefined
+        callback, "DELETE", path, undefined, undefined,
     );
 };
 
@@ -539,7 +539,7 @@ MatrixBaseApis.prototype.getRoomIdForAlias = function(alias, callback) {
         $alias: alias,
     });
     return this._http.authedRequest(
-        callback, "GET", path
+        callback, "GET", path,
     );
 };
 
@@ -586,7 +586,7 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibility =
         $roomId: roomId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, { "visibility": visibility }
+        callback, "PUT", path, undefined, { "visibility": visibility },
     );
 };
 
@@ -610,7 +610,7 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibilityAppService =
         $roomId: roomId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, { "visibility": visibility }
+        callback, "PUT", path, undefined, { "visibility": visibility },
     );
 };
 
@@ -712,7 +712,7 @@ MatrixBaseApis.prototype.getProfileInfo = function(userId, info, callback) {
 MatrixBaseApis.prototype.getThreePids = function(callback) {
     const path = "/account/3pid";
     return this._http.authedRequest(
-        callback, "GET", path, undefined, undefined
+        callback, "GET", path, undefined, undefined,
     );
 };
 
@@ -730,7 +730,7 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
         'bind': bind,
     };
     return this._http.authedRequest(
-        callback, "POST", path, null, data
+        callback, "POST", path, null, data,
     );
 };
 
@@ -749,7 +749,7 @@ MatrixBaseApis.prototype.deleteThreePid = function(medium, address) {
         'address': address,
     };
     return this._http.authedRequestWithPrefix(
-        undefined, "POST", path, null, data, httpApi.PREFIX_UNSTABLE
+        undefined, "POST", path, null, data, httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -769,7 +769,7 @@ MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback)
     };
 
     return this._http.authedRequest(
-        callback, "POST", path, null, data
+        callback, "POST", path, null, data,
     );
 };
 
@@ -786,7 +786,7 @@ MatrixBaseApis.prototype.getDevices = function() {
     const path = "/devices";
     return this._http.authedRequestWithPrefix(
         undefined, "GET", path, undefined, undefined,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -806,7 +806,7 @@ MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
 
     return this._http.authedRequestWithPrefix(
         undefined, "PUT", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -831,7 +831,7 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
 
     return this._http.authedRequestWithPrefix(
         undefined, "DELETE", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -849,7 +849,7 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
 MatrixBaseApis.prototype.getPushers = function(callback) {
     const path = "/pushers";
     return this._http.authedRequest(
-        callback, "GET", path, undefined, undefined
+        callback, "GET", path, undefined, undefined,
     );
 };
 
@@ -864,7 +864,7 @@ MatrixBaseApis.prototype.getPushers = function(callback) {
 MatrixBaseApis.prototype.setPusher = function(pusher, callback) {
     const path = "/pushers/set";
     return this._http.authedRequest(
-        callback, "POST", path, null, pusher
+        callback, "POST", path, null, pusher,
     );
 };
 
@@ -893,7 +893,7 @@ MatrixBaseApis.prototype.addPushRule = function(scope, kind, ruleId, body, callb
         $ruleId: ruleId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, body
+        callback, "PUT", path, undefined, body,
     );
 };
 
@@ -931,7 +931,7 @@ MatrixBaseApis.prototype.setPushRuleEnabled = function(scope, kind,
         $ruleId: ruleId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, {"enabled": enabled}
+        callback, "PUT", path, undefined, {"enabled": enabled},
     );
 };
 
@@ -952,7 +952,7 @@ MatrixBaseApis.prototype.setPushRuleActions = function(scope, kind,
         $ruleId: ruleId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, {"actions": actions}
+        callback, "PUT", path, undefined, {"actions": actions},
     );
 };
 
@@ -975,7 +975,7 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
         queryparams.next_batch = opts.next_batch;
     }
     return this._http.authedRequest(
-        callback, "POST", "/search", queryparams, opts.body
+        callback, "POST", "/search", queryparams, opts.body,
     );
 };
 
@@ -1009,7 +1009,7 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
         path = "/keys/upload";
     }
     return this._http.authedRequestWithPrefix(
-        callback, "POST", path, undefined, content, httpApi.PREFIX_UNSTABLE
+        callback, "POST", path, undefined, content, httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -1032,7 +1032,7 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, callback) {
     const content = {device_keys: downloadQuery};
     return this._http.authedRequestWithPrefix(
         callback, "POST", "/keys/query", undefined, content,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -1063,7 +1063,7 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
     const content = {one_time_keys: queries};
     return this._http.authedRequestWithPrefix(
         undefined, "POST", "/keys/claim", undefined, content,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -1101,7 +1101,7 @@ MatrixBaseApis.prototype.requestEmailToken = function(email, clientSecret,
     };
     return this._http.idServerRequest(
         callback, "POST", "/validate/email/requestToken",
-        params, httpApi.PREFIX_IDENTITY_V1
+        params, httpApi.PREFIX_IDENTITY_V1,
     );
 };
 
@@ -1123,7 +1123,7 @@ MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
     };
     return this._http.idServerRequest(
         callback, "GET", "/lookup",
-        params, httpApi.PREFIX_IDENTITY_V1
+        params, httpApi.PREFIX_IDENTITY_V1,
     );
 };
 
@@ -1142,7 +1142,7 @@ MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
  * @return {module:client.Promise} Resolves to the result object
  */
 MatrixBaseApis.prototype.sendToDevice = function(
-    eventType, contentMap, txnId
+    eventType, contentMap, txnId,
 ) {
     const path = utils.encodeUri("/sendToDevice/$eventType/$txnId", {
         $eventType: eventType,
@@ -1155,7 +1155,7 @@ MatrixBaseApis.prototype.sendToDevice = function(
 
     return this._http.authedRequestWithPrefix(
         undefined, "PUT", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -1170,7 +1170,7 @@ MatrixBaseApis.prototype.sendToDevice = function(
 MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
     return this._http.authedRequestWithPrefix(
         undefined, "GET", "/thirdparty/protocols", undefined, undefined,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
@@ -1189,7 +1189,7 @@ MatrixBaseApis.prototype.getThirdpartyLocation = function(protocol, params) {
 
     return this._http.authedRequestWithPrefix(
         undefined, "GET", path, params, undefined,
-        httpApi.PREFIX_UNSTABLE
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 

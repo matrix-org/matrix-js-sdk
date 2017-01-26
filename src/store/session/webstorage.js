@@ -42,7 +42,7 @@ function WebStorageSessionStore(webStore) {
         typeof(webStore.length) !== 'number'
        ) {
         throw new Error(
-            "Supplied webStore does not meet the WebStorage API interface"
+            "Supplied webStore does not meet the WebStorage API interface",
         );
     }
 }
@@ -109,7 +109,7 @@ WebStorageSessionStore.prototype = {
         const sessions = this.getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = session;
         setJsonItem(
-            this.store, keyEndToEndSessions(deviceKey), sessions
+            this.store, keyEndToEndSessions(deviceKey), sessions,
         );
     },
 

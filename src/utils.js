@@ -51,7 +51,7 @@ module.exports.encodeUri = function(pathTemplate, variables) {
             continue;
         }
         pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key])
+            key, encodeURIComponent(variables[key]),
         );
     }
     return pathTemplate;

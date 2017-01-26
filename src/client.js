@@ -157,7 +157,7 @@ function MatrixClient(opts) {
         this._crypto = new Crypto(
             this, this,
             opts.sessionStore,
-            userId, this.deviceId
+            userId, this.deviceId,
         );
 
         this.olmVersion = Crypto.getOlmVersion();
@@ -395,11 +395,29 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
     _setDeviceVerification(this, userId, deviceId, null, blocked);
 };
 
-function _setDeviceVerification(client, userId, deviceId, verified, blocked) {
+/**
+ * Mark the given device as known/unknown
+ *
+ * @param {string} userId owner of the device
+ * @param {string} deviceId unique identifier for the device
+ *
+ * @param {boolean=} known whether to mark the device as known. defaults
+ *   to 'true'.
+ *
+ * @fires module:client~event:MatrixClient"deviceVerificationChanged"
+ */
+MatrixClient.prototype.setDeviceKnown = function(userId, deviceId, known) {
+    if (known === undefined) {
+        known = true;
+    }
+    _setDeviceVerification(this, userId, deviceId, null, null, known);
+};
+
+function _setDeviceVerification(client, userId, deviceId, verified, blocked, known) {
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked);
+    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked, known);
     client.emit("deviceVerificationChanged", userId, deviceId);
 }
 
@@ -605,7 +623,7 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
         $type: eventType,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, contents
+        callback, "PUT", path, undefined, contents,
     );
 };
 
@@ -655,7 +673,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
     if (opts.inviteSignUrl) {
         sign_promise = this._http.requestOtherUrl(
             undefined, 'POST',
-            opts.inviteSignUrl, { mxid: this.credentials.userId }
+            opts.inviteSignUrl, { mxid: this.credentials.userId },
         );
     }
 
@@ -758,7 +776,7 @@ MatrixClient.prototype.getRoomTags = function(roomId, callback) {
         $roomId: roomId,
     });
     return this._http.authedRequest(
-        callback, "GET", path, undefined
+        callback, "GET", path, undefined,
     );
 };
 
@@ -777,7 +795,7 @@ MatrixClient.prototype.setRoomTag = function(roomId, tagName, metadata, callback
         $tag: tagName,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, metadata
+        callback, "PUT", path, undefined, metadata,
     );
 };
 
@@ -795,7 +813,7 @@ MatrixClient.prototype.deleteRoomTag = function(roomId, tagName, callback) {
         $tag: tagName,
     });
     return this._http.authedRequest(
-        callback, "DELETE", path, undefined, undefined
+        callback, "DELETE", path, undefined, undefined,
     );
 };
 
@@ -815,7 +833,7 @@ MatrixClient.prototype.setRoomAccountData = function(roomId, eventType,
         $type: eventType,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, content
+        callback, "PUT", path, undefined, content,
     );
 };
 
@@ -844,7 +862,7 @@ MatrixClient.prototype.setPowerLevel = function(roomId, userId, powerLevel,
         $roomId: roomId,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, content
+        callback, "PUT", path, undefined, content,
     );
 };
 
@@ -984,12 +1002,12 @@ function _sendEventHttpRequest(client, event) {
         path = utils.encodeUri(pathTemplate, pathParams);
     } else {
         path = utils.encodeUri(
-            "/rooms/$roomId/send/$eventType/$txnId", pathParams
+            "/rooms/$roomId/send/$eventType/$txnId", pathParams,
         );
     }
 
     return client._http.authedRequest(
-        undefined, "PUT", path, undefined, event.getWireContent()
+        undefined, "PUT", path, undefined, event.getWireContent(),
     );
 }
 
@@ -1006,7 +1024,7 @@ MatrixClient.prototype.sendMessage = function(roomId, content, txnId, callback) 
         callback = txnId; txnId = undefined;
     }
     return this.sendEvent(
-        roomId, "m.room.message", content, txnId, callback
+        roomId, "m.room.message", content, txnId, callback,
     );
 };
 
@@ -1156,7 +1174,7 @@ MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
         $eventId: event.getId(),
     });
     const promise = this._http.authedRequest(
-        callback, "POST", path, undefined, {}
+        callback, "POST", path, undefined, {},
     );
 
     const room = this.getRoom(event.getRoomId());
@@ -1205,7 +1223,7 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
         callback, "GET", "/preview_url", {
             url: url,
             ts: ts,
-        }, undefined, httpApi.PREFIX_MEDIA_R0
+        }, undefined, httpApi.PREFIX_MEDIA_R0,
     ).then(function(response) {
         // TODO: expire cache occasionally
         self.urlPreviewCache[key] = response;
@@ -1237,7 +1255,7 @@ MatrixClient.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callba
         data.timeout = timeoutMs ? timeoutMs : 20000;
     }
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, data
+        callback, "PUT", path, undefined, data,
     );
 };
 
@@ -1263,7 +1281,7 @@ MatrixClient.prototype.invite = function(roomId, userId, callback) {
  */
 MatrixClient.prototype.inviteByEmail = function(roomId, email, callback) {
     return this.inviteByThreePid(
-        roomId, "email", email, callback
+        roomId, "email", email, callback,
     );
 };
 
@@ -1279,7 +1297,7 @@ MatrixClient.prototype.inviteByEmail = function(roomId, email, callback) {
 MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, callback) {
     const path = utils.encodeUri(
         "/rooms/$roomId/invite",
-        { $roomId: roomId }
+        { $roomId: roomId },
     );
 
     let identityServerUrl = this.getIdentityServerUrl();
@@ -1361,7 +1379,7 @@ MatrixClient.prototype.forget = function(roomId, deleteRoom, callback) {
 MatrixClient.prototype.unban = function(roomId, userId, callback) {
     // unbanning = set their state to leave
     return _setMembershipState(
-        this, roomId, userId, "leave", undefined, callback
+        this, roomId, userId, "leave", undefined, callback,
     );
 };
 
@@ -1375,7 +1393,7 @@ MatrixClient.prototype.unban = function(roomId, userId, callback) {
  */
 MatrixClient.prototype.kick = function(roomId, userId, reason, callback) {
     return _setMembershipState(
-        this, roomId, userId, "leave", reason, callback
+        this, roomId, userId, "leave", reason, callback,
     );
 };
 
@@ -1398,7 +1416,7 @@ function _setMembershipState(client, roomId, userId, membershipValue, reason,
 
     const path = utils.encodeUri(
         "/rooms/$roomId/state/m.room.member/$userId",
-        { $roomId: roomId, $userId: userId}
+        { $roomId: roomId, $userId: userId},
     );
 
     return client._http.authedRequest(callback, "PUT", path, undefined, {
@@ -1431,7 +1449,7 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
         callback, "POST", path, undefined, {
             user_id: userId,  // may be undefined e.g. on leave
             reason: reason,
-        }
+        },
     );
 }
 
@@ -1465,7 +1483,7 @@ MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
         $info: info,
     });
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, data
+        callback, "PUT", path, undefined, data,
     );
 };
 
@@ -1477,7 +1495,7 @@ MatrixClient.prototype.setProfileInfo = function(info, data, callback) {
  */
 MatrixClient.prototype.setDisplayName = function(name, callback) {
     return this.setProfileInfo(
-        "displayname", { displayname: name }, callback
+        "displayname", { displayname: name }, callback,
     );
 };
 
@@ -1489,7 +1507,7 @@ MatrixClient.prototype.setDisplayName = function(name, callback) {
  */
 MatrixClient.prototype.setAvatarUrl = function(url, callback) {
     return this.setProfileInfo(
-        "avatar_url", { avatar_url: url }, callback
+        "avatar_url", { avatar_url: url }, callback,
     );
 };
 
@@ -1509,7 +1527,7 @@ MatrixClient.prototype.setAvatarUrl = function(url, callback) {
 MatrixClient.prototype.mxcUrlToHttp =
         function(mxcUrl, width, height, resizeMethod, allowDirectLinks) {
     return contentRepo.getHttpUriForMxc(
-        this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks
+        this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks,
     );
 };
 
@@ -1536,7 +1554,7 @@ MatrixClient.prototype.setPresence = function(opts, callback) {
         throw new Error("Bad presence value: " + opts.presence);
     }
     return this._http.authedRequest(
-        callback, "PUT", path, undefined, opts
+        callback, "PUT", path, undefined, opts,
     );
 };
 
@@ -1626,7 +1644,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     limit = limit - numAdded;
 
     const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: room.roomId}
+        "/rooms/$roomId/messages", {$roomId: room.roomId},
     );
     const params = {
         from: room.oldState.paginationToken,
@@ -1696,7 +1714,7 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
     }
 
     const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()}
+        "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()},
     );
     const params = {
         from: token,
@@ -1706,7 +1724,7 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
 
     const self = this;
     const promise =
-        self._http.authedRequest(undefined, "GET", path, params
+        self._http.authedRequest(undefined, "GET", path, params,
     ).then(function(res) {
         let token = res.end;
         if (res.chunk.length === 0) {
@@ -1760,14 +1778,14 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         "/rooms/$roomId/context/$eventId", {
             $roomId: timelineSet.room.roomId,
             $eventId: eventId,
-        }
+        },
     );
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     const self = this;
     const promise =
-        self._http.authedRequest(undefined, "GET", path
+        self._http.authedRequest(undefined, "GET", path,
     ).then(function(res) {
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
@@ -1867,7 +1885,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
 
         promise =
             this._http.authedRequestWithPrefix(undefined, "GET", path, params,
-                undefined, httpApi.PREFIX_UNSTABLE
+                undefined, httpApi.PREFIX_UNSTABLE,
         ).then(function(res) {
             const token = res.next_token;
             const matrixEvents = [];
@@ -1876,7 +1894,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
                 const notification = res.notifications[i];
                 const event = self.getEventMapper()(notification.event);
                 event.setPushActions(
-                    PushProcessor.actionListToActionsObject(notification.actions)
+                    PushProcessor.actionListToActionsObject(notification.actions),
                 );
                 event.event.room_id = notification.room_id; // XXX: gutwrenching
                 matrixEvents[i] = event;
@@ -1903,7 +1921,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         }
 
         path = utils.encodeUri(
-            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()}
+            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()},
         );
         params = {
             from: token,
@@ -1919,7 +1937,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         }
 
         promise =
-            this._http.authedRequest(undefined, "GET", path, params
+            this._http.authedRequest(undefined, "GET", path, params,
         ).then(function(res) {
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
@@ -2055,7 +2073,7 @@ MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
                                                     sendAttempt, nextLink, callback) {
     return this._requestTokenFromEndpoint(
         "/register/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback
+        email, clientSecret, sendAttempt, nextLink, callback,
     );
 };
 
@@ -2083,7 +2101,7 @@ MatrixClient.prototype.requestAdd3pidEmailToken = function(email, clientSecret,
                                                     sendAttempt, nextLink, callback) {
     return this._requestTokenFromEndpoint(
         "/account/3pid/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback
+        email, clientSecret, sendAttempt, nextLink, callback,
     );
 };
 
@@ -2110,7 +2128,7 @@ MatrixClient.prototype.requestPasswordEmailToken = function(email, clientSecret,
                                                     sendAttempt, nextLink, callback) {
     return this._requestTokenFromEndpoint(
         "/account/password/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback
+        email, clientSecret, sendAttempt, nextLink, callback,
     );
 };
 
@@ -2143,7 +2161,7 @@ MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint,
     };
     return this._http.request(
         callback, "POST", endpoint, undefined,
-        params
+        params,
     );
 };
 
@@ -2169,7 +2187,7 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
         }
     } else {
         throw new Error(
-            "SyncApi.sync() must be done before accessing to push rules."
+            "SyncApi.sync() must be done before accessing to push rules.",
         );
     }
 };
@@ -2321,7 +2339,7 @@ MatrixClient.prototype.searchRoomEvents = function(opts) {
     };
 
     return this.search({body: body}).then(
-        this._processRoomEventsSearch.bind(this, searchResults)
+        this._processRoomEventsSearch.bind(this, searchResults),
     );
 };
 
@@ -2351,7 +2369,7 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
     };
 
     const promise = this.search(searchOpts).then(
-        this._processRoomEventsSearch.bind(this, searchResults)
+        this._processRoomEventsSearch.bind(this, searchResults),
     ).finally(function() {
         searchResults.pendingRequest = null;
     });
@@ -2441,11 +2459,11 @@ MatrixClient.prototype.createFilter = function(content) {
         $userId: this.credentials.userId,
     });
     return this._http.authedRequest(
-        undefined, "POST", path, undefined, content
+        undefined, "POST", path, undefined, content,
     ).then(function(response) {
         // persist the filter
         const filter = Filter.fromJson(
-            self.credentials.userId, response.filter_id, content
+            self.credentials.userId, response.filter_id, content,
         );
         self.store.storeFilter(filter);
         return filter;
@@ -2476,11 +2494,11 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
     });
 
     return this._http.authedRequest(
-        undefined, "GET", path, undefined, undefined
+        undefined, "GET", path, undefined, undefined,
     ).then(function(response) {
         // persist the filter
         const filter = Filter.fromJson(
-            userId, filterId, response
+            userId, filterId, response,
         );
         self.store.storeFilter(filter);
         return filter;
@@ -2500,7 +2518,7 @@ MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
     if (filterId) {
         // check that the existing filter matches our expectations
         promise = self.getFilter(self.credentials.userId,
-                         filterId, true
+                         filterId, true,
         ).then(function(existingFilter) {
             const oldDef = existingFilter.getDefinition();
             const newDef = filter.getDefinition();
@@ -2542,7 +2560,7 @@ MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
         }
 
         // create a new filter
-        return self.createFilter(filter.getDefinition()
+        return self.createFilter(filter.getDefinition(),
         ).then(function(createdFilter) {
             // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
             //          JSON.stringify(createdFilter.getDefinition()));
@@ -2566,7 +2584,7 @@ MatrixClient.prototype.getOpenIdToken = function() {
     });
 
     return this._http.authedRequest(
-        undefined, "POST", path, undefined, {}
+        undefined, "POST", path, undefined, {},
     );
 };
 
@@ -2756,7 +2774,7 @@ function setupCallEventHandler(client) {
                 console.log(
                     "WARN: Already have a MatrixCall with id %s but got an " +
                     "invite. Clobbering.",
-                    content.call_id
+                    content.call_id,
                 );
             }
 
@@ -2764,7 +2782,7 @@ function setupCallEventHandler(client) {
             if (!call) {
                 console.log(
                     "Incoming call ID " + content.call_id + " but this client " +
-                    "doesn't support WebRTC"
+                    "doesn't support WebRTC",
                 );
                 // don't hang up the call: there could be other clients
                 // connected that do support WebRTC and declining the
@@ -2780,7 +2798,7 @@ function setupCallEventHandler(client) {
             if (candidatesByCall[call.callId]) {
                 for (i = 0; i < candidatesByCall[call.callId].length; i++) {
                     call._gotRemoteIceCandidate(
-                        candidatesByCall[call.callId][i]
+                        candidatesByCall[call.callId][i],
                     );
                 }
             }
@@ -2809,14 +2827,14 @@ function setupCallEventHandler(client) {
                         existingCall.callId > call.callId) {
                     console.log(
                         "Glare detected: answering incoming call " + call.callId +
-                        " and canceling outgoing call " + existingCall.callId
+                        " and canceling outgoing call " + existingCall.callId,
                     );
                     existingCall._replacedBy(call);
                     call.answer();
                 } else {
                     console.log(
                         "Glare detected: rejecting incoming call " + call.callId +
-                        " and keeping outgoing call " + existingCall.callId
+                        " and keeping outgoing call " + existingCall.callId,
                     );
                     call.hangup();
                 }

@@ -46,7 +46,7 @@ function addEventsToTimeline(timeline, numEvents, atStart) {
             utils.mkMessage({
                 room: ROOM_ID, user: USER_ID,
                 event: true,
-            }), atStart
+            }), atStart,
         );
     }
 }

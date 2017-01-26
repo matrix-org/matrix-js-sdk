@@ -1,4 +1,5 @@
 module.exports = {
+    parser: "babel-eslint",
     parserOptions: {
         ecmaVersion: 6,
         sourceType: "module",
@@ -18,6 +19,13 @@ module.exports = {
         }],
         curly: ["error", "multi-line"],
         "prefer-const": ["error"],
+        "comma-dangle": ["error", {
+            arrays: "always-multiline",
+            objects: "always-multiline",
+            imports: "always-multiline",
+            exports: "always-multiline",
+            functions: "always-multiline",
+        }],
 
         // loosen jsdoc requirements a little
         "require-jsdoc": ["error", {
@@ -48,14 +56,12 @@ module.exports = {
         // we set these to warnings, and assert that the number
         // of warnings doesn't exceed a given threshold
         "no-var": ["warn"],
-        "comma-dangle": ["warn"],
-        "brace-style": ["warn"],
+        "brace-style": ["warn", "1tbs", {"allowSingleLine": true}],
         "prefer-rest-params": ["warn"],
         "prefer-spread": ["warn"],
         "one-var": ["warn"],
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
-
     }
 }

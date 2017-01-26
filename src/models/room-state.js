@@ -133,7 +133,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         self.events[event.getType()][event.getStateKey()] = event;
         if (event.getType() === "m.room.member") {
             _updateDisplayNameCache(
-                self, event.getStateKey(), event.getContent().displayname
+                self, event.getStateKey(), event.getContent().displayname,
             );
             _updateThirdPartyTokenCache(self, event);
         }
@@ -360,7 +360,7 @@ function _updateThirdPartyTokenCache(roomState, memberEvent) {
         return;
     }
     const threePidInvite = roomState.getStateEvents(
-        "m.room.third_party_invite", token
+        "m.room.third_party_invite", token,
     );
     if (!threePidInvite) {
         return;
