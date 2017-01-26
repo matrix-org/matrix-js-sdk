@@ -96,6 +96,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
             keys: this._deviceKeys,
             algorithms: this._supportedAlgorithms,
             verified: DeviceVerification.VERIFIED,
+            known: true,
         };
 
         myDevices[this._deviceId] = deviceInfo;

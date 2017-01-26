@@ -86,6 +86,7 @@ DeviceInfo.prototype.toStorage = function() {
         algorithms: this.algorithms,
         keys: this.keys,
         verified: this.verified,
+        known: this.known,
         unsigned: this.unsigned,
     };
 };
