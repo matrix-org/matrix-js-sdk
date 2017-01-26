@@ -47,7 +47,6 @@
   "dependencies": {
     "another-json": "^0.2.0",
     "browser-request": "^0.3.3",
-    "browserify": "^10.2.3",
     "q": "^1.4.1",
     "request": "^2.53.0"
   },
@@ -55,6 +54,7 @@
     "babel-cli": "^6.18.0",
     "babel-eslint": "^7.1.1",
     "babel-preset-es2015": "^6.18.0",
+    "browserify": "^10.2.3",
     "eslint": "^3.13.1",
     "eslint-config-google": "^0.7.1",
     "istanbul": "^0.3.13",
