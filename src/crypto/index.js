@@ -20,15 +20,15 @@ limitations under the License.
  * @module crypto
  */
 
-let anotherjson = require('another-json');
-let q = require("q");
+const anotherjson = require('another-json');
+const q = require("q");
 
-let utils = require("../utils");
-let OlmDevice = require("./OlmDevice");
-let olmlib = require("./olmlib");
-let algorithms = require("./algorithms");
-let DeviceInfo = require("./deviceinfo");
-let DeviceVerification = DeviceInfo.DeviceVerification;
+const utils = require("../utils");
+const OlmDevice = require("./OlmDevice");
+const olmlib = require("./olmlib");
+const algorithms = require("./algorithms");
+const DeviceInfo = require("./deviceinfo");
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 /**
  * Cryptography bits
@@ -69,7 +69,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     this._roomDecryptors = {};
 
     this._supportedAlgorithms = utils.keys(
-        algorithms.DECRYPTION_CLASSES
+        algorithms.DECRYPTION_CLASSES,
     );
 
     // build our device keys: these will later be uploaded
@@ -80,7 +80,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
         this._olmDevice.deviceCurve25519Key;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
-        this._userId
+        this._userId,
     );
 
     if (!myDevices) {
@@ -92,7 +92,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
 
     if (!myDevices[this._deviceId]) {
         // add our own deviceinfo to the sessionstore
-        let deviceInfo = {
+        const deviceInfo = {
             keys: this._deviceKeys,
             algorithms: this._supportedAlgorithms,
             verified: DeviceVerification.VERIFIED,
@@ -100,7 +100,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
 
         myDevices[this._deviceId] = deviceInfo;
         this._sessionStore.storeEndToEndDevicesForUser(
-            this._userId, myDevices
+            this._userId, myDevices,
         );
     }
 
@@ -113,7 +113,7 @@ function _registerEventHandlers(crypto, eventEmitter) {
             if (syncState == "PREPARED") {
                 // XXX ugh. we're assuming the eventEmitter is a MatrixClient.
                 // how can we avoid doing so?
-                let rooms = eventEmitter.getRooms();
+                const rooms = eventEmitter.getRooms();
                 crypto._onInitialSyncCompleted(rooms);
             }
         } catch (e) {
@@ -176,7 +176,7 @@ Crypto.prototype.getDeviceEd25519Key = function() {
  * @return {object} A promise that will resolve when the keys are uploaded.
  */
 Crypto.prototype.uploadKeys = function(maxKeys) {
-    let self = this;
+    const self = this;
     return _uploadDeviceKeys(this).then(function(res) {
         // We need to keep a pool of one time public keys on the server so that
         // other devices can start conversations with us. But we can only store
@@ -191,16 +191,16 @@ Crypto.prototype.uploadKeys = function(maxKeys) {
         // these factors.
 
         // We first find how many keys the server has for us.
-        let keyCount = res.one_time_key_counts.signed_curve25519 || 0;
+        const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
         // We then check how many keys we can store in the Account object.
-        let maxOneTimeKeys = self._olmDevice.maxNumberOfOneTimeKeys();
+        const maxOneTimeKeys = self._olmDevice.maxNumberOfOneTimeKeys();
         // Try to keep at most half that number on the server. This leaves the
         // rest of the slots free to hold keys that have been claimed from the
         // server but we haven't recevied a message for.
         // If we run out of slots when generating new keys then olm will
         // discard the oldest private keys first. This will eventually clean
         // out stale private keys that won't receive a message.
-        let keyLimit = Math.floor(maxOneTimeKeys / 2);
+        const keyLimit = Math.floor(maxOneTimeKeys / 2);
         // We work out how many new keys we need to create to top up the server
         // If there are too many keys on the server then we don't need to
         // create any more keys.
@@ -225,10 +225,10 @@ Crypto.prototype.uploadKeys = function(maxKeys) {
 
 // returns a promise which resolves to the response
 function _uploadDeviceKeys(crypto) {
-    let userId = crypto._userId;
-    let deviceId = crypto._deviceId;
+    const userId = crypto._userId;
+    const deviceId = crypto._deviceId;
 
-    let deviceKeys = {
+    const deviceKeys = {
         algorithms: crypto._supportedAlgorithms,
         device_id: deviceId,
         keys: crypto._deviceKeys,
@@ -247,12 +247,12 @@ function _uploadDeviceKeys(crypto) {
 
 // returns a promise which resolves to the response
 function _uploadOneTimeKeys(crypto) {
-    let oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
-    let oneTimeJson = {};
+    const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
+    const oneTimeJson = {};
 
-    for (let keyId in oneTimeKeys.curve25519) {
+    for (const keyId in oneTimeKeys.curve25519) {
         if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
-            let k = {
+            const k = {
                 key: oneTimeKeys.curve25519[keyId],
             };
             crypto._signObject(k);
@@ -282,10 +282,10 @@ function _uploadOneTimeKeys(crypto) {
  * module:crypto/deviceinfo|DeviceInfo}.
  */
 Crypto.prototype.downloadKeys = function(userIds, forceDownload) {
-    let self = this;
+    const self = this;
 
     // promises we need to wait for while the download happens
-    let promises = [];
+    const promises = [];
 
     // list of userids we need to download keys for
     let downloadUsers = [];
@@ -300,9 +300,9 @@ Crypto.prototype.downloadKeys = function(userIds, forceDownload) {
         downloadUsers = userIds;
     } else {
         for (let i = 0; i < userIds.length; ++i) {
-            let u = userIds[i];
+            const u = userIds[i];
 
-            let inprogress = this._keyDownloadsInProgressByUser[u];
+            const inprogress = this._keyDownloadsInProgressByUser[u];
             if (inprogress) {
                 // wait for the download to complete
                 promises.push(q.any(inprogress).catch(perUserCatch(u)));
@@ -313,7 +313,7 @@ Crypto.prototype.downloadKeys = function(userIds, forceDownload) {
     }
 
     if (downloadUsers.length > 0) {
-        let r = this._doKeyDownloadForUsers(downloadUsers);
+        const r = this._doKeyDownloadForUsers(downloadUsers);
         downloadUsers.map(function(u) {
             promises.push(r[u].catch(perUserCatch(u)));
         });
@@ -333,11 +333,11 @@ Crypto.prototype.downloadKeys = function(userIds, forceDownload) {
  * @return {Object} userId->deviceId->{@link module:crypto/deviceinfo|DeviceInfo}.
  */
 Crypto.prototype._getDevicesFromStore = function(userIds) {
-    let stored = {};
-    let self = this;
+    const stored = {};
+    const self = this;
     userIds.map(function(u) {
         stored[u] = {};
-        let devices = self.getStoredDevicesForUser(u) || [];
+        const devices = self.getStoredDevicesForUser(u) || [];
         devices.map(function(dev) {
             stored[u][dev.deviceId] = dev;
         });
@@ -351,17 +351,17 @@ Crypto.prototype._getDevicesFromStore = function(userIds) {
  * @return {Object} a map from userId to a promise for a result for that user
  */
 Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
-    let self = this;
+    const self = this;
 
     console.log('Starting key download for ' + downloadUsers);
 
-    let deferMap = {};
-    let promiseMap = {};
+    const deferMap = {};
+    const promiseMap = {};
 
     downloadUsers.map(function(u) {
-        let deferred = q.defer();
-        let promise = deferred.promise.finally(function() {
-            let inProgress = self._keyDownloadsInProgressByUser[u];
+        const deferred = q.defer();
+        const promise = deferred.promise.finally(function() {
+            const inProgress = self._keyDownloadsInProgressByUser[u];
             utils.removeElement(inProgress, function(e) {
                 return e === promise;
             });
@@ -381,42 +381,42 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
     });
 
     this._baseApis.downloadKeysForUsers(
-        downloadUsers
+        downloadUsers,
     ).done(function(res) {
-        let dk = res.device_keys || {};
+        const dk = res.device_keys || {};
 
         for (let i = 0; i < downloadUsers.length; ++i) {
-            let userId = downloadUsers[i];
+            const userId = downloadUsers[i];
             var deviceId;
 
             console.log('got keys for ' + userId + ':', dk[userId]);
 
             if (!dk[userId]) {
                 // no result for this user
-                let err = 'Unknown';
+                const err = 'Unknown';
                 // TODO: do something with res.failures
                 deferMap[userId].reject(err);
                 continue;
             }
 
             // map from deviceid -> deviceinfo for this user
-            let userStore = {};
-            let devs = self._sessionStore.getEndToEndDevicesForUser(userId);
+            const userStore = {};
+            const devs = self._sessionStore.getEndToEndDevicesForUser(userId);
             if (devs) {
                 for (deviceId in devs) {
                     if (devs.hasOwnProperty(deviceId)) {
-                        let d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
+                        const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
                         userStore[deviceId] = d;
                     }
                 }
             }
 
             _updateStoredDeviceKeysForUser(
-                self._olmDevice, userId, userStore, dk[userId]
+                self._olmDevice, userId, userStore, dk[userId],
             );
 
             // update the session store
-            let storage = {};
+            const storage = {};
             for (deviceId in userStore) {
                 if (!userStore.hasOwnProperty(deviceId)) {
                     continue;
@@ -425,7 +425,7 @@ Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
                 storage[deviceId] = userStore[deviceId].toStorage();
             }
             self._sessionStore.storeEndToEndDevicesForUser(
-                userId, storage
+                userId, storage,
             );
 
             deferMap[userId].resolve();
@@ -462,7 +462,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
             continue;
         }
 
-        let deviceResult = userResult[deviceId];
+        const deviceResult = userResult[deviceId];
 
         // check that the user_id and device_id in the response object are
         // correct
@@ -496,18 +496,18 @@ function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
         return false;
     }
 
-    let deviceId = deviceResult.device_id;
-    let userId = deviceResult.user_id;
+    const deviceId = deviceResult.device_id;
+    const userId = deviceResult.user_id;
 
-    let signKeyId = "ed25519:" + deviceId;
-    let signKey = deviceResult.keys[signKeyId];
+    const signKeyId = "ed25519:" + deviceId;
+    const signKey = deviceResult.keys[signKeyId];
     if (!signKey) {
         console.log("Device " + userId + ":" + deviceId +
                     " has no ed25519 key");
         return false;
     }
 
-    let unsigned = deviceResult.unsigned || {};
+    const unsigned = deviceResult.unsigned || {};
 
     try {
         olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
@@ -552,12 +552,12 @@ function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
  * managed to get a list of devices for this user yet.
  */
 Crypto.prototype.getStoredDevicesForUser = function(userId) {
-    let devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devs) {
         return null;
     }
-    let res = [];
-    for (let deviceId in devs) {
+    const res = [];
+    for (const deviceId in devs) {
         if (devs.hasOwnProperty(deviceId)) {
             res.push(DeviceInfo.fromStorage(devs[deviceId], deviceId));
         }
@@ -575,7 +575,7 @@ Crypto.prototype.getStoredDevicesForUser = function(userId) {
  * if we don't know about this device
  */
 Crypto.prototype.getStoredDevice = function(userId, deviceId) {
-    let devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devs || !devs[deviceId]) {
         return undefined;
     }
@@ -593,13 +593,13 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
  *    "key", and "display_name" parameters.
  */
 Crypto.prototype.listDeviceKeys = function(userId) {
-    let devices = this.getStoredDevicesForUser(userId) || [];
+    const devices = this.getStoredDevicesForUser(userId) || [];
 
-    let result = [];
+    const result = [];
 
     for (let i = 0; i < devices.length; ++i) {
-        let device = devices[i];
-        let ed25519Key = device.getFingerprint();
+        const device = devices[i];
+        const ed25519Key = device.getFingerprint();
         if (ed25519Key) {
             result.push({
                 id: device.deviceId,
@@ -643,25 +643,25 @@ Crypto.prototype.getDeviceByIdentityKey = function(userId, algorithm, sender_key
         return null;
     }
 
-    let devices = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices) {
         return null;
     }
 
-    for (let deviceId in devices) {
+    for (const deviceId in devices) {
         if (!devices.hasOwnProperty(deviceId)) {
             continue;
         }
 
-        let device = devices[deviceId];
-        for (let keyId in device.keys) {
+        const device = devices[deviceId];
+        for (const keyId in device.keys) {
             if (!device.keys.hasOwnProperty(keyId)) {
                 continue;
             }
             if (keyId.indexOf("curve25519:") !== 0) {
                 continue;
             }
-            let deviceKey = device.keys[keyId];
+            const deviceKey = device.keys[keyId];
             if (deviceKey == sender_key) {
                 return DeviceInfo.fromStorage(device, deviceId);
             }
@@ -686,12 +686,12 @@ Crypto.prototype.getDeviceByIdentityKey = function(userId, algorithm, sender_key
  *      leave unchanged.
  */
 Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, blocked) {
-    let devices = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
     }
 
-    let dev = devices[deviceId];
+    const dev = devices[deviceId];
     let verificationStatus = dev.verified;
 
     if (verified) {
@@ -729,12 +729,12 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, bl
  * @return {Object.<string, {deviceIdKey: string, sessions: object[]}>}
  */
 Crypto.prototype.getOlmSessionsForUser = function(userId) {
-    let devices = this.getStoredDevicesForUser(userId) || [];
-    let result = {};
+    const devices = this.getStoredDevicesForUser(userId) || [];
+    const result = {};
     for (let j = 0; j < devices.length; ++j) {
-        let device = devices[j];
-        let deviceKey = device.getIdentityKey();
-        let sessions = this._olmDevice.getSessionInfoForDevice(deviceKey);
+        const device = devices[j];
+        const deviceKey = device.getIdentityKey();
+        const sessions = this._olmDevice.getSessionInfoForDevice(deviceKey);
 
         result[device.deviceId] = {
             deviceIdKey: deviceKey,
@@ -753,8 +753,8 @@ Crypto.prototype.getOlmSessionsForUser = function(userId) {
  * @return {module:crypto/deviceinfo?}
  */
 Crypto.prototype.getEventSenderDeviceInfo = function(event) {
-    let sender_key = event.getSenderKey();
-    let algorithm = event.getWireContent().algorithm;
+    const sender_key = event.getSenderKey();
+    const algorithm = event.getWireContent().algorithm;
 
     if (!sender_key || !algorithm) {
         return null;
@@ -764,8 +764,8 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.
 
-    let device = this.getDeviceByIdentityKey(
-        event.getSender(), algorithm, sender_key
+    const device = this.getDeviceByIdentityKey(
+        event.getSender(), algorithm, sender_key,
     );
 
     if (device === null) {
@@ -781,7 +781,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     //
     // (see https://github.com/vector-im/vector-web/issues/2215)
 
-    let claimedKey = event.getKeysClaimed().ed25519;
+    const claimedKey = event.getKeysClaimed().ed25519;
     if (!claimedKey) {
         console.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
@@ -808,7 +808,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 Crypto.prototype.setRoomEncryption = function(roomId, config) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
-    let existingConfig = this._sessionStore.getEndToEndRoom(roomId);
+    const existingConfig = this._sessionStore.getEndToEndRoom(roomId);
     if (existingConfig) {
         if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
             console.error("Ignoring m.room.encryption event which requests " +
@@ -817,7 +817,7 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
         }
     }
 
-    let AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
+    const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
     if (!AlgClass) {
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
@@ -828,7 +828,7 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
     };
     this._sessionStore.storeEndToEndRoom(roomId, config);
 
-    let alg = new AlgClass({
+    const alg = new AlgClass({
         userId: this._userId,
         deviceId: this._deviceId,
         crypto: this,
@@ -859,17 +859,17 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
  *    {@link module:crypto~OlmSessionResult}
  */
 Crypto.prototype.ensureOlmSessionsForUsers = function(users) {
-    let devicesByUser = {};
+    const devicesByUser = {};
 
     for (let i = 0; i < users.length; ++i) {
-        let userId = users[i];
+        const userId = users[i];
         devicesByUser[userId] = [];
 
-        let devices = this.getStoredDevicesForUser(userId) || [];
+        const devices = this.getStoredDevicesForUser(userId) || [];
         for (let j = 0; j < devices.length; ++j) {
-            let deviceInfo = devices[j];
+            const deviceInfo = devices[j];
 
-            let key = deviceInfo.getIdentityKey();
+            const key = deviceInfo.getIdentityKey();
             if (key == this._olmDevice.deviceCurve25519Key) {
                 // don't bother setting up session to ourself
                 continue;
@@ -884,7 +884,7 @@ Crypto.prototype.ensureOlmSessionsForUsers = function(users) {
     }
 
     return olmlib.ensureOlmSessionsForDevices(
-        this._olmDevice, this._baseApis, devicesByUser
+        this._olmDevice, this._baseApis, devicesByUser,
     );
 };
 
@@ -895,6 +895,45 @@ Crypto.prototype.ensureOlmSessionsForUsers = function(users) {
  */
 Crypto.prototype.isRoomEncrypted = function(roomId) {
     return Boolean(this._roomEncryptors[roomId]);
+};
+
+
+/**
+ * Get a list containing all of the room keys
+ *
+ * @return {module:client.Promise} a promise which resolves to a list of
+ *    session export objects
+ */
+Crypto.prototype.exportRoomKeys = function() {
+    return q(
+        this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
+            (s) => {
+                const sess = this._olmDevice.exportInboundGroupSession(
+                    s.senderKey, s.sessionId,
+                );
+
+                sess.algorithm = olmlib.MEGOLM_ALGORITHM;
+                return sess;
+            },
+        ),
+    );
+};
+
+/**
+ * Import a list of room keys previously exported by exportRoomKeys
+ *
+ * @param {Object[]} keys a list of session export objects
+ */
+Crypto.prototype.importRoomKeys = function(keys) {
+    keys.map((session) => {
+        if (!session.room_id || !session.algorithm) {
+            console.warn("ignoring session entry with missing fields", session);
+            return;
+        }
+
+        const alg = this._getRoomDecryptor(session.room_id, session.algorithm);
+        alg.importRoomKey(session);
+    });
 };
 
 /**
@@ -920,9 +959,9 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
     }
 
-    let roomId = event.getRoomId();
+    const roomId = event.getRoomId();
 
-    let alg = this._roomEncryptors[roomId];
+    const alg = this._roomEncryptors[roomId];
     if (!alg) {
         // not encrypting messages in this room
 
@@ -931,7 +970,7 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
             throw new Error(
                 "Room was previously configured to use encryption, but is " +
                 "no longer. Perhaps the homeserver is hiding the " +
-                "configuration event."
+                "configuration event.",
             );
         }
         return null;
@@ -940,13 +979,13 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
     // We can claim and prove ownership of all our device keys in the local
     // echo of the event since we know that all the local echos come from
     // this device.
-    let myKeys = {
+    const myKeys = {
         curve25519: this._olmDevice.deviceCurve25519Key,
         ed25519: this._olmDevice.deviceEd25519Key,
     };
 
     return alg.encryptMessage(
-        room, event.getType(), event.getContent()
+        room, event.getType(), event.getContent(),
     ).then(function(encryptedContent) {
         event.makeEncrypted("m.room.encrypted", encryptedContent, myKeys);
     });
@@ -960,8 +999,8 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
  * @raises {algorithms.DecryptionError} if there is a problem decrypting the event
  */
 Crypto.prototype.decryptEvent = function(event) {
-    let content = event.getWireContent();
-    let alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
+    const content = event.getWireContent();
+    const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
     alg.decryptEvent(event);
 };
 
@@ -972,8 +1011,8 @@ Crypto.prototype.decryptEvent = function(event) {
  * @param {module:models/event.MatrixEvent} event encryption event
  */
 Crypto.prototype._onCryptoEvent = function(event) {
-    let roomId = event.getRoomId();
-    let content = event.getContent();
+    const roomId = event.getRoomId();
+    const content = event.getContent();
 
     try {
         this.setRoomEncryption(roomId, content);
@@ -1004,27 +1043,27 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     // we need to tell all the devices in all the rooms we are members of that
     // we have arrived.
     // build a list of rooms for each user.
-    let roomsByUser = {};
+    const roomsByUser = {};
     for (let i = 0; i < rooms.length; i++) {
-        let room = rooms[i];
+        const room = rooms[i];
 
         // check for rooms with encryption enabled
-        let alg = this._roomEncryptors[room.roomId];
+        const alg = this._roomEncryptors[room.roomId];
         if (!alg) {
             continue;
         }
 
         // ignore any rooms which we have left
-        let me = room.getMember(this._userId);
+        const me = room.getMember(this._userId);
         if (!me || (
             me.membership !== "join" && me.membership !== "invite"
         )) {
             continue;
         }
 
-        let members = room.getJoinedMembers();
+        const members = room.getJoinedMembers();
         for (let j = 0; j < members.length; j++) {
-            let m = members[j];
+            const m = members[j];
             if (!roomsByUser[m.userId]) {
                 roomsByUser[m.userId] = [];
             }
@@ -1033,8 +1072,8 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     }
 
     // build a per-device message for each user
-    let content = {};
-    for (let userId in roomsByUser) {
+    const content = {};
+    for (const userId in roomsByUser) {
         if (!roomsByUser.hasOwnProperty(userId)) {
             continue;
         }
@@ -1046,10 +1085,10 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
         };
     }
 
-    let self = this;
+    const self = this;
     this._baseApis.sendToDevice(
         "m.new_device", // OH HAI!
-        content
+        content,
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
     });
@@ -1062,14 +1101,14 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
  * @param {module:models/event.MatrixEvent} event key event
  */
 Crypto.prototype._onRoomKeyEvent = function(event) {
-    let content = event.getContent();
+    const content = event.getContent();
 
     if (!content.room_id || !content.algorithm) {
         console.error("key event is missing fields");
         return;
     }
 
-    let alg = this._getRoomDecryptor(content.room_id, content.algorithm);
+    const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
 };
 
@@ -1090,9 +1129,9 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     // Further, it is automatically registered and called when new members
     // arrive in the room.
 
-    let roomId = member.roomId;
+    const roomId = member.roomId;
 
-    let alg = this._roomEncryptors[roomId];
+    const alg = this._roomEncryptors[roomId];
     if (!alg) {
         // not encrypting in this room
         return;
@@ -1109,10 +1148,10 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
  * @param {module:models/event.MatrixEvent} event announcement event
  */
 Crypto.prototype._onNewDeviceEvent = function(event) {
-    let content = event.getContent();
-    let userId = event.getSender();
-    let deviceId = content.device_id;
-    let rooms = content.rooms;
+    const content = event.getContent();
+    const userId = event.getSender();
+    const deviceId = content.device_id;
+    const rooms = content.rooms;
 
     if (!rooms || !deviceId) {
         console.warn("new_device event missing keys");
@@ -1140,15 +1179,15 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
  * Start device queries for any users who sent us an m.new_device recently
  */
 Crypto.prototype._flushNewDeviceRequests = function() {
-    let self = this;
+    const self = this;
 
-    let users = utils.keys(this._pendingUsersWithNewDevices);
+    const users = utils.keys(this._pendingUsersWithNewDevices);
 
     if (users.length === 0) {
         return;
     }
 
-    let r = this._doKeyDownloadForUsers(users);
+    const r = this._doKeyDownloadForUsers(users);
 
     // we've kicked off requests to these users: remove their
     // pending flag for now.
@@ -1157,7 +1196,7 @@ Crypto.prototype._flushNewDeviceRequests = function() {
     users.map(function(u) {
         r[u] = r[u].catch(function(e) {
             console.error(
-                'Error updating device keys for user ' + u + ':', e
+                'Error updating device keys for user ' + u + ':', e,
             );
 
             // reinstate the pending flags on any users which failed; this will
@@ -1206,10 +1245,10 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
         }
     }
 
-    let AlgClass = algorithms.DECRYPTION_CLASSES[algorithm];
+    const AlgClass = algorithms.DECRYPTION_CLASSES[algorithm];
     if (!AlgClass) {
         throw new algorithms.DecryptionError(
-            'Unknown encryption algorithm "' + algorithm + '".'
+            'Unknown encryption algorithm "' + algorithm + '".',
         );
     }
     alg = new AlgClass({
@@ -1232,7 +1271,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
  * @param {Object} obj  Object to which we will add a 'signatures' property
  */
 Crypto.prototype._signObject = function(obj) {
-    let sigs = {};
+    const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
         this._olmDevice.sign(anotherjson.stringify(obj));

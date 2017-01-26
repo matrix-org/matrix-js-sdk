@@ -17,10 +17,10 @@ limitations under the License.
 /**
  * @module models/room-state
  */
-let EventEmitter = require("events").EventEmitter;
+const EventEmitter = require("events").EventEmitter;
 
-let utils = require("../utils");
-let RoomMember = require("./room-member");
+const utils = require("../utils");
+const RoomMember = require("./room-member");
 
 /**
  * Construct room state.
@@ -100,7 +100,7 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
     if (stateKey === undefined) { // return all values
         return utils.values(this.events[eventType]);
     }
-    let event = this.events[eventType][stateKey];
+    const event = this.events[eventType][stateKey];
     return event ? event : null;
 };
 
@@ -115,7 +115,7 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
  * @fires module:client~MatrixClient#event:"RoomState.events"
  */
 RoomState.prototype.setStateEvents = function(stateEvents) {
-    let self = this;
+    const self = this;
     this._updateModifiedTime();
 
     // update the core event dict
@@ -133,7 +133,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         self.events[event.getType()][event.getStateKey()] = event;
         if (event.getType() === "m.room.member") {
             _updateDisplayNameCache(
-                self, event.getStateKey(), event.getContent().displayname
+                self, event.getStateKey(), event.getContent().displayname,
             );
             _updateThirdPartyTokenCache(self, event);
         }
@@ -153,7 +153,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         }
 
         if (event.getType() === "m.room.member") {
-            let userId = event.getStateKey();
+            const userId = event.getStateKey();
 
             // leave events apparently elide the displayname or avatar_url,
             // so let's fake one up so that we don't leak user ids
@@ -178,11 +178,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             // so we don't make assumptions about the properties of RoomMember
             // (e.g. and manage to break it because deep copying doesn't do
             // everything).
-            let sentinel = new RoomMember(event.getRoomId(), userId);
+            const sentinel = new RoomMember(event.getRoomId(), userId);
             utils.forEach([member, sentinel], function(roomMember) {
                 roomMember.setMembershipEvent(event, self);
                 // this member may have a power level already, so set it.
-                let pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
+                const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
                 if (pwrLvlEvent) {
                     roomMember.setPowerLevelEvent(pwrLvlEvent);
                 }
@@ -192,7 +192,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self.members[userId] = member;
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
-            let members = utils.values(self.members);
+            const members = utils.values(self.members);
             utils.forEach(members, function(member) {
                 member.setPowerLevelEvent(event);
                 self.emit("RoomState.members", event, self, member);
@@ -312,12 +312,12 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
  *                        according to the room's state.
  */
 RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
-    let member = this.getMember(userId);
+    const member = this.getMember(userId);
     if (!member || member.membership == 'leave') {
         return false;
     }
 
-    let power_levels_event = this.getStateEvents('m.room.power_levels', '');
+    const power_levels_event = this.getStateEvents('m.room.power_levels', '');
 
     let power_levels;
     let events_levels = {};
@@ -355,12 +355,12 @@ function _updateThirdPartyTokenCache(roomState, memberEvent) {
     if (!memberEvent.getContent().third_party_invite) {
         return;
     }
-    let token = (memberEvent.getContent().third_party_invite.signed || {}).token;
+    const token = (memberEvent.getContent().third_party_invite.signed || {}).token;
     if (!token) {
         return;
     }
-    let threePidInvite = roomState.getStateEvents(
-        "m.room.third_party_invite", token
+    const threePidInvite = roomState.getStateEvents(
+        "m.room.third_party_invite", token,
     );
     if (!threePidInvite) {
         return;
@@ -369,14 +369,14 @@ function _updateThirdPartyTokenCache(roomState, memberEvent) {
 }
 
 function _updateDisplayNameCache(roomState, userId, displayName) {
-    let oldName = roomState._userIdsToDisplayNames[userId];
+    const oldName = roomState._userIdsToDisplayNames[userId];
     delete roomState._userIdsToDisplayNames[userId];
     if (oldName) {
         // Remove the old name from the cache.
         // We clobber the user_id > name lookup but the name -> [user_id] lookup
         // means we need to remove that user ID from that array rather than nuking
         // the lot.
-        let existingUserIds = roomState._displayNameToUserIds[oldName] || [];
+        const existingUserIds = roomState._displayNameToUserIds[oldName] || [];
         for (let i = 0; i < existingUserIds.length; i++) {
             if (existingUserIds[i] === userId) {
                 // remove this user ID from this array

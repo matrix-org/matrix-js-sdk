@@ -1,40 +1,40 @@
 "use strict";
-let q = require("q");
-let sdk = require("../..");
-let MatrixClient = sdk.MatrixClient;
-let utils = require("../test-utils");
+const q = require("q");
+const sdk = require("../..");
+const MatrixClient = sdk.MatrixClient;
+const utils = require("../test-utils");
 
 describe("MatrixClient", function() {
-    let userId = "@alice:bar";
-    let identityServerUrl = "https://identity.server";
-    let identityServerDomain = "identity.server";
+    const userId = "@alice:bar";
+    const identityServerUrl = "https://identity.server";
+    const identityServerDomain = "identity.server";
     let client;
     let store;
     let scheduler;
 
-    let KEEP_ALIVE_PATH = "/_matrix/client/versions";
+    const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
-    let PUSH_RULES_RESPONSE = {
+    const PUSH_RULES_RESPONSE = {
         method: "GET",
         path: "/pushrules/",
         data: {},
     };
 
-    let FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
+    const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
 
-    let FILTER_RESPONSE = {
+    const FILTER_RESPONSE = {
         method: "POST",
         path: FILTER_PATH,
         data: { filter_id: "f1lt3r" },
     };
 
-    let SYNC_DATA = {
+    const SYNC_DATA = {
         next_batch: "s_5_3",
         presence: { events: [] },
         rooms: {},
     };
 
-    let SYNC_RESPONSE = {
+    const SYNC_RESPONSE = {
         method: "GET",
         path: "/sync",
         data: SYNC_DATA,
@@ -59,8 +59,8 @@ describe("MatrixClient", function() {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return q();
         }
-        let next = httpLookups.shift();
-        let logLine = (
+        const next = httpLookups.shift();
+        const logLine = (
             "MatrixClient[UT] RECV " + method + " " + path + "  " +
             "EXPECT " + (next ? next.method : next) + " " + (next ? next.path : next)
         );
@@ -75,7 +75,7 @@ describe("MatrixClient", function() {
                 expect(false).toBe(
                     true, ">1 pending request. You should probably handle them. " +
                     "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
-                    method + " " + path
+                    method + " " + path,
                 );
             }
             pendingLookup = {
@@ -88,7 +88,7 @@ describe("MatrixClient", function() {
         if (next.path === path && next.method === method) {
             console.log(
                 "MatrixClient[UT] Matched. Returning " +
-                (next.error ? "BAD" : "GOOD") + " response"
+                (next.error ? "BAD" : "GOOD") + " response",
             );
             if (next.expectBody) {
                 expect(next.expectBody).toEqual(data);
@@ -176,9 +176,9 @@ describe("MatrixClient", function() {
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
-        let filterId = "ehfewf";
+        const filterId = "ehfewf";
         store.getFilterIdByName.andReturn(filterId);
-        let filter = new sdk.Filter(0, filterId);
+        const filter = new sdk.Filter(0, filterId);
         filter.setDefinition({"room": {"timeline": {"limit": 8}}});
         store.getFilter.andReturn(filter);
         client.startClient();
@@ -220,7 +220,7 @@ describe("MatrixClient", function() {
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
             }
-            let invalidFilterId = 'invalidF1lt3r';
+            const invalidFilterId = 'invalidF1lt3r';
             httpLookups = [];
             httpLookups.push({
                 method: "GET",
@@ -236,9 +236,9 @@ describe("MatrixClient", function() {
             httpLookups.push(FILTER_RESPONSE);
             store.getFilterIdByName.andReturn(invalidFilterId);
 
-            let filterName = getFilterName(client.credentials.userId);
+            const filterName = getFilterName(client.credentials.userId);
             client.store.setFilterIdByName(filterName, invalidFilterId);
-            let filter = new sdk.Filter(client.credentials.userId);
+            const filter = new sdk.Filter(client.credentials.userId);
 
             client.getOrCreateFilter(filterName, filter).then(function(filterId) {
                 expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
@@ -290,7 +290,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
                     expect(client.retryImmediately()).toBe(
-                        true, "retryImmediately returned false"
+                        true, "retryImmediately returned false",
                     );
                     jasmine.Clock.tick(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
@@ -332,9 +332,9 @@ describe("MatrixClient", function() {
     describe("emitted sync events", function() {
         function syncChecker(expectedStates, done) {
             return function syncListener(state, old) {
-                let expected = expectedStates.shift();
+                const expected = expectedStates.shift();
                 console.log(
-                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected
+                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
                 );
                 if (!expected) {
                     done();
@@ -352,14 +352,14 @@ describe("MatrixClient", function() {
         }
 
         it("should transition null -> PREPARED after the first /sync", function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
 
         it("should transition null -> ERROR after a failed /filter", function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
@@ -372,7 +372,7 @@ describe("MatrixClient", function() {
 
         it("should transition ERROR -> PREPARED after /sync if prev failed",
         function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             acceptKeepalives = false;
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
@@ -399,7 +399,7 @@ describe("MatrixClient", function() {
         });
 
         it("should transition PREPARED -> SYNCING after /sync", function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             client.on("sync", syncChecker(expectedStates, done));
@@ -408,7 +408,7 @@ describe("MatrixClient", function() {
 
         it("should transition SYNCING -> ERROR after a failed /sync", function(done) {
             acceptKeepalives = false;
-            let expectedStates = [];
+            const expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
@@ -427,7 +427,7 @@ describe("MatrixClient", function() {
 
         xit("should transition ERROR -> SYNCING after /sync if prev failed",
         function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
@@ -442,7 +442,7 @@ describe("MatrixClient", function() {
 
         it("should transition SYNCING -> SYNCING on subsequent /sync successes",
         function(done) {
-            let expectedStates = [];
+            const expectedStates = [];
             httpLookups.push(SYNC_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
@@ -455,7 +455,7 @@ describe("MatrixClient", function() {
 
         it("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
             acceptKeepalives = false;
-            let expectedStates = [];
+            const expectedStates = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
@@ -479,7 +479,7 @@ describe("MatrixClient", function() {
     });
 
     describe("inviteByEmail", function() {
-        let roomId = "!foo:bar";
+        const roomId = "!foo:bar";
 
         it("should send an invite HTTP POST", function() {
             httpLookups = [{

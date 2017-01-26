@@ -21,9 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-let EventEmitter = require("events").EventEmitter;
+const EventEmitter = require("events").EventEmitter;
 
-let utils = require('../utils.js');
+const utils = require('../utils.js');
 
 /**
  * Enum for event statuses.
@@ -70,7 +70,7 @@ module.exports.EventStatus = {
  * Default: true. <strong>This property is experimental and may change.</strong>
  */
 module.exports.MatrixEvent = function MatrixEvent(
-    event
+    event,
 ) {
     this.event = event || {};
     this.sender = null;
@@ -350,8 +350,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             }
         }
 
-        let keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
-        let content = this.getContent();
+        const keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        const content = this.getContent();
         for (key in content) {
             if (!content.hasOwnProperty(key)) {
                 continue;
@@ -424,7 +424,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
  *    m.room.aliases allows key aliases
  */
 // a map giving the keys we keep when an event is redacted
-let _REDACT_KEEP_KEY_MAP = [
+const _REDACT_KEEP_KEY_MAP = [
     'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
     'content', 'unsigned',
 ].reduce(function(ret, val) {
@@ -432,7 +432,7 @@ let _REDACT_KEEP_KEY_MAP = [
 }, {});
 
 // a map from event type to the .content keys we keep when an event is redacted
-let _REDACT_KEEP_CONTENT_MAP = {
+const _REDACT_KEEP_CONTENT_MAP = {
     'm.room.member': {'membership': 1},
     'm.room.create': {'creator': 1},
     'm.room.join_rules': {'join_rule': 1},

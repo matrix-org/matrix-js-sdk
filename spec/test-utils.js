@@ -1,6 +1,6 @@
 "use strict";
-let sdk = require("..");
-let MatrixEvent = sdk.MatrixEvent;
+const sdk = require("..");
+const MatrixEvent = sdk.MatrixEvent;
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
@@ -8,7 +8,7 @@ let MatrixEvent = sdk.MatrixEvent;
  * @param {TestCase} testCase The test case that is about to be run.
  */
 module.exports.beforeEach = function(testCase) {
-    let desc = testCase.suite.description + " : " + testCase.description;
+    const desc = testCase.suite.description + " : " + testCase.description;
     console.log(desc);
     console.log(new Array(1 + desc.length).join("="));
 };
@@ -22,13 +22,13 @@ module.exports.beforeEach = function(testCase) {
 module.exports.mock = function(constr, name) {
     // By Tim Buschtöns
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
-    let HelperConstr = new Function(); // jshint ignore:line
+    const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;
-    let result = new HelperConstr();
+    const result = new HelperConstr();
     result.jasmineToString = function() {
         return "mock" + (name ? " of " + name : "");
     };
-    for (let key in constr.prototype) { // eslint-disable-line guard-for-in
+    for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jasmine.createSpy((name || "mock") + '.' + key);
@@ -57,7 +57,7 @@ module.exports.mkEvent = function(opts) {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
-    let event = {
+    const event = {
         type: opts.type,
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
@@ -83,7 +83,7 @@ module.exports.mkPresence = function(opts) {
     if (!opts.user) {
         throw new Error("Missing user");
     }
-    let event = {
+    const event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
         sender: opts.sender || opts.user, // opts.user for backwards-compat
@@ -193,6 +193,12 @@ module.exports.MockStorageApi = function() {
     this.data = {};
 };
 module.exports.MockStorageApi.prototype = {
+    get length() {
+        return Object.keys(this.data).length;
+    },
+    key: function(i) {
+        return Object.keys(this.data)[i];
+    },
     setItem: function(k, v) {
         this.data[k] = v;
     },

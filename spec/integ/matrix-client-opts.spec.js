@@ -1,17 +1,18 @@
 "use strict";
-let sdk = require("../..");
-let MatrixClient = sdk.MatrixClient;
-let HttpBackend = require("../mock-request");
-let utils = require("../test-utils");
+const sdk = require("../..");
+const MatrixClient = sdk.MatrixClient;
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
 
 describe("MatrixClient opts", function() {
-    let baseUrl = "http://localhost.or.something";
-    let client, httpBackend;
-    let userId = "@alice:localhost";
-    let userB = "@bob:localhost";
-    let accessToken = "aseukfgwef";
-    let roomId = "!foo:bar";
-    let syncData = {
+    const baseUrl = "http://localhost.or.something";
+    let client = null;
+    let httpBackend = null;
+    const userId = "@alice:localhost";
+    const userB = "@bob:localhost";
+    const accessToken = "aseukfgwef";
+    const roomId = "!foo:bar";
+    const syncData = {
         next_batch: "s_5_3",
         presence: {},
         rooms: {
@@ -78,7 +79,7 @@ describe("MatrixClient opts", function() {
         });
 
         it("should be able to send messages", function(done) {
-            let eventId = "$flibble:wibble";
+            const eventId = "$flibble:wibble";
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: eventId,
             });
@@ -90,16 +91,16 @@ describe("MatrixClient opts", function() {
         });
 
         it("should be able to sync / get new events", function(done) {
-            let expectedEventTypes = [ // from /initialSync
+            const expectedEventTypes = [ // from /initialSync
                 "m.room.message", "m.room.name", "m.room.member", "m.room.member",
                 "m.room.create",
             ];
             client.on("event", function(event) {
                 expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
-                    -1, "Recv unexpected event type: " + event.getType()
+                    -1, "Recv unexpected event type: " + event.getType(),
                 );
                 expectedEventTypes.splice(
-                    expectedEventTypes.indexOf(event.getType()), 1
+                    expectedEventTypes.indexOf(event.getType()), 1,
                 );
             });
             httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -112,7 +113,7 @@ describe("MatrixClient opts", function() {
                 return httpBackend.flush("/sync", 1);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
-                    0, "Expected to see event types: " + expectedEventTypes
+                    0, "Expected to see event types: " + expectedEventTypes,
                 );
                 done();
             });

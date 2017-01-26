@@ -4,9 +4,9 @@
  * @module models/event-timeline
  */
 
-let RoomState = require("./room-state");
-let utils = require("../utils");
-let MatrixEvent = require("./event").MatrixEvent;
+const RoomState = require("./room-state");
+const utils = require("../utils");
+const MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct a new EventTimeline
@@ -75,11 +75,11 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
 
     // we deep-copy the events here, in case they get changed later - we don't
     // want changes to the start state leaking through to the end state.
-    let oldStateEvents = utils.map(
+    const oldStateEvents = utils.map(
         utils.deepCopy(
             stateEvents.map(function(mxEvent) {
                 return mxEvent.event;
-            })
+            }),
         ),
     function(ev) {
         return new MatrixEvent(ev);
@@ -237,10 +237,10 @@ EventTimeline.prototype.setNeighbouringTimeline = function(neighbour, direction)
  * @param {boolean}  atStart     true to insert new event at the start
  */
 EventTimeline.prototype.addEvent = function(event, atStart) {
-    let stateContext = atStart ? this._startState : this._endState;
+    const stateContext = atStart ? this._startState : this._endState;
 
     // only call setEventMetadata on the unfiltered timelineSets
-    let timelineSet = this.getTimelineSet();
+    const timelineSet = this.getTimelineSet();
     if (timelineSet.room &&
         timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
@@ -288,11 +288,11 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
 EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline) {
     // set sender and target properties
     event.sender = stateContext.getSentinelMember(
-        event.getSender()
+        event.getSender(),
     );
     if (event.getType() === "m.room.member") {
         event.target = stateContext.getSentinelMember(
-            event.getStateKey()
+            event.getStateKey(),
         );
     }
     if (event.isState()) {
@@ -314,7 +314,7 @@ EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline
  */
 EventTimeline.prototype.removeEvent = function(eventId) {
     for (let i = this._events.length - 1; i >= 0; i--) {
-        let ev = this._events[i];
+        const ev = this._events[i];
         if (ev.getId() == eventId) {
             this._events.splice(i, 1);
             if (i < this._baseIndex) {

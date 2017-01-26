@@ -19,10 +19,10 @@ limitations under the License.
  * @module store/session/webstorage
  */
 
-let utils = require("../../utils");
+const utils = require("../../utils");
 
-let DEBUG = false;  // set true to enable console logging.
-let E2E_PREFIX = "session.e2e.";
+const DEBUG = false;  // set true to enable console logging.
+const E2E_PREFIX = "session.e2e.";
 
 /**
  * Construct a web storage session store, capable of storing account keys,
@@ -37,9 +37,12 @@ function WebStorageSessionStore(webStore) {
     this.store = webStore;
     if (!utils.isFunction(webStore.getItem) ||
         !utils.isFunction(webStore.setItem) ||
-        !utils.isFunction(webStore.removeItem)) {
+        !utils.isFunction(webStore.removeItem) ||
+        !utils.isFunction(webStore.key) ||
+        typeof(webStore.length) !== 'number'
+       ) {
         throw new Error(
-            "Supplied webStore does not meet the WebStorage API interface"
+            "Supplied webStore does not meet the WebStorage API interface",
         );
     }
 }
@@ -103,10 +106,10 @@ WebStorageSessionStore.prototype = {
      * @param {string} session Base64 encoded end-to-end session.
      */
     storeEndToEndSession: function(deviceKey, sessionId, session) {
-        let sessions = this.getEndToEndSessions(deviceKey) || {};
+        const sessions = this.getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = session;
         setJsonItem(
-            this.store, keyEndToEndSessions(deviceKey), sessions
+            this.store, keyEndToEndSessions(deviceKey), sessions,
         );
     },
 
@@ -120,13 +123,39 @@ WebStorageSessionStore.prototype = {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
     },
 
+    /**
+     * Retrieve a list of all known inbound group sessions
+     *
+     * @return {{senderKey: string, sessionId: string}}
+     */
+    getAllEndToEndInboundGroupSessionKeys: function() {
+        const prefix = E2E_PREFIX + 'inboundgroupsessions/';
+        const result = [];
+        for (let i = 0; i < this.store.length; i++) {
+            const key = this.store.key(i);
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            // we can't use split, as the components we are trying to split out
+            // might themselves contain '/' characters. We rely on the
+            // senderKey being a (32-byte) curve25519 key, base64-encoded
+            // (hence 43 characters long).
+
+            result.push({
+                senderKey: key.substr(prefix.length, 43),
+                sessionId: key.substr(prefix.length + 44),
+            });
+        }
+        return result;
+    },
+
     getEndToEndInboundGroupSession: function(senderKey, sessionId) {
-        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        const key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.getItem(key);
     },
 
     storeEndToEndInboundGroupSession: function(senderKey, sessionId, pickledSession) {
-        let key = keyEndToEndInboundGroupSession(senderKey, sessionId);
+        const key = keyEndToEndInboundGroupSession(senderKey, sessionId);
         return this.store.setItem(key, pickledSession);
     },
 
@@ -149,8 +178,8 @@ WebStorageSessionStore.prototype = {
     },
 };
 
-let KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
-let KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
+const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
 
 function keyEndToEndDevicesForUser(userId) {
     return E2E_PREFIX + "devices/" + userId;

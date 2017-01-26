@@ -27,7 +27,7 @@ limitations under the License.
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
-let TIMER_CHECK_PERIOD_MS = 1000;
+const TIMER_CHECK_PERIOD_MS = 1000;
 
 // counter, for making up ids to return from setTimeout
 let _count = 0;
@@ -37,10 +37,10 @@ let _realCallbackKey;
 
 // a sorted list of the callbacks to be run.
 // each is an object with keys [runAt, func, params, key].
-let _callbackList = [];
+const _callbackList = [];
 
 // var debuglog = console.log.bind(console);
-let debuglog = function() {};
+const debuglog = function() {};
 
 /**
  * Replace the function used by this module to get the current time.
@@ -72,12 +72,12 @@ module.exports.setTimeout = function(func, delayMs) {
         delayMs = 0;
     }
 
-    let params = Array.prototype.slice.call(arguments, 2);
-    let runAt = _now() + delayMs;
-    let key = _count++;
+    const params = Array.prototype.slice.call(arguments, 2);
+    const runAt = _now() + delayMs;
+    const key = _count++;
     debuglog("setTimeout: scheduling cb", key, "at", runAt,
              "(delay", delayMs, ")");
-    let data = {
+    const data = {
         runAt: runAt,
         func: func,
         params: params,
@@ -85,10 +85,10 @@ module.exports.setTimeout = function(func, delayMs) {
     };
 
     // figure out where it goes in the list
-    let idx = binarySearch(
+    const idx = binarySearch(
         _callbackList, function(el) {
             return el.runAt - runAt;
-        }
+        },
     );
 
     _callbackList.splice(idx, 0, data);
@@ -110,7 +110,7 @@ module.exports.clearTimeout = function(key) {
     // remove the element from the list
     let i;
     for (i = 0; i < _callbackList.length; i++) {
-        let cb = _callbackList[i];
+        const cb = _callbackList[i];
         if (cb.key == key) {
             _callbackList.splice(i, 1);
             break;
@@ -129,15 +129,15 @@ function _scheduleRealCallback() {
         global.clearTimeout(_realCallbackKey);
     }
 
-    let first = _callbackList[0];
+    const first = _callbackList[0];
 
     if (!first) {
         debuglog("_scheduleRealCallback: no more callbacks, not rescheduling");
         return;
     }
 
-    let now = _now();
-    let delayMs = Math.min(first.runAt - now, TIMER_CHECK_PERIOD_MS);
+    const now = _now();
+    const delayMs = Math.min(first.runAt - now, TIMER_CHECK_PERIOD_MS);
 
     debuglog("_scheduleRealCallback: now:", now, "delay:", delayMs);
     _realCallbackKey = global.setTimeout(_runCallbacks, delayMs);
@@ -145,13 +145,13 @@ function _scheduleRealCallback() {
 
 function _runCallbacks() {
     let cb;
-    let now = _now();
+    const now = _now();
     debuglog("_runCallbacks: now:", now);
 
     // get the list of things to call
-    let callbacksToRun = [];
+    const callbacksToRun = [];
     while (true) {
-        let first = _callbackList[0];
+        const first = _callbackList[0];
         if (!first || first.runAt > now) {
             break;
         }
@@ -188,8 +188,8 @@ function binarySearch(array, func) {
         max = array.length;
 
     while (min < max) {
-        let mid = (min + max) >> 1;
-        let res = func(array[mid]);
+        const mid = (min + max) >> 1;
+        const res = func(array[mid]);
         if (res > 0) {
             // the element at 'mid' is too big; set it as the new max.
             max = mid;

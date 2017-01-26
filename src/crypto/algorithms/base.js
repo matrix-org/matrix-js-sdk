@@ -20,7 +20,7 @@ limitations under the License.
  *
  * @module crypto/algorithms/base
  */
-let utils = require("../../utils");
+const utils = require("../../utils");
 
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
@@ -53,7 +53,7 @@ module.exports.DECRYPTION_CLASSES = {};
  * @param {string} params.roomId  The ID of the room we will be sending to
  * @param {object} params.config  The body of the m.room.encryption event
  */
-let EncryptionAlgorithm = function(params) {
+const EncryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._deviceId = params.deviceId;
     this._crypto = params.crypto;
@@ -85,7 +85,7 @@ module.exports.EncryptionAlgorithm = EncryptionAlgorithm;
  * @param {string=} oldMembership  previous membership
  */
 EncryptionAlgorithm.prototype.onRoomMembership = function(
-    event, member, oldMembership
+    event, member, oldMembership,
 ) {};
 
 /**
@@ -101,7 +101,7 @@ EncryptionAlgorithm.prototype.onRoomMembership = function(
  * @param {string=} params.roomId The ID of the room we will be receiving
  *     from. Null for to-device events.
  */
-let DecryptionAlgorithm = function(params) {
+const DecryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._crypto = params.crypto;
     this._olmDevice = params.olmDevice;
@@ -133,6 +133,15 @@ module.exports.DecryptionAlgorithm = DecryptionAlgorithm;
  * @param {module:models/event.MatrixEvent} params event key event
  */
 DecryptionAlgorithm.prototype.onRoomKeyEvent = function(params) {
+    // ignore by default
+};
+
+/**
+ * Import a room key
+ *
+ * @param {module:crypto/OlmDevice.MegolmSessionData} session
+ */
+DecryptionAlgorithm.prototype.importRoomKey = function(session) {
     // ignore by default
 };
 

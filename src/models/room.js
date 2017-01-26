@@ -17,22 +17,22 @@ limitations under the License.
 /**
  * @module models/room
  */
-let EventEmitter = require("events").EventEmitter;
+const EventEmitter = require("events").EventEmitter;
 
-let EventStatus = require("./event").EventStatus;
-let RoomSummary = require("./room-summary");
-let MatrixEvent = require("./event").MatrixEvent;
-let utils = require("../utils");
-let ContentRepo = require("../content-repo");
-let EventTimeline = require("./event-timeline");
-let EventTimelineSet = require("./event-timeline-set");
+const EventStatus = require("./event").EventStatus;
+const RoomSummary = require("./room-summary");
+const MatrixEvent = require("./event").MatrixEvent;
+const utils = require("../utils");
+const ContentRepo = require("../content-repo");
+const EventTimeline = require("./event-timeline");
+const EventTimelineSet = require("./event-timeline-set");
 
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
     // This is really ugly because JS has no way to express an object literal
     // where the name of a key comes from an expression
-    let fakeReceipt = {
+    const fakeReceipt = {
         content: {},
         type: "m.receipt",
         room_id: event.getRoomId(),
@@ -108,7 +108,7 @@ function Room(roomId, opts) {
     if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
         throw new Error(
             "opts.pendingEventOrdering MUST be either 'chronological' or " +
-            "'detached'. Got: '" + opts.pendingEventOrdering + "'"
+            "'detached'. Got: '" + opts.pendingEventOrdering + "'",
         );
     }
 
@@ -308,7 +308,7 @@ Room.prototype.setUnreadNotificationCount = function(type, count) {
  */
 Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
                                        allowDefault) {
-    let roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
+    const roomAvatarEvent = this.currentState.getStateEvents("m.room.avatar", "");
     if (allowDefault === undefined) {
         allowDefault = true;
     }
@@ -316,14 +316,14 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
         return null;
     }
 
-    let mainUrl = roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
+    const mainUrl = roomAvatarEvent ? roomAvatarEvent.getContent().url : null;
     if (mainUrl) {
         return ContentRepo.getHttpUriForMxc(
-            baseUrl, mainUrl, width, height, resizeMethod
+            baseUrl, mainUrl, width, height, resizeMethod,
         );
     } else if (allowDefault) {
         return ContentRepo.getIdenticonUri(
-            baseUrl, this.roomId, width, height
+            baseUrl, this.roomId, width, height,
         );
     }
 
@@ -337,15 +337,15 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
  * @return {array} The room's alias as an array of strings
  */
 Room.prototype.getAliases = function() {
-    let alias_strings = [];
+    const alias_strings = [];
 
-    let alias_events = this.currentState.getStateEvents("m.room.aliases");
+    const alias_events = this.currentState.getStateEvents("m.room.aliases");
     if (alias_events) {
         for (let i = 0; i < alias_events.length; ++i) {
-            let alias_event = alias_events[i];
+            const alias_event = alias_events[i];
             if (utils.isArray(alias_event.getContent().aliases)) {
                 Array.prototype.push.apply(
-                    alias_strings, alias_event.getContent().aliases
+                    alias_strings, alias_event.getContent().aliases,
                 );
             }
         }
@@ -360,7 +360,7 @@ Room.prototype.getAliases = function() {
  * @return {?string} The room's canonical alias, or null if there is none
  */
 Room.prototype.getCanonicalAlias = function() {
-    let canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
+    const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
     if (canonicalAlias) {
         return canonicalAlias.getContent().alias;
     }
@@ -390,7 +390,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
                                               timeline, paginationToken) {
     timeline.getTimelineSet().addEventsToTimeline(
         events, toStartOfTimeline,
-        timeline, paginationToken
+        timeline, paginationToken,
     );
 };
 
@@ -400,7 +400,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    let member = this.currentState.members[userId];
+    const member = this.currentState.members[userId];
     if (!member) {
         return null;
     }
@@ -445,7 +445,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {boolean} True if this user_id has the given membership state.
  */
  Room.prototype.hasMembershipState = function(userId, membership) {
-    let member = this.getMember(userId);
+    const member = this.getMember(userId);
     if (!member) {
         return false;
     }
@@ -461,8 +461,8 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
     if (this._filteredTimelineSets[filter.filterId]) {
         return this._filteredTimelineSets[filter.filterId];
     }
-    let opts = Object.assign({ filter: filter }, this._opts);
-    let timelineSet = new EventTimelineSet(this, opts);
+    const opts = Object.assign({ filter: filter }, this._opts);
+    const timelineSet = new EventTimelineSet(this, opts);
     reEmit(this, timelineSet, ["Room.timeline", "Room.timelineReset"]);
     this._filteredTimelineSets[filter.filterId] = timelineSet;
     this._timelineSets.push(timelineSet);
@@ -474,7 +474,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
     // may have grown huge and so take a long time to filter.
     // see https://github.com/vector-im/vector-web/issues/2109
 
-    let unfilteredLiveTimeline = this.getLiveTimeline();
+    const unfilteredLiveTimeline = this.getLiveTimeline();
 
     unfilteredLiveTimeline.getEvents().forEach(function(event) {
         timelineSet.addLiveEvent(event);
@@ -488,7 +488,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
 
     timelineSet.getLiveTimeline().setPaginationToken(
         timeline.getPaginationToken(EventTimeline.BACKWARDS),
-        EventTimeline.BACKWARDS
+        EventTimeline.BACKWARDS,
     );
 
     // alternatively, we could try to do something like this to try and re-paginate
@@ -508,9 +508,9 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
  * @param {Filter} filter  the filter whose timelineSet is to be forgotten
  */
 Room.prototype.removeFilteredTimelineSet = function(filter) {
-    let timelineSet = this._filteredTimelineSets[filter.filterId];
+    const timelineSet = this._filteredTimelineSets[filter.filterId];
     delete this._filteredTimelineSets[filter.filterId];
-    let i = this._timelineSets.indexOf(timelineSet);
+    const i = this._timelineSets.indexOf(timelineSet);
     if (i > -1) {
         this._timelineSets.splice(i, 1);
     }
@@ -528,10 +528,10 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
 Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     let i;
     if (event.getType() === "m.room.redaction") {
-        let redactId = event.event.redacts;
+        const redactId = event.event.redacts;
 
         // if we know about this event, redact its contents now.
-        let redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+        const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
         if (redactedEvent) {
             redactedEvent.makeRedacted(event);
             this.emit("Room.redaction", event, this);
@@ -551,7 +551,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     }
 
     if (event.getUnsigned().transaction_id) {
-        let existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
+        const existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
         if (existingEvent) {
             // remote echo of an event we sent earlier
             this._handleRemoteEcho(event, existingEvent);
@@ -569,7 +569,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     // pointing to an event that wasn't yet in the timeline
     if (event.sender) {
         this.addReceipt(synthesizeReceipt(
-            event.sender.userId, event, "m.read"
+            event.sender.userId, event, "m.read",
         ), true);
 
         // Any live events from a user could be taken as implicit
@@ -616,7 +616,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     EventTimeline.setEventMetadata(
         event,
         this.getLiveTimeline().getState(EventTimeline.FORWARDS),
-        false
+        false,
     );
 
     this._txnToEvent[txnId] = event;
@@ -625,7 +625,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         this._pendingEventList.push(event);
     } else {
         for (let i = 0; i < this._timelineSets.length; i++) {
-            let timelineSet = this._timelineSets[i];
+            const timelineSet = this._timelineSets[i];
             if (timelineSet.getFilter()) {
                 if (this._filter.filterRoomTimeline([event]).length) {
                     timelineSet.addEventToTimeline(event,
@@ -656,9 +656,9 @@ Room.prototype.addPendingEvent = function(event, txnId) {
  * @private
  */
 Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
-    let oldEventId = localEvent.getId();
-    let newEventId = remoteEvent.getId();
-    let oldStatus = localEvent.status;
+    const oldEventId = localEvent.getId();
+    const newEventId = remoteEvent.getId();
+    const oldStatus = localEvent.status;
 
     // no longer pending
     delete this._txnToEvent[remoteEvent.transaction_id];
@@ -669,7 +669,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
             this._pendingEventList,
             function(ev) {
                 return ev.getId() == oldEventId;
-            }, false
+            }, false,
         );
     }
 
@@ -678,7 +678,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     localEvent.handleRemoteEcho(remoteEvent.event);
 
     for (let i = 0; i < this._timelineSets.length; i++) {
-        let timelineSet = this._timelineSets[i];
+        const timelineSet = this._timelineSets[i];
 
         // if it's already in the timeline, update the timeline map. If it's not, add it.
         timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
@@ -690,7 +690,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
 
 /* a map from current event status to a list of allowed next statuses
  */
-let ALLOWED_TRANSITIONS = {};
+const ALLOWED_TRANSITIONS = {};
 
 ALLOWED_TRANSITIONS[EventStatus.ENCRYPTING] = [
     EventStatus.SENDING,
@@ -737,7 +737,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
 
     // SENT races against /sync, so we have to special-case it.
     if (newStatus == EventStatus.SENT) {
-        let timeline = this.getUnfilteredTimelineSet().eventIdToTimeline(newEventId);
+        const timeline = this.getUnfilteredTimelineSet().eventIdToTimeline(newEventId);
         if (timeline) {
             // we've already received the event via the event stream.
             // nothing more to do here.
@@ -745,15 +745,15 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         }
     }
 
-    let oldStatus = event.status;
-    let oldEventId = event.getId();
+    const oldStatus = event.status;
+    const oldEventId = event.getId();
 
     if (!oldStatus) {
         throw new Error("updatePendingEventStatus called on an event which is " +
                         "not a local echo.");
     }
 
-    let allowed = ALLOWED_TRANSITIONS[oldStatus];
+    const allowed = ALLOWED_TRANSITIONS[oldStatus];
     if (!allowed || allowed.indexOf(newStatus) < 0) {
         throw new Error("Invalid EventStatus transition " + oldStatus + "->" +
                         newStatus);
@@ -778,7 +778,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
                 this._pendingEventList,
                 function(ev) {
                     return ev.getId() == oldEventId;
-                }, false
+                }, false,
             );
         }
         this.removeEvent(oldEventId);
@@ -812,17 +812,17 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
 
     // sanity check that the live timeline is still live
     for (i = 0; i < this._timelineSets.length; i++) {
-        let liveTimeline = this._timelineSets[i].getLiveTimeline();
+        const liveTimeline = this._timelineSets[i].getLiveTimeline();
         if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
             throw new Error(
                 "live timeline " + i + " is no longer live - it has a pagination token " +
-                "(" + liveTimeline.getPaginationToken(EventTimeline.FORWARDS) + ")"
+                "(" + liveTimeline.getPaginationToken(EventTimeline.FORWARDS) + ")",
             );
         }
         if (liveTimeline.getNeighbouringTimeline(EventTimeline.FORWARDS)) {
             throw new Error(
                 "live timeline " + i + " is no longer live - " +
-                "it has a neighbouring timeline"
+                "it has a neighbouring timeline",
             );
         }
     }
@@ -863,7 +863,7 @@ Room.prototype.removeEvents = function(event_ids) {
 Room.prototype.removeEvent = function(eventId) {
     let removedAny = false;
     for (let i = 0; i < this._timelineSets.length; i++) {
-        let removed = this._timelineSets[i].removeEvent(eventId);
+        const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
             removedAny = true;
         }
@@ -882,15 +882,15 @@ Room.prototype.removeEvent = function(eventId) {
 Room.prototype.recalculate = function(userId) {
     // set fake stripped state events if this is an invite room so logic remains
     // consistent elsewhere.
-    let self = this;
-    let membershipEvent = this.currentState.getStateEvents(
-        "m.room.member", userId
+    const self = this;
+    const membershipEvent = this.currentState.getStateEvents(
+        "m.room.member", userId,
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
-        let strippedStateEvents = membershipEvent.event.invite_room_state || [];
+        const strippedStateEvents = membershipEvent.event.invite_room_state || [];
         utils.forEach(strippedStateEvents, function(strippedEvent) {
-            let existingEvent = self.currentState.getStateEvents(
-                strippedEvent.type, strippedEvent.state_key
+            const existingEvent = self.currentState.getStateEvents(
+                strippedEvent.type, strippedEvent.state_key,
             );
             if (!existingEvent) {
                 // set the fake stripped event instead
@@ -906,7 +906,7 @@ Room.prototype.recalculate = function(userId) {
         });
     }
 
-    let oldName = this.name;
+    const oldName = this.name;
     this.name = calculateRoomName(this, userId);
     this.summary = new RoomSummary(this.roomId, {
         title: this.name,
@@ -1004,18 +1004,18 @@ Room.prototype.addReceipt = function(event, fake) {
  * @param {Object} receipts The object to add receipts to
  */
 Room.prototype._addReceiptsToStructure = function(event, receipts) {
-    let self = this;
+    const self = this;
     utils.keys(event.getContent()).forEach(function(eventId) {
         utils.keys(event.getContent()[eventId]).forEach(function(receiptType) {
             utils.keys(event.getContent()[eventId][receiptType]).forEach(
             function(userId) {
-                let receipt = event.getContent()[eventId][receiptType][userId];
+                const receipt = event.getContent()[eventId][receiptType][userId];
 
                 if (!receipts[receiptType]) {
                     receipts[receiptType] = {};
                 }
 
-                let existingReceipt = receipts[receiptType][userId];
+                const existingReceipt = receipts[receiptType][userId];
 
                 if (!existingReceipt) {
                     receipts[receiptType][userId] = {};
@@ -1024,7 +1024,7 @@ Room.prototype._addReceiptsToStructure = function(event, receipts) {
                     // than the one we already have. (This is managed
                     // server-side, but because we synthesize RRs locally we
                     // have to do it here too.)
-                    let ordering = self.getUnfilteredTimelineSet().compareEventOrdering(
+                    const ordering = self.getUnfilteredTimelineSet().compareEventOrdering(
                         existingReceipt.eventId, eventId);
                     if (ordering !== null && ordering >= 0) {
                         return;
@@ -1046,10 +1046,10 @@ Room.prototype._addReceiptsToStructure = function(event, receipts) {
  * @return {Object} Map of receipts by event ID
  */
 Room.prototype._buildReceiptCache = function(receipts) {
-    let receiptCacheByEventId = {};
+    const receiptCacheByEventId = {};
     utils.keys(receipts).forEach(function(receiptType) {
         utils.keys(receipts[receiptType]).forEach(function(userId) {
-            let receipt = receipts[receiptType][userId];
+            const receipt = receipts[receiptType][userId];
             if (!receiptCacheByEventId[receipt.eventId]) {
                 receiptCacheByEventId[receipt.eventId] = [];
             }
@@ -1102,7 +1102,7 @@ Room.prototype.addTags = function(event) {
  */
 Room.prototype.addAccountData = function(events) {
     for (let i = 0; i < events.length; i++) {
-        let event = events[i];
+        const event = events[i];
         if (event.getType() === "m.tag") {
             this.addTags(event);
         }
@@ -1134,7 +1134,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     if (!ignoreRoomNameEvent) {
         // check for an alias, if any. for now, assume first alias is the
         // official one.
-        let mRoomName = room.currentState.getStateEvents("m.room.name", "");
+        const mRoomName = room.currentState.getStateEvents("m.room.name", "");
         if (mRoomName && mRoomName.getContent() && mRoomName.getContent().name) {
             return mRoomName.getContent().name;
         }
@@ -1143,7 +1143,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     let alias = room.getCanonicalAlias();
 
     if (!alias) {
-        let aliases = room.getAliases();
+        const aliases = room.getAliases();
 
         if (aliases.length) {
             alias = aliases[0];
@@ -1154,16 +1154,16 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     }
 
     // get members that are NOT ourselves and are actually in the room.
-    let otherMembers = utils.filter(room.currentState.getMembers(), function(m) {
+    const otherMembers = utils.filter(room.currentState.getMembers(), function(m) {
         return (m.userId !== userId && m.membership !== "leave");
     });
-    let allMembers = utils.filter(room.currentState.getMembers(), function(m) {
+    const allMembers = utils.filter(room.currentState.getMembers(), function(m) {
         return (m.membership !== "leave");
     });
-    let myMemberEventArray = utils.filter(room.currentState.getMembers(), function(m) {
+    const myMemberEventArray = utils.filter(room.currentState.getMembers(), function(m) {
         return (m.userId == userId);
     });
-    let myMemberEvent = (
+    const myMemberEvent = (
         (myMemberEventArray.length && myMemberEventArray[0].events) ?
             myMemberEventArray[0].events.member.event : undefined
     );
@@ -1173,7 +1173,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         if (room.currentState.getMember(myMemberEvent.sender)) {
             // extract who invited us to the room
             return "Invite from " + room.currentState.getMember(
-                myMemberEvent.sender
+                myMemberEvent.sender,
             ).name;
         } else if (allMembers[0].events.member) {
             // use the sender field from the invite event, although this only
@@ -1190,7 +1190,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
             // self-chat, peeked room with 1 participant,
             // or inbound invite, or outbound 3PID invite.
             if (allMembers[0].userId === userId) {
-                let thirdPartyInvites =
+                const thirdPartyInvites =
                     room.currentState.getStateEvents("m.room.third_party_invite");
                 if (thirdPartyInvites && thirdPartyInvites.length > 0) {
                     let name = "Inviting " +
@@ -1238,7 +1238,7 @@ function reEmit(reEmitEntity, emittableEntity, eventNames) {
             // Transformation Example:
             // listener on "foo" => function(a,b) { ... }
             // Re-emit on "thing" => thing.emit("foo", a, b)
-            let newArgs = [eventName];
+            const newArgs = [eventName];
             for (let i = 0; i < arguments.length; i++) {
                 newArgs.push(arguments[i]);
             }

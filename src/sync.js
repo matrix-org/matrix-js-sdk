@@ -23,20 +23,20 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-let q = require("q");
-let User = require("./models/user");
-let Room = require("./models/room");
-let utils = require("./utils");
-let Filter = require("./filter");
-let EventTimeline = require("./models/event-timeline");
+const q = require("q");
+const User = require("./models/user");
+const Room = require("./models/room");
+const utils = require("./utils");
+const Filter = require("./filter");
+const EventTimeline = require("./models/event-timeline");
 
-let DEBUG = true;
+const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
 // to keep open the connection. This constant is *ADDED* to the timeout= value
 // to determine the max time we're willing to wait.
-let BUFFER_PERIOD_MS = 80 * 1000;
+const BUFFER_PERIOD_MS = 80 * 1000;
 
 function getFilterName(userId, suffix) {
     // scope this on the user ID because people may login on many accounts
@@ -88,8 +88,8 @@ function SyncApi(client, opts) {
  * @return {Room}
  */
 SyncApi.prototype.createRoom = function(roomId) {
-    let client = this.client;
-    let room = new Room(roomId, {
+    const client = this.client;
+    const room = new Room(roomId, {
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
@@ -108,7 +108,7 @@ SyncApi.prototype.createRoom = function(roomId) {
  * @private
  */
 SyncApi.prototype._registerStateListeners = function(room) {
-    let client = this.client;
+    const client = this.client;
     // we need to also re-emit room state and room member events, so hook it up
     // to the client now. We need to add a listener for RoomState.members in
     // order to hook them correctly. (TODO: find a better way?)
@@ -122,7 +122,7 @@ SyncApi.prototype._registerStateListeners = function(room) {
             [
                 "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
                 "RoomMember.membership",
-            ]
+            ],
         );
     });
 };
@@ -144,34 +144,34 @@ SyncApi.prototype._deregisterStateListeners = function(room) {
  * @return {Promise} Resolved when they've been added to the store.
  */
 SyncApi.prototype.syncLeftRooms = function() {
-    let client = this.client;
-    let self = this;
+    const client = this.client;
+    const self = this;
 
     // grab a filter with limit=1 and include_leave=true
-    let filter = new Filter(this.client.credentials.userId);
+    const filter = new Filter(this.client.credentials.userId);
     filter.setTimelineLimit(1);
     filter.setIncludeLeaveRooms(true);
 
-    let localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-    let qps = {
+    const localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
+    const qps = {
         timeout: 0, // don't want to block since this is a single isolated req
     };
 
     return client.getOrCreateFilter(
-        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter
+        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
     ).then(function(filterId) {
         qps.filter = filterId;
         return client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, localTimeoutMs
+            undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
         );
     }).then(function(data) {
         let leaveRooms = [];
         if (data.rooms && data.rooms.leave) {
             leaveRooms = self._mapSyncResponseToRoomArray(data.rooms.leave);
         }
-        let rooms = [];
+        const rooms = [];
         leaveRooms.forEach(function(leaveObj) {
-            let room = leaveObj.room;
+            const room = leaveObj.room;
             rooms.push(room);
             if (!leaveObj.isBrandNewRoom) {
                 // the intention behind syncLeftRooms is to add in rooms which were
@@ -185,9 +185,9 @@ SyncApi.prototype.syncLeftRooms = function() {
                 return;
             }
             leaveObj.timeline = leaveObj.timeline || {};
-            let timelineEvents =
+            const timelineEvents =
                 self._mapSyncEventsFormat(leaveObj.timeline, room);
-            let stateEvents = self._mapSyncEventsFormat(leaveObj.state, room);
+            const stateEvents = self._mapSyncEventsFormat(leaveObj.state, room);
 
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
@@ -212,8 +212,8 @@ SyncApi.prototype.syncLeftRooms = function() {
  * store.
  */
 SyncApi.prototype.peek = function(roomId) {
-    let self = this;
-    let client = this.client;
+    const self = this;
+    const client = this.client;
     this._peekRoomId = roomId;
     return this.client.roomInitialSync(roomId, 20).then(function(response) {
         // make sure things are init'd
@@ -221,18 +221,18 @@ SyncApi.prototype.peek = function(roomId) {
         response.messages.chunk = response.messages.chunk || [];
         response.state = response.state || [];
 
-        let peekRoom = self.createRoom(roomId);
+        const peekRoom = self.createRoom(roomId);
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
-        let oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper()
+        const oldStateEvents = utils.map(
+            utils.deepCopy(response.state), client.getEventMapper(),
         );
-        let stateEvents = utils.map(
-            response.state, client.getEventMapper()
+        const stateEvents = utils.map(
+            response.state, client.getEventMapper(),
         );
-        let messages = utils.map(
-            response.messages.chunk, client.getEventMapper()
+        const messages = utils.map(
+            response.messages.chunk, client.getEventMapper(),
         );
 
         // XXX: copypasted from /sync until we kill off this
@@ -301,7 +301,7 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         return;
     }
 
-    let self = this;
+    const self = this;
     // FIXME: gut wrenching; hard-coded timeout values
     this.client._http.authedRequest(undefined, "GET", "/events", {
         room_id: roomId,
@@ -332,10 +332,10 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         });
 
         // strip out events which aren't for the given room_id (e.g presence)
-        let events = res.chunk.filter(function(e) {
+        const events = res.chunk.filter(function(e) {
             return e.room_id === roomId;
         }).map(self.client.getEventMapper());
-        let room = self.client.getRoom(roomId);
+        const room = self.client.getRoom(roomId);
         room.addLiveEvents(events);
         self._peekPoll(roomId, res.end);
     }, function(err) {
@@ -362,8 +362,8 @@ SyncApi.prototype.sync = function() {
     debuglog("SyncApi.sync: starting with sync token " +
              this.client.store.getSyncToken());
 
-    let client = this.client;
-    let self = this;
+    const client = this.client;
+    const self = this;
 
     this._running = true;
 
@@ -401,7 +401,7 @@ SyncApi.prototype.sync = function() {
         }
 
         client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter
+            getFilterName(client.credentials.userId), filter,
         ).done(function(filterId) {
             // reset the notifications timeline to prepare it to paginate from
             // the current point in time.
@@ -465,8 +465,8 @@ SyncApi.prototype.retryImmediately = function() {
  * @param {boolean} syncOptions.hasSyncedBefore
  */
 SyncApi.prototype._sync = function(syncOptions) {
-    let client = this.client;
-    let self = this;
+    const client = this.client;
+    const self = this;
 
     if (!this._running) {
         debuglog("Sync no longer running: exiting.");
@@ -483,9 +483,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         filterId = this._getGuestFilter();
     }
 
-    let syncToken = client.store.getSyncToken();
+    const syncToken = client.store.getSyncToken();
 
-    let qps = {
+    const qps = {
         filter: filterId,
         timeout: this.opts.pollTimeout,
     };
@@ -508,10 +508,10 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     // normal timeout= plus buffer time
-    let clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
+    const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
     this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs
+        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
     );
 
     this._currentSyncRequest.done(function(data) {
@@ -576,8 +576,8 @@ SyncApi.prototype._sync = function(syncOptions) {
  * @param {Object} data The response from /sync
  */
 SyncApi.prototype._processSyncResponse = function(syncToken, data) {
-    let client = this.client;
-    let self = this;
+    const client = this.client;
+    const self = this;
 
     // data looks like:
     // {
@@ -635,7 +635,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // handle non-room account_data
     if (data.account_data && utils.isArray(data.account_data.events)) {
-        let events = data.account_data.events.map(client.getEventMapper());
+        const events = data.account_data.events.map(client.getEventMapper());
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
@@ -644,7 +644,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 }
                 client.emit("accountData", accountDataEvent);
                 return accountDataEvent;
-            }
+            },
         );
     }
 
@@ -654,19 +654,19 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             .map(client.getEventMapper())
             .forEach(
                 function(toDeviceEvent) {
-                    let content = toDeviceEvent.getContent();
+                    const content = toDeviceEvent.getContent();
                     if (
                         toDeviceEvent.getType() == "m.room.message" &&
                             content.msgtype == "m.bad.encrypted"
                     ) {
                         console.warn(
-                            "Unable to decrypt to-device event: " + content.body
+                            "Unable to decrypt to-device event: " + content.body,
                         );
                         return;
                     }
 
                     client.emit("toDeviceEvent", toDeviceEvent);
-                }
+                },
             );
     }
 
@@ -693,8 +693,8 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // Handle invites
     inviteRooms.forEach(function(inviteObj) {
-        let room = inviteObj.room;
-        let stateEvents =
+        const room = inviteObj.room;
+        const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
@@ -709,19 +709,19 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // Handle joins
     joinRooms.forEach(function(joinObj) {
-        let room = joinObj.room;
-        let stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        let timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
-        let ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
-        let accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
+        const room = joinObj.room;
+        const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
+        const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
-                'total', joinObj.unread_notifications.notification_count
+                'total', joinObj.unread_notifications.notification_count,
             );
             room.setUnreadNotificationCount(
-                'highlight', joinObj.unread_notifications.highlight_count
+                'highlight', joinObj.unread_notifications.highlight_count,
             );
         }
 
@@ -748,7 +748,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             // will stop us linking the empty timeline into the chain).
             //
             for (let i = timelineEvents.length - 1; i >= 0; i--) {
-                let eventId = timelineEvents[i].getId();
+                const eventId = timelineEvents[i].getId();
                 if (room.getTimelineForEvent(eventId)) {
                     debuglog("Already have event " + eventId + " in limited " +
                              "sync - not resetting");
@@ -818,12 +818,12 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
-        let room = leaveObj.room;
-        let stateEvents =
+        const room = leaveObj.room;
+        const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
-        let timelineEvents =
+        const timelineEvents =
             self._mapSyncEventsFormat(leaveObj.timeline, room);
-        let accountDataEvents =
+        const accountDataEvents =
             self._mapSyncEventsFormat(leaveObj.account_data);
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
@@ -876,11 +876,11 @@ SyncApi.prototype._startKeepAlives = function(delay) {
     if (this._keepAliveTimer !== null) {
         clearTimeout(this._keepAliveTimer);
     }
-    let self = this;
+    const self = this;
     if (delay > 0) {
         self._keepAliveTimer = setTimeout(
             self._pokeKeepAlive.bind(self),
-            delay
+            delay,
         );
     } else {
         self._pokeKeepAlive();
@@ -895,7 +895,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
  *
  */
 SyncApi.prototype._pokeKeepAlive = function() {
-    let self = this;
+    const self = this;
     function success() {
         clearTimeout(self._keepAliveTimer);
         if (self._connectionReturnedDefer) {
@@ -912,7 +912,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         {
             prefix: '',
             localTimeoutMs: 15 * 1000,
-        }
+        },
     ).done(function() {
         success();
     }, function(err) {
@@ -926,7 +926,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         } else {
             self._keepAliveTimer = setTimeout(
                 self._pokeKeepAlive.bind(self),
-                5000 + Math.floor(Math.random() * 5000)
+                5000 + Math.floor(Math.random() * 5000),
             );
             // A keepalive has failed, so we emit the
             // error state (whether or not this is the
@@ -947,10 +947,10 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // Maps { roomid: {stuff}, roomid: {stuff} }
     // to
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
-    let client = this.client;
-    let self = this;
+    const client = this.client;
+    const self = this;
     return utils.keys(obj).map(function(roomId) {
-        let arrObj = obj[roomId];
+        const arrObj = obj[roomId];
         let room = client.store.getRoom(roomId);
         let isBrandNewRoom = false;
         if (!room) {
@@ -972,7 +972,7 @@ SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }
-    let mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper();
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;
@@ -988,7 +988,7 @@ SyncApi.prototype._resolveInvites = function(room) {
     if (!room || !this.opts.resolveInvitesToProfiles) {
         return;
     }
-    let client = this.client;
+    const client = this.client;
     // For each invited room member we want to give them a displayname/avatar url
     // if they have one (the m.room.member invites don't contain this).
     room.getMembersWithMembership("invite").forEach(function(member) {
@@ -997,7 +997,7 @@ SyncApi.prototype._resolveInvites = function(room) {
         }
         member._requestedProfileInfo = true;
         // try to get a cached copy first.
-        let user = client.getUser(member.userId);
+        const user = client.getUser(member.userId);
         let promise;
         if (user) {
             promise = q({
@@ -1011,7 +1011,7 @@ SyncApi.prototype._resolveInvites = function(room) {
             // slightly naughty by doctoring the invite event but this means all
             // the code paths remain the same between invite/join display name stuff
             // which is a worthy trade-off for some minor pollution.
-            let inviteEvent = member.events.member;
+            const inviteEvent = member.events.member;
             if (inviteEvent.getContent().membership !== "invite") {
                 // between resolving and now they have since joined, so don't clobber
                 return;
@@ -1036,19 +1036,19 @@ SyncApi.prototype._resolveInvites = function(room) {
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
     timelineEventList = timelineEventList || [];
-    let client = this.client;
+    const client = this.client;
     // "old" and "current" state are the same initially; they
     // start diverging if the user paginates.
     // We must deep copy otherwise membership changes in old state
     // will leak through to current state!
-    let oldStateEvents = utils.map(
+    const oldStateEvents = utils.map(
         utils.deepCopy(
             stateEventList.map(function(mxEvent) {
                 return mxEvent.event;
-            })
-        ), client.getEventMapper()
+            }),
+        ), client.getEventMapper(),
     );
-    let stateEvents = stateEventList;
+    const stateEvents = stateEventList;
 
     // set the state of the room to as it was before the timeline executes
     //
@@ -1068,7 +1068,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // gather our notifications into this._notifEvents
     if (client.getNotifTimelineSet()) {
         for (let i = 0; i < timelineEventList.length; i++) {
-            let pushActions = client.getPushActionsForEvent(timelineEventList[i]);
+            const pushActions = client.getPushActionsForEvent(timelineEventList[i]);
             if (pushActions && pushActions.notify &&
                 pushActions.tweaks && pushActions.tweaks.highlight) {
                 this._notifEvents.push(timelineEventList[i]);
@@ -1085,7 +1085,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
  * @return {string}
  */
 SyncApi.prototype._getGuestFilter = function() {
-    let guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
+    const guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
     if (!guestRooms) {
         return "{}";
     }
@@ -1106,7 +1106,7 @@ SyncApi.prototype._getGuestFilter = function() {
  * @param {Object} data Object of additional data to emit in the event
  */
 SyncApi.prototype._updateSyncState = function(newState, data) {
-    let old = this._syncState;
+    const old = this._syncState;
     this._syncState = newState;
     this.client.emit("sync", this._syncState, old, data);
 };
@@ -1123,7 +1123,7 @@ SyncApi.prototype._onOnline = function() {
 };
 
 function createNewUser(client, userId) {
-    let user = new User(userId);
+    const user = new User(userId);
     reEmit(client, user, [
         "User.avatarUrl", "User.displayName", "User.presence",
         "User.currentlyActive", "User.lastPresenceTs",
@@ -1140,7 +1140,7 @@ function reEmit(reEmitEntity, emittableEntity, eventNames) {
             // Transformation Example:
             // listener on "foo" => function(a,b) { ... }
             // Re-emit on "thing" => thing.emit("foo", a, b)
-            let newArgs = [eventName];
+            const newArgs = [eventName];
             for (let i = 0; i < arguments.length; i++) {
                 newArgs.push(arguments[i]);
             }

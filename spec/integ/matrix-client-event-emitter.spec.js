@@ -1,14 +1,14 @@
 "use strict";
-let sdk = require("../..");
-let HttpBackend = require("../mock-request");
-let utils = require("../test-utils");
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
 
 describe("MatrixClient events", function() {
-    let baseUrl = "http://localhost.or.something";
+    const baseUrl = "http://localhost.or.something";
     let client;
     let httpBackend;
-    let selfUserId = "@alice:localhost";
-    let selfAccessToken = "aseukfgwef";
+    const selfUserId = "@alice:localhost";
+    const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -29,7 +29,7 @@ describe("MatrixClient events", function() {
     });
 
     describe("emissions", function() {
-        let SYNC_DATA = {
+        const SYNC_DATA = {
             next_batch: "s_5_3",
             presence: {
                 events: [
@@ -67,7 +67,7 @@ describe("MatrixClient events", function() {
                 },
             },
         };
-        let NEXT_SYNC_DATA = {
+        const NEXT_SYNC_DATA = {
             next_batch: "e_6_7",
             rooms: {
                 join: {
@@ -108,7 +108,7 @@ describe("MatrixClient events", function() {
                 SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
                 SYNC_DATA.rooms.join["!erufh:bar"].state.events,
                 NEXT_SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
-                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events
+                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events,
             );
 
             client.on("event", function(event) {
@@ -121,7 +121,7 @@ describe("MatrixClient events", function() {
                     }
                 }
                 expect(found).toBe(
-                    true, "Unexpected 'event' emitted: " + event.getType()
+                    true, "Unexpected 'event' emitted: " + event.getType(),
                 );
             });
 
@@ -129,7 +129,7 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(expectedEvents.length).toEqual(
-                    0, "Failed to see all events from /sync calls"
+                    0, "Failed to see all events from /sync calls",
                 );
                 done();
             });
@@ -149,7 +149,7 @@ describe("MatrixClient events", function() {
 
                 expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
-                    SYNC_DATA.presence.events[0].content.presence
+                    SYNC_DATA.presence.events[0].content.presence,
                 );
             });
             client.startClient();
@@ -182,13 +182,13 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(roomInvokeCount).toEqual(
-                    1, "Room fired wrong number of times."
+                    1, "Room fired wrong number of times.",
                 );
                 expect(roomNameInvokeCount).toEqual(
-                    1, "Room.name fired wrong number of times."
+                    1, "Room.name fired wrong number of times.",
                 );
                 expect(timelineFireCount).toEqual(
-                    3, "Room.timeline fired the wrong number of times"
+                    3, "Room.timeline fired the wrong number of times",
                 );
                 done();
             });
@@ -198,7 +198,7 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            let roomStateEventTypes = [
+            const roomStateEventTypes = [
                 "m.room.member", "m.room.create",
             ];
             let eventsInvokeCount = 0;
@@ -206,9 +206,9 @@ describe("MatrixClient events", function() {
             let newMemberInvokeCount = 0;
             client.on("RoomState.events", function(event, state) {
                 eventsInvokeCount++;
-                let index = roomStateEventTypes.indexOf(event.getType());
+                const index = roomStateEventTypes.indexOf(event.getType());
                 expect(index).not.toEqual(
-                    -1, "Unexpected room state event type: " + event.getType()
+                    -1, "Unexpected room state event type: " + event.getType(),
                 );
                 if (index >= 0) {
                     roomStateEventTypes.splice(index, 1);
@@ -231,13 +231,13 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(membersInvokeCount).toEqual(
-                    1, "RoomState.members fired wrong number of times"
+                    1, "RoomState.members fired wrong number of times",
                 );
                 expect(newMemberInvokeCount).toEqual(
-                    1, "RoomState.newMember fired wrong number of times"
+                    1, "RoomState.newMember fired wrong number of times",
                 );
                 expect(eventsInvokeCount).toEqual(
-                    2, "RoomState.events fired wrong number of times"
+                    2, "RoomState.events fired wrong number of times",
                 );
                 done();
             });
@@ -270,16 +270,16 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(typingInvokeCount).toEqual(
-                    1, "RoomMember.typing fired wrong number of times"
+                    1, "RoomMember.typing fired wrong number of times",
                 );
                 expect(powerLevelInvokeCount).toEqual(
-                    0, "RoomMember.powerLevel fired wrong number of times"
+                    0, "RoomMember.powerLevel fired wrong number of times",
                 );
                 expect(nameInvokeCount).toEqual(
-                    0, "RoomMember.name fired wrong number of times"
+                    0, "RoomMember.name fired wrong number of times",
                 );
                 expect(membershipInvokeCount).toEqual(
-                    1, "RoomMember.membership fired wrong number of times"
+                    1, "RoomMember.membership fired wrong number of times",
                 );
                 done();
             });
@@ -297,7 +297,7 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(sessionLoggedOutCount).toEqual(
-                    1, "Session.logged_out fired wrong number of times"
+                    1, "Session.logged_out fired wrong number of times",
                 );
                 done();
             });
