@@ -21,6 +21,11 @@ limitations under the License.
  * @module crypto/OlmDevice
  */
 const Olm = require("olm");
+if (!Olm) {
+    // this happens if we were loaded via browserify and the Olm module was not
+    // loaded.
+    throw new Error("Olm is not defined");
+}
 const utils = require("../utils");
 
 
