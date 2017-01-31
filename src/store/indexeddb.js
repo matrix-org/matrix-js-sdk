@@ -137,6 +137,20 @@ IndexedDBStoreBackend.prototype = {
             return promiseifyTxn(txn);
         });
     },
+
+    /**
+     * Load all the users from the database. This is not cached.
+     * @return {Promise<User[]>} A list of users.
+     */
+    loadUsers: function() {
+        return q.try(() => {
+            const txn = this.db.transaction(["users"], "readonly");
+            const store = txn.objectStore("users");
+            return selectQuery(store, undefined, (cursor) => {
+                return cursor.value;
+            });
+        });
+    },
 };
 
 /**
@@ -149,6 +163,20 @@ IndexedDBStoreBackend.prototype = {
  * <code>startup()</code>. This can make startup times quicker as a complete
  * sync from the server is not required. This does not reduce memory usage as all
  * the data is eagerly fetched when <code>startup()</code> is called.
+ * <pre>
+ * let opts = { localStorage: window.localStorage };
+ * let store = new IndexedDBStore(new IndexedDBStoreBackend(window.indexedDB), opts);
+ * await store.startup(); // load from indexed db
+ * let client = sdk.createClient({
+ *     store: store,
+ * });
+ * client.startClient();
+ * client.on("sync", function(state, prevState, data) {
+ *     if (state === "PREPARED") {
+ *         console.log("Started up, now with go faster stripes!");
+ *     }
+ * });
+ * </pre>
  *
  * @constructor
  * @extends MatrixInMemoryStore
@@ -158,6 +186,7 @@ IndexedDBStoreBackend.prototype = {
 const IndexedDBStore = function IndexedDBStore(backend, opts) {
     MatrixInMemoryStore.call(this, opts);
     this.backend = backend;
+    this.startedUp = false;
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
@@ -165,7 +194,16 @@ utils.inherits(IndexedDBStore, MatrixInMemoryStore);
  * @return {Promise} Resolved when loaded from indexed db.
   */
 IndexedDBStore.prototype.startup = function() {
-    return q();
+    if (this.startedUp) {
+        return q();
+    }
+    return this.backend.connect().then(() => {
+        return this.backend.loadUsers();
+    }).then((users) => {
+        users.forEach((u) => {
+            this.storeUser(u);
+        });
+    });
 };
 
 function createDatabase(db) {
@@ -181,6 +219,36 @@ function createDatabase(db) {
 
     // Make configuration store (sync tokens, etc), always clobber (const key).
     db.createObjectStore("config", { keyPath: ["clobber"] });
+}
+
+/**
+ * Helper method to collect results from a Cursor and promiseify it.
+ * @param {ObjectStore|Index} store The store to perform openCursor on.
+ * @param {IDBKeyRange=} keyRange Optional key range to apply on the cursor.
+ * @param {Function} resultMapper A function which is repeatedly called with a
+ * Cursor.
+ * Return the data you want to keep.
+ * @return {Promise<T[]>} Resolves to an array of whatever you returned from
+ * resultMapper.
+ */
+function selectQuery(store, keyRange, resultMapper) {
+    const query = store.openCursor(keyRange);
+    return q.Promise((resolve, reject) => { /*eslint new-cap: 0*/
+        const results = [];
+        query.onerror = (event) => {
+            reject(new Error("Query failed: " + event.target.errorCode));
+        };
+        // collect results
+        query.onsuccess = (event) => {
+            const cursor = event.target.result;
+            if (!cursor) {
+                resolve(results);
+                return; // end of results
+            }
+            results.push(resultMapper(cursor));
+            cursor.continue();
+        };
+    });
 }
 
 function promiseifyTxn(txn) {
