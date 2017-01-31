@@ -16,7 +16,7 @@ limitations under the License.
 "use strict";
 
 import q from "q";
-import MatrixInMemoryStore from "./memory";
+import {MatrixInMemoryStore} from "./memory";
 import utils from "../utils";
 
 /**
@@ -160,6 +160,13 @@ const IndexedDBStore = function IndexedDBStore(backend, opts) {
     this.backend = backend;
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
+
+/**
+ * @return {Promise} Resolved when loaded from indexed db.
+  */
+IndexedDBStore.prototype.startup = function() {
+    return q();
+};
 
 function createDatabase(db) {
     // Make room store, clobber based on room ID. (roomId property of Room objects)
