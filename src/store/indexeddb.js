@@ -16,6 +16,8 @@ limitations under the License.
 "use strict";
 
 import q from "q";
+import MatrixInMemoryStore from "./memory";
+import utils from "../utils";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -25,20 +27,22 @@ import q from "q";
 const VERSION = 1;
 
 /**
- * Construct a new Indexed Database store. This requires a call to <code>connect()</code> before
- * this store can be used.
+ * Construct a new Indexed Database store backend. This requires a call to
+ * <code>connect()</code> before this store can be used.
  * @constructor
- * @param {Object} indexedDBInterface The Indexed DB interface e.g <code>window.indexedDB</code>
+ * @param {Object} indexedDBInterface The Indexed DB interface e.g
+ * <code>window.indexedDB</code>
  */
-module.exports.IndexedDBStore = function IndexedDBStore(indexedDBInterface) {
+const IndexedDBStoreBackend = function IndexedDBStoreBackend(indexedDBInterface) {
     this.indexedDB = indexedDBInterface;
     this.db = null;
 };
 
 
-module.exports.IndexedDBStore.prototype = {
+IndexedDBStoreBackend.prototype = {
     /**
-     * Attempt to connect to the database. This can fail if the user does not grant permission.
+     * Attempt to connect to the database. This can fail if the user does not
+     * grant permission.
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
@@ -133,8 +137,29 @@ module.exports.IndexedDBStore.prototype = {
             return promiseifyTxn(txn);
         });
     },
-
 };
+
+/**
+ * Construct a new Indexed Database store, which extends MatrixInMemoryStore.
+ *
+ * This store functions like a MatrixInMemoryStore except it periodically persists
+ * the contents of the store to an IndexedDB backend.
+ *
+ * All data is still kept in-memory but can be loaded from disk by calling
+ * <code>startup()</code>. This can make startup times quicker as a complete
+ * sync from the server is not required. This does not reduce memory usage as all
+ * the data is eagerly fetched when <code>startup()</code> is called.
+ *
+ * @constructor
+ * @extends MatrixInMemoryStore
+ * @param {IndexedDBStoreBackend} backend The indexed db backend instance.
+ * @param {Object=} opts Options for MatrixInMemoryStore.
+ */
+const IndexedDBStore = function IndexedDBStore(backend, opts) {
+    MatrixInMemoryStore.call(this, opts);
+    this.backend = backend;
+};
+utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
 function createDatabase(db) {
     // Make room store, clobber based on room ID. (roomId property of Room objects)
@@ -172,3 +197,6 @@ function promiseifyRequest(req) {
         };
     });
 }
+
+module.exports.IndexedDBStore = IndexedDBStore;
+module.exports.IndexedDBStoreBackend = IndexedDBStoreBackend;

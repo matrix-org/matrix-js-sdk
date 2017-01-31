@@ -1,5 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2015, 2016, 2017 OpenMarket Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ module.exports.EventStatus = require("./models/event").EventStatus;
 module.exports.MatrixInMemoryStore = require("./store/memory").MatrixInMemoryStore;
 /** The {@link module:store/indexeddb.IndexedDBStore|IndexedDBStore} class. */
 module.exports.IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
+/** The {@link module:store/indexeddb.IndexedDBStoreBackend|IndexedDBStoreBackend} class. */
+module.exports.IndexedDBStoreBackend = require("./store/indexeddb").IndexedDBStoreBackend;
 /** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
 module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
 /** The {@link module:http-api.MatrixError|MatrixError} class. */
