@@ -17,6 +17,7 @@ limitations under the License.
 
 import q from "q";
 import {MatrixInMemoryStore} from "./memory";
+import User from "../models/user";
 import utils from "../utils";
 
 /**
@@ -147,7 +148,9 @@ IndexedDBStoreBackend.prototype = {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
-                return cursor.value;
+                const user = new User(cursor.value.userId);
+                Object.assign(user, cursor.value);
+                return user;
             });
         });
     },
