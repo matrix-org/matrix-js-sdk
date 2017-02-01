@@ -41,6 +41,8 @@ export default class DeviceList {
 
         // userId -> promise
         this._keyDownloadsInProgressByUser = {};
+
+        this.lastKnownSyncToken = null;
     }
 
     /**
@@ -288,8 +290,13 @@ export default class DeviceList {
     _doKeyDownloadForUsers(downloadUsers) {
         console.log('Starting key download for ' + downloadUsers);
 
+        const token = this.lastKnownSyncToken;
+        const opts = {};
+        if (token) {
+            opts.token = token;
+        }
         return this._baseApis.downloadKeysForUsers(
-            downloadUsers,
+            downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
 

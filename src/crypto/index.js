@@ -55,8 +55,6 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     this._userId = userId;
     this._deviceId = deviceId;
 
-    this._initialSyncCompleted = false;
-
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
 
@@ -114,6 +112,9 @@ function _registerEventHandlers(crypto, eventEmitter) {
                 // how can we avoid doing so?
                 const rooms = eventEmitter.getRooms();
                 crypto._onInitialSyncCompleted(rooms);
+            }
+            if (syncState === "SYNCING") {
+                crypto._onSyncCompleted(data);
             }
         } catch (e) {
             console.error("Error handling sync", e);
@@ -690,6 +691,18 @@ Crypto.prototype.decryptEvent = function(event) {
 };
 
 /**
+ * Handle the notification from /sync that a user has updated their device list.
+ *
+ * @param {String} userId
+ */
+Crypto.prototype.userDeviceListChanged = function(userId) {
+    this._deviceList.invalidateUserDeviceList(userId);
+
+    // don't flush the outdated device list yet - we do it once we finish
+    // processing the sync.
+};
+
+/**
  * handle an m.room.encryption event
  *
  * @private
@@ -716,11 +729,6 @@ Crypto.prototype._onCryptoEvent = function(event) {
  * @param {module:models/room[]} rooms list of rooms the client knows about
  */
 Crypto.prototype._onInitialSyncCompleted = function(rooms) {
-    this._initialSyncCompleted = true;
-
-    // catch up on any m.new_device events which arrived during the initial sync.
-    this._deviceList.refreshOutdatedDeviceLists().done();
-
     if (this._sessionStore.getDeviceAnnounced()) {
         return;
     }
@@ -777,6 +785,12 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
     });
+};
+
+Crypto.prototype._onSyncCompleted = function(syncData) {
+    // catch up on any new devices we got told about during the sync.
+    this._deviceList.lastKnownSyncToken = syncData.nextSyncToken;
+    this._deviceList.refreshOutdatedDeviceLists().done();
 };
 
 /**
@@ -852,12 +866,6 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
     }
 
     this._deviceList.invalidateUserDeviceList(userId);
-
-    // we delay handling these until the intialsync has completed, so that we
-    // can do all of them together.
-    if (this._initialSyncCompleted) {
-        this._deviceList.refreshOutdatedDeviceLists().done();
-    }
 };
 
 
