@@ -1082,6 +1082,28 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
     );
 };
 
+/**
+ * Ask the server for a list of users who have changed their device lists
+ * between a pair of sync tokens
+ *
+ * @param {string} oldToken
+ * @param {string} newToken
+ *
+ * @return {module:client.Promise} Resolves: result object. Rejects: with
+ *     an error response ({@link module:http-api.MatrixError}).
+ */
+MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
+    const qps = {
+        from: oldToken,
+        to: newToken,
+    };
+
+    return this._http.authedRequestWithPrefix(
+        undefined, "GET", "/keys/changes", qps, undefined,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
+
 
 // Identity Server Operations
 // ==========================

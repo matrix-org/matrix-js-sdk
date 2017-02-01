@@ -732,6 +732,22 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
     if (!syncData.oldSyncToken) {
         // an initialsync.
         this._sendNewDeviceEvents();
+
+        // if we have a deviceSyncToken, we can tell the deviceList to
+        // invalidate devices which have changed since then.
+        const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
+        if (oldSyncToken) {
+            this._invalidateDeviceListsSince(oldSyncToken).catch((e) => {
+                // if that failed, we fall back to invalidating everyone.
+                console.warn("Error fetching changed device list", e);
+                this._invalidateDeviceListForAllActiveUsers();
+                return this._deviceList.flushNewDeviceRequests();
+            }).done();
+        } else {
+            // otherwise, we have to invalidate all devices for all users we
+            // share a room with.
+            this._invalidateDeviceListForAllActiveUsers();
+        }
     }
 
     // catch up on any new devices we got told about during the sync.
@@ -754,25 +770,8 @@ Crypto.prototype._sendNewDeviceEvents = function() {
     // we need to tell all the devices in all the rooms we are members of that
     // we have arrived.
     // build a list of rooms for each user.
-    const rooms = this._clientStore.getRooms();
     const roomsByUser = {};
-    for (let i = 0; i < rooms.length; i++) {
-        const room = rooms[i];
-
-        // check for rooms with encryption enabled
-        const alg = this._roomEncryptors[room.roomId];
-        if (!alg) {
-            continue;
-        }
-
-        // ignore any rooms which we have left
-        const me = room.getMember(this._userId);
-        if (!me || (
-            me.membership !== "join" && me.membership !== "invite"
-        )) {
-            continue;
-        }
-
+    for (const room of this._getE2eRooms()) {
         const members = room.getJoinedMembers();
         for (let j = 0; j < members.length; j++) {
             const m = members[j];
@@ -803,6 +802,88 @@ Crypto.prototype._sendNewDeviceEvents = function() {
         content,
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
+    });
+};
+
+/**
+ * Ask the server which users have new devices since a given token,
+ * invalidate them, and start an update query.
+ *
+ * @param {String} oldSyncToken
+ *
+ * @returns {Promise} resolves once the query is complete. Rejects if the
+ *   keyChange query fails.
+ */
+Crypto.prototype._invalidateDeviceListsSince = function(oldSyncToken) {
+    return this._baseApis.getKeyChanges(
+        oldSyncToken, this.lastKnownSyncToken,
+    ).then((r) => {
+        if (!r.changed || !Array.isArray(r.changed)) {
+            return;
+        }
+
+        // only invalidate users we share an e2e room with - we don't
+        // care about users in non-e2e rooms.
+        const filteredUserIds = this._getE2eRoomMembers();
+        r.changed.forEach((u) => {
+            if (u in filteredUserIds) {
+                this._deviceList.invalidateUserDeviceList(u);
+            }
+        });
+        return this._deviceList.flushNewDeviceRequests();
+    });
+};
+
+/**
+ * Invalidate any stored device list for any users we share an e2e room with
+ *
+ * @private
+ */
+Crypto.prototype._invalidateDeviceListForAllActiveUsers = function() {
+    Object.keys(this._getE2eRoomMembers()).forEach((m) => {
+        this._deviceList.invalidateUserDeviceList(m);
+    });
+};
+
+/**
+ * get the users we share an e2e-enabled room with
+ *
+ * @returns {Object<string>} userid->userid map (should be a Set but argh ES6)
+ */
+Crypto.prototype._getE2eRoomMembers = function() {
+    const userIds = Object.create(null);
+
+    const rooms = this._getE2eRooms();
+    for (const r of rooms) {
+        const members = r.getJoinedMembers();
+        members.forEach((m) => { userIds[m.userId] = m.userId; });
+    }
+
+    return userIds;
+};
+
+/**
+ * Get a list of the e2e-enabled rooms we are members of
+ *
+ * @returns {module:models.Room[]}
+ */
+Crypto.prototype._getE2eRooms = function() {
+    return this._clientStore.getRooms().filter((room) => {
+        // check for rooms with encryption enabled
+        const alg = this._roomEncryptors[room.roomId];
+        if (!alg) {
+            return false;
+        }
+
+        // ignore any rooms which we have left
+        const me = room.getMember(this._userId);
+        if (!me || (
+            me.membership !== "join" && me.membership !== "invite"
+        )) {
+            return false;
+        }
+
+        return true;
     });
 };
 
