@@ -87,6 +87,18 @@ module.exports.MatrixEvent = function MatrixEvent(
 };
 utils.inherits(module.exports.MatrixEvent, EventEmitter);
 
+/**
+ * Deserialize this event from a JSON object.
+ * @static
+ * @param {Object} obj The MatrixEvent object from the structured-clone algorithm.
+ * @return {MatrixEvent} An event
+ */
+module.exports.MatrixEvent.deserialize = function(obj) {
+    const ev = new module.exports.MatrixEvent(obj.event);
+    Object.assign(ev, obj);
+    return ev;
+};
+
 
 utils.extend(module.exports.MatrixEvent.prototype, {
 

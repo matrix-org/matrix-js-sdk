@@ -19,6 +19,7 @@ limitations under the License.
  */
  const EventEmitter = require("events").EventEmitter;
  const utils = require("../utils");
+ const MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -59,6 +60,25 @@ function User(userId) {
     this._updateModifiedTime();
 }
 utils.inherits(User, EventEmitter);
+
+/**
+ * Deserialize this user from a JSON object.
+ * @static
+ * @param {Object} obj The User object from the structured-clone algorithm.
+ * @return {User} A user
+ */
+User.deserialize = function(obj) {
+    const user = new User(obj.userId);
+    Object.assign(user, obj); // copy normal props
+    // create instances where appropriate
+    if (user.events.presence) {
+        user.events.presence = MatrixEvent.deserialize(user.events.presence);
+    }
+    if (user.events.profile) {
+        user.events.profile = MatrixEvent.deserialize(user.events.profile);
+    }
+    return user;
+};
 
 /**
  * Update this User with the given presence event. May fire "User.presence",
