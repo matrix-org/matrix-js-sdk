@@ -146,11 +146,11 @@ export default class DeviceList {
      *
      * @param {string} userId     owner of the device
      * @param {string} algorithm  encryption algorithm
-     * @param {string} sender_key curve25519 key to match
+     * @param {string} senderKey  curve25519 key to match
      *
      * @return {module:crypto/deviceinfo?}
      */
-    getDeviceByIdentityKey(userId, algorithm, sender_key) {
+    getDeviceByIdentityKey(userId, algorithm, senderKey) {
         if (
             algorithm !== olmlib.OLM_ALGORITHM &&
             algorithm !== olmlib.MEGOLM_ALGORITHM
@@ -178,7 +178,7 @@ export default class DeviceList {
                     continue;
                 }
                 const deviceKey = device.keys[keyId];
-                if (deviceKey == sender_key) {
+                if (deviceKey == senderKey) {
                     return DeviceInfo.fromStorage(device, deviceId);
                 }
             }
@@ -340,7 +340,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     let updated = false;
 
     // remove any devices in the store which aren't in the response
-    for (var deviceId in userStore) {
+    for (const deviceId in userStore) {
         if (!userStore.hasOwnProperty(deviceId)) {
             continue;
         }
@@ -353,7 +353,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         }
     }
 
-    for (deviceId in userResult) {
+    for (const deviceId in userResult) {
         if (!userResult.hasOwnProperty(deviceId)) {
             continue;
         }

@@ -464,19 +464,19 @@ Crypto.prototype.getOlmSessionsForUser = function(userId) {
  * @return {module:crypto/deviceinfo?}
  */
 Crypto.prototype.getEventSenderDeviceInfo = function(event) {
-    const sender_key = event.getSenderKey();
+    const senderKey = event.getSenderKey();
     const algorithm = event.getWireContent().algorithm;
 
-    if (!sender_key || !algorithm) {
+    if (!senderKey || !algorithm) {
         return null;
     }
 
-    // sender_key is the Curve25519 identity key of the device which the event
+    // senderKey is the Curve25519 identity key of the device which the event
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.
 
     const device = this._deviceList.getDeviceByIdentityKey(
-        event.getSender(), algorithm, sender_key,
+        event.getSender(), algorithm, senderKey,
     );
 
     if (device === null) {
