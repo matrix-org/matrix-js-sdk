@@ -79,14 +79,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the rooms were persisted.
      */
     persistRooms: function(rooms) {
-        return q.try(() => {
-            const txn = this.db.transaction(["rooms"], "readwrite");
-            const store = txn.objectStore("rooms");
-            for (let i =0; i < rooms.length; i++) {
-                store.put(rooms[i]); // put == UPSERT
-            }
-            return promiseifyTxn(txn);
-        });
+        return this._upsert("rooms", rooms);
     },
 
     /**
@@ -99,12 +92,7 @@ IndexedDBStoreBackend.prototype = {
             clobber: "-", // constant key so will always clobber
             syncToken: syncToken,
         };
-        return q.try(() => {
-            const txn = this.db.transaction(["config"], "readwrite");
-            const store = txn.objectStore("config");
-            store.put(obj); // put == UPSERT
-            return promiseifyTxn(txn);
-        });
+        return this._upsert("config", [obj]);
     },
 
     /**
@@ -113,14 +101,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the events were persisted.
      */
     persistAccountData: function(accountData) {
-        return q.try(() => {
-            const txn = this.db.transaction(["accountData"], "readwrite");
-            const store = txn.objectStore("accountData");
-            for (let i =0; i < accountData.length; i++) {
-                store.put(accountData[i]); // put == UPSERT
-            }
-            return promiseifyTxn(txn);
-        });
+        return this._upsert("accountData", accountData);
     },
 
     /**
@@ -129,14 +110,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     persistUsers: function(users) {
-        return q.try(() => {
-            const txn = this.db.transaction(["users"], "readwrite");
-            const store = txn.objectStore("users");
-            for (let i =0; i < users.length; i++) {
-                store.put(users[i]); // put == UPSERT
-            }
-            return promiseifyTxn(txn);
-        });
+        return this._upsert("users", users);
     },
 
     /**
@@ -152,6 +126,21 @@ IndexedDBStoreBackend.prototype = {
                 Object.assign(user, cursor.value);
                 return user;
             });
+        });
+    },
+
+    _upsert: function(storeName, rows) {
+        return q.try(() => {
+            const txn = this.db.transaction([storeName], "readwrite");
+            const store = txn.objectStore(storeName);
+            for (let i = 0; i < rows.length; i++) {
+                if (typeof rows[i].serialize === "function") {
+                    store.put(rows[i].serialize()); // put == UPSERT
+                } else {
+                    store.put(rows[i]); // put == UPSERT
+                }
+            }
+            return promiseifyTxn(txn);
         });
     },
 };
