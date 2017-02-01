@@ -833,10 +833,6 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
 
-    // remove spurious keys
-    config = {
-        algorithm: config.algorithm,
-    };
     this._sessionStore.storeEndToEndRoom(roomId, config);
 
     const alg = new AlgClass({
