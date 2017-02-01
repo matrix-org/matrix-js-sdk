@@ -122,9 +122,13 @@ IndexedDBStoreBackend.prototype = {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
-                const user = new User(cursor.value.userId);
-                Object.assign(user, cursor.value);
-                return user;
+                if (typeof User.deserialize === "function") {
+                    return User.deserialize(cursor.value);
+                } else {
+                    const user = new User(cursor.value.userId);
+                    Object.assign(user, cursor.value);
+                    return user;
+                }
             });
         });
     },
