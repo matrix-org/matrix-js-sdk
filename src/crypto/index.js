@@ -48,12 +48,16 @@ const DeviceList = require('./DeviceList').default;
  * @param {string} userId The user ID for the local user
  *
  * @param {string} deviceId The identifier for this device.
+ *
+ * @param {Object} clientStore the MatrixClient data store.
  */
-function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
+function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
+                clientStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
     this._deviceId = deviceId;
+    this._clientStore = clientStore;
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
@@ -107,12 +111,6 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
 function _registerEventHandlers(crypto, eventEmitter) {
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
-            if (syncState == "PREPARED") {
-                // XXX ugh. we're assuming the eventEmitter is a MatrixClient.
-                // how can we avoid doing so?
-                const rooms = eventEmitter.getRooms();
-                crypto._onInitialSyncCompleted(rooms);
-            }
             if (syncState === "SYNCING") {
                 crypto._onSyncCompleted(data);
             }
@@ -721,14 +719,34 @@ Crypto.prototype._onCryptoEvent = function(event) {
 };
 
 /**
- * handle the completion of the initial sync.
+ * handle the completion of a /sync
  *
- * Announces the new device.
+ * This is called after the processing of each successful /sync response.
+ * It is an opportunity to do a batch process on the information received.
+ *
+ * @param {Object} syncData  the data from the 'MatrixClient.sync' event
+ */
+Crypto.prototype._onSyncCompleted = function(syncData) {
+    this._deviceList.lastKnownSyncToken = syncData.nextSyncToken;
+
+    if (!syncData.oldSyncToken) {
+        // an initialsync.
+        this._sendNewDeviceEvents();
+    }
+
+    // catch up on any new devices we got told about during the sync.
+    this._deviceList.refreshOutdatedDeviceLists().done();
+};
+
+/**
+ * Send m.new_device messages to any devices we share a room with.
+ *
+ * (TODO: we can get rid of this once a suitable number of homeservers and
+ * clients support the more reliable device list update stream mechanism)
  *
  * @private
- * @param {module:models/room[]} rooms list of rooms the client knows about
  */
-Crypto.prototype._onInitialSyncCompleted = function(rooms) {
+Crypto.prototype._sendNewDeviceEvents = function() {
     if (this._sessionStore.getDeviceAnnounced()) {
         return;
     }
@@ -736,6 +754,7 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     // we need to tell all the devices in all the rooms we are members of that
     // we have arrived.
     // build a list of rooms for each user.
+    const rooms = this._clientStore.getRooms();
     const roomsByUser = {};
     for (let i = 0; i < rooms.length; i++) {
         const room = rooms[i];
@@ -785,12 +804,6 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
     });
-};
-
-Crypto.prototype._onSyncCompleted = function(syncData) {
-    // catch up on any new devices we got told about during the sync.
-    this._deviceList.lastKnownSyncToken = syncData.nextSyncToken;
-    this._deviceList.refreshOutdatedDeviceLists().done();
 };
 
 /**
