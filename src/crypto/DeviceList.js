@@ -326,6 +326,10 @@ export default class DeviceList {
                 this._sessionStore.storeEndToEndDevicesForUser(
                     userId, storage,
                 );
+
+                if (token) {
+                    this._sessionStore.storeEndToEndDeviceSyncToken(token);
+                }
             }
         });
     }
