@@ -29,6 +29,7 @@ const olmlib = require("./olmlib");
 const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
+const DeviceList = require('./DeviceList').default;
 
 /**
  * Cryptography bits
@@ -55,12 +56,9 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     this._deviceId = deviceId;
 
     this._initialSyncCompleted = false;
-    // userId -> true
-    this._pendingUsersWithNewDevices = {};
-    // userId -> [promise, ...]
-    this._keyDownloadsInProgressByUser = {};
 
     this._olmDevice = new OlmDevice(sessionStore);
+    this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
 
     // EncryptionAlgorithm instance for each room
     this._roomEncryptors = {};
@@ -86,7 +84,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     if (!myDevices) {
         // we don't yet have a list of our own devices; make sure we
         // get one when we flush the pendingUsersWithNewDevices.
-        this._pendingUsersWithNewDevices[this._userId] = true;
+        this._deviceList.invalidateUserDeviceList(this._userId);
         myDevices = {};
     }
 
@@ -283,266 +281,8 @@ function _uploadOneTimeKeys(crypto) {
  * module:crypto/deviceinfo|DeviceInfo}.
  */
 Crypto.prototype.downloadKeys = function(userIds, forceDownload) {
-    const self = this;
-
-    // promises we need to wait for while the download happens
-    const promises = [];
-
-    // list of userids we need to download keys for
-    let downloadUsers = [];
-
-    function perUserCatch(u) {
-        return function(e) {
-            console.warn('Error downloading keys for user ' + u + ':', e);
-        };
-    }
-
-    if (forceDownload) {
-        downloadUsers = userIds;
-    } else {
-        for (let i = 0; i < userIds.length; ++i) {
-            const u = userIds[i];
-
-            const inprogress = this._keyDownloadsInProgressByUser[u];
-            if (inprogress) {
-                // wait for the download to complete
-                promises.push(q.any(inprogress).catch(perUserCatch(u)));
-            } else if (!this.getStoredDevicesForUser(u)) {
-                downloadUsers.push(u);
-            }
-        }
-    }
-
-    if (downloadUsers.length > 0) {
-        const r = this._doKeyDownloadForUsers(downloadUsers);
-        downloadUsers.map(function(u) {
-            promises.push(r[u].catch(perUserCatch(u)));
-        });
-    }
-
-    return q.all(promises).then(function() {
-        return self._getDevicesFromStore(userIds);
-    });
+    return this._deviceList.downloadKeys(userIds, forceDownload);
 };
-
-
-/**
- * Get the stored device keys for a list of user ids
- *
- * @param {string[]} userIds the list of users to list keys for.
- *
- * @return {Object} userId->deviceId->{@link module:crypto/deviceinfo|DeviceInfo}.
- */
-Crypto.prototype._getDevicesFromStore = function(userIds) {
-    const stored = {};
-    const self = this;
-    userIds.map(function(u) {
-        stored[u] = {};
-        const devices = self.getStoredDevicesForUser(u) || [];
-        devices.map(function(dev) {
-            stored[u][dev.deviceId] = dev;
-        });
-    });
-    return stored;
-};
-
-/**
- * @param {string[]} downloadUsers list of userIds
- *
- * @return {Object} a map from userId to a promise for a result for that user
- */
-Crypto.prototype._doKeyDownloadForUsers = function(downloadUsers) {
-    const self = this;
-
-    console.log('Starting key download for ' + downloadUsers);
-
-    const deferMap = {};
-    const promiseMap = {};
-
-    downloadUsers.map(function(u) {
-        const deferred = q.defer();
-        const promise = deferred.promise.finally(function() {
-            const inProgress = self._keyDownloadsInProgressByUser[u];
-            utils.removeElement(inProgress, function(e) {
-                return e === promise;
-            });
-            if (inProgress.length === 0) {
-                // no more downloads for this user; remove the element
-                delete self._keyDownloadsInProgressByUser[u];
-            }
-        });
-
-        if (!self._keyDownloadsInProgressByUser[u]) {
-            self._keyDownloadsInProgressByUser[u] = [];
-        }
-        self._keyDownloadsInProgressByUser[u].push(promise);
-
-        deferMap[u] = deferred;
-        promiseMap[u] = promise;
-    });
-
-    this._baseApis.downloadKeysForUsers(
-        downloadUsers,
-    ).done(function(res) {
-        const dk = res.device_keys || {};
-
-        for (let i = 0; i < downloadUsers.length; ++i) {
-            const userId = downloadUsers[i];
-            var deviceId;
-
-            console.log('got keys for ' + userId + ':', dk[userId]);
-
-            if (!dk[userId]) {
-                // no result for this user
-                const err = 'Unknown';
-                // TODO: do something with res.failures
-                deferMap[userId].reject(err);
-                continue;
-            }
-
-            // map from deviceid -> deviceinfo for this user
-            const userStore = {};
-            const devs = self._sessionStore.getEndToEndDevicesForUser(userId);
-            if (devs) {
-                for (deviceId in devs) {
-                    if (devs.hasOwnProperty(deviceId)) {
-                        const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
-                        userStore[deviceId] = d;
-                    }
-                }
-            }
-
-            _updateStoredDeviceKeysForUser(
-                self._olmDevice, userId, userStore, dk[userId],
-            );
-
-            // update the session store
-            const storage = {};
-            for (deviceId in userStore) {
-                if (!userStore.hasOwnProperty(deviceId)) {
-                    continue;
-                }
-
-                storage[deviceId] = userStore[deviceId].toStorage();
-            }
-            self._sessionStore.storeEndToEndDevicesForUser(
-                userId, storage,
-            );
-
-            deferMap[userId].resolve();
-        }
-    }, function(err) {
-        downloadUsers.map(function(u) {
-            deferMap[u].reject(err);
-        });
-    });
-
-    return promiseMap;
-};
-
-function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
-                                        userResult) {
-    let updated = false;
-
-    // remove any devices in the store which aren't in the response
-    for (var deviceId in userStore) {
-        if (!userStore.hasOwnProperty(deviceId)) {
-            continue;
-        }
-
-        if (!(deviceId in userResult)) {
-            console.log("Device " + userId + ":" + deviceId +
-                        " has been removed");
-            delete userStore[deviceId];
-            updated = true;
-        }
-    }
-
-    for (deviceId in userResult) {
-        if (!userResult.hasOwnProperty(deviceId)) {
-            continue;
-        }
-
-        const deviceResult = userResult[deviceId];
-
-        // check that the user_id and device_id in the response object are
-        // correct
-        if (deviceResult.user_id !== userId) {
-            console.warn("Mismatched user_id " + deviceResult.user_id +
-                         " in keys from " + userId + ":" + deviceId);
-            continue;
-        }
-        if (deviceResult.device_id !== deviceId) {
-            console.warn("Mismatched device_id " + deviceResult.device_id +
-                         " in keys from " + userId + ":" + deviceId);
-            continue;
-        }
-
-        if (_storeDeviceKeys(_olmDevice, userStore, deviceResult)) {
-            updated = true;
-        }
-    }
-
-    return updated;
-}
-
-/*
- * Process a device in a /query response, and add it to the userStore
- *
- * returns true if a change was made, else false
- */
-function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
-    if (!deviceResult.keys) {
-        // no keys?
-        return false;
-    }
-
-    const deviceId = deviceResult.device_id;
-    const userId = deviceResult.user_id;
-
-    const signKeyId = "ed25519:" + deviceId;
-    const signKey = deviceResult.keys[signKeyId];
-    if (!signKey) {
-        console.log("Device " + userId + ":" + deviceId +
-                    " has no ed25519 key");
-        return false;
-    }
-
-    const unsigned = deviceResult.unsigned || {};
-
-    try {
-        olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
-    } catch (e) {
-        console.log("Unable to verify signature on device " +
-                    userId + ":" + deviceId + ":", e);
-        return false;
-    }
-
-    // DeviceInfo
-    let deviceStore;
-
-    if (deviceId in userStore) {
-        // already have this device.
-        deviceStore = userStore[deviceId];
-
-        if (deviceStore.getFingerprint() != signKey) {
-            // this should only happen if the list has been MITMed; we are
-            // best off sticking with the original keys.
-            //
-            // Should we warn the user about it somehow?
-            console.warn("Ed25519 key for device" + userId + ": " +
-                         deviceId + " has changed");
-            return false;
-        }
-    } else {
-        userStore[deviceId] = deviceStore = new DeviceInfo(deviceId);
-    }
-
-    deviceStore.keys = deviceResult.keys || {};
-    deviceStore.algorithms = deviceResult.algorithms || [];
-    deviceStore.unsigned = unsigned;
-    return true;
-}
 
 /**
  * Get the stored device keys for a user id
@@ -553,17 +293,7 @@ function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
  * managed to get a list of devices for this user yet.
  */
 Crypto.prototype.getStoredDevicesForUser = function(userId) {
-    const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
-    if (!devs) {
-        return null;
-    }
-    const res = [];
-    for (const deviceId in devs) {
-        if (devs.hasOwnProperty(deviceId)) {
-            res.push(DeviceInfo.fromStorage(devs[deviceId], deviceId));
-        }
-    }
-    return res;
+    return this._deviceList.getStoredDevicesForUser(userId);
 };
 
 /**
@@ -572,15 +302,11 @@ Crypto.prototype.getStoredDevicesForUser = function(userId) {
  * @param {string} userId
  * @param {string} deviceId
  *
- * @return {module:crypto/deviceinfo?} list of devices, or undefined
+ * @return {module:crypto/deviceinfo?} device, or undefined
  * if we don't know about this device
  */
 Crypto.prototype.getStoredDevice = function(userId, deviceId) {
-    const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
-    if (!devs || !devs[deviceId]) {
-        return undefined;
-    }
-    return DeviceInfo.fromStorage(devs[deviceId], deviceId);
+    return this._deviceList.getStoredDevice(userId, deviceId);
 };
 
 /**
@@ -625,54 +351,6 @@ Crypto.prototype.listDeviceKeys = function(userId) {
 
     return result;
 };
-
-/**
- * Find a device by curve25519 identity key
- *
- * @param {string} userId     owner of the device
- * @param {string} algorithm  encryption algorithm
- * @param {string} sender_key curve25519 key to match
- *
- * @return {module:crypto/deviceinfo?}
- */
-Crypto.prototype.getDeviceByIdentityKey = function(userId, algorithm, sender_key) {
-    if (
-        algorithm !== olmlib.OLM_ALGORITHM &&
-        algorithm !== olmlib.MEGOLM_ALGORITHM
-    ) {
-        // we only deal in olm keys
-        return null;
-    }
-
-    const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
-    if (!devices) {
-        return null;
-    }
-
-    for (const deviceId in devices) {
-        if (!devices.hasOwnProperty(deviceId)) {
-            continue;
-        }
-
-        const device = devices[deviceId];
-        for (const keyId in device.keys) {
-            if (!device.keys.hasOwnProperty(keyId)) {
-                continue;
-            }
-            if (keyId.indexOf("curve25519:") !== 0) {
-                continue;
-            }
-            const deviceKey = device.keys[keyId];
-            if (deviceKey == sender_key) {
-                return DeviceInfo.fromStorage(device, deviceId);
-            }
-        }
-    }
-
-    // doesn't match a known device
-    return null;
-};
-
 
 /**
  * Update the blocked/verified state of the given device
@@ -775,7 +453,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.
 
-    const device = this.getDeviceByIdentityKey(
+    const device = this._deviceList.getDeviceByIdentityKey(
         event.getSender(), algorithm, sender_key,
     );
 
@@ -1041,7 +719,7 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     this._initialSyncCompleted = true;
 
     // catch up on any m.new_device events which arrived during the initial sync.
-    this._flushNewDeviceRequests();
+    this._deviceList.flushNewDeviceRequests();
 
     if (this._sessionStore.getDeviceAnnounced()) {
         return;
@@ -1173,49 +851,15 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
         return;
     }
 
-    this._pendingUsersWithNewDevices[userId] = true;
+    this._deviceList.invalidateUserDeviceList(userId);
 
     // we delay handling these until the intialsync has completed, so that we
     // can do all of them together.
     if (this._initialSyncCompleted) {
-        this._flushNewDeviceRequests();
+        this._deviceList.flushNewDeviceRequests();
     }
 };
 
-/**
- * Start device queries for any users who sent us an m.new_device recently
- */
-Crypto.prototype._flushNewDeviceRequests = function() {
-    const self = this;
-
-    const users = utils.keys(this._pendingUsersWithNewDevices);
-
-    if (users.length === 0) {
-        return;
-    }
-
-    const r = this._doKeyDownloadForUsers(users);
-
-    // we've kicked off requests to these users: remove their
-    // pending flag for now.
-    this._pendingUsersWithNewDevices = {};
-
-    users.map(function(u) {
-        r[u] = r[u].catch(function(e) {
-            console.error(
-                'Error updating device keys for user ' + u + ':', e,
-            );
-
-            // reinstate the pending flags on any users which failed; this will
-            // mean that we will do another download in the future, but won't
-            // tight-loop.
-            //
-            self._pendingUsersWithNewDevices[u] = true;
-        });
-    });
-
-    q.all(utils.values(r)).done();
-};
 
 /**
  * Get a decryptor for a given room and algorithm.
