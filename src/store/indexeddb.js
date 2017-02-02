@@ -261,8 +261,8 @@ IndexedDBStore.prototype.startup = function() {
             this.backend.loadSyncToken(),
         ]);
     }).then((values) => {
-        console.log("Loaded data from database. Reticulating splines...");
         const [users, accountData, rooms, syncToken] = values;
+        console.log("Loaded data from database. Reticulating splines...",accountData, users);
         users.forEach((u) => {
             this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
@@ -305,7 +305,15 @@ IndexedDBStore.prototype._syncToDatabase = function() {
         this._userModifiedMap[u.userId] = u.getLastModifiedTime();
     });
 
-    return this.backend.persistUsers(changedUsers);
+    // TODO: work out changed account data events. They don't have timestamps or IDs.
+    // so we'll need to hook into storeAccountDataEvents instead to catch them when
+    // they update from /sync
+    const changedAccountData = Object.keys(this.accountData).map((etype) => this.accountData[etype]);
+
+    return q.all([
+        this.backend.persistUsers(changedUsers),
+        this.backend.persistAccountData(changedAccountData),
+    ]);
 };
 
 function createDatabase(db) {
@@ -317,7 +325,7 @@ function createDatabase(db) {
 
     // Make account data store, clobber based on event type.
     // (event.type property of MatrixEvent objects)
-    db.createObjectStore("accountData", { keyPath: ["event.type"] });
+    db.createObjectStore("accountData", { keyPath: ["type"] });
 
     // Make configuration store (sync tokens, etc), always clobber (const key).
     db.createObjectStore("config", { keyPath: ["clobber"] });
