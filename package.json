@@ -25,6 +25,7 @@
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
+    ".babelrc",
     ".eslintrc.js",
     "spec/.eslintrc.js",
     "CHANGELOG.md",
