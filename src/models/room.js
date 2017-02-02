@@ -171,42 +171,6 @@ function Room(roomId, opts) {
 utils.inherits(Room, EventEmitter);
 
 /**
- * Deserialize a room from a JSON object.
- * @static
- * @param {Object} obj The Room object from the structured-clone algorithm.
- * @return {Room} A room
- */
-Room.deserialize = function(obj) {
-    const room = new Room(obj.roomId, obj._opts);
-    Object.assign(room, obj); // copy normal props
-    // remove all in-flight requests as if we've been deserialized it's impossible
-    // to have any in-flight requests ongoing
-    room._txnToEvent = {};
-    room._pendingEventList = []; // TODO: This removes unsent messages?
-    // remove all filtered timeline sets (from jumping to messages in the past),
-    // they'll just have to re-request this information.
-    room._filteredTimelineSets = {};
-
-    // create instances of MatrixEvent where appropriate
-    Object.keys(room.accountData).forEach((t) => {
-        room.accountData[t] = MatrixEvent.deserialize(room.accountData[t]);
-    });
-
-    // Deserialize the first timeline set and drop the rest, they can always
-    // backpaginate to get this data again.
-    if (obj._timelineSets.length > 0) {
-        room._timelineSets = [
-            EventTimelineSet.deserialize(obj._timelineSets[0], room, obj._opts),
-        ];
-    }
-    reEmit(this, this.getUnfilteredTimelineSet(),
-           ["Room.timeline", "Room.timelineReset"]);
-    this._fixUpLegacyTimelineFields(); // add refs to the recent timeline
-
-    return room;
-};
-
-/**
  * Get the list of pending sent events for this room
  *
  * @return {module:models/event.MatrixEvent[]} A list of the sent events

@@ -64,20 +64,22 @@ utils.inherits(User, EventEmitter);
 /**
  * Deserialize this user from a JSON object.
  * @static
- * @param {Object} obj The User object from the structured-clone algorithm.
+ * @param {Object} obj The User object from User.serialize().
  * @return {User} A user
  */
 User.deserialize = function(obj) {
     const user = new User(obj.userId);
-    Object.assign(user, obj); // copy normal props
-    // create instances where appropriate
-    if (user.events.presence) {
-        user.events.presence = MatrixEvent.deserialize(user.events.presence);
-    }
-    if (user.events.profile) {
-        user.events.profile = MatrixEvent.deserialize(user.events.profile);
+    if (obj.event) {
+        user.setPresenceEvent(new MatrixEvent(obj.event));
     }
     return user;
+};
+
+User.prototype.serialize = function() {
+    return {
+        userId: this.userId,
+        event: (this.events.presence ? this.events.presence.event : null),
+    };
 };
 
 /**

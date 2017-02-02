@@ -19,7 +19,6 @@ limitations under the License.
  */
 const EventEmitter = require("events").EventEmitter;
 const ContentRepo = require("../content-repo");
-const MatrixEvent = require("./event").MatrixEvent;
 
 const utils = require("../utils");
 
@@ -58,22 +57,6 @@ function RoomMember(roomId, userId) {
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
-
-
-/**
- * Deserialize a room member.
- * @param {Object} obj The RoomMember as a JSON object.
- * @return {RoomMember} The room member.
- */
-RoomMember.deserialize = function(obj) {
-    const member = new RoomMember(obj.roomId, obj.userId);
-    Object.assign(member, obj);
-    // Convert JSON objects to class instances
-    if (member.events.member) {
-        member.events.member = MatrixEvent.deserialize(member.events.member);
-    }
-    return member;
-};
 
 /**
  * Update this room member's membership event. May fire "RoomMember.name" if

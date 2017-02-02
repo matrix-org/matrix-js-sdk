@@ -105,7 +105,14 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the events were persisted.
      */
     persistAccountData: function(accountData) {
-        return this._upsert("accountData", accountData);
+        return q.try(() => {
+            const txn = this.db.transaction(["accountData"], "readwrite");
+            const store = txn.objectStore("accountData");
+            for (let i = 0; i < accountData.length; i++) {
+                store.put(accountData[i].event); // put == UPSERT
+            }
+            return promiseifyTxn(txn);
+        });
     },
 
     /**
@@ -115,6 +122,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     persistUsers: function(users) {
+        console.log("persistUsers =>", users);
         return this._upsert("users", users);
     },
 
@@ -139,7 +147,13 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise<MatrixEvent[]>} A list of events.
      */
     loadAccountData: function() {
-        return this._deserializeAll("accountData", MatrixEvent);
+        return q.try(() => {
+            const txn = this.db.transaction(["accountData"], "readonly");
+            const store = txn.objectStore("accountData");
+            return selectQuery(store, undefined, (cursor) => {
+                return new MatrixEvent(cursor.value);
+            });
+        });
     },
 
     /**
@@ -224,6 +238,11 @@ const IndexedDBStore = function IndexedDBStore(backend, opts) {
     this.backend = backend;
     this.startedUp = false;
     this._syncTs = Date.now(); // updated when writes to the database are performed
+
+    // internal structs to determine deltas for syncs to the database.
+    this._userModifiedMap = {
+        // user_id : timestamp
+    };
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
@@ -245,6 +264,7 @@ IndexedDBStore.prototype.startup = function() {
         console.log("Loaded data from database. Reticulating splines...");
         const [users, accountData, rooms, syncToken] = values;
         users.forEach((u) => {
+            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
         });
         this.storeAccountDataEvents(accountData);
@@ -267,11 +287,25 @@ IndexedDBStore.prototype.setSyncToken = function(token) {
     MatrixInMemoryStore.prototype.setSyncToken.call(this, token);
     const now = Date.now();
     if (now - this._syncTs > WRITE_DELAY_MS) {
-        // save contents to the database.
-        console.log("TODO: Write to database.");
-        this._syncTs = Date.now();
-        return q();
+        return this._syncToDatabase().catch((err) => {console.error("sync fail:", err);});
     }
+    return null;
+};
+
+IndexedDBStore.prototype._syncToDatabase = function() {
+    console.log("_syncToDatabase");
+    this._syncTs = Date.now(); // set now to guard against multi-writes
+
+    // work out changed users (this doesn't handle deletions but you
+    // can't 'delete' users as they are just presence events).
+    const changedUsers = this.getUsers().filter((user) => {
+        return this._userModifiedMap[user.userId] !== user.getLastModifiedTime();
+    });
+    changedUsers.forEach((u) => { // update times
+        this._userModifiedMap[u.userId] = u.getLastModifiedTime();
+    });
+
+    return this.backend.persistUsers(changedUsers);
 };
 
 function createDatabase(db) {
@@ -322,9 +356,11 @@ function selectQuery(store, keyRange, resultMapper) {
 function promiseifyTxn(txn) {
     return new q.Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
+            console.log("txn success:", event);
             resolve(event);
         };
         txn.onerror = function(event) {
+            console.error("txn fail:", event);
             reject(event);
         };
     });
@@ -333,9 +369,11 @@ function promiseifyTxn(txn) {
 function promiseifyRequest(req) {
     return new q.Promise((resolve, reject) => {
         req.onsuccess = function(event) {
+            console.log("req success:", event);
             resolve(event);
         };
         req.onerror = function(event) {
+            console.error("req fail:", event);
             reject(event);
         };
     });

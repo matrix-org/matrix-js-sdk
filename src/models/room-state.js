@@ -21,7 +21,6 @@ const EventEmitter = require("events").EventEmitter;
 
 const utils = require("../utils");
 const RoomMember = require("./room-member");
-const MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct room state.
@@ -55,37 +54,6 @@ function RoomState(roomId) {
     }; // 3pid invite state_key to m.room.member invite
 }
 utils.inherits(RoomState, EventEmitter);
-
-/**
- * Deserialize a room state.
- * @param {Object} obj The RoomState as a JSON object.
- * @param {string} roomId The room it belongs to.
- * @return {RoomState} The room state.
- */
-RoomState.deserialize = function(obj, roomId) {
-    const state = new RoomState(roomId);
-    Object.assign(state, obj);
-    // convert JSON objects to class instances
-    Object.keys(state.members).forEach((userId) => {
-        state.members[userId] = RoomMember.deserialize(state.members[userId]);
-    });
-    Object.keys(state.events).forEach((eventType) => {
-        Object.keys(state.events[eventType]).forEach((stateKey) => {
-            state.events[eventType][stateKey] = MatrixEvent.deserialize(
-                state.events[eventType][stateKey],
-            );
-        });
-    });
-    Object.keys(state._sentinels).forEach((userId) => {
-        state._sentinels[userId] = RoomMember.deserialize(state._sentinels[userId]);
-    });
-    Object.keys(state._tokenToInvite).forEach((token) => {
-        state._tokenToInvite[token] = MatrixEvent.deserialize(
-            state._tokenToInvite[token],
-        );
-    });
-    return state;
-};
 
 /**
  * Get all RoomMembers in this room.

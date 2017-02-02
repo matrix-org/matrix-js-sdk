@@ -74,22 +74,6 @@ function EventTimelineSet(room, opts) {
 utils.inherits(EventTimelineSet, EventEmitter);
 
 /**
- * Deserialize an event timeline set. This drops non-live timelines even
- * if they are included in 'obj'.
- * @param {Object} obj The EventTimelineSet as a JSON object.
- * @param {Room} room The room it should be referencing.
- * @param {Object} opts Options for the room.
- * @return {EventTimelineSet} The timeline set
- */
-EventTimelineSet.deserialize = function(obj, room, opts) {
-    const ets = new EventTimelineSet(room, opts);
-    // only keep the live timeline, they can always re-request older times.
-    ets._liveTimeline = EventTimeline.deserialize(obj._liveTimeline, ets);
-    ets._timelines = [ets._liveTimeline];
-    return ets;
-};
-
-/**
  * Get the filter object this timeline set is filtered on, if any
  * @return {?Filter} the optional filter for this timelineSet
  */

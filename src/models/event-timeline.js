@@ -48,23 +48,6 @@ function EventTimeline(eventTimelineSet) {
 }
 
 /**
- * Deserialize an event timeline. This drops prev/next timelines even
- * if they are included in 'obj'.
- * @param {Object} obj The EventTimeline as a JSON object.
- * @param {EventTimelineSet} eventTimelineSet The set it belongs to.
- * @return {EventTimeline} The timeline.
- */
-EventTimeline.deserialize = function(obj, eventTimelineSet) {
-    const timeline = new EventTimeline(eventTimelineSet);
-    timeline._events = obj._events.map((e) => MatrixEvent.deserialize(e));
-    timeline._baseIndex = obj._baseIndex;
-    timeline._startState = RoomState.deserialize(obj._startState, timeline._roomId);
-    timeline._endState = RoomState.deserialize(obj._endState, timeline._roomId);
-    // drop prev/next timelines, they can always re-request this information.
-    return timeline;
-};
-
-/**
  * Symbolic constant for methods which take a 'direction' argument:
  * refers to the start of the timeline, or backwards in time.
  */
