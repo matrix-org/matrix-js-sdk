@@ -388,6 +388,10 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
 MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     const self = this;
     return this._getDevicesInRoom(room).then(function(devicesInRoom) {
+        // check if any of these devices are not yet known to the user.
+        // if so, warn the user so they can verify or ignore.
+        self._checkForUnknownDevices(devicesInRoom);
+
         return self._ensureOutboundSession(devicesInRoom);
     }).then(function(session) {
         const payloadJson = {
@@ -416,6 +420,37 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
 };
 
 /**
+ * Checks the devices we're about to send to and see if any are entirely
+ * unknown to the user.  If so, warn the user, and mark them as known to
+ * give the user a chance to go verify them before re-sending this message.
+ *
+ * @param {Object} devicesInRoom userId -> {deviceId -> object}
+ *   devices we should shared the session with.
+ */
+MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
+    const unknownDevices = {};
+
+    Object.keys(devicesInRoom).forEach((userId)=>{
+        Object.keys(devicesInRoom[userId]).forEach((deviceId)=>{
+            const device = devicesInRoom[userId][deviceId];
+            if (device.isUnverified() && !device.isKnown()) {
+                if (!unknownDevices[userId]) {
+                    unknownDevices[userId] = {};
+                }
+                unknownDevices[userId][deviceId] = device;
+            }
+        });
+    });
+
+    if (Object.keys(unknownDevices).length) {
+        // it'd be kind to pass unknownDevices up to the user in this error
+        throw new base.UnknownDeviceError(
+            "This room contains unknown devices which have not been verified. " +
+            "We strongly recommend you verify them before continuing.", unknownDevices);
+    }
+};
+
+/**
  * Get the list of unblocked devices for all users in the room
  *
  * @param {module:models/room} room
@@ -433,6 +468,11 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // have a list of the user's devices, then we already share an e2e room
     // with them, which means that they will have announced any new devices via
     // an m.new_device.
+    //
+    // XXX: what if the cache is stale, and the user left the room we had in
+    // common and then added new devices before joining this one? --Matthew
+    //
+    // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
     return this._crypto.downloadKeys(roomMembers, false).then(function(devices) {
         // remove any blocked devices
         for (const userId in devices) {
