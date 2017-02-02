@@ -262,7 +262,10 @@ IndexedDBStore.prototype.startup = function() {
         ]);
     }).then((values) => {
         const [users, accountData, rooms, syncToken] = values;
-        console.log("Loaded data from database. Reticulating splines...",accountData, users);
+        console.log(
+            "Loaded data from database. Reticulating splines...",
+            accountData, users,
+        );
         users.forEach((u) => {
             this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
@@ -308,7 +311,9 @@ IndexedDBStore.prototype._syncToDatabase = function() {
     // TODO: work out changed account data events. They don't have timestamps or IDs.
     // so we'll need to hook into storeAccountDataEvents instead to catch them when
     // they update from /sync
-    const changedAccountData = Object.keys(this.accountData).map((etype) => this.accountData[etype]);
+    const changedAccountData = Object.keys(this.accountData).map((etype) => {
+        return this.accountData[etype];
+    });
 
     return q.all([
         this.backend.persistUsers(changedUsers),
