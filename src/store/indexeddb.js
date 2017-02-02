@@ -28,6 +28,7 @@ import utils from "../utils";
  */
 
 const VERSION = 1;
+const WRITE_DELAY_MS = 1000 * 60; // once a minute
 
 /**
  * Construct a new Indexed Database store backend. This requires a call to
@@ -222,6 +223,7 @@ const IndexedDBStore = function IndexedDBStore(backend, opts) {
     MatrixInMemoryStore.call(this, opts);
     this.backend = backend;
     this.startedUp = false;
+    this._syncTs = Date.now(); // updated when writes to the database are performed
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
@@ -233,12 +235,43 @@ IndexedDBStore.prototype.startup = function() {
         return q();
     }
     return this.backend.connect().then(() => {
-        return this.backend.loadUsers();
-    }).then((users) => {
+        return q.all([
+            this.backend.loadUsers(),
+            this.backend.loadAccountData(),
+            this.backend.loadRooms(),
+            this.backend.loadSyncToken(),
+        ]);
+    }).then((values) => {
+        console.log("Loaded data from database. Reticulating splines...");
+        const [users, accountData, rooms, syncToken] = values;
         users.forEach((u) => {
             this.storeUser(u);
         });
+        this.storeAccountDataEvents(accountData);
+        rooms.forEach((r) => {
+            this.storeRoom(r);
+        });
+        this._syncTs = Date.now(); // pretend we've written so we don't rewrite
+        this.setSyncToken(syncToken);
     });
+};
+
+/**
+ * Set a new sync token and possibly write to the database.
+ * Overrides MatrixInMemoryStore.
+ * @param {string} token The new sync token
+ * @return {?Promise} A promise if this sync token triggered a write to the
+ * database, else null. Promise resolves after the write completes.
+ */
+IndexedDBStore.prototype.setSyncToken = function(token) {
+    MatrixInMemoryStore.prototype.setSyncToken.call(this, token);
+    const now = Date.now();
+    if (now - this._syncTs > WRITE_DELAY_MS) {
+        // save contents to the database.
+        console.log("TODO: Write to database.");
+        this._syncTs = Date.now();
+        return q();
+    }
 };
 
 function createDatabase(db) {
