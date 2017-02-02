@@ -18,6 +18,8 @@ limitations under the License.
 import q from "q";
 import {MatrixInMemoryStore} from "./memory";
 import User from "../models/user";
+import Room from "../models/room";
+import {MatrixEvent} from "../models/event";
 import utils from "../utils";
 
 /**
@@ -74,7 +76,7 @@ IndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Persist a list of Room objects.
+     * Persist a list of Room objects. Rooms with the same 'roomId' will be replaced.
      * @param {Room[]} rooms An array of rooms
      * @return {Promise} Resolves if the rooms were persisted.
      */
@@ -83,7 +85,7 @@ IndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Persist a sync token.
+     * Persist a sync token. This will replace any existing sync token.
      * @param {string} syncToken The token to persist.
      * @return {Promise} Resolves if the token was persisted.
      */
@@ -96,7 +98,8 @@ IndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Persist a list of account data events.
+     * Persist a list of account data events. Events with the same 'type' will
+     * be replaced.
      * @param {MatrixEvent[]} accountData An array of user-scoped account data events
      * @return {Promise} Resolves if the events were persisted.
      */
@@ -105,7 +108,8 @@ IndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Persist a list of User objects.
+     * Persist a list of User objects. Users with the same 'userId' will be
+     * replaced.
      * @param {User[]} users An array of users
      * @return {Promise} Resolves if the users were persisted.
      */
@@ -118,18 +122,40 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise<User[]>} A list of users.
      */
     loadUsers: function() {
+        return this._deserializeAll("users", User);
+    },
+
+    /**
+     * Load all the rooms from the database. This is not cached.
+     * @return {Promise<Room[]>} A list of rooms.
+     */
+    loadRooms: function() {
+        return this._deserializeAll("rooms", Room);
+    },
+
+    /**
+     * Load all the account data events from the database. This is not cached.
+     * @return {Promise<MatrixEvent[]>} A list of events.
+     */
+    loadAccountData: function() {
+        return this._deserializeAll("accountData", MatrixEvent);
+    },
+
+    /**
+     * Load the sync token from the database.
+     * @return {Promise<?string>} The sync token
+     */
+    loadSyncToken: function() {
         return q.try(() => {
-            const txn = this.db.transaction(["users"], "readonly");
-            const store = txn.objectStore("users");
-            return selectQuery(store, undefined, (cursor) => {
-                if (typeof User.deserialize === "function") {
-                    return User.deserialize(cursor.value);
-                } else {
-                    const user = new User(cursor.value.userId);
-                    Object.assign(user, cursor.value);
-                    return user;
-                }
+            const txn = this.db.transaction(["config"], "readonly");
+            const store = txn.objectStore("config");
+            const results = selectQuery(store, undefined, (cursor) => {
+                return cursor.value;
             });
+            if (results.length > 1) {
+                console.warn("loadSyncToken: More than 1 config row found.");
+            }
+            return (results.length > 0 ? results[0].syncToken : null);
         });
     },
 
@@ -145,6 +171,16 @@ IndexedDBStoreBackend.prototype = {
                 }
             }
             return promiseifyTxn(txn);
+        });
+    },
+
+    _deserializeAll: function(storeName, Cls) {
+        return q.try(() => {
+            const txn = this.db.transaction([storeName], "readonly");
+            const store = txn.objectStore(storeName);
+            return selectQuery(store, undefined, (cursor) => {
+                return Cls.deserialize(cursor.value);
+            });
         });
     },
 };
@@ -178,6 +214,9 @@ IndexedDBStoreBackend.prototype = {
  * @extends MatrixInMemoryStore
  * @param {IndexedDBStoreBackend} backend The indexed db backend instance.
  * @param {Object=} opts Options for MatrixInMemoryStore.
+ * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
+ * this API if you need to perform specific indexeddb actions like deleting the
+ * database.
  */
 const IndexedDBStore = function IndexedDBStore(backend, opts) {
     MatrixInMemoryStore.call(this, opts);
