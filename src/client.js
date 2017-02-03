@@ -395,11 +395,29 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
     _setDeviceVerification(this, userId, deviceId, null, blocked);
 };
 
-function _setDeviceVerification(client, userId, deviceId, verified, blocked) {
+/**
+ * Mark the given device as known/unknown
+ *
+ * @param {string} userId owner of the device
+ * @param {string} deviceId unique identifier for the device
+ *
+ * @param {boolean=} known whether to mark the device as known. defaults
+ *   to 'true'.
+ *
+ * @fires module:client~event:MatrixClient"deviceVerificationChanged"
+ */
+MatrixClient.prototype.setDeviceKnown = function(userId, deviceId, known) {
+    if (known === undefined) {
+        known = true;
+    }
+    _setDeviceVerification(this, userId, deviceId, null, null, known);
+};
+
+function _setDeviceVerification(client, userId, deviceId, verified, blocked, known) {
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked);
+    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked, known);
     client.emit("deviceVerificationChanged", userId, deviceId);
 }
 

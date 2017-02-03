@@ -97,7 +97,10 @@ TestClient.prototype.start = function(existingDevices) {
         }};
     });
 
-    this.client.startClient();
+    this.client.startClient({
+        // set this so that we can get hold of failed events
+        pendingEventOrdering: 'detached',
+    });
 
     return this.httpBackend.flush();
 };
@@ -533,11 +536,24 @@ describe("megolm", function() {
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
             return aliceTestClient.httpBackend.flush('/sync', 1);
         }).then(function() {
-            let inboundGroupSession;
+            // start out with the device unknown - the send should be rejected.
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
 
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test').then(() => {
+                    throw new Error("sendTextMessage failed on an unknown device");
+                }, (e) => {
+                    expect(e.name).toEqual("UnknownDeviceError");
+                }),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).then(function() {
+            // mark the device as known, and resend.
+            aliceTestClient.client.setDeviceKnown('@bob:xyz', 'DEVICE_ID');
+
+            let inboundGroupSession;
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room.encrypted/',
             ).respond(200, function(path, content) {
@@ -568,8 +584,11 @@ describe("megolm", function() {
                 };
             });
 
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const pendingMsg = room.getPendingEvents()[0];
+
             return q.all([
-                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                aliceTestClient.client.resendEvent(pendingMsg, room),
                 aliceTestClient.httpBackend.flush(),
             ]);
         }).nodeify(done);
@@ -678,11 +697,20 @@ describe("megolm", function() {
 
             return aliceTestClient.httpBackend.flush('/sync', 1);
         }).then(function() {
-            console.log('Telling alice to send a megolm message');
+            console.log("Fetching bob's devices and marking known");
 
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
+
+            return q.all([
+                aliceTestClient.client.downloadKeys(['@bob:xyz']),
+                aliceTestClient.httpBackend.flush(),
+            ]).then((keys) => {
+                aliceTestClient.client.setDeviceKnown('@bob:xyz', 'DEVICE_ID');
+            });
+        }).then(function() {
+            console.log('Telling alice to send a megolm message');
 
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room.encrypted/',
@@ -737,7 +765,7 @@ describe("megolm", function() {
     // https://github.com/vector-im/riot-web/issues/2676
     it("Alice should send to her other devices", function(done) {
         // for this test, we make the testOlmAccount be another of Alice's devices.
-        // it ought to get include in messages Alice sends.
+        // it ought to get included in messages Alice sends.
 
         let p2pSession;
         let inboundGroupSession;
@@ -774,6 +802,7 @@ describe("megolm", function() {
 
             return aliceTestClient.httpBackend.flush();
         }).then(function() {
+            aliceTestClient.client.setDeviceKnown(aliceTestClient.userId, 'DEVICE_ID');
             aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
                 200, function(path, content) {
                 expect(content.one_time_keys[aliceTestClient.userId].DEVICE_ID)
@@ -882,10 +911,15 @@ describe("megolm", function() {
 
             // this will block
             downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
-        }).then(function() {
+
             // so will this.
-            sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test');
-        }).then(function() {
+            sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test')
+            .then(() => {
+                throw new Error("sendTextMessage failed on an unknown device");
+            }, (e) => {
+                expect(e.name).toEqual("UnknownDeviceError");
+            });
+
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );

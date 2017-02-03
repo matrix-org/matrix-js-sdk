@@ -158,6 +158,23 @@ module.exports.DecryptionError = function(msg) {
 utils.inherits(module.exports.DecryptionError, Error);
 
 /**
+ * Exception thrown specifically when we want to warn the user to consider
+ * the security of their conversation before continuing
+ *
+ * @constructor
+ * @param {string} msg message describing the problem
+ * @param {Object} devices userId -> {deviceId -> object}
+ *      set of unknown devices per user we're warning about
+ * @extends Error
+ */
+module.exports.UnknownDeviceError = function(msg, devices) {
+    this.name = "UnknownDeviceError";
+    this.message = msg;
+    this.devices = devices;
+};
+utils.inherits(module.exports.UnknownDeviceError, Error);
+
+/**
  * Registers an encryption/decryption class for a particular algorithm
  *
  * @param {string} algorithm algorithm tag to register for

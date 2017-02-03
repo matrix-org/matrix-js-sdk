@@ -94,6 +94,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
             keys: this._deviceKeys,
             algorithms: this._supportedAlgorithms,
             verified: DeviceVerification.VERIFIED,
+            known: true,
         };
 
         myDevices[this._deviceId] = deviceInfo;
@@ -362,8 +363,12 @@ Crypto.prototype.listDeviceKeys = function(userId) {
  *
  * @param {?boolean} blocked whether to mark the device as blocked. Null to
  *      leave unchanged.
+ *
+ * @param {?boolean} known whether to mark that the user has been made aware of
+ *      the existence of this device. Null to leave unchanged
  */
-Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, blocked) {
+Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
+                                                  blocked, known) {
     const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
@@ -384,10 +389,16 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified, bl
         verificationStatus = DeviceVerification.UNVERIFIED;
     }
 
-    if (dev.verified === verificationStatus) {
+    let knownStatus = dev.known;
+    if (known !== null && known !== undefined) {
+        knownStatus = known;
+    }
+
+    if (dev.verified === verificationStatus && dev.known === knownStatus) {
         return;
     }
     dev.verified = verificationStatus;
+    dev.known = knownStatus;
     this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
 };
 

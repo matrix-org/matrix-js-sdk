@@ -9,9 +9,9 @@
     "check": "npm run buildtest && jasmine-node specbuild --verbose --junitreport --captureExceptions",
     "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
     "start": "babel -s -w -d lib src",
-    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify browser-index.js -o dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js dist/browser-matrix.js",
+    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
     "dist": "npm run build",
-    "watch": "watchify browser-index.js -o dist/browser-matrix-dev.js -v",
+    "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 121 src spec",
     "prepublish": "npm run build && git rev-parse HEAD > git-revision.txt"
   },
@@ -25,6 +25,7 @@
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
+    ".babelrc",
     ".eslintrc.js",
     "spec/.eslintrc.js",
     "CHANGELOG.md",
@@ -54,14 +55,16 @@
     "babel-cli": "^6.18.0",
     "babel-eslint": "^7.1.1",
     "babel-preset-es2015": "^6.18.0",
-    "browserify": "^10.2.3",
+    "browserify": "^14.0.0",
     "browserify-shim": "^3.8.13",
     "eslint": "^3.13.1",
     "eslint-config-google": "^0.7.1",
+    "exorcist": "^0.4.0",
     "istanbul": "^0.3.13",
     "jasmine-node": "^1.14.5",
     "jsdoc": "^3.4.0",
     "rimraf": "^2.5.4",
+    "sourceify": "^0.1.0",
     "uglifyjs": "^2.4.10",
     "watchify": "^3.2.1"
   },
@@ -69,7 +72,10 @@
     "olm": "https://matrix.org/packages/npm/olm/olm-2.2.1.tgz"
   },
   "browserify": {
-    "transform": "browserify-shim"
+    "transform": [
+      "sourceify",
+      "browserify-shim"
+    ]
   },
   "browserify-shim": {
     "olm": "global:Olm"
