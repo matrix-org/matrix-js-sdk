@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: pushprocessor.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: pushprocessor.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>'use strict';
+
+var _typeof = typeof Symbol === "function" &amp;&amp; typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj &amp;&amp; typeof Symbol === "function" &amp;&amp; obj.constructor === Symbol &amp;&amp; obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+/*
+Copyright 2015, 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+/**
+ * @module pushprocessor
+ */
+
+/**
+ * Construct a Push Processor.
+ * @constructor
+ * @param {Object} client The Matrix client object to use
+ */
+function PushProcessor(client) {
+    var escapeRegExp = function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&amp;");
+    };
+
+    var matchingRuleFromKindSet = function matchingRuleFromKindSet(ev, kindset, device) {
+        var rulekinds_in_order = ['override', 'content', 'room', 'sender', 'underride'];
+        for (var ruleKindIndex = 0; ruleKindIndex &lt; rulekinds_in_order.length; ++ruleKindIndex) {
+            var kind = rulekinds_in_order[ruleKindIndex];
+            var ruleset = kindset[kind];
+
+            for (var ruleIndex = 0; ruleIndex &lt; ruleset.length; ++ruleIndex) {
+                var rule = ruleset[ruleIndex];
+                if (!rule.enabled) {
+                    continue;
+                }
+
+                var rawrule = templateRuleToRaw(kind, rule, device);
+                if (!rawrule) {
+                    continue;
+                }
+
+                if (ruleMatchesEvent(rawrule, ev)) {
+                    rule.kind = kind;
+                    return rule;
+                }
+            }
+        }
+        return null;
+    };
+
+    var templateRuleToRaw = function templateRuleToRaw(kind, tprule, device) {
+        var rawrule = {
+            'rule_id': tprule.rule_id,
+            'actions': tprule.actions,
+            'conditions': []
+        };
+        switch (kind) {
+            case 'underride':
+            case 'override':
+                rawrule.conditions = tprule.conditions;
+                break;
+            case 'room':
+                if (!tprule.rule_id) {
+                    return null;
+                }
+                rawrule.conditions.push({
+                    'kind': 'event_match',
+                    'key': 'room_id',
+                    'pattern': tprule.rule_id
+                });
+                break;
+            case 'sender':
+                if (!tprule.rule_id) {
+                    return null;
+                }
+                rawrule.conditions.push({
+                    'kind': 'event_match',
+                    'key': 'user_id',
+                    'pattern': tprule.rule_id
+                });
+                break;
+            case 'content':
+                if (!tprule.pattern) {
+                    return null;
+                }
+                rawrule.conditions.push({
+                    'kind': 'event_match',
+                    'key': 'content.body',
+                    'pattern': tprule.pattern
+                });
+                break;
+        }
+        if (device) {
+            rawrule.conditions.push({
+                'kind': 'device',
+                'profile_tag': device
+            });
+        }
+        return rawrule;
+    };
+
+    var ruleMatchesEvent = function ruleMatchesEvent(rule, ev) {
+        var ret = true;
+        for (var i = 0; i &lt; rule.conditions.length; ++i) {
+            var cond = rule.conditions[i];
+            ret &amp;= eventFulfillsCondition(cond, ev);
+        }
+        //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
+        return ret;
+    };
+
+    var eventFulfillsCondition = function eventFulfillsCondition(cond, ev) {
+        var condition_functions = {
+            "event_match": eventFulfillsEventMatchCondition,
+            "device": eventFulfillsDeviceCondition,
+            "contains_display_name": eventFulfillsDisplayNameCondition,
+            "room_member_count": eventFulfillsRoomMemberCountCondition
+        };
+        if (condition_functions[cond.kind]) {
+            return condition_functions[cond.kind](cond, ev);
+        }
+        return true;
+    };
+
+    var eventFulfillsRoomMemberCountCondition = function eventFulfillsRoomMemberCountCondition(cond, ev) {
+        if (!cond.is) {
+            return false;
+        }
+
+        var room = client.getRoom(ev.getRoomId());
+        if (!room || !room.currentState || !room.currentState.members) {
+            return false;
+        }
+
+        var memberCount = Object.keys(room.currentState.members).filter(function (m) {
+            return room.currentState.members[m].membership == 'join';
+        }).length;
+
+        var m = cond.is.match(/^([=&lt;>]*)([0-9]*)$/);
+        if (!m) {
+            return false;
+        }
+        var ineq = m[1];
+        var rhs = parseInt(m[2]);
+        if (isNaN(rhs)) {
+            return false;
+        }
+        switch (ineq) {
+            case '':
+            case '==':
+                return memberCount == rhs;
+            case '&lt;':
+                return memberCount &lt; rhs;
+            case '>':
+                return memberCount > rhs;
+            case '&lt;=':
+                return memberCount &lt;= rhs;
+            case '>=':
+                return memberCount >= rhs;
+            default:
+                return false;
+        }
+    };
+
+    var eventFulfillsDisplayNameCondition = function eventFulfillsDisplayNameCondition(cond, ev) {
+        var content = ev.getContent();
+        if (!content || !content.body || typeof content.body != 'string') {
+            return false;
+        }
+
+        var room = client.getRoom(ev.getRoomId());
+        if (!room || !room.currentState || !room.currentState.members || !room.currentState.getMember(client.credentials.userId)) {
+            return false;
+        }
+
+        var displayName = room.currentState.getMember(client.credentials.userId).name;
+
+        // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
+        // as shorthand for [^0-9A-Za-z_].
+        var pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
+        return content.body.search(pat) > -1;
+    };
+
+    var eventFulfillsDeviceCondition = function eventFulfillsDeviceCondition(cond, ev) {
+        return false; // XXX: Allow a profile tag to be set for the web client instance
+    };
+
+    var eventFulfillsEventMatchCondition = function eventFulfillsEventMatchCondition(cond, ev) {
+        var val = valueForDottedKey(cond.key, ev);
+        if (!val || typeof val != 'string') {
+            return false;
+        }
+
+        var pat = void 0;
+        if (cond.key == 'content.body') {
+            pat = '(^|\\W)' + globToRegexp(cond.pattern) + '(\\W|$)';
+        } else {
+            pat = '^' + globToRegexp(cond.pattern) + '$';
+        }
+        var regex = new RegExp(pat, 'i');
+        return !!val.match(regex);
+    };
+
+    var globToRegexp = function globToRegexp(glob) {
+        // From
+        // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
+        // Because micromatch is about 130KB with dependencies,
+        // and minimatch is not much better.
+        var pat = escapeRegExp(glob);
+        pat = pat.replace(/\\\*/, '.*');
+        pat = pat.replace(/\?/, '.');
+        pat = pat.replace(/\\\[(!|)(.*)\\]/, function (match, p1, p2, offset, string) {
+            var first = p1 &amp;&amp; '^' || '';
+            var second = p2.replace(/\\\-/, '-');
+            return '[' + first + second + ']';
+        });
+        return pat;
+    };
+
+    var valueForDottedKey = function valueForDottedKey(key, ev) {
+        var parts = key.split('.');
+        var val = void 0;
+
+        // special-case the first component to deal with encrypted messages
+        var firstPart = parts[0];
+        if (firstPart == 'content') {
+            val = ev.getContent();
+            parts.shift();
+        } else if (firstPart == 'type') {
+            val = ev.getType();
+            parts.shift();
+        } else {
+            // use the raw event for any other fields
+            val = ev.event;
+        }
+
+        while (parts.length > 0) {
+            var thispart = parts.shift();
+            if (!val[thispart]) {
+                return null;
+            }
+            val = val[thispart];
+        }
+        return val;
+    };
+
+    var matchingRuleForEventWithRulesets = function matchingRuleForEventWithRulesets(ev, rulesets) {
+        if (!rulesets || !rulesets.device) {
+            return null;
+        }
+        if (ev.getSender() == client.credentials.userId) {
+            return null;
+        }
+
+        var allDevNames = Object.keys(rulesets.device);
+        for (var i = 0; i &lt; allDevNames.length; ++i) {
+            var devname = allDevNames[i];
+            var devrules = rulesets.device[devname];
+
+            var matchingRule = matchingRuleFromKindSet(devrules, devname);
+            if (matchingRule) {
+                return matchingRule;
+            }
+        }
+        return matchingRuleFromKindSet(ev, rulesets.global);
+    };
+
+    var pushActionsForEventAndRulesets = function pushActionsForEventAndRulesets(ev, rulesets) {
+        var rule = matchingRuleForEventWithRulesets(ev, rulesets);
+        if (!rule) {
+            return {};
+        }
+
+        var actionObj = PushProcessor.actionListToActionsObject(rule.actions);
+
+        // Some actions are implicit in some situations: we add those here
+        if (actionObj.tweaks.highlight === undefined) {
+            // if it isn't specified, highlight if it's a content
+            // rule but otherwise not
+            actionObj.tweaks.highlight = rule.kind == 'content';
+        }
+
+        return actionObj;
+    };
+
+    /**
+     * Get the user's push actions for the given event
+     *
+     * @param {module:models/event.MatrixEvent} ev
+     *
+     * @return {PushAction}
+     */
+    this.actionsForEvent = function (ev) {
+        return pushActionsForEventAndRulesets(ev, client.pushRules);
+    };
+}
+
+/**
+ * Convert a list of actions into a object with the actions as keys and their values
+ * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
+ *     becomes { notify: true, tweaks: { sound: 'default' } }
+ * @param {array} actionlist The actions list
+ *
+ * @return {object} A object with key 'notify' (true or false) and an object of actions
+ */
+PushProcessor.actionListToActionsObject = function (actionlist) {
+    var actionobj = { 'notify': false, 'tweaks': {} };
+    for (var i = 0; i &lt; actionlist.length; ++i) {
+        var action = actionlist[i];
+        if (action === 'notify') {
+            actionobj.notify = true;
+        } else if ((typeof action === 'undefined' ? 'undefined' : _typeof(action)) === 'object') {
+            if (action.value === undefined) {
+                action.value = true;
+            }
+            actionobj.tweaks[action.set_tweak] = action.value;
+        }
+    }
+    return actionobj;
+};
+
+/**
+ * @typedef {Object} PushAction
+ * @type {Object}
+ * @property {boolean} notify Whether this event should notify the user or not.
+ * @property {Object} tweaks How this event should be notified.
+ * @property {boolean} tweaks.highlight Whether this event should be highlighted
+ * on the UI.
+ * @property {boolean} tweaks.sound Whether this notification should produce a
+ * noise.
+ */
+
+/** The PushProcessor class. */
+module.exports = PushProcessor;
+//# sourceMappingURL=pushprocessor.js.map</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.html#.DecryptionAlgorithm">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.html#.EncryptionAlgorithm">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Fri Feb 03 2017 13:02:29 GMT+0000 (GMT)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
