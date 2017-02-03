@@ -65,6 +65,7 @@ module.exports.EventStatus = {
  * @prop {RoomMember} target The room member who is the target of this event, e.g.
  * the invitee, the person being banned, etc.
  * @prop {EventStatus} status The sending status of the event.
+ * @prop {Error} error most recent error associated with sending the event, if any
  * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
  * that getDirectionalContent() will return event.content and not event.prev_content.
  * Default: true. <strong>This property is experimental and may change.</strong>
@@ -76,6 +77,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.sender = null;
     this.target = null;
     this.status = null;
+    this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
     this._date = this.event.origin_server_ts ?
