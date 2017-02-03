@@ -764,7 +764,7 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
                 // if that failed, we fall back to invalidating everyone.
                 console.warn("Error fetching changed device list", e);
                 this._invalidateDeviceListForAllActiveUsers();
-                return this._deviceList.flushNewDeviceRequests();
+                return this._deviceList.refreshOutdatedDeviceLists();
             }).done();
         } else {
             // otherwise, we have to invalidate all devices for all users we
@@ -853,7 +853,7 @@ Crypto.prototype._invalidateDeviceListsSince = function(oldSyncToken) {
                 this._deviceList.invalidateUserDeviceList(u);
             }
         });
-        return this._deviceList.flushNewDeviceRequests();
+        return this._deviceList.refreshOutdatedDeviceLists();
     });
 };
 
