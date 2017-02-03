@@ -740,7 +740,7 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     this._initialSyncCompleted = true;
 
     // catch up on any m.new_device events which arrived during the initial sync.
-    this._deviceList.flushNewDeviceRequests();
+    this._deviceList.refreshOutdatedDeviceLists().done();
 
     if (this._sessionStore.getDeviceAnnounced()) {
         return;
@@ -877,7 +877,7 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
     // we delay handling these until the intialsync has completed, so that we
     // can do all of them together.
     if (this._initialSyncCompleted) {
-        this._deviceList.flushNewDeviceRequests();
+        this._deviceList.refreshOutdatedDeviceLists().done();
     }
 };
 
