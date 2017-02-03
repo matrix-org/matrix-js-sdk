@@ -77,6 +77,8 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
     this._deviceKeys["curve25519:" + this._deviceId] =
         this._olmDevice.deviceCurve25519Key;
 
+    this._globalBlacklistUnverifiedDevices = false;
+
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
     );
@@ -166,6 +168,25 @@ Crypto.getOlmVersion = function() {
  */
 Crypto.prototype.getDeviceEd25519Key = function() {
     return this._olmDevice.deviceEd25519Key;
+};
+
+/**
+ * Set the global override for whether the client should ever send encrypted
+ * messages to unverified devices.  If false, it can still be overridden
+ * per-room.  If true, it overrides the per-room settings.
+ *
+ * @param {boolean} value whether to unilaterally blacklist all
+ * unverified devices
+ */
+Crypto.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
+    this._globalBlacklistUnverifiedDevices = value;
+};
+
+/**
+ * @return {boolean} whether to unilaterally blacklist all unverified devices
+ */
+Crypto.prototype.getGlobalBlacklistUnverifiedDevices = function() {
+    return this._globalBlacklistUnverifiedDevices;
 };
 
 /**

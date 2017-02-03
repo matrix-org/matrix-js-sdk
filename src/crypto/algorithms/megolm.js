@@ -473,7 +473,7 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // common and then added new devices before joining this one? --Matthew
     //
     // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
-    return this._crypto.downloadKeys(roomMembers, false).then(function(devices) {
+    return this._crypto.downloadKeys(roomMembers, false).then((devices) => {
         // remove any blocked devices
         for (const userId in devices) {
             if (!devices.hasOwnProperty(userId)) {
@@ -485,7 +485,12 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
                 if (!userDevices.hasOwnProperty(deviceId)) {
                     continue;
                 }
-                if (userDevices[deviceId].isBlocked()) {
+
+                if (userDevices[deviceId].isBlocked() ||
+                    (userDevices[deviceId].isUnverified() &&
+                     (room.getBlacklistUnverifiedDevices() ||
+                      this._crypto.getGlobalBlacklistUnverifiedDevices()))
+                   ) {
                     delete userDevices[deviceId];
                 }
             }
