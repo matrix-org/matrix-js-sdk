@@ -1,3 +1,12 @@
+Changes in [0.7.5-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.2) (2017-02-03)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.1...v0.7.5-rc.2)
+
+ * Use the device change notifications interface
+   [\#348](https://github.com/matrix-org/matrix-js-sdk/pull/348)
+ * Rewrite the device key query logic
+   [\#347](https://github.com/matrix-org/matrix-js-sdk/pull/347)
+
 Changes in [0.7.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.1) (2017-02-03)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.4...v0.7.5-rc.1)
