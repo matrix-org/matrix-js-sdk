@@ -1018,20 +1018,35 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
  *
  * @param {string[]} userIds  list of users to get keys for
  *
- * @param {module:client.callback=} callback
+ * @param {Object=} opts
+ *
+ * @param {string=} opts.token   sync token to pass in the query request, to help
+ *   the HS give the most recent results
  *
  * @return {module:client.Promise} Resolves: result object. Rejects: with
  *     an error response ({@link module:http-api.MatrixError}).
  */
-MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, callback) {
-    const downloadQuery = {};
-
-    for (let i = 0; i < userIds.length; ++i) {
-        downloadQuery[userIds[i]] = {};
+MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
+    if (utils.isFunction(opts)) {
+        // opts used to be 'callback'.
+        throw new Error(
+            'downloadKeysForUsers no longer accepts a callback parameter',
+        );
     }
-    const content = {device_keys: downloadQuery};
+    opts = opts || {};
+
+    const content = {
+        device_keys: {},
+    };
+    if ('token' in opts) {
+        content.token = opts.token;
+    }
+    userIds.forEach((u) => {
+        content.device_keys[u] = {};
+    });
+
     return this._http.authedRequestWithPrefix(
-        callback, "POST", "/keys/query", undefined, content,
+        undefined, "POST", "/keys/query", undefined, content,
         httpApi.PREFIX_UNSTABLE,
     );
 };
@@ -1063,6 +1078,28 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
     const content = {one_time_keys: queries};
     return this._http.authedRequestWithPrefix(
         undefined, "POST", "/keys/claim", undefined, content,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
+
+/**
+ * Ask the server for a list of users who have changed their device lists
+ * between a pair of sync tokens
+ *
+ * @param {string} oldToken
+ * @param {string} newToken
+ *
+ * @return {module:client.Promise} Resolves: result object. Rejects: with
+ *     an error response ({@link module:http-api.MatrixError}).
+ */
+MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
+    const qps = {
+        from: oldToken,
+        to: newToken,
+    };
+
+    return this._http.authedRequestWithPrefix(
+        undefined, "GET", "/keys/changes", qps, undefined,
         httpApi.PREFIX_UNSTABLE,
     );
 };

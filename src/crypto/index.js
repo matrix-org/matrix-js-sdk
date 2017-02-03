@@ -48,14 +48,16 @@ const DeviceList = require('./DeviceList').default;
  * @param {string} userId The user ID for the local user
  *
  * @param {string} deviceId The identifier for this device.
+ *
+ * @param {Object} clientStore the MatrixClient data store.
  */
-function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
+function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
+                clientStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
     this._deviceId = deviceId;
-
-    this._initialSyncCompleted = false;
+    this._clientStore = clientStore;
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
@@ -111,11 +113,8 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId) {
 function _registerEventHandlers(crypto, eventEmitter) {
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
-            if (syncState == "PREPARED") {
-                // XXX ugh. we're assuming the eventEmitter is a MatrixClient.
-                // how can we avoid doing so?
-                const rooms = eventEmitter.getRooms();
-                crypto._onInitialSyncCompleted(rooms);
+            if (syncState === "SYNCING") {
+                crypto._onSyncCompleted(data);
             }
         } catch (e) {
             console.error("Error handling sync", e);
@@ -711,6 +710,18 @@ Crypto.prototype.decryptEvent = function(event) {
 };
 
 /**
+ * Handle the notification from /sync that a user has updated their device list.
+ *
+ * @param {String} userId
+ */
+Crypto.prototype.userDeviceListChanged = function(userId) {
+    this._deviceList.invalidateUserDeviceList(userId);
+
+    // don't flush the outdated device list yet - we do it once we finish
+    // processing the sync.
+};
+
+/**
  * handle an m.room.encryption event
  *
  * @private
@@ -729,19 +740,50 @@ Crypto.prototype._onCryptoEvent = function(event) {
 };
 
 /**
- * handle the completion of the initial sync.
+ * handle the completion of a /sync
  *
- * Announces the new device.
+ * This is called after the processing of each successful /sync response.
+ * It is an opportunity to do a batch process on the information received.
+ *
+ * @param {Object} syncData  the data from the 'MatrixClient.sync' event
+ */
+Crypto.prototype._onSyncCompleted = function(syncData) {
+    this._deviceList.lastKnownSyncToken = syncData.nextSyncToken;
+
+    if (!syncData.oldSyncToken) {
+        // an initialsync.
+        this._sendNewDeviceEvents();
+
+        // if we have a deviceSyncToken, we can tell the deviceList to
+        // invalidate devices which have changed since then.
+        const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
+        if (oldSyncToken) {
+            this._invalidateDeviceListsSince(oldSyncToken).catch((e) => {
+                // if that failed, we fall back to invalidating everyone.
+                console.warn("Error fetching changed device list", e);
+                this._invalidateDeviceListForAllActiveUsers();
+                return this._deviceList.flushNewDeviceRequests();
+            }).done();
+        } else {
+            // otherwise, we have to invalidate all devices for all users we
+            // share a room with.
+            this._invalidateDeviceListForAllActiveUsers();
+        }
+    }
+
+    // catch up on any new devices we got told about during the sync.
+    this._deviceList.refreshOutdatedDeviceLists().done();
+};
+
+/**
+ * Send m.new_device messages to any devices we share a room with.
+ *
+ * (TODO: we can get rid of this once a suitable number of homeservers and
+ * clients support the more reliable device list update stream mechanism)
  *
  * @private
- * @param {module:models/room[]} rooms list of rooms the client knows about
  */
-Crypto.prototype._onInitialSyncCompleted = function(rooms) {
-    this._initialSyncCompleted = true;
-
-    // catch up on any m.new_device events which arrived during the initial sync.
-    this._deviceList.flushNewDeviceRequests();
-
+Crypto.prototype._sendNewDeviceEvents = function() {
     if (this._sessionStore.getDeviceAnnounced()) {
         return;
     }
@@ -750,23 +792,7 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
     // we have arrived.
     // build a list of rooms for each user.
     const roomsByUser = {};
-    for (let i = 0; i < rooms.length; i++) {
-        const room = rooms[i];
-
-        // check for rooms with encryption enabled
-        const alg = this._roomEncryptors[room.roomId];
-        if (!alg) {
-            continue;
-        }
-
-        // ignore any rooms which we have left
-        const me = room.getMember(this._userId);
-        if (!me || (
-            me.membership !== "join" && me.membership !== "invite"
-        )) {
-            continue;
-        }
-
+    for (const room of this._getE2eRooms()) {
         const members = room.getJoinedMembers();
         for (let j = 0; j < members.length; j++) {
             const m = members[j];
@@ -797,6 +823,88 @@ Crypto.prototype._onInitialSyncCompleted = function(rooms) {
         content,
     ).done(function() {
         self._sessionStore.setDeviceAnnounced();
+    });
+};
+
+/**
+ * Ask the server which users have new devices since a given token,
+ * invalidate them, and start an update query.
+ *
+ * @param {String} oldSyncToken
+ *
+ * @returns {Promise} resolves once the query is complete. Rejects if the
+ *   keyChange query fails.
+ */
+Crypto.prototype._invalidateDeviceListsSince = function(oldSyncToken) {
+    return this._baseApis.getKeyChanges(
+        oldSyncToken, this.lastKnownSyncToken,
+    ).then((r) => {
+        if (!r.changed || !Array.isArray(r.changed)) {
+            return;
+        }
+
+        // only invalidate users we share an e2e room with - we don't
+        // care about users in non-e2e rooms.
+        const filteredUserIds = this._getE2eRoomMembers();
+        r.changed.forEach((u) => {
+            if (u in filteredUserIds) {
+                this._deviceList.invalidateUserDeviceList(u);
+            }
+        });
+        return this._deviceList.flushNewDeviceRequests();
+    });
+};
+
+/**
+ * Invalidate any stored device list for any users we share an e2e room with
+ *
+ * @private
+ */
+Crypto.prototype._invalidateDeviceListForAllActiveUsers = function() {
+    Object.keys(this._getE2eRoomMembers()).forEach((m) => {
+        this._deviceList.invalidateUserDeviceList(m);
+    });
+};
+
+/**
+ * get the users we share an e2e-enabled room with
+ *
+ * @returns {Object<string>} userid->userid map (should be a Set but argh ES6)
+ */
+Crypto.prototype._getE2eRoomMembers = function() {
+    const userIds = Object.create(null);
+
+    const rooms = this._getE2eRooms();
+    for (const r of rooms) {
+        const members = r.getJoinedMembers();
+        members.forEach((m) => { userIds[m.userId] = m.userId; });
+    }
+
+    return userIds;
+};
+
+/**
+ * Get a list of the e2e-enabled rooms we are members of
+ *
+ * @returns {module:models.Room[]}
+ */
+Crypto.prototype._getE2eRooms = function() {
+    return this._clientStore.getRooms().filter((room) => {
+        // check for rooms with encryption enabled
+        const alg = this._roomEncryptors[room.roomId];
+        if (!alg) {
+            return false;
+        }
+
+        // ignore any rooms which we have left
+        const me = room.getMember(this._userId);
+        if (!me || (
+            me.membership !== "join" && me.membership !== "invite"
+        )) {
+            return false;
+        }
+
+        return true;
     });
 };
 
@@ -873,12 +981,6 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
     }
 
     this._deviceList.invalidateUserDeviceList(userId);
-
-    // we delay handling these until the intialsync has completed, so that we
-    // can do all of them together.
-    if (this._initialSyncCompleted) {
-        this._deviceList.flushNewDeviceRequests();
-    }
 };
 
 
