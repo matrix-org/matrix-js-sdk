@@ -386,6 +386,8 @@ Crypto.prototype.listDeviceKeys = function(userId) {
  *
  * @param {?boolean} known whether to mark that the user has been made aware of
  *      the existence of this device. Null to leave unchanged
+ *
+ * @return {module:crypto/deviceinfo} updated DeviceInfo
  */
 Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
                                                   blocked, known) {
@@ -414,12 +416,12 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
         knownStatus = known;
     }
 
-    if (dev.verified === verificationStatus && dev.known === knownStatus) {
-        return;
+    if (dev.verified !== verificationStatus || dev.known !== knownStatus) {
+        dev.verified = verificationStatus;
+        dev.known = knownStatus;
+        this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
     }
-    dev.verified = verificationStatus;
-    dev.known = knownStatus;
-    this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
+    return DeviceInfo.fromStorage(dev, deviceId);
 };
 
 

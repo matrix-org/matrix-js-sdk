@@ -418,8 +418,10 @@ function _setDeviceVerification(client, userId, deviceId, verified, blocked, kno
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked, known);
-    client.emit("deviceVerificationChanged", userId, deviceId);
+    const dev = client._crypto.setDeviceVerification(
+        userId, deviceId, verified, blocked, known,
+    );
+    client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
 
 /**
@@ -3163,6 +3165,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @event module:client~MatrixClient#"deviceVerificationChanged"
  * @param {string} userId the owner of the verified device
  * @param {string} deviceId the id of the verified device
+ * @param {module:crypto/deviceinfo} deviceInfo updated device information
  */
 
 /**
