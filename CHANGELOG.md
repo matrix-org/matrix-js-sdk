@@ -1,20 +1,10 @@
-Changes in [0.7.5-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.2) (2017-02-03)
+Changes in unreleased
 ==========================================================================================================
-[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.1...v0.7.5-rc.2)
 
- * Use the device change notifications interface
-   [\#348](https://github.com/matrix-org/matrix-js-sdk/pull/348)
- * Rewrite the device key query logic
-   [\#347](https://github.com/matrix-org/matrix-js-sdk/pull/347)
-
-Changes in [0.7.5-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.2) (2017-02-03)
-==========================================================================================================
-[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.1...v0.7.5-rc.2)
-
- * Use the device change notifications interface
-   [\#348](https://github.com/matrix-org/matrix-js-sdk/pull/348)
- * Rewrite the device key query logic
-   [\#347](https://github.com/matrix-org/matrix-js-sdk/pull/347)
+ * Include DeviceInfo in deviceVerificationChanged events
+   [a3cc8eb](https://github.com/matrix-org/matrix-js-sdk/commit/a3cc8eb1f6d165576a342596f638316721cb26b6)
+ * Fix device list update
+   [5fd7410](https://github.com/matrix-org/matrix-js-sdk/commit/5fd74109ffc56b73deb40c2604d84c38b8032c40)
 
 Changes in [0.7.5-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.2) (2017-02-03)
 ==========================================================================================================
