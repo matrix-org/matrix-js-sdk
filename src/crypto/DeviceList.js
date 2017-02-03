@@ -56,7 +56,7 @@ export default class DeviceList {
         // promises we need to wait for while the download happens
         const promises = [];
 
-        let needsFlush = false;
+        let needsRefresh = false;
         userIds.forEach((u) => {
             if (this._keyDownloadsInProgressByUser[u]) {
                 // just wait for the existing download to complete
@@ -66,13 +66,13 @@ export default class DeviceList {
                     this.invalidateUserDeviceList(u);
                 }
                 if (this._pendingUsersWithNewDevices[u]) {
-                    needsFlush = true;
+                    needsRefresh = true;
                 }
             }
         });
 
-        if (needsFlush) {
-            promises.push(this.flushNewDeviceRequests(true));
+        if (needsRefresh) {
+            promises.push(this.refreshOutdatedDeviceLists(true));
         }
 
         return q.all(promises).then(() => {
@@ -190,11 +190,18 @@ export default class DeviceList {
      * Mark the cached device list for the given user outdated.
      *
      * This doesn't set off an update, so that several users can be batched
-     * together. Call flushDeviceListRequests() for that.
+     * together. Call refreshOutdatedDeviceLists() for that.
      *
      * @param {String} userId
      */
     invalidateUserDeviceList(userId) {
+        // sanity-check the userId. This is mostly paranoia, but if synapse
+        // can't parse the userId we give it as an mxid, it 500s the whole
+        // request and we can never update the device lists again (because
+        // the broken userId is always 'invalid' and always included in any
+        // refresh request).
+        // By checking it is at least a string, we can eliminate a class of
+        // silly errors.
         if (typeof userId !== 'string') {
             throw new Error('userId must be a string; was '+userId);
         }
@@ -207,14 +214,15 @@ export default class DeviceList {
      * We tolerate multiple concurrent device queries, but only one query per
      * user.
      *
-     * If any users already have downloads in progress, they are ignored -
-     * they will be refreshed when the current download completes anyway.
+     * If any users already have downloads in progress, they are ignored - they
+     * will be refreshed when the current download completes anyway, so
+     * each user with outdated device lists will be updated eventually.
      *
      * The returned promise resolves immediately if there are no users with
      * outdated device lists, or if all users with outdated device lists already
      * have a query in progress.
      *
-     * Otherwise, a new query request is made, and the promise resolves or
+     * Otherwise, a new query request is made, and the promise resolves
      * once that query completes. If the query fails, the promise will reject
      * if rejectOnFailure was truthy, otherwise it will still resolve.
      *
@@ -223,7 +231,7 @@ export default class DeviceList {
      *
      * @return {Promise}
      */
-    flushNewDeviceRequests(rejectOnFailure) {
+    refreshOutdatedDeviceLists(rejectOnFailure) {
         const users = Object.keys(this._pendingUsersWithNewDevices).filter(
             (u) => !this._keyDownloadsInProgressByUser[u],
         );
@@ -240,7 +248,7 @@ export default class DeviceList {
             // flush out any more requests that were blocked up while that
             // was going on, but let the initial promise complete now.
             //
-            this.flushNewDeviceRequests().done();
+            this.refreshOutdatedDeviceLists().done();
         }, (e) => {
             console.error(
                 'Error updating device key cache for ' + users + ":", e,
