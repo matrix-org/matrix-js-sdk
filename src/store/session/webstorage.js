@@ -100,6 +100,27 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
+     * Store the sync token corresponding to the device list.
+     *
+     * This is used when starting the client, to get a list of the users who
+     * have changed their device list since the list time we were running.
+     *
+     * @param {String?} token
+     */
+    storeEndToEndDeviceSyncToken: function(token) {
+        setJsonItem(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN, token);
+    },
+
+    /**
+     * Get the sync token corresponding to the device list.
+     *
+     * @return {String?} token
+     */
+    getEndToEndDeviceSyncToken: function() {
+        return getJsonItem(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
+    },
+
+    /**
      * Store a session between the logged-in user and another device
      * @param {string} deviceKey The public key of the other device.
      * @param {string} sessionId The ID for this end-to-end session.
@@ -180,6 +201,7 @@ WebStorageSessionStore.prototype = {
 
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
+const KEY_END_TO_END_DEVICE_SYNC_TOKEN = E2E_PREFIX + "device_sync_token";
 
 function keyEndToEndDevicesForUser(userId) {
     return E2E_PREFIX + "devices/" + userId;
@@ -199,6 +221,8 @@ function keyEndToEndRoom(roomId) {
 
 function getJsonItem(store, key) {
     try {
+        // if the key is absent, store.getItem() returns null, and
+        // JSON.parse(null) === null, so this returns null.
         return JSON.parse(store.getItem(key));
     } catch (e) {
         debuglog("Failed to get key %s: %s", key, e);

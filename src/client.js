@@ -158,6 +158,7 @@ function MatrixClient(opts) {
             this, this,
             opts.sessionStore,
             userId, this.deviceId,
+            this.store,
         );
 
         this.olmVersion = Crypto.getOlmVersion();
@@ -2665,8 +2666,6 @@ MatrixClient.prototype.startClient = function(opts) {
         };
     }
 
-    this._clientOpts = opts;
-
     if (this._crypto) {
         this._crypto.uploadKeys(5).done();
         const tenMinutes = 1000 * 60 * 10;
@@ -2684,6 +2683,13 @@ MatrixClient.prototype.startClient = function(opts) {
         console.error("Still have sync object whilst not running: stopping old one");
         this._syncApi.stop();
     }
+
+    // shallow-copy the opts dict before modifying and storing it
+    opts = Object.assign({}, opts);
+
+    opts.crypto = this._crypto;
+    this._clientOpts = opts;
+
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
 };
@@ -3067,12 +3073,26 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * </ul>
  *
  * @event module:client~MatrixClient#"sync"
+ *
  * @param {string} state An enum representing the syncing state. One of "PREPARED",
  * "SYNCING", "ERROR", "STOPPED".
+ *
  * @param {?string} prevState An enum representing the previous syncing state.
  * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
+ *
  * @param {?Object} data Data about this transition.
+ *
  * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ *
+ * @param {String} data.oldSyncToken The 'since' token passed to /sync.
+ *    <code>null</code> for the first successful sync since this client was
+ *    started. Only present if <code>state=PREPARED</code> or
+ *    <code>state=SYNCING</code>.
+ *
+ * @param {String} data.nextSyncToken The 'next_batch' result from /sync, which
+ *    will become the 'since' token for the next call to /sync. Only present if
+ *    <code>state=PREPARED</code> or <code>state=SYNCING</code>.
+ *
  * @example
  * matrixClient.on("sync", function(state, prevState, data) {
  *   switch (state) {
