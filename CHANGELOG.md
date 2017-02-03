@@ -1,3 +1,38 @@
+Changes in [0.7.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.1) (2017-02-03)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.4...v0.7.5-rc.1)
+
+ * Support for blacklisting unverified devices, both per-room and globally
+   [\#336](https://github.com/matrix-org/matrix-js-sdk/pull/336)
+ * track errors when events can't be sent
+   [\#349](https://github.com/matrix-org/matrix-js-sdk/pull/349)
+ * Factor out device list management
+   [\#346](https://github.com/matrix-org/matrix-js-sdk/pull/346)
+ * Support for warning users when unknown devices show up
+   [\#335](https://github.com/matrix-org/matrix-js-sdk/pull/335)
+ * Enable sourcemaps in browserified distro
+   [\#345](https://github.com/matrix-org/matrix-js-sdk/pull/345)
+ * Record all e2e room settings in localstorage
+   [\#344](https://github.com/matrix-org/matrix-js-sdk/pull/344)
+ * Make Olm work with browserified js-sdk
+   [\#340](https://github.com/matrix-org/matrix-js-sdk/pull/340)
+ * Make browserify a dev dependency
+   [\#339](https://github.com/matrix-org/matrix-js-sdk/pull/339)
+ * Allow single line brace-style
+   [\#338](https://github.com/matrix-org/matrix-js-sdk/pull/338)
+ * Turn on comma-dangle for function calls
+   [\#333](https://github.com/matrix-org/matrix-js-sdk/pull/333)
+ * Add prefer-const
+   [\#331](https://github.com/matrix-org/matrix-js-sdk/pull/331)
+ * Support for importing and exporting megolm sessions
+   [\#326](https://github.com/matrix-org/matrix-js-sdk/pull/326)
+ * Fix linting on all tests
+   [\#329](https://github.com/matrix-org/matrix-js-sdk/pull/329)
+ * Fix ESLint warnings and errors
+   [\#325](https://github.com/matrix-org/matrix-js-sdk/pull/325)
+ * BREAKING CHANGE: Remove WebStorageStore
+   [\#324](https://github.com/matrix-org/matrix-js-sdk/pull/324)
+
 Changes in [0.7.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.4) (2017-01-16)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.4-rc.1...v0.7.4)
