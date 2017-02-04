@@ -225,6 +225,14 @@ if [ -z "$skip_jsdoc" ]; then
     git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
 fi
 
+# publish to npmjs
+npm publish
+
+# if it is a pre-release, leave it on the release branch for now.
+if [ $prerelease -eq 1 ]; then
+    exit 0
+fi
+
 # merge release branch to master
 echo "updating master branch"
 git checkout master
@@ -236,9 +244,6 @@ git push origin master
 if [ -z "$skip_jsdoc" ]; then
     git push origin gh-pages
 fi
-
-# publish to npmjs
-npm publish
 
 # finally, merge master back onto develop
 git checkout develop
