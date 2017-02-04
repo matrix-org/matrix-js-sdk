@@ -1,3 +1,9 @@
+Changes in [0.7.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5) (2017-02-04)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.3...v0.7.5)
+
+No changes from 0.7.5-rc.3
+
 Changes in [0.7.5-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5-rc.3) (2017-02-03)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.2...v0.7.5-rc.3)
