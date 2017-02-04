@@ -186,6 +186,13 @@ if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
     GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
+
+    # also make a signature for the source tarball.
+    project_name=`jq -r '.name' package.json`
+    source_sigfile="${tag}-src.tar.gz.asc"
+    git archive --format tgz --prefix="${project_name}-${release}/" "$tag" |
+        gpg -u "$signing_id" --armor --output "$source_sigfile" --detach-sig -
+    assets="$assets -a $source_sigfile"
 else
     git tag -a -F "${latest_changes}" "$tag"
 fi
