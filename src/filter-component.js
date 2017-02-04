@@ -27,10 +27,9 @@ limitations under the License.
  */
 function _matches_wildcard(actual_value, filter_value) {
     if (filter_value.endsWith("*")) {
-        var type_prefix = filter_value.slice(0, -1);
+        const type_prefix = filter_value.slice(0, -1);
         return actual_value.substr(0, type_prefix.length) === type_prefix;
-    }
-    else {
+    } else {
         return actual_value === filter_value;
     }
 }
@@ -71,7 +70,7 @@ FilterComponent.prototype.check = function(event) {
         event.getRoomId(),
         event.getSender(),
         event.getType(),
-        event.getContent() ? event.getContent().url !== undefined : false
+        event.getContent() ? event.getContent().url !== undefined : false,
     );
 };
 
@@ -84,24 +83,29 @@ FilterComponent.prototype.check = function(event) {
  * @return {bool} true if the event fields match the filter
  */
 FilterComponent.prototype._checkFields =
-    function(room_id, sender, event_type, contains_url)
-{
-    var literal_keys = {
-        "rooms": function(v) { return room_id === v; },
-        "senders": function(v) { return sender === v; },
-        "types": function(v) { return _matches_wildcard(event_type, v); },
+    function(room_id, sender, event_type, contains_url) {
+    const literal_keys = {
+        "rooms": function(v) {
+            return room_id === v;
+        },
+        "senders": function(v) {
+            return sender === v;
+        },
+        "types": function(v) {
+            return _matches_wildcard(event_type, v);
+        },
     };
 
-    var self = this;
+    const self = this;
     Object.keys(literal_keys).forEach(function(name) {
-        var match_func = literal_keys[name];
-        var not_name = "not_" + name;
-        var disallowed_values = self[not_name];
+        const match_func = literal_keys[name];
+        const not_name = "not_" + name;
+        const disallowed_values = self[not_name];
         if (disallowed_values.map(match_func)) {
             return false;
         }
 
-        var allowed_values = self[name];
+        const allowed_values = self[name];
         if (allowed_values) {
             if (!allowed_values.map(match_func)) {
                 return false;
@@ -109,7 +113,7 @@ FilterComponent.prototype._checkFields =
         }
     });
 
-    var contains_url_filter = this.filter_json.contains_url;
+    const contains_url_filter = this.filter_json.contains_url;
     if (contains_url_filter !== undefined) {
         if (contains_url_filter !== contains_url) {
             return false;

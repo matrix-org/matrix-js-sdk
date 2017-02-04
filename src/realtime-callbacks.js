@@ -27,20 +27,20 @@ limitations under the License.
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
-var TIMER_CHECK_PERIOD_MS = 1000;
+const TIMER_CHECK_PERIOD_MS = 1000;
 
 // counter, for making up ids to return from setTimeout
-var _count = 0;
+let _count = 0;
 
 // the key for our callback with the real global.setTimeout
-var _realCallbackKey;
+let _realCallbackKey;
 
 // a sorted list of the callbacks to be run.
 // each is an object with keys [runAt, func, params, key].
-var _callbackList = [];
+const _callbackList = [];
 
 // var debuglog = console.log.bind(console);
-var debuglog = function() {};
+const debuglog = function() {};
 
 /**
  * Replace the function used by this module to get the current time.
@@ -54,7 +54,7 @@ var debuglog = function() {};
 module.exports.setNow = function(f) {
     _now = f || Date.now;
 };
-var _now = Date.now;
+let _now = Date.now;
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if
@@ -72,12 +72,12 @@ module.exports.setTimeout = function(func, delayMs) {
         delayMs = 0;
     }
 
-    var params = Array.prototype.slice.call(arguments, 2);
-    var runAt = _now() + delayMs;
-    var key = _count++;
+    const params = Array.prototype.slice.call(arguments, 2);
+    const runAt = _now() + delayMs;
+    const key = _count++;
     debuglog("setTimeout: scheduling cb", key, "at", runAt,
              "(delay", delayMs, ")");
-    var data = {
+    const data = {
         runAt: runAt,
         func: func,
         params: params,
@@ -85,10 +85,10 @@ module.exports.setTimeout = function(func, delayMs) {
     };
 
     // figure out where it goes in the list
-    var idx = binarySearch(
+    const idx = binarySearch(
         _callbackList, function(el) {
             return el.runAt - runAt;
-        }
+        },
     );
 
     _callbackList.splice(idx, 0, data);
@@ -108,9 +108,9 @@ module.exports.clearTimeout = function(key) {
     }
 
     // remove the element from the list
-    var i;
+    let i;
     for (i = 0; i < _callbackList.length; i++) {
-        var cb = _callbackList[i];
+        const cb = _callbackList[i];
         if (cb.key == key) {
             _callbackList.splice(i, 1);
             break;
@@ -129,29 +129,29 @@ function _scheduleRealCallback() {
         global.clearTimeout(_realCallbackKey);
     }
 
-    var first = _callbackList[0];
+    const first = _callbackList[0];
 
     if (!first) {
         debuglog("_scheduleRealCallback: no more callbacks, not rescheduling");
         return;
     }
 
-    var now = _now();
-    var delayMs = Math.min(first.runAt - now, TIMER_CHECK_PERIOD_MS);
+    const now = _now();
+    const delayMs = Math.min(first.runAt - now, TIMER_CHECK_PERIOD_MS);
 
     debuglog("_scheduleRealCallback: now:", now, "delay:", delayMs);
     _realCallbackKey = global.setTimeout(_runCallbacks, delayMs);
 }
 
 function _runCallbacks() {
-    var cb;
-    var now = _now();
+    let cb;
+    const now = _now();
     debuglog("_runCallbacks: now:", now);
 
     // get the list of things to call
-    var callbacksToRun = [];
+    const callbacksToRun = [];
     while (true) {
-        var first = _callbackList[0];
+        const first = _callbackList[0];
         if (!first || first.runAt > now) {
             break;
         }
@@ -165,7 +165,7 @@ function _runCallbacks() {
     // register their own setTimeouts.
     _scheduleRealCallback();
 
-    for (var i = 0; i < callbacksToRun.length; i++) {
+    for (let i = 0; i < callbacksToRun.length; i++) {
         cb = callbacksToRun[i];
         try {
             cb.func.apply(null, cb.params);
@@ -184,12 +184,12 @@ function _runCallbacks() {
  */
 function binarySearch(array, func) {
     // min is inclusive, max exclusive.
-    var min = 0,
+    let min = 0,
         max = array.length;
 
     while (min < max) {
-        var mid = (min + max) >> 1;
-        var res = func(array[mid]);
+        const mid = (min + max) >> 1;
+        const res = func(array[mid]);
         if (res > 0) {
             // the element at 'mid' is too big; set it as the new max.
             max = mid;

@@ -1,17 +1,18 @@
 "use strict";
-var sdk = require("../..");
-var MatrixClient = sdk.MatrixClient;
-var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
+const sdk = require("../..");
+const MatrixClient = sdk.MatrixClient;
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
 
 describe("MatrixClient opts", function() {
-    var baseUrl = "http://localhost.or.something";
-    var client, httpBackend;
-    var userId = "@alice:localhost";
-    var userB = "@bob:localhost";
-    var accessToken = "aseukfgwef";
-    var roomId = "!foo:bar";
-    var syncData = {
+    const baseUrl = "http://localhost.or.something";
+    let client = null;
+    let httpBackend = null;
+    const userId = "@alice:localhost";
+    const userB = "@bob:localhost";
+    const accessToken = "aseukfgwef";
+    const roomId = "!foo:bar";
+    const syncData = {
         next_batch: "s_5_3",
         presence: {},
         rooms: {
@@ -20,36 +21,36 @@ describe("MatrixClient opts", function() {
                     timeline: {
                         events: [
                             utils.mkMessage({
-                                room: roomId, user: userB, msg: "hello"
-                            })
+                                room: roomId, user: userB, msg: "hello",
+                            }),
                         ],
-                        prev_batch: "f_1_1"
+                        prev_batch: "f_1_1",
                     },
                     state: {
                         events: [
                             utils.mkEvent({
                                 type: "m.room.name", room: roomId, user: userB,
                                 content: {
-                                    name: "Old room name"
-                                }
+                                    name: "Old room name",
+                                },
                             }),
                             utils.mkMembership({
-                                room: roomId, mship: "join", user: userB, name: "Bob"
+                                room: roomId, mship: "join", user: userB, name: "Bob",
                             }),
                             utils.mkMembership({
-                                room: roomId, mship: "join", user: userId, name: "Alice"
+                                room: roomId, mship: "join", user: userId, name: "Alice",
                             }),
                             utils.mkEvent({
                                 type: "m.room.create", room: roomId, user: userId,
                                 content: {
-                                    creator: userId
-                                }
-                            })
-                        ]
-                    }
-                }
-            }
-        }
+                                    creator: userId,
+                                },
+                            }),
+                        ],
+                    },
+                },
+            },
+        },
     };
 
     beforeEach(function() {
@@ -69,7 +70,7 @@ describe("MatrixClient opts", function() {
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
-                scheduler: new sdk.MatrixScheduler()
+                scheduler: new sdk.MatrixScheduler(),
             });
         });
 
@@ -78,9 +79,9 @@ describe("MatrixClient opts", function() {
         });
 
         it("should be able to send messages", function(done) {
-            var eventId = "$flibble:wibble";
+            const eventId = "$flibble:wibble";
             httpBackend.when("PUT", "/txn1").respond(200, {
-                event_id: eventId
+                event_id: eventId,
             });
             client.sendTextMessage("!foo:bar", "a body", "txn1").done(function(res) {
                 expect(res.event_id).toEqual(eventId);
@@ -90,16 +91,16 @@ describe("MatrixClient opts", function() {
         });
 
         it("should be able to sync / get new events", function(done) {
-            var expectedEventTypes = [ // from /initialSync
+            const expectedEventTypes = [ // from /initialSync
                 "m.room.message", "m.room.name", "m.room.member", "m.room.member",
-                "m.room.create"
+                "m.room.create",
             ];
             client.on("event", function(event) {
                 expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
-                    -1, "Recv unexpected event type: " + event.getType()
+                    -1, "Recv unexpected event type: " + event.getType(),
                 );
                 expectedEventTypes.splice(
-                    expectedEventTypes.indexOf(event.getType()), 1
+                    expectedEventTypes.indexOf(event.getType()), 1,
                 );
             });
             httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -112,7 +113,7 @@ describe("MatrixClient opts", function() {
                 return httpBackend.flush("/sync", 1);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
-                    0, "Expected to see event types: " + expectedEventTypes
+                    0, "Expected to see event types: " + expectedEventTypes,
                 );
                 done();
             });
@@ -127,14 +128,14 @@ describe("MatrixClient opts", function() {
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
-                scheduler: undefined
+                scheduler: undefined,
             });
         });
 
         it("shouldn't retry sending events", function(done) {
             httpBackend.when("PUT", "/txn1").fail(500, {
                 errcode: "M_SOMETHING",
-                error: "Ruh roh"
+                error: "Ruh roh",
             });
             client.sendTextMessage("!foo:bar", "a body", "txn1").done(function(res) {
                 expect(false).toBe(true, "sendTextMessage resolved but shouldn't");
@@ -147,13 +148,13 @@ describe("MatrixClient opts", function() {
 
         it("shouldn't queue events", function(done) {
             httpBackend.when("PUT", "/txn1").respond(200, {
-                event_id: "AAA"
+                event_id: "AAA",
             });
             httpBackend.when("PUT", "/txn2").respond(200, {
-                event_id: "BBB"
+                event_id: "BBB",
             });
-            var sentA = false;
-            var sentB = false;
+            let sentA = false;
+            let sentB = false;
             client.sendTextMessage("!foo:bar", "a body", "txn1").done(function(res) {
                 sentA = true;
                 expect(sentB).toBe(true);
@@ -171,7 +172,7 @@ describe("MatrixClient opts", function() {
 
         it("should be able to send messages", function(done) {
             httpBackend.when("PUT", "/txn1").respond(200, {
-                event_id: "foo"
+                event_id: "foo",
             });
             client.sendTextMessage("!foo:bar", "a body", "txn1").done(function(res) {
                 expect(res.event_id).toEqual("foo");

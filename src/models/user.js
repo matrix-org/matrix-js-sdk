@@ -17,8 +17,8 @@ limitations under the License.
 /**
  * @module models/user
  */
- var EventEmitter = require("events").EventEmitter;
- var utils = require("../utils");
+ const EventEmitter = require("events").EventEmitter;
+ const utils = require("../utils");
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -54,7 +54,7 @@ function User(userId) {
     this.currentlyActive = false;
     this.events = {
         presence: null,
-        profile: null
+        profile: null,
     };
     this._updateModifiedTime();
 }
@@ -73,26 +73,23 @@ User.prototype.setPresenceEvent = function(event) {
     if (event.getType() !== "m.presence") {
         return;
     }
-    var firstFire = this.events.presence === null;
+    const firstFire = this.events.presence === null;
     this.events.presence = event;
 
-    var eventsToFire = [];
+    const eventsToFire = [];
     if (event.getContent().presence !== this.presence || firstFire) {
         eventsToFire.push("User.presence");
     }
     if (event.getContent().avatar_url &&
-        event.getContent().avatar_url !== this.avatarUrl)
-    {
+        event.getContent().avatar_url !== this.avatarUrl) {
         eventsToFire.push("User.avatarUrl");
     }
     if (event.getContent().displayname &&
-        event.getContent().displayname !== this.displayName)
-    {
+        event.getContent().displayname !== this.displayName) {
         eventsToFire.push("User.displayName");
     }
     if (event.getContent().currently_active !== undefined &&
-        event.getContent().currently_active !== this.currentlyActive)
-    {
+        event.getContent().currently_active !== this.currentlyActive) {
         eventsToFire.push("User.currentlyActive");
     }
 
@@ -114,7 +111,7 @@ User.prototype.setPresenceEvent = function(event) {
 
     this._updateModifiedTime();
 
-    for (var i = 0; i < eventsToFire.length; i++) {
+    for (let i = 0; i < eventsToFire.length; i++) {
         this.emit(eventsToFire[i], event, this);
     }
 };
@@ -125,7 +122,7 @@ User.prototype.setPresenceEvent = function(event) {
  * @param {string} name The new display name.
  */
 User.prototype.setDisplayName = function(name) {
-    var oldName = this.displayName;
+    const oldName = this.displayName;
     this.displayName = name;
     if (name !== oldName) {
         this._updateModifiedTime();
@@ -149,7 +146,7 @@ User.prototype.setRawDisplayName = function(name) {
  * @param {string} url The new avatar URL.
  */
 User.prototype.setAvatarUrl = function(url) {
-    var oldUrl = this.avatarUrl;
+    const oldUrl = this.avatarUrl;
     this.avatarUrl = url;
     if (url !== oldUrl) {
         this._updateModifiedTime();

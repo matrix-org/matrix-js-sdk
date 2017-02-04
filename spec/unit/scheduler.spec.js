@@ -1,22 +1,23 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-var q = require("q");
-var sdk = require("../..");
-var MatrixScheduler = sdk.MatrixScheduler;
-var MatrixError = sdk.MatrixError;
-var utils = require("../test-utils");
+const q = require("q");
+const sdk = require("../..");
+const MatrixScheduler = sdk.MatrixScheduler;
+const MatrixError = sdk.MatrixError;
+const utils = require("../test-utils");
 
 describe("MatrixScheduler", function() {
-    var scheduler;
-    var retryFn, queueFn;
-    var defer;
-    var roomId = "!foo:bar";
-    var eventA = utils.mkMessage({
-        user: "@alice:bar", room: roomId, event: true
+    let scheduler;
+    let retryFn;
+    let queueFn;
+    let defer;
+    const roomId = "!foo:bar";
+    const eventA = utils.mkMessage({
+        user: "@alice:bar", room: roomId, event: true,
     });
-    var eventB = utils.mkMessage({
-        user: "@alice:bar", room: roomId, event: true
+    const eventB = utils.mkMessage({
+        user: "@alice:bar", room: roomId, event: true,
     });
 
     beforeEach(function() {
@@ -45,15 +46,14 @@ describe("MatrixScheduler", function() {
         queueFn = function() {
             return "one_big_queue";
         };
-        var deferA = q.defer();
-        var deferB = q.defer();
-        var resolvedA = false;
+        const deferA = q.defer();
+        const deferB = q.defer();
+        let resolvedA = false;
         scheduler.setProcessFunction(function(event) {
             if (resolvedA) {
                 expect(event).toEqual(eventB);
                 return deferB.promise;
-            }
-            else {
+            } else {
                 expect(event).toEqual(eventA);
                 return deferA.promise;
             }
@@ -70,22 +70,23 @@ describe("MatrixScheduler", function() {
 
     it("should invoke the retryFn on failure and wait the amount of time specified",
     function(done) {
-        var waitTimeMs = 1500;
-        var retryDefer = q.defer();
+        const waitTimeMs = 1500;
+        const retryDefer = q.defer();
         retryFn = function() {
             retryDefer.resolve();
             return waitTimeMs;
         };
-        queueFn = function() { return "yep"; };
+        queueFn = function() {
+            return "yep";
+        };
 
-        var procCount = 0;
+        let procCount = 0;
         scheduler.setProcessFunction(function(ev) {
             procCount += 1;
             if (procCount === 1) {
                 expect(ev).toEqual(eventA);
                 return defer.promise;
-            }
-            else if (procCount === 2) {
+            } else if (procCount === 2) {
                 // don't care about this defer
                 return q.defer().promise;
             }
@@ -111,25 +112,26 @@ describe("MatrixScheduler", function() {
         retryFn = function() {
             return -1;
         };
-        queueFn = function() { return "yep"; };
+        queueFn = function() {
+ return "yep";
+};
 
-        var deferA = q.defer();
-        var deferB = q.defer();
-        var procCount = 0;
+        const deferA = q.defer();
+        const deferB = q.defer();
+        let procCount = 0;
         scheduler.setProcessFunction(function(ev) {
             procCount += 1;
             if (procCount === 1) {
                 expect(ev).toEqual(eventA);
                 return deferA.promise;
-            }
-            else if (procCount === 2) {
+            } else if (procCount === 2) {
                 expect(ev).toEqual(eventB);
                 return deferB.promise;
             }
             expect(procCount).toBeLessThan(3);
         });
 
-        var globalA = scheduler.queueEvent(eventA);
+        const globalA = scheduler.queueEvent(eventA);
         scheduler.queueEvent(eventB);
 
         expect(procCount).toEqual(1);
@@ -147,10 +149,10 @@ describe("MatrixScheduler", function() {
         // Expect to have processFn invoked for A&B.
         // Resolve A.
         // Expect to have processFn invoked for D.
-        var eventC = utils.mkMessage({user: "@a:bar", room: roomId, event: true});
-        var eventD = utils.mkMessage({user: "@b:bar", room: roomId, event: true});
+        const eventC = utils.mkMessage({user: "@a:bar", room: roomId, event: true});
+        const eventD = utils.mkMessage({user: "@b:bar", room: roomId, event: true});
 
-        var buckets = {};
+        const buckets = {};
         buckets[eventA.getId()] = "queue_A";
         buckets[eventD.getId()] = "queue_A";
         buckets[eventB.getId()] = "queue_B";
@@ -163,12 +165,12 @@ describe("MatrixScheduler", function() {
             return buckets[event.getId()];
         };
 
-        var expectOrder = [
-            eventA.getId(), eventB.getId(), eventD.getId()
+        const expectOrder = [
+            eventA.getId(), eventB.getId(), eventD.getId(),
         ];
-        var deferA = q.defer();
+        const deferA = q.defer();
         scheduler.setProcessFunction(function(event) {
-            var id = expectOrder.shift();
+            const id = expectOrder.shift();
             expect(id).toEqual(event.getId());
             if (expectOrder.length === 0) {
                 done();
@@ -199,7 +201,7 @@ describe("MatrixScheduler", function() {
             queueFn = function() {
                 return "yep";
             };
-            var prom = scheduler.queueEvent(eventA);
+            const prom = scheduler.queueEvent(eventA);
             expect(prom).toBeDefined();
             expect(prom.then).toBeDefined();
         });
@@ -227,15 +229,15 @@ describe("MatrixScheduler", function() {
             };
             scheduler.queueEvent(eventA);
             scheduler.queueEvent(eventB);
-            var queue = scheduler.getQueueForEvent(eventA);
+            const queue = scheduler.getQueueForEvent(eventA);
             expect(queue.length).toEqual(2);
             expect(queue).toEqual([eventA, eventB]);
             // modify the queue
-            var eventC = utils.mkMessage(
-                {user: "@a:bar", room: roomId, event: true}
+            const eventC = utils.mkMessage(
+                {user: "@a:bar", room: roomId, event: true},
             );
             queue.push(eventC);
-            var queueAgain = scheduler.getQueueForEvent(eventA);
+            const queueAgain = scheduler.getQueueForEvent(eventA);
             expect(queueAgain.length).toEqual(2);
         });
 
@@ -246,9 +248,9 @@ describe("MatrixScheduler", function() {
             };
             scheduler.queueEvent(eventA);
             scheduler.queueEvent(eventB);
-            var queue = scheduler.getQueueForEvent(eventA);
+            const queue = scheduler.getQueueForEvent(eventA);
             queue[1].event.content.body = "foo";
-            var queueAgain = scheduler.getQueueForEvent(eventA);
+            const queueAgain = scheduler.getQueueForEvent(eventA);
             expect(queueAgain[1].event.content.body).toEqual("foo");
         });
     });
@@ -282,7 +284,7 @@ describe("MatrixScheduler", function() {
             queueFn = function() {
                 return "yep";
             };
-            var procCount = 0;
+            let procCount = 0;
             scheduler.queueEvent(eventA);
             scheduler.setProcessFunction(function(ev) {
                 procCount += 1;
@@ -296,7 +298,7 @@ describe("MatrixScheduler", function() {
             queueFn = function() {
                 return "yep";
             };
-            var procCount = 0;
+            let procCount = 0;
             scheduler.setProcessFunction(function(ev) {
                 procCount += 1;
                 return defer.promise;
@@ -310,41 +312,41 @@ describe("MatrixScheduler", function() {
             expect(MatrixScheduler.QUEUE_MESSAGES(eventA)).toEqual("message");
             expect(MatrixScheduler.QUEUE_MESSAGES(
                 utils.mkMembership({
-                    user: "@alice:bar", room: roomId, mship: "join", event: true
-                })
+                    user: "@alice:bar", room: roomId, mship: "join", event: true,
+                }),
             )).toEqual(null);
         });
     });
 
     describe("RETRY_BACKOFF_RATELIMIT", function() {
         it("should wait at least the time given on M_LIMIT_EXCEEDED", function() {
-            var res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
+            const res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
                 eventA, 1, new MatrixError({
-                    errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 5000
-                })
+                    errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 5000,
+                }),
             );
             expect(res >= 500).toBe(true, "Didn't wait long enough.");
         });
 
         it("should give up after 5 attempts", function() {
-            var res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 5, {}
+            const res = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
+                eventA, 5, {},
             );
             expect(res).toBe(-1, "Didn't give up.");
         });
 
         it("should do exponential backoff", function() {
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 1, {}
+                eventA, 1, {},
             )).toEqual(2000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 2, {}
+                eventA, 2, {},
             )).toEqual(4000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 3, {}
+                eventA, 3, {},
             )).toEqual(8000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(
-                eventA, 4, {}
+                eventA, 4, {},
             )).toEqual(16000);
         });
     });

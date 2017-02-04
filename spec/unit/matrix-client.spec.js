@@ -1,44 +1,46 @@
 "use strict";
-var q = require("q");
-var sdk = require("../..");
-var MatrixClient = sdk.MatrixClient;
-var utils = require("../test-utils");
+const q = require("q");
+const sdk = require("../..");
+const MatrixClient = sdk.MatrixClient;
+const utils = require("../test-utils");
 
 describe("MatrixClient", function() {
-    var userId = "@alice:bar";
-    var identityServerUrl = "https://identity.server";
-    var identityServerDomain = "identity.server";
-    var client, store, scheduler;
+    const userId = "@alice:bar";
+    const identityServerUrl = "https://identity.server";
+    const identityServerDomain = "identity.server";
+    let client;
+    let store;
+    let scheduler;
 
-    var KEEP_ALIVE_PATH = "/_matrix/client/versions";
+    const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
-    var PUSH_RULES_RESPONSE = {
+    const PUSH_RULES_RESPONSE = {
         method: "GET",
         path: "/pushrules/",
-        data: {}
+        data: {},
     };
 
-    var FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
+    const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
 
-    var FILTER_RESPONSE = {
+    const FILTER_RESPONSE = {
         method: "POST",
         path: FILTER_PATH,
-        data: { filter_id: "f1lt3r" }
+        data: { filter_id: "f1lt3r" },
     };
 
-    var SYNC_DATA = {
+    const SYNC_DATA = {
         next_batch: "s_5_3",
         presence: { events: [] },
-        rooms: {}
+        rooms: {},
     };
 
-    var SYNC_RESPONSE = {
+    const SYNC_RESPONSE = {
         method: "GET",
         path: "/sync",
-        data: SYNC_DATA
+        data: SYNC_DATA,
     };
 
-    var httpLookups = [
+    let httpLookups = [
         // items are objects which look like:
         // {
         //   method: "GET",
@@ -51,14 +53,14 @@ describe("MatrixClient", function() {
         // }
         // items are popped off when processed and block if no items left.
     ];
-    var accept_keepalives;
-    var pendingLookup = null;
+    let acceptKeepalives;
+    let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
-        if (path === KEEP_ALIVE_PATH && accept_keepalives) {
+        if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return q();
         }
-        var next = httpLookups.shift();
-        var logLine = (
+        const next = httpLookups.shift();
+        const logLine = (
             "MatrixClient[UT] RECV " + method + " " + path + "  " +
             "EXPECT " + (next ? next.method : next) + " " + (next ? next.path : next)
         );
@@ -73,20 +75,20 @@ describe("MatrixClient", function() {
                 expect(false).toBe(
                     true, ">1 pending request. You should probably handle them. " +
                     "PENDING: " + JSON.stringify(pendingLookup) + " JUST GOT: " +
-                    method + " " + path
+                    method + " " + path,
                 );
             }
             pendingLookup = {
                 promise: q.defer().promise,
                 method: method,
-                path: path
+                path: path,
             };
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
             console.log(
                 "MatrixClient[UT] Matched. Returning " +
-                (next.error ? "BAD" : "GOOD") + " response"
+                (next.error ? "BAD" : "GOOD") + " response",
             );
             if (next.expectBody) {
                 expect(next.expectBody).toEqual(data);
@@ -107,7 +109,7 @@ describe("MatrixClient", function() {
                     httpStatus: next.error.httpStatus,
                     name: next.error.errcode,
                     message: "Expected testing error",
-                    data: next.error
+                    data: next.error,
                 });
             }
             return q(next.data);
@@ -121,12 +123,12 @@ describe("MatrixClient", function() {
         jasmine.Clock.useMock();
         scheduler = jasmine.createSpyObj("scheduler", [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-            "setProcessFunction"
+            "setProcessFunction",
         ]);
         store = jasmine.createSpyObj("store", [
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
             "setSyncToken", "storeEvents", "storeRoom", "storeUser",
-            "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter"
+            "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
         ]);
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
@@ -135,12 +137,12 @@ describe("MatrixClient", function() {
             request: function() {}, // NOP
             store: store,
             scheduler: scheduler,
-            userId: userId
+            userId: userId,
         });
         // FIXME: We shouldn't be yanking _http like this.
         client._http = jasmine.createSpyObj("httpApi", [
             "authedRequest", "authedRequestWithPrefix", "getContentUri",
-            "request", "requestWithPrefix", "uploadContent"
+            "request", "requestWithPrefix", "uploadContent",
         ]);
         client._http.authedRequest.andCallFake(httpReq);
         client._http.authedRequestWithPrefix.andCallFake(httpReq);
@@ -148,7 +150,7 @@ describe("MatrixClient", function() {
         client._http.request.andCallFake(httpReq);
 
         // set reasonable working defaults
-        accept_keepalives = true;
+        acceptKeepalives = true;
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
@@ -174,9 +176,9 @@ describe("MatrixClient", function() {
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
-        var filterId = "ehfewf";
+        const filterId = "ehfewf";
         store.getFilterIdByName.andReturn(filterId);
-        var filter = new sdk.Filter(0, filterId);
+        const filter = new sdk.Filter(0, filterId);
         filter.setDefinition({"room": {"timeline": {"limit": 8}}});
         store.getFilter.andReturn(filter);
         client.startClient();
@@ -191,7 +193,6 @@ describe("MatrixClient", function() {
     });
 
     describe("getSyncState", function() {
-
         it("should return null if the client isn't started", function() {
             expect(client.getSyncState()).toBeNull();
         });
@@ -219,7 +220,7 @@ describe("MatrixClient", function() {
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
             }
-            var invalidFilterId = 'invalidF1lt3r';
+            const invalidFilterId = 'invalidF1lt3r';
             httpLookups = [];
             httpLookups.push({
                 method: "GET",
@@ -229,15 +230,15 @@ describe("MatrixClient", function() {
                     name: "M_UNKNOWN",
                     message: "No row found",
                     data: { errcode: "M_UNKNOWN", error: "No row found" },
-                    httpStatus: 404
-                }
+                    httpStatus: 404,
+                },
             });
             httpLookups.push(FILTER_RESPONSE);
             store.getFilterIdByName.andReturn(invalidFilterId);
 
-            var filterName = getFilterName(client.credentials.userId);
+            const filterName = getFilterName(client.credentials.userId);
             client.store.setFilterIdByName(filterName, invalidFilterId);
-            var filter = new sdk.Filter(client.credentials.userId);
+            const filter = new sdk.Filter(client.credentials.userId);
 
             client.getOrCreateFilter(filterName, filter).then(function(filterId) {
                 expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
@@ -256,7 +257,7 @@ describe("MatrixClient", function() {
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
-                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" }
+                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
@@ -279,17 +280,17 @@ describe("MatrixClient", function() {
 
         it("should work on /sync", function(done) {
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" }
+                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push({
-                method: "GET", path: "/sync", data: SYNC_DATA
+                method: "GET", path: "/sync", data: SYNC_DATA,
             });
 
             client.on("sync", function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
                     expect(client.retryImmediately()).toBe(
-                        true, "retryImmediately returned false"
+                        true, "retryImmediately returned false",
                     );
                     jasmine.Clock.tick(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
@@ -305,7 +306,7 @@ describe("MatrixClient", function() {
         it("should work on /pushrules", function(done) {
             httpLookups = [];
             httpLookups.push({
-                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" }
+                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
@@ -329,12 +330,11 @@ describe("MatrixClient", function() {
     });
 
     describe("emitted sync events", function() {
-
         function syncChecker(expectedStates, done) {
             return function syncListener(state, old) {
-                var expected = expectedStates.shift();
+                const expected = expectedStates.shift();
                 console.log(
-                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected
+                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
                 );
                 if (!expected) {
                     done();
@@ -352,18 +352,18 @@ describe("MatrixClient", function() {
         }
 
         it("should transition null -> PREPARED after the first /sync", function(done) {
-            var expectedStates = [];
+            const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
 
         it("should transition null -> ERROR after a failed /filter", function(done) {
-            var expectedStates = [];
+            const expectedStates = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
-                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" }
+                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
             client.on("sync", syncChecker(expectedStates, done));
@@ -372,22 +372,23 @@ describe("MatrixClient", function() {
 
         it("should transition ERROR -> PREPARED after /sync if prev failed",
         function(done) {
-            var expectedStates = [];
-            accept_keepalives = false;
+            const expectedStates = [];
+            acceptKeepalives = false;
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" }
+                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, data: {}
+                method: "GET", path: KEEP_ALIVE_PATH, data: {},
             });
             httpLookups.push({
-                method: "GET", path: "/sync", data: SYNC_DATA
+                method: "GET", path: "/sync", data: SYNC_DATA,
             });
 
             expectedStates.push(["RECONNECTING", null]);
@@ -398,7 +399,7 @@ describe("MatrixClient", function() {
         });
 
         it("should transition PREPARED -> SYNCING after /sync", function(done) {
-            var expectedStates = [];
+            const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             client.on("sync", syncChecker(expectedStates, done));
@@ -406,13 +407,14 @@ describe("MatrixClient", function() {
         });
 
         it("should transition SYNCING -> ERROR after a failed /sync", function(done) {
-            accept_keepalives = false;
-            var expectedStates = [];
+            acceptKeepalives = false;
+            const expectedStates = [];
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
+                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
 
             expectedStates.push(["PREPARED", null]);
@@ -425,9 +427,9 @@ describe("MatrixClient", function() {
 
         xit("should transition ERROR -> SYNCING after /sync if prev failed",
         function(done) {
-            var expectedStates = [];
+            const expectedStates = [];
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
+                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
             httpLookups.push(SYNC_RESPONSE);
 
@@ -440,7 +442,7 @@ describe("MatrixClient", function() {
 
         it("should transition SYNCING -> SYNCING on subsequent /sync successes",
         function(done) {
-            var expectedStates = [];
+            const expectedStates = [];
             httpLookups.push(SYNC_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
@@ -452,16 +454,18 @@ describe("MatrixClient", function() {
         });
 
         it("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
-            accept_keepalives = false;
-            var expectedStates = [];
+            acceptKeepalives = false;
+            const expectedStates = [];
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" }
+                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH, error: { errcode: "KEEPALIVE_FAIL" }
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
             });
 
             expectedStates.push(["PREPARED", null]);
@@ -475,7 +479,7 @@ describe("MatrixClient", function() {
     });
 
     describe("inviteByEmail", function() {
-        var roomId = "!foo:bar";
+        const roomId = "!foo:bar";
 
         it("should send an invite HTTP POST", function() {
             httpLookups = [{
@@ -485,17 +489,15 @@ describe("MatrixClient", function() {
                 expectBody: {
                     id_server: identityServerDomain,
                     medium: "email",
-                    address: "alice@gmail.com"
-                }
+                    address: "alice@gmail.com",
+                },
             }];
             client.inviteByEmail(roomId, "alice@gmail.com");
             expect(httpLookups.length).toEqual(0);
         });
-
     });
 
     describe("guest rooms", function() {
-
         it("should only do /sync calls (without filter/pushrules)", function(done) {
             httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
@@ -504,7 +506,7 @@ describe("MatrixClient", function() {
                 data: SYNC_DATA,
                 thenCall: function() {
                     done();
-                }
+                },
             });
             client.setGuest(true);
             client.startClient();

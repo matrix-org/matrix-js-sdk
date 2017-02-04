@@ -1,13 +1,14 @@
 "use strict";
-var sdk = require("../..");
-var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
 
 describe("MatrixClient events", function() {
-    var baseUrl = "http://localhost.or.something";
-    var client, httpBackend;
-    var selfUserId = "@alice:localhost";
-    var selfAccessToken = "aseukfgwef";
+    const baseUrl = "http://localhost.or.something";
+    let client;
+    let httpBackend;
+    const selfUserId = "@alice:localhost";
+    const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -16,7 +17,7 @@ describe("MatrixClient events", function() {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: selfUserId,
-            accessToken: selfAccessToken
+            accessToken: selfAccessToken,
         });
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
@@ -28,14 +29,14 @@ describe("MatrixClient events", function() {
     });
 
     describe("emissions", function() {
-        var SYNC_DATA = {
+        const SYNC_DATA = {
             next_batch: "s_5_3",
             presence: {
                 events: [
                     utils.mkPresence({
-                        user: "@foo:bar", name: "Foo Bar", presence: "online"
-                    })
-                ]
+                        user: "@foo:bar", name: "Foo Bar", presence: "online",
+                    }),
+                ],
             },
             rooms: {
                 join: {
@@ -43,30 +44,30 @@ describe("MatrixClient events", function() {
                         timeline: {
                             events: [
                                 utils.mkMessage({
-                                    room: "!erufh:bar", user: "@foo:bar", msg: "hmmm"
-                                })
+                                    room: "!erufh:bar", user: "@foo:bar", msg: "hmmm",
+                                }),
                             ],
-                            prev_batch: "s"
+                            prev_batch: "s",
                         },
                         state: {
                             events: [
                                 utils.mkMembership({
-                                    room: "!erufh:bar", mship: "join", user: "@foo:bar"
+                                    room: "!erufh:bar", mship: "join", user: "@foo:bar",
                                 }),
                                 utils.mkEvent({
                                     type: "m.room.create", room: "!erufh:bar",
                                     user: "@foo:bar",
                                     content: {
-                                        creator: "@foo:bar"
-                                    }
-                                })
-                            ]
-                        }
-                    }
-                }
-            }
+                                        creator: "@foo:bar",
+                                    },
+                                }),
+                            ],
+                        },
+                    },
+                },
+            },
         };
-        var NEXT_SYNC_DATA = {
+        const NEXT_SYNC_DATA = {
             next_batch: "e_6_7",
             rooms: {
                 join: {
@@ -74,25 +75,26 @@ describe("MatrixClient events", function() {
                         timeline: {
                             events: [
                                 utils.mkMessage({
-                                    room: "!erufh:bar", user: "@foo:bar", msg: "ello ello"
+                                    room: "!erufh:bar", user: "@foo:bar",
+                                    msg: "ello ello",
                                 }),
                                 utils.mkMessage({
-                                    room: "!erufh:bar", user: "@foo:bar", msg: ":D"
+                                    room: "!erufh:bar", user: "@foo:bar", msg: ":D",
                                 }),
-                            ]
+                            ],
                         },
                         ephemeral: {
                             events: [
                                 utils.mkEvent({
                                     type: "m.typing", room: "!erufh:bar", content: {
-                                        user_ids: ["@foo:bar"]
-                                    }
-                                })
-                            ]
-                        }
-                    }
-                }
-            }
+                                        user_ids: ["@foo:bar"],
+                                    },
+                                }),
+                            ],
+                        },
+                    },
+                },
+            },
         };
 
         it("should emit events from both the first and subsequent /sync calls",
@@ -100,18 +102,18 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            var expectedEvents = [];
+            let expectedEvents = [];
             expectedEvents = expectedEvents.concat(
                 SYNC_DATA.presence.events,
                 SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
                 SYNC_DATA.rooms.join["!erufh:bar"].state.events,
                 NEXT_SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
-                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events
+                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events,
             );
 
             client.on("event", function(event) {
-                var found = false;
-                for (var i = 0; i < expectedEvents.length; i++) {
+                let found = false;
+                for (let i = 0; i < expectedEvents.length; i++) {
                     if (expectedEvents[i].event_id === event.getId()) {
                         expectedEvents.splice(i, 1);
                         found = true;
@@ -119,7 +121,7 @@ describe("MatrixClient events", function() {
                     }
                 }
                 expect(found).toBe(
-                    true, "Unexpected 'event' emitted: " + event.getType()
+                    true, "Unexpected 'event' emitted: " + event.getType(),
                 );
             });
 
@@ -127,7 +129,7 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(expectedEvents.length).toEqual(
-                    0, "Failed to see all events from /sync calls"
+                    0, "Failed to see all events from /sync calls",
                 );
                 done();
             });
@@ -136,16 +138,18 @@ describe("MatrixClient events", function() {
         it("should emit User events", function(done) {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
-            var fired = false;
+            let fired = false;
             client.on("User.presence", function(event, user) {
                 fired = true;
                 expect(user).toBeDefined();
                 expect(event).toBeDefined();
-                if (!user || !event) { return; }
+                if (!user || !event) {
+                    return;
+                }
 
                 expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
-                    SYNC_DATA.presence.events[0].content.presence
+                    SYNC_DATA.presence.events[0].content.presence,
                 );
             });
             client.startClient();
@@ -159,9 +163,9 @@ describe("MatrixClient events", function() {
         it("should emit Room events", function(done) {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
-            var roomInvokeCount = 0;
-            var roomNameInvokeCount = 0;
-            var timelineFireCount = 0;
+            let roomInvokeCount = 0;
+            let roomNameInvokeCount = 0;
+            let timelineFireCount = 0;
             client.on("Room", function(room) {
                 roomInvokeCount++;
                 expect(room.roomId).toEqual("!erufh:bar");
@@ -178,13 +182,13 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(roomInvokeCount).toEqual(
-                    1, "Room fired wrong number of times."
+                    1, "Room fired wrong number of times.",
                 );
                 expect(roomNameInvokeCount).toEqual(
-                    1, "Room.name fired wrong number of times."
+                    1, "Room.name fired wrong number of times.",
                 );
                 expect(timelineFireCount).toEqual(
-                    3, "Room.timeline fired the wrong number of times"
+                    3, "Room.timeline fired the wrong number of times",
                 );
                 done();
             });
@@ -194,17 +198,17 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            var roomStateEventTypes = [
-                "m.room.member", "m.room.create"
+            const roomStateEventTypes = [
+                "m.room.member", "m.room.create",
             ];
-            var eventsInvokeCount = 0;
-            var membersInvokeCount = 0;
-            var newMemberInvokeCount = 0;
+            let eventsInvokeCount = 0;
+            let membersInvokeCount = 0;
+            let newMemberInvokeCount = 0;
             client.on("RoomState.events", function(event, state) {
                 eventsInvokeCount++;
-                var index = roomStateEventTypes.indexOf(event.getType());
+                const index = roomStateEventTypes.indexOf(event.getType());
                 expect(index).not.toEqual(
-                    -1, "Unexpected room state event type: " + event.getType()
+                    -1, "Unexpected room state event type: " + event.getType(),
                 );
                 if (index >= 0) {
                     roomStateEventTypes.splice(index, 1);
@@ -227,13 +231,13 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(membersInvokeCount).toEqual(
-                    1, "RoomState.members fired wrong number of times"
+                    1, "RoomState.members fired wrong number of times",
                 );
                 expect(newMemberInvokeCount).toEqual(
-                    1, "RoomState.newMember fired wrong number of times"
+                    1, "RoomState.newMember fired wrong number of times",
                 );
                 expect(eventsInvokeCount).toEqual(
-                    2, "RoomState.events fired wrong number of times"
+                    2, "RoomState.events fired wrong number of times",
                 );
                 done();
             });
@@ -243,10 +247,10 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            var typingInvokeCount = 0;
-            var powerLevelInvokeCount = 0;
-            var nameInvokeCount = 0;
-            var membershipInvokeCount = 0;
+            let typingInvokeCount = 0;
+            let powerLevelInvokeCount = 0;
+            let nameInvokeCount = 0;
+            let membershipInvokeCount = 0;
             client.on("RoomMember.name", function(event, member) {
                 nameInvokeCount++;
             });
@@ -266,16 +270,16 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(typingInvokeCount).toEqual(
-                    1, "RoomMember.typing fired wrong number of times"
+                    1, "RoomMember.typing fired wrong number of times",
                 );
                 expect(powerLevelInvokeCount).toEqual(
-                    0, "RoomMember.powerLevel fired wrong number of times"
+                    0, "RoomMember.powerLevel fired wrong number of times",
                 );
                 expect(nameInvokeCount).toEqual(
-                    0, "RoomMember.name fired wrong number of times"
+                    0, "RoomMember.name fired wrong number of times",
                 );
                 expect(membershipInvokeCount).toEqual(
-                    1, "RoomMember.membership fired wrong number of times"
+                    1, "RoomMember.membership fired wrong number of times",
                 );
                 done();
             });
@@ -284,7 +288,7 @@ describe("MatrixClient events", function() {
         it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function(done) {
             httpBackend.when("GET", "/sync").respond(401, { errcode: 'M_UNKNOWN_TOKEN' });
 
-            var sessionLoggedOutCount = 0;
+            let sessionLoggedOutCount = 0;
             client.on("Session.logged_out", function(event, member) {
                 sessionLoggedOutCount++;
             });
@@ -293,11 +297,10 @@ describe("MatrixClient events", function() {
 
             httpBackend.flush().done(function() {
                 expect(sessionLoggedOutCount).toEqual(
-                    1, "Session.logged_out fired wrong number of times"
+                    1, "Session.logged_out fired wrong number of times",
                 );
                 done();
             });
         });
     });
-
 });

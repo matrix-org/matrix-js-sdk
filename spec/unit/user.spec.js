@@ -1,11 +1,11 @@
 "use strict";
-var sdk = require("../..");
-var User = sdk.User;
-var utils = require("../test-utils");
+const sdk = require("../..");
+const User = sdk.User;
+const utils = require("../test-utils");
 
 describe("User", function() {
-    var userId = "@alice:bar";
-    var user;
+    const userId = "@alice:bar";
+    let user;
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -13,18 +13,18 @@ describe("User", function() {
     });
 
     describe("setPresenceEvent", function() {
-        var event = utils.mkEvent({
+        const event = utils.mkEvent({
             type: "m.presence", content: {
                 presence: "online",
                 user_id: userId,
                 displayname: "Alice",
                 last_active_ago: 1085,
-                avatar_url: "mxc://foo/bar"
-            }, event: true
+                avatar_url: "mxc://foo/bar",
+            }, event: true,
         });
 
         it("should emit 'User.displayName' if the display name changes", function() {
-            var emitCount = 0;
+            let emitCount = 0;
             user.on("User.displayName", function(ev, usr) {
                 emitCount += 1;
             });
@@ -35,7 +35,7 @@ describe("User", function() {
         });
 
         it("should emit 'User.avatarUrl' if the avatar URL changes", function() {
-            var emitCount = 0;
+            let emitCount = 0;
             user.on("User.avatarUrl", function(ev, usr) {
                 emitCount += 1;
             });
@@ -46,7 +46,7 @@ describe("User", function() {
         });
 
         it("should emit 'User.presence' if the presence changes", function() {
-            var emitCount = 0;
+            let emitCount = 0;
             user.on("User.presence", function(ev, usr) {
                 emitCount += 1;
             });

@@ -23,20 +23,20 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-var q = require("q");
-var User = require("./models/user");
-var Room = require("./models/room");
-var utils = require("./utils");
-var Filter = require("./filter");
-var EventTimeline = require("./models/event-timeline");
+const q = require("q");
+const User = require("./models/user");
+const Room = require("./models/room");
+const utils = require("./utils");
+const Filter = require("./filter");
+const EventTimeline = require("./models/event-timeline");
 
-var DEBUG = true;
+const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
 // to keep open the connection. This constant is *ADDED* to the timeout= value
 // to determine the max time we're willing to wait.
-var BUFFER_PERIOD_MS = 80 * 1000;
+const BUFFER_PERIOD_MS = 80 * 1000;
 
 function getFilterName(userId, suffix) {
     // scope this on the user ID because people may login on many accounts
@@ -45,8 +45,10 @@ function getFilterName(userId, suffix) {
 }
 
 function debuglog() {
-    if (!DEBUG) { return; }
-    console.log.apply(console, arguments);
+    if (!DEBUG) {
+        return;
+    }
+    console.log(...arguments);
 }
 
 
@@ -56,6 +58,7 @@ function debuglog() {
  * @constructor
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
+ * @param {module:crypto=} opts.crypto Crypto manager
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -86,8 +89,8 @@ function SyncApi(client, opts) {
  * @return {Room}
  */
 SyncApi.prototype.createRoom = function(roomId) {
-    var client = this.client;
-    var room = new Room(roomId, {
+    const client = this.client;
+    const room = new Room(roomId, {
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
@@ -106,12 +109,12 @@ SyncApi.prototype.createRoom = function(roomId) {
  * @private
  */
 SyncApi.prototype._registerStateListeners = function(room) {
-    var client = this.client;
+    const client = this.client;
     // we need to also re-emit room state and room member events, so hook it up
     // to the client now. We need to add a listener for RoomState.members in
     // order to hook them correctly. (TODO: find a better way?)
     reEmit(client, room.currentState, [
-        "RoomState.events", "RoomState.members", "RoomState.newMember"
+        "RoomState.events", "RoomState.members", "RoomState.newMember",
     ]);
     room.currentState.on("RoomState.newMember", function(event, state, member) {
         member.user = client.getUser(member.userId);
@@ -119,8 +122,8 @@ SyncApi.prototype._registerStateListeners = function(room) {
             client, member,
             [
                 "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
-                "RoomMember.membership"
-            ]
+                "RoomMember.membership",
+            ],
         );
     });
 };
@@ -142,34 +145,34 @@ SyncApi.prototype._deregisterStateListeners = function(room) {
  * @return {Promise} Resolved when they've been added to the store.
  */
 SyncApi.prototype.syncLeftRooms = function() {
-    var client = this.client;
-    var self = this;
+    const client = this.client;
+    const self = this;
 
     // grab a filter with limit=1 and include_leave=true
-    var filter = new Filter(this.client.credentials.userId);
+    const filter = new Filter(this.client.credentials.userId);
     filter.setTimelineLimit(1);
     filter.setIncludeLeaveRooms(true);
 
-    var localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-    var qps = {
-        timeout: 0 // don't want to block since this is a single isolated req
+    const localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
+    const qps = {
+        timeout: 0, // don't want to block since this is a single isolated req
     };
 
     return client.getOrCreateFilter(
-        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter
+        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
     ).then(function(filterId) {
         qps.filter = filterId;
         return client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, localTimeoutMs
+            undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
         );
     }).then(function(data) {
-        var leaveRooms = [];
+        let leaveRooms = [];
         if (data.rooms && data.rooms.leave) {
             leaveRooms = self._mapSyncResponseToRoomArray(data.rooms.leave);
         }
-        var rooms = [];
+        const rooms = [];
         leaveRooms.forEach(function(leaveObj) {
-            var room = leaveObj.room;
+            const room = leaveObj.room;
             rooms.push(room);
             if (!leaveObj.isBrandNewRoom) {
                 // the intention behind syncLeftRooms is to add in rooms which were
@@ -183,9 +186,9 @@ SyncApi.prototype.syncLeftRooms = function() {
                 return;
             }
             leaveObj.timeline = leaveObj.timeline || {};
-            var timelineEvents =
+            const timelineEvents =
                 self._mapSyncEventsFormat(leaveObj.timeline, room);
-            var stateEvents = self._mapSyncEventsFormat(leaveObj.state, room);
+            const stateEvents = self._mapSyncEventsFormat(leaveObj.state, room);
 
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
@@ -210,8 +213,8 @@ SyncApi.prototype.syncLeftRooms = function() {
  * store.
  */
 SyncApi.prototype.peek = function(roomId) {
-    var self = this;
-    var client = this.client;
+    const self = this;
+    const client = this.client;
     this._peekRoomId = roomId;
     return this.client.roomInitialSync(roomId, 20).then(function(response) {
         // make sure things are init'd
@@ -219,18 +222,18 @@ SyncApi.prototype.peek = function(roomId) {
         response.messages.chunk = response.messages.chunk || [];
         response.state = response.state || [];
 
-        var peekRoom = self.createRoom(roomId);
+        const peekRoom = self.createRoom(roomId);
 
         // FIXME: Mostly duplicated from _processRoomEvents but not entirely
         // because "state" in this API is at the BEGINNING of the chunk
-        var oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper()
+        const oldStateEvents = utils.map(
+            utils.deepCopy(response.state), client.getEventMapper(),
         );
-        var stateEvents = utils.map(
-            response.state, client.getEventMapper()
+        const stateEvents = utils.map(
+            response.state, client.getEventMapper(),
         );
-        var messages = utils.map(
-            response.messages.chunk, client.getEventMapper()
+        const messages = utils.map(
+            response.messages.chunk, client.getEventMapper(),
         );
 
         // XXX: copypasted from /sync until we kill off this
@@ -239,11 +242,10 @@ SyncApi.prototype.peek = function(roomId) {
         if (response.presence && utils.isArray(response.presence)) {
             response.presence.map(client.getEventMapper()).forEach(
             function(presenceEvent) {
-                var user = client.store.getUser(presenceEvent.getContent().user_id);
+                let user = client.store.getUser(presenceEvent.getContent().user_id);
                 if (user) {
                     user.setPresenceEvent(presenceEvent);
-                }
-                else {
+                } else {
                     user = createNewUser(client, presenceEvent.getContent().user_id);
                     user.setPresenceEvent(presenceEvent);
                     client.store.storeUser(user);
@@ -300,14 +302,13 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         return;
     }
 
-    var self = this;
+    const self = this;
     // FIXME: gut wrenching; hard-coded timeout values
     this.client._http.authedRequest(undefined, "GET", "/events", {
         room_id: roomId,
         timeout: 30 * 1000,
-        from: token
+        from: token,
     }, undefined, 50 * 1000).done(function(res) {
-
         // We have a problem that we get presence both from /events and /sync
         // however, /sync only returns presence for users in rooms
         // you're actually joined to.
@@ -320,11 +321,10 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         res.chunk.filter(function(e) {
             return e.type === "m.presence";
         }).map(self.client.getEventMapper()).forEach(function(presenceEvent) {
-            var user = self.client.store.getUser(presenceEvent.getContent().user_id);
+            let user = self.client.store.getUser(presenceEvent.getContent().user_id);
             if (user) {
                 user.setPresenceEvent(presenceEvent);
-            }
-            else {
+            } else {
                 user = createNewUser(self.client, presenceEvent.getContent().user_id);
                 user.setPresenceEvent(presenceEvent);
                 self.client.store.storeUser(user);
@@ -333,10 +333,10 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         });
 
         // strip out events which aren't for the given room_id (e.g presence)
-        var events = res.chunk.filter(function(e) {
+        const events = res.chunk.filter(function(e) {
             return e.room_id === roomId;
         }).map(self.client.getEventMapper());
-        var room = self.client.getRoom(roomId);
+        const room = self.client.getRoom(roomId);
         room.addLiveEvents(events);
         self._peekPoll(roomId, res.end);
     }, function(err) {
@@ -363,8 +363,8 @@ SyncApi.prototype.sync = function() {
     debuglog("SyncApi.sync: starting with sync token " +
              this.client.store.getSyncToken());
 
-    var client = this.client;
-    var self = this;
+    const client = this.client;
+    const self = this;
 
     this._running = true;
 
@@ -393,7 +393,7 @@ SyncApi.prototype.sync = function() {
     }
 
     function getFilter() {
-        var filter;
+        let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
         } else {
@@ -402,7 +402,7 @@ SyncApi.prototype.sync = function() {
         }
 
         client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter
+            getFilterName(client.credentials.userId), filter,
         ).done(function(filterId) {
             // reset the notifications timeline to prepare it to paginate from
             // the current point in time.
@@ -422,8 +422,7 @@ SyncApi.prototype.sync = function() {
     if (client.isGuest()) {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
-    }
-    else {
+    } else {
         getPushRules();
     }
 };
@@ -438,7 +437,9 @@ SyncApi.prototype.stop = function() {
         this._onOnlineBound = undefined;
     }
     this._running = false;
-    if (this._currentSyncRequest) { this._currentSyncRequest.abort(); }
+    if (this._currentSyncRequest) {
+        this._currentSyncRequest.abort();
+    }
     if (this._keepAliveTimer) {
         clearTimeout(this._keepAliveTimer);
         this._keepAliveTimer = null;
@@ -451,7 +452,9 @@ SyncApi.prototype.stop = function() {
  * @return {boolean} True if this resulted in a request being retried.
  */
 SyncApi.prototype.retryImmediately = function() {
-    if (!this._connectionReturnedDefer) { return false; }
+    if (!this._connectionReturnedDefer) {
+        return false;
+    }
     this._startKeepAlives(0);
     return true;
 };
@@ -463,8 +466,8 @@ SyncApi.prototype.retryImmediately = function() {
  * @param {boolean} syncOptions.hasSyncedBefore
  */
 SyncApi.prototype._sync = function(syncOptions) {
-    var client = this.client;
-    var self = this;
+    const client = this.client;
+    const self = this;
 
     if (!this._running) {
         debuglog("Sync no longer running: exiting.");
@@ -476,14 +479,14 @@ SyncApi.prototype._sync = function(syncOptions) {
         return;
     }
 
-    var filterId = syncOptions.filterId;
+    let filterId = syncOptions.filterId;
     if (client.isGuest() && !filterId) {
         filterId = this._getGuestFilter();
     }
 
-    var syncToken = client.store.getSyncToken();
+    const syncToken = client.store.getSyncToken();
 
-    var qps = {
+    const qps = {
         filter: filterId,
         timeout: this.opts.pollTimeout,
     };
@@ -506,10 +509,10 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     // normal timeout= plus buffer time
-    var clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
+    const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
     this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs
+        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
     );
 
     this._currentSyncRequest.done(function(data) {
@@ -520,21 +523,25 @@ SyncApi.prototype._sync = function(syncOptions) {
 
         try {
             self._processSyncResponse(syncToken, data);
-        }
-        catch (e) {
+        } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
             console.error("Caught /sync error", e.stack || e);
         }
 
         // emit synced events
+        const syncEventData = {
+            oldSyncToken: syncToken,
+            nextSyncToken: data.next_batch,
+        };
+
         if (!syncOptions.hasSyncedBefore) {
-            self._updateSyncState("PREPARED");
+            self._updateSyncState("PREPARED", syncEventData);
             syncOptions.hasSyncedBefore = true;
         }
 
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        self._updateSyncState("SYNCING");
+        self._updateSyncState("SYNCING", syncEventData);
 
         self._sync(syncOptions);
     }, function(err) {
@@ -575,14 +582,15 @@ SyncApi.prototype._sync = function(syncOptions) {
  * @param {Object} data The response from /sync
  */
 SyncApi.prototype._processSyncResponse = function(syncToken, data) {
-    var client = this.client;
-    var self = this;
+    const client = this.client;
+    const self = this;
 
     // data looks like:
     // {
     //    next_batch: $token,
     //    presence: { events: [] },
     //    account_data: { events: [] },
+    //    device_lists: { changed: ["@user:server", ... ]},
     //    to_device: { events: [] },
     //    rooms: {
     //      invite: {
@@ -620,11 +628,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     if (data.presence && utils.isArray(data.presence.events)) {
         data.presence.events.map(client.getEventMapper()).forEach(
         function(presenceEvent) {
-            var user = client.store.getUser(presenceEvent.getSender());
+            let user = client.store.getUser(presenceEvent.getSender());
             if (user) {
                 user.setPresenceEvent(presenceEvent);
-            }
-            else {
+            } else {
                 user = createNewUser(client, presenceEvent.getSender());
                 user.setPresenceEvent(presenceEvent);
                 client.store.storeUser(user);
@@ -635,7 +642,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // handle non-room account_data
     if (data.account_data && utils.isArray(data.account_data.events)) {
-        var events = data.account_data.events.map(client.getEventMapper());
+        const events = data.account_data.events.map(client.getEventMapper());
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
@@ -644,7 +651,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 }
                 client.emit("accountData", accountDataEvent);
                 return accountDataEvent;
-            }
+            },
         );
     }
 
@@ -654,28 +661,28 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             .map(client.getEventMapper())
             .forEach(
                 function(toDeviceEvent) {
-                    var content = toDeviceEvent.getContent();
+                    const content = toDeviceEvent.getContent();
                     if (
                         toDeviceEvent.getType() == "m.room.message" &&
                             content.msgtype == "m.bad.encrypted"
                     ) {
                         console.warn(
-                            "Unable to decrypt to-device event: " + content.body
+                            "Unable to decrypt to-device event: " + content.body,
                         );
                         return;
                     }
 
                     client.emit("toDeviceEvent", toDeviceEvent);
-                }
+                },
             );
     }
 
     // the returned json structure is a bit crap, so make it into a
     // nicer form (array) after applying sanity to make sure we don't fail
     // on missing keys (on the off chance)
-    var inviteRooms = [];
-    var joinRooms = [];
-    var leaveRooms = [];
+    let inviteRooms = [];
+    let joinRooms = [];
+    let leaveRooms = [];
 
     if (data.rooms) {
         if (data.rooms.invite) {
@@ -693,8 +700,8 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
 
     // Handle invites
     inviteRooms.forEach(function(inviteObj) {
-        var room = inviteObj.room;
-        var stateEvents =
+        const room = inviteObj.room;
+        const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
@@ -702,24 +709,26 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.store.storeRoom(room);
             client.emit("Room", room);
         }
-        stateEvents.forEach(function(e) { client.emit("event", e); });
+        stateEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
     });
 
     // Handle joins
     joinRooms.forEach(function(joinObj) {
-        var room = joinObj.room;
-        var stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
-        var timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
-        var ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
-        var accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
+        const room = joinObj.room;
+        const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
+        const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
+        const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
+        const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
-                'total', joinObj.unread_notifications.notification_count
+                'total', joinObj.unread_notifications.notification_count,
             );
             room.setUnreadNotificationCount(
-                'highlight', joinObj.unread_notifications.highlight_count
+                'highlight', joinObj.unread_notifications.highlight_count,
             );
         }
 
@@ -730,9 +739,8 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(
                 joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
-        }
-        else if (joinObj.timeline.limited) {
-            var limited = true;
+        } else if (joinObj.timeline.limited) {
+            let limited = true;
 
             // we've got a limited sync, so we *probably* have a gap in the
             // timeline, so should reset. But we might have been peeking or
@@ -746,8 +754,8 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             // which we'll try to paginate but not get any new events (which
             // will stop us linking the empty timeline into the chain).
             //
-            for (var i = timelineEvents.length - 1; i >= 0; i--) {
-                var eventId = timelineEvents[i].getId();
+            for (let i = timelineEvents.length - 1; i >= 0; i--) {
+                const eventId = timelineEvents[i].getId();
                 if (room.getTimelineForEvent(eventId)) {
                     debuglog("Already have event " + eventId + " in limited " +
                              "sync - not resetting");
@@ -801,20 +809,28 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.store.storeRoom(room);
             client.emit("Room", room);
         }
-        stateEvents.forEach(function(e) { client.emit("event", e); });
-        timelineEvents.forEach(function(e) { client.emit("event", e); });
-        ephemeralEvents.forEach(function(e) { client.emit("event", e); });
-        accountDataEvents.forEach(function(e) { client.emit("event", e); });
+        stateEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
+        timelineEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
+        ephemeralEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
+        accountDataEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
     });
 
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
-        var room = leaveObj.room;
-        var stateEvents =
+        const room = leaveObj.room;
+        const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
-        var timelineEvents =
+        const timelineEvents =
             self._mapSyncEventsFormat(leaveObj.timeline, room);
-        var accountDataEvents =
+        const accountDataEvents =
             self._mapSyncEventsFormat(leaveObj.account_data);
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
@@ -826,9 +842,15 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.emit("Room", room);
         }
 
-        stateEvents.forEach(function(e) { client.emit("event", e); });
-        timelineEvents.forEach(function(e) { client.emit("event", e); });
-        accountDataEvents.forEach(function(e) { client.emit("event", e); });
+        stateEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
+        timelineEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
+        accountDataEvents.forEach(function(e) {
+            client.emit("event", e);
+        });
     });
 
     // update the notification timeline, if appropriate.
@@ -842,6 +864,13 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         });
         this._notifEvents.forEach(function(event) {
             client.getNotifTimelineSet().addLiveEvent(event);
+        });
+    }
+
+    // Handle device list updates
+    if (this.opts.crypto && data.device_lists && data.device_lists.changed) {
+        data.device_lists.changed.forEach((u) => {
+            this.opts.crypto.userDeviceListChanged(u);
         });
     }
 };
@@ -861,11 +890,11 @@ SyncApi.prototype._startKeepAlives = function(delay) {
     if (this._keepAliveTimer !== null) {
         clearTimeout(this._keepAliveTimer);
     }
-    var self = this;
+    const self = this;
     if (delay > 0) {
         self._keepAliveTimer = setTimeout(
             self._pokeKeepAlive.bind(self),
-            delay
+            delay,
         );
     } else {
         self._pokeKeepAlive();
@@ -880,7 +909,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
  *
  */
 SyncApi.prototype._pokeKeepAlive = function() {
-    var self = this;
+    const self = this;
     function success() {
         clearTimeout(self._keepAliveTimer);
         if (self._connectionReturnedDefer) {
@@ -897,7 +926,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         {
             prefix: '',
             localTimeoutMs: 15 * 1000,
-        }
+        },
     ).done(function() {
         success();
     }, function(err) {
@@ -911,7 +940,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
         } else {
             self._keepAliveTimer = setTimeout(
                 self._pokeKeepAlive.bind(self),
-                5000 + Math.floor(Math.random() * 5000)
+                5000 + Math.floor(Math.random() * 5000),
             );
             // A keepalive has failed, so we emit the
             // error state (whether or not this is the
@@ -932,12 +961,12 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // Maps { roomid: {stuff}, roomid: {stuff} }
     // to
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
-    var client = this.client;
-    var self = this;
+    const client = this.client;
+    const self = this;
     return utils.keys(obj).map(function(roomId) {
-        var arrObj = obj[roomId];
-        var room = client.store.getRoom(roomId);
-        var isBrandNewRoom = false;
+        const arrObj = obj[roomId];
+        let room = client.store.getRoom(roomId);
+        let isBrandNewRoom = false;
         if (!room) {
             room = self.createRoom(roomId);
             isBrandNewRoom = true;
@@ -957,7 +986,7 @@ SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }
-    var mapper = this.client.getEventMapper();
+    const mapper = this.client.getEventMapper();
     return obj.events.map(function(e) {
         if (room) {
             e.room_id = room.roomId;
@@ -973,7 +1002,7 @@ SyncApi.prototype._resolveInvites = function(room) {
     if (!room || !this.opts.resolveInvitesToProfiles) {
         return;
     }
-    var client = this.client;
+    const client = this.client;
     // For each invited room member we want to give them a displayname/avatar url
     // if they have one (the m.room.member invites don't contain this).
     room.getMembersWithMembership("invite").forEach(function(member) {
@@ -982,22 +1011,21 @@ SyncApi.prototype._resolveInvites = function(room) {
         }
         member._requestedProfileInfo = true;
         // try to get a cached copy first.
-        var user = client.getUser(member.userId);
-        var promise;
+        const user = client.getUser(member.userId);
+        let promise;
         if (user) {
             promise = q({
                 avatar_url: user.avatarUrl,
-                displayname: user.displayName
+                displayname: user.displayName,
             });
-        }
-        else {
+        } else {
             promise = client.getProfileInfo(member.userId);
         }
         promise.done(function(info) {
             // slightly naughty by doctoring the invite event but this means all
             // the code paths remain the same between invite/join display name stuff
             // which is a worthy trade-off for some minor pollution.
-            var inviteEvent = member.events.member;
+            const inviteEvent = member.events.member;
             if (inviteEvent.getContent().membership !== "invite") {
                 // between resolving and now they have since joined, so don't clobber
                 return;
@@ -1022,17 +1050,19 @@ SyncApi.prototype._resolveInvites = function(room) {
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
     timelineEventList = timelineEventList || [];
-    var client = this.client;
+    const client = this.client;
     // "old" and "current" state are the same initially; they
     // start diverging if the user paginates.
     // We must deep copy otherwise membership changes in old state
     // will leak through to current state!
-    var oldStateEvents = utils.map(
+    const oldStateEvents = utils.map(
         utils.deepCopy(
-            stateEventList.map(function(mxEvent) { return mxEvent.event; })
-        ), client.getEventMapper()
+            stateEventList.map(function(mxEvent) {
+                return mxEvent.event;
+            }),
+        ), client.getEventMapper(),
     );
-    var stateEvents = stateEventList;
+    const stateEvents = stateEventList;
 
     // set the state of the room to as it was before the timeline executes
     //
@@ -1051,11 +1081,10 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
 
     // gather our notifications into this._notifEvents
     if (client.getNotifTimelineSet()) {
-        for (var i = 0; i < timelineEventList.length; i++) {
-            var pushActions = client.getPushActionsForEvent(timelineEventList[i]);
+        for (let i = 0; i < timelineEventList.length; i++) {
+            const pushActions = client.getPushActionsForEvent(timelineEventList[i]);
             if (pushActions && pushActions.notify &&
-                pushActions.tweaks && pushActions.tweaks.highlight)
-            {
+                pushActions.tweaks && pushActions.tweaks.highlight) {
                 this._notifEvents.push(timelineEventList[i]);
             }
         }
@@ -1070,7 +1099,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
  * @return {string}
  */
 SyncApi.prototype._getGuestFilter = function() {
-    var guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
+    const guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
     if (!guestRooms) {
         return "{}";
     }
@@ -1079,9 +1108,9 @@ SyncApi.prototype._getGuestFilter = function() {
     return JSON.stringify({
         room: {
             timeline: {
-                limit: 20
-            }
-        }
+                limit: 20,
+            },
+        },
     });
 };
 
@@ -1091,7 +1120,7 @@ SyncApi.prototype._getGuestFilter = function() {
  * @param {Object} data Object of additional data to emit in the event
  */
 SyncApi.prototype._updateSyncState = function(newState, data) {
-    var old = this._syncState;
+    const old = this._syncState;
     this._syncState = newState;
     this.client.emit("sync", this._syncState, old, data);
 };
@@ -1108,10 +1137,10 @@ SyncApi.prototype._onOnline = function() {
 };
 
 function createNewUser(client, userId) {
-    var user = new User(userId);
+    const user = new User(userId);
     reEmit(client, user, [
         "User.avatarUrl", "User.displayName", "User.presence",
-        "User.currentlyActive", "User.lastPresenceTs"
+        "User.currentlyActive", "User.lastPresenceTs",
     ]);
     return user;
 }
@@ -1125,11 +1154,11 @@ function reEmit(reEmitEntity, emittableEntity, eventNames) {
             // Transformation Example:
             // listener on "foo" => function(a,b) { ... }
             // Re-emit on "thing" => thing.emit("foo", a, b)
-            var newArgs = [eventName];
-            for (var i = 0; i < arguments.length; i++) {
+            const newArgs = [eventName];
+            for (let i = 0; i < arguments.length; i++) {
                 newArgs.push(arguments[i]);
             }
-            reEmitEntity.emit.apply(reEmitEntity, newArgs);
+            reEmitEntity.emit(...newArgs);
         });
     });
 }

@@ -16,9 +16,9 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-var q = require("q");
+const q = require("q");
 
-var utils = require("./utils");
+const utils = require("./utils");
 
 /**
  * Abstracts the logic used to drive the interactive auth process.
@@ -93,7 +93,7 @@ InteractiveAuth.prototype = {
      * @return {object?} any parameters from the server for this stage
      */
     getStageParams: function(loginType) {
-        var params = {};
+        let params = {};
         if (this._data && this._data.params) {
             params = this._data.params;
         }
@@ -115,7 +115,7 @@ InteractiveAuth.prototype = {
         }
 
         // use the sessionid from the last request.
-        var auth = {
+        const auth = {
             session: this._data.session,
         };
         utils.extend(auth, authData);
@@ -131,12 +131,12 @@ InteractiveAuth.prototype = {
      * @param {object?} auth new auth dict, including session id
      */
     _doRequest: function(auth) {
-        var self = this;
+        const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
         // handler (without the additional event loop entailed by q.fcall or an
         // extra q().then)
-        var prom;
+        let prom;
         try {
             prom = this._requestCallback(auth);
         } catch (e) {
@@ -154,7 +154,7 @@ InteractiveAuth.prototype = {
                 }
                 self._data = error.data;
                 self._startNextAuthStage();
-            }
+            },
         ).catch(this._completionDeferred.reject).done();
     },
 
@@ -164,12 +164,12 @@ InteractiveAuth.prototype = {
      * @private
      */
     _startNextAuthStage: function() {
-        var nextStage = this._chooseStage();
+        const nextStage = this._chooseStage();
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
 
-        var stageError = null;
+        let stageError = null;
         if (this._data.errcode || this._data.error) {
             stageError = {
                 errcode: this._data.errcode || "",
@@ -186,9 +186,9 @@ InteractiveAuth.prototype = {
      * @return {string?} login type
      */
     _chooseStage: function() {
-        var flow = this._chooseFlow();
+        const flow = this._chooseFlow();
         console.log("Active flow => %s", JSON.stringify(flow));
-        var nextStage = this._firstUncompletedStage(flow);
+        const nextStage = this._firstUncompletedStage(flow);
         console.log("Next stage: %s", nextStage);
         return nextStage;
     },
@@ -200,7 +200,7 @@ InteractiveAuth.prototype = {
      * @return {object} flow
      */
     _chooseFlow: function() {
-        var flows = this._data.flows || [];
+        const flows = this._data.flows || [];
         // always use the first flow for now
         return flows[0];
     },
@@ -213,9 +213,9 @@ InteractiveAuth.prototype = {
      * @return {string} login type
      */
     _firstUncompletedStage: function(flow) {
-        var completed = (this._data || {}).completed || [];
-        for (var i = 0; i < flow.stages.length; ++i) {
-            var stageType = flow.stages[i];
+        const completed = (this._data || {}).completed || [];
+        for (let i = 0; i < flow.stages.length; ++i) {
+            const stageType = flow.stages[i];
             if (completed.indexOf(stageType) === -1) {
                 return stageType;
             }

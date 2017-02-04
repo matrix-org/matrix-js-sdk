@@ -1,12 +1,12 @@
 "use strict";
-var sdk = require("../..");
-var Filter = sdk.Filter;
-var utils = require("../test-utils");
+const sdk = require("../..");
+const Filter = sdk.Filter;
+const utils = require("../test-utils");
 
 describe("Filter", function() {
-    var filterId = "f1lt3ring15g00d4ursoul";
-    var userId = "@sir_arthur_david:humming.tiger";
-    var filter;
+    const filterId = "f1lt3ring15g00d4ursoul";
+    const userId = "@sir_arthur_david:humming.tiger";
+    let filter;
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -15,10 +15,10 @@ describe("Filter", function() {
 
     describe("fromJson", function() {
         it("create a new Filter from the provided values", function() {
-            var definition = {
-                event_fields: ["type", "content"]
+            const definition = {
+                event_fields: ["type", "content"],
             };
-            var f = Filter.fromJson(userId, filterId, definition);
+            const f = Filter.fromJson(userId, filterId, definition);
             expect(f.getDefinition()).toEqual(definition);
             expect(f.userId).toEqual(userId);
             expect(f.filterId).toEqual(filterId);
@@ -31,17 +31,17 @@ describe("Filter", function() {
             expect(filter.getDefinition()).toEqual({
                 room: {
                     timeline: {
-                        limit: 10
-                    }
-                }
+                        limit: 10,
+                    },
+                },
             });
         });
     });
 
     describe("setDefinition/getDefinition", function() {
         it("should set and get the filter body", function() {
-            var definition = {
-                event_format: "client"
+            const definition = {
+                event_format: "client",
             };
             filter.setDefinition(definition);
             expect(filter.getDefinition()).toEqual(definition);

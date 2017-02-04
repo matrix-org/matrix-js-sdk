@@ -18,16 +18,15 @@ limitations under the License.
  * This is an internal module. See {@link MatrixInMemoryStore} for the public class.
  * @module store/memory
  */
- var utils = require("../utils");
- var User = require("../models/user");
+ const utils = require("../utils");
+ const User = require("../models/user");
 
 /**
  * Construct a new in-memory data store for the Matrix Client.
  * @constructor
  * @param {Object=} opts Config options
  * @param {LocalStorage} opts.localStorage The local storage instance to persist
- * some forms of data such as tokens. Rooms will NOT be stored. See
- * {@link WebStorageStore} to persist rooms.
+ * some forms of data such as tokens. Rooms will NOT be stored.
  */
 module.exports.MatrixInMemoryStore = function MatrixInMemoryStore(opts) {
     opts = opts || {};
@@ -78,7 +77,7 @@ module.exports.MatrixInMemoryStore.prototype = {
         // map up-to-date.
         room.currentState.on("RoomState.members", this._onRoomMember.bind(this));
         // add existing members
-        var self = this;
+        const self = this;
         room.currentState.getMembers().forEach(function(m) {
             self._onRoomMember(null, room.currentState, m);
         });
@@ -98,12 +97,12 @@ module.exports.MatrixInMemoryStore.prototype = {
             return;
         }
 
-        var user = this.users[member.userId] || new User(member.userId);
+        const user = this.users[member.userId] || new User(member.userId);
         if (member.name) {
             user.setDisplayName(member.name);
             if (member.events.member) {
                 user.setRawDisplayName(
-                    member.events.member.getDirectionalContent().displayname
+                    member.events.member.getDirectionalContent().displayname,
                 );
             }
         }
@@ -203,7 +202,9 @@ module.exports.MatrixInMemoryStore.prototype = {
      * @param {Filter} filter
      */
     storeFilter: function(filter) {
-        if (!filter) { return; }
+        if (!filter) {
+            return;
+        }
         if (!this.filters[filter.userId]) {
             this.filters[filter.userId] = {};
         }
@@ -234,8 +235,7 @@ module.exports.MatrixInMemoryStore.prototype = {
         }
         try {
             return this.localStorage.getItem("mxjssdk_memory_filter_" + filterName);
-        }
-        catch (e) {}
+        } catch (e) {}
         return null;
     },
 
@@ -250,8 +250,7 @@ module.exports.MatrixInMemoryStore.prototype = {
         }
         try {
             this.localStorage.setItem("mxjssdk_memory_filter_" + filterName, filterId);
-        }
-        catch (e) {}
+        } catch (e) {}
     },
 
     /**
@@ -261,7 +260,7 @@ module.exports.MatrixInMemoryStore.prototype = {
      * @param {Array<MatrixEvent>} events The events to store.
      */
     storeAccountDataEvents: function(events) {
-        var self = this;
+        const self = this;
         events.forEach(function(event) {
             self.accountData[event.getType()] = event;
         });

@@ -19,10 +19,10 @@ limitations under the License.
  * of requests.
  * @module scheduler
  */
-var utils = require("./utils");
-var q = require("q");
+const utils = require("./utils");
+const q = require("q");
 
-var DEBUG = false;  // set true to enable console logging.
+const DEBUG = false;  // set true to enable console logging.
 
 /**
  * Construct a scheduler for Matrix. Requires
@@ -60,7 +60,7 @@ function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
  * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
  */
 MatrixScheduler.prototype.getQueueForEvent = function(event) {
-    var name = this.queueAlgorithm(event);
+    const name = this.queueAlgorithm(event);
     if (!name || !this._queues[name]) {
         return null;
     }
@@ -76,11 +76,11 @@ MatrixScheduler.prototype.getQueueForEvent = function(event) {
  * @return {boolean} True if this event was removed.
  */
 MatrixScheduler.prototype.removeEventFromQueue = function(event) {
-    var name = this.queueAlgorithm(event);
+    const name = this.queueAlgorithm(event);
     if (!name || !this._queues[name]) {
         return false;
     }
-    var removed = false;
+    let removed = false;
     utils.removeElement(this._queues[name], function(element) {
         if (element.event.getId() === event.getId()) {
             removed = true;
@@ -110,7 +110,7 @@ MatrixScheduler.prototype.setProcessFunction = function(fn) {
  * resolved or rejected in due time, else null.
  */
 MatrixScheduler.prototype.queueEvent = function(event) {
-    var queueName = this.queueAlgorithm(event);
+    const queueName = this.queueAlgorithm(event);
     if (!queueName) {
         return null;
     }
@@ -118,15 +118,15 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    var defer = q.defer();
+    const defer = q.defer();
     this._queues[queueName].push({
         event: event,
         defer: defer,
-        attempts: 0
+        attempts: 0,
     });
     debuglog(
         "Queue algorithm dumped event %s into queue '%s'",
-        event.getId(), queueName
+        event.getId(), queueName,
     );
     _startProcessingQueues(this);
     return defer.promise;
@@ -155,7 +155,7 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
     }
 
     if (err.name === "M_LIMIT_EXCEEDED") {
-        var waitTime = err.data.retry_after_ms;
+        const waitTime = err.data.retry_after_ms;
         if (waitTime) {
             return waitTime;
         }
@@ -201,10 +201,10 @@ function _startProcessingQueues(scheduler) {
 
 function _processQueue(scheduler, queueName) {
     // get head of queue
-    var obj = _peekNextEvent(scheduler, queueName);
+    const obj = _peekNextEvent(scheduler, queueName);
     if (!obj) {
         // queue is empty. Mark as inactive and stop recursing.
-        var index = scheduler._activeQueues.indexOf(queueName);
+        const index = scheduler._activeQueues.indexOf(queueName);
         if (index >= 0) {
             scheduler._activeQueues.splice(index, 1);
         }
@@ -213,7 +213,7 @@ function _processQueue(scheduler, queueName) {
     }
     debuglog(
         "Queue '%s' has %s pending events",
-        queueName, scheduler._queues[queueName].length
+        queueName, scheduler._queues[queueName].length,
     );
     // fire the process function and if it resolves, resolve the deferred. Else
     // invoke the retry algorithm.
@@ -227,22 +227,21 @@ function _processQueue(scheduler, queueName) {
     }, function(err) {
         obj.attempts += 1;
         // ask the retry algorithm when/if we should try again
-        var waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
+        const waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
         debuglog(
             "retry(%s) err=%s event_id=%s waitTime=%s",
-            obj.attempts, err, obj.event.getId(), waitTimeMs
+            obj.attempts, err, obj.event.getId(), waitTimeMs,
         );
         if (waitTimeMs === -1) {  // give up (you quitter!)
             debuglog(
-                "Queue '%s' giving up on event %s", queueName, obj.event.getId()
+                "Queue '%s' giving up on event %s", queueName, obj.event.getId(),
             );
             // remove this from the queue
             _removeNextEvent(scheduler, queueName);
             obj.defer.reject(err);
             // process next event
             _processQueue(scheduler, queueName);
-        }
-        else {
+        } else {
             setTimeout(function() {
                 _processQueue(scheduler, queueName);
             }, waitTimeMs);
@@ -251,7 +250,7 @@ function _processQueue(scheduler, queueName) {
 }
 
 function _peekNextEvent(scheduler, queueName) {
-    var queue = scheduler._queues[queueName];
+    const queue = scheduler._queues[queueName];
     if (!utils.isArray(queue)) {
         return null;
     }
@@ -259,7 +258,7 @@ function _peekNextEvent(scheduler, queueName) {
 }
 
 function _removeNextEvent(scheduler, queueName) {
-    var queue = scheduler._queues[queueName];
+    const queue = scheduler._queues[queueName];
     if (!utils.isArray(queue)) {
         return null;
     }
@@ -268,7 +267,7 @@ function _removeNextEvent(scheduler, queueName) {
 
 function debuglog() {
     if (DEBUG) {
-        console.log.apply(console, arguments);
+        console.log(...arguments);
     }
 }
 

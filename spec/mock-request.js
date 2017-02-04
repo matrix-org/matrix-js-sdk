@@ -1,5 +1,5 @@
 "use strict";
-var q = require("q");
+const q = require("q");
 
 /**
  * Construct a mock HTTP backend, heavily inspired by Angular.js.
@@ -8,15 +8,15 @@ var q = require("q");
 function HttpBackend() {
     this.requests = [];
     this.expectedRequests = [];
-    var self = this;
+    const self = this;
     // the request function dependency that the SDK needs.
     this.requestFn = function(opts, callback) {
-        var req = new Request(opts, callback);
+        const req = new Request(opts, callback);
         console.log("HTTP backend received request: %s", req);
         self.requests.push(req);
 
-        var abort = function() {
-            var idx = self.requests.indexOf(req);
+        const abort = function() {
+            const idx = self.requests.indexOf(req);
             if (idx >= 0) {
                 console.log("Aborting HTTP request: %s %s", opts.method,
                             opts.uri);
@@ -26,7 +26,7 @@ function HttpBackend() {
         };
 
         return {
-            abort: abort
+            abort: abort,
         };
     };
 }
@@ -38,18 +38,18 @@ HttpBackend.prototype = {
      * @return {Promise} resolved when there is nothing left to flush.
      */
     flush: function(path, numToFlush) {
-        var defer = q.defer();
-        var self = this;
-        var flushed = 0;
-        var triedWaiting = false;
+        const defer = q.defer();
+        const self = this;
+        let flushed = 0;
+        let triedWaiting = false;
         console.log(
-            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush
+            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush,
         );
-        var tryFlush = function() {
+        const tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
                 "  trying to flush queue => reqs=%s expected=%s [%s]",
-                self.requests.length, self.expectedRequests.length, path
+                self.requests.length, self.expectedRequests.length, path,
             );
             if (self._takeFromQueue(path)) {
                 // try again on the next tick.
@@ -58,18 +58,15 @@ HttpBackend.prototype = {
                 if (numToFlush && flushed === numToFlush) {
                     console.log("  [%s] Flushed assigned amount: %s", path, numToFlush);
                     defer.resolve();
-                }
-                else {
+                } else {
                     setTimeout(tryFlush, 0);
                 }
-            }
-            else if (flushed === 0 && !triedWaiting) {
+            } else if (flushed === 0 && !triedWaiting) {
                 // we may not have made the request yet, wait a generous amount of
                 // time before giving up.
                 setTimeout(tryFlush, 5);
                 triedWaiting = true;
-            }
-            else {
+            } else {
                 console.log("  no more flushes. [%s]", path);
                 defer.resolve();
             }
@@ -86,14 +83,19 @@ HttpBackend.prototype = {
      * @return {boolean} true if something was resolved.
      */
     _takeFromQueue: function(path) {
-        var req = null;
-        var i, j;
-        var matchingReq, expectedReq, testResponse = null;
+        let req = null;
+        let i;
+        let j;
+        let matchingReq = null;
+        let expectedReq = null;
+        let testResponse = null;
         for (i = 0; i < this.requests.length; i++) {
             req = this.requests[i];
             for (j = 0; j < this.expectedRequests.length; j++) {
                 expectedReq = this.expectedRequests[j];
-                if (path && path !== expectedReq.path) { continue; }
+                if (path && path !== expectedReq.path) {
+                    continue;
+                }
                 if (expectedReq.method === req.method &&
                         req.path.indexOf(expectedReq.path) !== -1) {
                     if (!expectedReq.data || (JSON.stringify(expectedReq.data) ===
@@ -115,12 +117,12 @@ HttpBackend.prototype = {
                 }
                 testResponse = matchingReq.response;
                 console.log("    responding to %s", matchingReq.path);
-                var body = testResponse.body;
+                let body = testResponse.body;
                 if (Object.prototype.toString.call(body) == "[object Function]") {
                     body = body(req.path, req.data);
                 }
                 req.callback(
-                    testResponse.err, testResponse.response, body
+                    testResponse.err, testResponse.response, body,
                 );
                 matchingReq = null;
             }
@@ -135,10 +137,10 @@ HttpBackend.prototype = {
      * Makes sure that the SDK hasn't sent any more requests to the backend.
      */
     verifyNoOutstandingRequests: function() {
-        var firstOutstandingReq = this.requests[0] || {};
+        const firstOutstandingReq = this.requests[0] || {};
         expect(this.requests.length).toEqual(0,
             "Expected no more HTTP requests but received request to " +
-            firstOutstandingReq.path
+            firstOutstandingReq.path,
         );
     },
 
@@ -146,9 +148,9 @@ HttpBackend.prototype = {
      * Makes sure that the test doesn't have any unresolved requests.
      */
     verifyNoOutstandingExpectation: function() {
-        var firstOutstandingExpectation = this.expectedRequests[0] || {};
+        const firstOutstandingExpectation = this.expectedRequests[0] || {};
         expect(this.expectedRequests.length).toEqual(0,
-            "Expected to see HTTP request for " + firstOutstandingExpectation.path
+            "Expected to see HTTP request for " + firstOutstandingExpectation.path,
         );
     },
 
@@ -160,10 +162,10 @@ HttpBackend.prototype = {
      * @return {Request} An expected request.
      */
     when: function(method, path, data) {
-        var pendingReq = new ExpectedRequest(method, path, data);
+        const pendingReq = new ExpectedRequest(method, path, data);
         this.expectedRequests.push(pendingReq);
         return pendingReq;
-    }
+    },
 };
 
 /**
@@ -206,10 +208,10 @@ ExpectedRequest.prototype = {
         this.response = {
             response: {
                 statusCode: code,
-                headers: {}
+                headers: {},
             },
             body: data,
-            err: null
+            err: null,
         };
     },
 
@@ -222,12 +224,12 @@ ExpectedRequest.prototype = {
         this.response = {
             response: {
                 statusCode: code,
-                headers: {}
+                headers: {},
             },
             body: null,
-            err: err
+            err: err,
         };
-    }
+    },
 };
 
 /**
@@ -242,23 +244,33 @@ function Request(opts, callback) {
     this.callback = callback;
 
     Object.defineProperty(this, 'method', {
-        get: function() { return opts.method; }
+        get: function() {
+            return opts.method;
+        },
     });
 
     Object.defineProperty(this, 'path', {
-        get: function() { return opts.uri; }
+        get: function() {
+            return opts.uri;
+        },
     });
 
     Object.defineProperty(this, 'data', {
-        get: function() { return opts.body; }
+        get: function() {
+            return opts.body;
+        },
     });
 
     Object.defineProperty(this, 'queryParams', {
-        get: function() { return opts.qs; }
+        get: function() {
+            return opts.qs;
+        },
     });
 
     Object.defineProperty(this, 'headers', {
-        get: function() { return opts.headers || {}; }
+        get: function() {
+            return opts.headers || {};
+        },
     });
 }
 

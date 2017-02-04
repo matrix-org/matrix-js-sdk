@@ -21,9 +21,6 @@ module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 module.exports.EventStatus = require("./models/event").EventStatus;
 /** The {@link module:store/memory.MatrixInMemoryStore|MatrixInMemoryStore} class. */
 module.exports.MatrixInMemoryStore = require("./store/memory").MatrixInMemoryStore;
-/** The {@link module:store/webstorage~WebStorageStore|WebStorageStore} class.
- * <strong>Work in progress; unstable.</strong> */
-module.exports.WebStorageStore = require("./store/webstorage");
 /** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
 module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
 /** The {@link module:http-api.MatrixError|MatrixError} class. */
@@ -71,7 +68,7 @@ module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCal
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
-var request;
+let request;
 /**
  * The function used to perform HTTP requests. Only use this if you want to
  * use a different HTTP library, e.g. Angular's <code>$http</code>. This should
@@ -97,7 +94,7 @@ module.exports.getRequest = function() {
  * @param {requestWrapperFunction} wrapper The wrapping function.
  */
 module.exports.wrapRequest = function(wrapper) {
-    var origRequest = request;
+    const origRequest = request;
     request = function(options, callback) {
         return wrapper(origRequest, options, callback);
     };
@@ -122,12 +119,12 @@ module.exports.wrapRequest = function(wrapper) {
 module.exports.createClient = function(opts) {
     if (typeof opts === "string") {
         opts = {
-            "baseUrl": opts
+            "baseUrl": opts,
         };
     }
     opts.request = opts.request || request;
     opts.store = opts.store || new module.exports.MatrixInMemoryStore({
-      localStorage: global.localStorage
+      localStorage: global.localStorage,
     });
     opts.scheduler = opts.scheduler || new module.exports.MatrixScheduler();
     return new module.exports.MatrixClient(opts);
