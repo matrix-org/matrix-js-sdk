@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
 

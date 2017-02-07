@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const RoomState = sdk.RoomState;
 const RoomMember = sdk.RoomMember;

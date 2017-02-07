@@ -1,5 +1,6 @@
 "use strict";
 
+import 'source-map-support/register';
 const callbacks = require("../../lib/realtime-callbacks");
 const testUtils = require("../test-utils.js");
 

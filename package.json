@@ -64,6 +64,7 @@
     "jasmine-node": "^1.14.5",
     "jsdoc": "^3.4.0",
     "rimraf": "^2.5.4",
+    "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
     "uglifyjs": "^2.4.10",
     "watchify": "^3.2.1"

@@ -1,5 +1,6 @@
 
 "use strict";
+import 'source-map-support/register';
 const Crypto = require("../../lib/crypto");
 const sdk = require("../..");
 

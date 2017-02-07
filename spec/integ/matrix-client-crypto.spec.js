@@ -24,6 +24,7 @@ limitations under the License.
  */
 
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const q = require("q");
 const utils = require("../../lib/utils");
