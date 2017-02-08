@@ -64,7 +64,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
     }
 
     const self = this;
-    this._prepPromise = self._crypto.downloadKeys(roomMembers, true).then(function(res) {
+    this._prepPromise = self._crypto.downloadKeys(roomMembers).then(function(res) {
         return self._crypto.ensureOlmSessionsForUsers(roomMembers);
     }).then(function() {
         self._sessionPrepared = true;
