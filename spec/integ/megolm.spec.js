@@ -25,6 +25,7 @@ try {
 
 const anotherjson = require('another-json');
 const q = require('q');
+import expect from 'expect';
 
 const sdk = require('../..');
 const utils = require('../../lib/utils');
@@ -32,7 +33,6 @@ const testUtils = require('../test-utils');
 const TestClient = require('../TestClient').default;
 
 const ROOM_ID = "!room:id";
-
 
 /**
  * start an Olm session with a given recipient
@@ -66,9 +66,9 @@ function createOlmSession(olmAccount, recipientTestClient) {
  * @return {object} event
  */
 function encryptOlmEvent(opts) {
-    expect(opts.senderKey).toBeDefined();
-    expect(opts.p2pSession).toBeDefined();
-    expect(opts.recipient).toBeDefined();
+    expect(opts.senderKey).toBeTruthy();
+    expect(opts.p2pSession).toBeTruthy();
+    expect(opts.recipient).toBeTruthy();
 
     const plaintext = {
         content: opts.plaincontent || {},
@@ -106,8 +106,8 @@ function encryptOlmEvent(opts) {
  * @return {object} event
  */
 function encryptMegolmEvent(opts) {
-    expect(opts.senderKey).toBeDefined();
-    expect(opts.groupSession).toBeDefined();
+    expect(opts.senderKey).toBeTruthy();
+    expect(opts.groupSession).toBeTruthy();
 
     const plaintext = opts.plaintext || {};
     if (!plaintext.content) {
@@ -120,7 +120,7 @@ function encryptMegolmEvent(opts) {
         plaintext.type = "m.room.message";
     }
     if (!plaintext.room_id) {
-        expect(opts.room_id).toBeDefined();
+        expect(opts.room_id).toBeTruthy();
         plaintext.room_id = opts.room_id;
     }
 
@@ -650,7 +650,7 @@ describe("megolm", function() {
                 'PUT', '/send/',
             ).respond(200, function(path, content) {
                 console.log('/send:', content);
-                expect(content.session_id).not.toEqual(megolmSessionId);
+                expect(content.session_id).toNotEqual(megolmSessionId);
                 return {
                     event_id: '$event_id',
                 };

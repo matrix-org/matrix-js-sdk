@@ -3,6 +3,8 @@ import 'source-map-support/register';
 const ContentRepo = require("../../lib/content-repo");
 const testUtils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("ContentRepo", function() {
     const baseUrl = "https://my.home.server";
 

@@ -5,6 +5,8 @@ const MatrixClient = sdk.MatrixClient;
 const HttpBackend = require("../mock-request");
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -97,7 +99,7 @@ describe("MatrixClient opts", function() {
                 "m.room.create",
             ];
             client.on("event", function(event) {
-                expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
+                expect(expectedEventTypes.indexOf(event.getType())).toNotEqual(
                     -1, "Recv unexpected event type: " + event.getType(),
                 );
                 expectedEventTypes.splice(
