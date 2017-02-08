@@ -2286,13 +2286,18 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.searchMessageText = function(opts, callback) {
+    const roomEvents = {
+        search_term: opts.query,
+    };
+
+    if ('keys' in opts) {
+        roomEvents.keys = opts.keys;
+    }
+
     return this.search({
         body: {
             search_categories: {
-                room_events: {
-                    keys: opts.keys,
-                    search_term: opts.query,
-                },
+                room_events: roomEvents,
             },
         },
     }, callback);
