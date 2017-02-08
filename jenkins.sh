@@ -15,6 +15,9 @@ function fail {
     RC=1
 }
 
+# don't use last time's test reports
+rm -rf reports || exit $?
+
 npm test || fail "npm test finished with return code $?"
 
 npm run -s lint -- -f checkstyle > eslint.xml ||
