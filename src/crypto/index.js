@@ -86,9 +86,6 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
     );
 
     if (!myDevices) {
-        // we don't yet have a list of our own devices; make sure we
-        // get one when we flush the pendingUsersWithNewDevices.
-        this._deviceList.invalidateUserDeviceList(this._userId);
         myDevices = {};
     }
 
@@ -769,6 +766,8 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         } else {
             // otherwise, we have to invalidate all devices for all users we
             // share a room with.
+            console.log("Completed first initialsync; invalidating all " +
+                        "device list caches");
             this._invalidateDeviceListForAllActiveUsers();
         }
     }

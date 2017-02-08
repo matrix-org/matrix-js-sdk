@@ -64,7 +64,13 @@ export default class DeviceList {
                 // just wait for the existing download to complete
                 promises.push(this._keyDownloadsInProgressByUser[u]);
             } else {
-                if (forceDownload || !this.getStoredDevicesForUser(u)) {
+                if (forceDownload) {
+                    console.log("Invalidating device list for " + u +
+                                " for forceDownload");
+                    this.invalidateUserDeviceList(u);
+                } else if (!this.getStoredDevicesForUser(u)) {
+                    console.log("Invalidating device list for " + u +
+                                " due to empty cache");
                     this.invalidateUserDeviceList(u);
                 }
                 if (this._pendingUsersWithNewDevices[u]) {
