@@ -542,6 +542,23 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
         config: config,
     });
     this._roomEncryptors[roomId] = alg;
+
+    // if encryption was not previously enabled in this room, we will have been
+    // ignoring new device events for these users so far. We may well have
+    // up-to-date lists for some users, for instance if we were sharing other
+    // e2e rooms with them, so there is room for optimisation here, but for now
+    // we just invalidate everyone in the room.
+    if (!existingConfig) {
+        console.log("Enabling encryption in " + roomId + " for the first time; " +
+                    "invalidating device lists for all users therein");
+        const room = this._clientStore.getRoom(roomId);
+        const members = room.getJoinedMembers();
+        members.forEach((m) => {
+            this._deviceList.invalidateUserDeviceList(m.userId);
+        });
+        // the actual refresh happens once we've finished processing the sync,
+        // in _onSyncCompleted.
+    }
 };
 
 

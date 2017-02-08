@@ -684,4 +684,44 @@ describe("MatrixClient crypto", function() {
             }).then(expectAliQueryKeys)
             .nodeify(done);
     });
+
+    it("Ali does a key query when encryption is enabled", function(done) {
+        // enabling encryption in the room should make alice download devices
+        // for both members.
+        q()
+            .then(() => startClient(aliTestClient))
+            .then(() => {
+                const syncData = {
+                    next_batch: '2',
+                    rooms: {
+                        join: {},
+                    },
+                };
+                syncData.rooms.join[roomId] = {
+                    state: {
+                        events: [
+                            testUtils.mkEvent({
+                                type: 'm.room.encryption',
+                                skey: '',
+                                content: {
+                                    algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                                },
+                            }),
+                        ],
+                    },
+                };
+
+                aliTestClient.httpBackend.when('GET', '/sync').respond(
+                    200, syncData);
+                return aliTestClient.httpBackend.flush('/sync', 1);
+            }).then(() => {
+                aliTestClient.expectKeyQuery({
+                    device_keys: {
+                        [aliUserId]: {},
+                        [bobUserId]: {},
+                    },
+                });
+                return aliTestClient.httpBackend.flush('/keys/query', 1);
+            }).nodeify(done);
+    });
 });
