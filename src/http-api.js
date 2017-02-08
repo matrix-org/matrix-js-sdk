@@ -627,12 +627,15 @@ module.exports.MatrixHttpApi.prototype = {
 
         const defer = q.defer();
 
-        let timeoutId;
         let timedOut = false;
         let req;
+        let loaded;
+        let timeoutId;
+        let onProgressFunc;
         const localTimeoutMs = opts.localTimeoutMs || this.opts.localTimeoutMs;
+
         if (localTimeoutMs) {
-            timeoutId = callbacks.setTimeout(function() {
+            let timedOut = function () {
                 timedOut = true;
                 if (req && req.abort) {
                     req.abort();
@@ -640,9 +643,19 @@ module.exports.MatrixHttpApi.prototype = {
                 defer.reject(new module.exports.MatrixError({
                     error: "Locally timed out waiting for a response",
                     errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-                    timeout: localTimeoutMs,
+                    timeout: localTimeoutMs
                 }));
-            }, localTimeoutMs);
+            };
+
+            timeoutId = setTimeout(timedOut, localTimeoutMs);
+
+            onProgressFunc = function(ev) {
+                if (loaded === null || ev.loaded > loaded) {
+                        loaded = ev.loaded;
+                        clearTimeout(timeoutId);
+                        timeoutId = setTimeout(timedOut, localTimeoutMs);
+                }
+            };
         }
 
         const reqPromise = defer.promise;
@@ -662,7 +675,7 @@ module.exports.MatrixHttpApi.prototype = {
                 },
                 function(err, response, body) {
                     if (localTimeoutMs) {
-                        callbacks.clearTimeout(timeoutId);
+                        clearTimeout(timeoutId);
                         if (timedOut) {
                             return; // already rejected promise
                         }
@@ -683,6 +696,9 @@ module.exports.MatrixHttpApi.prototype = {
                 // FIXME: This is EVIL, but I can't think of a better way to expose
                 // abort() operations on underlying HTTP requests :(
                 reqPromise.abort = req.abort.bind(req);
+            }
+            if (localTimeoutMs) {
+                req.onprogress = onProgressFunc;
             }
         } catch (ex) {
             defer.reject(ex);

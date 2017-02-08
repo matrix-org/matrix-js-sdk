@@ -1,14 +1,25 @@
 "use strict";
 const q = require("q");
+let fakeDate;
+let callbacks = require("../lib/realtime-callbacks");
+
+let tick = function tick(millis) {
+    // make sure we tick the fakedate first, otherwise nothing will happen!
+    fakeDate += millis;
+    jasmine.Clock.tick(millis);
+};
+
 
 /**
  * Construct a mock HTTP backend, heavily inspired by Angular.js.
  * @constructor
  */
-function HttpBackend() {
+function HttpBackend(useMockClock) {
     this.requests = [];
     this.expectedRequests = [];
+    this.useMockClock = useMockClock ? true : false
     const self = this;
+
     // the request function dependency that the SDK needs.
     this.requestFn = function(opts, callback) {
         const req = new Request(opts, callback);
@@ -41,11 +52,20 @@ HttpBackend.prototype = {
         const defer = q.defer();
         const self = this;
         let flushed = 0;
-        let triedWaiting = false;
+        let waitLoops = 0;
         console.log(
             "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush,
         );
-        const tryFlush = function() {
+        // Mock out Clock for .timeout() tests
+        if (this.useMockClock) {
+            jasmine.Clock.useMock();
+            fakeDate = Date.now();
+            callbacks.setNow(function() {
+                return fakeDate;
+            });
+        }
+
+        const tryFlush = function tryFlush() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
                 "  trying to flush queue => reqs=%s expected=%s [%s]",
@@ -57,23 +77,27 @@ HttpBackend.prototype = {
                 flushed += 1;
                 if (numToFlush && flushed === numToFlush) {
                     console.log("  [%s] Flushed assigned amount: %s", path, numToFlush);
+                    // Restore Clock
+                    if (self.useMockClock) {
+                        callbacks.setNow();
+                    }
                     defer.resolve();
                 } else {
-                    setTimeout(tryFlush, 0);
+                    setImmediate(tryFlush);
                 }
-            } else if (flushed === 0 && !triedWaiting) {
-                // we may not have made the request yet, wait a generous amount of
-                // time before giving up.
-                setTimeout(tryFlush, 5);
-                triedWaiting = true;
+            } else if (flushed === 0 && waitLoops < 50) {
+                waitLoops += 1
+                setImmediate(tryFlush);
             } else {
                 console.log("  no more flushes. [%s]", path);
+                // Restore Clock
+                if (self.useMockClock) {
+                    callbacks.setNow();
+                }
                 defer.resolve();
             }
         };
-
-        setTimeout(tryFlush, 0);
-
+        setImmediate(tryFlush);
         return defer.promise;
     },
 
@@ -116,6 +140,9 @@ HttpBackend.prototype = {
                     matchingReq.checks[j](req);
                 }
                 testResponse = matchingReq.response;
+                if (matchingReq._waitMs) {
+                    tick(matchingReq._waitMs);
+                }
                 console.log("    responding to %s", matchingReq.path);
                 let body = testResponse.body;
                 if (Object.prototype.toString.call(body) == "[object Function]") {
@@ -203,6 +230,7 @@ ExpectedRequest.prototype = {
      * @param {Number} code The HTTP status code.
      * @param {Object|Function} data The HTTP JSON body. If this is a function,
      * it will be invoked when the JSON body is required (which should be returned).
+     * @return {Request} for chaining calls.
      */
     respond: function(code, data) {
         this.response = {
@@ -213,6 +241,7 @@ ExpectedRequest.prototype = {
             body: data,
             err: null,
         };
+        return this;
     },
 
     /**
@@ -229,6 +258,17 @@ ExpectedRequest.prototype = {
             body: null,
             err: err,
         };
+    },
+
+    /**
+     * Advance the time before processing a request by waitMs.
+     *
+     * @param {Number} waitMs number of miliseconds of timeout.
+     * @return {Request} for chaining calls.
+     */
+    waitFor: function(waitMs) {
+        this._waitMs = waitMs;
+        return this;
     },
 };
 
