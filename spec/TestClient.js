@@ -20,6 +20,7 @@ limitations under the License.
 import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from './mock-request';
+import expect from 'expect';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -94,15 +95,15 @@ TestClient.prototype.expectKeyUpload = function(existingDevices) {
         return res;
     });
     this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
-        expect(content.one_time_keys).not.toBeDefined();
-        expect(content.device_keys).toBeDefined();
+        expect(content.one_time_keys).toBe(undefined);
+        expect(content.device_keys).toBeTruthy();
         self.deviceKeys = content.device_keys;
         return {one_time_key_counts: {signed_curve25519: 0}};
     });
     this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
-        expect(content.device_keys).not.toBeDefined();
-        expect(content.one_time_keys).toBeDefined();
-        expect(content.one_time_keys).not.toEqual({});
+        expect(content.device_keys).toBe(undefined);
+        expect(content.one_time_keys).toBeTruthy();
+        expect(content.one_time_keys).toNotEqual({});
         self.oneTimeKeys = content.one_time_keys;
         return {one_time_key_counts: {
             signed_curve25519: Object.keys(self.oneTimeKeys).length,

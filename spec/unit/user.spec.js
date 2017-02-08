@@ -4,6 +4,8 @@ const sdk = require("../..");
 const User = sdk.User;
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("User", function() {
     const userId = "@alice:bar";
     let user;

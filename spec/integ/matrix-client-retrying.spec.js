@@ -5,6 +5,8 @@ const HttpBackend = require("../mock-request");
 const utils = require("../test-utils");
 const EventStatus = sdk.EventStatus;
 
+import expect from 'expect';
+
 describe("MatrixClient retrying", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;

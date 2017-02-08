@@ -25,6 +25,7 @@ limitations under the License.
 
 "use strict";
 import 'source-map-support/register';
+import expect from 'expect';
 const sdk = require("../..");
 const q = require("q");
 const utils = require("../../lib/utils");
@@ -51,7 +52,7 @@ function bobUploadsKeys() {
         bobTestClient.httpBackend.flush(),
     ]).then(() => {
         expect(Object.keys(bobTestClient.oneTimeKeys).length).toEqual(5);
-        expect(bobTestClient.deviceKeys).not.toEqual({});
+        expect(bobTestClient.deviceKeys).toNotEqual({});
     });
 }
 
@@ -107,7 +108,7 @@ function expectBobQueryKeys() {
  */
 function expectAliClaimKeys() {
     // can't query keys before bob has uploaded them
-    expect(bobTestClient.oneTimeKeys).not.toEqual({});
+    expect(bobTestClient.oneTimeKeys).toNotEqual({});
 
     aliTestClient.httpBackend.when(
         "POST", "/keys/claim",
@@ -135,7 +136,7 @@ function expectAliClaimKeys() {
 
 function aliDownloadsKeys() {
     // can't query keys before bob has uploaded them
-    expect(bobTestClient.getSigningKey()).toBeDefined();
+    expect(bobTestClient.getSigningKey()).toBeTruthy();
 
     const p1 = aliTestClient.client.downloadKeys([bobUserId]).then(function() {
         expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([{
@@ -232,7 +233,7 @@ function expectAliSendMessageRequest() {
         aliMessages.push(content);
         expect(utils.keys(content.ciphertext)).toEqual([bobTestClient.getDeviceKey()]);
         const ciphertext = content.ciphertext[bobTestClient.getDeviceKey()];
-        expect(ciphertext).toBeDefined();
+        expect(ciphertext).toBeTruthy();
         return ciphertext;
     });
 }
@@ -249,7 +250,7 @@ function expectBobSendMessageRequest() {
         const aliDeviceCurve25519Key = aliTestClient.deviceKeys.keys[aliKeyId];
         expect(utils.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
         const ciphertext = content.ciphertext[aliDeviceCurve25519Key];
-        expect(ciphertext).toBeDefined();
+        expect(ciphertext).toBeTruthy();
         return ciphertext;
     });
 }
@@ -437,7 +438,7 @@ describe("MatrixClient crypto", function() {
             .then(function() {
                 // tamper bob's keys
                 const bobDeviceKeys = bobTestClient.deviceKeys;
-                expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeDefined();
+                expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeTruthy();
                 bobDeviceKeys.keys["curve25519:" + bobDeviceId] += "abc";
 
                 return q.all(aliTestClient.client.downloadKeys([bobUserId]),

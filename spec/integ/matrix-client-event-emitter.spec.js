@@ -4,6 +4,8 @@ const sdk = require("../..");
 const HttpBackend = require("../mock-request");
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("MatrixClient events", function() {
     const baseUrl = "http://localhost.or.something";
     let client;
@@ -142,8 +144,8 @@ describe("MatrixClient events", function() {
             let fired = false;
             client.on("User.presence", function(event, user) {
                 fired = true;
-                expect(user).toBeDefined();
-                expect(event).toBeDefined();
+                expect(user).toBeTruthy();
+                expect(event).toBeTruthy();
                 if (!user || !event) {
                     return;
                 }
@@ -208,7 +210,7 @@ describe("MatrixClient events", function() {
             client.on("RoomState.events", function(event, state) {
                 eventsInvokeCount++;
                 const index = roomStateEventTypes.indexOf(event.getType());
-                expect(index).not.toEqual(
+                expect(index).toNotEqual(
                     -1, "Unexpected room state event type: " + event.getType(),
                 );
                 if (index >= 0) {

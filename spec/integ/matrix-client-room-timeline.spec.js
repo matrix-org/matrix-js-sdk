@@ -5,6 +5,8 @@ const EventStatus = sdk.EventStatus;
 const HttpBackend = require("../mock-request");
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("MatrixClient room timelines", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -248,7 +250,7 @@ describe("MatrixClient room timelines", function() {
 
                 client.scrollback(room).done(function() {
                     expect(room.timeline.length).toEqual(1);
-                    expect(room.oldState.paginationToken).toBeNull();
+                    expect(room.oldState.paginationToken).toBe(null);
                     done();
                 });
 
@@ -368,7 +370,7 @@ describe("MatrixClient room timelines", function() {
                     return;
                 }
                 const room = client.getRoom(roomId);
-                expect(room.oldState.paginationToken).toBeDefined();
+                expect(room.oldState.paginationToken).toBeTruthy();
 
                 client.scrollback(room, 1).done(function() {
                     expect(room.oldState.paginationToken).toEqual(sbEndTok);

@@ -6,6 +6,8 @@ const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
+import expect from 'expect';
+
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -135,7 +137,7 @@ describe("MatrixClient syncing", function() {
                 expect(member.name).toEqual("The Boss");
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false),
-                ).toBeDefined();
+                ).toBeTruthy();
                 done();
             });
         });
@@ -212,7 +214,7 @@ describe("MatrixClient syncing", function() {
                 expect(member.name).toEqual(userC);
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false),
-                ).toBeNull();
+                ).toBe(null);
                 done();
             });
         });
@@ -406,10 +408,10 @@ describe("MatrixClient syncing", function() {
             httpBackend.flush().done(function() {
                 const room = client.getRoom(roomTwo);
                 let member = room.getMember(otherUserId);
-                expect(member).toBeDefined();
+                expect(member).toBeTruthy();
                 expect(member.typing).toEqual(true);
                 member = room.getMember(selfUserId);
-                expect(member).toBeDefined();
+                expect(member).toBeTruthy();
                 expect(member.typing).toEqual(false);
                 done();
             });

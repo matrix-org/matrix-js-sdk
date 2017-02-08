@@ -5,6 +5,8 @@ const RoomState = sdk.RoomState;
 const RoomMember = sdk.RoomMember;
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("RoomState", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
@@ -44,8 +46,8 @@ describe("RoomState", function() {
             const members = state.getMembers();
             expect(members.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(members[0].userId)).not.toEqual(-1);
-            expect([userA, userB].indexOf(members[1].userId)).not.toEqual(-1);
+            expect([userA, userB].indexOf(members[0].userId)).toNotEqual(-1);
+            expect([userA, userB].indexOf(members[1].userId)).toNotEqual(-1);
         });
     });
 
@@ -55,7 +57,7 @@ describe("RoomState", function() {
         });
 
         it("should return a member if they exist", function() {
-            expect(state.getMember(userB)).toBeDefined();
+            expect(state.getMember(userB)).toBeTruthy();
         });
 
         it("should return a member which changes as state changes", function() {
@@ -115,8 +117,8 @@ describe("RoomState", function() {
             const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(events[0].getStateKey())).not.toEqual(-1);
-            expect([userA, userB].indexOf(events[1].getStateKey())).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[0].getStateKey())).toNotEqual(-1);
+            expect([userA, userB].indexOf(events[1].getStateKey())).toNotEqual(-1);
         });
 
         it("should return a single MatrixEvent if a state_key was specified",
@@ -239,7 +241,7 @@ describe("RoomState", function() {
 
             // TODO: We do this because we don't DI the RoomMember constructor
             // so we can't inject a mock :/ so we have to infer.
-            expect(state.members[userC]).toBeDefined();
+            expect(state.members[userC]).toBeTruthy();
             expect(state.members[userC].powerLevel).toEqual(10);
         });
 
@@ -253,7 +255,7 @@ describe("RoomState", function() {
             });
             state.setStateEvents([memberEvent]);
 
-            expect(state.members[userA].setMembershipEvent).not.toHaveBeenCalled();
+            expect(state.members[userA].setMembershipEvent).toNotHaveBeenCalled();
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
                 memberEvent, state,
             );

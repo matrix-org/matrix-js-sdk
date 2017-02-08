@@ -1,14 +1,17 @@
 "use strict";
+import expect from 'expect';
+
 const sdk = require("..");
 const MatrixEvent = sdk.MatrixEvent;
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
  * name to stdout.
- * @param {TestCase} testCase The test case that is about to be run.
+ * @param {Mocha.Context} context  The test context
  */
-module.exports.beforeEach = function(testCase) {
-    const desc = testCase.suite.description + " : " + testCase.description;
+module.exports.beforeEach = function(context) {
+    const desc = context.currentTest.fullTitle();
+
     console.log(desc);
     console.log(new Array(1 + desc.length).join("="));
 };
@@ -20,18 +23,18 @@ module.exports.beforeEach = function(testCase) {
  * @return {Object} An instantiated object with spied methods/properties.
  */
 module.exports.mock = function(constr, name) {
-    // By Tim Buschtöns
+    // Based on
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;
     const result = new HelperConstr();
-    result.jasmineToString = function() {
+    result.toString = function() {
         return "mock" + (name ? " of " + name : "");
     };
     for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
-                result[key] = jasmine.createSpy((name || "mock") + '.' + key);
+                result[key] = expect.createSpy();
             }
         } catch (ex) {
             // Direct access to some non-function fields of DOM prototypes may
