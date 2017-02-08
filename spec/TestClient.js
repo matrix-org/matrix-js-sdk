@@ -61,12 +61,25 @@ TestClient.prototype.start = function(existingDevices) {
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectKeyUpload(existingDevices);
 
+    this.httpBackend.when('POST', '/keys/query').respond(200, (path, content) => {
+        expect(Object.keys(content.device_keys)).toEqual([this.userId]);
+        expect(content.device_keys[this.userId]).toEqual({});
+        let res = existingDevices;
+        if (!res) {
+            res = { device_keys: {} };
+            res.device_keys[this.userId] = {};
+        }
+        return res;
+    });
+
     this.client.startClient({
         // set this so that we can get hold of failed events
         pendingEventOrdering: 'detached',
     });
 
-    return this.httpBackend.flush();
+    return this.httpBackend.flush().then(() => {
+        console.log('TestClient[' + this.userId + ']: started');
+    });
 };
 
 /**
@@ -78,22 +91,9 @@ TestClient.prototype.stop = function() {
 
 /**
  * Set up expectations that the client will upload device and one-time keys.
- *
- * @param {object?} existingDevices  the list of our existing devices to return from
- *    the /query request. Defaults to empty device list
  */
-TestClient.prototype.expectKeyUpload = function(existingDevices) {
+TestClient.prototype.expectKeyUpload = function() {
     const self = this;
-    this.httpBackend.when('POST', '/keys/query').respond(200, function(path, content) {
-        expect(Object.keys(content.device_keys)).toEqual([self.userId]);
-        expect(content.device_keys[self.userId]).toEqual({});
-        let res = existingDevices;
-        if (!res) {
-            res = { device_keys: {} };
-            res.device_keys[self.userId] = {};
-        }
-        return res;
-    });
     this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
         expect(content.one_time_keys).toBe(undefined);
         expect(content.device_keys).toBeTruthy();

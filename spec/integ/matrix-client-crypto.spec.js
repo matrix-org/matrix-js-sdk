@@ -393,7 +393,9 @@ describe("MatrixClient crypto", function() {
 
     afterEach(function() {
         aliTestClient.stop();
+        aliTestClient.httpBackend.verifyNoOutstandingExpectation();
         bobTestClient.stop();
+        bobTestClient.httpBackend.verifyNoOutstandingExpectation();
     });
 
     it('Ali knows the difference between a new user and one with no devices',
@@ -620,16 +622,13 @@ describe("MatrixClient crypto", function() {
             .then(function() {
                 aliTestClient.client.setDeviceBlocked(bobUserId, bobDeviceId, true);
                 const p1 = sendMessage(aliTestClient.client);
-                const p2 = expectAliQueryKeys()
-                    .then(expectAliClaimKeys)
-                    .then(function() {
-                        return expectSendMessageRequest(aliTestClient.httpBackend);
-                    }).then(function(sentContent) {
-                        // no unblocked devices, so the ciphertext should be empty
-                        expect(sentContent.ciphertext).toEqual({});
-                    });
+                const p2 = expectSendMessageRequest(aliTestClient.httpBackend)
+                      .then(function(sentContent) {
+                          // no unblocked devices, so the ciphertext should be empty
+                          expect(sentContent.ciphertext).toEqual({});
+                      });
                 return q.all([p1, p2]);
-            }).catch(testUtils.failTest).nodeify(done);
+            }).nodeify(done);
     });
 
     it("Bob receives two pre-key messages", function(done) {
