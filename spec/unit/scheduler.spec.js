@@ -1,6 +1,7 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const MatrixScheduler = sdk.MatrixScheduler;

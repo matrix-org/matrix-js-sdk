@@ -16,6 +16,7 @@ limitations under the License.
 
 "use strict";
 
+import 'source-map-support/register';
 
 let Olm = null;
 try {

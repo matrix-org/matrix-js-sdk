@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;

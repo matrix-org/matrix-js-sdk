@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const HttpBackend = require("../mock-request");
 const publicGlobals = require("../../lib/matrix");

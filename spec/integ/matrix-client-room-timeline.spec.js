@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const EventStatus = sdk.EventStatus;
 const HttpBackend = require("../mock-request");
