@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
@@ -6,6 +7,7 @@ const TimelineWindow = sdk.TimelineWindow;
 const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
 
 const utils = require("../test-utils");
+import expect from 'expect';
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";

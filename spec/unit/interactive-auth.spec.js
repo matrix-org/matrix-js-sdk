@@ -15,6 +15,7 @@ limitations under the License.
 */
 "use strict";
 
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const utils = require("../test-utils");
@@ -22,14 +23,16 @@ const utils = require("../test-utils");
 const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
+import expect from 'expect';
+
 describe("InteractiveAuth", function() {
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
     });
 
     it("should start an auth stage and complete it", function(done) {
-        const doRequest = jasmine.createSpy('doRequest');
-        const startAuthStage = jasmine.createSpy('startAuthStage');
+        const doRequest = expect.createSpy();
+        const startAuthStage = expect.createSpy();
 
         const ia = new InteractiveAuth({
             doRequest: doRequest,
@@ -51,7 +54,7 @@ describe("InteractiveAuth", function() {
         });
 
         // first we expect a call here
-        startAuthStage.andCallFake(function(stage) {
+        startAuthStage.andCall(function(stage) {
             expect(stage).toEqual("logintype");
             ia.submitAuthDict({
                 type: "logintype",
@@ -61,7 +64,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should trigger a call here
         const requestRes = {"a": "b"};
-        doRequest.andCallFake(function(authData) {
+        doRequest.andCall(function(authData) {
             expect(authData).toEqual({
                 session: "sessionId",
                 type: "logintype",
@@ -78,8 +81,8 @@ describe("InteractiveAuth", function() {
     });
 
     it("should make a request if no authdata is provided", function(done) {
-        const doRequest = jasmine.createSpy('doRequest');
-        const startAuthStage = jasmine.createSpy('startAuthStage');
+        const doRequest = expect.createSpy();
+        const startAuthStage = expect.createSpy();
 
         const ia = new InteractiveAuth({
             doRequest: doRequest,
@@ -90,7 +93,7 @@ describe("InteractiveAuth", function() {
         expect(ia.getStageParams("logintype")).toBe(undefined);
 
         // first we expect a call to doRequest
-        doRequest.andCallFake(function(authData) {
+        doRequest.andCall(function(authData) {
             console.log("request1", authData);
             expect(authData).toBe(null);
             const err = new MatrixError({
@@ -108,7 +111,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should be followed by a call to startAuthStage
         const requestRes = {"a": "b"};
-        startAuthStage.andCallFake(function(stage) {
+        startAuthStage.andCall(function(stage) {
             expect(stage).toEqual("logintype");
             expect(ia.getSessionId()).toEqual("sessionId");
             expect(ia.getStageParams("logintype")).toEqual({
@@ -116,7 +119,7 @@ describe("InteractiveAuth", function() {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.andCallFake(function(authData) {
+            doRequest.andCall(function(authData) {
                 console.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",

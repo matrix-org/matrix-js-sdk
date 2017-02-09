@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const HttpBackend = require("../mock-request");
@@ -94,7 +95,6 @@ function startClient(httpBackend, client) {
     return deferred.promise;
 }
 
-
 describe("getEventTimeline support", function() {
     let httpBackend;
     let client;
@@ -142,7 +142,7 @@ describe("getEventTimeline support", function() {
             const timelineSet = room.getTimelineSets()[0];
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
-            }).not.toThrow();
+            }).toNotThrow();
         }).catch(utils.failTest).done(done);
 
         httpBackend.flush().catch(utils.failTest);
@@ -218,6 +218,8 @@ describe("getEventTimeline support", function() {
         }).catch(utils.failTest).done(done);
     });
 });
+
+import expect from 'expect';
 
 describe("MatrixClient event timelines", function() {
     let client = null;
@@ -310,7 +312,7 @@ describe("MatrixClient event timelines", function() {
             httpBackend.flush().catch(utils.failTest);
         });
 
-        it("should update timelines where they overlap a previous /sync", function(done) {
+        it("should update timelines where they overlap a previous /sync", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/sync").respond(200, {
@@ -342,6 +344,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
+            const deferred = q.defer();
             client.on("sync", function() {
                 client.getEventTimeline(timelineSet, EVENTS[2].event_id,
                 ).then(function(tl) {
@@ -353,10 +356,14 @@ describe("MatrixClient event timelines", function() {
                         .toEqual("start_token");
                     // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     //    .toEqual("s_5_4");
-                }).catch(utils.failTest).done(done);
+                }).done(() => deferred.resolve(),
+                        (e) => deferred.reject(e));
             });
 
-            httpBackend.flush().catch(utils.failTest);
+            return q.all([
+                httpBackend.flush(),
+                deferred.promise,
+            ]);
         });
 
         it("should join timelines where they overlap a previous /context",

@@ -1,8 +1,12 @@
 "use strict";
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const MatrixClient = sdk.MatrixClient;
 const utils = require("../test-utils");
+
+import expect from 'expect';
+import lolex from 'lolex';
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
@@ -11,6 +15,7 @@ describe("MatrixClient", function() {
     let client;
     let store;
     let scheduler;
+    let clock;
 
     const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
@@ -120,16 +125,16 @@ describe("MatrixClient", function() {
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
-        jasmine.Clock.useMock();
-        scheduler = jasmine.createSpyObj("scheduler", [
+        clock = lolex.install();
+        scheduler = [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
             "setProcessFunction",
-        ]);
-        store = jasmine.createSpyObj("store", [
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+        store = [
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
             "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
-        ]);
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -140,14 +145,14 @@ describe("MatrixClient", function() {
             userId: userId,
         });
         // FIXME: We shouldn't be yanking _http like this.
-        client._http = jasmine.createSpyObj("httpApi", [
+        client._http = [
             "authedRequest", "authedRequestWithPrefix", "getContentUri",
             "request", "requestWithPrefix", "uploadContent",
-        ]);
-        client._http.authedRequest.andCallFake(httpReq);
-        client._http.authedRequestWithPrefix.andCallFake(httpReq);
-        client._http.requestWithPrefix.andCallFake(httpReq);
-        client._http.request.andCallFake(httpReq);
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+        client._http.authedRequest.andCall(httpReq);
+        client._http.authedRequestWithPrefix.andCall(httpReq);
+        client._http.requestWithPrefix.andCall(httpReq);
+        client._http.request.andCall(httpReq);
 
         // set reasonable working defaults
         acceptKeepalives = true;
@@ -159,15 +164,16 @@ describe("MatrixClient", function() {
     });
 
     afterEach(function() {
+        clock.uninstall();
         // need to re-stub the requests with NOPs because there are no guarantees
         // clients from previous tests will be GC'd before the next test. This
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client._http.authedRequest.andCallFake(function() {
+        client._http.authedRequest.andCall(function() {
             return q.defer().promise;
         });
-        client._http.authedRequestWithPrefix.andCallFake(function() {
+        client._http.authedRequestWithPrefix.andCall(function() {
             return q.defer().promise;
         });
     });
@@ -194,7 +200,7 @@ describe("MatrixClient", function() {
 
     describe("getSyncState", function() {
         it("should return null if the client isn't started", function() {
-            expect(client.getSyncState()).toBeNull();
+            expect(client.getSyncState()).toBe(null);
         });
 
         it("should return the same sync state as emitted sync events", function(done) {
@@ -266,7 +272,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
-                    jasmine.Clock.tick(1);
+                    clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -292,9 +298,9 @@ describe("MatrixClient", function() {
                     expect(client.retryImmediately()).toBe(
                         true, "retryImmediately returned false",
                     );
-                    jasmine.Clock.tick(1);
+                    clock.tick(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
-                    jasmine.Clock.tick(10000);
+                    clock.tick(10000);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -316,7 +322,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
-                    jasmine.Clock.tick(1);
+                    clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -347,7 +353,7 @@ describe("MatrixClient", function() {
                     done();
                 }
                 // standard retry time is 5 to 10 seconds
-                jasmine.Clock.tick(10000);
+                clock.tick(10000);
             };
         }
 

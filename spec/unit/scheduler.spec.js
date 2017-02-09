@@ -1,13 +1,18 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
+import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
 const MatrixScheduler = sdk.MatrixScheduler;
 const MatrixError = sdk.MatrixError;
 const utils = require("../test-utils");
 
+import expect from 'expect';
+import lolex from 'lolex';
+
 describe("MatrixScheduler", function() {
+    let clock;
     let scheduler;
     let retryFn;
     let queueFn;
@@ -22,7 +27,7 @@ describe("MatrixScheduler", function() {
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
-        jasmine.Clock.useMock();
+        clock = lolex.install();
         scheduler = new MatrixScheduler(function(ev, attempts, err) {
             if (retryFn) {
                 return retryFn(ev, attempts, err);
@@ -37,6 +42,10 @@ describe("MatrixScheduler", function() {
         retryFn = null;
         queueFn = null;
         defer = q.defer();
+    });
+
+    afterEach(function() {
+        clock.uninstall();
     });
 
     it("should process events in a queue in a FIFO manner", function(done) {
@@ -98,7 +107,7 @@ describe("MatrixScheduler", function() {
         defer.reject({});
         retryDefer.promise.done(function() {
             expect(procCount).toEqual(1);
-            jasmine.Clock.tick(waitTimeMs);
+            clock.tick(waitTimeMs);
             expect(procCount).toEqual(2);
             done();
         });
@@ -186,7 +195,7 @@ describe("MatrixScheduler", function() {
         setTimeout(function() {
             deferA.resolve({});
         }, 1000);
-        jasmine.Clock.tick(1000);
+        clock.tick(1000);
     });
 
     describe("queueEvent", function() {
@@ -202,8 +211,8 @@ describe("MatrixScheduler", function() {
                 return "yep";
             };
             const prom = scheduler.queueEvent(eventA);
-            expect(prom).toBeDefined();
-            expect(prom.then).toBeDefined();
+            expect(prom).toBeTruthy();
+            expect(prom.then).toBeTruthy();
         });
     });
 
@@ -212,14 +221,14 @@ describe("MatrixScheduler", function() {
             queueFn = function() {
                 return null;
             };
-            expect(scheduler.getQueueForEvent(eventA)).toBeNull();
+            expect(scheduler.getQueueForEvent(eventA)).toBe(null);
         });
 
         it("should return null if the mapped queue doesn't exist", function() {
             queueFn = function() {
                 return "yep";
             };
-            expect(scheduler.getQueueForEvent(eventA)).toBeNull();
+            expect(scheduler.getQueueForEvent(eventA)).toBe(null);
         });
 
         it("should return a list of events in the queue and modifications to" +

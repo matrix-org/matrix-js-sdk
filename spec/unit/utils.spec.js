@@ -1,6 +1,9 @@
 "use strict";
+import 'source-map-support/register';
 const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
+
+import expect from 'expect';
 
 describe("utils", function() {
     beforeEach(function() {
@@ -132,7 +135,7 @@ describe("utils", function() {
                 utils.checkObjectHasKeys({
                     foo: "bar",
                 }, ["foo"]);
-            }).not.toThrow();
+            }).toNotThrow();
         });
     });
 
@@ -149,7 +152,7 @@ describe("utils", function() {
                 utils.checkObjectHasNoAdditionalKeys({
                             foo: "bar",
                         }, ["foo"]);
-            }).not.toThrow();
+            }).toNotThrow();
         });
     });
 

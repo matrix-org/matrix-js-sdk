@@ -158,6 +158,7 @@ function MatrixClient(opts) {
             this, this,
             opts.sessionStore,
             userId, this.deviceId,
+            this.store,
         );
 
         this.olmVersion = Crypto.getOlmVersion();
@@ -395,13 +396,59 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
     _setDeviceVerification(this, userId, deviceId, null, blocked);
 };
 
-function _setDeviceVerification(client, userId, deviceId, verified, blocked) {
+/**
+ * Mark the given device as known/unknown
+ *
+ * @param {string} userId owner of the device
+ * @param {string} deviceId unique identifier for the device
+ *
+ * @param {boolean=} known whether to mark the device as known. defaults
+ *   to 'true'.
+ *
+ * @fires module:client~event:MatrixClient"deviceVerificationChanged"
+ */
+MatrixClient.prototype.setDeviceKnown = function(userId, deviceId, known) {
+    if (known === undefined) {
+        known = true;
+    }
+    _setDeviceVerification(this, userId, deviceId, null, null, known);
+};
+
+function _setDeviceVerification(client, userId, deviceId, verified, blocked, known) {
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    client._crypto.setDeviceVerification(userId, deviceId, verified, blocked);
-    client.emit("deviceVerificationChanged", userId, deviceId);
+    const dev = client._crypto.setDeviceVerification(
+        userId, deviceId, verified, blocked, known,
+    );
+    client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
+
+/**
+ * Set the global override for whether the client should ever send encrypted
+ * messages to unverified devices.  If false, it can still be overridden
+ * per-room.  If true, it overrides the per-room settings.
+ *
+ * @param {boolean} value whether to unilaterally blacklist all
+ * unverified devices
+ */
+MatrixClient.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.setGlobalBlacklistUnverifiedDevices(value);
+};
+
+/**
+ * @return {boolean} whether to unilaterally blacklist all
+ * unverified devices
+ */
+MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getGlobalBlacklistUnverifiedDevices();
+};
 
 /**
  * Get e2e information on the device that sent an event
@@ -919,6 +966,7 @@ function _sendEvent(client, room, event, callback) {
 
         try {
             _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            event.error = err;
 
             if (callback) {
                 callback(err);
@@ -2238,13 +2286,18 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.searchMessageText = function(opts, callback) {
+    const roomEvents = {
+        search_term: opts.query,
+    };
+
+    if ('keys' in opts) {
+        roomEvents.keys = opts.keys;
+    }
+
     return this.search({
         body: {
             search_categories: {
-                room_events: {
-                    keys: opts.keys,
-                    search_term: opts.query,
-                },
+                room_events: roomEvents,
             },
         },
     }, callback);
@@ -2620,8 +2673,6 @@ MatrixClient.prototype.startClient = function(opts) {
         };
     }
 
-    this._clientOpts = opts;
-
     if (this._crypto) {
         this._crypto.uploadKeys(5).done();
         const tenMinutes = 1000 * 60 * 10;
@@ -2639,6 +2690,13 @@ MatrixClient.prototype.startClient = function(opts) {
         console.error("Still have sync object whilst not running: stopping old one");
         this._syncApi.stop();
     }
+
+    // shallow-copy the opts dict before modifying and storing it
+    opts = Object.assign({}, opts);
+
+    opts.crypto = this._crypto;
+    this._clientOpts = opts;
+
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
 };
@@ -3022,12 +3080,26 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * </ul>
  *
  * @event module:client~MatrixClient#"sync"
+ *
  * @param {string} state An enum representing the syncing state. One of "PREPARED",
  * "SYNCING", "ERROR", "STOPPED".
+ *
  * @param {?string} prevState An enum representing the previous syncing state.
  * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
+ *
  * @param {?Object} data Data about this transition.
+ *
  * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ *
+ * @param {String} data.oldSyncToken The 'since' token passed to /sync.
+ *    <code>null</code> for the first successful sync since this client was
+ *    started. Only present if <code>state=PREPARED</code> or
+ *    <code>state=SYNCING</code>.
+ *
+ * @param {String} data.nextSyncToken The 'next_batch' result from /sync, which
+ *    will become the 'since' token for the next call to /sync. Only present if
+ *    <code>state=PREPARED</code> or <code>state=SYNCING</code>.
+ *
  * @example
  * matrixClient.on("sync", function(state, prevState, data) {
  *   switch (state) {
@@ -3098,6 +3170,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @event module:client~MatrixClient#"deviceVerificationChanged"
  * @param {string} userId the owner of the verified device
  * @param {string} deviceId the id of the verified device
+ * @param {module:crypto/deviceinfo} deviceInfo updated device information
  */
 
 /**

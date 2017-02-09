@@ -58,6 +58,7 @@ function debuglog() {
  * @constructor
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
+ * @param {module:crypto=} opts.crypto Crypto manager
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -529,13 +530,18 @@ SyncApi.prototype._sync = function(syncOptions) {
         }
 
         // emit synced events
+        const syncEventData = {
+            oldSyncToken: syncToken,
+            nextSyncToken: data.next_batch,
+        };
+
         if (!syncOptions.hasSyncedBefore) {
-            self._updateSyncState("PREPARED");
+            self._updateSyncState("PREPARED", syncEventData);
             syncOptions.hasSyncedBefore = true;
         }
 
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        self._updateSyncState("SYNCING");
+        self._updateSyncState("SYNCING", syncEventData);
 
         self._sync(syncOptions);
     }, function(err) {
@@ -584,6 +590,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     //    next_batch: $token,
     //    presence: { events: [] },
     //    account_data: { events: [] },
+    //    device_lists: { changed: ["@user:server", ... ]},
     //    to_device: { events: [] },
     //    rooms: {
     //      invite: {
@@ -857,6 +864,13 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         });
         this._notifEvents.forEach(function(event) {
             client.getNotifTimelineSet().addLiveEvent(event);
+        });
+    }
+
+    // Handle device list updates
+    if (this.opts.crypto && data.device_lists && data.device_lists.changed) {
+        data.device_lists.changed.forEach((u) => {
+            this.opts.crypto.userDeviceListChanged(u);
         });
     }
 };

@@ -1,7 +1,10 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const Filter = sdk.Filter;
 const utils = require("../test-utils");
+
+import expect from 'expect';
 
 describe("Filter", function() {
     const filterId = "f1lt3ring15g00d4ursoul";

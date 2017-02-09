@@ -34,7 +34,11 @@ limitations under the License.
   *      &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;>
   *
   * @property {module:crypto/deviceinfo.DeviceVerification} verified
-  *     whether the device has been verified by the user
+  *     whether the device has been verified/blocked by the user
+  *
+  * @property {boolean} known
+  *     whether the user knows of this device's existence (useful when warning
+  *     the user that a user has added new devices)
   *
   * @property {Object} unsigned  additional data from the homeserver
   *
@@ -50,6 +54,7 @@ function DeviceInfo(deviceId) {
     this.algorithms = [];
     this.keys = {};
     this.verified = DeviceVerification.UNVERIFIED;
+    this.known = false;
     this.unsigned = {};
 }
 
@@ -81,6 +86,7 @@ DeviceInfo.prototype.toStorage = function() {
         algorithms: this.algorithms,
         keys: this.keys,
         verified: this.verified,
+        known: this.known,
         unsigned: this.unsigned,
     };
 };
@@ -128,6 +134,24 @@ DeviceInfo.prototype.isBlocked = function() {
  */
 DeviceInfo.prototype.isVerified = function() {
     return this.verified == DeviceVerification.VERIFIED;
+};
+
+/**
+ * Returns true if this device is unverified
+ *
+ * @return {Boolean} true if unverified
+ */
+DeviceInfo.prototype.isUnverified = function() {
+    return this.verified == DeviceVerification.UNVERIFIED;
+};
+
+/**
+ * Returns true if the user knows about this device's existence
+ *
+ * @return {Boolean} true if known
+ */
+DeviceInfo.prototype.isKnown = function() {
+    return this.known == true;
 };
 
 /**

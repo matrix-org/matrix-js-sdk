@@ -186,6 +186,13 @@ if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
     GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
+
+    # also make a signature for the source tarball.
+    project_name=`jq -r '.name' package.json`
+    source_sigfile="${tag}-src.tar.gz.asc"
+    git archive --format tgz --prefix="${project_name}-${release}/" "$tag" |
+        gpg -u "$signing_id" --armor --output "$source_sigfile" --detach-sig -
+    assets="$assets -a $source_sigfile"
 else
     git tag -a -F "${latest_changes}" "$tag"
 fi
@@ -225,6 +232,14 @@ if [ -z "$skip_jsdoc" ]; then
     git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
 fi
 
+# publish to npmjs
+npm publish
+
+# if it is a pre-release, leave it on the release branch for now.
+if [ $prerelease -eq 1 ]; then
+    exit 0
+fi
+
 # merge release branch to master
 echo "updating master branch"
 git checkout master
@@ -236,9 +251,6 @@ git push origin master
 if [ -z "$skip_jsdoc" ]; then
     git push origin gh-pages
 fi
-
-# publish to npmjs
-npm publish
 
 # finally, merge master back onto develop
 git checkout develop

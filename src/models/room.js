@@ -167,6 +167,8 @@ function Room(roomId, opts) {
     if (this._opts.pendingEventOrdering == "detached") {
         this._pendingEventList = [];
     }
+
+    this._blacklistUnverifiedDevices = false; // read by megolm
 }
 utils.inherits(Room, EventEmitter);
 
@@ -294,6 +296,24 @@ Room.prototype.getUnreadNotificationCount = function(type) {
  */
 Room.prototype.setUnreadNotificationCount = function(type, count) {
     this._notificationCounts[type] = count;
+};
+
+/**
+ * Whether to send encrypted messages to devices within this room.
+ * Will be ignored if MatrixClient's blacklistUnverifiedDevices setting is true.
+ * @param {boolean} value if true, blacklist unverified devices.
+ */
+Room.prototype.setBlacklistUnverifiedDevices = function(value) {
+    this._blacklistUnverifiedDevices = value;
+};
+
+/**
+ * Whether to send encrypted messages to devices within this room.
+ * Will be ignored if MatrixClient's blacklistUnverifiedDevices setting is true.
+ * @return {boolean} true if blacklisting unverified devices.
+ */
+Room.prototype.getBlacklistUnverifiedDevices = function() {
+    return this._blacklistUnverifiedDevices;
 };
 
 /**

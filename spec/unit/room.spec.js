@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const Room = sdk.Room;
 const RoomState = sdk.RoomState;
@@ -6,6 +7,8 @@ const MatrixEvent = sdk.MatrixEvent;
 const EventStatus = sdk.EventStatus;
 const EventTimeline = sdk.EventTimeline;
 const utils = require("../test-utils");
+
+import expect from 'expect';
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -29,7 +32,7 @@ describe("Room", function() {
         const hsUrl = "https://my.home.server";
 
         it("should return the URL from m.room.avatar preferentially", function() {
-            room.currentState.getStateEvents.andCallFake(function(type, key) {
+            room.currentState.getStateEvents.andCall(function(type, key) {
                 if (type === "m.room.avatar" && key === "") {
                     return utils.mkEvent({
                         event: true,
@@ -46,7 +49,7 @@ describe("Room", function() {
             const url = room.getAvatarUrl(hsUrl);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
-            expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
+            expect(url.indexOf("flibble/wibble")).toNotEqual(-1);
         });
 
         it("should return an identicon HTTP URL if allowDefault was set and there " +
@@ -78,7 +81,7 @@ describe("Room", function() {
         });
 
         it("should return the member from current state", function() {
-            expect(room.getMember(userA)).not.toEqual(null);
+            expect(room.getMember(userA)).toNotEqual(null);
         });
     });
 
@@ -170,7 +173,7 @@ describe("Room", function() {
             );
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
-            expect(room.oldState.setStateEvents).not.toHaveBeenCalled();
+            expect(room.oldState.setStateEvents).toNotHaveBeenCalled();
         });
 
         it("should synthesize read receipts for the senders of events", function() {
@@ -179,7 +182,7 @@ describe("Room", function() {
                 membership: "join",
                 name: "Alice",
             };
-            room.currentState.getSentinelMember.andCallFake(function(uid) {
+            room.currentState.getSentinelMember.andCall(function(uid) {
                 if (uid === userA) {
                     return sentinel;
                 }
@@ -288,13 +291,13 @@ describe("Room", function() {
                 membership: "join",
                 name: "Old Alice",
             };
-            room.currentState.getSentinelMember.andCallFake(function(uid) {
+            room.currentState.getSentinelMember.andCall(function(uid) {
                 if (uid === userA) {
                     return sentinel;
                 }
                 return null;
             });
-            room.oldState.getSentinelMember.andCallFake(function(uid) {
+            room.oldState.getSentinelMember.andCall(function(uid) {
                 if (uid === userA) {
                     return oldSentinel;
                 }
@@ -327,13 +330,13 @@ describe("Room", function() {
                 membership: "join",
                 name: "Old Alice",
             };
-            room.currentState.getSentinelMember.andCallFake(function(uid) {
+            room.currentState.getSentinelMember.andCall(function(uid) {
                 if (uid === userA) {
                     return sentinel;
                 }
                 return null;
             });
-            room.oldState.getSentinelMember.andCallFake(function(uid) {
+            room.oldState.getSentinelMember.andCall(function(uid) {
                 if (uid === userA) {
                     return oldSentinel;
                 }
@@ -375,7 +378,7 @@ describe("Room", function() {
             );
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
-            expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
+            expect(room.currentState.setStateEvents).toNotHaveBeenCalled();
         });
     });
 
@@ -538,7 +541,7 @@ describe("Room", function() {
 
     describe("getJoinedMembers", function() {
         it("should return members whose membership is 'join'", function() {
-            room.currentState.getMembers.andCallFake(function() {
+            room.currentState.getMembers.andCall(function() {
                 return [
                     { userId: "@alice:bar", membership: "join" },
                     { userId: "@bob:bar", membership: "invite" },
@@ -551,7 +554,7 @@ describe("Room", function() {
         });
 
         it("should return an empty list if no membership is 'join'", function() {
-            room.currentState.getMembers.andCallFake(function() {
+            room.currentState.getMembers.andCall(function() {
                 return [
                     { userId: "@bob:bar", membership: "invite" },
                 ];
@@ -646,7 +649,7 @@ describe("Room", function() {
 
         beforeEach(function() {
             stateLookup = {};
-            room.currentState.getStateEvents.andCallFake(function(type, key) {
+            room.currentState.getStateEvents.andCall(function(type, key) {
                 if (key === undefined) {
                     const prefix = type + "$";
                     const list = [];
@@ -663,7 +666,7 @@ describe("Room", function() {
                     return stateLookup[type + "$" + key];
                 }
             });
-            room.currentState.getMembers.andCallFake(function() {
+            room.currentState.getMembers.andCall(function() {
                 const memberEvents = room.currentState.getStateEvents("m.room.member");
                 const members = [];
                 for (let i = 0; i < memberEvents.length; i++) {
@@ -678,7 +681,7 @@ describe("Room", function() {
                 }
                 return members;
             });
-            room.currentState.getMember.andCallFake(function(userId) {
+            room.currentState.getMember.andCall(function(userId) {
                 const memberEvent = room.currentState.getStateEvents(
                     "m.room.member", userId,
                 );
@@ -712,7 +715,8 @@ describe("Room", function() {
                 room.recalculate(userA);
                 expect(room.currentState.setStateEvents).toHaveBeenCalled();
                 // first call, first arg (which is an array), first element in array
-                const fakeEvent = room.currentState.setStateEvents.calls[0].args[0][0];
+                const fakeEvent = room.currentState.setStateEvents.calls[0].
+                      arguments[0][0];
                 expect(fakeEvent.getContent()).toEqual({
                     name: roomName,
                 });
@@ -731,7 +735,7 @@ describe("Room", function() {
                 ];
 
                 room.recalculate(userA);
-                expect(room.currentState.setStateEvents).not.toHaveBeenCalled();
+                expect(room.currentState.setStateEvents).toNotHaveBeenCalled();
             });
         });
 
@@ -767,8 +771,8 @@ describe("Room", function() {
                 addMember(userC);
                 room.recalculate(userA);
                 const name = room.name;
-                expect(name.indexOf(userB)).not.toEqual(-1, name);
-                expect(name.indexOf(userC)).not.toEqual(-1, name);
+                expect(name.indexOf(userB)).toNotEqual(-1, name);
+                expect(name.indexOf(userC)).toNotEqual(-1, name);
             });
 
             it("should return the names of members in a public (public join_rules)" +
@@ -780,8 +784,8 @@ describe("Room", function() {
                 addMember(userC);
                 room.recalculate(userA);
                 const name = room.name;
-                expect(name.indexOf(userB)).not.toEqual(-1, name);
-                expect(name.indexOf(userC)).not.toEqual(-1, name);
+                expect(name.indexOf(userB)).toNotEqual(-1, name);
+                expect(name.indexOf(userC)).toNotEqual(-1, name);
             });
 
             it("should show the other user's name for public (public join_rules)" +
@@ -792,7 +796,7 @@ describe("Room", function() {
                 addMember(userB);
                 room.recalculate(userA);
                 const name = room.name;
-                expect(name.indexOf(userB)).not.toEqual(-1, name);
+                expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
 
             it("should show the other user's name for private " +
@@ -803,7 +807,7 @@ describe("Room", function() {
                 addMember(userB);
                 room.recalculate(userA);
                 const name = room.name;
-                expect(name.indexOf(userB)).not.toEqual(-1, name);
+                expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
 
             it("should show the other user's name for private" +
@@ -813,7 +817,7 @@ describe("Room", function() {
                 addMember(userB);
                 room.recalculate(userA);
                 const name = room.name;
-                expect(name.indexOf(userB)).not.toEqual(-1, name);
+                expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
 
             it("should show the room alias if one exists for private " +
@@ -959,7 +963,7 @@ describe("Room", function() {
 
             it("should emit an event when a receipt is added",
             function() {
-                const listener = jasmine.createSpy('spy');
+                const listener = expect.createSpy();
                 room.on("Room.receipt", listener);
 
                 const ts = 13787898424;
@@ -1130,7 +1134,7 @@ describe("Room", function() {
             it("should emit Room.tags event when new tags are " +
                "received on the event stream",
             function() {
-                const listener = jasmine.createSpy('spy');
+                const listener = expect.createSpy();
                 room.on("Room.tags", listener);
 
                 const tags = { "m.foo": { "order": 0.5 } };

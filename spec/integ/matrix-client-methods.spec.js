@@ -1,4 +1,5 @@
 "use strict";
+import 'source-map-support/register';
 const sdk = require("../..");
 const HttpBackend = require("../mock-request");
 const publicGlobals = require("../../lib/matrix");
@@ -7,6 +8,8 @@ const MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
 const Filter = publicGlobals.Filter;
 const utils = require("../test-utils");
 const MockStorageApi = require("../MockStorageApi");
+
+import expect from 'expect';
 
 describe("MatrixClient", function() {
     const baseUrl = "http://localhost.or.something";
@@ -60,7 +63,7 @@ describe("MatrixClient", function() {
                 type: "text/plain",
             });
 
-            expect(prom).toBeDefined();
+            expect(prom).toBeTruthy();
 
             const uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
@@ -208,14 +211,14 @@ describe("MatrixClient", function() {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
-            expect(store.getFilter(userId, filterId)).toBeNull();
+            expect(store.getFilter(userId, filterId)).toBe(null);
 
             httpBackend.when(
                 "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
             ).respond(200, httpFilterDefinition);
             client.getFilter(userId, filterId, true).done(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                expect(store.getFilter(userId, filterId)).toBeDefined();
+                expect(store.getFilter(userId, filterId)).toBeTruthy();
                 done();
             });
 
@@ -227,7 +230,7 @@ describe("MatrixClient", function() {
         const filterId = "f1llllllerid";
 
         it("should do an HTTP request and then store the filter", function(done) {
-            expect(store.getFilter(userId, filterId)).toBeNull();
+            expect(store.getFilter(userId, filterId)).toBe(null);
 
             const filterDefinition = {
                 event_format: "client",
@@ -347,7 +350,11 @@ describe("MatrixClient", function() {
             */
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
-                expect(req.data).toEqual({device_keys: {boris: {}, chaz: {}}});
+                expect(req.data).toEqual({device_keys: {
+                    '@alice:localhost': {},
+                    'boris': {},
+                    'chaz': {},
+                }});
             }).respond(200, {
                 device_keys: {
                     boris: borisKeys,

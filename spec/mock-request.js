@@ -1,5 +1,6 @@
 "use strict";
 const q = require("q");
+import expect from 'expect';
 
 /**
  * Construct a mock HTTP backend, heavily inspired by Angular.js.

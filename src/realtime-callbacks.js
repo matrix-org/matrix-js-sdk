@@ -168,7 +168,7 @@ function _runCallbacks() {
     for (let i = 0; i < callbacksToRun.length; i++) {
         cb = callbacksToRun[i];
         try {
-            cb.func.apply(null, cb.params);
+            cb.func.apply(global, cb.params);
         } catch (e) {
             console.error("Uncaught exception in callback function",
                           e.stack || e);
