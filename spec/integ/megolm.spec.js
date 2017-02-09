@@ -672,9 +672,7 @@ describe("megolm", function() {
         let inboundGroupSession;
         let decrypted;
 
-        return aliceTestClient.start(
-            getTestKeysQueryResponse(aliceTestClient.userId),
-        ).then(function() {
+        return aliceTestClient.start().then(function() {
             // an encrypted room with just alice
             const syncResponse = {
                 next_batch: 1,
@@ -700,6 +698,13 @@ describe("megolm", function() {
                 },
             };
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+
+            // the completion of the first initialsync hould make Alice
+            // invalidate the device cache for all members in e2e rooms (ie,
+            // herself), and do a key query.
+            aliceTestClient.expectKeyQuery(
+                getTestKeysQueryResponse(aliceTestClient.userId),
+            );
 
             return aliceTestClient.httpBackend.flush();
         }).then(function() {

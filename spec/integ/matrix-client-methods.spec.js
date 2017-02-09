@@ -351,7 +351,6 @@ describe("MatrixClient", function() {
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
                 expect(req.data).toEqual({device_keys: {
-                    '@alice:localhost': {},
                     'boris': {},
                     'chaz': {},
                 }});

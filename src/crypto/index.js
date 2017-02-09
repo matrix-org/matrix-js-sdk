@@ -86,9 +86,6 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
     );
 
     if (!myDevices) {
-        // we don't yet have a list of our own devices; make sure we
-        // get one when we flush the pendingUsersWithNewDevices.
-        this._deviceList.invalidateUserDeviceList(this._userId);
         myDevices = {};
     }
 
@@ -545,6 +542,23 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
         config: config,
     });
     this._roomEncryptors[roomId] = alg;
+
+    // if encryption was not previously enabled in this room, we will have been
+    // ignoring new device events for these users so far. We may well have
+    // up-to-date lists for some users, for instance if we were sharing other
+    // e2e rooms with them, so there is room for optimisation here, but for now
+    // we just invalidate everyone in the room.
+    if (!existingConfig) {
+        console.log("Enabling encryption in " + roomId + " for the first time; " +
+                    "invalidating device lists for all users therein");
+        const room = this._clientStore.getRoom(roomId);
+        const members = room.getJoinedMembers();
+        members.forEach((m) => {
+            this._deviceList.invalidateUserDeviceList(m.userId);
+        });
+        // the actual refresh happens once we've finished processing the sync,
+        // in _onSyncCompleted.
+    }
 };
 
 
@@ -769,6 +783,8 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         } else {
             // otherwise, we have to invalidate all devices for all users we
             // share a room with.
+            console.log("Completed first initialsync; invalidating all " +
+                        "device list caches");
             this._invalidateDeviceListForAllActiveUsers();
         }
     }
