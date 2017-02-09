@@ -595,22 +595,24 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
 MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     console.log("Adding key from ", event);
     const content = event.getContent();
+    const senderKey = event.getSenderKey();
 
     if (!content.room_id ||
         !content.session_id ||
-        !content.session_key
+        !content.session_key ||
+        !senderKey
        ) {
         console.error("key event is missing fields");
         return;
     }
 
     this._olmDevice.addInboundGroupSession(
-        content.room_id, event.getSenderKey(), content.session_id,
+        content.room_id, senderKey, content.session_id,
         content.session_key, event.getKeysClaimed(),
     );
 
     // have another go at decrypting events sent with this session.
-    this._retryDecryption(event.getSenderKey, content.session_id);
+    this._retryDecryption(senderKey, content.session_id);
 };
 
 
