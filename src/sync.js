@@ -552,7 +552,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         // If there's an accumulator then the first HTTP response is actually the
         // accumulated data. We don't want to accumulate the same thing twice, so
         // only accumulate if this isn't a cached response.
-        if (!isCachedResponse) {
+        if (self.opts.syncAccumulator && !isCachedResponse) {
             self.opts.syncAccumulator.accumulateRooms(data);
         }
 
