@@ -57,6 +57,11 @@ class SyncAccumulator {
             //    _accountData: { $event_type: json }
             //}
         };
+        // the /sync token which corresponds to the last time rooms were
+        // accumulated. We remember this so that any caller can obtain a
+        // coherent /sync response and know at what point they should be
+        // streaming from without losing events.
+        this.nextBatch = null;
     }
 
     /**
@@ -67,6 +72,7 @@ class SyncAccumulator {
         if (!syncResponse.rooms) {
             return;
         }
+        this.nextBatch = syncResponse.next_batch;
         if (syncResponse.rooms.invite) {
             Object.keys(syncResponse.rooms.invite).forEach((roomId) => {
                 this._accumulateRoom(
@@ -261,18 +267,13 @@ class SyncAccumulator {
      * Return everything under the 'rooms' key from a /sync response which
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
-     * provided to accumulateRooms(). Failure to do this can result in missing
-     * events.
-     * <pre>
-     * accumulator = new SyncAccumulator();
-     * // these 2 lines must occur on the same event loop tick to prevent
-     * // race conditions!
-     * accumulator.accumulateRooms(someSyncResponse);
-     * var outputSyncData = accumulator.getJSON();
-     * // the next batch pairs with outputSyncData.
-     * var syncToken = someSyncResponse.next_batch;
-     * </pre>
-     * @return {Object} A JSON object which has the same API shape as /sync.
+     * provided to accumulateRooms().
+     * @return {Object} An object with a "nextBatch" key and a "roomsData" key.
+     * The "nextBatch" key is a string which represents at what point in the
+     * /sync stream the accumulator reached. This token should be used when
+     * restarting a /sync stream at startup. Failure to do so can lead to missing
+     * events. The "roomsData" key is an Object which represents the entire
+     * /sync response from the 'rooms' key onwards.
      */
     getJSON() {
         const data = {
@@ -337,7 +338,10 @@ class SyncAccumulator {
             });
             data.join[roomId] = roomJson;
         });
-        return data;
+        return {
+            nextBatch: this.nextBatch,
+            roomsData: data,
+        };
     }
 }
 

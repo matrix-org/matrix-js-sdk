@@ -59,6 +59,8 @@ function debuglog() {
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
  * @param {module:crypto=} opts.crypto Crypto manager
+ * @param {SyncAccumulator=} opts.syncAccumulator An accumulator which will be
+ * kept up-to-date.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -527,6 +529,10 @@ SyncApi.prototype._sync = function(syncOptions) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
             console.error("Caught /sync error", e.stack || e);
+        }
+
+        if(self.opts.syncAccumulator) {
+            self.opts.syncAccumulator.accumulateRooms(data);
         }
 
         // emit synced events
