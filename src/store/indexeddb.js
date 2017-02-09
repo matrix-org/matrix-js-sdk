@@ -284,19 +284,15 @@ IndexedDBStore.prototype.getSyncAccumulator = function() {
 };
 
 /**
- * Set a new sync token and possibly write to the database.
- * Overrides MatrixInMemoryStore.
- * @param {string} token The new sync token
- * @return {?Promise} A promise if this sync token triggered a write to the
- * database, else null. Promise resolves after the write completes.
+ * Possibly write data to the database.
+ * @return {Promise} Promise resolves after the write completes.
  */
-IndexedDBStore.prototype.setSyncToken = function(token) {
-    MatrixInMemoryStore.prototype.setSyncToken.call(this, token);
+IndexedDBStore.prototype.save = function() {
     const now = Date.now();
     if (now - this._syncTs > WRITE_DELAY_MS) {
         return this._syncToDatabase().catch((err) => {console.error("sync fail:", err);});
     }
-    return null;
+    return q();
 };
 
 IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData) {

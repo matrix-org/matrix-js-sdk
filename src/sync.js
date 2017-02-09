@@ -570,6 +570,10 @@ SyncApi.prototype._sync = function(syncOptions) {
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
         self._updateSyncState("SYNCING", syncEventData);
 
+        // tell databases that everything is now in a consistent state and can be
+        // saved.
+        client.store.save();
+
         self._sync(syncOptions);
     }, function(err) {
         if (!self._running) {

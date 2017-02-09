@@ -179,6 +179,11 @@ StubStore.prototype = {
     getAccountData: function(eventType) {
 
     },
+
+    /**
+     * Save does nothing as there is no backing data store.
+     */
+    save: function() {},
 };
 
 /** Stub Store class. */

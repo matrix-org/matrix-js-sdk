@@ -274,4 +274,9 @@ module.exports.MatrixInMemoryStore.prototype = {
     getAccountData: function(eventType) {
         return this.accountData[eventType];
     },
+
+    /**
+     * Save does nothing as there is no backing data store.
+     */
+    save: function() {},
 };
