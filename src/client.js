@@ -38,6 +38,7 @@ const Filter = require("./filter");
 const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
+const IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
@@ -162,6 +163,11 @@ function MatrixClient(opts) {
         );
 
         this.olmVersion = Crypto.getOlmVersion();
+    }
+
+    // Set up a sync accumulator if we can persist room data
+    if (this.store instanceof IndexedDBStore) {
+        this._syncAccumulator = this.store.getSyncAccumulator();
     }
 }
 utils.inherits(MatrixClient, EventEmitter);
@@ -2695,6 +2701,7 @@ MatrixClient.prototype.startClient = function(opts) {
     opts = Object.assign({}, opts);
 
     opts.crypto = this._crypto;
+    opts.syncAccumulator = this._syncAccumulator;
     this._clientOpts = opts;
 
     this._syncApi = new SyncApi(this, opts);

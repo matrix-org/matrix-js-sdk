@@ -25,6 +25,8 @@ module.exports.MatrixInMemoryStore = require("./store/memory").MatrixInMemorySto
 module.exports.IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
 /** The {@link module:store/indexeddb.IndexedDBStoreBackend|IndexedDBStoreBackend} class. */
 module.exports.IndexedDBStoreBackend = require("./store/indexeddb").IndexedDBStoreBackend;
+/** The {@link module:sync-accumulator.SyncAccumulator|SyncAccumulator} class. */
+module.exports.SyncAccumulator = require("./sync-accumulator");
 /** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
 module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
 /** The {@link module:http-api.MatrixError|MatrixError} class. */

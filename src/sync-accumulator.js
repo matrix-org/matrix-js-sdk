@@ -15,10 +15,13 @@ limitations under the License.
 */
 "use strict";
 
+/**
+ * This is an internal module. See {@link SyncAccumulator} for the public class.
+ * @module sync-accumulator
+ */
+
 
 /**
- * Internal class.
- *
  * The purpose of this class is to accumulate /sync responses such that a
  * complete "initial" JSON response can be returned which accurately represents
  * the sum total of the /sync responses accumulated to date. It only handles

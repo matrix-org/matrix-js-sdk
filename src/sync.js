@@ -60,7 +60,8 @@ function debuglog() {
  * @param {Object} opts Config options
  * @param {module:crypto=} opts.crypto Crypto manager
  * @param {SyncAccumulator=} opts.syncAccumulator An accumulator which will be
- * kept up-to-date.
+ * kept up-to-date. If one is supplied, the response to getJSON() will be used
+ * initially.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -513,9 +514,26 @@ SyncApi.prototype._sync = function(syncOptions) {
     // normal timeout= plus buffer time
     const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
-    this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-    );
+    let isCachedResponse = false;
+    if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
+        const data = self.opts.syncAccumulator.getJSON();
+        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
+        // if there is data there.
+        if (data.nextBatch) {
+            console.log("sync(): not doing HTTP hit, instead returning stored /sync");
+            this._currentSyncRequest = q.resolve({
+                next_batch: data.nextBatch,
+                rooms: data.roomsData,
+            });
+            isCachedResponse = true;
+        }
+    }
+
+    if (!isCachedResponse) {
+        this._currentSyncRequest = client._http.authedRequest(
+            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+        );
+    }
 
     this._currentSyncRequest.done(function(data) {
         // set the sync token NOW *before* processing the events. We do this so
@@ -531,7 +549,10 @@ SyncApi.prototype._sync = function(syncOptions) {
             console.error("Caught /sync error", e.stack || e);
         }
 
-        if(self.opts.syncAccumulator) {
+        // If there's an accumulator then the first HTTP response is actually the
+        // accumulated data. We don't want to accumulate the same thing twice, so
+        // only accumulate if this isn't a cached response.
+        if (!isCachedResponse) {
             self.opts.syncAccumulator.accumulateRooms(data);
         }
 
