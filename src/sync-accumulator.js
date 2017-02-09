@@ -48,8 +48,12 @@ class SyncAccumulator {
         this.joinRooms = {
             //$roomId: {
             //    _currentState: { $event_type: { $state_key: json } },
-            //    _timeline: [json, json, json],
-            //    _timelineToken: token,
+            //    _timeline: [
+            //       { event: $event, token: null|token },
+            //       { event: $event, token: null|token },
+            //       { event: $event, token: null|token },
+            //       ...
+            //    ],
             //    _accountData: { $event_type: json }
             //}
         };
@@ -199,15 +203,15 @@ class SyncAccumulator {
             this.joinRooms[roomId] = {
                 _currentState: {},
                 _timeline: [],
-                _timelineToken: null,
                 _accountData: {},
             };
         }
+        const currentData = this.joinRooms[roomId];
 
         if (data.account_data && data.account_data.events) {
             // clobber based on type
             data.account_data.events.forEach((e) => {
-                this.joinRooms[roomId]._accountData[e.type] = e;
+                currentData._accountData[e.type] = e;
             });
         }
 
@@ -217,17 +221,38 @@ class SyncAccumulator {
         // - State events in the 'timeline'.
         if (data.state && data.state.events) {
             data.state.events.forEach((e) => {
-                setState(this.joinRooms[roomId]._currentState, e);
+                setState(currentData._currentState, e);
             });
         }
         if (data.timeline && data.timeline.events) {
-            data.timeline.events.forEach((e) => {
+            data.timeline.events.forEach((e, index) => {
                 // this nops if 'e' isn't a state event
-                setState(this.joinRooms[roomId]._currentState, e);
+                setState(currentData._currentState, e);
+                // append the event to the timeline. The back-pagination token
+                // corresponds to the first event in the timeline
+                currentData._timeline.push({
+                    event: e,
+                    token: index === 0 ? data.timeline.prev_batch : null,
+                });
             });
         }
 
-        // TODO: append events to our timeline and attempt to prune it
+        // attempt to prune the timeline by jumping between events which have
+        // pagination tokens.
+        if (currentData._timeline.length > this.opts.maxTimelineEntries) {
+            const startIndex = (
+                currentData._timeline.length - this.opts.maxTimelineEntries
+            );
+            for (let i = startIndex; i < currentData._timeline.length; i++) {
+                if (currentData._timeline[i].token) {
+                    // keep all events after this, including this one
+                    currentData._timeline = currentData._timeline.slice(
+                        i, currentData._timeline.length,
+                    );
+                    break;
+                }
+            }
+        }
     }
 
     /**
