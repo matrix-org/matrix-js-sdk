@@ -200,10 +200,12 @@ class SyncAccumulator {
         // store stale typing notifs.
 
         if (!this.joinRooms[roomId]) {
+            // Create truly empty objects so event types of 'hasOwnProperty' and co
+            // don't cause this code to break.
             this.joinRooms[roomId] = {
-                _currentState: {},
+                _currentState: Object.create(null),
                 _timeline: [],
-                _accountData: {},
+                _accountData: Object.create(null),
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -259,7 +261,8 @@ class SyncAccumulator {
      * Return everything under the 'rooms' key from a /sync response which
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
-     * provided to accumulate(). Failure to do this can result in missing events.
+     * provided to accumulateRooms(). Failure to do this can result in missing
+     * events.
      * <pre>
      * accumulator = new SyncAccumulator();
      * // these 2 lines must occur on the same event loop tick to prevent
@@ -287,8 +290,52 @@ class SyncAccumulator {
             data.invite[roomId] = this.inviteRooms[roomId];
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
-            // TODO roll back current state to start of timeline.
-            data.join[roomId] = this.joinRooms[roomId].data;
+            const roomData = this.joinRooms[roomId];
+            const roomJson = {
+                ephemeral: { events: [] },
+                account_data: { events: [] },
+                state: { events: [] },
+                timeline: {
+                    events: [],
+                    prev_batch: null,
+                },
+            };
+            // Add account data
+            Object.keys(roomData._accountData).forEach((evType) => {
+                roomJson.account_data.events.push(roomData._accountData[evType]);
+            });
+
+            // Add timeline data
+            roomData._timeline.forEach((msgData) => {
+                if (!roomJson.timeline.prev_batch) {
+                    // the first event we add to the timeline MUST match up to
+                    // the prev_batch token.
+                    if (!msgData.token) {
+                        return; // this shouldn't happen as we prune constantly.
+                    }
+                    roomJson.timeline.prev_batch = msgData.token;
+                }
+                roomJson.timeline.events.push(msgData.event);
+            });
+
+            // Add state data: roll back current state to the start of timeline,
+            // by "reverse clobbering" from the end of the timeline to the start.
+            // Convert maps back into arrays.
+            const rollBackState = Object.create(null);
+            for (let i = roomJson.timeline.events.length - 1; i >=0; i--) {
+                setState(rollBackState, roomJson.timeline.events[i]);
+            }
+            Object.keys(roomData._currentState).forEach((evType) => {
+                Object.keys(roomData._currentState[evType]).forEach((stateKey) => {
+                    let ev = roomData._currentState[evType][stateKey];
+                    if (rollBackState[evType] && rollBackState[evType][stateKey]) {
+                        // use the reverse clobbered event instead.
+                        ev = rollBackState[evType][stateKey];
+                    }
+                    roomJson.state.events.push(ev);
+                });
+            });
+            data.join[roomId] = roomJson;
         });
         return data;
     }
@@ -299,7 +346,7 @@ function setState(eventMap, event) {
         return;
     }
     if (!eventMap[event.type]) {
-        eventMap[event.type] = {};
+        eventMap[event.type] = Object.create(null);
     }
     eventMap[event.type][event.state_key] = event;
 }
