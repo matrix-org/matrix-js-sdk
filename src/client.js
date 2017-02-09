@@ -550,6 +550,9 @@ function _decryptEvent(client, event) {
     try {
         client._crypto.decryptEvent(event);
     } catch (e) {
+        console.warn(
+            `Error decrypting event (id=${event.getId()}): ${e}`,
+        );
         if (!(e instanceof Crypto.DecryptionError)) {
             throw e;
         }

@@ -544,7 +544,11 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._addEventToPendingList(event);
         }
-        throw new base.DecryptionError(e);
+        throw new base.DecryptionError(
+            e.toString(), {
+                session: content.sender_key + '|' + content.session_id,
+            },
+        );
     }
 
     if (res === null) {
@@ -552,6 +556,9 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
         this._addEventToPendingList(event);
         throw new base.DecryptionError(
             "The sender's device has not sent us the keys for this message.",
+            {
+                session: content.sender_key + '|' + content.session_id,
+            },
         );
     }
 
@@ -593,26 +600,27 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
  * @param {module:models/event.MatrixEvent} event key event
  */
 MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
-    console.log("Adding key from ", event);
     const content = event.getContent();
     const senderKey = event.getSenderKey();
+    const sessionId = content.session_id;
 
     if (!content.room_id ||
-        !content.session_id ||
+        !sessionId ||
         !content.session_key ||
         !senderKey
        ) {
-        console.error("key event is missing fields");
+        console.error(`key event is missing fields`);
         return;
     }
 
+    console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
     this._olmDevice.addInboundGroupSession(
-        content.room_id, senderKey, content.session_id,
+        content.room_id, senderKey, sessionId,
         content.session_key, event.getKeysClaimed(),
     );
 
     // have another go at decrypting events sent with this session.
-    this._retryDecryption(senderKey, content.session_id);
+    this._retryDecryption(senderKey, sessionId);
 };
 
 

@@ -360,9 +360,6 @@ SyncApi.prototype.getSyncState = function() {
  * Main entry point
  */
 SyncApi.prototype.sync = function() {
-    debuglog("SyncApi.sync: starting with sync token " +
-             this.client.store.getSyncToken());
-
     const client = this.client;
     const self = this;
 
@@ -511,11 +508,14 @@ SyncApi.prototype._sync = function(syncOptions) {
     // normal timeout= plus buffer time
     const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
+    debuglog('Starting sync since=' + syncToken);
     this._currentSyncRequest = client._http.authedRequest(
         undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
     );
 
     this._currentSyncRequest.done(function(data) {
+        debuglog('Completed sync, next_batch=' + data.next_batch);
+
         // set the sync token NOW *before* processing the events. We do this so
         // if something barfs on an event we can skip it rather than constantly
         // polling with the same token.
@@ -666,8 +666,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                         toDeviceEvent.getType() == "m.room.message" &&
                             content.msgtype == "m.bad.encrypted"
                     ) {
-                        console.warn(
-                            "Unable to decrypt to-device event: " + content.body,
+                        // the mapper already logged a warning.
+                        console.log(
+                            'Ignoring undecryptable to-device event from ' +
+                                toDeviceEvent.getSender(),
                         );
                         return;
                     }

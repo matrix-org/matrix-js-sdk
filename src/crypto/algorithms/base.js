@@ -148,14 +148,42 @@ DecryptionAlgorithm.prototype.importRoomKey = function(session) {
 /**
  * Exception thrown when decryption fails
  *
+ * @alias module:crypto/algorithms/base.DecryptionError
  * @constructor
- * @param {string} msg message describing the problem
+ * @param {string} msg user-visible message describing the problem
+ *
+ * @param {Object=} details key/value pairs reported in the logs but not shown
+ *   to the user.
+ *
  * @extends Error
  */
-module.exports.DecryptionError = function(msg) {
+const DecryptionError = function(msg, details) {
+    this.name = 'DecryptionError';
     this.message = msg;
+    this.details = details;
 };
-utils.inherits(module.exports.DecryptionError, Error);
+utils.inherits(DecryptionError, Error);
+
+/** override the string used when logging
+ *
+ * @returns {String}
+ */
+DecryptionError.prototype.toString = function() {
+    let result = this.name + '[msg: '+ this.message;
+
+    if (this.details) {
+        result += ', ' +
+            Object.keys(this.details).map(
+                (k) => k + ': ' + this.details[k],
+            ).join(', ');
+    }
+
+    result += ']';
+
+    return result;
+};
+
+module.exports.DecryptionError = DecryptionError;
 
 /**
  * Exception thrown specifically when we want to warn the user to consider
