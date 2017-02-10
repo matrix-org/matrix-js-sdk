@@ -57,7 +57,8 @@ class SyncAccumulator {
             //       { event: $event, token: null|token },
             //       ...
             //    ],
-            //    _accountData: { $event_type: json }
+            //    _accountData: { $event_type: json },
+            //    _unreadNotifications: { ... unread_notifications JSON ... }
             //}
         };
         // the /sync token which corresponds to the last time rooms were
@@ -218,6 +219,7 @@ class SyncAccumulator {
                 _currentState: Object.create(null),
                 _timeline: [],
                 _accountData: Object.create(null),
+                _unreadNotifications: {},
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -227,6 +229,11 @@ class SyncAccumulator {
             data.account_data.events.forEach((e) => {
                 currentData._accountData[e.type] = e;
             });
+        }
+
+        // these probably clobber, spec is unclear.
+        if (data.unread_notifications) {
+            currentData._unreadNotifications = data.unread_notifications;
         }
 
         // Work out the current state. The deltas need to be applied in the order:
@@ -306,6 +313,7 @@ class SyncAccumulator {
                     events: [],
                     prev_batch: null,
                 },
+                unread_notifications: roomData._unreadNotifications,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
