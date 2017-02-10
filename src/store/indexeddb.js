@@ -89,13 +89,17 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the data was persisted.
      */
     persistSyncData: function(nextBatch, roomsData) {
-        const obj = {
-            clobber: "-", // constant key so will always clobber
-            nextBatch: nextBatch,
-            roomsData: roomsData,
-        };
         console.log("persisting sync data");
-        return this._upsert("sync", [obj]);
+        return q.try(() => {
+            const txn = this.db.transaction(["sync"], "readwrite");
+            const store = txn.objectStore("sync");
+            store.put({
+                clobber: "-", // constant key so will always clobber
+                nextBatch: nextBatch,
+                roomsData: roomsData,
+            }); // put == UPSERT
+            return promiseifyTxn(txn);
+        });
     },
 
     /**
@@ -122,7 +126,19 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     persistUsers: function(users) {
-        return this._upsert("users", users);
+        return q.try(() => {
+            const txn = this.db.transaction(["users"], "readwrite");
+            const store = txn.objectStore("users");
+            for (let i = 0; i < users.length; i++) {
+                store.put({
+                    userId: users[i].userId,
+                    event: (users[i].events.presence ?
+                                users[i].events.presence.event :
+                                null),
+                }); // put == UPSERT
+            }
+            return promiseifyTxn(txn);
+        });
     },
 
     /**
@@ -130,7 +146,17 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise<User[]>} A list of users.
      */
     loadUsers: function() {
-        return this._deserializeAll("users", User);
+        return q.try(() => {
+            const txn = this.db.transaction(["users"], "readonly");
+            const store = txn.objectStore("users");
+            return selectQuery(store, undefined, (cursor) => {
+                const user = new User(cursor.value.userId);
+                if (cursor.value.event) {
+                    user.setPresenceEvent(new MatrixEvent(cursor.value.event));
+                }
+                return user;
+            });
+        });
     },
 
     /**
@@ -162,31 +188,6 @@ IndexedDBStoreBackend.prototype = {
                     console.warn("loadSyncData: More than 1 sync row found.");
                 }
                 return (results.length > 0 ? results[0] : {});
-            });
-        });
-    },
-
-    _upsert: function(storeName, rows) {
-        return q.try(() => {
-            const txn = this.db.transaction([storeName], "readwrite");
-            const store = txn.objectStore(storeName);
-            for (let i = 0; i < rows.length; i++) {
-                if (typeof rows[i].serialize === "function") {
-                    store.put(rows[i].serialize()); // put == UPSERT
-                } else {
-                    store.put(rows[i]); // put == UPSERT
-                }
-            }
-            return promiseifyTxn(txn);
-        });
-    },
-
-    _deserializeAll: function(storeName, Cls) {
-        return q.try(() => {
-            const txn = this.db.transaction([storeName], "readonly");
-            const store = txn.objectStore(storeName);
-            return selectQuery(store, undefined, (cursor) => {
-                return Cls.deserialize(cursor.value);
             });
         });
     },

@@ -19,7 +19,6 @@ limitations under the License.
  */
  const EventEmitter = require("events").EventEmitter;
  const utils = require("../utils");
- const MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -60,27 +59,6 @@ function User(userId) {
     this._updateModifiedTime();
 }
 utils.inherits(User, EventEmitter);
-
-/**
- * Deserialize this user from a JSON object.
- * @static
- * @param {Object} obj The User object from User.serialize().
- * @return {User} A user
- */
-User.deserialize = function(obj) {
-    const user = new User(obj.userId);
-    if (obj.event) {
-        user.setPresenceEvent(new MatrixEvent(obj.event));
-    }
-    return user;
-};
-
-User.prototype.serialize = function() {
-    return {
-        userId: this.userId,
-        event: (this.events.presence ? this.events.presence.event : null),
-    };
-};
 
 /**
  * Update this User with the given presence event. May fire "User.presence",
