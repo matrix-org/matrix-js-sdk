@@ -75,6 +75,7 @@ class SyncAccumulator {
         if (!syncResponse.rooms) {
             return;
         }
+        console.log("Accumulating ", syncResponse.next_batch, syncResponse);
         this.nextBatch = syncResponse.next_batch;
         if (syncResponse.rooms.invite) {
             Object.keys(syncResponse.rooms.invite).forEach((roomId) => {

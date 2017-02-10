@@ -61,8 +61,15 @@ IndexedDBStoreBackend.prototype = {
             }
             // Expand as needed.
         };
+
         return promiseifyRequest(req).then((ev) => {
             this.db = ev.target.result;
+
+            // add a poorly-named listener for when deleteDatabase is called
+            // so we can close our db connections.
+            this.db.onversionchange = () => {
+                this.db.close();
+            };
         });
     },
 
@@ -87,6 +94,7 @@ IndexedDBStoreBackend.prototype = {
             nextBatch: nextBatch,
             roomsData: roomsData,
         };
+        console.log("persisting sync data");
         return this._upsert("sync", [obj]);
     },
 
@@ -114,7 +122,6 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     persistUsers: function(users) {
-        console.log("persistUsers =>", users);
         return this._upsert("users", users);
     },
 
@@ -148,13 +155,14 @@ IndexedDBStoreBackend.prototype = {
         return q.try(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
-            const results = selectQuery(store, undefined, (cursor) => {
+            return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
+            }).then((results) => {
+                if (results.length > 1) {
+                    console.warn("loadSyncData: More than 1 sync row found.");
+                }
+                return (results.length > 0 ? results[0] : {});
             });
-            if (results.length > 1) {
-                console.warn("loadSyncData: More than 1 sync row found.");
-            }
-            return (results.length > 0 ? results[0] : {});
         });
     },
 
@@ -251,26 +259,22 @@ IndexedDBStore.prototype.startup = function() {
         return q.all([
             this.backend.loadUsers(),
             this.backend.loadAccountData(),
-            this.backend.loadRooms(),
             this.backend.loadSyncData(),
         ]);
     }).then((values) => {
-        const [users, accountData, rooms, syncData] = values;
+        const [users, accountData, syncData] = values;
         console.log(
-            "Loaded data from database. Reticulating splines...",
-            accountData, users,
+            "Loaded data from database: sync from ", syncData,
+            " -- Reticulating splines...",
         );
         users.forEach((u) => {
             this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
         });
         this.storeAccountDataEvents(accountData);
-        rooms.forEach((r) => {
-            this.storeRoom(r);
-        });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
-        this.setSyncToken(syncData.syncToken);
-        this._setSyncData(syncData.syncToken, syncData.roomsData);
+        this.setSyncToken(syncData.nextBatch);
+        this._setSyncData(syncData.nextBatch, syncData.roomsData);
     });
 };
 
