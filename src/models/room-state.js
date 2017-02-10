@@ -47,11 +47,9 @@ function RoomState(roomId) {
         // userId: RoomMember
     };
     this._updateModifiedTime();
-    this._displayNameToUserIds = {}; // string: string[]
-    this._userIdsToDisplayNames = {}; // string: string
-    this._tokenToInvite = {
-        // string: MatrixEvent
-    }; // 3pid invite state_key to m.room.member invite
+    this._displayNameToUserIds = {};
+    this._userIdsToDisplayNames = {};
+    this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
 }
 utils.inherits(RoomState, EventEmitter);
 

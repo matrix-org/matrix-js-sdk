@@ -147,9 +147,7 @@ function Room(roomId, opts) {
     // only receipts that came from the server, not synthesized ones
     this._realReceipts = {};
 
-    this._notificationCounts = {
-        // string: number
-    };
+    this._notificationCounts = {};
 
     // all our per-room timeline sets. the first one is the unfiltered ones;
     // the subsequent ones are the filtered ones in no particular order.
