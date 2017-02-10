@@ -606,10 +606,13 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
     if (!content.room_id ||
         !sessionId ||
-        !content.session_key ||
-        !senderKey
+        !content.session_key
        ) {
-        console.error(`key event is missing fields`);
+        console.error("key event is missing fields");
+        return;
+    }
+    if (!senderKey) {
+        console.error("key event has no sender key (not encrypted?)");
         return;
     }
 

@@ -169,7 +169,7 @@ utils.inherits(DecryptionError, Error);
  * @returns {String}
  */
 DecryptionError.prototype.toString = function() {
-    let result = this.name + '[msg: '+ this.message;
+    let result = this.name + '[msg: ' + this.message;
 
     if (this.details) {
         result += ', ' +
