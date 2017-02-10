@@ -147,7 +147,9 @@ class SyncAccumulator {
             return;
         }
         if (!this.inviteRooms[roomId]) {
-            this.inviteRooms[roomId] = data;
+            this.inviteRooms[roomId] = {
+                invite_state: data.invite_state,
+            };
             return;
         }
         // accumulate extra keys for invite->invite transitions
@@ -350,7 +352,7 @@ class SyncAccumulator {
 }
 
 function setState(eventMap, event) {
-    if (!event.state_key || !event.type) {
+    if (event.state_key === null || event.state_key === undefined || !event.type) {
         return;
     }
     if (!eventMap[event.type]) {
