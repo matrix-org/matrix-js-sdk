@@ -393,7 +393,9 @@ describe("MatrixClient crypto", function() {
 
     afterEach(function() {
         aliTestClient.stop();
+        aliTestClient.httpBackend.verifyNoOutstandingExpectation();
         bobTestClient.stop();
+        bobTestClient.httpBackend.verifyNoOutstandingExpectation();
     });
 
     it('Ali knows the difference between a new user and one with no devices',
@@ -620,16 +622,13 @@ describe("MatrixClient crypto", function() {
             .then(function() {
                 aliTestClient.client.setDeviceBlocked(bobUserId, bobDeviceId, true);
                 const p1 = sendMessage(aliTestClient.client);
-                const p2 = expectAliQueryKeys()
-                    .then(expectAliClaimKeys)
-                    .then(function() {
-                        return expectSendMessageRequest(aliTestClient.httpBackend);
-                    }).then(function(sentContent) {
-                        // no unblocked devices, so the ciphertext should be empty
-                        expect(sentContent.ciphertext).toEqual({});
-                    });
+                const p2 = expectSendMessageRequest(aliTestClient.httpBackend)
+                      .then(function(sentContent) {
+                          // no unblocked devices, so the ciphertext should be empty
+                          expect(sentContent.ciphertext).toEqual({});
+                      });
                 return q.all([p1, p2]);
-            }).catch(testUtils.failTest).nodeify(done);
+            }).nodeify(done);
     });
 
     it("Bob receives two pre-key messages", function(done) {
@@ -684,5 +683,45 @@ describe("MatrixClient crypto", function() {
                 return aliTestClient.httpBackend.flush('/sync', 1);
             }).then(expectAliQueryKeys)
             .nodeify(done);
+    });
+
+    it("Ali does a key query when encryption is enabled", function(done) {
+        // enabling encryption in the room should make alice download devices
+        // for both members.
+        q()
+            .then(() => startClient(aliTestClient))
+            .then(() => {
+                const syncData = {
+                    next_batch: '2',
+                    rooms: {
+                        join: {},
+                    },
+                };
+                syncData.rooms.join[roomId] = {
+                    state: {
+                        events: [
+                            testUtils.mkEvent({
+                                type: 'm.room.encryption',
+                                skey: '',
+                                content: {
+                                    algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                                },
+                            }),
+                        ],
+                    },
+                };
+
+                aliTestClient.httpBackend.when('GET', '/sync').respond(
+                    200, syncData);
+                return aliTestClient.httpBackend.flush('/sync', 1);
+            }).then(() => {
+                aliTestClient.expectKeyQuery({
+                    device_keys: {
+                        [aliUserId]: {},
+                        [bobUserId]: {},
+                    },
+                });
+                return aliTestClient.httpBackend.flush('/keys/query', 1);
+            }).nodeify(done);
     });
 });

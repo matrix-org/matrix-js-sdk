@@ -64,7 +64,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
     }
 
     const self = this;
-    this._prepPromise = self._crypto.downloadKeys(roomMembers, true).then(function(res) {
+    this._prepPromise = self._crypto.downloadKeys(roomMembers).then(function(res) {
         return self._crypto.ensureOlmSessionsForUsers(roomMembers);
     }).then(function() {
         self._sessionPrepared = true;
@@ -174,12 +174,12 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     try {
         payloadString = this._decryptMessage(deviceKey, message);
     } catch (e) {
-        console.warn(
-            "Failed to decrypt Olm event (id=" +
-                event.getId() + ") from " + deviceKey +
-                ": " + e.message,
+        throw new base.DecryptionError(
+            "Bad Encrypted Message", {
+                sender: deviceKey,
+                err: e,
+            },
         );
-        throw new base.DecryptionError("Bad Encrypted Message");
     }
 
     const payload = JSON.parse(payloadString);
@@ -187,22 +187,18 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     // check that we were the intended recipient, to avoid unknown-key attack
     // https://github.com/vector-im/vector-web/issues/2483
     if (payload.recipient != this._userId) {
-        console.warn(
-            "Event " + event.getId() + ": Intended recipient " +
-            payload.recipient + " does not match our id " + this._userId,
-        );
         throw new base.DecryptionError(
             "Message was intented for " + payload.recipient,
         );
     }
 
-    if (payload.recipient_keys.ed25519 !=
-               this._olmDevice.deviceEd25519Key) {
-        console.warn(
-            "Event " + event.getId() + ": Intended recipient ed25519 key " +
-            payload.recipient_keys.ed25519 + " did not match ours",
+    if (payload.recipient_keys.ed25519 != this._olmDevice.deviceEd25519Key) {
+        throw new base.DecryptionError(
+            "Message not intended for this device", {
+                intended: payload.recipient_keys.ed25519,
+                our_key: this._olmDevice.deviceEd25519Key,
+            },
         );
-        throw new base.DecryptionError("Message not intended for this device");
     }
 
     // check that the original sender matches what the homeserver told us, to
@@ -210,23 +206,19 @@ OlmDecryption.prototype.decryptEvent = function(event) {
     // (this check is also provided via the sender's embedded ed25519 key,
     // which is checked elsewhere).
     if (payload.sender != event.getSender()) {
-        console.warn(
-            "Event " + event.getId() + ": original sender " + payload.sender +
-            " does not match reported sender " + event.getSender(),
-        );
         throw new base.DecryptionError(
-            "Message forwarded from " + payload.sender,
+            "Message forwarded from " + payload.sender, {
+                reported_sender: event.getSender(),
+            },
         );
     }
 
     // Olm events intended for a room have a room_id.
     if (payload.room_id !== event.getRoomId()) {
-        console.warn(
-            "Event " + event.getId() + ": original room " + payload.room_id +
-            " does not match reported room " + event.room_id,
-        );
         throw new base.DecryptionError(
-            "Message intended for room " + payload.room_id,
+            "Message intended for room " + payload.room_id, {
+                reported_room: event.room_id,
+            },
         );
     }
 

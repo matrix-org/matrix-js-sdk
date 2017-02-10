@@ -49,17 +49,17 @@ HttpBackend.prototype = {
         const tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
             console.log(
-                "  trying to flush queue => reqs=%s expected=%s [%s]",
-                self.requests.length, self.expectedRequests.length, path,
+                "  trying to flush queue => reqs=[%s] expected=[%s]",
+                self.requests, self.expectedRequests.map((er) => er.path),
             );
             if (self._takeFromQueue(path)) {
                 // try again on the next tick.
-                console.log("  flushed. Trying for more. [%s]", path);
                 flushed += 1;
                 if (numToFlush && flushed === numToFlush) {
-                    console.log("  [%s] Flushed assigned amount: %s", path, numToFlush);
+                    console.log("  Flushed assigned amount: %s", numToFlush);
                     defer.resolve();
                 } else {
+                    console.log("  flushed. Trying for more.");
                     setTimeout(tryFlush, 0);
                 }
             } else if (flushed === 0 && !triedWaiting) {
@@ -68,7 +68,7 @@ HttpBackend.prototype = {
                 setTimeout(tryFlush, 5);
                 triedWaiting = true;
             } else {
-                console.log("  no more flushes. [%s]", path);
+                console.log("  no more flushes.");
                 defer.resolve();
             }
         };

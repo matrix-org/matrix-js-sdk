@@ -363,9 +363,6 @@ SyncApi.prototype.getSyncState = function() {
  * Main entry point
  */
 SyncApi.prototype.sync = function() {
-    debuglog("SyncApi.sync: starting with sync token " +
-             this.client.store.getSyncToken());
-
     const client = this.client;
     const self = this;
 
@@ -520,7 +517,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
         if (data.nextBatch) {
-            console.log("sync(): not doing HTTP hit, instead returning stored /sync");
+            debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
             this._currentSyncRequest = q.resolve({
                 next_batch: data.nextBatch,
                 rooms: data.roomsData,
@@ -530,12 +527,15 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     if (!isCachedResponse) {
+        debuglog('Starting sync since=' + syncToken);
         this._currentSyncRequest = client._http.authedRequest(
             undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
         );
     }
 
     this._currentSyncRequest.done(function(data) {
+        debuglog('Completed sync, next_batch=' + data.next_batch);
+
         // set the sync token NOW *before* processing the events. We do this so
         // if something barfs on an event we can skip it rather than constantly
         // polling with the same token.
@@ -697,8 +697,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                         toDeviceEvent.getType() == "m.room.message" &&
                             content.msgtype == "m.bad.encrypted"
                     ) {
-                        console.warn(
-                            "Unable to decrypt to-device event: " + content.body,
+                        // the mapper already logged a warning.
+                        console.log(
+                            'Ignoring undecryptable to-device event from ' +
+                                toDeviceEvent.getSender(),
                         );
                         return;
                     }
