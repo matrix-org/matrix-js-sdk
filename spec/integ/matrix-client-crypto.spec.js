@@ -130,7 +130,12 @@ function expectAliClaimKeys() {
         return {one_time_keys: result};
     });
 
-    return aliTestClient.httpBackend.flush("/keys/claim", 1);
+    // it can take a while to process the key query, so give it some extra
+    // time, and make sure the claim actually happens tather than ploughing on
+    // confusingly.
+    return aliTestClient.httpBackend.flush("/keys/claim", 1, 20).then((r) => {
+        expect(r).toEqual(1);
+    });
 }
 
 
@@ -263,16 +268,16 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    let sent;
+    const deferred = q.defer();
     httpBackend.when("PUT", path).respond(200, function(path, content) {
-        sent = content;
+        deferred.resolve(content);
         return {
             event_id: "asdfgh",
         };
     });
-    return httpBackend.flush(path, 1).then(function() {
-        return sent;
-    });
+
+    // it can take a while to process the key query, so give it 20ms
+    return httpBackend.flush(path, 1, 20).then(() => deferred.promise);
 }
 
 function aliRecvMessage() {
