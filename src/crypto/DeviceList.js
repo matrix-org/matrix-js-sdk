@@ -404,7 +404,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     const signKeyId = "ed25519:" + deviceId;
     const signKey = deviceResult.keys[signKeyId];
     if (!signKey) {
-        console.log("Device " + userId + ":" + deviceId +
+        console.warn("Device " + userId + ":" + deviceId +
             " has no ed25519 key");
         return false;
     }
@@ -414,8 +414,8 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     try {
         olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
     } catch (e) {
-        console.log("Unable to verify signature on device " +
-            userId + ":" + deviceId + ":", e);
+        console.warn("Unable to verify signature on device " +
+            userId + ":" + deviceId + ":" + e);
         return false;
     }
 
@@ -431,7 +431,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
             // best off sticking with the original keys.
             //
             // Should we warn the user about it somehow?
-            console.warn("Ed25519 key for device" + userId + ": " +
+            console.warn("Ed25519 key for device " + userId + ":" +
                deviceId + " has changed");
             return false;
         }
