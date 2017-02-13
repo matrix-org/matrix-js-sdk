@@ -123,7 +123,7 @@ describe("MatrixClient room timelines", function() {
         client.startClient();
         httpBackend.flush("/pushrules").then(function() {
             return httpBackend.flush("/filter");
-        }).done(done);
+        }).nodeify(done);
     });
 
     afterEach(function() {
