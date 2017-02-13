@@ -914,6 +914,99 @@ describe("megolm", function() {
     });
 
 
+    it("We should not get confused by out-of-order device query responses",
+       () => {
+           // https://github.com/vector-im/riot-web/issues/3126
+           return aliceTestClient.start().then(() => {
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                   200, getSyncResponse(['@bob:xyz', '@chris:abc']));
+               return aliceTestClient.httpBackend.flush('/sync', 1);
+           }).then(() => {
+               // to make sure the initial device queries are flushed out, we
+               // attempt to send a message.
+
+               aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                   200, {
+                       device_keys: {
+                           '@bob:xyz': {},
+                           '@chris:abc': {},
+                       },
+                   },
+               );
+
+               aliceTestClient.httpBackend.when('PUT', '/send/').respond(
+                   200, {event_id: '$event1'});
+
+               return q.all([
+                   aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                   aliceTestClient.httpBackend.flush('/keys/query', 1).then(
+                       () => aliceTestClient.httpBackend.flush('/send/', 1, 20),
+                   ),
+               ]);
+           }).then(() => {
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
+
+               // invalidate bob's and chris's device lists in separate syncs
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(200, {
+                   next_batch: '2',
+                   device_lists: {
+                       changed: ['@bob:xyz'],
+                   },
+               });
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(200, {
+                   next_batch: '3',
+                   device_lists: {
+                       changed: ['@chris:abc'],
+                   },
+               });
+               return aliceTestClient.httpBackend.flush('/sync', 2);
+           }).then(() => {
+               // check that we don't yet have a request for chris's devices.
+               aliceTestClient.httpBackend.when('POST', '/keys/query', {
+                   device_keys: {
+                       '@chris:abc': {},
+                   },
+                   token: '3',
+               }).respond(200, {
+                   device_keys: {'@chris:abc': {}},
+               });
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(0);
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
+
+               // now add an expectation for a query for bob's devices, and let
+               // it complete.
+               aliceTestClient.httpBackend.when('POST', '/keys/query', {
+                   device_keys: {
+                       '@bob:xyz': {},
+                   },
+                   token: '2',
+               }).respond(200, {
+                   device_keys: {'@bob:xyz': {}},
+               });
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(1);
+
+               // wait for the client to stop processing the response
+               return aliceTestClient.client.downloadKeys(['@bob:xyz']);
+           }).then(() => {
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(2);
+
+               // now let the query for chris's devices complete.
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(1);
+
+               // wait for the client to stop processing the response
+               return aliceTestClient.client.downloadKeys(['@chris:abc']);
+           }).then(() => {
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(3);
+           });
+       });
+
+
     it("Alice exports megolm keys and imports them to a new device", function(done) {
         let messageEncrypted;
 
