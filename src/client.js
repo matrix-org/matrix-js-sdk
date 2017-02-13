@@ -1386,7 +1386,7 @@ MatrixClient.prototype.forget = function(roomId, deleteRoom, callback) {
 MatrixClient.prototype.unban = function(roomId, userId, callback) {
     // unbanning = set their state to leave
     return _setMembershipState(
-        this, roomId, userId, "leave", undefined, callback,
+        this, roomId, userId, "unban", undefined, callback,
     );
 };
 
@@ -1400,7 +1400,7 @@ MatrixClient.prototype.unban = function(roomId, userId, callback) {
  */
 MatrixClient.prototype.kick = function(roomId, userId, reason, callback) {
     return _setMembershipState(
-        this, roomId, userId, "leave", reason, callback,
+        this, roomId, userId, "kick", reason, callback,
     );
 };
 
