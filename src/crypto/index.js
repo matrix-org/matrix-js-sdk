@@ -61,6 +61,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
+    this._initialDeviceListInvalidationDone = false;
 
     // EncryptionAlgorithm instance for each room
     this._roomEncryptors = {};
@@ -764,7 +765,7 @@ Crypto.prototype._onCryptoEvent = function(event) {
  * @param {Object} syncData  the data from the 'MatrixClient.sync' event
  */
 Crypto.prototype._onSyncCompleted = function(syncData) {
-    this._deviceList.lastKnownSyncToken = syncData.nextSyncToken;
+    const nextSyncToken = syncData.nextSyncToken;
 
     if (!syncData.oldSyncToken) {
         // an initialsync.
@@ -773,24 +774,37 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         // if we have a deviceSyncToken, we can tell the deviceList to
         // invalidate devices which have changed since then.
         const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
-        if (oldSyncToken) {
-            this._invalidateDeviceListsSince(oldSyncToken).catch((e) => {
+        if (oldSyncToken !== null) {
+            this._invalidateDeviceListsSince(
+                oldSyncToken, nextSyncToken,
+            ).catch((e) => {
                 // if that failed, we fall back to invalidating everyone.
                 console.warn("Error fetching changed device list", e);
                 this._invalidateDeviceListForAllActiveUsers();
+            }).done(() => {
+                this._initialDeviceListInvalidationDone = true;
+                this._deviceList.lastKnownSyncToken = nextSyncToken;
                 this._deviceList.refreshOutdatedDeviceLists();
-            }).done();
+            });
         } else {
             // otherwise, we have to invalidate all devices for all users we
             // share a room with.
             console.log("Completed first initialsync; invalidating all " +
                         "device list caches");
             this._invalidateDeviceListForAllActiveUsers();
+            this._initialDeviceListInvalidationDone = true;
         }
     }
 
-    // catch up on any new devices we got told about during the sync.
-    this._deviceList.refreshOutdatedDeviceLists();
+    if (this._initialDeviceListInvalidationDone) {
+        // if we've got an up-to-date list of users with outdated device lists,
+        // tell the device list about the new sync token (but not otherwise, because
+        // otherwise we'll start thinking we're more in sync than we are.)
+        this._deviceList.lastKnownSyncToken = nextSyncToken;
+
+        // catch up on any new devices we got told about during the sync.
+        this._deviceList.refreshOutdatedDeviceLists();
+    }
 };
 
 /**
@@ -846,16 +860,19 @@ Crypto.prototype._sendNewDeviceEvents = function() {
 
 /**
  * Ask the server which users have new devices since a given token,
- * invalidate them, and start an update query.
+ * and invalidate them
  *
  * @param {String} oldSyncToken
+ * @param {String} lastKnownSyncToken
  *
  * @returns {Promise} resolves once the query is complete. Rejects if the
  *   keyChange query fails.
  */
-Crypto.prototype._invalidateDeviceListsSince = function(oldSyncToken) {
+Crypto.prototype._invalidateDeviceListsSince = function(
+    oldSyncToken, lastKnownSyncToken,
+) {
     return this._baseApis.getKeyChanges(
-        oldSyncToken, this.lastKnownSyncToken,
+        oldSyncToken, lastKnownSyncToken,
     ).then((r) => {
         if (!r.changed || !Array.isArray(r.changed)) {
             return;
@@ -869,7 +886,6 @@ Crypto.prototype._invalidateDeviceListsSince = function(oldSyncToken) {
                 this._deviceList.invalidateUserDeviceList(u);
             }
         });
-        this._deviceList.refreshOutdatedDeviceLists();
     });
 };
 
