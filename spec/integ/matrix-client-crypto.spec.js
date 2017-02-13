@@ -131,7 +131,7 @@ function expectAliClaimKeys() {
     });
 
     // it can take a while to process the key query, so give it some extra
-    // time, and make sure the claim actually happens tather than ploughing on
+    // time, and make sure the claim actually happens rather than ploughing on
     // confusingly.
     return aliTestClient.httpBackend.flush("/keys/claim", 1, 20).then((r) => {
         expect(r).toEqual(1);
