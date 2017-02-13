@@ -771,6 +771,20 @@ describe("megolm", function() {
 
             return aliceTestClient.httpBackend.flush();
         }).then(function() {
+            // start out with the device unknown - the send should be rejected.
+            return q.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test').then(() => {
+                    throw new Error("sendTextMessage failed on an unknown device");
+                }, (e) => {
+                    expect(e.name).toEqual("UnknownDeviceError");
+                    expect(Object.keys(e.devices)).toEqual([aliceTestClient.userId]);
+                    expect(Object.keys(e.devices[aliceTestClient.userId])).
+                        toEqual(['DEVICE_ID']);
+                }),
+                aliceTestClient.httpBackend.flush(),
+            ]);
+        }).then(function() {
+            // mark the device as known, and resend.
             aliceTestClient.client.setDeviceKnown(aliceTestClient.userId, 'DEVICE_ID');
             aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
                 200, function(path, content) {

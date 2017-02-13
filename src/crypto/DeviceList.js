@@ -306,40 +306,56 @@ export default class DeviceList {
         ).then((res) => {
             const dk = res.device_keys || {};
 
+            // do each user in a separate promise, to avoid wedging the CPU
+            // (https://github.com/vector-im/riot-web/issues/3158)
+            //
+            // of course we ought to do this in a web worker or similar, but
+            // this serves as an easy solution for now.
+            let prom = q();
             for (const userId of downloadUsers) {
-                console.log('got keys for ' + userId + ':', dk[userId]);
-
-                // map from deviceid -> deviceinfo for this user
-                const userStore = {};
-                const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
-                if (devs) {
-                    Object.keys(devs).forEach((deviceId) => {
-                        const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
-                        userStore[deviceId] = d;
-                    });
-                }
-
-                _updateStoredDeviceKeysForUser(
-                    this._olmDevice, userId, userStore, dk[userId] || {},
-                );
-
-                // update the session store
-                const storage = {};
-                Object.keys(userStore).forEach((deviceId) => {
-                    storage[deviceId] = userStore[deviceId].toStorage();
+                prom = prom.delay(5).then(() => {
+                    this._processQueryResponseForUser(userId, dk[userId]);
                 });
-
-                this._sessionStore.storeEndToEndDevicesForUser(
-                    userId, storage,
-                );
-
-                if (token) {
-                    this._sessionStore.storeEndToEndDeviceSyncToken(token);
-                }
             }
+
+            return prom;
+        }).then(() => {
+            if (token) {
+                this._sessionStore.storeEndToEndDeviceSyncToken(token);
+            }
+            console.log('Completed key download for ' + downloadUsers);
         });
     }
+
+    _processQueryResponseForUser(userId, response) {
+        console.log('got keys for ' + userId + ':', response);
+
+        // map from deviceid -> deviceinfo for this user
+        const userStore = {};
+        const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+        if (devs) {
+            Object.keys(devs).forEach((deviceId) => {
+                const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
+                userStore[deviceId] = d;
+            });
+        }
+
+        _updateStoredDeviceKeysForUser(
+            this._olmDevice, userId, userStore, response || {},
+        );
+
+        // update the session store
+        const storage = {};
+        Object.keys(userStore).forEach((deviceId) => {
+            storage[deviceId] = userStore[deviceId].toStorage();
+        });
+
+        this._sessionStore.storeEndToEndDevicesForUser(
+            userId, storage,
+        );
+    }
 }
+
 
 function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         userResult) {
