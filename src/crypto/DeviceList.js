@@ -294,6 +294,13 @@ export default class DeviceList {
             // nothing to do
             this._currentQueryDeferred.resolve();
             this._currentQueryDeferred = null;
+
+            // that means we're up-to-date with the lastKnownSyncToken.
+            const token = this.lastKnownSyncToken;
+            if (token !== null) {
+                this._sessionStore.storeEndToEndDeviceSyncToken(token);
+            }
+
             return;
         }
 
@@ -363,7 +370,7 @@ export default class DeviceList {
 
             return prom;
         }).then(() => {
-            if (token) {
+            if (token !== null) {
                 this._sessionStore.storeEndToEndDeviceSyncToken(token);
             }
             console.log('Completed key download for ' + downloadUsers);
