@@ -513,11 +513,14 @@ SyncApi.prototype._sync = function(syncOptions) {
 
     let isCachedResponse = false;
     if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
-        const data = self.opts.syncAccumulator.getJSON();
+        let data = self.opts.syncAccumulator.getJSON();
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
         if (data.nextBatch) {
             debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+            // We must deep copy the stored data so that the /sync processing code doesn't
+            // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
+            data = JSON.parse(JSON.stringify(data));
             this._currentSyncRequest = q.resolve({
                 next_batch: data.nextBatch,
                 rooms: data.roomsData,
