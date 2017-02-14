@@ -125,10 +125,6 @@ class SyncAccumulator {
                     delete this.inviteRooms[roomId];
                 }
                 // (3)
-                // TODO: Check that join 'state' is the same if you leave then
-                //       rejoin. We need to know if Synapse is instead returning
-                //       a delta from the old leave state. If it is, this means
-                //       we can NEVER delete 'leave' room data :/
                 this._accumulateJoinState(roomId, data);
                 break;
             case "leave":
@@ -297,7 +293,6 @@ class SyncAccumulator {
             // about any previous room being in 'invite' or 'join' so we can
             // just omit mentioning it at all, even if it has previously come
             // down /sync.
-            // TODO: Check if full state is given upon rejoin.
             leave: {},
         };
         Object.keys(this.inviteRooms).forEach((roomId) => {
