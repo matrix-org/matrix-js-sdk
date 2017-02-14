@@ -58,7 +58,8 @@ class SyncAccumulator {
             //       ...
             //    ],
             //    _accountData: { $event_type: json },
-            //    _unreadNotifications: { ... unread_notifications JSON ... }
+            //    _unreadNotifications: { ... unread_notifications JSON ... },
+            //    _readReceipts: { $user_id: { data: $json, eventId: $event_id }}
             //}
         };
         // the /sync token which corresponds to the last time rooms were
@@ -204,9 +205,6 @@ class SyncAccumulator {
         // opts.maxTimelineEntries, and we may have a few less. We should never
         // have more though, provided that the /sync limit is less than or equal
         // to opts.maxTimelineEntries.
-        //
-        // We *NEVER* accumulate 'ephemeral' events because we don't want to
-        // store stale typing notifs.
 
         if (!this.joinRooms[roomId]) {
             // Create truly empty objects so event types of 'hasOwnProperty' and co
@@ -216,6 +214,7 @@ class SyncAccumulator {
                 _timeline: [],
                 _accountData: Object.create(null),
                 _unreadNotifications: {},
+                _readReceipts: {},
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -230,6 +229,46 @@ class SyncAccumulator {
         // these probably clobber, spec is unclear.
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
+        }
+
+        if (data.ephemeral && data.ephemeral.events) {
+            data.ephemeral.events.forEach((e) => {
+                // We purposefully do not persist m.typing events.
+                // Technically you could refresh a browser before the timer on a
+                // typing event is up, so it'll look like you aren't typing when
+                // you really still are. However, the alternative is worse. If
+                // we do persist typing events, it will look like people are
+                // typing forever until someone really does start typing (which
+                // will prompt Synapse to send down an actual m.typing event to
+                // clobber the one we persisted).
+                if (e.type !== "m.receipt" || !e.content) {
+                    // This means we'll drop unknown ephemeral events but that
+                    // seems okay.
+                    return;
+                }
+                // Handle m.receipt events. They clobber based on:
+                //   (user_id, receipt_type)
+                // but they are keyed in the event as:
+                //   content:{ $event_id: { $receipt_type: { $user_id: {json} }}}
+                // so store them in the former so we can accumulate receipt deltas
+                // quickly and efficiently (we expect a lot of them). Fold the
+                // receipt type into the key name since we only have 1 at the
+                // moment (m.read) and nested JSON objects are slower and more
+                // of a hassle to work with. We'll inflate this back out when
+                // getJSON() is called.
+                Object.keys(e.content).forEach((eventId) => {
+                    if (!e.content[eventId]["m.read"]) {
+                        return;
+                    }
+                    Object.keys(e.content[eventId]["m.read"]).forEach((userId) => {
+                        // clobber on user ID
+                        currentData._readReceipts[userId] = {
+                            data: e.content[eventId]["m.read"][userId],
+                            eventId: eventId,
+                        };
+                    });
+                });
+            });
         }
 
         // Work out the current state. The deltas need to be applied in the order:
@@ -314,6 +353,27 @@ class SyncAccumulator {
             Object.keys(roomData._accountData).forEach((evType) => {
                 roomJson.account_data.events.push(roomData._accountData[evType]);
             });
+
+            // Add receipt data
+            const receiptEvent = {
+                type: "m.receipt",
+                room_id: roomId,
+                content: {
+                    // $event_id: { "m.read": { $user_id: $json } }
+                },
+            };
+            Object.keys(roomData._readReceipts).forEach((userId) => {
+                const receiptData = roomData._readReceipts[userId];
+                if (!receiptEvent.content[receiptData.eventId]) {
+                    receiptEvent.content[receiptData.eventId] = {
+                        "m.read": {},
+                    };
+                }
+                receiptEvent.content[receiptData.eventId]["m.read"][userId] = (
+                    receiptData.data
+                );
+            });
+            roomJson.ephemeral.events.push(receiptEvent);
 
             // Add timeline data
             roomData._timeline.forEach((msgData) => {
