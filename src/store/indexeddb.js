@@ -89,7 +89,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the data was persisted.
      */
     persistSyncData: function(nextBatch, roomsData) {
-        console.log("persisting sync data");
+        console.log("Persisting sync data up to ", nextBatch);
         return q.try(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
@@ -308,7 +308,6 @@ IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData) {
 };
 
 IndexedDBStore.prototype._syncToDatabase = function() {
-    console.log("_syncToDatabase");
     this._syncTs = Date.now(); // set now to guard against multi-writes
 
     // work out changed users (this doesn't handle deletions but you
@@ -381,11 +380,9 @@ function selectQuery(store, keyRange, resultMapper) {
 function promiseifyTxn(txn) {
     return new q.Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
-            console.log("txn success:", event);
             resolve(event);
         };
         txn.onerror = function(event) {
-            console.error("txn fail:", event);
             reject(event);
         };
     });
@@ -394,11 +391,9 @@ function promiseifyTxn(txn) {
 function promiseifyRequest(req) {
     return new q.Promise((resolve, reject) => {
         req.onsuccess = function(event) {
-            console.log("req success:", event);
             resolve(event);
         };
         req.onerror = function(event) {
-            console.error("req fail:", event);
             reject(event);
         };
     });
