@@ -61,8 +61,8 @@ module.exports.EventStatus = {
  * from changes to event JSON between Matrix versions.
  *
  * @prop {RoomMember} sender The room member who sent this event, or null e.g.
- * this is a presence event. This is only guarenteed to be set for events that
- * appear in a timeline, ie. do not guarentee that it will be set on state
+ * this is a presence event. This is only guaranteed to be set for events that
+ * appear in a timeline, ie. do not guarantee that it will be set on state
  * events.
  * @prop {RoomMember} target The room member who is the target of this event, e.g.
  * the invitee, the person being banned, etc.
