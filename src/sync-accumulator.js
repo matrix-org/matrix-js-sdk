@@ -332,6 +332,12 @@ class SyncAccumulator {
             // about any previous room being in 'invite' or 'join' so we can
             // just omit mentioning it at all, even if it has previously come
             // down /sync.
+            // The notable exception is when a client is kicked or banned:
+            // we may want to hold onto that room so the client can clearly see
+            // why their room has disappeared. We don't persist it though because
+            // it is unclear *when* we can safely remove the room from the DB.
+            // Instead, we assume that if you're loading from the DB, you've
+            // refreshed the page, which means you've seen the kick/ban already.
             leave: {},
         };
         Object.keys(this.inviteRooms).forEach((roomId) => {
@@ -373,7 +379,10 @@ class SyncAccumulator {
                     receiptData.data
                 );
             });
-            roomJson.ephemeral.events.push(receiptEvent);
+            // add only if we have some receipt data
+            if (Object.keys(receiptEvent.content).length > 0) {
+                roomJson.ephemeral.events.push(receiptEvent);
+            }
 
             // Add timeline data
             roomData._timeline.forEach((msgData) => {
