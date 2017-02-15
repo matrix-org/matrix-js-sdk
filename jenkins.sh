@@ -16,7 +16,7 @@ function fail {
 }
 
 # don't use last time's test reports
-rm -rf reports || exit $?
+rm -rf reports coverage || exit $?
 
 npm test || fail "npm test finished with return code $?"
 

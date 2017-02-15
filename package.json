@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test:build": "babel -s -d specbuild spec",
-    "test:run": "mocha --recursive specbuild --colors --reporter mocha-jenkins-reporter --reporter-options junit_report_path=reports/test-results.xml",
-    "test": "npm run test:build && istanbul cover --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" npm run test:run",
-    "check": "npm run test:build && npm run test:run",
+    "test:run": "istanbul cover --report text --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" _mocha -- --recursive specbuild --colors --reporter mocha-jenkins-reporter --reporter-options junit_report_path=reports/test-results.xml",
+    "test": "npm run test:build && npm test:run",
+    "check": "npm run test:build && _mocha --recursive specbuild --colors",
     "gendoc": "jsdoc -r lib -P package.json -R README.md -d .jsdoc",
     "start": "babel -s -w -d lib src",
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
