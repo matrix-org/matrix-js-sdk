@@ -882,7 +882,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
  * @param {number} delay How long to delay until the first poll.
  *        defaults to a short, randomised interval (to prevent
  *        tightlooping if /versions succeeds but /sync etc. fail).
- * @return {promise}
+ * @return {promise} which resolves once the connection returns
  */
 SyncApi.prototype._startKeepAlives = function(delay) {
     if (delay === undefined) {
@@ -908,7 +908,11 @@ SyncApi.prototype._startKeepAlives = function(delay) {
 };
 
 /**
+ * Make a dummy call to /_matrix/client/versions, to see if the HS is
+ * reachable.
  *
+ * On failure, schedules a call back to itself. On success, resolves
+ * this._connectionReturnedDefer.
  */
 SyncApi.prototype._pokeKeepAlive = function() {
     const self = this;
