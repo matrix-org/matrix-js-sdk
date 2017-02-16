@@ -3038,21 +3038,26 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
 /**
  * Fires whenever the SDK's syncing state is updated. The state can be one of:
  * <ul>
- * <li>PREPARED : The client has synced with the server at least once and is
+ *
+ * <li>PREPARED: The client has synced with the server at least once and is
  * ready for methods to be called on it. This will be immediately followed by
  * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
  * previous API.</i></li>
+ *
  * <li>SYNCING : The client is currently polling for new events from the server.
  * This will be called <i>after</i> processing latest events from a sync.</li>
+ *
  * <li>ERROR : The client has had a problem syncing with the server. If this is
  * called <i>before</i> PREPARED then there was a problem performing the initial
  * sync. If this is called <i>after</i> PREPARED then there was a problem polling
  * the server for updates. This may be called multiple times even if the state is
  * already ERROR. <i>This is the equivalent of "syncError" in the previous
  * API.</i></li>
- * <li>RECONNECTING: The sync connedtion has dropped, but not in a way that should
- * be considered erroneous.
+ *
+ * <li>RECONNECTING: The sync connection has dropped, but not (yet) in a way that
+ * should be considered erroneous.
  * </li>
+ *
  * <li>STOPPED: The client has stopped syncing with server due to stopClient
  * being called.
  * </li>
@@ -3062,32 +3067,46 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *                                          +---->STOPPED
  *                                          |
  *              +----->PREPARED -------> SYNCING <--+
- *              |        ^                  ^       |
- *              |        |                  |       |
- *              |        |                  V       |
- *   null ------+        |  +-RECONNECTING<-+       |
+ *              |        ^                |  ^      |
+ *              |        |                |  |      |
+ *              |        |                V  |      |
+ *   null ------+        |  +--------RECONNECTING   |
  *              |        |  V                       |
  *              +------->ERROR ---------------------+
  *
  * NB: 'null' will never be emitted by this event.
+ *
  * </pre>
  * Transitions:
  * <ul>
+ *
  * <li><code>null -> PREPARED</code> : Occurs when the initial sync is completed
  * first time. This involves setting up filters and obtaining push rules.
+ *
  * <li><code>null -> ERROR</code> : Occurs when the initial sync failed first time.
+ *
  * <li><code>ERROR -> PREPARED</code> : Occurs when the initial sync succeeds
  * after previously failing.
+ *
  * <li><code>PREPARED -> SYNCING</code> : Occurs immediately after transitioning
  * to PREPARED. Starts listening for live updates rather than catching up.
- * <li><code>SYNCING -> ERROR</code> : Occurs the first time a client cannot perform a
- * live update.
+ *
+ * <li><code>SYNCING -> RECONNECTING</code> : Occurs when the live update fails.
+ *
+ * <li><code>RECONNECTING -> RECONNECTING</code> : Can occur if the update calls
+ * continue to fail, but the keepalive calls (to /versions) succeed.
+ *
+ * <li><code>RECONNECTING -> ERROR</code> : Occurs when the keepalive call also fails
+ *
  * <li><code>ERROR -> SYNCING</code> : Occurs when the client has performed a
  * live update after having previously failed.
- * <li><code>ERROR -> ERROR</code> : Occurs when the client has failed to sync
+ *
+ * <li><code>ERROR -> ERROR</code> : Occurs when the client has failed to keepalive
  * for a second time or more.</li>
+ *
  * <li><code>SYNCING -> SYNCING</code> : Occurs when the client has performed a live
  * update. This is called <i>after</i> processing.</li>
+ *
  * <li><code>* -> STOPPED</code> : Occurs once the client has stopped syncing or
  * trying to sync after stopClient has been called.</li>
  * </ul>
@@ -3112,6 +3131,9 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @param {String} data.nextSyncToken The 'next_batch' result from /sync, which
  *    will become the 'since' token for the next call to /sync. Only present if
  *    <code>state=PREPARED</code> or <code>state=SYNCING</code>.
+ *
+ * @param {boolean} data.catchingUp True if we are working our way through a
+ *    backlog of events after connecting. Only present if <code>state=SYNCING</code>.
  *
  * @example
  * matrixClient.on("sync", function(state, prevState, data) {
