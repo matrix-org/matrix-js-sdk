@@ -3054,7 +3054,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * already ERROR. <i>This is the equivalent of "syncError" in the previous
  * API.</i></li>
  *
- * <li>RECONNECTING: The sync connedtion has dropped, but not (yet) in a way that
+ * <li>RECONNECTING: The sync connection has dropped, but not (yet) in a way that
  * should be considered erroneous.
  * </li>
  *
