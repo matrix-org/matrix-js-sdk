@@ -1383,13 +1383,23 @@ MatrixClient.prototype.forget = function(roomId, deleteRoom, callback) {
  * @param {string} roomId
  * @param {string} userId
  * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: Object (currently empty)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.unban = function(roomId, userId, callback) {
-    // unbanning = set their state to leave
-    return _setMembershipState(
-        this, roomId, userId, "leave", undefined, callback,
+    // unbanning != set their state to leave: this used to be
+    // the case, but was then changed so that leaving was always
+    // a revoking of priviledge, otherwise two people racing to
+    // kick / ban someone could end up banning and then un-banning
+    // them.
+    const path = utils.encodeUri("/rooms/$roomId/unban", {
+        $roomId: roomId,
+    });
+    const data = {
+        user_id: userId,
+    };
+    return this._http.authedRequest(
+        callback, "POST", path, undefined, data,
     );
 };
 

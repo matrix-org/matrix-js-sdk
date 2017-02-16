@@ -36,15 +36,23 @@ HttpBackend.prototype = {
      * Respond to all of the requests (flush the queue).
      * @param {string} path The path to flush (optional) default: all.
      * @param {integer} numToFlush The number of things to flush (optional), default: all.
-     * @return {Promise} resolved when there is nothing left to flush.
+     * @param {integer=} waitTime  The time (in ms) to wait for a request to happen.
+     *    default: 5
+     *
+     * @return {Promise} resolves when there is nothing left to flush, with the
+     *    number of requests flushed
      */
-    flush: function(path, numToFlush) {
+    flush: function(path, numToFlush, waitTime) {
         const defer = q.defer();
         const self = this;
         let flushed = 0;
         let triedWaiting = false;
+        if (waitTime === undefined) {
+            waitTime = 5;
+        }
         console.log(
-            "HTTP backend flushing... (path=%s  numToFlush=%s)", path, numToFlush,
+            "HTTP backend flushing... (path=%s numToFlush=%s waitTime=%s)",
+            path, numToFlush, waitTime,
         );
         const tryFlush = function() {
             // if there's more real requests and more expected requests, flush 'em.
@@ -57,7 +65,7 @@ HttpBackend.prototype = {
                 flushed += 1;
                 if (numToFlush && flushed === numToFlush) {
                     console.log("  Flushed assigned amount: %s", numToFlush);
-                    defer.resolve();
+                    defer.resolve(flushed);
                 } else {
                     console.log("  flushed. Trying for more.");
                     setTimeout(tryFlush, 0);
@@ -65,11 +73,11 @@ HttpBackend.prototype = {
             } else if (flushed === 0 && !triedWaiting) {
                 // we may not have made the request yet, wait a generous amount of
                 // time before giving up.
-                setTimeout(tryFlush, 5);
+                setTimeout(tryFlush, waitTime);
                 triedWaiting = true;
             } else {
                 console.log("  no more flushes.");
-                defer.resolve();
+                defer.resolve(flushed);
             }
         };
 
