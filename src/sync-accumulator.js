@@ -40,7 +40,8 @@ class SyncAccumulator {
      * timeline entries to keep in the sync response. This is best-effort, as
      * clients do not always have a back-pagination token for each event, so
      * it's possible there may be slightly *less* than this value. There will
-     * never be more.
+     * never be more. This cannot be 0 or else it makes it impossible to scroll
+     * back in a room. Default: 50.
      */
     constructor(opts) {
         opts = opts || {};
