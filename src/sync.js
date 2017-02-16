@@ -73,6 +73,7 @@ function SyncApi(client, opts) {
     this._peekRoomId = null;
     this._currentSyncRequest = null;
     this._syncState = null;
+    this._catchingUp = false;
     this._running = false;
     this._keepAliveTimer = null;
     this._connectionReturnedDefer = null;
@@ -483,9 +484,30 @@ SyncApi.prototype._sync = function(syncOptions) {
 
     const syncToken = client.store.getSyncToken();
 
+    let pollTimeout = this.opts.pollTimeout;
+
+    if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
+        // unless we are happily syncing already, we want the server to return
+        // as quickly as possible, even if there are no events queued. This
+        // serves two purposes:
+        //
+        // * When the connection dies, we want to know asap when it comes back,
+        //   so that we can hide the error from the user. (We don't want to
+        //   have to wait for an event or a timeout).
+        //
+        // * We want to know if the server has any to_device messages queued up
+        //   for us. We do that by calling it with a zero timeout until it
+        //   doesn't give us any more to_device messages.
+        this._catchingUp = true;
+        pollTimeout = 0;
+    }
+
+    // normal timeout= plus buffer time
+    const clientSideTimeoutMs = pollTimeout + BUFFER_PERIOD_MS;
+
     const qps = {
         filter: filterId,
-        timeout: this.opts.pollTimeout,
+        timeout: pollTimeout,
     };
 
     if (syncToken) {
@@ -496,17 +518,6 @@ SyncApi.prototype._sync = function(syncOptions) {
         // (https://github.com/vector-im/vector-web/issues/1354)
         qps._cacheBuster = Date.now();
     }
-
-    if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
-        // we think the connection is dead. If it comes back up, we won't know
-        // about it till /sync returns. If the timeout= is high, this could
-        // be a long time. Set it to 0 when doing retries so we don't have to wait
-        // for an event or a timeout before emiting the SYNCING event.
-        qps.timeout = 0;
-    }
-
-    // normal timeout= plus buffer time
-    const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
     debuglog('Starting sync since=' + syncToken);
     this._currentSyncRequest = client._http.authedRequest(
@@ -533,6 +544,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         const syncEventData = {
             oldSyncToken: syncToken,
             nextSyncToken: data.next_batch,
+            catchingUp: self._catchingUp,
         };
 
         if (!syncOptions.hasSyncedBefore) {
@@ -656,7 +668,9 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     }
 
     // handle to-device events
-    if (data.to_device && utils.isArray(data.to_device.events)) {
+    if (data.to_device && utils.isArray(data.to_device.events) &&
+        data.to_device.events.length > 0
+       ) {
         data.to_device.events
             .map(client.getEventMapper())
             .forEach(
@@ -677,6 +691,9 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                     client.emit("toDeviceEvent", toDeviceEvent);
                 },
             );
+    } else {
+        // no more to-device events: we can stop polling with a short timeout.
+        this._catchingUp = false;
     }
 
     // the returned json structure is a bit crap, so make it into a

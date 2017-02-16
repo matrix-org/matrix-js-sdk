@@ -3132,6 +3132,9 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *    will become the 'since' token for the next call to /sync. Only present if
  *    <code>state=PREPARED</code> or <code>state=SYNCING</code>.
  *
+ * @param {boolean} data.catchingUp True if we are working our way through a
+ *    backlog of events after connecting. Only present if <code>state=SYNCING</code>.
+ *
  * @example
  * matrixClient.on("sync", function(state, prevState, data) {
  *   switch (state) {
