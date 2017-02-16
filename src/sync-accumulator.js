@@ -19,6 +19,8 @@ limitations under the License.
  * @module sync-accumulator
  */
 
+import utils from "./utils";
+
 
 /**
  * The purpose of this class is to accumulate /sync responses such that a
@@ -400,7 +402,24 @@ class SyncAccumulator {
             // Convert maps back into arrays.
             const rollBackState = Object.create(null);
             for (let i = roomJson.timeline.events.length - 1; i >=0; i--) {
-                setState(rollBackState, roomJson.timeline.events[i]);
+                const timelineEvent = roomJson.timeline.events[i];
+                if (timelineEvent.state_key === null ||
+                        timelineEvent.state_key === undefined) {
+                    continue; // not a state event
+                }
+                // since we're going back in time, we need to use the previous
+                // state value else we'll break causality. We don't have the
+                // complete previous state event, so we need to create one.
+                const prevStateEvent = utils.deepCopy(timelineEvent);
+                if (prevStateEvent.unsigned) {
+                    if (prevStateEvent.unsigned.prev_content) {
+                        prevStateEvent.content = prevStateEvent.unsigned.prev_content;
+                    }
+                    if (prevStateEvent.unsigned.prev_sender) {
+                        prevStateEvent.sender = prevStateEvent.unsigned.prev_sender;
+                    }
+                }
+                setState(rollBackState, prevStateEvent);
             }
             Object.keys(roomData._currentState).forEach((evType) => {
                 Object.keys(roomData._currentState[evType]).forEach((stateKey) => {
