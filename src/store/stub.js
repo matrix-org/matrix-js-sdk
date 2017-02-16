@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -184,6 +185,14 @@ StubStore.prototype = {
      * Save does nothing as there is no backing data store.
      */
     save: function() {},
+
+    /**
+     * Returns nothing as this store does not accumulate /sync data.
+     * @return {?SyncAccumulator} null
+     */
+    getSyncAccumulator: function() {
+        return null;
+    },
 };
 
 /** Stub Store class. */

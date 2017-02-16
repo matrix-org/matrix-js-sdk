@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -508,9 +509,6 @@ SyncApi.prototype._sync = function(syncOptions) {
         qps.timeout = 0;
     }
 
-    // normal timeout= plus buffer time
-    const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-
     let isCachedResponse = false;
     if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
         let data = self.opts.syncAccumulator.getJSON();
@@ -520,7 +518,7 @@ SyncApi.prototype._sync = function(syncOptions) {
             debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
             // We must deep copy the stored data so that the /sync processing code doesn't
             // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
-            data = JSON.parse(JSON.stringify(data));
+            data = utils.deepCopy(data);
             this._currentSyncRequest = q.resolve({
                 next_batch: data.nextBatch,
                 rooms: data.roomsData,
@@ -528,6 +526,9 @@ SyncApi.prototype._sync = function(syncOptions) {
             isCachedResponse = true;
         }
     }
+
+    // normal timeout= plus buffer time
+    const clientSideTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
 
     if (!isCachedResponse) {
         debuglog('Starting sync since=' + syncToken);
