@@ -300,6 +300,7 @@ module.exports.MatrixInMemoryStore.prototype = {
 
     /**
      * Delete all data from this store.
+     * @return {Promise} An immediately resolved promise.
      */
     deleteAllData: function() {
         this.rooms = {
@@ -317,5 +318,6 @@ module.exports.MatrixInMemoryStore.prototype = {
         this.accountData = {
             // type : content
         };
+        return q();
     },
 };

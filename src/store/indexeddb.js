@@ -295,13 +295,15 @@ IndexedDBStore.prototype.getSyncAccumulator = function() {
 
 /**
  * Delete all data from this store.
+ * @return {Promise} Resolves if the data was deleted from the database.
  */
 IndexedDBStore.prototype.deleteAllData = function() {
     MatrixInMemoryStore.prototype.deleteAllData.call(this);
-    this.backend.clearDatabase().then(() => {
+    return this.backend.clearDatabase().then(() => {
         console.log("Deleted indexeddb data.");
     }, (err) => {
         console.error("Failed to delete indexeddb data: ", err);
+        throw err;
     });
 };
 
