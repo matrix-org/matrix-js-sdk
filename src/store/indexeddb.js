@@ -27,7 +27,13 @@ import utils from "../utils";
  */
 
 const VERSION = 1;
-const WRITE_DELAY_MS = 1000 * 60; // once a minute
+
+// If this value is too small we'll be writing very often which will cause
+// noticable stop-the-world pauses. If this value is too big we'll be writing
+// so infrequently that the /sync size gets bigger on reload. Writing more
+// often does not affect the length of the pause since the entire /sync
+// response is persisted each time.
+const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 /**
  * Construct a new Indexed Database store backend. This requires a call to
