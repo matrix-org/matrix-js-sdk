@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,6 +60,9 @@ function debuglog() {
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
  * @param {module:crypto=} opts.crypto Crypto manager
+ * @param {SyncAccumulator=} opts.syncAccumulator An accumulator which will be
+ * kept up-to-date. If one is supplied, the response to getJSON() will be used
+ * initially.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -519,10 +523,38 @@ SyncApi.prototype._sync = function(syncOptions) {
         qps._cacheBuster = Date.now();
     }
 
-    debuglog('Starting sync since=' + syncToken);
-    this._currentSyncRequest = client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-    );
+    if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
+        // we think the connection is dead. If it comes back up, we won't know
+        // about it till /sync returns. If the timeout= is high, this could
+        // be a long time. Set it to 0 when doing retries so we don't have to wait
+        // for an event or a timeout before emiting the SYNCING event.
+        qps.timeout = 0;
+    }
+
+    let isCachedResponse = false;
+    if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
+        let data = self.opts.syncAccumulator.getJSON();
+        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
+        // if there is data there.
+        if (data.nextBatch) {
+            debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+            // We must deep copy the stored data so that the /sync processing code doesn't
+            // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
+            data = utils.deepCopy(data);
+            this._currentSyncRequest = q.resolve({
+                next_batch: data.nextBatch,
+                rooms: data.roomsData,
+            });
+            isCachedResponse = true;
+        }
+    }
+
+    if (!isCachedResponse) {
+        debuglog('Starting sync since=' + syncToken);
+        this._currentSyncRequest = client._http.authedRequest(
+            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+        );
+    }
 
     this._currentSyncRequest.done(function(data) {
         debuglog('Completed sync, next_batch=' + data.next_batch);
@@ -540,6 +572,13 @@ SyncApi.prototype._sync = function(syncOptions) {
             console.error("Caught /sync error", e.stack || e);
         }
 
+        // If there's an accumulator then the first HTTP response is actually the
+        // accumulated data. We don't want to accumulate the same thing twice, so
+        // only accumulate if this isn't a cached response.
+        if (self.opts.syncAccumulator && !isCachedResponse) {
+            self.opts.syncAccumulator.accumulateRooms(data);
+        }
+
         // emit synced events
         const syncEventData = {
             oldSyncToken: syncToken,
@@ -554,6 +593,10 @@ SyncApi.prototype._sync = function(syncOptions) {
 
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
         self._updateSyncState("SYNCING", syncEventData);
+
+        // tell databases that everything is now in a consistent state and can be
+        // saved.
+        client.store.save();
 
         self._sync(syncOptions);
     }, function(err) {

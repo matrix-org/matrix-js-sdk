@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -163,6 +164,8 @@ function MatrixClient(opts) {
 
         this.olmVersion = Crypto.getOlmVersion();
     }
+
+    this._syncAccumulator = this.store.getSyncAccumulator();
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -2708,6 +2711,7 @@ MatrixClient.prototype.startClient = function(opts) {
     opts = Object.assign({}, opts);
 
     opts.crypto = this._crypto;
+    opts.syncAccumulator = this._syncAccumulator;
     this._clientOpts = opts;
 
     this._syncApi = new SyncApi(this, opts);

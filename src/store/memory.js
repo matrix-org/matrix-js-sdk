@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ limitations under the License.
  */
  const utils = require("../utils");
  const User = require("../models/user");
+ const q = require("q");
 
 /**
  * Construct a new in-memory data store for the Matrix Client.
@@ -275,9 +277,45 @@ module.exports.MatrixInMemoryStore.prototype = {
         return this.accountData[eventType];
     },
 
-    // TODO
-    //setMaxHistoryPerRoom: function(maxHistory) {},
+    /**
+     * Save does nothing as there is no backing data store.
+     */
+    save: function() {},
 
-    // TODO
-    //reapOldMessages: function() {},
+    /**
+     * Returns nothing as this store does not accumulate /sync data.
+     * @return {?SyncAccumulator} null
+     */
+    getSyncAccumulator: function() {
+        return null;
+    },
+
+    /**
+     * Startup does nothing as this store doesn't require starting up.
+     * @return {Promise} An immediately resolved promise.
+     */
+    startup: function() {
+        return q();
+    },
+
+    /**
+     * Delete all data from this store.
+     */
+    deleteAllData: function() {
+        this.rooms = {
+            // roomId: Room
+        };
+        this.users = {
+            // userId: User
+        };
+        this.syncToken = null;
+        this.filters = {
+            // userId: {
+            //    filterId: Filter
+            // }
+        };
+        this.accountData = {
+            // type : content
+        };
+    },
 };

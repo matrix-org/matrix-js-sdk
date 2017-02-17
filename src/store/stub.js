@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 "use strict";
+import q from "q";
 /**
  * This is an internal module.
  * @module store/stub
@@ -180,11 +182,32 @@ StubStore.prototype = {
 
     },
 
-    // TODO
-    //setMaxHistoryPerRoom: function(maxHistory) {},
+    /**
+     * Save does nothing as there is no backing data store.
+     */
+    save: function() {},
 
-    // TODO
-    //reapOldMessages: function() {},
+    /**
+     * Returns nothing as this store does not accumulate /sync data.
+     * @return {?SyncAccumulator} null
+     */
+    getSyncAccumulator: function() {
+        return null;
+    },
+
+    /**
+     * Startup does nothing.
+     * @return {Promise} An immediately resolved promise.
+     */
+    startup: function() {
+        return q();
+    },
+
+    /**
+     * Delete all data from this store. Does nothing since this store
+     * doesn't store anything.
+     */
+    deleteAllData: function() {},
 };
 
 /** Stub Store class. */
