@@ -21,6 +21,7 @@ limitations under the License.
  */
  const utils = require("../utils");
  const User = require("../models/user");
+ const q = require("q");
 
 /**
  * Construct a new in-memory data store for the Matrix Client.
@@ -287,5 +288,13 @@ module.exports.MatrixInMemoryStore.prototype = {
      */
     getSyncAccumulator: function() {
         return null;
+    },
+
+    /**
+     * Startup does nothing as this store doesn't require starting up.
+     * @return {Promise} An immediately resolved promise.
+     */
+    startup: function() {
+        return q();
     },
 };

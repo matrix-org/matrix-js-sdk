@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 "use strict";
+import q from "q";
 /**
  * This is an internal module.
  * @module store/stub
@@ -192,6 +193,14 @@ StubStore.prototype = {
      */
     getSyncAccumulator: function() {
         return null;
+    },
+
+    /**
+     * Startup does nothing.
+     * @return {Promise} An immediately resolved promise.
+     */
+    startup: function() {
+        return q();
     },
 };
 
