@@ -297,4 +297,25 @@ module.exports.MatrixInMemoryStore.prototype = {
     startup: function() {
         return q();
     },
+
+    /**
+     * Delete all data from this store.
+     */
+    deleteAllData: function() {
+        this.rooms = {
+            // roomId: Room
+        };
+        this.users = {
+            // userId: User
+        };
+        this.syncToken = null;
+        this.filters = {
+            // userId: {
+            //    filterId: Filter
+            // }
+        };
+        this.accountData = {
+            // type : content
+        };
+    },
 };

@@ -202,6 +202,12 @@ StubStore.prototype = {
     startup: function() {
         return q();
     },
+
+    /**
+     * Delete all data from this store. Does nothing since this store
+     * doesn't store anything.
+     */
+    deleteAllData: function() {},
 };
 
 /** Stub Store class. */

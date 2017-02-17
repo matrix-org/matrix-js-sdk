@@ -41,7 +41,7 @@ const WRITE_DELAY_MS = 1000 * 60; // once a minute
 const IndexedDBStoreBackend = function IndexedDBStoreBackend(indexedDBInterface,
                                                              dbName) {
     this.indexedDB = indexedDBInterface;
-    this._dbName = dbName || "default";
+    this._dbName = "matrix-js-sdk:" + (dbName || "default");
     this.db = null;
 };
 
@@ -56,7 +56,7 @@ IndexedDBStoreBackend.prototype = {
         if (this.db) {
             return q();
         }
-        const req = this.indexedDB.open("matrix-js-sdk:" + this._dbName, VERSION);
+        const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
             const db = ev.target.result;
             const oldVersion = ev.oldVersion;
@@ -83,7 +83,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        return promiseifyRequest(this.indexedDB.deleteDatabase("matrix-js-sdk"));
+        return promiseifyRequest(this.indexedDB.deleteDatabase(this._dbName));
     },
 
     /**
@@ -290,6 +290,14 @@ IndexedDBStore.prototype.startup = function() {
  */
 IndexedDBStore.prototype.getSyncAccumulator = function() {
     return this._syncAccumulator;
+};
+
+/**
+ * Delete all data from this store.
+ */
+IndexedDBStore.prototype.deleteAllData = function() {
+    MatrixInMemoryStore.prototype.deleteAllData.call(this);
+    this.backend.clearDatabase();
 };
 
 /**
