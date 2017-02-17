@@ -35,9 +35,13 @@ const WRITE_DELAY_MS = 1000 * 60; // once a minute
  * @constructor
  * @param {Object} indexedDBInterface The Indexed DB interface e.g
  * <code>window.indexedDB</code>
+ * @param {string=} dbName Optional database name. The same name must be used
+ * to open the same database.
  */
-const IndexedDBStoreBackend = function IndexedDBStoreBackend(indexedDBInterface) {
+const IndexedDBStoreBackend = function IndexedDBStoreBackend(indexedDBInterface,
+                                                             dbName) {
     this.indexedDB = indexedDBInterface;
+    this._dbName = dbName || "default";
     this.db = null;
 };
 
@@ -52,7 +56,7 @@ IndexedDBStoreBackend.prototype = {
         if (this.db) {
             return q();
         }
-        const req = this.indexedDB.open("matrix-js-sdk", VERSION);
+        const req = this.indexedDB.open("matrix-js-sdk:" + this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
             const db = ev.target.result;
             const oldVersion = ev.oldVersion;
