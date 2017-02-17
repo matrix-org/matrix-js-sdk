@@ -1175,7 +1175,9 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
     // get members that are NOT ourselves and are actually in the room.
     const otherMembers = utils.filter(room.currentState.getMembers(), function(m) {
-        return (m.userId !== userId && m.membership !== "leave");
+        return (
+            m.userId !== userId && m.membership !== "leave" && m.membership !== "ban"
+        );
     });
     const allMembers = utils.filter(room.currentState.getMembers(), function(m) {
         return (m.membership !== "leave");
