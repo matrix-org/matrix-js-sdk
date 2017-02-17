@@ -206,8 +206,11 @@ StubStore.prototype = {
     /**
      * Delete all data from this store. Does nothing since this store
      * doesn't store anything.
+     * @return {Promise} An immediately resolved promise.
      */
-    deleteAllData: function() {},
+    deleteAllData: function() {
+        return q();
+    },
 };
 
 /** Stub Store class. */
