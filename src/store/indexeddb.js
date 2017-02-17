@@ -83,6 +83,7 @@ IndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
+        console.log("Removing indexeddb instance: ", this._dbName);
         return promiseifyRequest(this.indexedDB.deleteDatabase(this._dbName));
     },
 
@@ -297,7 +298,11 @@ IndexedDBStore.prototype.getSyncAccumulator = function() {
  */
 IndexedDBStore.prototype.deleteAllData = function() {
     MatrixInMemoryStore.prototype.deleteAllData.call(this);
-    this.backend.clearDatabase();
+    this.backend.clearDatabase().then(() => {
+        console.log("Deleted indexeddb data.");
+    }, (err) => {
+        console.error("Failed to delete indexeddb data: ", err);
+    });
 };
 
 /**
