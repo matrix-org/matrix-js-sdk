@@ -39,17 +39,19 @@ const ROOM_ID = "!room:id";
  *
  * @param {Olm.Account} olmAccount
  * @param {TestClient} recipientTestClient
- * @return {Olm.Session}
+ * @return {Promise} promise for Olm.Session
  */
 function createOlmSession(olmAccount, recipientTestClient) {
-    const otkId = utils.keys(recipientTestClient.oneTimeKeys)[0];
-    const otk = recipientTestClient.oneTimeKeys[otkId];
+    return recipientTestClient.awaitOneTimeKeyUpload().then((keys) => {
+        const otkId = utils.keys(keys)[0];
+        const otk = keys[otkId];
 
-    const session = new Olm.Session();
-    session.create_outbound(
-        olmAccount, recipientTestClient.getDeviceKey(), otk.key,
-    );
-    return session;
+        const session = new Olm.Session();
+        session.create_outbound(
+            olmAccount, recipientTestClient.getDeviceKey(), otk.key,
+        );
+        return session;
+    });
 }
 
 /**
@@ -302,9 +304,9 @@ describe("megolm", function() {
     });
 
     it("Alice receives a megolm message", function(done) {
-        return aliceTestClient.start().then(function() {
-            const p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
-
+        return aliceTestClient.start().then(() => {
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -353,9 +355,9 @@ describe("megolm", function() {
         // https://github.com/vector-im/riot-web/issues/2273
         let roomKeyEncrypted;
 
-        return aliceTestClient.start().then(function() {
-            const p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
-
+        return aliceTestClient.start().then(() => {
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -413,9 +415,9 @@ describe("megolm", function() {
     });
 
     it("Alice gets a second room_key message", function(done) {
-        return aliceTestClient.start().then(function() {
-            const p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
-
+        return aliceTestClient.start().then(() => {
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -483,11 +485,13 @@ describe("megolm", function() {
     it('Alice sends a megolm message', function(done) {
         let p2pSession;
 
-        return aliceTestClient.start().then(function() {
-            const syncResponse = getSyncResponse(['@bob:xyz']);
-
+        return aliceTestClient.start().then(() => {
             // establish an olm session with alice
-            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((_p2pSession) => {
+            p2pSession = _p2pSession;
+
+            const syncResponse = getSyncResponse(['@bob:xyz']);
 
             const olmEvent = encryptOlmEvent({
                 senderKey: testSenderKey,
@@ -595,11 +599,11 @@ describe("megolm", function() {
 
 
     it("We shouldn't attempt to send to blocked devices", function(done) {
-        return aliceTestClient.start().then(function() {
-            const syncResponse = getSyncResponse(['@bob:xyz']);
-
+        return aliceTestClient.start().then(() => {
             // establish an olm session with alice
-            const p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
+            const syncResponse = getSyncResponse(['@bob:xyz']);
 
             const olmEvent = encryptOlmEvent({
                 senderKey: testSenderKey,
@@ -644,11 +648,13 @@ describe("megolm", function() {
         let p2pSession;
         let megolmSessionId;
 
-        return aliceTestClient.start().then(function() {
-            const syncResponse = getSyncResponse(['@bob:xyz']);
-
+        return aliceTestClient.start().then(() => {
             // establish an olm session with alice
-            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((_p2pSession) => {
+            p2pSession = _p2pSession;
+
+            const syncResponse = getSyncResponse(['@bob:xyz']);
 
             const olmEvent = encryptOlmEvent({
                 senderKey: testSenderKey,
@@ -873,11 +879,11 @@ describe("megolm", function() {
             };
         });
 
-        return aliceTestClient.start().then(function() {
-            const syncResponse = getSyncResponse(['@bob:xyz']);
-
+        return aliceTestClient.start().then(() => {
             // establish an olm session with alice
-            p2pSession = createOlmSession(testOlmAccount, aliceTestClient);
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
+            const syncResponse = getSyncResponse(['@bob:xyz']);
 
             const olmEvent = encryptOlmEvent({
                 senderKey: testSenderKey,
@@ -1056,10 +1062,9 @@ describe("megolm", function() {
         let messageEncrypted;
 
         return aliceTestClient.start().then(() => {
-            const p2pSession = createOlmSession(
-                testOlmAccount, aliceTestClient,
-            );
-
+            // establish an olm session with alice
+            return createOlmSession(testOlmAccount, aliceTestClient);
+        }).then((p2pSession) => {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 

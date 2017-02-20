@@ -63,6 +63,13 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
     this._initialDeviceListInvalidationDone = false;
 
+    this._clientRunning = false;
+
+    // the last time we did a check for the number of one-time-keys on the
+    // server.
+    this._lastOneTimeKeyCheck = null;
+    this._oneTimeKeyCheckInProgress = false;
+
     // EncryptionAlgorithm instance for each room
     this._roomEncryptors = {};
 
@@ -111,6 +118,11 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 function _registerEventHandlers(crypto, eventEmitter) {
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
+            if (syncState === "STOPPED") {
+                crypto._clientRunning = false;
+            } else if (syncState === "PREPARED") {
+                crypto._clientRunning = true;
+            }
             if (syncState === "SYNCING") {
                 crypto._onSyncCompleted(data);
             }
@@ -187,61 +199,11 @@ Crypto.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
- * Upload the device keys to the homeserver and ensure that the
- * homeserver has enough one-time keys.
- * @param {number} maxKeys The maximum number of keys to generate
+ * Upload the device keys to the homeserver.
  * @return {object} A promise that will resolve when the keys are uploaded.
  */
-Crypto.prototype.uploadKeys = function(maxKeys) {
-    const self = this;
-    return _uploadDeviceKeys(this).then(function(res) {
-        // We need to keep a pool of one time public keys on the server so that
-        // other devices can start conversations with us. But we can only store
-        // a finite number of private keys in the olm Account object.
-        // To complicate things further then can be a delay between a device
-        // claiming a public one time key from the server and it sending us a
-        // message. We need to keep the corresponding private key locally until
-        // we receive the message.
-        // But that message might never arrive leaving us stuck with duff
-        // private keys clogging up our local storage.
-        // So we need some kind of enginering compromise to balance all of
-        // these factors.
-
-        // We first find how many keys the server has for us.
-        const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
-        // We then check how many keys we can store in the Account object.
-        const maxOneTimeKeys = self._olmDevice.maxNumberOfOneTimeKeys();
-        // Try to keep at most half that number on the server. This leaves the
-        // rest of the slots free to hold keys that have been claimed from the
-        // server but we haven't recevied a message for.
-        // If we run out of slots when generating new keys then olm will
-        // discard the oldest private keys first. This will eventually clean
-        // out stale private keys that won't receive a message.
-        const keyLimit = Math.floor(maxOneTimeKeys / 2);
-        // We work out how many new keys we need to create to top up the server
-        // If there are too many keys on the server then we don't need to
-        // create any more keys.
-        let numberToGenerate = Math.max(keyLimit - keyCount, 0);
-        if (maxKeys !== undefined) {
-            // Creating keys can be an expensive operation so we limit the
-            // number we generate in one go to avoid blocking the application
-            // for too long.
-            numberToGenerate = Math.min(numberToGenerate, maxKeys);
-        }
-
-        if (numberToGenerate <= 0) {
-            // If we don't need to generate any keys then we are done.
-            return;
-        }
-
-        // Ask olm to generate new one time keys, then upload them to synapse.
-        self._olmDevice.generateOneTimeKeys(numberToGenerate);
-        return _uploadOneTimeKeys(self);
-    });
-};
-
-// returns a promise which resolves to the response
-function _uploadDeviceKeys(crypto) {
+Crypto.prototype.uploadDeviceKeys = function() {
+    const crypto = this;
     const userId = crypto._userId;
     const deviceId = crypto._deviceId;
 
@@ -260,6 +222,90 @@ function _uploadDeviceKeys(crypto) {
         // same one as used in login.
         device_id: deviceId,
     });
+};
+
+// check if it's time to upload one-time keys, and do so if so.
+function _maybeUploadOneTimeKeys(crypto) {
+    // frequency with which to check & upload one-time keys
+    const uploadPeriod = 1000 * 60; // one minute
+
+    // max number of keys to upload at once
+    // Creating keys can be an expensive operation so we limit the
+    // number we generate in one go to avoid blocking the application
+    // for too long.
+    const maxKeysPerCycle = 5;
+
+    if (crypto._oneTimeKeyCheckInProgress) {
+        return;
+    }
+
+    const now = Date.now();
+    if (crypto._lastOneTimeKeyCheck !== null &&
+        now - crypto._lastOneTimeKeyCheck < uploadPeriod
+       ) {
+        // we've done a key upload recently.
+        return;
+    }
+
+    crypto._lastOneTimeKeyCheck = now;
+
+    function uploadLoop(numberToGenerate) {
+        if (numberToGenerate <= 0) {
+            // If we don't need to generate any more keys then we are done.
+            return;
+        }
+
+        const keysThisLoop = Math.min(numberToGenerate, maxKeysPerCycle);
+
+        // Ask olm to generate new one time keys, then upload them to synapse.
+        crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
+        return _uploadOneTimeKeys(crypto).then(() => {
+            return uploadLoop(numberToGenerate - keysThisLoop);
+        });
+    }
+
+    crypto._oneTimeKeyCheckInProgress = true;
+    q().then(() => {
+        // ask the server how many keys we have
+        return crypto._baseApis.uploadKeysRequest({}, {
+            device_id: crypto._deviceId,
+        });
+    }).then((res) => {
+        // We need to keep a pool of one time public keys on the server so that
+        // other devices can start conversations with us. But we can only store
+        // a finite number of private keys in the olm Account object.
+        // To complicate things further then can be a delay between a device
+        // claiming a public one time key from the server and it sending us a
+        // message. We need to keep the corresponding private key locally until
+        // we receive the message.
+        // But that message might never arrive leaving us stuck with duff
+        // private keys clogging up our local storage.
+        // So we need some kind of enginering compromise to balance all of
+        // these factors.
+
+        // We first find how many keys the server has for us.
+        const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
+        // We then check how many keys we can store in the Account object.
+        const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
+        // Try to keep at most half that number on the server. This leaves the
+        // rest of the slots free to hold keys that have been claimed from the
+        // server but we haven't recevied a message for.
+        // If we run out of slots when generating new keys then olm will
+        // discard the oldest private keys first. This will eventually clean
+        // out stale private keys that won't receive a message.
+        const keyLimit = Math.floor(maxOneTimeKeys / 2);
+
+        // We work out how many new keys we need to create to top up the server
+        // If there are too many keys on the server then we don't need to
+        // create any more keys.
+        const numberToGenerate = Math.max(keyLimit - keyCount, 0);
+
+        return uploadLoop(numberToGenerate);
+    }).catch((e) => {
+        console.error("Error uploading one-time keys", e.stack || e);
+    }).finally(() => {
+        crypto._oneTimeKeyCheckInProgress = false;
+    }).done();
 }
 
 // returns a promise which resolves to the response
@@ -804,6 +850,14 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
 
         // catch up on any new devices we got told about during the sync.
         this._deviceList.refreshOutdatedDeviceLists();
+    }
+
+    // we don't start uploading one-time keys until we've caught up with
+    // to-device messages, to help us avoid throwing away one-time-keys that we
+    // are about to receive messages for
+    // (https://github.com/vector-im/riot-web/issues/2782).
+    if (!syncData.catchingUp) {
+        _maybeUploadOneTimeKeys(this);
     }
 };
 
