@@ -684,7 +684,11 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             },
             lifetime: MatrixCall.CALL_TIMEOUT_MS,
         };
-        sendEvent(self, 'm.call.invite', content);
+        sendEvent(self, 'm.call.invite', content).catch(
+            (err) => {
+                self.emit('error', err);
+            },
+        );
 
         setTimeout(function() {
             if (self.state == 'invite_sent') {
