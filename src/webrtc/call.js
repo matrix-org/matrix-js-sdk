@@ -684,11 +684,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             },
             lifetime: MatrixCall.CALL_TIMEOUT_MS,
         };
-        sendEvent(self, 'm.call.invite', content).catch(
-            (err) => {
-                self.emit('error', err);
-            },
-        );
+        sendEvent(self, 'm.call.invite', content);
 
         setTimeout(function() {
             if (self.state == 'invite_sent') {
@@ -907,7 +903,14 @@ const setState = function(self, state) {
  * @return {Promise}
  */
 const sendEvent = function(self, eventType, content) {
-    return self.client.sendEvent(self.roomId, eventType, content);
+    return self.client.sendEvent(self.roomId, eventType, content).catch(
+        (err) => {
+            if (!err.name === 'UnknownDeviceError') {
+                throw err;
+            }
+            self.emit('error', err);
+        },
+    );
 };
 
 const sendCandidate = function(self, content) {
