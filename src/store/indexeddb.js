@@ -116,7 +116,7 @@ IndexedDBStoreBackend.prototype = {
     /**
      * Persist a list of account data events. Events with the same 'type' will
      * be replaced.
-     * @param {MatrixEvent[]} accountData An array of user-scoped account data events
+     * @param {Object[]} accountData An array of raw user-scoped account data events
      * @return {Promise} Resolves if the events were persisted.
      */
     persistAccountData: function(accountData) {
@@ -124,7 +124,7 @@ IndexedDBStoreBackend.prototype = {
             const txn = this.db.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
-                store.put(accountData[i].event); // put == UPSERT
+                store.put(accountData[i]); // put == UPSERT
             }
             return promiseifyTxn(txn);
         });
@@ -172,14 +172,14 @@ IndexedDBStoreBackend.prototype = {
 
     /**
      * Load all the account data events from the database. This is not cached.
-     * @return {Promise<MatrixEvent[]>} A list of events.
+     * @return {Promise<Object[]>} A list of raw global account events.
      */
     loadAccountData: function() {
         return q.try(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
-                return new MatrixEvent(cursor.value);
+                return cursor.value;
             });
         });
     },
@@ -283,10 +283,9 @@ IndexedDBStore.prototype.startup = function() {
             this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
         });
-        this.storeAccountDataEvents(accountData);
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
         this.setSyncToken(syncData.nextBatch);
-        this._setSyncData(syncData.nextBatch, syncData.roomsData);
+        this._setSyncData(syncData.nextBatch, syncData.roomsData, accountData);
     });
 };
 
@@ -325,10 +324,13 @@ IndexedDBStore.prototype.save = function() {
     return q();
 };
 
-IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData) {
-    this._syncAccumulator.accumulateRooms({
+IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData, accountData) {
+    this._syncAccumulator.accumulate({
         next_batch: nextBatch,
         rooms: roomsData,
+        account_data: {
+            events: accountData,
+        },
     });
 };
 
@@ -344,18 +346,11 @@ IndexedDBStore.prototype._syncToDatabase = function() {
         this._userModifiedMap[u.userId] = u.getLastModifiedTime();
     });
 
-    // TODO: work out changed account data events. They don't have timestamps or IDs.
-    // so we'll need to hook into storeAccountDataEvents instead to catch them when
-    // they update from /sync
-    const changedAccountData = Object.keys(this.accountData).map((etype) => {
-        return this.accountData[etype];
-    });
-
     const syncData = this._syncAccumulator.getJSON();
 
     return q.all([
         this.backend.persistUsers(changedUsers),
-        this.backend.persistAccountData(changedAccountData),
+        this.backend.persistAccountData(syncData.accountData),
         this.backend.persistSyncData(syncData.nextBatch, syncData.roomsData),
     ]);
 };
