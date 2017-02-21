@@ -60,7 +60,7 @@ describe("SyncAccumulator", function() {
                 },
             },
         };
-        sa.accumulateRooms(res);
+        sa.accumulate(res);
         const output = sa.getJSON();
         expect(output.nextBatch).toEqual(res.next_batch);
         expect(output.roomsData).toEqual(res.rooms);
@@ -69,7 +69,7 @@ describe("SyncAccumulator", function() {
     it("should prune the timeline to the oldest prev_batch within the limit", () => {
         // maxTimelineEntries is 10 so we should get back all
         // 10 timeline messages with a prev_batch of "pinned_to_1"
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             state: { events: [member("alice", "join")] },
             timeline: {
                 events: [
@@ -84,7 +84,7 @@ describe("SyncAccumulator", function() {
                 prev_batch: "pinned_to_1",
             },
         }));
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             state: { events: [] },
             timeline: {
                 events: [
@@ -93,7 +93,7 @@ describe("SyncAccumulator", function() {
                 prev_batch: "pinned_to_8",
             },
         }));
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             state: { events: [] },
             timeline: {
                 events: [
@@ -116,7 +116,7 @@ describe("SyncAccumulator", function() {
         // AND give us <= 10 messages without losing messages in-between.
         // It should try to find the oldest prev_batch which still fits into 10
         // messages, which is "pinned to 8".
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             state: { events: [] },
             timeline: {
                 events: [
@@ -153,7 +153,7 @@ describe("SyncAccumulator", function() {
                 }],
             },
         });
-        sa.accumulateRooms(res);
+        sa.accumulate(res);
         expect(
             sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events.length,
         ).toEqual(0);
@@ -172,12 +172,12 @@ describe("SyncAccumulator", function() {
                 food: "apple",
             },
         };
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             account_data: {
                 events: [acc1],
             },
         }));
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             account_data: {
                 events: [acc2],
             },
@@ -187,6 +187,37 @@ describe("SyncAccumulator", function() {
         ).toEqual(1);
         expect(
             sa.getJSON().roomsData.join["!foo:bar"].account_data.events[0],
+        ).toEqual(acc2);
+    });
+
+    it("should clobber global account data based on event type", () => {
+        const acc1 = {
+            type: "favourite.food",
+            content: {
+                food: "banana",
+            },
+        };
+        const acc2 = {
+            type: "favourite.food",
+            content: {
+                food: "apple",
+            },
+        };
+        sa.accumulate({
+            account_data: {
+                events: [acc1],
+            },
+        });
+        sa.accumulate({
+            account_data: {
+                events: [acc2],
+            },
+        });
+        expect(
+            sa.getJSON().accountData.length,
+        ).toEqual(1);
+        expect(
+            sa.getJSON().accountData[0],
         ).toEqual(acc2);
     });
 
@@ -218,12 +249,12 @@ describe("SyncAccumulator", function() {
                 },
             },
         };
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             ephemeral: {
                 events: [receipt1],
             },
         }));
-        sa.accumulateRooms(syncSkeleton({
+        sa.accumulate(syncSkeleton({
             ephemeral: {
                 events: [receipt2],
             },

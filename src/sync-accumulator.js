@@ -47,6 +47,9 @@ class SyncAccumulator {
         opts = opts || {};
         opts.maxTimelineEntries = opts.maxTimelineEntries || 50;
         this.opts = opts;
+        this.accountData = {
+            //$event_type: Object
+        };
         this.inviteRooms = {
             //$roomId: { ... sync 'invite' json data ... }
         };
@@ -71,15 +74,30 @@ class SyncAccumulator {
         this.nextBatch = null;
     }
 
+    accumulate(syncResponse) {
+        this._accumulateRooms(syncResponse);
+        this._accumulateAccountData(syncResponse);
+        this.nextBatch = syncResponse.next_batch;
+    }
+
+    _accumulateAccountData(syncResponse) {
+        if (!syncResponse.account_data || !syncResponse.account_data.events) {
+            return;
+        }
+        // Clobbers based on event type.
+        syncResponse.account_data.events.forEach((e) => {
+            this.accountData[e.type] = e;
+        });
+    }
+
     /**
      * Accumulate incremental /sync room data.
      * @param {Object} syncResponse the complete /sync JSON
      */
-    accumulateRooms(syncResponse) {
+    _accumulateRooms(syncResponse) {
         if (!syncResponse.rooms) {
             return;
         }
-        this.nextBatch = syncResponse.next_batch;
         if (syncResponse.rooms.invite) {
             Object.keys(syncResponse.rooms.invite).forEach((roomId) => {
                 this._accumulateRoom(
@@ -316,13 +334,15 @@ class SyncAccumulator {
      * Return everything under the 'rooms' key from a /sync response which
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
-     * provided to accumulateRooms().
-     * @return {Object} An object with a "nextBatch" key and a "roomsData" key.
+     * provided to accumulate().
+     * @return {Object} An object with a "nextBatch", "roomsData" and "accountData"
+     * keys.
      * The "nextBatch" key is a string which represents at what point in the
      * /sync stream the accumulator reached. This token should be used when
      * restarting a /sync stream at startup. Failure to do so can lead to missing
      * events. The "roomsData" key is an Object which represents the entire
-     * /sync response from the 'rooms' key onwards.
+     * /sync response from the 'rooms' key onwards. The "accountData" key is
+     * a list of raw events which represent global account data.
      */
     getJSON() {
         const data = {
@@ -434,9 +454,17 @@ class SyncAccumulator {
             });
             data.join[roomId] = roomJson;
         });
+
+        // Add account data
+        const accData = [];
+        Object.keys(this.accountData).forEach((evType) => {
+            accData.push(this.accountData[evType]);
+        });
+
         return {
             nextBatch: this.nextBatch,
             roomsData: data,
+            accountData: accData,
         };
     }
 }

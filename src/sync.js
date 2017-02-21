@@ -544,6 +544,9 @@ SyncApi.prototype._sync = function(syncOptions) {
             this._currentSyncRequest = q.resolve({
                 next_batch: data.nextBatch,
                 rooms: data.roomsData,
+                account_data: {
+                    events: data.accountData,
+                },
             });
             isCachedResponse = true;
         }
@@ -576,7 +579,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         // accumulated data. We don't want to accumulate the same thing twice, so
         // only accumulate if this isn't a cached response.
         if (self.opts.syncAccumulator && !isCachedResponse) {
-            self.opts.syncAccumulator.accumulateRooms(data);
+            self.opts.syncAccumulator.accumulate(data);
         }
 
         // emit synced events
