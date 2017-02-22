@@ -905,10 +905,7 @@ const setState = function(self, state) {
 const sendEvent = function(self, eventType, content) {
     return self.client.sendEvent(self.roomId, eventType, content).catch(
         (err) => {
-            if (!err.name === 'UnknownDeviceError') {
-                throw err;
-            }
-            self.emit('error', err);
+            self.emit('send_event_error', err);
         },
     );
 };
