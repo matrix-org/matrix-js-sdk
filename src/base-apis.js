@@ -135,7 +135,7 @@ MatrixBaseApis.prototype.register = function(
     sessionId, auth, bindEmail, guestAccessToken,
     callback,
 ) {
-    if (auth === undefined) {
+    if (auth === undefined || auth === null) {
         auth = {};
     }
     if (sessionId) {

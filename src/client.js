@@ -2086,14 +2086,44 @@ MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
  * @param {string} clientSecret As requestEmailToken
  * @param {number} sendAttempt As requestEmailToken
  * @param {string} nextLink As requestEmailToken
- * @param {module:client.callback} callback Optional. As requestEmailToken
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
-                                                    sendAttempt, nextLink, callback) {
+                                                    sendAttempt, nextLink) {
     return this._requestTokenFromEndpoint(
         "/register/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback,
+        {
+            email: email,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
+    );
+};
+
+/**
+ * Requests a text message verification token for the purposes of registration.
+ * This API proxies the Identity Server /validate/msisdn/requestToken API,
+ * adding registration-specific behaviour, as with requestRegisterEmailToken.
+ *
+ * @param {string} phoneCountry The ISO 3166-1 alpha-2 code for the country in which
+ *    phoneNumber should be parsed relative to.
+ * @param {string} phoneNumber The phone number, in national or international format
+ * @param {string} clientSecret As requestEmailToken
+ * @param {number} sendAttempt As requestEmailToken
+ * @return {module:client.Promise} Resolves: As requestEmailToken
+ */
+MatrixClient.prototype.requestRegisterMsisdnToken = function(phoneCountry, phoneNumber,
+                                                    clientSecret, sendAttempt, nextLink) {
+    return this._requestTokenFromEndpoint(
+        "/register/msisdn/requestToken",
+        {
+            country: phoneCountry,
+            phone_number: phoneNumber,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
     );
 };
 
@@ -2114,14 +2144,45 @@ MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
  * @param {string} clientSecret As requestEmailToken
  * @param {number} sendAttempt As requestEmailToken
  * @param {string} nextLink As requestEmailToken
- * @param {module:client.callback} callback Optional. As requestEmailToken
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype.requestAdd3pidEmailToken = function(email, clientSecret,
-                                                    sendAttempt, nextLink, callback) {
+                                                    sendAttempt, nextLink) {
     return this._requestTokenFromEndpoint(
         "/account/3pid/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback,
+        {
+            email: email,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
+    );
+};
+
+/**
+ * Requests a text message verification token for the purposes of adding a
+ * third party identifier to an account.
+ * This API proxies the Identity Server /validate/email/requestToken API,
+ * adding specific behaviour for the addition of phone numbers to an
+ * account, as requestAdd3pidEmailToken.
+ *
+ * @param {string} phoneCountry As requestRegisterMsisdnToken
+ * @param {string} phoneNumber As requestRegisterMsisdnToken
+ * @param {string} clientSecret As requestEmailToken
+ * @param {number} sendAttempt As requestEmailToken
+ * @return {module:client.Promise} Resolves: As requestEmailToken
+ */
+MatrixClient.prototype.requestAdd3pidMsisdnToken = function(phoneCountry, phoneNumber,
+                                                    clientSecret, sendAttempt, nextLink) {
+    return this._requestTokenFromEndpoint(
+        "/account/3pid/msisdn/requestToken",
+        {
+            country: phoneCountry,
+            phone_number: phoneNumber,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
     );
 };
 
@@ -2145,10 +2206,42 @@ MatrixClient.prototype.requestAdd3pidEmailToken = function(email, clientSecret,
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype.requestPasswordEmailToken = function(email, clientSecret,
-                                                    sendAttempt, nextLink, callback) {
+                                                    sendAttempt, nextLink) {
     return this._requestTokenFromEndpoint(
         "/account/password/email/requestToken",
-        email, clientSecret, sendAttempt, nextLink, callback,
+        {
+            email: email,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
+    );
+};
+
+/**
+ * Requests a text message verification token for the purposes of resetting
+ * the password on an account.
+ * This API proxies the Identity Server /validate/email/requestToken API,
+ * adding specific behaviour for the password resetting, as requestPasswordEmailToken.
+ *
+ * @param {string} phoneCountry As requestRegisterMsisdnToken
+ * @param {string} phoneNumber As requestRegisterMsisdnToken
+ * @param {string} clientSecret As requestEmailToken
+ * @param {number} sendAttempt As requestEmailToken
+ * @param {string} nextLink As requestEmailToken
+ * @return {module:client.Promise} Resolves: As requestEmailToken
+ */
+MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phoneNumber,
+                                                    clientSecret, sendAttempt, nextLink) {
+    return this._requestTokenFromEndpoint(
+        "/account/password/msisdn/requestToken",
+        {
+            country: phoneCountry,
+            phone_number: phoneNumber,
+            client_secret: clientSecret,
+            send_attempt: sendAttempt,
+            next_link: nextLink,
+        }
     );
 };
 
@@ -2157,31 +2250,21 @@ MatrixClient.prototype.requestPasswordEmailToken = function(email, clientSecret,
  * requestToken endpoints.
  *
  * @param {string} endpoint The endpoint to send the request to
- * @param {string} email As requestEmailToken
- * @param {string} clientSecret As requestEmailToken
- * @param {number} sendAttempt As requestEmailToken
- * @param {string} nextLink As requestEmailToken
- * @param {module:client.callback} callback Optional. As requestEmailToken
+ * @param {object} params Parameters for the POST request
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
-MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint,
-                                                    email, clientSecret,
-                                                    sendAttempt, nextLink, callback) {
+MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
     const id_server_url = url.parse(this.idBaseUrl);
     if (id_server_url.host === null) {
         throw new Error("Invalid ID server URL: " + this.idBaseUrl);
     }
 
-    const params = {
-        client_secret: clientSecret,
-        email: email,
-        send_attempt: sendAttempt,
-        next_link: nextLink,
+    const postParams = Object.assign({}, params, {
         id_server: id_server_url.host,
-    };
+    });
     return this._http.request(
-        callback, "POST", endpoint, undefined,
-        params,
+        undefined, "POST", endpoint, undefined,
+        postParams,
     );
 };
 
