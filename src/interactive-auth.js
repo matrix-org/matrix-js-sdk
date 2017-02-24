@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +18,12 @@ limitations under the License.
 
 /** @module interactive-auth */
 const q = require("q");
+const url = require("url");
 
 const utils = require("./utils");
+
+const EMAIL_STAGE_TYPE = "m.login.email.identity";
+const MSISDN_STAGE_TYPE = "m.login.msisdn";
 
 /**
  * Abstracts the logic used to drive the interactive auth process.
@@ -37,6 +42,8 @@ const utils = require("./utils");
  *
  * @param {object} opts  options object
  *
+ * @param {object} opts.matrixClient A matrix client to use for the auth process
+ *
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
@@ -45,17 +52,48 @@ const utils = require("./utils");
  *     promise which resolves to the successful response or rejects with a
  *     MatrixError.
  *
- * @param {function(string, object?)} opts.startAuthStage
- *     called to ask the UI to start a particular auth stage. The arguments
- *     are: the login type (eg m.login.password); and (if the last request
- *     returned an error), an error object, with fields 'errcode' and 'error'.
+ * @param {function(string, object?)} opts.stateUpdated
+ *     called when the status of the UI auth changes, ie. when the state of
+ *     an auth stage changes of when the auth flow moves to a new stage.
+ *     The arguments are: the login type (eg m.login.password); and an object
+ *     specific to the login type.
+ *
+ * @param {object?} opts.inputs Inputs provided by the user and used by different
+ *     stages of the auto process. The inputs provided will affect what flow is chosen.
+ *
+ * @param {string?} opts.inputs.emailAddress An email address. If supplied, a flow
+ *     using email verification will be chosen.
+ *
+ * @param {string?} opts.inputs.phoneCountry An ISO two letter country code. Gives
+ *     the country that opts.phoneNumber should be resolved relative to.
+ *
+ * @param {string?} opts.inputs.phoneNumber A phone number. If supplied, a flow
+ *     using phone number validation will be chosen.
+ *
+ * @param {function(object)?} opts.makeRegistrationUrl A function that makes a registration URL
+ *
+ * @param {string?} opts.sessionId If resuming an existing interactive auth session,
+ *     the sessionId of that session.
+ *
+ * @param {string?} opts.clientSecret If resuming an existing interactive auth session,
+ *     the client secret for that session
+ *
+ * @param {string?} opts.emailSid If returning from having completed m.login.email.identity
+ *     auth, the sid for the email verification session.
  *
  */
 function InteractiveAuth(opts) {
-    this._data = opts.authData;
+    this._matrixClient = opts.matrixClient;
+    this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
-    this._startAuthStageCallback = opts.startAuthStage;
+    this._stateUpdatedCallback = opts.stateUpdated;
     this._completionDeferred = null;
+    this._inputs = opts.inputs || {};
+    this._makeRegistrationUrl = opts.makeRegistrationUrl;
+
+    if (opts.sessionId) this._data.session = opts.sessionId;
+    this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
+    this._emailSid = opts.emailSid;
 }
 
 InteractiveAuth.prototype = {
@@ -68,8 +106,10 @@ InteractiveAuth.prototype = {
     attemptAuth: function() {
         this._completionDeferred = q.defer();
 
-        if (!this._data) {
-            this._doRequest(null);
+        // if we have no flows, try a request (we'll have
+        // just a session ID in _data if resuming)
+        if (!this._data.flows) {
+            this._doRequest(this._data);
         } else {
             this._startNextAuthStage();
         }
@@ -176,7 +216,53 @@ InteractiveAuth.prototype = {
                 error: this._data.error || "",
             };
         }
-        this._startAuthStageCallback(nextStage, stageError);
+
+        const stageStatus = {};
+        if (nextStage == EMAIL_STAGE_TYPE) stageStatus.busy = true;
+        this._stateUpdatedCallback(nextStage, stageStatus);
+
+        // Do stage-specific things to start the stage. These would be
+        // an obvious thing to stick in a different file / function if there
+        // were more of them.
+        if (nextStage == EMAIL_STAGE_TYPE) {
+            if (this._emailSid) {
+                const idServerParsedUrl = url.parse(this._matrixClient.getIdentityServerUrl());
+                this.submitAuthDict({
+                    type: EMAIL_STAGE_TYPE,
+                    threepid_creds: {
+                        sid: this._emailSid,
+                        client_secret: this._clientSecret,
+                        id_server: idServerParsedUrl.host,
+                    }
+                });
+            } else {
+                this._requestEmailToken().catch(this._completionDeferred.reject).finally(() => {
+                    this._stateUpdatedCallback(nextStage, {busy: false});
+                }).done();
+            }
+        }
+    },
+
+    /*
+     * Requests a verification token by email.
+     * Specific to m.login.email.identity, and would be
+     * an obvious thing to move out to stage-specific
+     * modules if worthwhile.
+     */
+    _requestEmailToken() {
+        const nextLink = this._makeRegistrationUrl({
+            client_secret: this._clientSecret,
+            hs_url: this._matrixClient.getHomeserverUrl(),
+            is_url: this._matrixClient.getIdentityServerUrl(),
+            session_id: this.getSessionId(),
+        });
+
+        return this._matrixClient.requestRegisterEmailToken(
+            this._inputs.emailAddress,
+            this._clientSecret,
+            1, // TODO: Multiple send attempts?
+            nextLink
+        );
     },
 
     /**
@@ -201,8 +287,27 @@ InteractiveAuth.prototype = {
      */
     _chooseFlow: function() {
         const flows = this._data.flows || [];
-        // always use the first flow for now
-        return flows[0];
+
+        // we've been given an email or we've already done an email part
+        const haveEmail = Boolean(this._inputs.emailAddress) || Boolean(this._emailSid);
+        const haveMsisdn = Boolean(this._inputs.phoneCountry) && Boolean(this._inputs.phoneNumber);
+
+        for (const flow of flows) {
+            let flowHasEmail = false;
+            let flowHasMsisdn = false;
+            for (const stage of flow.stages) {
+                if (stage === EMAIL_STAGE_TYPE) {
+                    flowHasEmail = true;
+                } else if (stage == MSISDN_STAGE_TYPE) {
+                    flowHasMsisdn = true;
+                }
+            }
+
+            if (flowHasEmail == haveEmail && flowHasMsisdn == haveMsisdn) {
+                return flow;
+            }
+        };
+        return null;
     },
 
     /**

@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -135,7 +136,7 @@ MatrixBaseApis.prototype.register = function(
     sessionId, auth, bindEmail, guestAccessToken,
     callback,
 ) {
-    if (auth === undefined) {
+    if (auth === undefined || auth === null) {
         auth = {};
     }
     if (sessionId) {
