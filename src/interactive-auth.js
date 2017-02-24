@@ -94,6 +94,8 @@ function InteractiveAuth(opts) {
     if (opts.sessionId) this._data.session = opts.sessionId;
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
+
+    this._currentStage = null;
 }
 
 InteractiveAuth.prototype = {
@@ -115,6 +117,34 @@ InteractiveAuth.prototype = {
         }
 
         return this._completionDeferred.promise;
+    },
+
+    /**
+     * Poll to check if the auth session or current stage has been
+     * completed out-of-band. If so, the attemptAuth promise will
+     * be resolved.
+     */
+    poll: function() {
+        if (!this._data.session) return;
+
+        let authDict = {};
+        if (this._currentStage == EMAIL_STAGE_TYPE) {
+            // The email can be validated out-of-band, but we need to provide the
+            // creds so the HS can go & check it.
+            if (this._emailSid) {
+                const idServerParsedUrl = url.parse(this._matrixClient.getIdentityServerUrl());
+                authDict = {
+                    type: EMAIL_STAGE_TYPE,
+                    threepid_creds: {
+                        sid: this._emailSid,
+                        client_secret: this._clientSecret,
+                        id_server: idServerParsedUrl.host,
+                    }
+                };
+            }
+        }
+
+        this.submitAuthDict(authDict);
     },
 
     /**
@@ -188,11 +218,13 @@ InteractiveAuth.prototype = {
                 console.log("result from request: ", result);
                 self._completionDeferred.resolve(result);
             }, function(error) {
-                if (error.httpStatus !== 401 || !error.data || !error.data.flows) {
+                // sometimes UI auth errors don't come with flows
+                const haveFlows = Boolean(self._data.flows) || Boolean(error.data.flows);
+                if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                self._data = error.data;
+                if (error.data.flows) self._data = error.data;
                 self._startNextAuthStage();
             },
         ).catch(this._completionDeferred.reject).done();
@@ -208,6 +240,11 @@ InteractiveAuth.prototype = {
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
+        if (nextStage == this._currentStage) {
+            // we've already started: don't re-start it
+            return;
+        }
+        this._currentStage = nextStage;
 
         let stageError = null;
         if (this._data.errcode || this._data.error) {
@@ -218,7 +255,9 @@ InteractiveAuth.prototype = {
         }
 
         const stageStatus = {};
-        if (nextStage == EMAIL_STAGE_TYPE) stageStatus.busy = true;
+        if (nextStage == EMAIL_STAGE_TYPE) {
+            stageStatus.busy = true;
+        }
         this._stateUpdatedCallback(nextStage, stageStatus);
 
         // Do stage-specific things to start the stage. These would be
@@ -226,18 +265,10 @@ InteractiveAuth.prototype = {
         // were more of them.
         if (nextStage == EMAIL_STAGE_TYPE) {
             if (this._emailSid) {
-                const idServerParsedUrl = url.parse(this._matrixClient.getIdentityServerUrl());
-                this.submitAuthDict({
-                    type: EMAIL_STAGE_TYPE,
-                    threepid_creds: {
-                        sid: this._emailSid,
-                        client_secret: this._clientSecret,
-                        id_server: idServerParsedUrl.host,
-                    }
-                });
+                this.poll();
             } else {
                 this._requestEmailToken().catch(this._completionDeferred.reject).finally(() => {
-                    this._stateUpdatedCallback(nextStage, {busy: false});
+                    this._stateUpdatedCallback(nextStage, { busy: false });
                 }).done();
             }
         }
@@ -262,7 +293,9 @@ InteractiveAuth.prototype = {
             this._clientSecret,
             1, // TODO: Multiple send attempts?
             nextLink
-        );
+        ).then((result) => {
+            this._emailSid = result.sid;
+        });
     },
 
     /**
