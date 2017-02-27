@@ -144,7 +144,7 @@ InteractiveAuth.prototype = {
             }
         }
 
-        this.submitAuthDict(authDict);
+        this.submitAuthDict(authDict, true);
     },
 
     /**
@@ -178,8 +178,11 @@ InteractiveAuth.prototype = {
      * @param {object} authData new auth dict to send to the server. Should
      *    include a `type` propterty denoting the login type, as well as any
      *    other params for that stage.
+     * @param {bool} ignoreFailure If true, this request failing will not result
+     *    in the attemptAuth promise being rejected. This can be set to true
+     *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData) {
+    submitAuthDict: function(authData, ignoreFailure) {
         if (!this._completionDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -190,7 +193,7 @@ InteractiveAuth.prototype = {
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth);
+        this._doRequest(auth, ignoreFailure);
     },
 
     /**
@@ -200,7 +203,7 @@ InteractiveAuth.prototype = {
      * @private
      * @param {object?} auth new auth dict, including session id
      */
-    _doRequest: function(auth) {
+    _doRequest: function(auth, ignoreFailure) {
         const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
@@ -213,7 +216,7 @@ InteractiveAuth.prototype = {
             prom = q.reject(e);
         }
 
-        prom.then(
+        prom = prom.then(
             function(result) {
                 console.log("result from request: ", result);
                 self._completionDeferred.resolve(result);
@@ -227,7 +230,15 @@ InteractiveAuth.prototype = {
                 if (error.data.flows) self._data = error.data;
                 self._startNextAuthStage();
             },
-        ).catch(this._completionDeferred.reject).done();
+        );
+        if (!ignoreFailure) {
+            prom = prom.catch(this._completionDeferred.reject);
+        } else {
+            prom = prom.catch((error) => {
+                console.log("Ignoring error from UI auth: " + error);
+            });
+        }
+        prom.done();
     },
 
     /**
