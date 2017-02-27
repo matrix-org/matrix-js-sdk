@@ -3020,6 +3020,25 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  */
 
 /**
+ * Fires whenever an error occurs when call.js sendEvent encounters an error.
+ * <p>
+ * This is required to allow UnknownDeviceError to propagate from client.sendEvent, whilst
+ * differentiating it from being a normal `error` emission. (This is because call.js
+ * does a hangup when it encounters a normal `error`, which in turn could lead to an
+ * UnknownDeviceError.)
+ * <p>
+ * To deal with an UnknownDeviceError when trying to send events, the application should let
+ * users know that there are new devices in the encrypted room (into which the event was
+ * sent) and give the user the options to resend unsent events or cancel them.
+ *
+ * @event module:client~MatrixClient#"send_event_error"
+ * @param {Error} err The error caught from calling client.sendEvent in call.js.
+ * matrixClient.on("send_event_error", function(err){
+ *   console.error(err);
+ * });
+ */
+
+/**
  * Fires whenever the SDK receives a new to-device event.
  * @event module:client~MatrixClient#"toDeviceEvent"
  * @param {MatrixEvent} event The matrix event which caused this event to fire.
