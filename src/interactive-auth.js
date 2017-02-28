@@ -132,14 +132,16 @@ InteractiveAuth.prototype = {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
             if (this._emailSid) {
-                const idServerParsedUrl = url.parse(this._matrixClient.getIdentityServerUrl());
+                const idServerParsedUrl = url.parse(
+                    this._matrixClient.getIdentityServerUrl(),
+                );
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
                     threepid_creds: {
                         sid: this._emailSid,
                         client_secret: this._clientSecret,
                         id_server: idServerParsedUrl.host,
-                    }
+                    },
                 };
             }
         }
@@ -202,6 +204,9 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @param {object?} auth new auth dict, including session id
+     * @param {bool?} ignoreFailure If true, this request failing will not result
+     *    in the attemptAuth promise being rejected. This can be set to true
+     *    for requests that just poll to see if auth has been completed elsewhere.
      */
     _doRequest: function(auth, ignoreFailure) {
         const self = this;
@@ -258,12 +263,12 @@ InteractiveAuth.prototype = {
         }
         this._currentStage = nextStage;
 
-        let stageError = null;
         if (this._data.errcode || this._data.error) {
-            stageError = {
+            this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",
                 error: this._data.error || "",
-            };
+            });
+            return;
         }
 
         const stageStatus = {};
@@ -279,7 +284,9 @@ InteractiveAuth.prototype = {
             if (this._emailSid) {
                 this.poll();
             } else {
-                this._requestEmailToken().catch(this._completionDeferred.reject).finally(() => {
+                this._requestEmailToken().catch(
+                    this._completionDeferred.reject
+                ).finally(() => {
                     this._stateUpdatedCallback(nextStage, { busy: false });
                 }).done();
             }
@@ -304,7 +311,7 @@ InteractiveAuth.prototype = {
             this._inputs.emailAddress,
             this._clientSecret,
             1, // TODO: Multiple send attempts?
-            nextLink
+            nextLink,
         ).then((result) => {
             this._emailSid = result.sid;
         });
@@ -335,7 +342,10 @@ InteractiveAuth.prototype = {
 
         // we've been given an email or we've already done an email part
         const haveEmail = Boolean(this._inputs.emailAddress) || Boolean(this._emailSid);
-        const haveMsisdn = Boolean(this._inputs.phoneCountry) && Boolean(this._inputs.phoneNumber);
+        const haveMsisdn = (
+            Boolean(this._inputs.phoneCountry) &&
+            Boolean(this._inputs.phoneNumber)
+        );
 
         for (const flow of flows) {
             let flowHasEmail = false;
@@ -351,7 +361,7 @@ InteractiveAuth.prototype = {
             if (flowHasEmail == haveEmail && flowHasMsisdn == haveMsisdn) {
                 return flow;
             }
-        };
+        }
         return null;
     },
 
