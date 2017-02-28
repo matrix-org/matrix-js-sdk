@@ -291,31 +291,6 @@ InteractiveAuth.prototype = {
                 }).done();
             }
         }
-
-        const stageStatus = {};
-        if (nextStage == EMAIL_STAGE_TYPE) stageStatus.busy = true;
-        this._stateUpdatedCallback(nextStage, stageStatus);
-
-        // Do stage-specific things to start the stage. These would be
-        // an obvious thing to stick in a different file / function if there
-        // were more of them.
-        if (nextStage == EMAIL_STAGE_TYPE) {
-            if (this._emailSid) {
-                const idServerParsedUrl = url.parse(this._matrixClient.getIdentityServerUrl());
-                this.submitAuthDict({
-                    type: EMAIL_STAGE_TYPE,
-                    threepid_creds: {
-                        sid: this._emailSid,
-                        client_secret: this._clientSecret,
-                        id_server: idServerParsedUrl.host,
-                    }
-                });
-            } else {
-                this._requestEmailToken().catch(this._completionDeferred.reject).finally(() => {
-                    this._stateUpdatedCallback(nextStage, {busy: false});
-                }).done();
-            }
-        }
     },
 
     /*
