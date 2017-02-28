@@ -285,7 +285,7 @@ InteractiveAuth.prototype = {
                 this.poll();
             } else {
                 this._requestEmailToken().catch(
-                    this._completionDeferred.reject
+                    this._completionDeferred.reject,
                 ).finally(() => {
                     this._stateUpdatedCallback(nextStage, { busy: false });
                 }).done();
