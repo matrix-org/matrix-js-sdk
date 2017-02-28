@@ -25,6 +25,47 @@ const DEBUG = true;  // set true to enable console logging.
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
 /**
+ * Fires when the MatrixCall encounters an error when sending a Matrix event.
+ * <p>
+ * This is required to allow errors, which occur during sending of events, to bubble up.
+ * (This is because call.js does a hangup when it encounters a normal `error`, which in
+ * turn could lead to an UnknownDeviceError.)
+ * <p>
+ * To deal with an UnknownDeviceError when trying to send events, the application should let
+ * users know that there are new devices in the encrypted room (into which the event was
+ * sent) and give the user the options to resend unsent events or cancel them. Resending
+ * is done using {@link module:client~MatrixClient#resendEvent} and cancelling can be done by using
+ * {@link module:client~MatrixClient#cancelPendingEvent}.
+ * <p>
+ * MatrixCall will not do anything in response to an error that causes `send_event_error`
+ * to be emitted with the exception of sending `m.call.candidates`, which is retried upon
+ * failure when ICE candidates are being sent. This happens during call setup.
+ *
+ * @event module:webrtc/call~MatrixCall#"send_event_error"
+ * @param {Error} err The error caught from calling client.sendEvent in call.js.
+ * @example
+ * matrixCall.on("send_event_error", function(err){
+ *   console.error(err);
+ * });
+ */
+
+/**
+ * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
+ * <p>
+ * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
+ * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
+ * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
+ * to their audio/video hardware.
+ *
+ * @event module:webrtc/call~MatrixCall#"error"
+ * @param {Error} err The error raised by MatrixCall.
+ * @example
+ * matrixCall.on("error", function(err){
+ *   console.error(err.code, err);
+ * });
+ */
+
+/**
  * Construct a new Matrix Call.
  * @constructor
  * @param {Object} opts Config options.
