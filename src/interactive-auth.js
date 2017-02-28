@@ -222,12 +222,13 @@ InteractiveAuth.prototype = {
                 self._completionDeferred.resolve(result);
             }, function(error) {
                 // sometimes UI auth errors don't come with flows
-                const haveFlows = Boolean(self._data.flows) || Boolean(error.data.flows);
+                const errorFlows = error.data ? error.data.flows : null;
+                const haveFlows = Boolean(self._data.flows) || Boolean(errorFlows);
                 if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                if (error.data.flows) self._data = error.data;
+                if (errorFlows) self._data = error.data;
                 self._startNextAuthStage();
             },
         );
