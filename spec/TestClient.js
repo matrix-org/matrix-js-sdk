@@ -21,6 +21,7 @@ import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from './mock-request';
 import expect from 'expect';
+import q from 'q';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -49,6 +50,10 @@ export default function TestClient(userId, deviceId, accessToken) {
     this.oneTimeKeys = {};
 }
 
+TestClient.prototype.toString = function() {
+    return 'TestClient[' + this.userId + ']';
+};
+
 /**
  * start the client, and wait for it to initialise.
  *
@@ -57,7 +62,11 @@ export default function TestClient(userId, deviceId, accessToken) {
 TestClient.prototype.start = function() {
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-    this.expectKeyUpload();
+    this.expectDeviceKeyUpload();
+
+    // we let the client do a very basic initial sync, which it needs before
+    // it will upload one-time keys.
+    this.httpBackend.when("GET", "/sync").respond(200, { next_batch: 1 });
 
     this.client.startClient({
         // set this so that we can get hold of failed events
@@ -65,7 +74,7 @@ TestClient.prototype.start = function() {
     });
 
     return this.httpBackend.flush().then(() => {
-        console.log('TestClient[' + this.userId + ']: started');
+        console.log(this + ': started');
     });
 };
 
@@ -77,24 +86,62 @@ TestClient.prototype.stop = function() {
 };
 
 /**
- * Set up expectations that the client will upload device and one-time keys.
+ * Set up expectations that the client will upload device keys.
  */
-TestClient.prototype.expectKeyUpload = function() {
+TestClient.prototype.expectDeviceKeyUpload = function() {
     const self = this;
     this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
         expect(content.one_time_keys).toBe(undefined);
         expect(content.device_keys).toBeTruthy();
+
+        console.log(self + ': received device keys');
+        // we expect this to happen before any one-time keys are uploaded.
+        expect(Object.keys(self.oneTimeKeys).length).toEqual(0);
+
         self.deviceKeys = content.device_keys;
         return {one_time_key_counts: {signed_curve25519: 0}};
     });
-    this.httpBackend.when("POST", "/keys/upload").respond(200, function(path, content) {
-        expect(content.device_keys).toBe(undefined);
-        expect(content.one_time_keys).toBeTruthy();
-        expect(content.one_time_keys).toNotEqual({});
-        self.oneTimeKeys = content.one_time_keys;
-        return {one_time_key_counts: {
-            signed_curve25519: Object.keys(self.oneTimeKeys).length,
-        }};
+};
+
+
+/**
+ * If one-time keys have already been uploaded, return them. Otherwise,
+ * set up an expectation that the keys will be uploaded, and wait for
+ * that to happen.
+ *
+ * @returns {Promise} for the one-time keys
+ */
+TestClient.prototype.awaitOneTimeKeyUpload = function() {
+    if (Object.keys(this.oneTimeKeys).length != 0) {
+        // already got one-time keys
+        return q(this.oneTimeKeys);
+    }
+
+    this.httpBackend.when("POST", "/keys/upload")
+        .respond(200, (path, content) => {
+            expect(content.device_keys).toBe(undefined);
+            expect(content.one_time_keys).toBe(undefined);
+            return {one_time_key_counts: {
+                signed_curve25519: Object.keys(this.oneTimeKeys).length,
+            }};
+        });
+
+    this.httpBackend.when("POST", "/keys/upload")
+          .respond(200, (path, content) => {
+              expect(content.device_keys).toBe(undefined);
+              expect(content.one_time_keys).toBeTruthy();
+              expect(content.one_time_keys).toNotEqual({});
+              console.log('%s: received %i one-time keys', this,
+                          Object.keys(content.one_time_keys).length);
+              this.oneTimeKeys = content.one_time_keys;
+              return {one_time_key_counts: {
+                  signed_curve25519: Object.keys(this.oneTimeKeys).length,
+              }};
+          });
+
+    return this.httpBackend.flush('/keys/upload', 2).then((flushed) => {
+        expect(flushed).toEqual(2);
+        return this.oneTimeKeys;
     });
 };
 

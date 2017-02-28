@@ -94,6 +94,8 @@ function InteractiveAuth(opts) {
     if (opts.sessionId) this._data.session = opts.sessionId;
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
+
+    this._currentStage = null;
 }
 
 InteractiveAuth.prototype = {
@@ -115,6 +117,36 @@ InteractiveAuth.prototype = {
         }
 
         return this._completionDeferred.promise;
+    },
+
+    /**
+     * Poll to check if the auth session or current stage has been
+     * completed out-of-band. If so, the attemptAuth promise will
+     * be resolved.
+     */
+    poll: function() {
+        if (!this._data.session) return;
+
+        let authDict = {};
+        if (this._currentStage == EMAIL_STAGE_TYPE) {
+            // The email can be validated out-of-band, but we need to provide the
+            // creds so the HS can go & check it.
+            if (this._emailSid) {
+                const idServerParsedUrl = url.parse(
+                    this._matrixClient.getIdentityServerUrl(),
+                );
+                authDict = {
+                    type: EMAIL_STAGE_TYPE,
+                    threepid_creds: {
+                        sid: this._emailSid,
+                        client_secret: this._clientSecret,
+                        id_server: idServerParsedUrl.host,
+                    },
+                };
+            }
+        }
+
+        this.submitAuthDict(authDict, true);
     },
 
     /**
@@ -148,8 +180,11 @@ InteractiveAuth.prototype = {
      * @param {object} authData new auth dict to send to the server. Should
      *    include a `type` propterty denoting the login type, as well as any
      *    other params for that stage.
+     * @param {bool} ignoreFailure If true, this request failing will not result
+     *    in the attemptAuth promise being rejected. This can be set to true
+     *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData) {
+    submitAuthDict: function(authData, ignoreFailure) {
         if (!this._completionDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -160,7 +195,7 @@ InteractiveAuth.prototype = {
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth);
+        this._doRequest(auth, ignoreFailure);
     },
 
     /**
@@ -169,8 +204,11 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @param {object?} auth new auth dict, including session id
+     * @param {bool?} ignoreFailure If true, this request failing will not result
+     *    in the attemptAuth promise being rejected. This can be set to true
+     *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    _doRequest: function(auth) {
+    _doRequest: function(auth, ignoreFailure) {
         const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
@@ -183,19 +221,30 @@ InteractiveAuth.prototype = {
             prom = q.reject(e);
         }
 
-        prom.then(
+        prom = prom.then(
             function(result) {
                 console.log("result from request: ", result);
                 self._completionDeferred.resolve(result);
             }, function(error) {
-                if (error.httpStatus !== 401 || !error.data || !error.data.flows) {
+                // sometimes UI auth errors don't come with flows
+                const errorFlows = error.data ? error.data.flows : null;
+                const haveFlows = Boolean(self._data.flows) || Boolean(errorFlows);
+                if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                self._data = error.data;
+                if (errorFlows) self._data = error.data;
                 self._startNextAuthStage();
             },
-        ).catch(this._completionDeferred.reject).done();
+        );
+        if (!ignoreFailure) {
+            prom = prom.catch(this._completionDeferred.reject);
+        } else {
+            prom = prom.catch((error) => {
+                console.log("Ignoring error from UI auth: " + error);
+            });
+        }
+        prom.done();
     },
 
     /**
@@ -208,13 +257,39 @@ InteractiveAuth.prototype = {
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
+        if (nextStage == this._currentStage) {
+            // we've already started: don't re-start it
+            return;
+        }
+        this._currentStage = nextStage;
 
-        let stageError = null;
         if (this._data.errcode || this._data.error) {
-            stageError = {
+            this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",
                 error: this._data.error || "",
-            };
+            });
+            return;
+        }
+
+        const stageStatus = {};
+        if (nextStage == EMAIL_STAGE_TYPE) {
+            stageStatus.busy = true;
+        }
+        this._stateUpdatedCallback(nextStage, stageStatus);
+
+        // Do stage-specific things to start the stage. These would be
+        // an obvious thing to stick in a different file / function if there
+        // were more of them.
+        if (nextStage == EMAIL_STAGE_TYPE) {
+            if (this._emailSid) {
+                this.poll();
+            } else {
+                this._requestEmailToken().catch(
+                    this._completionDeferred.reject,
+                ).finally(() => {
+                    this._stateUpdatedCallback(nextStage, { busy: false });
+                }).done();
+            }
         }
 
         const stageStatus = {};
@@ -261,8 +336,10 @@ InteractiveAuth.prototype = {
             this._inputs.emailAddress,
             this._clientSecret,
             1, // TODO: Multiple send attempts?
-            nextLink
-        );
+            nextLink,
+        ).then((result) => {
+            this._emailSid = result.sid;
+        });
     },
 
     /**
@@ -290,7 +367,10 @@ InteractiveAuth.prototype = {
 
         // we've been given an email or we've already done an email part
         const haveEmail = Boolean(this._inputs.emailAddress) || Boolean(this._emailSid);
-        const haveMsisdn = Boolean(this._inputs.phoneCountry) && Boolean(this._inputs.phoneNumber);
+        const haveMsisdn = (
+            Boolean(this._inputs.phoneCountry) &&
+            Boolean(this._inputs.phoneNumber)
+        );
 
         for (const flow of flows) {
             let flowHasEmail = false;
@@ -306,7 +386,7 @@ InteractiveAuth.prototype = {
             if (flowHasEmail == haveEmail && flowHasMsisdn == haveMsisdn) {
                 return flow;
             }
-        };
+        }
         return null;
     },
 

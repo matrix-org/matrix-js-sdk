@@ -303,17 +303,15 @@ MatrixClient.prototype.getDeviceEd25519Key = function() {
 };
 
 /**
- * Upload the device keys to the homeserver and ensure that the
- * homeserver has enough one-time keys.
- * @param {number} maxKeys The maximum number of keys to generate
+ * Upload the device keys to the homeserver.
  * @return {object} A promise that will resolve when the keys are uploaded.
  */
-MatrixClient.prototype.uploadKeys = function(maxKeys) {
+MatrixClient.prototype.uploadKeys = function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    return this._crypto.uploadKeys(maxKeys);
+    return this._crypto.uploadDeviceKeys();
 };
 
 /**
@@ -2773,12 +2771,7 @@ MatrixClient.prototype.startClient = function(opts) {
     }
 
     if (this._crypto) {
-        this._crypto.uploadKeys(5).done();
-        const tenMinutes = 1000 * 60 * 10;
-        const self = this;
-        this._uploadIntervalID = global.setInterval(function() {
-            self._crypto.uploadKeys(5).done();
-        }, tenMinutes);
+        this._crypto.uploadDeviceKeys().done();
     }
 
     // periodically poll for turn servers if we support voip
@@ -2811,9 +2804,6 @@ MatrixClient.prototype.stopClient = function() {
     if (this._syncApi) {
         this._syncApi.stop();
         this._syncApi = null;
-    }
-    if (this._crypto) {
-        global.clearInterval(this._uploadIntervalID);
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
 };
