@@ -2095,7 +2095,7 @@ MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
@@ -2109,6 +2109,7 @@ MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
  * @param {string} phoneNumber The phone number, in national or international format
  * @param {string} clientSecret As requestEmailToken
  * @param {number} sendAttempt As requestEmailToken
+ * @param {string} nextLink As requestEmailToken
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype.requestRegisterMsisdnToken = function(phoneCountry, phoneNumber,
@@ -2121,7 +2122,7 @@ MatrixClient.prototype.requestRegisterMsisdnToken = function(phoneCountry, phone
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
@@ -2153,7 +2154,7 @@ MatrixClient.prototype.requestAdd3pidEmailToken = function(email, clientSecret,
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
@@ -2168,6 +2169,7 @@ MatrixClient.prototype.requestAdd3pidEmailToken = function(email, clientSecret,
  * @param {string} phoneNumber As requestRegisterMsisdnToken
  * @param {string} clientSecret As requestEmailToken
  * @param {number} sendAttempt As requestEmailToken
+ * @param {string} nextLink As requestEmailToken
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype.requestAdd3pidMsisdnToken = function(phoneCountry, phoneNumber,
@@ -2180,7 +2182,7 @@ MatrixClient.prototype.requestAdd3pidMsisdnToken = function(phoneCountry, phoneN
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
@@ -2212,7 +2214,7 @@ MatrixClient.prototype.requestPasswordEmailToken = function(email, clientSecret,
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
@@ -2239,7 +2241,7 @@ MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phone
             client_secret: clientSecret,
             send_attempt: sendAttempt,
             next_link: nextLink,
-        }
+        },
     );
 };
 
