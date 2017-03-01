@@ -70,8 +70,6 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {string?} opts.inputs.phoneNumber A phone number. If supplied, a flow
  *     using phone number validation will be chosen.
  *
- * @param {function(object)?} opts.makeRegistrationUrl A function that makes a registration URL
- *
  * @param {string?} opts.sessionId If resuming an existing interactive auth session,
  *     the sessionId of that session.
  *
@@ -89,11 +87,11 @@ function InteractiveAuth(opts) {
     this._stateUpdatedCallback = opts.stateUpdated;
     this._completionDeferred = null;
     this._inputs = opts.inputs || {};
-    this._makeRegistrationUrl = opts.makeRegistrationUrl;
 
     if (opts.sessionId) this._data.session = opts.sessionId;
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
+    if (this._emailSid === undefined) this._emailSid = null;
 
     this._currentStage = null;
 }
@@ -158,6 +156,10 @@ InteractiveAuth.prototype = {
         return this._data ? this._data.session : undefined;
     },
 
+    getClientSecret: function() {
+        return this._clientSecret;
+    },
+
     /**
      * get the server params for a given stage
      *
@@ -196,6 +198,10 @@ InteractiveAuth.prototype = {
         utils.extend(auth, authData);
 
         this._doRequest(auth, ignoreFailure);
+    },
+
+    setEmailSid: function(sid) {
+        this._emailSid = sid;
     },
 
     /**
@@ -273,48 +279,9 @@ InteractiveAuth.prototype = {
 
         const stageStatus = {};
         if (nextStage == EMAIL_STAGE_TYPE) {
-            stageStatus.busy = true;
+            stageStatus.emailSid = this._emailSid;
         }
         this._stateUpdatedCallback(nextStage, stageStatus);
-
-        // Do stage-specific things to start the stage. These would be
-        // an obvious thing to stick in a different file / function if there
-        // were more of them.
-        if (nextStage == EMAIL_STAGE_TYPE) {
-            if (this._emailSid) {
-                this.poll();
-            } else {
-                this._requestEmailToken().catch(
-                    this._completionDeferred.reject,
-                ).finally(() => {
-                    this._stateUpdatedCallback(nextStage, { busy: false });
-                }).done();
-            }
-        }
-    },
-
-    /*
-     * Requests a verification token by email.
-     * Specific to m.login.email.identity, and would be
-     * an obvious thing to move out to stage-specific
-     * modules if worthwhile.
-     */
-    _requestEmailToken() {
-        const nextLink = this._makeRegistrationUrl({
-            client_secret: this._clientSecret,
-            hs_url: this._matrixClient.getHomeserverUrl(),
-            is_url: this._matrixClient.getIdentityServerUrl(),
-            session_id: this.getSessionId(),
-        });
-
-        return this._matrixClient.requestRegisterEmailToken(
-            this._inputs.emailAddress,
-            this._clientSecret,
-            1, // TODO: Multiple send attempts?
-            nextLink,
-        ).then((result) => {
-            this._emailSid = result.sid;
-        });
     },
 
     /**
