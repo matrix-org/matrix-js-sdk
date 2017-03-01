@@ -56,7 +56,9 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  *     called when the status of the UI auth changes, ie. when the state of
  *     an auth stage changes of when the auth flow moves to a new stage.
  *     The arguments are: the login type (eg m.login.password); and an object
- *     specific to the login type.
+ *     specific to the login type. These are:
+ *         m.login.email.identity:
+ *          * emailSid: string, the sid of the active email auth session
  *
  * @param {object?} opts.inputs Inputs provided by the user and used by different
  *     stages of the auto process. The inputs provided will affect what flow is chosen.
