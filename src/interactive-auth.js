@@ -265,10 +265,6 @@ InteractiveAuth.prototype = {
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
-        if (nextStage == this._currentStage) {
-            // we've already started: don't re-start it
-            return;
-        }
         this._currentStage = nextStage;
 
         if (this._data.errcode || this._data.error) {
