@@ -241,7 +241,9 @@ InteractiveAuth.prototype = {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                if (errorFlows) self._data = error.data;
+                // if the error didn't come with flows, copy over the ones we have
+                if (!error.data.flows) error.data.flows = self._data.flows;
+                self._data = error.data;
                 self._startNextAuthStage();
             },
         );
