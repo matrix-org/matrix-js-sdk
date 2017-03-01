@@ -300,6 +300,14 @@ InteractiveAuth.prototype = {
 
     /**
      * Pick one of the flows from the returned list
+     * If a flow using all of the inputs is found, it will
+     * be returned, otherwise, null will be returned.
+     *
+     * Only flows using all given inputs are chosen because it
+     * is likley to be surprising if the user provides a
+     * credential and it is not used. For example, for registration,
+     * this could result in the email not being used which would leave
+     * the account with no means to reset a password.
      *
      * @private
      * @return {object} flow
