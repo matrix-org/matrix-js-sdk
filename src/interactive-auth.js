@@ -248,6 +248,9 @@ InteractiveAuth.prototype = {
         if (!ignoreFailure) {
             prom = prom.catch(this._completionDeferred.reject);
         } else {
+            // We ignore all failures here (even non-UI auth related ones)
+            // since we don't want to suddenly fail if the internet connection
+            // had a blip whilst we were polling
             prom = prom.catch((error) => {
                 console.log("Ignoring error from UI auth: " + error);
             });
