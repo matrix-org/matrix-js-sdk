@@ -165,6 +165,12 @@ InteractiveAuth.prototype = {
         return this._data ? this._data.session : undefined;
     },
 
+    /**
+     * get the client secret used for validation sessions
+     * with the ID server.
+     *
+     * @return {string} client secret
+     */
     getClientSecret: function() {
         return this._clientSecret;
     },
@@ -209,6 +215,12 @@ InteractiveAuth.prototype = {
         this._doRequest(auth, ignoreFailure);
     },
 
+    /**
+     * Sets the sid for the email validation session
+     * This must be set in order to successfully poll for completion
+     * of the email validation.
+     * Specific to m.login.email.identity
+     */
     setEmailSid: function(sid) {
         this._emailSid = sid;
     },
