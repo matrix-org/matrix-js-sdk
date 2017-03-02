@@ -56,7 +56,13 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  *     called when the status of the UI auth changes, ie. when the state of
  *     an auth stage changes of when the auth flow moves to a new stage.
  *     The arguments are: the login type (eg m.login.password); and an object
- *     specific to the login type. These are:
+ *     which is either an error or an informational object specific to the
+ *     login type. If the 'errcode' key is defined, the object is an error,
+ *     and has keys:
+ *         errcode: string, the textual error code, eg. M_UNKNOWN
+ *         error: string, human readable string describing the error
+ *
+ *     The login type specific objects are as follows:
  *         m.login.email.identity:
  *          * emailSid: string, the sid of the active email auth session
  *
@@ -86,7 +92,8 @@ function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
     this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
-    this._stateUpdatedCallback = opts.stateUpdated;
+    // startAuthStage included for backwards compat
+    this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
     this._completionDeferred = null;
     this._inputs = opts.inputs || {};
 
@@ -158,6 +165,12 @@ InteractiveAuth.prototype = {
         return this._data ? this._data.session : undefined;
     },
 
+    /**
+     * get the client secret used for validation sessions
+     * with the ID server.
+     *
+     * @return {string} client secret
+     */
     getClientSecret: function() {
         return this._clientSecret;
     },
@@ -202,6 +215,12 @@ InteractiveAuth.prototype = {
         this._doRequest(auth, ignoreFailure);
     },
 
+    /**
+     * Sets the sid for the email validation session
+     * This must be set in order to successfully poll for completion
+     * of the email validation.
+     * Specific to m.login.email.identity
+     */
     setEmailSid: function(sid) {
         this._emailSid = sid;
     },
