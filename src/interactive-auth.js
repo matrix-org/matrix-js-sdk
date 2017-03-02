@@ -92,7 +92,8 @@ function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
     this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
-    this._stateUpdatedCallback = opts.stateUpdated;
+    // startAuthStage included for backwards compat
+    this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
     this._completionDeferred = null;
     this._inputs = opts.inputs || {};
 
