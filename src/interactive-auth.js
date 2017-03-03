@@ -216,6 +216,14 @@ InteractiveAuth.prototype = {
     },
 
     /**
+     * Gets the sid for the email validation session
+     * Specific to m.login.email.identity
+     */
+    getEmailSid: function() {
+        return this._emailSid;
+    },
+
+    /**
      * Sets the sid for the email validation session
      * This must be set in order to successfully poll for completion
      * of the email validation.
