@@ -125,7 +125,9 @@ MatrixBaseApis.prototype.makeTxnId = function() {
  * @param {string} password
  * @param {string} sessionId
  * @param {Object} auth
- * @param {boolean} bindEmail
+ * @param {Object} bindThreepids Set key 'email' to true to bind any email
+ *     threepid uses during registration in the ID server. Set 'msisdn' to
+ *     true to bind msisdn.
  * @param {string} guestAccessToken
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
@@ -133,9 +135,16 @@ MatrixBaseApis.prototype.makeTxnId = function() {
  */
 MatrixBaseApis.prototype.register = function(
     username, password,
-    sessionId, auth, bindEmail, guestAccessToken,
+    sessionId, auth, bindThreepids, guestAccessToken,
     callback,
 ) {
+    // backwards compat
+    if (bindThreepids === true) {
+        bindThreepids = {email: true};
+    } else if (bindThreepids === null || bindThreepids === undefined) {
+        bindThreepids = {};
+    }
+
     if (auth === undefined || auth === null) {
         auth = {};
     }
@@ -152,8 +161,11 @@ MatrixBaseApis.prototype.register = function(
     if (password !== undefined && password !== null) {
         params.password = password;
     }
-    if (bindEmail !== undefined && bindEmail !== null) {
-        params.bind_email = bindEmail;
+    if (bindThreepids.email) {
+        params.bind_email = true;
+    }
+    if (bindThreepids.msisdn) {
+        params.bind_msisdn = true;
     }
     if (guestAccessToken !== undefined && guestAccessToken !== null) {
         params.guest_access_token = guestAccessToken;
