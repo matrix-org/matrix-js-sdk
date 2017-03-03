@@ -25,6 +25,14 @@ const MatrixError = sdk.MatrixError;
 
 import expect from 'expect';
 
+// Trivial client object to test interactive auth
+// (we do not need TestClient here)
+class FakeClient {
+    generateClientSecret() {
+        return "testcl1Ent5EcreT";
+    }
+}
+
 describe("InteractiveAuth", function() {
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -32,11 +40,12 @@ describe("InteractiveAuth", function() {
 
     it("should start an auth stage and complete it", function(done) {
         const doRequest = expect.createSpy();
-        const startAuthStage = expect.createSpy();
+        const stateUpdated = expect.createSpy();
 
         const ia = new InteractiveAuth({
+            matrixClient: new FakeClient(),
             doRequest: doRequest,
-            startAuthStage: startAuthStage,
+            stateUpdated: stateUpdated,
             authData: {
                 session: "sessionId",
                 flows: [
@@ -54,7 +63,8 @@ describe("InteractiveAuth", function() {
         });
 
         // first we expect a call here
-        startAuthStage.andCall(function(stage) {
+        stateUpdated.andCall(function(stage) {
+            console.log('aaaa');
             expect(stage).toEqual("logintype");
             ia.submitAuthDict({
                 type: "logintype",
@@ -65,6 +75,7 @@ describe("InteractiveAuth", function() {
         // .. which should trigger a call here
         const requestRes = {"a": "b"};
         doRequest.andCall(function(authData) {
+            console.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
                 type: "logintype",
@@ -76,17 +87,18 @@ describe("InteractiveAuth", function() {
         ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(1);
-            expect(startAuthStage.calls.length).toEqual(1);
+            expect(stateUpdated.calls.length).toEqual(1);
         }).catch(utils.failTest).done(done);
     });
 
     it("should make a request if no authdata is provided", function(done) {
         const doRequest = expect.createSpy();
-        const startAuthStage = expect.createSpy();
+        const stateUpdated = expect.createSpy();
 
         const ia = new InteractiveAuth({
+            matrixClient: new FakeClient(),
+            stateUpdated: stateUpdated,
             doRequest: doRequest,
-            startAuthStage: startAuthStage,
         });
 
         expect(ia.getSessionId()).toBe(undefined);
@@ -95,7 +107,7 @@ describe("InteractiveAuth", function() {
         // first we expect a call to doRequest
         doRequest.andCall(function(authData) {
             console.log("request1", authData);
-            expect(authData).toBe(null);
+            expect(authData).toEqual({});
             const err = new MatrixError({
                 session: "sessionId",
                 flows: [
@@ -109,9 +121,9 @@ describe("InteractiveAuth", function() {
             throw err;
         });
 
-        // .. which should be followed by a call to startAuthStage
+        // .. which should be followed by a call to stateUpdated
         const requestRes = {"a": "b"};
-        startAuthStage.andCall(function(stage) {
+        stateUpdated.andCall(function(stage) {
             expect(stage).toEqual("logintype");
             expect(ia.getSessionId()).toEqual("sessionId");
             expect(ia.getStageParams("logintype")).toEqual({
@@ -138,7 +150,7 @@ describe("InteractiveAuth", function() {
         ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(2);
-            expect(startAuthStage.calls.length).toEqual(1);
+            expect(stateUpdated.calls.length).toEqual(1);
         }).catch(utils.failTest).done(done);
     });
 });
