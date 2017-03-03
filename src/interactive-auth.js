@@ -220,6 +220,8 @@ InteractiveAuth.prototype = {
      * This must be set in order to successfully poll for completion
      * of the email validation.
      * Specific to m.login.email.identity
+     *
+     * @param {string} sid The sid for the email validation session
      */
     setEmailSid: function(sid) {
         this._emailSid = sid;
