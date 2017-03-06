@@ -2914,7 +2914,7 @@ function setupCallEventHandler(client) {
             const existingCalls = utils.values(client.callList);
             for (i = 0; i < existingCalls.length; ++i) {
                 const thisCall = existingCalls[i];
-                if (call.room_id === thisCall.room_id &&
+                if (call.roomId === thisCall.roomId &&
                         thisCall.direction === 'outbound' &&
                         (["wait_local_media", "create_offer", "invite_sent"].indexOf(
                             thisCall.state) !== -1)) {
