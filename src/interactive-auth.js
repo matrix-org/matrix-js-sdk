@@ -218,6 +218,8 @@ InteractiveAuth.prototype = {
     /**
      * Gets the sid for the email validation session
      * Specific to m.login.email.identity
+     *
+     * @returns {string} The sid of the email auth session
      */
     getEmailSid: function() {
         return this._emailSid;
