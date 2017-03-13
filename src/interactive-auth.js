@@ -272,9 +272,10 @@ InteractiveAuth.prototype = {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                // if the error didn't come with flows or session ID,
+                // if the error didn't come with flows, completed flows or session ID,
                 // copy over the ones we have
                 if (!error.data.flows) error.data.flows = self._data.flows;
+                if (!error.data.completed) error.data.completed = self._data.completed;
                 if (!error.data.session) error.data.session = self._data.session;
                 self._data = error.data;
                 self._startNextAuthStage();
