@@ -272,10 +272,16 @@ InteractiveAuth.prototype = {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
-                // if the error didn't come with flows or session ID,
-                // copy over the ones we have
-                if (!error.data.flows) error.data.flows = self._data.flows;
-                if (!error.data.session) error.data.session = self._data.session;
+                // if the error didn't come with flows, completed flows or session ID,
+                // copy over the ones we have. Synapse sometimes sends responses without
+                // any UI auth data (eg. when polling for email validation, if the email
+                // has not yet been validated). This appears to be a Synapse bug, which
+                // we workaround here.
+                if (!error.data.flows && !error.data.completed && !error.data.session) {
+                    error.data.flows = self._data.flows;
+                    error.data.completed = self._data.completed;
+                    error.data.session = self._data.session;
+                }
                 self._data = error.data;
                 self._startNextAuthStage();
             },
