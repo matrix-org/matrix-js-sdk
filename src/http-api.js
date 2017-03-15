@@ -631,19 +631,26 @@ module.exports.MatrixHttpApi.prototype = {
         let timedOut = false;
         let req;
         const localTimeoutMs = opts.localTimeoutMs || this.opts.localTimeoutMs;
-        if (localTimeoutMs) {
-            timeoutId = callbacks.setTimeout(function() {
-                timedOut = true;
-                if (req && req.abort) {
-                    req.abort();
+
+        const resetTimeout = () => {
+            if (localTimeoutMs) {
+                if (timeoutId) {
+                    callbacks.clearTimeout(timeoutId);
                 }
-                defer.reject(new module.exports.MatrixError({
-                    error: "Locally timed out waiting for a response",
-                    errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-                    timeout: localTimeoutMs,
-                }));
-            }, localTimeoutMs);
-        }
+                timeoutId = callbacks.setTimeout(function() {
+                    timedOut = true;
+                    if (req && req.abort) {
+                        req.abort();
+                    }
+                    defer.reject(new module.exports.MatrixError({
+                        error: "Locally timed out waiting for a response",
+                        errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
+                        timeout: localTimeoutMs,
+                    }));
+                }, localTimeoutMs);
+            }
+        };
+        resetTimeout();
 
         const reqPromise = defer.promise;
 
@@ -679,6 +686,11 @@ module.exports.MatrixHttpApi.prototype = {
                     handlerFn(err, response, body);
                 },
             );
+            req.onprogress = (e) => {
+                // Prevent the timeout from rejecting the deferred promise if progress is
+                // seen with the request
+                resetTimeout();
+            };
             if (req && req.abort) {
                 // FIXME: This is EVIL, but I can't think of a better way to expose
                 // abort() operations on underlying HTTP requests :(
