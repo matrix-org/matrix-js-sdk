@@ -383,9 +383,12 @@ InteractiveAuth.prototype = {
         // in general this is not really going to be an accurate error message.
         // Ideally this would signal what inputs could be removed such that a matching
         // flow could be found.
-        throw new Error(
-            "This server does not support registration with a phone number",
-        );
+        const err = new Error("No appropriate authentication flow found");
+        err.required_stages = [];
+        if (haveEmail) err.required_stages.push(EMAIL_STAGE_TYPE);
+        if (haveMsisdn) err.required_stages.push(MSISDN_STAGE_TYPE);
+        err.available_flows = flows;
+        throw err;
     },
 
     /**
