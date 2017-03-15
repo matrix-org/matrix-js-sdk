@@ -334,6 +334,13 @@ InteractiveAuth.prototype = {
      */
     _chooseStage: function() {
         const flow = this._chooseFlow();
+        if (!flow) {
+            // XXX: This happens to be the only way this can fail right now, but
+            // in general this is not really going to be an accurate error message.
+            // Ideally this would signal what inputs could be removed such that a matching
+            // flow could be found.
+            throw new Error("This server does not support registration with a phone number");
+        }
         console.log("Active flow => %s", JSON.stringify(flow));
         const nextStage = this._firstUncompletedStage(flow);
         console.log("Next stage: %s", nextStage);
