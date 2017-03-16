@@ -406,31 +406,18 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 });
 
 
-/* http://matrix.org/docs/spec/r0.0.1/client_server.html#redactions says:
+/* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
- * the server should strip off any keys not in the following list:
- *    event_id
- *    type
- *    room_id
- *    user_id
- *    state_key
- *    prev_state
- *    content
- *    [we keep 'unsigned' as well, since that is created by the local server]
+ * This is specified here:
+ *  http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#redactions
  *
- * The content object should also be stripped of all keys, unless it is one of
- * one of the following event types:
- *    m.room.member allows key membership
- *    m.room.create allows key creator
- *    m.room.join_rules allows key join_rule
- *    m.room.power_levels allows keys ban, events, events_default, kick,
- *        redact, state_default, users, users_default.
- *    m.room.aliases allows key aliases
+ * Also:
+ *  - We keep 'unsigned' since that is created by the local server
+ *  - We keep user_id for backwards-compat with v1
  */
-// a map giving the keys we keep when an event is redacted
 const _REDACT_KEEP_KEY_MAP = [
-    'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
-    'content', 'unsigned',
+    'event_id', 'type', 'room_id', 'user_id', 'sender', 'state_key', 'prev_state',
+    'content', 'unsigned', 'origin_server_ts',
 ].reduce(function(ret, val) {
     ret[val] = 1; return ret;
 }, {});
