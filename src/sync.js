@@ -82,6 +82,9 @@ function SyncApi(client, opts) {
     this._keepAliveTimer = null;
     this._connectionReturnedDefer = null;
     this._notifEvents = []; // accumulator of sync events in the current sync response
+    client._fns = {
+        // eventName: function
+    };
 
     if (client.getNotifTimelineSet()) {
         reEmit(client, client.getNotifTimelineSet(),
@@ -425,7 +428,8 @@ SyncApi.prototype.sync = function() {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
-        getPushRules();
+        //getPushRules();
+        self._sync({});
     }
 };
 
@@ -470,6 +474,7 @@ SyncApi.prototype.retryImmediately = function() {
 SyncApi.prototype._sync = function(syncOptions) {
     const client = this.client;
     const self = this;
+    console.log("_sync");
 
     if (!this._running) {
         debuglog("Sync no longer running: exiting.");
@@ -532,10 +537,13 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     let isCachedResponse = false;
+    console.log("syncOptions => ", syncOptions, self.opts);
     if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
+
         let data = self.opts.syncAccumulator.getJSON();
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
+        console.log("Data: ", data);
         if (data.nextBatch) {
             debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
             // We must deep copy the stored data so that the /sync processing code doesn't
@@ -553,10 +561,15 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     if (!isCachedResponse) {
-        //debuglog('Starting sync since=' + syncToken);
+/*
+        debuglog('Starting sync since=' + syncToken);
         this._currentSyncRequest = client._http.authedRequest(
             undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-        );
+        ); */
+        
+
+        var d = q.defer();
+        this._currentSyncRequest = d.promise;
     }
 
     this._currentSyncRequest.done(function(data) {
@@ -1214,21 +1227,23 @@ function createNewUser(client, userId) {
     return user;
 }
 
-function reEmit(reEmitEntity, emittableEntity, eventNames) {
-    utils.forEach(eventNames, function(eventName) {
-        // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
-            // take the args from the listener and reuse them, adding the
-            // event name to the arg list so it works with .emit()
-            // Transformation Example:
-            // listener on "foo" => function(a,b) { ... }
-            // Re-emit on "thing" => thing.emit("foo", a, b)
-            const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
+function reEmit(client, emittableEntity, eventNames) {
+    eventNames.forEach((name) => {
+        if (!client._fns[name]) {
+            client._fns[name] = function() {
+                // take the args from the listener and reuse them, adding the
+                // event name to the arg list so it works with .emit()
+                // Transformation Example:
+                // listener on "foo" => function(a,b) { ... }
+                // Re-emit on "thing" => thing.emit("foo", a, b)
+                const newArgs = [name];
+                for (let i = 0; i < arguments.length; i++) {
+                    newArgs.push(arguments[i]);
+                }
+                client.emit(...newArgs);
             }
-            reEmitEntity.emit(...newArgs);
-        });
+        }
+        emittableEntity.on(name, client._fns[name]);
     });
 }
 

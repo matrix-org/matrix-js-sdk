@@ -2777,7 +2777,7 @@ MatrixClient.prototype.startClient = function(opts) {
     }
 
     // periodically poll for turn servers if we support voip
-    checkTurnServers(this);
+    //checkTurnServers(this);
 
     if (this._syncApi) {
         // This shouldn't happen since we thought the client was not running
