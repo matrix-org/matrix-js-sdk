@@ -141,6 +141,41 @@ describe("SyncAccumulator", function() {
         expect(output.timeline.prev_batch).toEqual("pinned_to_8");
     });
 
+    it("should remove the stored timeline on limited syncs", () => {
+        sa.accumulate(syncSkeleton({
+            state: { events: [member("alice", "join")] },
+            timeline: {
+                events: [
+                    msg("alice", "1"),
+                    msg("alice", "2"),
+                    msg("alice", "3"),
+                ],
+                prev_batch: "pinned_to_1",
+            },
+        }));
+        // some time passes and now we get a limited sync
+        sa.accumulate(syncSkeleton({
+            state: { events: [] },
+            timeline: {
+                limited: true,
+                events: [
+                    msg("alice", "51"),
+                    msg("alice", "52"),
+                    msg("alice", "53"),
+                ],
+                prev_batch: "pinned_to_51",
+            },
+        }));
+
+        const output = sa.getJSON().roomsData.join["!foo:bar"];
+
+        expect(output.timeline.events.length).toEqual(3);
+        output.timeline.events.forEach((e, i) => {
+            expect(e.content.body).toEqual(""+(i+51));
+        });
+        expect(output.timeline.prev_batch).toEqual("pinned_to_51");
+    });
+
     it("should drop typing notifications", () => {
         const res = syncSkeleton({
             ephemeral: {

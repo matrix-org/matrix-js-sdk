@@ -290,6 +290,12 @@ class SyncAccumulator {
             });
         }
 
+        // if we got a limited sync, we need to remove all timeline entries or else
+        // we will have gaps in the timeline.
+        if (data.timeline && data.timeline.limited) {
+            currentData._timeline = [];
+        }
+
         // Work out the current state. The deltas need to be applied in the order:
         // - existing state which didn't come down /sync.
         // - State events under the 'state' key.
