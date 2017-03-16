@@ -109,21 +109,25 @@ InteractiveAuth.prototype = {
     /**
      * begin the authentication process.
      *
-     * @return {module:client.Promise}  which resolves to the response on success,
-     * or rejects with the error on failure.
+     * @return {module:client.Promise} which resolves to the response on success,
+     * or rejects with the error on failure. Rejects with NoAuthFlowFoundError} if
+     *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
         this._completionDeferred = q.defer();
 
-        // if we have no flows, try a request (we'll have
-        // just a session ID in _data if resuming)
-        if (!this._data.flows) {
-            this._doRequest(this._data);
-        } else {
-            this._startNextAuthStage();
-        }
-
-        return this._completionDeferred.promise;
+        // wrap in a promise so that if _startNextAuthStage
+        // throws, it rejects the promise in a consistent way
+        return q().then(() => {
+            // if we have no flows, try a request (we'll have
+            // just a session ID in _data if resuming)
+            if (!this._data.flows) {
+                this._doRequest(this._data);
+            } else {
+                this._startNextAuthStage();
+            }
+            return this._completionDeferred.promise;
+        });
     },
 
     /**
@@ -303,6 +307,7 @@ InteractiveAuth.prototype = {
      * Pick the next stage and call the callback
      *
      * @private
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _startNextAuthStage: function() {
         const nextStage = this._chooseStage();
@@ -331,6 +336,7 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @return {string?} login type
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _chooseStage: function() {
         const flow = this._chooseFlow();
@@ -353,6 +359,7 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @return {object} flow
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _chooseFlow: function() {
         const flows = this._data.flows || [];
@@ -379,11 +386,10 @@ InteractiveAuth.prototype = {
                 return flow;
             }
         }
-        // XXX: This happens to be the only way this can fail right now, but
-        // in general this is not really going to be an accurate error message.
-        // Ideally this would signal what inputs could be removed such that a matching
-        // flow could be found.
+        // Throw an error with a fairly generic description, but with more
+        // information such that the app can give a better one if so desired.
         const err = new Error("No appropriate authentication flow found");
+        err.name = 'NoAuthFlowFoundError';
         err.required_stages = [];
         if (haveEmail) err.required_stages.push(EMAIL_STAGE_TYPE);
         if (haveMsisdn) err.required_stages.push(MSISDN_STAGE_TYPE);
