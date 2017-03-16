@@ -110,7 +110,7 @@ InteractiveAuth.prototype = {
      * begin the authentication process.
      *
      * @return {module:client.Promise} which resolves to the response on success,
-     * or rejects with the error on failure. Rejects with NoAuthFlowFoundError} if
+     * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
