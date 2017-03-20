@@ -553,7 +553,7 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     if (!isCachedResponse) {
-        // debuglog('Starting sync since=' + syncToken);
+        //debuglog('Starting sync since=' + syncToken);
         this._currentSyncRequest = client._http.authedRequest(
             undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
         );
@@ -1215,7 +1215,7 @@ function createNewUser(client, userId) {
 }
 
 function reEmit(reEmitEntity, emittableEntity, eventNames) {
-    utils.forEach(eventName, function(eventName) {
+    utils.forEach(eventNames, function(eventName) {
         // setup a listener on the entity (the Room, User, etc) for this event
         emittableEntity.on(eventName, function() {
             // take the args from the listener and reuse them, adding the
@@ -1228,7 +1228,7 @@ function reEmit(reEmitEntity, emittableEntity, eventNames) {
                 newArgs.push(arguments[i]);
             }
             reEmitEntity.emit(...newArgs);
-        });  
+        });
     });
 }
 
