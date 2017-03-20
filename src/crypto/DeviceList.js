@@ -231,7 +231,7 @@ export default class DeviceList {
         // refresh request).
         // By checking it is at least a string, we can eliminate a class of
         // silly errors.
-        if (typeof userId !== 'string' && typeof userId !== 'object') {
+        if (typeof userId !== 'string') {
             throw new Error('userId must be a string; was '+userId);
         }
         this._pendingUsersWithNewDevices[userId] = true;

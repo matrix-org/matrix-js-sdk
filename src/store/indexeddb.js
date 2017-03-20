@@ -33,7 +33,7 @@ const VERSION = 1;
 // so infrequently that the /sync size gets bigger on reload. Writing more
 // often does not affect the length of the pause since the entire /sync
 // response is persisted each time.
-const WRITE_DELAY_MS = 1000 * 60 * 100; // once every 5 minutes
+const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 /**
  * Construct a new Indexed Database store backend. This requires a call to
