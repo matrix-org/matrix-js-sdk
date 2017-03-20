@@ -77,6 +77,9 @@ const interns = {};
 module.exports.MatrixEvent = function MatrixEvent(
     event,
 ) {
+    // intern the values of matrix events to force share strings and reduce the
+    // amount of needless string duplication. This can save moderate amounts of
+    // memory (~10% on a 350MB heap).
     ["state_key", "type", "sender", "room_id"].forEach((prop) => {
         if (!event[prop]) {
             return;
@@ -97,10 +100,7 @@ module.exports.MatrixEvent = function MatrixEvent(
         event.content[prop] = interns[event.content[prop]];
     });
 
-    
-
     this.event = event || {};
-
 
     this.sender = null;
     this.target = null;
