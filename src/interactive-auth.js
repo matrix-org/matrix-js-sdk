@@ -47,8 +47,9 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
- * @param {function(object?): module:client.Promise} opts.doRequest
- *     called with the new auth dict to submit the request. Should return a
+ * @param {function(object?, bool?): module:client.Promise} opts.doRequest
+ *     called with the new auth dict to submit the request and a flag set
+ *     to true if this request is a background request. Should return a
  *     promise which resolves to the successful response or rejects with a
  *     MatrixError.
  *
