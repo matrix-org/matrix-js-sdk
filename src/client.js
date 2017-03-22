@@ -3289,7 +3289,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
 
 /**
  * Fires whenever new user-scoped account_data is added.
- * @event module:client~MatrixClient#"Room"
+ * @event module:client~MatrixClient#"accountData"
  * @param {MatrixEvent} event The event describing the account_data just added
  * @example
  * matrixClient.on("accountData", function(event){
