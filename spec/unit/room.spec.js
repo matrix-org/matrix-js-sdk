@@ -446,12 +446,15 @@ describe("Room", function() {
             expect(callCount).toEqual(1);
         });
 
-        it("should forget old timelines", function() {
+        it("should " + (timelineSupport ? "remember" : "forget") +
+                " old timelines", function() {
             room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
+            const firstLiveTimeline = room.getLiveTimeline();
             room.resetLiveTimeline();
+
             const tl = room.getTimelineForEvent(events[0].getId());
-            expect(tl).toBe(null);
+            expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
         });
     };
 
