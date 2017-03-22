@@ -47,8 +47,9 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
- * @param {function(object?): module:client.Promise} opts.doRequest
- *     called with the new auth dict to submit the request. Should return a
+ * @param {function(object?, bool?): module:client.Promise} opts.doRequest
+ *     called with the new auth dict to submit the request and a flag set
+ *     to true if this request is a background request. Should return a
  *     promise which resolves to the successful response or rejects with a
  *     MatrixError.
  *
@@ -201,11 +202,11 @@ InteractiveAuth.prototype = {
      * @param {object} authData new auth dict to send to the server. Should
      *    include a `type` propterty denoting the login type, as well as any
      *    other params for that stage.
-     * @param {bool} ignoreFailure If true, this request failing will not result
+     * @param {bool} background If true, this request failing will not result
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData, ignoreFailure) {
+    submitAuthDict: function(authData, background) {
         if (!this._completionDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -216,7 +217,7 @@ InteractiveAuth.prototype = {
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth, ignoreFailure);
+        this._doRequest(auth, background);
     },
 
     /**
@@ -247,11 +248,12 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @param {object?} auth new auth dict, including session id
-     * @param {bool?} ignoreFailure If true, this request failing will not result
-     *    in the attemptAuth promise being rejected. This can be set to true
-     *    for requests that just poll to see if auth has been completed elsewhere.
+     * @param {bool?} background If true, this request is a background poll, so it
+     *    failing will not result in the attemptAuth promise being rejected.
+     *    This can be set to true for requests that just poll to see if auth has
+     *    been completed elsewhere.
      */
-    _doRequest: function(auth, ignoreFailure) {
+    _doRequest: function(auth, background) {
         const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
@@ -259,7 +261,7 @@ InteractiveAuth.prototype = {
         // extra q().then)
         let prom;
         try {
-            prom = this._requestCallback(auth);
+            prom = this._requestCallback(auth, background);
         } catch (e) {
             prom = q.reject(e);
         }
@@ -290,7 +292,7 @@ InteractiveAuth.prototype = {
                 self._startNextAuthStage();
             },
         );
-        if (!ignoreFailure) {
+        if (!background) {
             prom = prom.catch(this._completionDeferred.reject);
         } else {
             // We ignore all failures here (even non-UI auth related ones)
