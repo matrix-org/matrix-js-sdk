@@ -2758,13 +2758,6 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Filter=} opts.filter The filter to apply to /sync calls. This will override
  * the opts.initialSyncLimit, which would normally result in a timeline limit filter.
- *
- * @param {Function=} opts.canResetEntireTimeline A function which is called when /sync
- * returns a 'limited' response. It is called with a room ID and returns a boolean.
- * It should return 'true' if the SDK can SAFELY remove events from this room. It may
- * not be safe to remove events if there are other references to the timelines for this
- * room, e.g because the client is actively viewing events in this room.
- * Default: returns false.
  */
 MatrixClient.prototype.startClient = function(opts) {
     if (this.clientRunning) {
@@ -2797,6 +2790,12 @@ MatrixClient.prototype.startClient = function(opts) {
 
     opts.crypto = this._crypto;
     opts.syncAccumulator = this._syncAccumulator;
+    opts.canResetEntireTimeline = (roomId) => {
+        if (!this._canResetTimelineCallback) {
+            return false;
+        }
+        return this._canResetTimelineCallback(roomId);
+    };
     this._clientOpts = opts;
 
     this._syncApi = new SyncApi(this, opts);
@@ -2815,6 +2814,27 @@ MatrixClient.prototype.stopClient = function() {
         this._syncApi = null;
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
+};
+
+/*
+ * Set a function which is called when /sync returns a 'limited' response.
+ * It is called with a room ID and returns a boolean. It should return 'true' if the SDK
+ * can SAFELY remove events from this room. It may not be safe to remove events if there
+ * are other references to the timelines for this room, e.g because the client is
+ * actively viewing events in this room.
+ * Default: returns false.
+ * @param {Function} cb The callback which will be invoked.
+ */
+MatrixClient.prototype.setCanResetTimelineCallback = function(cb) {
+    this._canResetTimelineCallback = cb;
+};
+
+/**
+ * Get the callback set via `setCanResetTimelineCallback`.
+ * @return {?Function} The callback or null
+ */
+MatrixClient.prototype.getCanResetTimelineCallback = function() {
+    return this._canResetTimelineCallback;
 };
 
 function setupCallEventHandler(client) {
