@@ -49,6 +49,8 @@ module.exports.EventStatus = {
     CANCELLED: "cancelled",
 };
 
+const interns = {};
+
 /**
  * Construct a Matrix Event object
  * @constructor
@@ -75,7 +77,31 @@ module.exports.EventStatus = {
 module.exports.MatrixEvent = function MatrixEvent(
     event,
 ) {
+    // intern the values of matrix events to force share strings and reduce the
+    // amount of needless string duplication. This can save moderate amounts of
+    // memory (~10% on a 350MB heap).
+    ["state_key", "type", "sender", "room_id"].forEach((prop) => {
+        if (!event[prop]) {
+            return;
+        }
+        if (!interns[event[prop]]) {
+            interns[event[prop]] = event[prop];
+        }
+        event[prop] = interns[event[prop]];
+    });
+
+    ["membership", "avatar_url", "displayname"].forEach((prop) => {
+        if (!event.content || !event.content[prop]) {
+            return;
+        }
+        if (!interns[event.content[prop]]) {
+            interns[event.content[prop]] = event.content[prop];
+        }
+        event.content[prop] = interns[event.content[prop]];
+    });
+
     this.event = event || {};
+
     this.sender = null;
     this.target = null;
     this.status = null;

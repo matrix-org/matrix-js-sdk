@@ -154,10 +154,11 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
  * @fires module:client~MatrixClient#event:"Room.timelineReset"
  */
 EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
-    let newTimeline;
+    // if timeline support is disabled, forget about the old timelines
+    const resetAllTimelines = !this._timelineSupport || flush;
 
-    if (!this._timelineSupport || flush) {
-        // if timeline support is disabled, forget about the old timelines
+    let newTimeline;
+    if (resetAllTimelines) {
         newTimeline = new EventTimeline(this);
         this._timelines = [newTimeline];
         this._eventIdToTimeline = {};
@@ -187,7 +188,7 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
     newTimeline.setPaginationToken(backPaginationToken, EventTimeline.BACKWARDS);
 
     this._liveTimeline = newTimeline;
-    this.emit("Room.timelineReset", this.room, this);
+    this.emit("Room.timelineReset", this.room, this, resetAllTimelines);
 };
 
 /**
@@ -655,4 +656,5 @@ module.exports = EventTimelineSet;
  * @event module:client~MatrixClient#"Room.timelineReset"
  * @param {Room} room The room whose live timeline was reset, if any
  * @param {EventTimelineSet} timelineSet timelineSet room whose live timeline was reset
+ * @param {boolean} resetAllTimelines True if all timelines were reset.
  */
