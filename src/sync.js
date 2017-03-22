@@ -860,7 +860,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId)
+                    self.opts.canResetEntireTimeline(room.roomId),
                 );
 
                 // We have to assume any gap in any timeline is
