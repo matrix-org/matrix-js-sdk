@@ -204,15 +204,12 @@ Room.prototype.getLiveTimeline = function() {
  * <p>This is used when /sync returns a 'limited' timeline.
  *
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
+ * @param {boolean=} flush True to remove all events in all timelines. If false, only
+ * the live timeline is reset.
  */
-Room.prototype.resetLiveTimeline = function(backPaginationToken) {
+Room.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
     for (let i = 0; i < this._timelineSets.length; i++) {
-        // Flush out non-live timelines. We do this to reduce the amount of memory
-        // used, as storing multiple distinct copies of room state (each of which
-        // can be 10s of MBs) for each timeline is expensive. This is particularly
-        // noticeable when the client unsleeps and there are a lot of 'limited: true'
-        // responses. https://github.com/vector-im/riot-web/issues/3307#issuecomment-282895568
-        this._timelineSets[i].resetLiveTimeline(backPaginationToken, true);
+        this._timelineSets[i].resetLiveTimeline(backPaginationToken, flush);
     }
 
     this._fixUpLegacyTimelineFields();

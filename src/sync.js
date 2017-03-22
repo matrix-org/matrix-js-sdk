@@ -63,6 +63,11 @@ function debuglog() {
  * @param {SyncAccumulator=} opts.syncAccumulator An accumulator which will be
  * kept up-to-date. If one is supplied, the response to getJSON() will be used
  * initially.
+ * @param {Function=} opts.canResetEntireTimeline A function which is called
+ * with a room ID and returns a boolean. It should return 'true' if the SDK can
+ * SAFELY remove events from this room. It may not be safe to remove events if
+ * there are other references to the timelines for this room.
+ * Default: returns false.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -73,6 +78,11 @@ function SyncApi(client, opts) {
     opts.resolveInvitesToProfiles = opts.resolveInvitesToProfiles || false;
     opts.pollTimeout = opts.pollTimeout || (30 * 1000);
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
+    if (!opts.canResetEntireTimeline) {
+        opts.canResetEntireTimeline = function(roomId) {
+            return false;
+        };
+    }
     this.opts = opts;
     this._peekRoomId = null;
     this._currentSyncRequest = null;
@@ -848,7 +858,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 // timeline.
                 room.currentState.paginationToken = syncToken;
                 self._deregisterStateListeners(room);
-                room.resetLiveTimeline(joinObj.timeline.prev_batch);
+                room.resetLiveTimeline(
+                    joinObj.timeline.prev_batch,
+                    self.opts.canResetEntireTimeline(room.roomId)
+                );
 
                 // We have to assume any gap in any timeline is
                 // reason to stop incrementally tracking notifications and

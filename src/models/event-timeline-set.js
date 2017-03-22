@@ -187,7 +187,7 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
     newTimeline.setPaginationToken(backPaginationToken, EventTimeline.BACKWARDS);
 
     this._liveTimeline = newTimeline;
-    this.emit("Room.timelineReset", this.room, this);
+    this.emit("Room.timelineReset", this.room, this, flush);
 };
 
 /**
@@ -655,4 +655,6 @@ module.exports = EventTimelineSet;
  * @event module:client~MatrixClient#"Room.timelineReset"
  * @param {Room} room The room whose live timeline was reset, if any
  * @param {EventTimelineSet} timelineSet timelineSet room whose live timeline was reset
+ * @param {boolean} resetAll The return value for canResetEntireTimeline() for this room.
+ * If true, ALL timeline sets for this room will be reset.
  */
