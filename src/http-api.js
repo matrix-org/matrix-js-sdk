@@ -686,21 +686,22 @@ module.exports.MatrixHttpApi.prototype = {
                     handlerFn(err, response, body);
                 },
             );
-            // This will only work in a browser, where opts.request is the
-            // `browser-request` import. Currently `request` does not support progress
-            // updates - see https://github.com/request/request/pull/2346.
-            // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
-            if ('onprogress' in req) {
-                req.onprogress = (e) => {
-                    // Prevent the timeout from rejecting the deferred promise if progress is
-                    // seen with the request
-                    resetTimeout();
-                };
-            }
-            if (req && req.abort) {
+            if (req) {
+                // This will only work in a browser, where opts.request is the
+                // `browser-request` import. Currently `request` does not support progress
+                // updates - see https://github.com/request/request/pull/2346.
+                // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
+                if ('onprogress' in req) {
+                    req.onprogress = (e) => {
+                        // Prevent the timeout from rejecting the deferred promise if progress is
+                        // seen with the request
+                        resetTimeout();
+                    };
+                }
+
                 // FIXME: This is EVIL, but I can't think of a better way to expose
                 // abort() operations on underlying HTTP requests :(
-                reqPromise.abort = req.abort.bind(req);
+                if (req.abort) reqPromise.abort = req.abort.bind(req);
             }
         } catch (ex) {
             defer.reject(ex);
