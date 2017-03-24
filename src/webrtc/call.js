@@ -248,22 +248,23 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
  * serialising the operation into a chain of promises to avoid racing access
  * to the element
  * @param {Element} element HTMLMediaElement element to pause
- * @param {string} src the src attribute value to assign to the element
+ * @param {MediaStream} srcObject the srcObject attribute value to assign to the element
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
-MatrixCall.prototype.assignElement = function(element, src, queueId) {
-    console.log("queuing assign on " + queueId + " element " + element + " for " + src);
+MatrixCall.prototype.assignElement = function(element, srcObject, queueId) {
+    console.log("queuing assign on " + queueId + " element " + element + " for " +
+        srcObject);
     if (this.mediaPromises[queueId]) {
         this.mediaPromises[queueId] =
             this.mediaPromises[queueId].then(function() {
                 console.log("previous promise completed for " + queueId);
-                element.src = src;
+                element.srcObject = srcObject;
             }, function() {
                 console.log("previous promise failed for " + queueId);
-                element.src = src;
+                element.srcObject = srcObject;
             });
     } else {
-        element.src = src;
+        element.srcObject = srcObject;
     }
 };
 
@@ -303,9 +304,7 @@ MatrixCall.prototype.setLocalVideoElement = function(element) {
 
     if (element && this.localAVStream && this.type === 'video') {
         element.autoplay = true;
-        this.assignElement(element,
-                           this.URL.createObjectURL(this.localAVStream),
-                           "localVideo");
+        this.assignElement(element, this.localAVStream, "localVideo");
         element.muted = true;
         const self = this;
         setTimeout(function() {
@@ -540,13 +539,9 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         videoEl.autoplay = true;
         if (this.screenSharingStream) {
             debuglog("Setting screen sharing stream to the local video element");
-            this.assignElement(videoEl,
-                   this.URL.createObjectURL(this.screenSharingStream),
-                   "localVideo");
+            this.assignElement(videoEl, this.screenSharingStream, "localVideo");
         } else {
-            this.assignElement(videoEl,
-                   this.URL.createObjectURL(stream),
-                   "localVideo");
+            this.assignElement(videoEl, stream, "localVideo");
         }
         videoEl.muted = true;
         setTimeout(function() {
@@ -588,9 +583,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
 
     if (localVidEl && self.type == 'video') {
         localVidEl.autoplay = true;
-        this.assignElement(localVidEl,
-               this.URL.createObjectURL(stream),
-               "localVideo");
+        this.assignElement(localVidEl, stream, "localVideo");
         localVidEl.muted = true;
         setTimeout(function() {
             const vel = self.getLocalVideoElement();
@@ -967,19 +960,19 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
         if (self.getRemoteVideoElement().pause) {
             self.pauseElement(self.getRemoteVideoElement(), "remoteVideo");
         }
-        self.assignElement(self.getRemoteVideoElement(), "", "remoteVideo");
+        self.assignElement(self.getRemoteVideoElement(), null, "remoteVideo");
     }
     if (self.getRemoteAudioElement()) {
         if (self.getRemoteAudioElement().pause) {
             self.pauseElement(self.getRemoteAudioElement(), "remoteAudio");
         }
-        self.assignElement(self.getRemoteAudioElement(), "", "remoteAudio");
+        self.assignElement(self.getRemoteAudioElement(), null, "remoteAudio");
     }
     if (self.getLocalVideoElement()) {
         if (self.getLocalVideoElement().pause) {
             self.pauseElement(self.getLocalVideoElement(), "localVideo");
         }
-        self.assignElement(self.getLocalVideoElement(), "", "localVideo");
+        self.assignElement(self.getLocalVideoElement(), null, "localVideo");
     }
     self.hangupParty = hangupParty;
     self.hangupReason = hangupReason;
@@ -1037,9 +1030,7 @@ const _tryPlayRemoteStream = function(self) {
     if (self.getRemoteVideoElement() && self.remoteAVStream) {
         const player = self.getRemoteVideoElement();
         player.autoplay = true;
-        self.assignElement(player,
-                           self.URL.createObjectURL(self.remoteAVStream),
-                           "remoteVideo");
+        self.assignElement(player, self.remoteAVStream, "remoteVideo");
         setTimeout(function() {
             const vel = self.getRemoteVideoElement();
             if (vel.play) {
@@ -1057,9 +1048,7 @@ const _tryPlayRemoteAudioStream = function(self) {
     if (self.getRemoteAudioElement() && self.remoteAStream) {
         const player = self.getRemoteAudioElement();
         player.autoplay = true;
-        self.assignElement(player,
-                           self.URL.createObjectURL(self.remoteAStream),
-                           "remoteAudio");
+        self.assignElement(player, self.remoteAStream, "remoteAudio");
         setTimeout(function() {
             const ael = self.getRemoteAudioElement();
             if (ael.play) {
