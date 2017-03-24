@@ -44,7 +44,7 @@ window.onload = function() {
     disableButtons(true, true, true);
 };
 
-matrixClient.on("sync", function(state, prevState, data) {
+client.on("sync", function(state, prevState, data) {
     switch (state) {
         case "PREPARED":
           syncComplete();
