@@ -276,7 +276,7 @@ IndexedDBStore.prototype.startup = function() {
     }).then((values) => {
         const [users, accountData, syncData] = values;
         console.log(
-            "Loaded data from database: sync from ", syncData,
+            "Loaded data from database: sync from ", syncData.nextBatch,
             " -- Reticulating splines...",
         );
         users.forEach((u) => {
