@@ -252,7 +252,8 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.assignElement = function(element, srcObject, queueId) {
-    console.log("queuing assign on " + queueId + " element " + element + " for " + srcObject);
+    console.log("queuing assign on " + queueId + " element " + element + " for " +
+        srcObject);
     if (this.mediaPromises[queueId]) {
         this.mediaPromises[queueId] =
             this.mediaPromises[queueId].then(function() {
