@@ -19,6 +19,7 @@ limitations under the License.
  * @module webrtc/call
  */
 const utils = require("../utils");
+const Sdp = require('./sdp');
 const EventEmitter = require("events").EventEmitter;
 const DEBUG = true;  // set true to enable console logging.
 
@@ -74,12 +75,14 @@ const DEBUG = true;  // set true to enable console logging.
  * @param {Object} opts.URL The URL global.
  * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
+ * @param {Array<string>} opts.codecPriority Optional. A list of codec strings in order of priority, e.g. ['h264', 'vp9']
  */
 function MatrixCall(opts) {
     this.roomId = opts.roomId;
     this.client = opts.client;
     this.webRtc = opts.webRtc;
     this.URL = opts.URL;
+    this.codecPriority = opts.codecPriority || ['H264'];
     // Array of Objects with urls, username, credential keys
     this.turnServers = opts.turnServers || [];
     if (this.turnServers.length === 0) {
@@ -520,6 +523,43 @@ MatrixCall.prototype.isMicrophoneMuted = function() {
 
 /**
  * Internal
+ * Within each m= block, bump preferred codecs, in order, to before other codecs.
+ * Retain ordering of other codecs. e.g. a, c, d, e, b input with e, x, c preferred
+ * gives e, c, a, d, b.
+ * @private
+ * @param {string} sdp
+ * @return {string} sdp with codecs ordered by priority
+ */
+MatrixCall.prototype._reorderCodecs = function(sdp) {
+    const self = this;
+    if (!self.codecPriority || !Array.isArray(self.codecPriority)) {
+        return sdp;
+    }
+    const codecPrioritySet = new Set(self.codecPriority);
+
+    const parsed = new Sdp().parseSdp(sdp);
+    parsed.media.forEach((media) => {
+        let newRtp = [];
+        self.codecPriority.forEach((priorityCodec) => {
+            newRtp = newRtp.concat(
+                media.rtp.filter(
+                    (rtp) => rtp.codec.toLowerCase() === priorityCodec.toLowerCase(),
+                ),
+            );
+        });
+        newRtp = newRtp.concat(
+            media.rtp.filter(
+                (rtp) => !codecPrioritySet.has(rtp.codec),
+            ),
+        );
+        media.rtp = newRtp;
+    });
+    const reorderedSdp = new Sdp().compileSdp(parsed);
+    return reorderedSdp;
+};
+
+/**
+ * Internal
  * @private
  * @param {Object} stream
  */
@@ -604,6 +644,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
         },
     };
     self.peerConn.createAnswer(function(description) {
+        description.sdp = self._reorderCodecs(description.sdp);
         debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
             const content = {
@@ -691,6 +732,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
  */
 MatrixCall.prototype._gotLocalOffer = function(description) {
     const self = this;
+    description.sdp = self._reorderCodecs(description.sdp);
     debuglog("Created offer: " + description);
 
     if (self.state == 'ended') {
