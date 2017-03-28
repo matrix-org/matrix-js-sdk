@@ -69,6 +69,9 @@ Sdp.prototype.parseSdp = function(s) {
                             }
                             break;
                         }
+                        case 'ice-options':
+                            sdp.iceOptions = args;
+                            break;
                         case 'msid-semantic': {
                             const r = args.match(/^ *(.*?) (.*)$/);
                             if (r) {
@@ -105,10 +108,15 @@ Sdp.prototype.parseSdp = function(s) {
                         case 'fingerprint': {
                             const r = args.match(/^(.*?) (.*)$/);
                             if (r) {
-                                media.fingerprint = {
+                                const fingerprint = {
                                     type: r[1],
                                     hash: r[2],
                                 };
+                                if (media) {
+                                    media.fingerprint = fingerprint;
+                                } else {
+                                    sdp.fingerprint = fingerprint;
+                                }
                             } else {
                                 console.error('Couldn\'t parse fingerprint line: ' +
                                     line);
@@ -120,6 +128,9 @@ Sdp.prototype.parseSdp = function(s) {
                             break;
                         case 'mid':
                             media.mid = args;
+                            break;
+                        case 'msid':
+                            media.msid = args;
                             break;
                         case 'extmap': {
                             const r = args.match(/^(.*?) (.*)$/);
@@ -301,14 +312,21 @@ Sdp.prototype.compileSdp = function(sdp) {
         s += 't=' + sdp.timing.start + ' ' +
                     sdp.timing.stop + '\r\n';
     }
+    if (sdp.fingerprint !== undefined) {
+        s += 'a=fingerprint:' + sdp.fingerprint.type + ' ' +
+            sdp.fingerprint.hash + '\r\n';
+    }
     if (sdp.groups !== undefined) {
         for (let i = 0; i < sdp.groups.length; i++) {
             const group = sdp.groups[i];
             s += 'a=group:' + group.type + ' ' + group.mids + '\r\n';
         }
     }
+    if (sdp.iceOptions !== undefined) {
+        s += 'a=ice-options:' + sdp.iceOptions + '\r\n';
+    }
     if (sdp.msidSemantic !== undefined) {
-        s += 'a=msid-semantic: ' + sdp.msidSemantic.semantic + ' ' +
+        s += 'a=msid-semantic:' + sdp.msidSemantic.semantic + ' ' +
                                    sdp.msidSemantic.token + '\r\n';
     }
     if (sdp.media !== undefined) {
@@ -343,6 +361,9 @@ Sdp.prototype.compileSdp = function(sdp) {
             }
             if (media.mid !== undefined) {
                 s += 'a=mid:' + media.mid + '\r\n';
+            }
+            if (media.msid !== undefined) {
+                s += 'a=msid:' + media.msid + '\r\n';
             }
             if (media.ext !== undefined) {
                 for (let j = 0; j < media.ext.length; j++) {
