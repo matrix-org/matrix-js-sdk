@@ -7,6 +7,10 @@ Sdp.prototype.parseSdp = function(s) {
     let media;
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (line.match(/^\s*$/)) {
+            console.log('Skipping empty sdp line');
+            continue;
+        }
         const r = line.match(/^(.+?)=(.+)$/);
         if (!r) {
             console.error('Couldn\'t parse sdp line: ' + line);
