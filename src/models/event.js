@@ -21,9 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-var EventEmitter = require("events").EventEmitter;
+const EventEmitter = require("events").EventEmitter;
 
-var utils = require('../utils.js');
+const utils = require('../utils.js');
 
 /**
  * Enum for event statuses.
@@ -49,6 +49,8 @@ module.exports.EventStatus = {
     CANCELLED: "cancelled",
 };
 
+const interns = {};
+
 /**
  * Construct a Matrix Event object
  * @constructor
@@ -61,21 +63,49 @@ module.exports.EventStatus = {
  * from changes to event JSON between Matrix versions.
  *
  * @prop {RoomMember} sender The room member who sent this event, or null e.g.
- * this is a presence event.
+ * this is a presence event. This is only guaranteed to be set for events that
+ * appear in a timeline, ie. do not guarantee that it will be set on state
+ * events.
  * @prop {RoomMember} target The room member who is the target of this event, e.g.
  * the invitee, the person being banned, etc.
  * @prop {EventStatus} status The sending status of the event.
+ * @prop {Error} error most recent error associated with sending the event, if any
  * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
  * that getDirectionalContent() will return event.content and not event.prev_content.
  * Default: true. <strong>This property is experimental and may change.</strong>
  */
 module.exports.MatrixEvent = function MatrixEvent(
-    event
+    event,
 ) {
+    // intern the values of matrix events to force share strings and reduce the
+    // amount of needless string duplication. This can save moderate amounts of
+    // memory (~10% on a 350MB heap).
+    ["state_key", "type", "sender", "room_id"].forEach((prop) => {
+        if (!event[prop]) {
+            return;
+        }
+        if (!interns[event[prop]]) {
+            interns[event[prop]] = event[prop];
+        }
+        event[prop] = interns[event[prop]];
+    });
+
+    ["membership", "avatar_url", "displayname"].forEach((prop) => {
+        if (!event.content || !event.content[prop]) {
+            return;
+        }
+        if (!interns[event.content[prop]]) {
+            interns[event.content[prop]] = event.content[prop];
+        }
+        event.content[prop] = interns[event.content[prop]];
+    });
+
     this.event = event || {};
+
     this.sender = null;
     this.target = null;
     this.status = null;
+    this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
     this._date = this.event.origin_server_ts ?
@@ -340,18 +370,22 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         this.event.unsigned.redacted_because = redaction_event.event;
 
-        var key;
+        let key;
         for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) { continue; }
+            if (!this.event.hasOwnProperty(key)) {
+                continue;
+            }
             if (!_REDACT_KEEP_KEY_MAP[key]) {
                 delete this.event[key];
             }
         }
 
-        var keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
-        var content = this.getContent();
+        const keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        const content = this.getContent();
         for (key in content) {
-            if (!content.hasOwnProperty(key)) { continue; }
+            if (!content.hasOwnProperty(key)) {
+                continue;
+            }
             if (!keeps[key]) {
                 delete content[key];
             }
@@ -394,39 +428,28 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         // successfully sent.
         this.status = null;
         this._date = new Date(this.event.origin_server_ts);
-     }
+     },
 });
 
 
-/* http://matrix.org/docs/spec/r0.0.1/client_server.html#redactions says:
+/* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
- * the server should strip off any keys not in the following list:
- *    event_id
- *    type
- *    room_id
- *    user_id
- *    state_key
- *    prev_state
- *    content
- *    [we keep 'unsigned' as well, since that is created by the local server]
+ * This is specified here:
+ *  http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#redactions
  *
- * The content object should also be stripped of all keys, unless it is one of
- * one of the following event types:
- *    m.room.member allows key membership
- *    m.room.create allows key creator
- *    m.room.join_rules allows key join_rule
- *    m.room.power_levels allows keys ban, events, events_default, kick,
- *        redact, state_default, users, users_default.
- *    m.room.aliases allows key aliases
+ * Also:
+ *  - We keep 'unsigned' since that is created by the local server
+ *  - We keep user_id for backwards-compat with v1
  */
-// a map giving the keys we keep when an event is redacted
-var _REDACT_KEEP_KEY_MAP = [
-    'event_id', 'type', 'room_id', 'user_id', 'state_key', 'prev_state',
-    'content', 'unsigned',
-].reduce(function(ret, val) { ret[val] = 1; return ret; }, {});
+const _REDACT_KEEP_KEY_MAP = [
+    'event_id', 'type', 'room_id', 'user_id', 'sender', 'state_key', 'prev_state',
+    'content', 'unsigned', 'origin_server_ts',
+].reduce(function(ret, val) {
+    ret[val] = 1; return ret;
+}, {});
 
 // a map from event type to the .content keys we keep when an event is redacted
-var _REDACT_KEEP_CONTENT_MAP = {
+const _REDACT_KEEP_CONTENT_MAP = {
     'm.room.member': {'membership': 1},
     'm.room.create': {'creator': 1},
     'm.room.join_rules': {'join_rule': 1},
@@ -436,8 +459,6 @@ var _REDACT_KEEP_CONTENT_MAP = {
                            },
     'm.room.aliases': {'aliases': 1},
 };
-
-
 
 
 /**

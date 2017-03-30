@@ -20,7 +20,7 @@ limitations under the License.
  *
  * @module crypto/algorithms/base
  */
-var utils = require("../../utils");
+const utils = require("../../utils");
 
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
@@ -53,7 +53,7 @@ module.exports.DECRYPTION_CLASSES = {};
  * @param {string} params.roomId  The ID of the room we will be sending to
  * @param {object} params.config  The body of the m.room.encryption event
  */
-var EncryptionAlgorithm = function(params) {
+const EncryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._deviceId = params.deviceId;
     this._crypto = params.crypto;
@@ -85,7 +85,7 @@ module.exports.EncryptionAlgorithm = EncryptionAlgorithm;
  * @param {string=} oldMembership  previous membership
  */
 EncryptionAlgorithm.prototype.onRoomMembership = function(
-    event, member, oldMembership
+    event, member, oldMembership,
 ) {};
 
 /**
@@ -101,7 +101,7 @@ EncryptionAlgorithm.prototype.onRoomMembership = function(
  * @param {string=} params.roomId The ID of the room we will be receiving
  *     from. Null for to-device events.
  */
-var DecryptionAlgorithm = function(params) {
+const DecryptionAlgorithm = function(params) {
     this._userId = params.userId;
     this._crypto = params.crypto;
     this._olmDevice = params.olmDevice;
@@ -130,23 +130,77 @@ module.exports.DecryptionAlgorithm = DecryptionAlgorithm;
  *
  * @method module:crypto/algorithms/base.DecryptionAlgorithm#onRoomKeyEvent
  *
- * @param {module:models/event.MatrixEvent} event key event
+ * @param {module:models/event.MatrixEvent} params event key event
  */
 DecryptionAlgorithm.prototype.onRoomKeyEvent = function(params) {
     // ignore by default
 };
 
 /**
+ * Import a room key
+ *
+ * @param {module:crypto/OlmDevice.MegolmSessionData} session
+ */
+DecryptionAlgorithm.prototype.importRoomKey = function(session) {
+    // ignore by default
+};
+
+/**
  * Exception thrown when decryption fails
+ *
+ * @alias module:crypto/algorithms/base.DecryptionError
+ * @constructor
+ * @param {string} msg user-visible message describing the problem
+ *
+ * @param {Object=} details key/value pairs reported in the logs but not shown
+ *   to the user.
+ *
+ * @extends Error
+ */
+const DecryptionError = function(msg, details) {
+    this.name = 'DecryptionError';
+    this.message = msg;
+    this.details = details;
+};
+utils.inherits(DecryptionError, Error);
+
+/** override the string used when logging
+ *
+ * @returns {String}
+ */
+DecryptionError.prototype.toString = function() {
+    let result = this.name + '[msg: ' + this.message;
+
+    if (this.details) {
+        result += ', ' +
+            Object.keys(this.details).map(
+                (k) => k + ': ' + this.details[k],
+            ).join(', ');
+    }
+
+    result += ']';
+
+    return result;
+};
+
+module.exports.DecryptionError = DecryptionError;
+
+/**
+ * Exception thrown specifically when we want to warn the user to consider
+ * the security of their conversation before continuing
  *
  * @constructor
  * @param {string} msg message describing the problem
+ * @param {Object} devices userId -> {deviceId -> object}
+ *      set of unknown devices per user we're warning about
  * @extends Error
  */
-module.exports.DecryptionError = function(msg) {
+module.exports.UnknownDeviceError = function(msg, devices) {
+    this.name = "UnknownDeviceError";
     this.message = msg;
+    this.devices = devices;
 };
-utils.inherits(module.exports.DecryptionError, Error);
+utils.inherits(module.exports.UnknownDeviceError, Error);
 
 /**
  * Registers an encryption/decryption class for a particular algorithm

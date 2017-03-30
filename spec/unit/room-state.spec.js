@@ -1,35 +1,38 @@
 "use strict";
-var sdk = require("../..");
-var RoomState = sdk.RoomState;
-var RoomMember = sdk.RoomMember;
-var utils = require("../test-utils");
+import 'source-map-support/register';
+const sdk = require("../..");
+const RoomState = sdk.RoomState;
+const RoomMember = sdk.RoomMember;
+const utils = require("../test-utils");
+
+import expect from 'expect';
 
 describe("RoomState", function() {
-    var roomId = "!foo:bar";
-    var userA = "@alice:bar";
-    var userB = "@bob:bar";
-    var state;
+    const roomId = "!foo:bar";
+    const userA = "@alice:bar";
+    const userB = "@bob:bar";
+    let state;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         state = new RoomState(roomId);
         state.setStateEvents([
             utils.mkMembership({  // userA joined
-                event: true, mship: "join", user: userA, room: roomId
+                event: true, mship: "join", user: userA, room: roomId,
             }),
             utils.mkMembership({  // userB joined
-                event: true, mship: "join", user: userB, room: roomId
+                event: true, mship: "join", user: userB, room: roomId,
             }),
             utils.mkEvent({  // Room name is "Room name goes here"
                 type: "m.room.name", user: userA, room: roomId, event: true, content: {
-                    name: "Room name goes here"
-                }
+                    name: "Room name goes here",
+                },
             }),
             utils.mkEvent({  // Room creation
                 type: "m.room.create", user: userA, room: roomId, event: true, content: {
-                    creator: userA
-                }
-            })
+                    creator: userA,
+                },
+            }),
         ]);
     });
 
@@ -40,11 +43,11 @@ describe("RoomState", function() {
         });
 
         it("should return a member for each m.room.member event", function() {
-            var members = state.getMembers();
+            const members = state.getMembers();
             expect(members.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(members[0].userId)).not.toEqual(-1);
-            expect([userA, userB].indexOf(members[1].userId)).not.toEqual(-1);
+            expect([userA, userB].indexOf(members[0].userId)).toNotEqual(-1);
+            expect([userA, userB].indexOf(members[1].userId)).toNotEqual(-1);
         });
     });
 
@@ -54,19 +57,19 @@ describe("RoomState", function() {
         });
 
         it("should return a member if they exist", function() {
-            expect(state.getMember(userB)).toBeDefined();
+            expect(state.getMember(userB)).toBeTruthy();
         });
 
         it("should return a member which changes as state changes", function() {
-            var member = state.getMember(userB);
+            const member = state.getMember(userB);
             expect(member.membership).toEqual("join");
             expect(member.name).toEqual(userB);
 
             state.setStateEvents([
                 utils.mkMembership({
                     room: roomId, user: userB, mship: "leave", event: true,
-                    name: "BobGone"
-                })
+                    name: "BobGone",
+                }),
             ]);
 
             expect(member.membership).toEqual("leave");
@@ -81,14 +84,14 @@ describe("RoomState", function() {
 
         it("should return a member which doesn't change when the state is updated",
         function() {
-            var preLeaveUser = state.getSentinelMember(userA);
+            const preLeaveUser = state.getSentinelMember(userA);
             state.setStateEvents([
                 utils.mkMembership({
                     room: roomId, user: userA, mship: "leave", event: true,
-                    name: "AliceIsGone"
-                })
+                    name: "AliceIsGone",
+                }),
             ]);
-            var postLeaveUser = state.getSentinelMember(userA);
+            const postLeaveUser = state.getSentinelMember(userA);
 
             expect(preLeaveUser.membership).toEqual("join");
             expect(preLeaveUser.name).toEqual(userA);
@@ -111,33 +114,33 @@ describe("RoomState", function() {
 
         it("should return a list of matching events if no state_key was specified",
         function() {
-            var events = state.getStateEvents("m.room.member");
+            const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(events[0].getStateKey())).not.toEqual(-1);
-            expect([userA, userB].indexOf(events[1].getStateKey())).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[0].getStateKey())).toNotEqual(-1);
+            expect([userA, userB].indexOf(events[1].getStateKey())).toNotEqual(-1);
         });
 
         it("should return a single MatrixEvent if a state_key was specified",
         function() {
-            var event = state.getStateEvents("m.room.member", userA);
+            const event = state.getStateEvents("m.room.member", userA);
             expect(event.getContent()).toEqual({
-                membership: "join"
+                membership: "join",
             });
         });
     });
 
     describe("setStateEvents", function() {
         it("should emit 'RoomState.members' for each m.room.member event", function() {
-            var memberEvents = [
+            const memberEvents = [
                 utils.mkMembership({
-                    user: "@cleo:bar", mship: "invite", room: roomId, event: true
+                    user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
                 utils.mkMembership({
-                    user: "@daisy:bar", mship: "join", room: roomId, event: true
-                })
+                    user: "@daisy:bar", mship: "join", room: roomId, event: true,
+                }),
             ];
-            var emitCount = 0;
+            let emitCount = 0;
             state.on("RoomState.members", function(ev, st, mem) {
                 expect(ev).toEqual(memberEvents[emitCount]);
                 expect(st).toEqual(state);
@@ -149,15 +152,15 @@ describe("RoomState", function() {
         });
 
         it("should emit 'RoomState.newMember' for each new member added", function() {
-            var memberEvents = [
+            const memberEvents = [
                 utils.mkMembership({
-                    user: "@cleo:bar", mship: "invite", room: roomId, event: true
+                    user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
                 utils.mkMembership({
-                    user: "@daisy:bar", mship: "join", room: roomId, event: true
-                })
+                    user: "@daisy:bar", mship: "join", room: roomId, event: true,
+                }),
             ];
-            var emitCount = 0;
+            let emitCount = 0;
             state.on("RoomState.newMember", function(ev, st, mem) {
                 expect(mem.userId).toEqual(memberEvents[emitCount].getSender());
                 expect(mem.membership).toBeFalsy();  // not defined yet
@@ -168,21 +171,21 @@ describe("RoomState", function() {
         });
 
         it("should emit 'RoomState.events' for each state event", function() {
-            var events = [
+            const events = [
                 utils.mkMembership({
-                    user: "@cleo:bar", mship: "invite", room: roomId, event: true
+                    user: "@cleo:bar", mship: "invite", room: roomId, event: true,
                 }),
                 utils.mkEvent({
                     user: userB, room: roomId, type: "m.room.topic", event: true,
                     content: {
-                        topic: "boo!"
-                    }
+                        topic: "boo!",
+                    },
                 }),
                 utils.mkMessage({  // Not a state event
-                    user: userA, room: roomId, event: true
-                })
+                    user: userA, room: roomId, event: true,
+                }),
             ];
-            var emitCount = 0;
+            let emitCount = 0;
             state.on("RoomState.events", function(ev, st) {
                 expect(ev).toEqual(events[emitCount]);
                 expect(st).toEqual(state);
@@ -198,39 +201,39 @@ describe("RoomState", function() {
             state.members[userA] = utils.mock(RoomMember);
             state.members[userB] = utils.mock(RoomMember);
 
-            var powerLevelEvent = utils.mkEvent({
-                type: "m.room.power_levels", room: roomId, user: userA, event: true,
-                content: {
-                    users_default: 10,
-                    state_default: 50,
-                    events_default: 25
-                }
-            });
-
-            state.setStateEvents([powerLevelEvent]);
-
-            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent
-            );
-            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(
-                powerLevelEvent
-            );
-        });
-
-        it("should call setPowerLevelEvent on a new RoomMember if power levels exist",
-        function() {
-            var userC = "@cleo:bar";
-            var memberEvent = utils.mkMembership({
-                mship: "join", user: userC, room: roomId, event: true
-            });
-            var powerLevelEvent = utils.mkEvent({
+            const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
                     state_default: 50,
                     events_default: 25,
-                    users: {}
-                }
+                },
+            });
+
+            state.setStateEvents([powerLevelEvent]);
+
+            expect(state.members[userA].setPowerLevelEvent).toHaveBeenCalledWith(
+                powerLevelEvent,
+            );
+            expect(state.members[userB].setPowerLevelEvent).toHaveBeenCalledWith(
+                powerLevelEvent,
+            );
+        });
+
+        it("should call setPowerLevelEvent on a new RoomMember if power levels exist",
+        function() {
+            const userC = "@cleo:bar";
+            const memberEvent = utils.mkMembership({
+                mship: "join", user: userC, room: roomId, event: true,
+            });
+            const powerLevelEvent = utils.mkEvent({
+                type: "m.room.power_levels", room: roomId, user: userA, event: true,
+                content: {
+                    users_default: 10,
+                    state_default: 50,
+                    events_default: 25,
+                    users: {},
+                },
             });
 
             state.setStateEvents([powerLevelEvent]);
@@ -238,7 +241,7 @@ describe("RoomState", function() {
 
             // TODO: We do this because we don't DI the RoomMember constructor
             // so we can't inject a mock :/ so we have to infer.
-            expect(state.members[userC]).toBeDefined();
+            expect(state.members[userC]).toBeTruthy();
             expect(state.members[userC].powerLevel).toEqual(10);
         });
 
@@ -247,24 +250,24 @@ describe("RoomState", function() {
             state.members[userA] = utils.mock(RoomMember);
             state.members[userB] = utils.mock(RoomMember);
 
-            var memberEvent = utils.mkMembership({
-                user: userB, mship: "leave", room: roomId, event: true
+            const memberEvent = utils.mkMembership({
+                user: userB, mship: "leave", room: roomId, event: true,
             });
             state.setStateEvents([memberEvent]);
 
-            expect(state.members[userA].setMembershipEvent).not.toHaveBeenCalled();
+            expect(state.members[userA].setMembershipEvent).toNotHaveBeenCalled();
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
-                memberEvent, state
+                memberEvent, state,
             );
         });
     });
 
     describe("setTypingEvent", function() {
         it("should call setTypingEvent on each RoomMember", function() {
-            var typingEvent = utils.mkEvent({
+            const typingEvent = utils.mkEvent({
                 type: "m.typing", room: roomId, event: true, content: {
-                    user_ids: [userA]
-                }
+                    user_ids: [userA],
+                },
             });
             // mock up the room members
             state.members[userA] = utils.mock(RoomMember);
@@ -272,10 +275,10 @@ describe("RoomState", function() {
             state.setTypingEvent(typingEvent);
 
             expect(state.members[userA].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent
+                typingEvent,
             );
             expect(state.members[userB].setTypingEvent).toHaveBeenCalledWith(
-                typingEvent
+                typingEvent,
             );
         });
     });
@@ -284,7 +287,7 @@ describe("RoomState", function() {
         it("should say non-joined members may not send state",
         function() {
             expect(state.maySendStateEvent(
-                'm.room.name', "@nobody:nowhere"
+                'm.room.name', "@nobody:nowhere",
             )).toEqual(false);
         });
 
@@ -296,15 +299,15 @@ describe("RoomState", function() {
         it("should say members with power >=50 may send state with power level event " +
         "but no state default",
         function() {
-            var powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
                     // state_default: 50, "intentionally left blank"
                     events_default: 25,
                     users: {
-                    }
-                }
+                    },
+                },
             };
             powerLevelEvent.content.users[userA] = 50;
 
@@ -316,15 +319,15 @@ describe("RoomState", function() {
 
         it("should obey state_default",
         function() {
-            var powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
                     state_default: 30,
                     events_default: 25,
                     users: {
-                    }
-                }
+                    },
+                },
             };
             powerLevelEvent.content.users[userA] = 30;
             powerLevelEvent.content.users[userB] = 29;
@@ -337,18 +340,18 @@ describe("RoomState", function() {
 
         it("should honour explicit event power levels in the power_levels event",
         function() {
-            var powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     events: {
-                        "m.room.other_thing": 76
+                        "m.room.other_thing": 76,
                     },
                     users_default: 10,
                     state_default: 50,
                     events_default: 25,
                     users: {
-                    }
-                }
+                    },
+                },
             };
             powerLevelEvent.content.users[userA] = 80;
             powerLevelEvent.content.users[userB] = 50;
@@ -367,7 +370,7 @@ describe("RoomState", function() {
         it("should say non-joined members may not send events",
         function() {
             expect(state.maySendEvent(
-                'm.room.message', "@nobody:nowhere"
+                'm.room.message', "@nobody:nowhere",
             )).toEqual(false);
             expect(state.maySendMessage("@nobody:nowhere")).toEqual(false);
         });
@@ -380,15 +383,15 @@ describe("RoomState", function() {
 
         it("should obey events_default",
         function() {
-            var powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     users_default: 10,
                     state_default: 30,
                     events_default: 25,
                     users: {
-                    }
-                }
+                    },
+                },
             };
             powerLevelEvent.content.users[userA] = 26;
             powerLevelEvent.content.users[userB] = 24;
@@ -404,18 +407,18 @@ describe("RoomState", function() {
 
         it("should honour explicit event power levels in the power_levels event",
         function() {
-            var powerLevelEvent = {
+            const powerLevelEvent = {
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
                 content: {
                     events: {
-                        "m.room.other_thing": 33
+                        "m.room.other_thing": 33,
                     },
                     users_default: 10,
                     state_default: 50,
                     events_default: 25,
                     users: {
-                    }
-                }
+                    },
+                },
             };
             powerLevelEvent.content.users[userA] = 40;
             powerLevelEvent.content.users[userB] = 30;

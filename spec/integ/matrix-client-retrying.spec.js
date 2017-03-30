@@ -1,20 +1,24 @@
 "use strict";
-var sdk = require("../..");
-var HttpBackend = require("../mock-request");
-var utils = require("../test-utils");
-var EventStatus = sdk.EventStatus;
+import 'source-map-support/register';
+const sdk = require("../..");
+const HttpBackend = require("../mock-request");
+const utils = require("../test-utils");
+const EventStatus = sdk.EventStatus;
+
+import expect from 'expect';
 
 describe("MatrixClient retrying", function() {
-    var baseUrl = "http://localhost.or.something";
-    var client, httpBackend;
-    var scheduler;
-    var userId = "@alice:localhost";
-    var accessToken = "aseukfgwef";
-    var roomId = "!room:here";
-    var room;
+    const baseUrl = "http://localhost.or.something";
+    let client = null;
+    let httpBackend = null;
+    let scheduler;
+    const userId = "@alice:localhost";
+    const accessToken = "aseukfgwef";
+    const roomId = "!room:here";
+    let room;
 
     beforeEach(function() {
-        utils.beforeEach(this);
+        utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         scheduler = new sdk.MatrixScheduler();
@@ -49,9 +53,7 @@ describe("MatrixClient retrying", function() {
     });
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function(done) {
-
         // send a couple of events; the second will be queued
-        var ev1, ev2;
         client.sendMessage(roomId, "m1").then(function(ev) {
             expect(ev).toEqual(ev1);
         });
@@ -60,10 +62,10 @@ describe("MatrixClient retrying", function() {
         });
 
         // both events should be in the timeline at this point
-        var tl = room.getLiveTimeline().getEvents();
+        const tl = room.getLiveTimeline().getEvents();
         expect(tl.length).toEqual(2);
-        ev1 = tl[0];
-        ev2 = tl[1];
+        const ev1 = tl[0];
+        const ev2 = tl[1];
 
         expect(ev1.status).toEqual(EventStatus.SENDING);
         expect(ev2.status).toEqual(EventStatus.SENDING);
@@ -79,8 +81,9 @@ describe("MatrixClient retrying", function() {
             expect(tl.length).toEqual(1);
 
             // shouldn't be able to cancel the first message yet
-            expect(function() { client.cancelPendingEvent(ev1); })
-                .toThrow();
+            expect(function() {
+                client.cancelPendingEvent(ev1);
+            }).toThrow();
         }).respond(400); // fail the first message
 
         httpBackend.flush().then(function() {

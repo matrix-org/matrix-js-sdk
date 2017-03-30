@@ -18,11 +18,52 @@ limitations under the License.
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  * @module webrtc/call
  */
-var utils = require("../utils");
-var EventEmitter = require("events").EventEmitter;
-var DEBUG = true;  // set true to enable console logging.
+const utils = require("../utils");
+const EventEmitter = require("events").EventEmitter;
+const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
+
+/**
+ * Fires when the MatrixCall encounters an error when sending a Matrix event.
+ * <p>
+ * This is required to allow errors, which occur during sending of events, to bubble up.
+ * (This is because call.js does a hangup when it encounters a normal `error`, which in
+ * turn could lead to an UnknownDeviceError.)
+ * <p>
+ * To deal with an UnknownDeviceError when trying to send events, the application should let
+ * users know that there are new devices in the encrypted room (into which the event was
+ * sent) and give the user the options to resend unsent events or cancel them. Resending
+ * is done using {@link module:client~MatrixClient#resendEvent} and cancelling can be done by using
+ * {@link module:client~MatrixClient#cancelPendingEvent}.
+ * <p>
+ * MatrixCall will not do anything in response to an error that causes `send_event_error`
+ * to be emitted with the exception of sending `m.call.candidates`, which is retried upon
+ * failure when ICE candidates are being sent. This happens during call setup.
+ *
+ * @event module:webrtc/call~MatrixCall#"send_event_error"
+ * @param {Error} err The error caught from calling client.sendEvent in call.js.
+ * @example
+ * matrixCall.on("send_event_error", function(err){
+ *   console.error(err);
+ * });
+ */
+
+/**
+ * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
+ * <p>
+ * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
+ * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
+ * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
+ * to their audio/video hardware.
+ *
+ * @event module:webrtc/call~MatrixCall#"error"
+ * @param {Error} err The error raised by MatrixCall.
+ * @example
+ * matrixCall.on("error", function(err){
+ *   console.error(err.code, err);
+ * });
+ */
 
 /**
  * Construct a new Matrix Call.
@@ -43,7 +84,7 @@ function MatrixCall(opts) {
     this.turnServers = opts.turnServers || [];
     if (this.turnServers.length === 0) {
         this.turnServers.push({
-            urls: [MatrixCall.FALLBACK_STUN_SERVER]
+            urls: [MatrixCall.FALLBACK_STUN_SERVER],
         });
     }
     utils.forEach(this.turnServers, function(server) {
@@ -122,28 +163,27 @@ MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoEle
  * @throws If you have not specified a listener for 'error' events.
  */
 MatrixCall.prototype.placeScreenSharingCall =
-    function(remoteVideoElement, localVideoElement)
-{
+    function(remoteVideoElement, localVideoElement) {
     debuglog("placeScreenSharingCall");
     checkForErrorListener(this);
-    var screenConstraints = _getChromeScreenSharingConstraints(this);
+    const screenConstraints = _getChromeScreenSharingConstraints(this);
     if (!screenConstraints) {
         return;
     }
     this.localVideoElement = localVideoElement;
     this.remoteVideoElement = remoteVideoElement;
-    var self = this;
+    const self = this;
     this.webRtc.getUserMedia(screenConstraints, function(stream) {
         self.screenSharingStream = stream;
         debuglog("Got screen stream, requesting audio stream...");
-        var audioConstraints = _getUserMediaVideoContraints('voice');
+        const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
     }, function(err) {
         self.emit("error",
             callError(
                 MatrixCall.ERR_NO_USER_MEDIA,
-                "Failed to get screen-sharing stream: " + err
-            )
+                "Failed to get screen-sharing stream: " + err,
+            ),
         );
     });
     this.type = 'video';
@@ -153,7 +193,7 @@ MatrixCall.prototype.placeScreenSharingCall =
 /**
  * Play the given HTMLMediaElement, serialising the operation into a chain
  * of promises to avoid racing access to the element
- * @param {Element} HTMLMediaElement element to play
+ * @param {Element} element HTMLMediaElement element to play
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.playElement = function(element, queueId) {
@@ -174,8 +214,7 @@ MatrixCall.prototype.playElement = function(element, queueId) {
                 console.log("previous promise failed for " + queueId);
                 return element.play();
             });
-    }
-    else {
+    } else {
         this.mediaPromises[queueId] = element.play();
     }
 };
@@ -183,7 +222,7 @@ MatrixCall.prototype.playElement = function(element, queueId) {
 /**
  * Pause the given HTMLMediaElement, serialising the operation into a chain
  * of promises to avoid racing access to the element
- * @param {Element} HTMLMediaElement element to pause
+ * @param {Element} element HTMLMediaElement element to pause
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.pauseElement = function(element, queueId) {
@@ -197,8 +236,7 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
                 console.log("previous promise failed for " + queueId);
                 return element.pause();
             });
-    }
-    else {
+    } else {
         // pause doesn't actually return a promise, but do this for symmetry
         // and just in case it does in future.
         this.mediaPromises[queueId] = element.pause();
@@ -209,24 +247,24 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
  * Assign the given HTMLMediaElement by setting the .src attribute on it,
  * serialising the operation into a chain of promises to avoid racing access
  * to the element
- * @param {Element} HTMLMediaElement element to pause
- * @param {string} src the src attribute value to assign to the element
+ * @param {Element} element HTMLMediaElement element to pause
+ * @param {MediaStream} srcObject the srcObject attribute value to assign to the element
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
-MatrixCall.prototype.assignElement = function(element, src, queueId) {
-    console.log("queuing assign on " + queueId + " element " + element + " for " + src);
+MatrixCall.prototype.assignElement = function(element, srcObject, queueId) {
+    console.log("queuing assign on " + queueId + " element " + element + " for " +
+        srcObject);
     if (this.mediaPromises[queueId]) {
         this.mediaPromises[queueId] =
             this.mediaPromises[queueId].then(function() {
                 console.log("previous promise completed for " + queueId);
-                element.src = src;
+                element.srcObject = srcObject;
             }, function() {
                 console.log("previous promise failed for " + queueId);
-                element.src = src;
+                element.srcObject = srcObject;
             });
-    }
-    else {
-        element.src = src;
+    } else {
+        element.srcObject = srcObject;
     }
 };
 
@@ -266,13 +304,11 @@ MatrixCall.prototype.setLocalVideoElement = function(element) {
 
     if (element && this.localAVStream && this.type === 'video') {
         element.autoplay = true;
-        this.assignElement(element,
-                           this.URL.createObjectURL(this.localAVStream),
-                           "localVideo");
+        this.assignElement(element, this.localAVStream, "localVideo");
         element.muted = true;
-        var self = this;
+        const self = this;
         setTimeout(function() {
-            var vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
@@ -310,12 +346,12 @@ MatrixCall.prototype.setRemoteAudioElement = function(element) {
 MatrixCall.prototype._initWithInvite = function(event) {
     this.msg = event.getContent();
     this.peerConn = _createPeerConnection(this);
-    var self = this;
+    const self = this;
     if (this.peerConn) {
         this.peerConn.setRemoteDescription(
             new this.webRtc.RtcSessionDescription(this.msg.offer),
             hookCallback(self, self._onSetRemoteDescriptionSuccess),
-            hookCallback(self, self._onSetRemoteDescriptionError)
+            hookCallback(self, self._onSetRemoteDescriptionError),
         );
     }
     setState(this, 'ringing');
@@ -330,8 +366,7 @@ MatrixCall.prototype._initWithInvite = function(event) {
         this.msg.offer.sdp.indexOf('m=video') > -1
     ) {
         this.type = 'video';
-    }
-    else {
+    } else {
         this.type = 'voice';
     }
 
@@ -369,13 +404,13 @@ MatrixCall.prototype._initWithHangup = function(event) {
  */
 MatrixCall.prototype.answer = function() {
     debuglog("Answering call %s of type %s", this.callId, this.type);
-    var self = this;
+    const self = this;
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
         this.webRtc.getUserMedia(
             _getUserMediaVideoContraints(this.type),
             hookCallback(self, self._gotUserMediaForAnswer),
-            hookCallback(self, self._getUserMediaFailed)
+            hookCallback(self, self._getUserMediaFailed),
         );
         setState(this, 'wait_local_media');
     } else if (this.localAVStream) {
@@ -421,10 +456,10 @@ MatrixCall.prototype._replacedBy = function(newCall) {
 MatrixCall.prototype.hangup = function(reason, suppressEvent) {
     debuglog("Ending call " + this.callId);
     terminate(this, "local", reason, !suppressEvent);
-    var content = {
+    const content = {
         version: 0,
         call_id: this.callId,
-        reason: reason
+        reason: reason,
     };
     sendEvent(this, 'm.call.hangup', content);
 };
@@ -497,33 +532,30 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
         return;
     }
     debuglog("_gotUserMediaForInvite -> " + this.type);
-    var self = this;
-    var videoEl = this.getLocalVideoElement();
+    const self = this;
+    const videoEl = this.getLocalVideoElement();
 
     if (videoEl && this.type == 'video') {
         videoEl.autoplay = true;
         if (this.screenSharingStream) {
             debuglog("Setting screen sharing stream to the local video element");
-            this.assignElement(videoEl,
-                   this.URL.createObjectURL(this.screenSharingStream),
-                   "localVideo");
-        }
-        else {
-            this.assignElement(videoEl,
-                   this.URL.createObjectURL(stream),
-                   "localVideo");
+            this.assignElement(videoEl, this.screenSharingStream, "localVideo");
+        } else {
+            this.assignElement(videoEl, stream, "localVideo");
         }
         videoEl.muted = true;
         setTimeout(function() {
-            var vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
         }, 0);
     }
 
-    this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
-    stream = this.screenSharingStream;
+    if (this.screenSharingStream) {
+        this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
+        stream = this.screenSharingStream;
+    }
 
     this.localAVStream = stream;
     // why do we enable audio (and only audio) tracks here? -- matthew
@@ -532,7 +564,7 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
     this.peerConn.addStream(stream);
     this.peerConn.createOffer(
         hookCallback(self, self._gotLocalOffer),
-        hookCallback(self, self._getLocalOfferFailed)
+        hookCallback(self, self._getLocalOfferFailed),
     );
     setState(self, 'create_offer');
 };
@@ -543,20 +575,18 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
  * @param {Object} stream
  */
 MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
-    var self = this;
+    const self = this;
     if (self.state == 'ended') {
         return;
     }
-    var localVidEl = self.getLocalVideoElement();
+    const localVidEl = self.getLocalVideoElement();
 
     if (localVidEl && self.type == 'video') {
         localVidEl.autoplay = true;
-        this.assignElement(localVidEl,
-               this.URL.createObjectURL(stream),
-               "localVideo");
+        this.assignElement(localVidEl, stream, "localVideo");
         localVidEl.muted = true;
         setTimeout(function() {
-            var vel = self.getLocalVideoElement();
+            const vel = self.getLocalVideoElement();
             if (vel.play) {
                 self.playElement(vel, "localVideo");
             }
@@ -567,22 +597,22 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
     setTracksEnabled(stream.getAudioTracks(), true);
     self.peerConn.addStream(stream);
 
-    var constraints = {
+    const constraints = {
         'mandatory': {
             'OfferToReceiveAudio': true,
-            'OfferToReceiveVideo': self.type == 'video'
-        }
+            'OfferToReceiveVideo': self.type == 'video',
+        },
     };
     self.peerConn.createAnswer(function(description) {
         debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
-            var content = {
+            const content = {
                 version: 0,
                 call_id: self.callId,
                 answer: {
                     sdp: self.peerConn.localDescription.sdp,
-                    type: self.peerConn.localDescription.type
-                }
+                    type: self.peerConn.localDescription.type,
+                },
             };
             sendEvent(self, 'm.call.answer', content);
             setState(self, 'connecting');
@@ -604,14 +634,14 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
     if (event.candidate) {
         debuglog(
             "Got local ICE " + event.candidate.sdpMid + " candidate: " +
-            event.candidate.candidate
+            event.candidate.candidate,
         );
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
-        var c = {
+        const c = {
             candidate: event.candidate.candidate,
             sdpMid: event.candidate.sdpMid,
-            sdpMLineIndex: event.candidate.sdpMLineIndex
+            sdpMLineIndex: event.candidate.sdpMLineIndex,
         };
         sendCandidate(this, c);
     }
@@ -631,7 +661,7 @@ MatrixCall.prototype._gotRemoteIceCandidate = function(cand) {
     this.peerConn.addIceCandidate(
         new this.webRtc.RtcIceCandidate(cand),
         function() {},
-        function(e) {}
+        function(e) {},
     );
 };
 
@@ -645,11 +675,11 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
         return;
     }
 
-    var self = this;
+    const self = this;
     this.peerConn.setRemoteDescription(
         new this.webRtc.RtcSessionDescription(msg.answer),
         hookCallback(self, self._onSetRemoteDescriptionSuccess),
-        hookCallback(self, self._onSetRemoteDescriptionError)
+        hookCallback(self, self._onSetRemoteDescriptionError),
     );
     setState(self, 'connecting');
 };
@@ -660,7 +690,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
  * @param {Object} description
  */
 MatrixCall.prototype._gotLocalOffer = function(description) {
-    var self = this;
+    const self = this;
     debuglog("Created offer: " + description);
 
     if (self.state == 'ended') {
@@ -670,7 +700,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
     }
 
     self.peerConn.setLocalDescription(description, function() {
-        var content = {
+        const content = {
             version: 0,
             call_id: self.callId,
             // OpenWebRTC appears to add extra stuff (like the DTLS fingerprint)
@@ -684,9 +714,9 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             // Chrome (as of about m43).
             offer: {
                 sdp: self.peerConn.localDescription.sdp,
-                type: self.peerConn.localDescription.type
+                type: self.peerConn.localDescription.type,
             },
-            lifetime: MatrixCall.CALL_TIMEOUT_MS
+            lifetime: MatrixCall.CALL_TIMEOUT_MS,
         };
         sendEvent(self, 'm.call.invite', content);
 
@@ -709,7 +739,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
 MatrixCall.prototype._getLocalOfferFailed = function(error) {
     this.emit(
         "error",
-        callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!")
+        callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!"),
     );
 };
 
@@ -724,8 +754,8 @@ MatrixCall.prototype._getUserMediaFailed = function(error) {
         callError(
             MatrixCall.ERR_NO_USER_MEDIA,
             "Couldn't start capturing media! Is your microphone set up and " +
-            "does this app have permission?"
-        )
+            "does this app have permission?",
+        ),
     );
     this.hangup("user_media_failed");
 };
@@ -739,7 +769,7 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
         return; // because ICE can still complete as we're ending the call
     }
     debuglog(
-        "Ice connection state changed to: " + this.peerConn.iceConnectionState
+        "Ice connection state changed to: " + this.peerConn.iceConnectionState,
     );
     // ideally we'd consider the call to be connected when we get media but
     // chrome doesn't implement any of the 'onstarted' events yet
@@ -759,7 +789,7 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
 MatrixCall.prototype._onSignallingStateChanged = function() {
     debuglog(
         "call " + this.callId + ": Signalling state changed to: " +
-        this.peerConn.signalingState
+        this.peerConn.signalingState,
     );
 };
 
@@ -788,7 +818,7 @@ MatrixCall.prototype._onSetRemoteDescriptionError = function(e) {
 MatrixCall.prototype._onAddStream = function(event) {
     debuglog("Stream id " + event.stream.id + " added");
 
-    var s = event.stream;
+    const s = event.stream;
 
     if (s.getVideoTracks().length > 0) {
         this.type = 'video';
@@ -799,7 +829,7 @@ MatrixCall.prototype._onAddStream = function(event) {
         this.remoteAStream = s;
     }
 
-    var self = this;
+    const self = this;
     forAllTracksOnStream(s, function(t) {
         debuglog("Track id " + t.id + " added");
         // not currently implemented in chrome
@@ -808,8 +838,7 @@ MatrixCall.prototype._onAddStream = function(event) {
 
     if (event.stream.oninactive !== undefined) {
         event.stream.oninactive = hookCallback(self, self._onRemoteStreamEnded);
-    }
-    else {
+    } else {
         // onended is deprecated from Chrome 54
         event.stream.onended = hookCallback(self, self._onRemoteStreamEnded);
     }
@@ -820,8 +849,7 @@ MatrixCall.prototype._onAddStream = function(event) {
     if (this.type === 'video') {
         _tryPlayRemoteStream(this);
         _tryPlayRemoteAudioStream(this);
-    }
-    else {
+    } else {
         _tryPlayRemoteAudioStream(this);
     }
 };
@@ -880,14 +908,14 @@ MatrixCall.prototype._onAnsweredElsewhere = function(msg) {
     terminate(this, "remote", "answered_elsewhere", true);
 };
 
-var setTracksEnabled = function(tracks, enabled) {
-    for (var i = 0; i < tracks.length; i++) {
+const setTracksEnabled = function(tracks, enabled) {
+    for (let i = 0; i < tracks.length; i++) {
         tracks[i].enabled = enabled;
     }
 };
 
-var isTracksEnabled = function(tracks) {
-    for (var i = 0; i < tracks.length; i++) {
+const isTracksEnabled = function(tracks) {
+    for (let i = 0; i < tracks.length; i++) {
         if (tracks[i].enabled) {
             return true; // at least one track is enabled
         }
@@ -895,8 +923,8 @@ var isTracksEnabled = function(tracks) {
     return false;
 };
 
-var setState = function(self, state) {
-    var oldState = self.state;
+const setState = function(self, state) {
+    const oldState = self.state;
     self.state = state;
     self.emit("state", state, oldState);
 };
@@ -908,11 +936,15 @@ var setState = function(self, state) {
  * @param {Object} content
  * @return {Promise}
  */
-var sendEvent = function(self, eventType, content) {
-    return self.client.sendEvent(self.roomId, eventType, content);
+const sendEvent = function(self, eventType, content) {
+    return self.client.sendEvent(self.roomId, eventType, content).catch(
+        (err) => {
+            self.emit('send_event_error', err);
+        },
+    );
 };
 
-var sendCandidate = function(self, content) {
+const sendCandidate = function(self, content) {
     // Sends candidates with are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
@@ -923,24 +955,24 @@ var sendCandidate = function(self, content) {
     }
 };
 
-var terminate = function(self, hangupParty, hangupReason, shouldEmit) {
+const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
     if (self.getRemoteVideoElement()) {
         if (self.getRemoteVideoElement().pause) {
             self.pauseElement(self.getRemoteVideoElement(), "remoteVideo");
         }
-        self.assignElement(self.getRemoteVideoElement(), "", "remoteVideo");
+        self.assignElement(self.getRemoteVideoElement(), null, "remoteVideo");
     }
     if (self.getRemoteAudioElement()) {
         if (self.getRemoteAudioElement().pause) {
             self.pauseElement(self.getRemoteAudioElement(), "remoteAudio");
         }
-        self.assignElement(self.getRemoteAudioElement(), "", "remoteAudio");
+        self.assignElement(self.getRemoteAudioElement(), null, "remoteAudio");
     }
     if (self.getLocalVideoElement()) {
         if (self.getLocalVideoElement().pause) {
             self.pauseElement(self.getLocalVideoElement(), "localVideo");
         }
-        self.assignElement(self.getLocalVideoElement(), "", "localVideo");
+        self.assignElement(self.getLocalVideoElement(), null, "localVideo");
     }
     self.hangupParty = hangupParty;
     self.hangupReason = hangupReason;
@@ -954,7 +986,7 @@ var terminate = function(self, hangupParty, hangupReason, shouldEmit) {
     }
 };
 
-var stopAllMedia = function(self) {
+const stopAllMedia = function(self) {
     debuglog("stopAllMedia (stream=%s)", self.localAVStream);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
@@ -994,15 +1026,13 @@ var stopAllMedia = function(self) {
     }
 };
 
-var _tryPlayRemoteStream = function(self) {
+const _tryPlayRemoteStream = function(self) {
     if (self.getRemoteVideoElement() && self.remoteAVStream) {
-        var player = self.getRemoteVideoElement();
+        const player = self.getRemoteVideoElement();
         player.autoplay = true;
-        self.assignElement(player,
-                           self.URL.createObjectURL(self.remoteAVStream),
-                           "remoteVideo");
+        self.assignElement(player, self.remoteAVStream, "remoteVideo");
         setTimeout(function() {
-            var vel = self.getRemoteVideoElement();
+            const vel = self.getRemoteVideoElement();
             if (vel.play) {
                 self.playElement(vel, "remoteVideo");
             }
@@ -1014,15 +1044,13 @@ var _tryPlayRemoteStream = function(self) {
     }
 };
 
-var _tryPlayRemoteAudioStream = function(self) {
+const _tryPlayRemoteAudioStream = function(self) {
     if (self.getRemoteAudioElement() && self.remoteAStream) {
-        var player = self.getRemoteAudioElement();
+        const player = self.getRemoteAudioElement();
         player.autoplay = true;
-        self.assignElement(player,
-                           self.URL.createObjectURL(self.remoteAStream),
-                           "remoteAudio");
+        self.assignElement(player, self.remoteAStream, "remoteAudio");
         setTimeout(function() {
-            var ael = self.getRemoteAudioElement();
+            const ael = self.getRemoteAudioElement();
             if (ael.play) {
                 self.playElement(ael, "remoteAudio");
             }
@@ -1034,58 +1062,58 @@ var _tryPlayRemoteAudioStream = function(self) {
     }
 };
 
-var checkForErrorListener = function(self) {
+const checkForErrorListener = function(self) {
     if (self.listeners("error").length === 0) {
         throw new Error(
-            "You MUST attach an error listener using call.on('error', function() {})"
+            "You MUST attach an error listener using call.on('error', function() {})",
         );
     }
 };
 
-var callError = function(code, msg) {
-    var e = new Error(msg);
+const callError = function(code, msg) {
+    const e = new Error(msg);
     e.code = code;
     return e;
 };
 
-var debuglog = function() {
+const debuglog = function() {
     if (DEBUG) {
-        console.log.apply(console, arguments);
+        console.log(...arguments);
     }
 };
 
-var _sendCandidateQueue = function(self) {
+const _sendCandidateQueue = function(self) {
     if (self.candidateSendQueue.length === 0) {
         return;
     }
 
-    var cands = self.candidateSendQueue;
+    const cands = self.candidateSendQueue;
     self.candidateSendQueue = [];
     ++self.candidateSendTries;
-    var content = {
+    const content = {
         version: 0,
         call_id: self.callId,
-        candidates: cands
+        candidates: cands,
     };
     debuglog("Attempting to send " + cands.length + " candidates");
     sendEvent(self, 'm.call.candidates', content).then(function() {
         self.candidateSendTries = 0;
         _sendCandidateQueue(self);
     }, function(error) {
-        for (var i = 0; i < cands.length; i++) {
+        for (let i = 0; i < cands.length; i++) {
             self.candidateSendQueue.push(cands[i]);
         }
 
         if (self.candidateSendTries > 5) {
             debuglog(
                 "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries
+                self.candidateSendTries,
             );
             self.candidateSendTries = 0;
             return;
         }
 
-        var delayMs = 500 * Math.pow(2, self.candidateSendTries);
+        const delayMs = 500 * Math.pow(2, self.candidateSendTries);
         ++self.candidateSendTries;
         debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
         setTimeout(function() {
@@ -1094,36 +1122,36 @@ var _sendCandidateQueue = function(self) {
     });
 };
 
-var _placeCallWithConstraints = function(self, constraints) {
+const _placeCallWithConstraints = function(self, constraints) {
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
         hookCallback(self, self._gotUserMediaForInvite),
-        hookCallback(self, self._getUserMediaFailed)
+        hookCallback(self, self._getUserMediaFailed),
     );
     setState(self, 'wait_local_media');
     self.direction = 'outbound';
     self.config = constraints;
 };
 
-var _createPeerConnection = function(self) {
-    var servers = self.turnServers;
+const _createPeerConnection = function(self) {
+    let servers = self.turnServers;
     if (self.webRtc.vendor === "mozilla") {
         // modify turnServers struct to match what mozilla expects.
         servers = [];
-        for (var i = 0; i < self.turnServers.length; i++) {
-            for (var j = 0; j < self.turnServers[i].urls.length; j++) {
+        for (let i = 0; i < self.turnServers.length; i++) {
+            for (let j = 0; j < self.turnServers[i].urls.length; j++) {
                 servers.push({
                     url: self.turnServers[i].urls[j],
                     username: self.turnServers[i].username,
-                    credential: self.turnServers[i].credential
+                    credential: self.turnServers[i].credential,
                 });
             }
         }
     }
 
-    var pc = new self.webRtc.RtcPeerConnection({
-        iceServers: servers
+    const pc = new self.webRtc.RtcPeerConnection({
+        iceServers: servers,
     });
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
     pc.onsignalingstatechange = hookCallback(self, self._onSignallingStateChanged);
@@ -1132,12 +1160,12 @@ var _createPeerConnection = function(self) {
     return pc;
 };
 
-var _getChromeScreenSharingConstraints = function(call) {
-    var screen = global.screen;
+const _getChromeScreenSharingConstraints = function(call) {
+    const screen = global.screen;
     if (!screen) {
         call.emit("error", callError(
             MatrixCall.ERR_NO_USER_MEDIA,
-            "Couldn't determine screen sharing constaints."
+            "Couldn't determine screen sharing constaints.",
         ));
         return;
     }
@@ -1150,13 +1178,13 @@ var _getChromeScreenSharingConstraints = function(call) {
                 maxWidth: screen.width,
                 maxHeight: screen.height,
                 minFrameRate: 1,
-                maxFrameRate: 10
-            }
-        }
+                maxFrameRate: 10,
+            },
+        },
     };
 };
 
-var _getUserMediaVideoContraints = function(callType) {
+const _getUserMediaVideoContraints = function(callType) {
     switch (callType) {
         case 'voice':
             return ({audio: true, video: false});
@@ -1166,33 +1194,33 @@ var _getUserMediaVideoContraints = function(callType) {
                     minWidth: 640,
                     maxWidth: 640,
                     minHeight: 360,
-                    maxHeight: 360
-                }
+                    maxHeight: 360,
+                },
             }});
     }
 };
 
-var hookCallback = function(call, fn) {
+const hookCallback = function(call, fn) {
     return function() {
         return fn.apply(call, arguments);
     };
 };
 
-var forAllVideoTracksOnStream = function(s, f) {
-    var tracks = s.getVideoTracks();
-    for (var i = 0; i < tracks.length; i++) {
+const forAllVideoTracksOnStream = function(s, f) {
+    const tracks = s.getVideoTracks();
+    for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-var forAllAudioTracksOnStream = function(s, f) {
-    var tracks = s.getAudioTracks();
-    for (var i = 0; i < tracks.length; i++) {
+const forAllAudioTracksOnStream = function(s, f) {
+    const tracks = s.getAudioTracks();
+    for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-var forAllTracksOnStream = function(s, f) {
+const forAllTracksOnStream = function(s, f) {
     forAllVideoTracksOnStream(s, f);
     forAllAudioTracksOnStream(s, f);
 };
@@ -1208,25 +1236,25 @@ module.exports.MatrixCall = MatrixCall;
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
 module.exports.createNewMatrixCall = function(client, roomId) {
-    var w = global.window;
-    var doc = global.document;
+    const w = global.window;
+    const doc = global.document;
     if (!w || !doc) {
         return null;
     }
-    var webRtc = {};
+    const webRtc = {};
     webRtc.isOpenWebRTC = function() {
-        var scripts = doc.getElementById("script");
+        const scripts = doc.getElementById("script");
         if (!scripts || !scripts.length) {
             return false;
         }
-        for (var i = 0; i < scripts.length; i++) {
+        for (let i = 0; i < scripts.length; i++) {
             if (scripts[i].src.indexOf("owr.js") > -1) {
                 return true;
             }
         }
         return false;
     };
-    var getUserMedia = (
+    const getUserMedia = (
         w.navigator.getUserMedia || w.navigator.webkitGetUserMedia ||
         w.navigator.mozGetUserMedia
     );
@@ -1248,23 +1276,21 @@ module.exports.createNewMatrixCall = function(client, roomId) {
     webRtc.vendor = null;
     if (w.mozRTCPeerConnection) {
         webRtc.vendor = "mozilla";
-    }
-    else if (w.webkitRTCPeerConnection) {
+    } else if (w.webkitRTCPeerConnection) {
         webRtc.vendor = "webkit";
-    }
-    else if (w.RTCPeerConnection) {
+    } else if (w.RTCPeerConnection) {
         webRtc.vendor = "generic";
     }
     if (!webRtc.RtcIceCandidate || !webRtc.RtcSessionDescription ||
             !webRtc.RtcPeerConnection || !webRtc.getUserMedia) {
         return null; // WebRTC is not supported.
     }
-    var opts = {
+    const opts = {
         webRtc: webRtc,
         client: client,
         URL: w.URL,
         roomId: roomId,
-        turnServers: client.getTurnServers()
+        turnServers: client.getTurnServers(),
     };
     return new MatrixCall(opts);
 };

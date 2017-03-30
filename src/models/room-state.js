@@ -17,10 +17,10 @@ limitations under the License.
 /**
  * @module models/room-state
  */
-var EventEmitter = require("events").EventEmitter;
+const EventEmitter = require("events").EventEmitter;
 
-var utils = require("../utils");
-var RoomMember = require("./room-member");
+const utils = require("../utils");
+const RoomMember = require("./room-member");
 
 /**
  * Construct room state.
@@ -100,7 +100,7 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
     if (stateKey === undefined) { // return all values
         return utils.values(this.events[eventType]);
     }
-    var event = this.events[eventType][stateKey];
+    const event = this.events[eventType][stateKey];
     return event ? event : null;
 };
 
@@ -115,13 +115,17 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
  * @fires module:client~MatrixClient#event:"RoomState.events"
  */
 RoomState.prototype.setStateEvents = function(stateEvents) {
-    var self = this;
+    const self = this;
     this._updateModifiedTime();
 
     // update the core event dict
     utils.forEach(stateEvents, function(event) {
-        if (event.getRoomId() !== self.roomId) { return; }
-        if (!event.isState()) { return; }
+        if (event.getRoomId() !== self.roomId) {
+            return;
+        }
+        if (!event.isState()) {
+            return;
+        }
 
         if (self.events[event.getType()] === undefined) {
             self.events[event.getType()] = {};
@@ -129,7 +133,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         self.events[event.getType()][event.getStateKey()] = event;
         if (event.getType() === "m.room.member") {
             _updateDisplayNameCache(
-                self, event.getStateKey(), event.getContent().displayname
+                self, event.getStateKey(), event.getContent().displayname,
             );
             _updateThirdPartyTokenCache(self, event);
         }
@@ -141,18 +145,21 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
     // the given array (e.g. disambiguating display names in one go to do both
     // clashing names rather than progressively which only catches 1 of them).
     utils.forEach(stateEvents, function(event) {
-        if (event.getRoomId() !== self.roomId) { return; }
-        if (!event.isState()) { return; }
+        if (event.getRoomId() !== self.roomId) {
+            return;
+        }
+        if (!event.isState()) {
+            return;
+        }
 
         if (event.getType() === "m.room.member") {
-            var userId = event.getStateKey();
+            const userId = event.getStateKey();
 
             // leave events apparently elide the displayname or avatar_url,
             // so let's fake one up so that we don't leak user ids
             // into the timeline
             if (event.getContent().membership === "leave" ||
-                event.getContent().membership === "ban")
-            {
+                event.getContent().membership === "ban") {
                 event.getContent().avatar_url =
                     event.getContent().avatar_url ||
                     event.getPrevContent().avatar_url;
@@ -161,7 +168,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                     event.getPrevContent().displayname;
             }
 
-            var member = self.members[userId];
+            let member = self.members[userId];
             if (!member) {
                 member = new RoomMember(event.getRoomId(), userId);
                 self.emit("RoomState.newMember", event, self, member);
@@ -171,11 +178,11 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             // so we don't make assumptions about the properties of RoomMember
             // (e.g. and manage to break it because deep copying doesn't do
             // everything).
-            var sentinel = new RoomMember(event.getRoomId(), userId);
+            const sentinel = new RoomMember(event.getRoomId(), userId);
             utils.forEach([member, sentinel], function(roomMember) {
                 roomMember.setMembershipEvent(event, self);
                 // this member may have a power level already, so set it.
-                var pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
+                const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
                 if (pwrLvlEvent) {
                     roomMember.setPowerLevelEvent(pwrLvlEvent);
                 }
@@ -184,9 +191,8 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._sentinels[userId] = sentinel;
             self.members[userId] = member;
             self.emit("RoomState.members", event, self, member);
-        }
-        else if (event.getType() === "m.room.power_levels") {
-            var members = utils.values(self.members);
+        } else if (event.getType() === "m.room.power_levels") {
+            const members = utils.values(self.members);
             utils.forEach(members, function(member) {
                 member.setPowerLevelEvent(event);
                 self.emit("RoomState.members", event, self, member);
@@ -253,7 +259,7 @@ RoomState.prototype.maySendMessage = function(userId) {
 /**
  * Returns true if the given user ID has permission to send a normal
  * event of type `eventType` into this room.
- * @param {string} type The type of event to test
+ * @param {string} eventType The type of event to test
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given user ID should be permitted to send
  *                        the given type of event into this room,
@@ -267,8 +273,8 @@ RoomState.prototype.maySendEvent = function(eventType, userId) {
 /**
  * Returns true if the given MatrixClient has permission to send a state
  * event of type `stateEventType` into this room.
- * @param {string} type The type of state events to test
- * @param {MatrixClient}  The client to test permission for
+ * @param {string} stateEventType The type of state events to test
+ * @param {MatrixClient} cli The client to test permission for
  * @return {boolean} true if the given client should be permitted to send
  *                        the given type of state event into this room,
  *                        according to the room's state.
@@ -283,7 +289,7 @@ RoomState.prototype.mayClientSendStateEvent = function(stateEventType, cli) {
 /**
  * Returns true if the given user ID has permission to send a state
  * event of type `stateEventType` into this room.
- * @param {string} type The type of state events to test
+ * @param {string} stateEventType The type of state events to test
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given user ID should be permitted to send
  *                        the given type of state event into this room,
@@ -296,7 +302,7 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
 /**
  * Returns true if the given user ID has permission to send a normal or state
  * event of type `eventType` into this room.
- * @param {string} type The type of event to test
+ * @param {string} eventType The type of event to test
  * @param {string} userId The user ID of the user to test permission for
  * @param {boolean} state If true, tests if the user may send a state
                           event of this type. Otherwise tests whether
@@ -306,25 +312,21 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
  *                        according to the room's state.
  */
 RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
-    var member = this.getMember(userId);
-    if (!member || member.membership == 'leave') { return false; }
+    const member = this.getMember(userId);
+    if (!member || member.membership == 'leave') {
+        return false;
+    }
 
-    var power_levels_event = this.getStateEvents('m.room.power_levels', '');
+    const power_levels_event = this.getStateEvents('m.room.power_levels', '');
 
-    var power_levels;
-    var events_levels = {};
+    let power_levels;
+    let events_levels = {};
 
-    var default_user_level = 0;
-    var user_levels = [];
-
-    var state_default = 0;
-    var events_default = 0;
+    let state_default = 0;
+    let events_default = 0;
     if (power_levels_event) {
         power_levels = power_levels_event.getContent();
         events_levels = power_levels.events || {};
-
-        default_user_level = parseInt(power_levels.users_default || 0);
-        user_levels = power_levels.users || {};
 
         if (power_levels.state_default !== undefined) {
             state_default = power_levels.state_default;
@@ -336,7 +338,7 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
         }
     }
 
-    var required_level = state ? state_default : events_default;
+    let required_level = state ? state_default : events_default;
     if (events_levels[eventType] !== undefined) {
         required_level = events_levels[eventType];
     }
@@ -353,12 +355,12 @@ function _updateThirdPartyTokenCache(roomState, memberEvent) {
     if (!memberEvent.getContent().third_party_invite) {
         return;
     }
-    var token = (memberEvent.getContent().third_party_invite.signed || {}).token;
+    const token = (memberEvent.getContent().third_party_invite.signed || {}).token;
     if (!token) {
         return;
     }
-    var threePidInvite = roomState.getStateEvents(
-        "m.room.third_party_invite", token
+    const threePidInvite = roomState.getStateEvents(
+        "m.room.third_party_invite", token,
     );
     if (!threePidInvite) {
         return;
@@ -367,15 +369,15 @@ function _updateThirdPartyTokenCache(roomState, memberEvent) {
 }
 
 function _updateDisplayNameCache(roomState, userId, displayName) {
-    var oldName = roomState._userIdsToDisplayNames[userId];
+    const oldName = roomState._userIdsToDisplayNames[userId];
     delete roomState._userIdsToDisplayNames[userId];
     if (oldName) {
         // Remove the old name from the cache.
         // We clobber the user_id > name lookup but the name -> [user_id] lookup
         // means we need to remove that user ID from that array rather than nuking
         // the lot.
-        var existingUserIds = roomState._displayNameToUserIds[oldName] || [];
-        for (var i = 0; i < existingUserIds.length; i++) {
+        const existingUserIds = roomState._displayNameToUserIds[oldName] || [];
+        for (let i = 0; i < existingUserIds.length; i++) {
             if (existingUserIds[i] === userId) {
                 // remove this user ID from this array
                 existingUserIds.splice(i, 1);

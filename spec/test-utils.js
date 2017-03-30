@@ -1,14 +1,17 @@
 "use strict";
-var sdk = require("..");
-var MatrixEvent = sdk.MatrixEvent;
+import expect from 'expect';
+
+const sdk = require("..");
+const MatrixEvent = sdk.MatrixEvent;
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
  * name to stdout.
- * @param {TestCase} testCase The test case that is about to be run.
+ * @param {Mocha.Context} context  The test context
  */
-module.exports.beforeEach = function(testCase) {
-    var desc = testCase.suite.description + " : " + testCase.description;
+module.exports.beforeEach = function(context) {
+    const desc = context.currentTest.fullTitle();
+
     console.log(desc);
     console.log(new Array(1 + desc.length).join("="));
 };
@@ -20,21 +23,20 @@ module.exports.beforeEach = function(testCase) {
  * @return {Object} An instantiated object with spied methods/properties.
  */
 module.exports.mock = function(constr, name) {
-    // By Tim Buschtöns
+    // Based on
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
-    var HelperConstr = new Function(); // jshint ignore:line
+    const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;
-    var result = new HelperConstr();
-    result.jasmineToString = function() {
+    const result = new HelperConstr();
+    result.toString = function() {
         return "mock" + (name ? " of " + name : "");
     };
-    for (var key in constr.prototype) { // jshint ignore:line
+    for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
-                result[key] = jasmine.createSpy((name || "mock") + '.' + key);
+                result[key] = expect.createSpy();
             }
-        }
-        catch (ex) {
+        } catch (ex) {
             // Direct access to some non-function fields of DOM prototypes may
             // cause exceptions.
             // Overwriting will not work either in that case.
@@ -58,17 +60,16 @@ module.exports.mkEvent = function(opts) {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
-    var event = {
+    const event = {
         type: opts.type,
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
-        event_id: "$" + Math.random() + "-" + Math.random()
+        event_id: "$" + Math.random() + "-" + Math.random(),
     };
     if (opts.skey !== undefined) {
         event.state_key = opts.skey;
-    }
-    else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
+    } else if (["m.room.name", "m.room.topic", "m.room.create", "m.room.join_rules",
          "m.room.power_levels", "m.room.topic",
          "com.example.state"].indexOf(opts.type) !== -1) {
         event.state_key = "";
@@ -85,7 +86,7 @@ module.exports.mkPresence = function(opts) {
     if (!opts.user) {
         throw new Error("Missing user");
     }
-    var event = {
+    const event = {
         event_id: "$" + Math.random() + "-" + Math.random(),
         type: "m.presence",
         sender: opts.sender || opts.user, // opts.user for backwards-compat
@@ -93,8 +94,8 @@ module.exports.mkPresence = function(opts) {
             avatar_url: opts.url,
             displayname: opts.name,
             last_active_ago: opts.ago,
-            presence: opts.presence || "offline"
-        }
+            presence: opts.presence || "offline",
+        },
     };
     return opts.event ? new MatrixEvent(event) : event;
 };
@@ -121,10 +122,14 @@ module.exports.mkMembership = function(opts) {
         throw new Error("Missing .mship => " + JSON.stringify(opts));
     }
     opts.content = {
-        membership: opts.mship
+        membership: opts.mship,
     };
-    if (opts.name) { opts.content.displayname = opts.name; }
-    if (opts.url) { opts.content.avatar_url = opts.url; }
+    if (opts.name) {
+        opts.content.displayname = opts.name;
+    }
+    if (opts.url) {
+        opts.content.avatar_url = opts.url;
+    }
     return module.exports.mkEvent(opts);
 };
 
@@ -147,7 +152,7 @@ module.exports.mkMessage = function(opts) {
     }
     opts.content = {
         msgtype: "m.text",
-        body: opts.msg
+        body: opts.msg,
     };
     return module.exports.mkEvent(opts);
 };
@@ -191,6 +196,12 @@ module.exports.MockStorageApi = function() {
     this.data = {};
 };
 module.exports.MockStorageApi.prototype = {
+    get length() {
+        return Object.keys(this.data).length;
+    },
+    key: function(i) {
+        return Object.keys(this.data)[i];
+    },
     setItem: function(k, v) {
         this.data[k] = v;
     },
@@ -199,5 +210,5 @@ module.exports.MockStorageApi.prototype = {
     },
     removeItem: function(k) {
         delete this.data[k];
-    }
+    },
 };

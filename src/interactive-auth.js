@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +17,13 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-var q = require("q");
+const q = require("q");
+const url = require("url");
 
-var utils = require("./utils");
+const utils = require("./utils");
+
+const EMAIL_STAGE_TYPE = "m.login.email.identity";
+const MSISDN_STAGE_TYPE = "m.login.msisdn";
 
 /**
  * Abstracts the logic used to drive the interactive auth process.
@@ -37,44 +42,123 @@ var utils = require("./utils");
  *
  * @param {object} opts  options object
  *
+ * @param {object} opts.matrixClient A matrix client to use for the auth process
+ *
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
- * @param {function(object?): module:client.Promise} opts.doRequest
- *     called with the new auth dict to submit the request. Should return a
+ * @param {function(object?, bool?): module:client.Promise} opts.doRequest
+ *     called with the new auth dict to submit the request and a flag set
+ *     to true if this request is a background request. Should return a
  *     promise which resolves to the successful response or rejects with a
  *     MatrixError.
  *
- * @param {function(string, object?)} opts.startAuthStage
- *     called to ask the UI to start a particular auth stage. The arguments
- *     are: the login type (eg m.login.password); and (if the last request
- *     returned an error), an error object, with fields 'errcode' and 'error'.
+ * @param {function(string, object?)} opts.stateUpdated
+ *     called when the status of the UI auth changes, ie. when the state of
+ *     an auth stage changes of when the auth flow moves to a new stage.
+ *     The arguments are: the login type (eg m.login.password); and an object
+ *     which is either an error or an informational object specific to the
+ *     login type. If the 'errcode' key is defined, the object is an error,
+ *     and has keys:
+ *         errcode: string, the textual error code, eg. M_UNKNOWN
+ *         error: string, human readable string describing the error
+ *
+ *     The login type specific objects are as follows:
+ *         m.login.email.identity:
+ *          * emailSid: string, the sid of the active email auth session
+ *
+ * @param {object?} opts.inputs Inputs provided by the user and used by different
+ *     stages of the auto process. The inputs provided will affect what flow is chosen.
+ *
+ * @param {string?} opts.inputs.emailAddress An email address. If supplied, a flow
+ *     using email verification will be chosen.
+ *
+ * @param {string?} opts.inputs.phoneCountry An ISO two letter country code. Gives
+ *     the country that opts.phoneNumber should be resolved relative to.
+ *
+ * @param {string?} opts.inputs.phoneNumber A phone number. If supplied, a flow
+ *     using phone number validation will be chosen.
+ *
+ * @param {string?} opts.sessionId If resuming an existing interactive auth session,
+ *     the sessionId of that session.
+ *
+ * @param {string?} opts.clientSecret If resuming an existing interactive auth session,
+ *     the client secret for that session
+ *
+ * @param {string?} opts.emailSid If returning from having completed m.login.email.identity
+ *     auth, the sid for the email verification session.
  *
  */
 function InteractiveAuth(opts) {
-    this._data = opts.authData;
+    this._matrixClient = opts.matrixClient;
+    this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
-    this._startAuthStageCallback = opts.startAuthStage;
+    // startAuthStage included for backwards compat
+    this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
     this._completionDeferred = null;
+    this._inputs = opts.inputs || {};
+
+    if (opts.sessionId) this._data.session = opts.sessionId;
+    this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
+    this._emailSid = opts.emailSid;
+    if (this._emailSid === undefined) this._emailSid = null;
+
+    this._currentStage = null;
 }
 
 InteractiveAuth.prototype = {
     /**
      * begin the authentication process.
      *
-     * @return {module:client.Promise}  which resolves to the response on success,
-     * or rejects with the error on failure.
+     * @return {module:client.Promise} which resolves to the response on success,
+     * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
+     *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
         this._completionDeferred = q.defer();
 
-        if (!this._data) {
-            this._doRequest(null);
-        } else {
-            this._startNextAuthStage();
+        // wrap in a promise so that if _startNextAuthStage
+        // throws, it rejects the promise in a consistent way
+        return q().then(() => {
+            // if we have no flows, try a request (we'll have
+            // just a session ID in _data if resuming)
+            if (!this._data.flows) {
+                this._doRequest(this._data);
+            } else {
+                this._startNextAuthStage();
+            }
+            return this._completionDeferred.promise;
+        });
+    },
+
+    /**
+     * Poll to check if the auth session or current stage has been
+     * completed out-of-band. If so, the attemptAuth promise will
+     * be resolved.
+     */
+    poll: function() {
+        if (!this._data.session) return;
+
+        let authDict = {};
+        if (this._currentStage == EMAIL_STAGE_TYPE) {
+            // The email can be validated out-of-band, but we need to provide the
+            // creds so the HS can go & check it.
+            if (this._emailSid) {
+                const idServerParsedUrl = url.parse(
+                    this._matrixClient.getIdentityServerUrl(),
+                );
+                authDict = {
+                    type: EMAIL_STAGE_TYPE,
+                    threepid_creds: {
+                        sid: this._emailSid,
+                        client_secret: this._clientSecret,
+                        id_server: idServerParsedUrl.host,
+                    },
+                };
+            }
         }
 
-        return this._completionDeferred.promise;
+        this.submitAuthDict(authDict, true);
     },
 
     /**
@@ -87,13 +171,23 @@ InteractiveAuth.prototype = {
     },
 
     /**
+     * get the client secret used for validation sessions
+     * with the ID server.
+     *
+     * @return {string} client secret
+     */
+    getClientSecret: function() {
+        return this._clientSecret;
+    },
+
+    /**
      * get the server params for a given stage
      *
-     * @param {string}  login type for the stage
-     * @return {object?}  any parameters from the server for this stage
+     * @param {string} loginType login type for the stage
+     * @return {object?} any parameters from the server for this stage
      */
     getStageParams: function(loginType) {
-        var params = {};
+        let params = {};
         if (this._data && this._data.params) {
             params = this._data.params;
         }
@@ -108,19 +202,44 @@ InteractiveAuth.prototype = {
      * @param {object} authData new auth dict to send to the server. Should
      *    include a `type` propterty denoting the login type, as well as any
      *    other params for that stage.
+     * @param {bool} background If true, this request failing will not result
+     *    in the attemptAuth promise being rejected. This can be set to true
+     *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData) {
+    submitAuthDict: function(authData, background) {
         if (!this._completionDeferred) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
 
         // use the sessionid from the last request.
-        var auth = {
+        const auth = {
             session: this._data.session,
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth);
+        this._doRequest(auth, background);
+    },
+
+    /**
+     * Gets the sid for the email validation session
+     * Specific to m.login.email.identity
+     *
+     * @returns {string} The sid of the email auth session
+     */
+    getEmailSid: function() {
+        return this._emailSid;
+    },
+
+    /**
+     * Sets the sid for the email validation session
+     * This must be set in order to successfully poll for completion
+     * of the email validation.
+     * Specific to m.login.email.identity
+     *
+     * @param {string} sid The sid for the email validation session
+     */
+    setEmailSid: function(sid) {
+        this._emailSid = sid;
     },
 
     /**
@@ -129,54 +248,89 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @param {object?} auth new auth dict, including session id
+     * @param {bool?} background If true, this request is a background poll, so it
+     *    failing will not result in the attemptAuth promise being rejected.
+     *    This can be set to true for requests that just poll to see if auth has
+     *    been completed elsewhere.
      */
-    _doRequest: function(auth) {
-        var self = this;
+    _doRequest: function(auth, background) {
+        const self = this;
 
         // hackery to make sure that synchronous exceptions end up in the catch
         // handler (without the additional event loop entailed by q.fcall or an
         // extra q().then)
-        var prom;
+        let prom;
         try {
-            prom = this._requestCallback(auth);
+            prom = this._requestCallback(auth, background);
         } catch (e) {
             prom = q.reject(e);
         }
 
-        prom.then(
+        prom = prom.then(
             function(result) {
                 console.log("result from request: ", result);
                 self._completionDeferred.resolve(result);
             }, function(error) {
-                if (error.httpStatus !== 401 || !error.data || !error.data.flows) {
+                // sometimes UI auth errors don't come with flows
+                const errorFlows = error.data ? error.data.flows : null;
+                const haveFlows = Boolean(self._data.flows) || Boolean(errorFlows);
+                if (error.httpStatus !== 401 || !error.data || !haveFlows) {
                     // doesn't look like an interactive-auth failure. fail the whole lot.
                     throw error;
                 }
+                // if the error didn't come with flows, completed flows or session ID,
+                // copy over the ones we have. Synapse sometimes sends responses without
+                // any UI auth data (eg. when polling for email validation, if the email
+                // has not yet been validated). This appears to be a Synapse bug, which
+                // we workaround here.
+                if (!error.data.flows && !error.data.completed && !error.data.session) {
+                    error.data.flows = self._data.flows;
+                    error.data.completed = self._data.completed;
+                    error.data.session = self._data.session;
+                }
                 self._data = error.data;
                 self._startNextAuthStage();
-            }
-        ).catch(this._completionDeferred.reject).done();
+            },
+        );
+        if (!background) {
+            prom = prom.catch(this._completionDeferred.reject);
+        } else {
+            // We ignore all failures here (even non-UI auth related ones)
+            // since we don't want to suddenly fail if the internet connection
+            // had a blip whilst we were polling
+            prom = prom.catch((error) => {
+                console.log("Ignoring error from UI auth: " + error);
+            });
+        }
+        prom.done();
     },
 
     /**
      * Pick the next stage and call the callback
      *
      * @private
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _startNextAuthStage: function() {
-        var nextStage = this._chooseStage();
+        const nextStage = this._chooseStage();
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
         }
+        this._currentStage = nextStage;
 
-        var stageError = null;
         if (this._data.errcode || this._data.error) {
-            stageError = {
+            this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",
                 error: this._data.error || "",
-            };
+            });
+            return;
         }
-        this._startAuthStageCallback(nextStage, stageError);
+
+        const stageStatus = {};
+        if (nextStage == EMAIL_STAGE_TYPE) {
+            stageStatus.emailSid = this._emailSid;
+        }
+        this._stateUpdatedCallback(nextStage, stageStatus);
     },
 
     /**
@@ -184,25 +338,65 @@ InteractiveAuth.prototype = {
      *
      * @private
      * @return {string?} login type
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _chooseStage: function() {
-        var flow = this._chooseFlow();
+        const flow = this._chooseFlow();
         console.log("Active flow => %s", JSON.stringify(flow));
-        var nextStage = this._firstUncompletedStage(flow);
+        const nextStage = this._firstUncompletedStage(flow);
         console.log("Next stage: %s", nextStage);
         return nextStage;
     },
 
     /**
      * Pick one of the flows from the returned list
+     * If a flow using all of the inputs is found, it will
+     * be returned, otherwise, null will be returned.
+     *
+     * Only flows using all given inputs are chosen because it
+     * is likley to be surprising if the user provides a
+     * credential and it is not used. For example, for registration,
+     * this could result in the email not being used which would leave
+     * the account with no means to reset a password.
      *
      * @private
      * @return {object} flow
+     * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _chooseFlow: function() {
-        var flows = this._data.flows || [];
-        // always use the first flow for now
-        return flows[0];
+        const flows = this._data.flows || [];
+
+        // we've been given an email or we've already done an email part
+        const haveEmail = Boolean(this._inputs.emailAddress) || Boolean(this._emailSid);
+        const haveMsisdn = (
+            Boolean(this._inputs.phoneCountry) &&
+            Boolean(this._inputs.phoneNumber)
+        );
+
+        for (const flow of flows) {
+            let flowHasEmail = false;
+            let flowHasMsisdn = false;
+            for (const stage of flow.stages) {
+                if (stage === EMAIL_STAGE_TYPE) {
+                    flowHasEmail = true;
+                } else if (stage == MSISDN_STAGE_TYPE) {
+                    flowHasMsisdn = true;
+                }
+            }
+
+            if (flowHasEmail == haveEmail && flowHasMsisdn == haveMsisdn) {
+                return flow;
+            }
+        }
+        // Throw an error with a fairly generic description, but with more
+        // information such that the app can give a better one if so desired.
+        const err = new Error("No appropriate authentication flow found");
+        err.name = 'NoAuthFlowFoundError';
+        err.required_stages = [];
+        if (haveEmail) err.required_stages.push(EMAIL_STAGE_TYPE);
+        if (haveMsisdn) err.required_stages.push(MSISDN_STAGE_TYPE);
+        err.available_flows = flows;
+        throw err;
     },
 
     /**
@@ -213,9 +407,9 @@ InteractiveAuth.prototype = {
      * @return {string} login type
      */
     _firstUncompletedStage: function(flow) {
-        var completed = (this._data || {}).completed || [];
-        for (var i = 0; i < flow.stages.length; ++i) {
-            var stageType = flow.stages[i];
+        const completed = (this._data || {}).completed || [];
+        for (let i = 0; i < flow.stages.length; ++i) {
+            const stageType = flow.stages[i];
             if (completed.indexOf(stageType) === -1) {
                 return stageType;
             }

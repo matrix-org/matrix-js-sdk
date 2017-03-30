@@ -1,97 +1,100 @@
 "use strict";
 
-var callbacks = require("../../lib/realtime-callbacks");
-var test_utils = require("../test-utils.js");
+import 'source-map-support/register';
+const callbacks = require("../../lib/realtime-callbacks");
+const testUtils = require("../test-utils.js");
+
+import expect from 'expect';
+import lolex from 'lolex';
 
 describe("realtime-callbacks", function() {
-    var clock = jasmine.Clock;
-    var fakeDate;
+    let clock;
 
     function tick(millis) {
-        // make sure we tick the fakedate first, otherwise nothing will happen!
-        fakeDate += millis;
         clock.tick(millis);
     }
 
     beforeEach(function() {
-        test_utils.beforeEach(this);
-        clock.useMock();
-        fakeDate = Date.now();
-        callbacks.setNow(function() { return fakeDate; });
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        clock = lolex.install();
+        const fakeDate = clock.Date;
+        callbacks.setNow(fakeDate.now.bind(fakeDate));
     });
 
     afterEach(function() {
         callbacks.setNow();
+        clock.uninstall();
     });
 
     describe("setTimeout", function() {
         it("should call the callback after the timeout", function() {
-            var callback = jasmine.createSpy();
+            const callback = expect.createSpy();
             callbacks.setTimeout(callback, 100);
 
-            expect(callback).not.toHaveBeenCalled();
+            expect(callback).toNotHaveBeenCalled();
             tick(100);
             expect(callback).toHaveBeenCalled();
         });
 
 
         it("should default to a zero timeout", function() {
-            var callback = jasmine.createSpy();
+            const callback = expect.createSpy();
             callbacks.setTimeout(callback);
 
-            expect(callback).not.toHaveBeenCalled();
+            expect(callback).toNotHaveBeenCalled();
             tick(0);
             expect(callback).toHaveBeenCalled();
         });
 
         it("should pass any parameters to the callback", function() {
-            var callback = jasmine.createSpy();
+            const callback = expect.createSpy();
             callbacks.setTimeout(callback, 0, "a", "b", "c");
             tick(0);
             expect(callback).toHaveBeenCalledWith("a", "b", "c");
         });
 
         it("should set 'this' to the global object", function() {
-            var callback = jasmine.createSpy();
-            callback.andCallFake(function() {
-                expect(this).toBe(global);
-                expect(this.console).toBeDefined();
-            });
+            let passed = false;
+            const callback = function() {
+                expect(this).toBe(global); // eslint-disable-line no-invalid-this
+                expect(this.console).toBeTruthy(); // eslint-disable-line no-invalid-this
+                passed = true;
+            };
             callbacks.setTimeout(callback);
             tick(0);
-            expect(callback).toHaveBeenCalled();
+            expect(passed).toBe(true);
         });
 
         it("should handle timeouts of several seconds", function() {
-            var callback = jasmine.createSpy();
+            const callback = expect.createSpy();
             callbacks.setTimeout(callback, 2000);
 
-            expect(callback).not.toHaveBeenCalled();
-            for (var i = 0; i < 4; i++) {
+            expect(callback).toNotHaveBeenCalled();
+            for (let i = 0; i < 4; i++) {
                 tick(500);
             }
             expect(callback).toHaveBeenCalled();
         });
 
         it("should call multiple callbacks in the right order", function() {
-            var callback1 = jasmine.createSpy("callback1");
-            var callback2 = jasmine.createSpy("callback2");
-            var callback3 = jasmine.createSpy("callback3");
+            const callback1 = expect.createSpy();
+            const callback2 = expect.createSpy();
+            const callback3 = expect.createSpy();
             callbacks.setTimeout(callback2, 200);
             callbacks.setTimeout(callback1, 100);
             callbacks.setTimeout(callback3, 300);
 
-            expect(callback1).not.toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
-            expect(callback3).not.toHaveBeenCalled();
+            expect(callback1).toNotHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
+            expect(callback3).toNotHaveBeenCalled();
             tick(100);
             expect(callback1).toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
-            expect(callback3).not.toHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
+            expect(callback3).toNotHaveBeenCalled();
             tick(100);
             expect(callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
-            expect(callback3).not.toHaveBeenCalled();
+            expect(callback3).toNotHaveBeenCalled();
             tick(100);
             expect(callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
@@ -99,81 +102,83 @@ describe("realtime-callbacks", function() {
         });
 
         it("should treat -ve timeouts the same as a zero timeout", function() {
-            var callback1 = jasmine.createSpy("callback1");
-            var callback2 = jasmine.createSpy("callback2");
+            const callback1 = expect.createSpy();
+            const callback2 = expect.createSpy();
 
             // check that cb1 is called before cb2
-            callback1.andCallFake(function() {
-                expect(callback2).not.toHaveBeenCalled();
+            callback1.andCall(function() {
+                expect(callback2).toNotHaveBeenCalled();
             });
 
             callbacks.setTimeout(callback1);
             callbacks.setTimeout(callback2, -100);
 
-            expect(callback1).not.toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
+            expect(callback1).toNotHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
             tick(0);
             expect(callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
         });
 
         it("should not get confused by chained calls", function() {
-            var callback2 = jasmine.createSpy("callback2");
-            var callback1 = jasmine.createSpy("callback1");
-            callback1.andCallFake(function() {
+            const callback2 = expect.createSpy();
+            const callback1 = expect.createSpy();
+            callback1.andCall(function() {
                 callbacks.setTimeout(callback2, 0);
-                expect(callback2).not.toHaveBeenCalled();
+                expect(callback2).toNotHaveBeenCalled();
             });
 
             callbacks.setTimeout(callback1);
-            expect(callback1).not.toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
+            expect(callback1).toNotHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
             tick(0);
             expect(callback1).toHaveBeenCalled();
+            // the fake timer won't actually run callbacks registered during
+            // one tick until the next tick.
+            tick(1);
             expect(callback2).toHaveBeenCalled();
         });
 
         it("should be immune to exceptions", function() {
-            var callback1 = jasmine.createSpy("callback1");
-            callback1.andCallFake(function() {
+            const callback1 = expect.createSpy();
+            callback1.andCall(function() {
                 throw new Error("prepare to die");
             });
-            var callback2 = jasmine.createSpy("callback2");
+            const callback2 = expect.createSpy();
             callbacks.setTimeout(callback1, 0);
             callbacks.setTimeout(callback2, 0);
 
-            expect(callback1).not.toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
+            expect(callback1).toNotHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
             tick(0);
             expect(callback1).toHaveBeenCalled();
             expect(callback2).toHaveBeenCalled();
         });
-
     });
 
     describe("cancelTimeout", function() {
         it("should cancel a pending timeout", function() {
-            var callback = jasmine.createSpy();
-            var k = callbacks.setTimeout(callback);
+            const callback = expect.createSpy();
+            const k = callbacks.setTimeout(callback);
             callbacks.clearTimeout(k);
             tick(0);
-            expect(callback).not.toHaveBeenCalled();
+            expect(callback).toNotHaveBeenCalled();
         });
 
         it("should not affect sooner timeouts", function() {
-            var callback1 = jasmine.createSpy("callback1");
-            var callback2 = jasmine.createSpy("callback2");
+            const callback1 = expect.createSpy();
+            const callback2 = expect.createSpy();
 
             callbacks.setTimeout(callback1, 100);
-            var k = callbacks.setTimeout(callback2, 200);
+            const k = callbacks.setTimeout(callback2, 200);
             callbacks.clearTimeout(k);
 
             tick(100);
             expect(callback1).toHaveBeenCalled();
-            expect(callback2).not.toHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
 
             tick(150);
-            expect(callback2).not.toHaveBeenCalled();
+            expect(callback2).toNotHaveBeenCalled();
         });
     });
 });
