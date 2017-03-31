@@ -60,7 +60,6 @@ function debuglog() {
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
  * @param {module:crypto=} opts.crypto Crypto manager
- * @param {SyncAccumulator=} opts.syncAccumulator An accumulator which will be
  * kept up-to-date. If one is supplied, the response to getJSON() will be used
  * initially.
  * @param {Function=} opts.canResetEntireTimeline A function which is called
@@ -542,34 +541,35 @@ SyncApi.prototype._sync = function(syncOptions) {
     }
 
     let isCachedResponse = false;
-    if (self.opts.syncAccumulator && !syncOptions.hasSyncedBefore) {
-        let data = self.opts.syncAccumulator.getJSON();
+
+    let syncPromise;
+    if (!syncOptions.hasSyncedBefore) {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
-        if (data.nextBatch) {
+        syncPromise = client.store.getSavedSync();
+    } else {
+        syncPromise = q(null);
+    }
+
+    syncPromise.then((savedSync) => {
+        if (savedSync) {
             debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-            // We must deep copy the stored data so that the /sync processing code doesn't
-            // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
-            data = utils.deepCopy(data);
-            this._currentSyncRequest = q.resolve({
-                next_batch: data.nextBatch,
-                rooms: data.roomsData,
-                account_data: {
-                    events: data.accountData,
-                },
-            });
             isCachedResponse = true;
+            return {
+                next_batch: savedSync.nextBatch,
+                rooms: savedSync.roomsData,
+                account_data: {
+                    events: savedSync.accountData,
+                },
+            };
+        } else {
+            //debuglog('Starting sync since=' + syncToken);
+            this._currentSyncRequest = client._http.authedRequest(
+                undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+            );
+            return this._currentSyncRequest;
         }
-    }
-
-    if (!isCachedResponse) {
-        //debuglog('Starting sync since=' + syncToken);
-        this._currentSyncRequest = client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-        );
-    }
-
-    this._currentSyncRequest.done(function(data) {
+    }).done(function(data) {
         //debuglog('Completed sync, next_batch=' + data.next_batch);
 
         // set the sync token NOW *before* processing the events. We do this so
@@ -585,11 +585,9 @@ SyncApi.prototype._sync = function(syncOptions) {
             console.error("Caught /sync error", e.stack || e);
         }
 
-        // If there's an accumulator then the first HTTP response is actually the
-        // accumulated data. We don't want to accumulate the same thing twice, so
-        // only accumulate if this isn't a cached response.
-        if (self.opts.syncAccumulator && !isCachedResponse) {
-            self.opts.syncAccumulator.accumulate(data);
+        // Don't give the store back its own cached data
+        if (!isCachedResponse) {
+            client.store.setSyncData(data);
         }
 
         // emit synced events

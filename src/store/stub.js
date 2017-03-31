@@ -183,17 +183,14 @@ StubStore.prototype = {
     },
 
     /**
+     * setSyncData does nothing as there is no backing data store.
+     */
+    setSyncData: function(syncData) {},
+
+    /**
      * Save does nothing as there is no backing data store.
      */
     save: function() {},
-
-    /**
-     * Returns nothing as this store does not accumulate /sync data.
-     * @return {?SyncAccumulator} null
-     */
-    getSyncAccumulator: function() {
-        return null;
-    },
 
     /**
      * Startup does nothing.
