@@ -28,11 +28,11 @@ function PushProcessor(client) {
     };
 
     const matchingRuleFromKindSet = function(ev, kindset, device) {
-        const rulekinds_in_order = ['override', 'content', 'room', 'sender', 'underride'];
+        const rulekindsInOrder = ['override', 'content', 'room', 'sender', 'underride'];
         for (let ruleKindIndex = 0;
-                ruleKindIndex < rulekinds_in_order.length;
+                ruleKindIndex < rulekindsInOrder.length;
                 ++ruleKindIndex) {
-            const kind = rulekinds_in_order[ruleKindIndex];
+            const kind = rulekindsInOrder[ruleKindIndex];
             const ruleset = kindset[kind];
 
             for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
@@ -117,14 +117,14 @@ function PushProcessor(client) {
     };
 
     const eventFulfillsCondition = function(cond, ev) {
-        const condition_functions = {
+        const conditionFunctions = {
             "event_match": eventFulfillsEventMatchCondition,
             "device": eventFulfillsDeviceCondition,
             "contains_display_name": eventFulfillsDisplayNameCondition,
             "room_member_count": eventFulfillsRoomMemberCountCondition,
         };
-        if (condition_functions[cond.kind]) {
-            return condition_functions[cond.kind](cond, ev);
+        if (conditionFunctions[cond.kind]) {
+            return conditionFunctions[cond.kind](cond, ev);
         }
         return true;
     };

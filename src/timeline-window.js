@@ -350,7 +350,8 @@ TimelineWindow.prototype.getEvents = function() {
         // (Note that both this._start.index and this._end.index are relative
         // to their respective timelines' BaseIndex).
         //
-        let startIndex = 0, endIndex = events.length;
+        let startIndex = 0;
+        let endIndex = events.length;
         if (timeline === this._start.timeline) {
             startIndex = this._start.index + timeline.getBaseIndex();
         }

@@ -572,7 +572,8 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
     if (timeline1 === timeline2) {
         // both events are in the same timeline - figure out their
         // relative indices
-        let idx1, idx2;
+        let idx1;
+        let idx2;
         const events = timeline1.getEvents();
         for (let idx = 0; idx < events.length &&
              (idx1 === undefined || idx2 === undefined); idx++) {

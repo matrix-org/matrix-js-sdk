@@ -66,7 +66,7 @@ describe("MatrixClient events", function() {
                                 }),
                                 utils.mkEvent({
                                     type: "m.room.topic",
-                                    content: { topic: "Topic" }
+                                    content: { topic: "Topic" },
                                 }),
                             ],
                         },
@@ -202,7 +202,7 @@ describe("MatrixClient events", function() {
                     1, "Room.name fired wrong number of times.",
                 );
                 expect(roomTopicInvokeCount).toEqual(
-                    1, "Room.topic fired wrong number of times."
+                    1, "Room.topic fired wrong number of times.",
                 );
                 expect(timelineFireCount).toEqual(
                     3, "Room.timeline fired the wrong number of times",
@@ -216,7 +216,7 @@ describe("MatrixClient events", function() {
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             const roomStateEventTypes = [
-                "m.room.member", "m.room.create", "m.room.topic"
+                "m.room.member", "m.room.create", "m.room.topic",
             ];
             let eventsInvokeCount = 0;
             let membersInvokeCount = 0;

@@ -182,7 +182,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             utils.forEach([member, sentinel], function(roomMember) {
                 roomMember.setMembershipEvent(event, self);
                 // this member may have a power level already, so set it.
-                const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
+                const pwrLvlEvent = self.getStateEvents("m.room.powerLevels", "");
                 if (pwrLvlEvent) {
                     roomMember.setPowerLevelEvent(pwrLvlEvent);
                 }
@@ -191,7 +191,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._sentinels[userId] = sentinel;
             self.members[userId] = member;
             self.emit("RoomState.members", event, self, member);
-        } else if (event.getType() === "m.room.power_levels") {
+        } else if (event.getType() === "m.room.powerLevels") {
             const members = utils.values(self.members);
             utils.forEach(members, function(member) {
                 member.setPowerLevelEvent(event);
@@ -317,32 +317,32 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
         return false;
     }
 
-    const power_levels_event = this.getStateEvents('m.room.power_levels', '');
+    const powerLevelsEvent = this.getStateEvents('m.room.powerLevels', '');
 
-    let power_levels;
-    let events_levels = {};
+    let powerLevels;
+    let eventsLevels = {};
 
-    let state_default = 0;
-    let events_default = 0;
-    if (power_levels_event) {
-        power_levels = power_levels_event.getContent();
-        events_levels = power_levels.events || {};
+    let stateDefault = 0;
+    let eventsDefault = 0;
+    if (powerLevelsEvent) {
+        powerLevels = powerLevelsEvent.getContent();
+        eventsLevels = powerLevels.events || {};
 
-        if (power_levels.state_default !== undefined) {
-            state_default = power_levels.state_default;
+        if (powerLevels.stateDefault !== undefined) {
+            stateDefault = powerLevels.stateDefault;
         } else {
-            state_default = 50;
+            stateDefault = 50;
         }
-        if (power_levels.events_default !== undefined) {
-            events_default = power_levels.events_default;
+        if (powerLevels.eventsDefault !== undefined) {
+            eventsDefault = powerLevels.eventsDefault;
         }
     }
 
-    let required_level = state ? state_default : events_default;
-    if (events_levels[eventType] !== undefined) {
-        required_level = events_levels[eventType];
+    let requiredLevel = state ? stateDefault : eventsDefault;
+    if (eventsLevels[eventType] !== undefined) {
+        requiredLevel = eventsLevels[eventType];
     }
-    return member.powerLevel >= required_level;
+    return member.powerLevel >= requiredLevel;
 };
 
 /**

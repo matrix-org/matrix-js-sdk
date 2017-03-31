@@ -86,7 +86,7 @@ function OlmDevice(sessionStore) {
     let e2eKeys;
     const account = new Olm.Account();
     try {
-        _initialise_account(this._sessionStore, this._pickleKey, account);
+        _initialiseAccount(this._sessionStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
     } finally {
         account.free();
@@ -112,7 +112,7 @@ function OlmDevice(sessionStore) {
     this._inboundGroupSessionMessageIndexes = {};
 }
 
-function _initialise_account(sessionStore, pickleKey, account) {
+function _initialiseAccount(sessionStore, pickleKey, account) {
     const e2eAccount = sessionStore.getEndToEndAccount();
     if (e2eAccount !== null) {
         account.unpickle(pickleKey, e2eAccount);
@@ -309,7 +309,7 @@ OlmDevice.prototype.createOutboundSession = function(
  * Generate a new inbound session, given an incoming message
  *
  * @param {string} theirDeviceIdentityKey remote user's Curve25519 identity key
- * @param {number} message_type  message_type field from the received message (must be 0)
+ * @param {number} messageType  messageType field from the received message (must be 0)
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {{payload: string, session_id: string}} decrypted payload, and
@@ -319,10 +319,10 @@ OlmDevice.prototype.createOutboundSession = function(
  *     didn't use a valid one-time key).
  */
 OlmDevice.prototype.createInboundSession = function(
-    theirDeviceIdentityKey, message_type, ciphertext,
+    theirDeviceIdentityKey, messageType, ciphertext,
 ) {
-    if (message_type !== 0) {
-        throw new Error("Need message_type == 0 to create inbound session");
+    if (messageType !== 0) {
+        throw new Error("Need messageType == 0 to create inbound session");
     }
 
     const self = this;
@@ -333,7 +333,7 @@ OlmDevice.prototype.createInboundSession = function(
             account.remove_one_time_keys(session);
             self._saveAccount(account);
 
-            const payloadString = session.decrypt(message_type, ciphertext);
+            const payloadString = session.decrypt(messageType, ciphertext);
 
             self._saveSession(theirDeviceIdentityKey, session);
 
@@ -441,18 +441,18 @@ OlmDevice.prototype.encryptMessage = function(
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
  * @param {string} sessionId  the id of the active session
- * @param {number} message_type  message_type field from the received message
+ * @param {number} messageType  messageType field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {string} decrypted payload.
  */
 OlmDevice.prototype.decryptMessage = function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
 ) {
     const self = this;
 
     return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
-        const payloadString = session.decrypt(message_type, ciphertext);
+        const payloadString = session.decrypt(messageType, ciphertext);
         self._saveSession(theirDeviceIdentityKey, session);
 
         return payloadString;
@@ -465,16 +465,16 @@ OlmDevice.prototype.decryptMessage = function(
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
  * @param {string} sessionId  the id of the active session
- * @param {number} message_type  message_type field from the received message
+ * @param {number} messageType  messageType field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {boolean} true if the received message is a prekey message which matches
  *    the given session.
  */
 OlmDevice.prototype.matchesSession = function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
 ) {
-    if (message_type !== 0) {
+    if (messageType !== 0) {
         return false;
     }
 

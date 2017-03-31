@@ -42,9 +42,10 @@ const MatrixError = httpApi.MatrixError;
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
+let Crypto;
 
 try {
-    var Crypto = require("./crypto");
+    Crypto = require("./crypto");
     CRYPTO_ENABLED = true;
 } catch (e) {
     console.error("olm load error", e);
@@ -675,10 +676,10 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         return q(room);
     }
 
-    let sign_promise = q();
+    let signPromise = q();
 
     if (opts.inviteSignUrl) {
-        sign_promise = this._http.requestOtherUrl(
+        signPromise = this._http.requestOtherUrl(
             undefined, 'POST',
             opts.inviteSignUrl, { mxid: this.credentials.userId },
         );
@@ -687,10 +688,10 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
     const defer = q.defer();
 
     const self = this;
-    sign_promise.then(function(signed_invite_object) {
+    signPromise.then(function(signedInviteObject) {
         const data = {};
-        if (signed_invite_object) {
-            data.third_party_signed = signed_invite_object;
+        if (signedInviteObject) {
+            data.third_party_signed = signedInviteObject;
         }
 
         const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
@@ -1887,7 +1888,9 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         return pendingRequest;
     }
 
-    let path, params, promise;
+    let path;
+    let params;
+    let promise;
     const self = this;
 
     if (isNotifTimeline) {
@@ -2254,13 +2257,13 @@ MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phone
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
-    const id_server_url = url.parse(this.idBaseUrl);
-    if (id_server_url.host === null) {
+    const idServerUrl = url.parse(this.idBaseUrl);
+    if (idServerUrl.host === null) {
         throw new Error("Invalid ID server URL: " + this.idBaseUrl);
     }
 
     const postParams = Object.assign({}, params, {
-        id_server: id_server_url.host,
+        id_server: idServerUrl.host,
     });
     return this._http.request(
         undefined, "POST", endpoint, undefined,
@@ -2306,7 +2309,8 @@ MatrixClient.prototype.getRoomPushRule = function(scope, roomId) {
  */
 MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     const self = this;
-    let deferred, hasDontNotifyRule;
+    let deferred;
+    let hasDontNotifyRule;
 
     // Get the existing room-kind push rule if any
     const roomPushRule = this.getRoomPushRule(scope, roomId);
@@ -2496,15 +2500,15 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
  * @private
  */
 MatrixClient.prototype._processRoomEventsSearch = function(searchResults, response) {
-    const room_events = response.search_categories.room_events;
+    const roomEvents = response.search_categories.room_events;
 
-    searchResults.count = room_events.count;
-    searchResults.next_batch = room_events.next_batch;
+    searchResults.count = roomEvents.count;
+    searchResults.next_batch = roomEvents.next_batch;
 
     // combine the highlight list with our existing list; build an object
     // to avoid O(N^2) fail
     const highlights = {};
-    room_events.highlights.forEach(function(hl) {
+    roomEvents.highlights.forEach(function(hl) {
         highlights[hl] = 1;
     });
     searchResults.highlights.forEach(function(hl) {
@@ -2515,8 +2519,8 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
     searchResults.highlights = Object.keys(highlights);
 
     // append the new results to our existing results
-    for (let i = 0; i < room_events.results.length; i++) {
-        const sr = SearchResult.fromJson(room_events.results[i], this.getEventMapper());
+    for (let i = 0; i < roomEvents.results.length; i++) {
+        const sr = SearchResult.fromJson(roomEvents.results[i], this.getEventMapper());
         searchResults.results.push(sr);
     }
     return searchResults;

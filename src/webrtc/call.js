@@ -1076,9 +1076,9 @@ const callError = function(code, msg) {
     return e;
 };
 
-const debuglog = function() {
+const debuglog = function(...args) {
     if (DEBUG) {
-        console.log(...arguments);
+        console.log(...args);
     }
 };
 
@@ -1259,8 +1259,8 @@ module.exports.createNewMatrixCall = function(client, roomId) {
         w.navigator.mozGetUserMedia
     );
     if (getUserMedia) {
-        webRtc.getUserMedia = function() {
-            return getUserMedia.apply(w.navigator, arguments);
+        webRtc.getUserMedia = function(...args) {
+            return getUserMedia.apply(w.navigator, args);
         };
     }
     webRtc.RtcPeerConnection = (

@@ -332,11 +332,11 @@ describe("MatrixClient syncing", function() {
                 events: [
                     utils.mkEvent({
                         type: "m.room.name", room: roomOne, user: selfUserId,
-                        content: { name: "A new room name" }
+                        content: { name: "A new room name" },
                     }),
                     utils.mkEvent({
                         type: "m.room.topic", room: roomOne, user: selfUserId,
-                        content: { topic: roomOneTopic } 
+                        content: { topic: roomOneTopic },
                     }),
 
                 ],
@@ -434,8 +434,8 @@ describe("MatrixClient syncing", function() {
             client.startClient();
 
             httpBackend.flush().done(function() {
-                var room = client.getRoom(roomOne);
-                
+                const room = client.getRoom(roomOne);
+
                 expect(room.topic).toEqual(roomOneTopic);
                 expect(room.summary.info.desc).toEqual(roomOneTopic);
                 done();

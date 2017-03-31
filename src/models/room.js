@@ -360,20 +360,20 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
  * @return {array} The room's alias as an array of strings
  */
 Room.prototype.getAliases = function() {
-    const alias_strings = [];
+    const aliasStrings = [];
 
-    const alias_events = this.currentState.getStateEvents("m.room.aliases");
-    if (alias_events) {
-        for (let i = 0; i < alias_events.length; ++i) {
-            const alias_event = alias_events[i];
-            if (utils.isArray(alias_event.getContent().aliases)) {
+    const aliasEvents = this.currentState.getStateEvents("m.room.aliases");
+    if (aliasEvents) {
+        for (let i = 0; i < aliasEvents.length; ++i) {
+            const aliasEvent = aliasEvents[i];
+            if (utils.isArray(aliasEvent.getContent().aliases)) {
                 Array.prototype.push.apply(
-                    alias_strings, alias_event.getContent().aliases,
+                    aliasStrings, aliasEvent.getContent().aliases,
                 );
             }
         }
     }
-    return alias_strings;
+    return aliasStrings;
 };
 
 /**
@@ -855,10 +855,9 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
             this.currentState.setTypingEvent(events[i]);
         } else if (events[i].getType() === "m.receipt") {
             this.addReceipt(events[i]);
-        }
-        // N.B. account_data is added directly by /sync to avoid
-        // having to maintain an event.isAccountData() here
-        else {
+        } else {
+            // N.B. account_data is added directly by /sync to avoid
+            // having to maintain an event.isAccountData() here
             // TODO: We should have a filter to say "only add state event
             // types X Y Z to the timeline".
             this._addLiveEvent(events[i], duplicateStrategy);
@@ -868,11 +867,11 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
 
 /**
  * Removes events from this room.
- * @param {String[]} event_ids A list of event_ids to remove.
+ * @param {String[]} eventIds A list of eventIds to remove.
  */
-Room.prototype.removeEvents = function(event_ids) {
-    for (let i = 0; i < event_ids.length; ++i) {
-        this.removeEvent(event_ids[i]);
+Room.prototype.removeEvents = function(eventIds) {
+    for (let i = 0; i < eventIds.length; ++i) {
+        this.removeEvent(eventIds[i]);
     }
 };
 
@@ -1269,15 +1268,15 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 function reEmit(reEmitEntity, emittableEntity, eventNames) {
     utils.forEach(eventNames, function(eventName) {
         // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
+        emittableEntity.on(eventName, function(...args) {
             // take the args from the listener and reuse them, adding the
             // event name to the arg list so it works with .emit()
             // Transformation Example:
             // listener on "foo" => function(a,b) { ... }
             // Re-emit on "thing" => thing.emit("foo", a, b)
             const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
+            for (let i = 0; i < args.length; i++) {
+                newArgs.push(args[i]);
             }
             reEmitEntity.emit(...newArgs);
         });
