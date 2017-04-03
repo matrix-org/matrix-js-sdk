@@ -184,6 +184,8 @@ StubStore.prototype = {
 
     /**
      * setSyncData does nothing as there is no backing data store.
+     *
+     * @param {Object} syncData The sync data
      */
     setSyncData: function(syncData) {},
 
