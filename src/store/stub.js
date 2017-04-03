@@ -203,6 +203,15 @@ StubStore.prototype = {
     },
 
     /**
+     * @return {Promise} Resolves with a sync response to restore the
+     * client state to where it was at the last save, or null if there
+     * is no saved sync data.
+     */
+    getSavedSync: function() {
+        return q(null);
+    },
+
+    /**
      * Delete all data from this store. Does nothing since this store
      * doesn't store anything.
      * @return {Promise} An immediately resolved promise.
