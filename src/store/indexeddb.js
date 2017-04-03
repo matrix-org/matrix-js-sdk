@@ -234,7 +234,6 @@ IndexedDBStoreBackend.prototype = {
  *
  * @constructor
  * @extends MatrixInMemoryStore
- * loaded from IndexedDB and periodically saved to IndexedDB.
  * @param {Object} opts Options optject.
  * @param {Object} opts.indexedDB The Indexed DB interface e.g.
  * <code>window.indexedDB</code>
