@@ -60,8 +60,6 @@ function debuglog() {
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
  * @param {module:crypto=} opts.crypto Crypto manager
- * kept up-to-date. If one is supplied, the response to getJSON() will be used
- * initially.
  * @param {Function=} opts.canResetEntireTimeline A function which is called
  * with a room ID and returns a boolean. It should return 'true' if the SDK can
  * SAFELY remove events from this room. It may not be safe to remove events if
