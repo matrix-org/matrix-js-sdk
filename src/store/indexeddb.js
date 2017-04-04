@@ -234,7 +234,7 @@ IndexedDBStoreBackend.prototype = {
  *
  * @constructor
  * @extends MatrixInMemoryStore
- * @param {Object} opts Options optject.
+ * @param {Object} opts Options object.
  * @param {Object} opts.indexedDB The Indexed DB interface e.g.
  * <code>window.indexedDB</code>
  * @param {string=} opts.dbName Optional database name. The same name must be used
