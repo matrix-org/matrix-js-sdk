@@ -39,6 +39,13 @@ const DEBUG = true;
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 80 * 1000;
 
+// Number of consecutive failed /sync requests
+let failedSyncCount = 0;
+// Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
+// to RECONNECTING. This is needed to inform the client of server issues when the
+// keepAlive is successful but the server /sync fails.
+const FAILED_SYNC_ERROR_THRESHOLD = 3;
+
 function getFilterName(userId, suffix) {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
@@ -610,6 +617,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         client.store.save();
 
         self._sync(syncOptions);
+
+        // Reset after a successful sync
+        failedSyncCount = 0;
     }, function(err) {
         if (!self._running) {
             debuglog("Sync no longer running: exiting");
@@ -623,6 +633,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         console.error("/sync error %s", err);
         console.error(err);
 
+        failedSyncCount++;
+        console.log('Number of consecutive failed sync requests:', failedSyncCount);
+
         debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
         // lost yet: we only do this if a keepalive poke
@@ -635,7 +648,10 @@ SyncApi.prototype._sync = function(syncOptions) {
             self._sync(syncOptions);
         });
         self._currentSyncRequest = null;
-        self._updateSyncState("RECONNECTING");
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        self._updateSyncState(
+            failedSyncCount > FAILED_SYNC_ERROR_THRESHOLD ? "ERROR" : "RECONNECTING",
+        );
     });
 };
 
