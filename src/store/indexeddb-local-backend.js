@@ -98,7 +98,7 @@ function promiseifyRequest(req) {
  * to open the same database.
  */
 const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
-    indexedDBInterface, dbName
+    indexedDBInterface, dbName,
 ) {
     this.indexedDB = indexedDBInterface;
     this._dbName = "matrix-js-sdk:" + (dbName || "default");
