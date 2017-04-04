@@ -134,8 +134,9 @@ describe("MatrixClient", function() {
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
             "save", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
-            "getSyncAccumulator", "startup", "deleteAllData",
+            "getSyncAccumulator", "startup", "deleteAllData", "setSyncData",
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+        store.getSavedSync = expect.createSpy().andReturn(q(null));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,

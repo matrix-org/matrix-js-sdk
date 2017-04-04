@@ -287,17 +287,27 @@ IndexedDBStore.prototype.startup = function() {
         });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
         this.setSyncToken(syncData.nextBatch);
-        this._setSyncData(syncData.nextBatch, syncData.roomsData, accountData);
+        this.setSyncData({
+            next_batch: syncData.nextBatch,
+            rooms: syncData.roomsData,
+            account_data: {
+                events: accountData,
+            },
+        });
     });
 };
 
 /**
- * Return the accumulator which will have the initial /sync data when startup()
- * is called.
- * @return {SyncAccumulator}
+ * @return {Promise} Resolves with a sync response to restore the
+ * client state to where it was at the last save, or null if there
+ * is no saved sync data.
  */
-IndexedDBStore.prototype.getSyncAccumulator = function() {
-    return this._syncAccumulator;
+IndexedDBStore.prototype.getSavedSync = function() {
+    const data = this._syncAccumulator.getJSON();
+    if (!data.nextBatch) return q(null);
+    // We must deep copy the stored data so that the /sync processing code doesn't
+    // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
+    return q(utils.deepCopy(data));
 };
 
 /**
@@ -326,14 +336,8 @@ IndexedDBStore.prototype.save = function() {
     return q();
 };
 
-IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData, accountData) {
-    this._syncAccumulator.accumulate({
-        next_batch: nextBatch,
-        rooms: roomsData,
-        account_data: {
-            events: accountData,
-        },
-    });
+IndexedDBStore.prototype.setSyncData = function(syncData) {
+    this._syncAccumulator.accumulate(syncData);
 };
 
 IndexedDBStore.prototype._syncToDatabase = function() {
