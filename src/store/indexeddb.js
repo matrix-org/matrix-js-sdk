@@ -146,7 +146,9 @@ IndexedDBStore.prototype.save = function() {
     const now = Date.now();
     if (now - this._syncTs > WRITE_DELAY_MS) {
         this._syncTs = Date.now(); // set now to guard against multi-writes
-        return this.backend.syncToDatabase(this.getUsers()).catch((err) => {console.error("sync fail:", err);});
+        return this.backend.syncToDatabase(this.getUsers()).catch((err) => {
+            console.error("sync fail:", err);
+        });
     }
     return q();
 };
