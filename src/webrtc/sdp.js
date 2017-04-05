@@ -141,7 +141,7 @@ Sdp.prototype.parseSdp = function(s) {
                             if (r) {
                                 if (media.ext === undefined) media.ext = [];
                                 media.ext.push({
-                                    value: r[1] | 0,
+                                    value: r[1],
                                     uri: r[2],
                                 });
                             } else {
