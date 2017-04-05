@@ -131,7 +131,7 @@ utils.inherits(MatrixCall, EventEmitter);
  * @throws If you have not specified a listener for 'error' events.
  */
 MatrixCall.prototype.placeVoiceCall = function() {
-    debuglog("placeVoiceCall");
+    this._debuglog("placeVoiceCall");
     checkForErrorListener(this);
     _placeCallWithConstraints(this, _getUserMediaVideoContraints('voice'));
     this.type = 'voice';
@@ -146,7 +146,7 @@ MatrixCall.prototype.placeVoiceCall = function() {
  * @throws If you have not specified a listener for 'error' events.
  */
 MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoElement) {
-    debuglog("placeVideoCall");
+    this._debuglog("placeVideoCall");
     checkForErrorListener(this);
     this.localVideoElement = localVideoElement;
     this.remoteVideoElement = remoteVideoElement;
@@ -167,7 +167,7 @@ MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoEle
  */
 MatrixCall.prototype.placeScreenSharingCall =
     function(remoteVideoElement, localVideoElement) {
-    debuglog("placeScreenSharingCall");
+    this._debuglog("placeScreenSharingCall");
     checkForErrorListener(this);
     const screenConstraints = _getChromeScreenSharingConstraints(this);
     if (!screenConstraints) {
@@ -178,7 +178,7 @@ MatrixCall.prototype.placeScreenSharingCall =
     const self = this;
     this.webRtc.getUserMedia(screenConstraints, function(stream) {
         self.screenSharingStream = stream;
-        debuglog("Got screen stream, requesting audio stream...");
+        self._debuglog("Got screen stream, requesting audio stream...");
         const audioConstraints = _getUserMediaVideoContraints('voice');
         _placeCallWithConstraints(self, audioConstraints);
     }, function(err) {
@@ -342,6 +342,17 @@ MatrixCall.prototype.setRemoteAudioElement = function(element) {
 };
 
 /**
+ * Internal
+ * Call console.log prefixing the arguments with the call ID
+ * @private
+ */
+MatrixCall.prototype._debuglog = function() {
+    if (DEBUG) {
+        console.log(`${this.callId}:`, ...arguments);
+    }
+};
+
+/**
  * Configure this call from an invite event. Used by MatrixClient.
  * @protected
  * @param {MatrixEvent} event The m.call.invite event
@@ -376,7 +387,7 @@ MatrixCall.prototype._initWithInvite = function(event) {
     if (event.getAge()) {
         setTimeout(function() {
             if (self.state == 'ringing') {
-                debuglog("Call invite has expired. Hanging up.");
+                self._debuglog("Call invite has expired. Hanging up.");
                 self.hangupParty = 'remote'; // effectively
                 setState(self, 'ended');
                 stopAllMedia(self);
@@ -406,7 +417,7 @@ MatrixCall.prototype._initWithHangup = function(event) {
  * Answer a call.
  */
 MatrixCall.prototype.answer = function() {
-    debuglog("Answering call %s of type %s", this.callId, this.type);
+    this._debuglog("Answering %s call", this.type);
     const self = this;
 
     if (!this.localAVStream && !this.waitForLocalAVStream) {
@@ -430,16 +441,16 @@ MatrixCall.prototype.answer = function() {
  * @param {MatrixCall} newCall The new call.
  */
 MatrixCall.prototype._replacedBy = function(newCall) {
-    debuglog(this.callId + " being replaced by " + newCall.callId);
+    this._debuglog("Replacing call by " + newCall.callId);
     if (this.state == 'wait_local_media') {
-        debuglog("Telling new call to wait for local media");
+        this._debuglog("Telling new call to wait for local media");
         newCall.waitForLocalAVStream = true;
     } else if (this.state == 'create_offer') {
-        debuglog("Handing local stream to new call");
+        this._debuglog("Handing local stream to new call");
         newCall._gotUserMediaForAnswer(this.localAVStream);
         delete(this.localAVStream);
     } else if (this.state == 'invite_sent') {
-        debuglog("Handing local stream to new call");
+        this._debuglog("Handing local stream to new call");
         newCall._gotUserMediaForAnswer(this.localAVStream);
         delete(this.localAVStream);
     }
@@ -457,7 +468,7 @@ MatrixCall.prototype._replacedBy = function(newCall) {
  * @param {boolean} suppressEvent True to suppress emitting an event.
  */
 MatrixCall.prototype.hangup = function(reason, suppressEvent) {
-    debuglog("Ending call " + this.callId);
+    this._debuglog("Ending call");
     terminate(this, "local", reason, !suppressEvent);
     const content = {
         version: 0,
@@ -571,14 +582,14 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
     if (this.state == 'ended') {
         return;
     }
-    debuglog("_gotUserMediaForInvite -> " + this.type);
+    this._debuglog("_gotUserMediaForInvite -> " + this.type);
     const self = this;
     const videoEl = this.getLocalVideoElement();
 
     if (videoEl && this.type == 'video') {
         videoEl.autoplay = true;
         if (this.screenSharingStream) {
-            debuglog("Setting screen sharing stream to the local video element");
+            this._debuglog("Setting screen sharing stream to the local video element");
             this.assignElement(videoEl, this.screenSharingStream, "localVideo");
         } else {
             this.assignElement(videoEl, stream, "localVideo");
@@ -645,7 +656,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
     };
     self.peerConn.createAnswer(function(description) {
         description.sdp = self._reorderCodecs(description.sdp);
-        debuglog("Created answer: " + description);
+        self._debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
             const content = {
                 version: 0,
@@ -658,10 +669,10 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
             sendEvent(self, 'm.call.answer', content);
             setState(self, 'connecting');
         }, function() {
-            debuglog("Error setting local description!");
+            self._debuglog("Error setting local description!");
         }, constraints);
     }, function(err) {
-        debuglog("Failed to create answer: " + err);
+        self._debuglog("Failed to create answer: " + err);
     });
     setState(self, 'create_answer');
 };
@@ -673,7 +684,7 @@ MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
  */
 MatrixCall.prototype._gotLocalIceCandidate = function(event) {
     if (event.candidate) {
-        debuglog(
+        this._debuglog(
             "Got local ICE " + event.candidate.sdpMid + " candidate: " +
             event.candidate.candidate,
         );
@@ -698,7 +709,7 @@ MatrixCall.prototype._gotRemoteIceCandidate = function(cand) {
         //debuglog("Ignoring remote ICE candidate because call has ended");
         return;
     }
-    debuglog("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
+    this._debuglog("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
     this.peerConn.addIceCandidate(
         new this.webRtc.RtcIceCandidate(cand),
         function() {},
@@ -733,11 +744,10 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
 MatrixCall.prototype._gotLocalOffer = function(description) {
     const self = this;
     description.sdp = self._reorderCodecs(description.sdp);
-    debuglog("Created offer: " + description);
+    self._debuglog("Created offer: " + description);
 
     if (self.state == 'ended') {
-        debuglog("Ignoring newly created offer on call ID " + self.callId +
-            " because the call has ended");
+        self._debuglog("Ignoring newly created offer because the call has ended");
         return;
     }
 
@@ -769,7 +779,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
         }, MatrixCall.CALL_TIMEOUT_MS);
         setState(self, 'invite_sent');
     }, function() {
-        debuglog("Error setting local description!");
+        self._debuglog("Error setting local description!");
     });
 };
 
@@ -810,7 +820,7 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
     if (this.state == 'ended') {
         return; // because ICE can still complete as we're ending the call
     }
-    debuglog(
+    this._debuglog(
         "Ice connection state changed to: " + this.peerConn.iceConnectionState,
     );
     // ideally we'd consider the call to be connected when we get media but
@@ -829,9 +839,8 @@ MatrixCall.prototype._onIceConnectionStateChanged = function() {
  * @private
  */
 MatrixCall.prototype._onSignallingStateChanged = function() {
-    debuglog(
-        "call " + this.callId + ": Signalling state changed to: " +
-        this.peerConn.signalingState,
+    this._debuglog(
+        "Signalling state changed to: " + this.peerConn.signalingState,
     );
 };
 
@@ -840,7 +849,7 @@ MatrixCall.prototype._onSignallingStateChanged = function() {
  * @private
  */
 MatrixCall.prototype._onSetRemoteDescriptionSuccess = function() {
-    debuglog("Set remote description");
+    this._debuglog("Set remote description");
 };
 
 /**
@@ -849,7 +858,7 @@ MatrixCall.prototype._onSetRemoteDescriptionSuccess = function() {
  * @param {Object} e
  */
 MatrixCall.prototype._onSetRemoteDescriptionError = function(e) {
-    debuglog("Failed to set remote description" + e);
+    this._debuglog("Failed to set remote description" + e);
 };
 
 /**
@@ -858,7 +867,7 @@ MatrixCall.prototype._onSetRemoteDescriptionError = function(e) {
  * @param {Object} event
  */
 MatrixCall.prototype._onAddStream = function(event) {
-    debuglog("Stream id " + event.stream.id + " added");
+    this._debuglog("Stream id " + event.stream.id + " added");
 
     const s = event.stream;
 
@@ -873,7 +882,7 @@ MatrixCall.prototype._onAddStream = function(event) {
 
     const self = this;
     forAllTracksOnStream(s, function(t) {
-        debuglog("Track id " + t.id + " added");
+        self._debuglog("Track id " + t.id + " added");
         // not currently implemented in chrome
         t.onstarted = hookCallback(self, self._onRemoteStreamTrackStarted);
     });
@@ -911,7 +920,7 @@ MatrixCall.prototype._onRemoteStreamStarted = function(event) {
  * @param {Object} event
  */
 MatrixCall.prototype._onRemoteStreamEnded = function(event) {
-    debuglog("Remote stream ended");
+    this._debuglog("Remote stream ended");
     this.hangupParty = 'remote';
     setState(this, 'ended');
     stopAllMedia(this);
@@ -936,7 +945,7 @@ MatrixCall.prototype._onRemoteStreamTrackStarted = function(event) {
  * @param {Object} msg
  */
 MatrixCall.prototype._onHangupReceived = function(msg) {
-    debuglog("Hangup received");
+    this._debuglog("Hangup received");
     terminate(this, "remote", msg.reason, true);
 };
 
@@ -946,7 +955,7 @@ MatrixCall.prototype._onHangupReceived = function(msg) {
  * @param {Object} msg
  */
 MatrixCall.prototype._onAnsweredElsewhere = function(msg) {
-    debuglog("Answered elsewhere");
+    this._debuglog("Answered elsewhere");
     terminate(this, "remote", "answered_elsewhere", true);
 };
 
@@ -1029,7 +1038,7 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
 };
 
 const stopAllMedia = function(self) {
-    debuglog("stopAllMedia (stream=%s)", self.localAVStream);
+    self._debuglog("stopAllMedia (stream=%s)", self.localAVStream);
     if (self.localAVStream) {
         forAllTracksOnStream(self.localAVStream, function(t) {
             if (t.stop) {
@@ -1118,12 +1127,6 @@ const callError = function(code, msg) {
     return e;
 };
 
-const debuglog = function() {
-    if (DEBUG) {
-        console.log(...arguments);
-    }
-};
-
 const _sendCandidateQueue = function(self) {
     if (self.candidateSendQueue.length === 0) {
         return;
@@ -1137,7 +1140,7 @@ const _sendCandidateQueue = function(self) {
         call_id: self.callId,
         candidates: cands,
     };
-    debuglog("Attempting to send " + cands.length + " candidates");
+    self._debuglog("Attempting to send " + cands.length + " candidates");
     sendEvent(self, 'm.call.candidates', content).then(function() {
         self.candidateSendTries = 0;
         _sendCandidateQueue(self);
@@ -1147,7 +1150,7 @@ const _sendCandidateQueue = function(self) {
         }
 
         if (self.candidateSendTries > 5) {
-            debuglog(
+            self._debuglog(
                 "Failed to send candidates on attempt %s. Giving up for now.",
                 self.candidateSendTries,
             );
@@ -1157,7 +1160,7 @@ const _sendCandidateQueue = function(self) {
 
         const delayMs = 500 * Math.pow(2, self.candidateSendTries);
         ++self.candidateSendTries;
-        debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
+        self._debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
         setTimeout(function() {
             _sendCandidateQueue(self);
         }, delayMs);
