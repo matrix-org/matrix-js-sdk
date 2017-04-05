@@ -278,17 +278,16 @@ module.exports.MatrixInMemoryStore.prototype = {
     },
 
     /**
+     * setSyncData does nothing as there is no backing data store.
+     *
+     * @param {Object} syncData The sync data
+     */
+    setSyncData: function(syncData) {},
+
+    /**
      * Save does nothing as there is no backing data store.
      */
     save: function() {},
-
-    /**
-     * Returns nothing as this store does not accumulate /sync data.
-     * @return {?SyncAccumulator} null
-     */
-    getSyncAccumulator: function() {
-        return null;
-    },
 
     /**
      * Startup does nothing as this store doesn't require starting up.
@@ -296,6 +295,15 @@ module.exports.MatrixInMemoryStore.prototype = {
      */
     startup: function() {
         return q();
+    },
+
+    /**
+     * @return {Promise} Resolves with a sync response to restore the
+     * client state to where it was at the last save, or null if there
+     * is no saved sync data.
+     */
+    getSavedSync: function() {
+        return q(null);
     },
 
     /**

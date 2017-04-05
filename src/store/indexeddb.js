@@ -20,6 +20,7 @@ import {MatrixInMemoryStore} from "./memory";
 import User from "../models/user";
 import {MatrixEvent} from "../models/event";
 import utils from "../utils";
+import SyncAccumulator from "../sync-accumulator";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -215,7 +216,6 @@ IndexedDBStoreBackend.prototype = {
  * sync from the server is not required. This does not reduce memory usage as all
  * the data is eagerly fetched when <code>startup()</code> is called.
  * <pre>
- * let syncAccumulator = new SyncAccumulator();
  * let opts = { localStorage: window.localStorage };
  * let store = new IndexedDBStore(
  *     new IndexedDBStoreBackend(window.indexedDB), syncAccumulator, opts
@@ -234,17 +234,23 @@ IndexedDBStoreBackend.prototype = {
  *
  * @constructor
  * @extends MatrixInMemoryStore
- * @param {IndexedDBStoreBackend} backend The indexed db backend instance.
- * @param {SyncAccumulator} syncAccumulator The sync accumulator which will be
- * loaded from IndexedDB and periodically saved to IndexedDB.
- * @param {Object=} opts Options for MatrixInMemoryStore.
+ * @param {Object} opts Options object.
+ * @param {Object} opts.indexedDB The Indexed DB interface e.g.
+ * <code>window.indexedDB</code>
+ * @param {string=} opts.dbName Optional database name. The same name must be used
+ * to open the same database.
  * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
  * this API if you need to perform specific indexeddb actions like deleting the
  * database.
  */
-const IndexedDBStore = function IndexedDBStore(backend, syncAccumulator, opts) {
+const IndexedDBStore = function IndexedDBStore(opts) {
     MatrixInMemoryStore.call(this, opts);
-    this.backend = backend;
+
+    if (!opts.indexedDB) {
+        throw new Error('Missing required option: indexedDB');
+    }
+
+    this.backend = new IndexedDBStoreBackend(opts.indexedDB, opts.dbName);
     this.startedUp = false;
     this._syncTs = Date.now(); // updated when writes to the database are performed
 
@@ -252,11 +258,7 @@ const IndexedDBStore = function IndexedDBStore(backend, syncAccumulator, opts) {
     this._userModifiedMap = {
         // user_id : timestamp
     };
-    this._syncAccumulator = syncAccumulator;
-
-    if (!this.backend || !this._syncAccumulator) {
-        throw new Error("Missing backend or syncAccumulator");
-    }
+    this._syncAccumulator = new SyncAccumulator();
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
@@ -285,17 +287,27 @@ IndexedDBStore.prototype.startup = function() {
         });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
         this.setSyncToken(syncData.nextBatch);
-        this._setSyncData(syncData.nextBatch, syncData.roomsData, accountData);
+        this.setSyncData({
+            next_batch: syncData.nextBatch,
+            rooms: syncData.roomsData,
+            account_data: {
+                events: accountData,
+            },
+        });
     });
 };
 
 /**
- * Return the accumulator which will have the initial /sync data when startup()
- * is called.
- * @return {SyncAccumulator}
+ * @return {Promise} Resolves with a sync response to restore the
+ * client state to where it was at the last save, or null if there
+ * is no saved sync data.
  */
-IndexedDBStore.prototype.getSyncAccumulator = function() {
-    return this._syncAccumulator;
+IndexedDBStore.prototype.getSavedSync = function() {
+    const data = this._syncAccumulator.getJSON();
+    if (!data.nextBatch) return q(null);
+    // We must deep copy the stored data so that the /sync processing code doesn't
+    // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
+    return q(utils.deepCopy(data));
 };
 
 /**
@@ -324,14 +336,8 @@ IndexedDBStore.prototype.save = function() {
     return q();
 };
 
-IndexedDBStore.prototype._setSyncData = function(nextBatch, roomsData, accountData) {
-    this._syncAccumulator.accumulate({
-        next_batch: nextBatch,
-        rooms: roomsData,
-        account_data: {
-            events: accountData,
-        },
-    });
+IndexedDBStore.prototype.setSyncData = function(syncData) {
+    this._syncAccumulator.accumulate(syncData);
 };
 
 IndexedDBStore.prototype._syncToDatabase = function() {

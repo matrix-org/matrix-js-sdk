@@ -164,8 +164,6 @@ function MatrixClient(opts) {
 
         this.olmVersion = Crypto.getOlmVersion();
     }
-
-    this._syncAccumulator = this.store.getSyncAccumulator();
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -2789,7 +2787,6 @@ MatrixClient.prototype.startClient = function(opts) {
     opts = Object.assign({}, opts);
 
     opts.crypto = this._crypto;
-    opts.syncAccumulator = this._syncAccumulator;
     opts.canResetEntireTimeline = (roomId) => {
         if (!this._canResetTimelineCallback) {
             return false;
