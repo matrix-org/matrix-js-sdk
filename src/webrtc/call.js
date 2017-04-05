@@ -423,12 +423,12 @@ MatrixCall.prototype.answer = function() {
     if (!this.localAVStream && !this.waitForLocalAVStream) {
         this.webRtc.getUserMedia(
             _getUserMediaVideoContraints(this.type),
-            hookCallback(self, self._gotUserMediaForAnswer),
-            hookCallback(self, self._getUserMediaFailed),
+            hookCallback(self, self._maybeGotUserMediaForAnswer),
+            hookCallback(self, self._maybeGotUserMediaForAnswer),
         );
         setState(this, 'wait_local_media');
     } else if (this.localAVStream) {
-        this._gotUserMediaForAnswer(this.localAVStream);
+        this._maybeGotUserMediaForAnswer(this.localAVStream);
     } else if (this.waitForLocalAVStream) {
         setState(this, 'wait_local_media');
     }
@@ -447,11 +447,11 @@ MatrixCall.prototype._replacedBy = function(newCall) {
         newCall.waitForLocalAVStream = true;
     } else if (this.state == 'create_offer') {
         this._debuglog("Handing local stream to new call");
-        newCall._gotUserMediaForAnswer(this.localAVStream);
+        newCall._maybeGotUserMediaForAnswer(this.localAVStream);
         delete(this.localAVStream);
     } else if (this.state == 'invite_sent') {
         this._debuglog("Handing local stream to new call");
-        newCall._gotUserMediaForAnswer(this.localAVStream);
+        newCall._maybeGotUserMediaForAnswer(this.localAVStream);
         delete(this.localAVStream);
     }
     newCall.localVideoElement = this.localVideoElement;
@@ -549,6 +549,9 @@ MatrixCall.prototype._reorderCodecs = function(sdp) {
     const codecPrioritySet = new Set(self.codecPriority);
 
     const parsed = new Sdp().parseSdp(sdp);
+    if (!parsed.media) {
+        return sdp;
+    }
     parsed.media.forEach((media) => {
         let newRtp = [];
         self.codecPriority.forEach((priorityCodec) => {
@@ -574,48 +577,70 @@ MatrixCall.prototype._reorderCodecs = function(sdp) {
  * @private
  * @param {Object} stream
  */
-MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
+MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
     if (this.successor) {
-        this.successor._gotUserMediaForAnswer(stream);
+        this.successor._maybeGotUserMediaForAnswer(stream);
         return;
     }
     if (this.state == 'ended') {
         return;
     }
-    this._debuglog("_gotUserMediaForInvite -> " + this.type);
+    this._debuglog("_maybeGotUserMediaForInvite -> " + this.type);
     const self = this;
-    const videoEl = this.getLocalVideoElement();
 
-    if (videoEl && this.type == 'video') {
-        videoEl.autoplay = true;
-        if (this.screenSharingStream) {
-            this._debuglog("Setting screen sharing stream to the local video element");
-            this.assignElement(videoEl, this.screenSharingStream, "localVideo");
-        } else {
-            this.assignElement(videoEl, stream, "localVideo");
-        }
-        videoEl.muted = true;
-        setTimeout(function() {
-            const vel = self.getLocalVideoElement();
-            if (vel.play) {
-                self.playElement(vel, "localVideo");
+    const error = stream;
+    let constraints = null;
+    if (stream instanceof MediaStream) {
+        const videoEl = this.getLocalVideoElement();
+
+        if (videoEl && this.type == 'video') {
+            videoEl.autoplay = true;
+            if (this.screenSharingStream) {
+                this._debuglog("Setting screen sharing stream to the local video" +
+                    " element");
+                this.assignElement(videoEl, this.screenSharingStream, "localVideo");
+            } else {
+                this.assignElement(videoEl, stream, "localVideo");
             }
-        }, 0);
+            videoEl.muted = true;
+            setTimeout(function() {
+                const vel = self.getLocalVideoElement();
+                if (vel.play) {
+                    self.playElement(vel, "localVideo");
+                }
+            }, 0);
+        }
+
+        if (this.screenSharingStream) {
+            this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
+            stream = this.screenSharingStream;
+        }
+
+        this.localAVStream = stream;
+        // why do we enable audio (and only audio) tracks here? -- matthew
+        setTracksEnabled(stream.getAudioTracks(), true);
+        this.peerConn = _createPeerConnection(this);
+        this.peerConn.addStream(stream);
+    } else if (error.name === 'PermissionDeniedError') {
+        this._debuglog('User denied access to camera/microphone.' +
+            ' Or possibly you are using an insecure domain. Receiving only.');
+        constraints = {
+            'mandatory': {
+                'OfferToReceiveAudio': true,
+                'OfferToReceiveVideo': self.type == 'video',
+            },
+        };
+        this.peerConn = _createPeerConnection(this);
+    } else {
+        this._debuglog('Failed to getUserMedia.');
+        this._getUserMediaFailed(error);
+        return;
     }
 
-    if (this.screenSharingStream) {
-        this.screenSharingStream.addTrack(stream.getAudioTracks()[0]);
-        stream = this.screenSharingStream;
-    }
-
-    this.localAVStream = stream;
-    // why do we enable audio (and only audio) tracks here? -- matthew
-    setTracksEnabled(stream.getAudioTracks(), true);
-    this.peerConn = _createPeerConnection(this);
-    this.peerConn.addStream(stream);
     this.peerConn.createOffer(
         hookCallback(self, self._gotLocalOffer),
         hookCallback(self, self._getLocalOfferFailed),
+        constraints,
     );
     setState(self, 'create_offer');
 };
@@ -625,28 +650,39 @@ MatrixCall.prototype._gotUserMediaForInvite = function(stream) {
  * @private
  * @param {Object} stream
  */
-MatrixCall.prototype._gotUserMediaForAnswer = function(stream) {
+MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     const self = this;
     if (self.state == 'ended') {
         return;
     }
-    const localVidEl = self.getLocalVideoElement();
 
-    if (localVidEl && self.type == 'video') {
-        localVidEl.autoplay = true;
-        this.assignElement(localVidEl, stream, "localVideo");
-        localVidEl.muted = true;
-        setTimeout(function() {
-            const vel = self.getLocalVideoElement();
-            if (vel.play) {
-                self.playElement(vel, "localVideo");
-            }
-        }, 0);
+    const error = stream;
+    if (stream instanceof MediaStream) {
+        const localVidEl = self.getLocalVideoElement();
+
+        if (localVidEl && self.type == 'video') {
+            localVidEl.autoplay = true;
+            this.assignElement(localVidEl, stream, "localVideo");
+            localVidEl.muted = true;
+            setTimeout(function() {
+                const vel = self.getLocalVideoElement();
+                if (vel.play) {
+                    self.playElement(vel, "localVideo");
+                }
+            }, 0);
+        }
+
+        self.localAVStream = stream;
+        setTracksEnabled(stream.getAudioTracks(), true);
+        self.peerConn.addStream(stream);
+    } else if (error.name === 'PermissionDeniedError') {
+        this._debuglog('User denied access to camera/microphone.' +
+            ' Or possibly you are using an insecure domain. Receiving only.');
+    } else {
+        this._debuglog('Failed to getUserMedia.');
+        this._getUserMediaFailed(error);
+        return;
     }
-
-    self.localAVStream = stream;
-    setTracksEnabled(stream.getAudioTracks(), true);
-    self.peerConn.addStream(stream);
 
     const constraints = {
         'mandatory': {
@@ -1171,8 +1207,8 @@ const _placeCallWithConstraints = function(self, constraints) {
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
-        hookCallback(self, self._gotUserMediaForInvite),
-        hookCallback(self, self._getUserMediaFailed),
+        hookCallback(self, self._maybeGotUserMediaForInvite),
+        hookCallback(self, self._maybeGotUserMediaForInvite),
     );
     setState(self, 'wait_local_media');
     self.direction = 'outbound';
