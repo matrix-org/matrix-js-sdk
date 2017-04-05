@@ -39,6 +39,11 @@ const DEBUG = true;
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 80 * 1000;
 
+// Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
+// to RECONNECTING. This is needed to inform the client of server issues when the
+// keepAlive is successful but the server /sync fails.
+const FAILED_SYNC_ERROR_THRESHOLD = 3;
+
 function getFilterName(userId, suffix) {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
@@ -89,6 +94,7 @@ function SyncApi(client, opts) {
     this._keepAliveTimer = null;
     this._connectionReturnedDefer = null;
     this._notifEvents = []; // accumulator of sync events in the current sync response
+    this._failedSyncCount = 0; // Number of consecutive failed /sync requests
 
     if (client.getNotifTimelineSet()) {
         reEmit(client, client.getNotifTimelineSet(),
@@ -575,6 +581,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         // polling with the same token.
         client.store.setSyncToken(data.next_batch);
 
+        // Reset after a successful sync
+        self._failedSyncCount = 0;
+
         try {
             self._processSyncResponse(syncToken, data);
         } catch (e) {
@@ -609,6 +618,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         // saved.
         client.store.save();
 
+        // Begin next sync
         self._sync(syncOptions);
     }, function(err) {
         if (!self._running) {
@@ -623,6 +633,9 @@ SyncApi.prototype._sync = function(syncOptions) {
         console.error("/sync error %s", err);
         console.error(err);
 
+        self._failedSyncCount++;
+        console.log('Number of consecutive failed sync requests:', self._failedSyncCount);
+
         debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
         // lost yet: we only do this if a keepalive poke
@@ -635,7 +648,11 @@ SyncApi.prototype._sync = function(syncOptions) {
             self._sync(syncOptions);
         });
         self._currentSyncRequest = null;
-        self._updateSyncState("RECONNECTING");
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        self._updateSyncState(
+            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+                "ERROR" : "RECONNECTING",
+        );
     });
 };
 
