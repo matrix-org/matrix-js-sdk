@@ -56,6 +56,13 @@ RemoteIndexedDBStoreBackend.prototype = {
     },
 
     /**
+     * Having connected, load initial data from the database and prepare for use
+     */
+    init: function() {
+        return this._doCmd('init');
+    },
+
+    /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
      * @return {Promise} Resolved when the database is cleared.
@@ -86,24 +93,8 @@ RemoteIndexedDBStoreBackend.prototype = {
      * Load all user presence events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
-    loadUserPresenceEvents: function() {
-        return this._doCmd('loadUserPresenceEvents');
-    },
-
-    /**
-     * Load all the account data events from the database. This is not cached.
-     * @return {Promise<Object[]>} A list of raw global account events.
-     */
-    loadAccountData: function() {
-        return this._doCmd('loadAccountData');
-    },
-
-    /**
-     * Load the sync data from the database.
-     * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
-     */
-    loadSyncData: function() {
-        return this._doCmd('loadSyncData');
+    getUserPresenceEvents: function() {
+        return this._doCmd('getUserPresenceEvents');
     },
 
     _doCmd: function(cmd, args) {

@@ -45,6 +45,9 @@ class IndexedDbStoreWorker {
             case 'connect':
                 prom = this.backend.connect();
                 break;
+            case 'init':
+                prom = this.backend.init();
+                break;
             case 'clearDatabase':
                 prom = this.backend.clearDatabase().then((result) => {
                     // This returns special classes which can't be cloned
@@ -64,14 +67,8 @@ class IndexedDbStoreWorker {
                     return {};
                 });
                 break;
-            case 'loadUserPresenceEvents':
-                prom = this.backend.loadUserPresenceEvents();
-                break;
-            case 'loadAccountData':
-                prom = this.backend.loadAccountData();
-                break;
-            case 'loadSyncData':
-                prom = this.backend.loadSyncData();
+            case 'getUserPresenceEvents':
+                prom = this.backend.getUserPresenceEvents();
                 break;
         }
 

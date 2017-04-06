@@ -111,17 +111,10 @@ IndexedDBStore.prototype.startup = function() {
     // the web worker to then immediately push it back again without
     // using it.
     return this.backend.connect().then(() => {
-        return q.all([
-            this.backend.loadUserPresenceEvents(),
-            this.backend.loadAccountData(),
-            this.backend.loadSyncData(),
-        ]);
-    }).then((values) => {
-        const [userPresenceEvents, accountData, syncData] = values;
-        console.log(
-            "Loaded data from database: sync from ", syncData.nextBatch,
-            " -- Reticulating splines...",
-        );
+        return this.backend.init();
+    }).then(() => {
+        return this.backend.getUserPresenceEvents();
+    }).then((userPresenceEvents) => {
         userPresenceEvents.forEach(([userId, rawEvent]) => {
             const u = new User(userId);
             if (rawEvent) {
@@ -131,13 +124,6 @@ IndexedDBStore.prototype.startup = function() {
             this.storeUser(u);
         });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
-        return this.setSyncData({
-            next_batch: syncData.nextBatch,
-            rooms: syncData.roomsData,
-            account_data: {
-                events: accountData,
-            },
-        });
     });
 };
 
