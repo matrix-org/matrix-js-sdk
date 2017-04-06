@@ -131,7 +131,6 @@ IndexedDBStore.prototype.startup = function() {
             this.storeUser(u);
         });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
-        this.setSyncToken(syncData.nextBatch);
         return this.setSyncData({
             next_batch: syncData.nextBatch,
             rooms: syncData.roomsData,
