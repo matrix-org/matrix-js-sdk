@@ -9,6 +9,7 @@ const MatrixEvent = sdk.MatrixEvent;
  * Return a promise that is resolved when the client next emits a
  * SYNCING event.
  * @param {Object} client The client
+ * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
 module.exports.syncPromise = function(client) {
     const def = q.defer();
