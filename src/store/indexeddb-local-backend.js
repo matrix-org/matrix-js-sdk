@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 import q from "q";
-import User from "../models/user";
-import {MatrixEvent} from "../models/event";
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
@@ -104,13 +102,6 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this._dbName = "matrix-js-sdk:" + (dbName || "default");
     this.db = null;
     this._syncAccumulator = new SyncAccumulator();
-
-    // Records the last-modified-time of each user at the last point we saved
-    // the database, such that we can derive the set if users that have been
-    // modified since we last saved.
-    this._userModifiedMap = {
-        // user_id : timestamp
-    };
 };
 
 
@@ -179,23 +170,16 @@ LocalIndexedDBStoreBackend.prototype = {
     },
 
     setSyncData: function(syncData) {
-        this._syncAccumulator.accumulate(syncData);
+        return q().then(() => {
+            this._syncAccumulator.accumulate(syncData);
+        });
     },
 
-    syncToDatabase: function(users) {
-        // work out changed users (this doesn't handle deletions but you
-        // can't 'delete' users as they are just presence events).
-        const changedUsers = users.filter((user) => {
-            return this._userModifiedMap[user.userId] !== user.getLastModifiedTime();
-        });
-        changedUsers.forEach((u) => { // update times
-            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
-        });
-
+    syncToDatabase: function(userTuples) {
         const syncData = this._syncAccumulator.getJSON();
 
         return q.all([
-            this._persistUsers(changedUsers),
+            this._persistUserPresenceEvents(userTuples),
             this._persistAccountData(syncData.accountData),
             this._persistSyncData(syncData.nextBatch, syncData.roomsData),
         ]);
@@ -239,21 +223,21 @@ LocalIndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Persist a list of User objects. Users with the same 'userId' will be
-     * replaced.
-     * @param {User[]} users An array of users
+     * Persist a list of [user id, presence event] they are for.
+     * Users with the same 'userId' will be replaced.
+     * Prfesence events should be the event in its raw form (not the Event
+     * object)
+     * @param {Object[]} users An array of users
      * @return {Promise} Resolves if the users were persisted.
      */
-    _persistUsers: function(users) {
+    _persistUserPresenceEvents: function(tuples) {
         return q.try(() => {
             const txn = this.db.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
-            for (let i = 0; i < users.length; i++) {
+            for (const tuple of tuples) {
                 store.put({
-                    userId: users[i].userId,
-                    event: (users[i].events.presence ?
-                                users[i].events.presence.event :
-                                null),
+                    userId: tuple[0],
+                    event: tuple[1],
                 }); // put == UPSERT
             }
             return promiseifyTxn(txn);
@@ -261,20 +245,17 @@ LocalIndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Load all the users from the database. This is not cached.
-     * @return {Promise<User[]>} A list of users.
+     * Load all user presence events from the database. This is not cached.
+     * FIXME: It would probably be more sensible to store the events in the
+     * sync.
+     * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
-    loadUsers: function() {
+    loadUserPresenceEvents: function() {
         return q.try(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
-                const user = new User(cursor.value.userId);
-                if (cursor.value.event) {
-                    user.setPresenceEvent(new MatrixEvent(cursor.value.event));
-                }
-                this._userModifiedMap[user.userId] = user.getLastModifiedTime();
-                return user;
+                return [cursor.value.userId, cursor.value.event];
             });
         });
     },

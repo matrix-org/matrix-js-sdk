@@ -18,6 +18,9 @@ import q from "q";
 import {MatrixInMemoryStore} from "./memory";
 import utils from "../utils";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
+import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
+import User from "../models/user";
+import {MatrixEvent} from "../models/event";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -64,6 +67,10 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * <code>window.indexedDB</code>
  * @param {string=} opts.dbName Optional database name. The same name must be used
  * to open the same database.
+ * @param {string=} opts.workerScript Optional URL to a script to invooke a web
+ * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
+ * class is provided for this purpose and requires the application to provide a
+ * trivial wrapper script around it.
  * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
  * this API if you need to perform specific indexeddb actions like deleting the
  * database.
@@ -75,9 +82,21 @@ const IndexedDBStore = function IndexedDBStore(opts) {
         throw new Error('Missing required option: indexedDB');
     }
 
-    this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
+    if (opts.workerScript) {
+        this.backend = new RemoteIndexedDBStoreBackend(opts.workerScript, opts.dbName);
+    } else {
+        this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
+    }
+
     this.startedUp = false;
     this._syncTs = Date.now(); // updated when writes to the database are performed
+
+    // Records the last-modified-time of each user at the last point we saved
+    // the database, such that we can derive the set if users that have been
+    // modified since we last saved.
+    this._userModifiedMap = {
+        // user_id : timestamp
+    };
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
@@ -90,22 +109,27 @@ IndexedDBStore.prototype.startup = function() {
     }
     return this.backend.connect().then(() => {
         return q.all([
-            this.backend.loadUsers(),
+            this.backend.loadUserPresenceEvents(),
             this.backend.loadAccountData(),
             this.backend.loadSyncData(),
         ]);
     }).then((values) => {
-        const [users, accountData, syncData] = values;
+        const [userPresenceEvents, accountData, syncData] = values;
         console.log(
             "Loaded data from database: sync from ", syncData.nextBatch,
             " -- Reticulating splines...",
         );
-        users.forEach((u) => {
+        userPresenceEvents.forEach(([userId, rawEvent]) => {
+            const u = new User(userId);
+            if (rawEvent) {
+                u.setPresenceEvent(new MatrixEvent(rawEvent));
+            }
+            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
         });
         this._syncTs = Date.now(); // pretend we've written so we don't rewrite
         this.setSyncToken(syncData.nextBatch);
-        this.setSyncData({
+        return this.setSyncData({
             next_batch: syncData.nextBatch,
             rooms: syncData.roomsData,
             account_data: {
@@ -146,7 +170,21 @@ IndexedDBStore.prototype.save = function() {
     const now = Date.now();
     if (now - this._syncTs > WRITE_DELAY_MS) {
         this._syncTs = Date.now(); // set now to guard against multi-writes
-        return this.backend.syncToDatabase(this.getUsers()).catch((err) => {
+
+        // work out changed users (this doesn't handle deletions but you
+        // can't 'delete' users as they are just presence events).
+        const userTuples = [];
+        for (const u of this.getUsers()) {
+            if (this._userModifiedMap[u.userId] === u.getLastModifiedTime()) continue;
+            if (!u.events.presence) continue;
+
+            userTuples.push([u.userId, u.events.presence.event]);
+
+            // note that we've saved this version of the user
+            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
+        }
+
+        return this.backend.syncToDatabase(userTuples).catch((err) => {
             console.error("sync fail:", err);
         });
     }
@@ -154,7 +192,7 @@ IndexedDBStore.prototype.save = function() {
 };
 
 IndexedDBStore.prototype.setSyncData = function(syncData) {
-    this.backend.setSyncData(syncData);
+    return this.backend.setSyncData(syncData);
 };
 
 module.exports.IndexedDBStore = IndexedDBStore;
