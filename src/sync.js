@@ -620,11 +620,13 @@ SyncApi.prototype._sync = function(syncOptions) {
         // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
         if (!isCachedResponse) {
             self._updateSyncState("SYNCING", syncEventData);
+
+            // tell databases that everything is now in a consistent state and can be
+            // saved (no point doing so if we only have the data we just got out of the
+            // store).
+            client.store.save();
         }
 
-        // tell databases that everything is now in a consistent state and can be
-        // saved.
-        client.store.save();
 
         // Begin next sync
         self._sync(syncOptions);
