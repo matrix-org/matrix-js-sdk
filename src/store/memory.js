@@ -281,8 +281,11 @@ module.exports.MatrixInMemoryStore.prototype = {
      * setSyncData does nothing as there is no backing data store.
      *
      * @param {Object} syncData The sync data
+     * @return {Promise} An immediately resolved promise.
      */
-    setSyncData: function(syncData) {},
+    setSyncData: function(syncData) {
+        return q();
+    },
 
     /**
      * Save does nothing as there is no backing data store.

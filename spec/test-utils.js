@@ -1,8 +1,22 @@
 "use strict";
 import expect from 'expect';
+import q from 'q';
 
 const sdk = require("..");
 const MatrixEvent = sdk.MatrixEvent;
+
+/**
+ * Return a promise that is resolved when the client next emits a
+ * SYNCING event.
+ * @param {Object} client The client
+ */
+module.exports.syncPromise = function(client) {
+    const def = q.defer();
+    client.on('sync', (state) => {
+        if (state == 'SYNCING') def.resolve();
+    });
+    return def.promise;
+};
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
