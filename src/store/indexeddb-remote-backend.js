@@ -122,8 +122,6 @@ RemoteIndexedDBStoreBackend.prototype = {
             });
 
             return def.promise;
-        }).catch((e) => {
-            console.log(args[0]);
         });
     },
 
