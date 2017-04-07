@@ -18,10 +18,10 @@ import q from "q";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 
 /**
- * This class lives in the webworker and drives a LocalIndexedDbStoreBackend
+ * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
  * controlled by messages from the main process.
  */
-class IndexedDbStoreWorker {
+class IndexedDBStoreWorker {
     constructor(postMessage) {
         this.backend = null;
         this.postMessage = postMessage;
@@ -101,4 +101,4 @@ class IndexedDbStoreWorker {
     }
 }
 
-module.exports = IndexedDbStoreWorker;
+module.exports = IndexedDBStoreWorker;
