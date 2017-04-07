@@ -47,6 +47,8 @@ class IndexedDBStoreWorker {
     /**
      * Passes a message event from the main script into the class. This method
      * can be directly assigned to the web worker `onmessage` variable.
+     *
+     * @param {Object} ev The message event
      */
     onMessage(ev) {
         const msg = ev.data;
