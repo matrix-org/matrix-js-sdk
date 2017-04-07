@@ -89,7 +89,7 @@ const IndexedDBStore = function IndexedDBStore(opts) {
     }
 
     this.startedUp = false;
-    this._syncTs = Date.now(); // updated when writes to the database are performed
+    this._syncTs = 0;
 
     // Records the last-modified-time of each user at the last point we saved
     // the database, such that we can derive the set if users that have been
@@ -119,7 +119,6 @@ IndexedDBStore.prototype.startup = function() {
             this._userModifiedMap[u.userId] = u.getLastModifiedTime();
             this.storeUser(u);
         });
-        this._syncTs = Date.now(); // pretend we've written so we don't rewrite
     });
 };
 
@@ -153,26 +152,30 @@ IndexedDBStore.prototype.deleteAllData = function() {
 IndexedDBStore.prototype.save = function() {
     const now = Date.now();
     if (now - this._syncTs > WRITE_DELAY_MS) {
-        this._syncTs = Date.now(); // set now to guard against multi-writes
-
-        // work out changed users (this doesn't handle deletions but you
-        // can't 'delete' users as they are just presence events).
-        const userTuples = [];
-        for (const u of this.getUsers()) {
-            if (this._userModifiedMap[u.userId] === u.getLastModifiedTime()) continue;
-            if (!u.events.presence) continue;
-
-            userTuples.push([u.userId, u.events.presence.event]);
-
-            // note that we've saved this version of the user
-            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
-        }
-
-        return this.backend.syncToDatabase(userTuples).catch((err) => {
-            console.error("sync fail:", err);
-        });
+        return this._reallySave();
     }
     return q();
+};
+
+IndexedDBStore.prototype._reallySave = function() {
+    this._syncTs = Date.now(); // set now to guard against multi-writes
+
+    // work out changed users (this doesn't handle deletions but you
+    // can't 'delete' users as they are just presence events).
+    const userTuples = [];
+    for (const u of this.getUsers()) {
+        if (this._userModifiedMap[u.userId] === u.getLastModifiedTime()) continue;
+        if (!u.events.presence) continue;
+
+        userTuples.push([u.userId, u.events.presence.event]);
+
+        // note that we've saved this version of the user
+        this._userModifiedMap[u.userId] = u.getLastModifiedTime();
+    }
+
+    return this.backend.syncToDatabase(userTuples).catch((err) => {
+        console.error("sync fail:", err);
+    });
 };
 
 IndexedDBStore.prototype.setSyncData = function(syncData) {
