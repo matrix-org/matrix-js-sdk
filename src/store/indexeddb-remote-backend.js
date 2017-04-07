@@ -56,13 +56,6 @@ RemoteIndexedDBStoreBackend.prototype = {
     },
 
     /**
-     * Having connected, load initial data from the database and prepare for use
-     */
-    init: function() {
-        return this._doCmd('init');
-    },
-
-    /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
      * @return {Promise} Resolved when the database is cleared.

@@ -133,13 +133,15 @@ LocalIndexedDBStoreBackend.prototype = {
             this.db.onversionchange = () => {
                 this.db.close();
             };
+
+            return this._init();
         });
     },
 
     /**
      * Having connected, load initial data from the database and prepare for use
      */
-    init: function() {
+    _init: function() {
         return q.all([
             this._loadAccountData(),
             this._loadSyncData(),

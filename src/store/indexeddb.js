@@ -109,8 +109,6 @@ IndexedDBStore.prototype.startup = function() {
     }
 
     return this.backend.connect().then(() => {
-        return this.backend.init();
-    }).then(() => {
         return this.backend.getUserPresenceEvents();
     }).then((userPresenceEvents) => {
         userPresenceEvents.forEach(([userId, rawEvent]) => {
