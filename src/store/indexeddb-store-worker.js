@@ -18,10 +18,25 @@ import q from "q";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 
 /**
- * This class lives in the webworker and drives a LocalIndexedDbStoreBackend
+ * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
  * controlled by messages from the main process.
+ *
+ * It should be instantiated by a web worker script provided by the application
+ * in a script, for example:
+ *
+ * import {IndexedDBStoreWorker} from 'matrix-js-sdk/lib/indexeddb-worker.js';
+ * const remoteWorker = new IndexedDBStoreWorker(postMessage);
+ * onmessage = remoteWorker.onMessage;
+ *
+ * Note that it is advisable to import this class by referencing the file directly to
+ * avoid a dependency on the whole js-sdk.
+ *
  */
-class IndexedDbStoreWorker {
+class IndexedDBStoreWorker {
+    /**
+     * @param {function} postMessage The web worker postMessage function that
+     * should be used to communicate back to the main script.
+     */
     constructor(postMessage) {
         this.backend = null;
         this.postMessage = postMessage;
@@ -29,6 +44,12 @@ class IndexedDbStoreWorker {
         this.onMessage = this.onMessage.bind(this);
     }
 
+    /**
+     * Passes a message event from the main script into the class. This method
+     * can be directly assigned to the web worker `onmessage` variable.
+     *
+     * @param {Object} ev The message event
+     */
     onMessage(ev) {
         const msg = ev.data;
         let prom;
@@ -51,7 +72,7 @@ class IndexedDbStoreWorker {
             case 'clearDatabase':
                 prom = this.backend.clearDatabase().then((result) => {
                     // This returns special classes which can't be cloned
-                    // accross to the main script, so don't try.
+                    // across to the main script, so don't try.
                     return {};
                 });
                 break;
@@ -76,7 +97,7 @@ class IndexedDbStoreWorker {
             postMessage({
                 command: 'cmd_fail',
                 seq: msg.seq,
-                // Canb't be an Error because they're not structured cloneable
+                // Can't be an Error because they're not structured cloneable
                 error: "Unrecognised command",
             });
             return;
@@ -89,13 +110,16 @@ class IndexedDbStoreWorker {
                 result: ret,
             });
         }, (err) => {
+            console.error("Error running command: "+msg.command);
+            console.error(err);
             this.postMessage.call(null, {
                 command: 'cmd_fail',
                 seq: msg.seq,
-                error: err,
+                // Just send a string because Error objects aren't cloneable
+                error: "Error running command",
             });
         });
     }
 }
 
-module.exports = IndexedDbStoreWorker;
+module.exports = IndexedDBStoreWorker;

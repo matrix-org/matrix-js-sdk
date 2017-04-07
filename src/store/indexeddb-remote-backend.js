@@ -30,6 +30,7 @@ import q from "q";
 const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     workerScript, dbName,
 ) {
+    this._dbName = dbName;
     this._worker = new Worker(workerScript);
     this._nextSeq = 0;
     // The currently in-flight requests to the actual backend
@@ -38,10 +39,6 @@ const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     };
 
     this._worker.onmessage = this._onWorkerMessage.bind(this);
-
-    this._doCmd('_setupWorker', [dbName]).done(() => {
-        console.log("IndexedDB worker is ready");
-    });
 };
 
 
@@ -52,7 +49,10 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        return this._doCmd('connect');
+        return this._doCmd('_setupWorker', [this._dbName]).then(() => {
+            console.log("IndexedDB worker is ready");
+            return this._doCmd('connect');
+        });
     },
 
     /**

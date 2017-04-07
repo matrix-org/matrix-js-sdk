@@ -61,8 +61,6 @@ module.exports.Filter = require("./filter");
 module.exports.TimelineWindow = require("./timeline-window").TimelineWindow;
 /** The {@link module:interactive-auth} class. */
 module.exports.InteractiveAuth = require("./interactive-auth");
-/** The {@link module:indexeddb-remote-worker} class. */
-module.exports.IndexedDbStoreWorker = require("./store/indexeddb-remote-worker.js");
 
 
 /**
