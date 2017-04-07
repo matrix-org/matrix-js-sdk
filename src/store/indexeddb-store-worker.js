@@ -111,10 +111,13 @@ class IndexedDBStoreWorker {
                 result: ret,
             });
         }, (err) => {
+            console.error("Error running command: "+msg.command);
+            console.error(err);
             this.postMessage.call(null, {
                 command: 'cmd_fail',
                 seq: msg.seq,
-                error: err,
+                // Just send a string because Error objects aren't cloneable
+                error: "Error running command",
             });
         });
     }
