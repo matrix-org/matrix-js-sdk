@@ -49,7 +49,7 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        return this._doCmd('_setupWorker', [dbName]).then(() => {
+        return this._doCmd('_setupWorker', [this._dbName]).then(() => {
             console.log("IndexedDB worker is ready");
             return this._doCmd('connect');
         });
