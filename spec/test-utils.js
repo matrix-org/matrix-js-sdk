@@ -13,9 +13,14 @@ const MatrixEvent = sdk.MatrixEvent;
  */
 module.exports.syncPromise = function(client) {
     const def = q.defer();
-    client.on('sync', (state) => {
-        if (state == 'SYNCING') def.resolve();
-    });
+    const cb = (state) => {
+        if (state == 'SYNCING') {
+            def.resolve();
+        } else {
+            client.once('sync', cb);
+        }
+    };
+    client.once('sync', cb);
     return def.promise;
 };
 
