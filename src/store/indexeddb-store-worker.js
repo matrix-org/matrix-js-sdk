@@ -24,7 +24,7 @@ import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
  * It should be instantiated by a web worker script provided by the application
  * in a script, for example:
  *
- * import IndexedDBStoreWorker from 'matrix-js-sdk/lib/store/indexeddb-store-worker';
+ * import {IndexedDBStoreWorker} from 'matrix-js-sdk/lib/indexeddb-worker.js';
  * const remoteWorker = new IndexedDBStoreWorker(postMessage);
  * onmessage = remoteWorker.onMessage;
  *
