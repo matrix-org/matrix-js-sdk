@@ -107,9 +107,7 @@ IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
         return q();
     }
-    // FIXME: This is a bit dumb: we pull the sync data over from
-    // the web worker to then immediately push it back again without
-    // using it.
+
     return this.backend.connect().then(() => {
         return this.backend.init();
     }).then(() => {
