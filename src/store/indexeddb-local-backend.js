@@ -140,6 +140,7 @@ LocalIndexedDBStoreBackend.prototype = {
 
     /**
      * Having connected, load initial data from the database and prepare for use
+     * @return {Promise} Resolves on success
      */
     _init: function() {
         return q.all([
