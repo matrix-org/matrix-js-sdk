@@ -67,7 +67,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * <code>window.indexedDB</code>
  * @param {string=} opts.dbName Optional database name. The same name must be used
  * to open the same database.
- * @param {string=} opts.workerScript Optional URL to a script to invooke a web
+ * @param {string=} opts.workerScript Optional URL to a script to invoke a web
  * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
  * class is provided for this purpose and requires the application to provide a
  * trivial wrapper script around it.
@@ -107,12 +107,8 @@ IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
         return q();
     }
-    // FIXME: This is a bit dumb: we pull the sync data over from
-    // the web worker to then immediately push it back again without
-    // using it.
+
     return this.backend.connect().then(() => {
-        return this.backend.init();
-    }).then(() => {
         return this.backend.getUserPresenceEvents();
     }).then((userPresenceEvents) => {
         userPresenceEvents.forEach(([userId, rawEvent]) => {

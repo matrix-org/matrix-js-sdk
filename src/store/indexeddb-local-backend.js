@@ -133,13 +133,16 @@ LocalIndexedDBStoreBackend.prototype = {
             this.db.onversionchange = () => {
                 this.db.close();
             };
+
+            return this._init();
         });
     },
 
     /**
      * Having connected, load initial data from the database and prepare for use
+     * @return {Promise} Resolves on success
      */
-    init: function() {
+    _init: function() {
         return q.all([
             this._loadAccountData(),
             this._loadSyncData(),
@@ -243,7 +246,7 @@ LocalIndexedDBStoreBackend.prototype = {
     /**
      * Persist a list of [user id, presence event] they are for.
      * Users with the same 'userId' will be replaced.
-     * Prfesence events should be the event in its raw form (not the Event
+     * Presence events should be the event in its raw form (not the Event
      * object)
      * @param {Object[]} tuples An array of [userid, event] tuples
      * @return {Promise} Resolves if the users were persisted.
