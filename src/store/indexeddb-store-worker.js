@@ -67,7 +67,7 @@ class IndexedDBStoreWorker {
             case 'clearDatabase':
                 prom = this.backend.clearDatabase().then((result) => {
                     // This returns special classes which can't be cloned
-                    // accross to the main script, so don't try.
+                    // across to the main script, so don't try.
                     return {};
                 });
                 break;
@@ -98,7 +98,7 @@ class IndexedDBStoreWorker {
             postMessage({
                 command: 'cmd_fail',
                 seq: msg.seq,
-                // Canb't be an Error because they're not structured cloneable
+                // Can't be an Error because they're not structured cloneable
                 error: "Unrecognised command",
             });
             return;
