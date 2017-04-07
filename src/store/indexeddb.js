@@ -82,7 +82,7 @@ const IndexedDBStore = function IndexedDBStore(opts) {
         throw new Error('Missing required option: indexedDB');
     }
 
-    if (opts.workerScript) {
+    if (opts.workerScript && window.Worker) {
         this.backend = new RemoteIndexedDBStoreBackend(opts.workerScript, opts.dbName);
     } else {
         this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
