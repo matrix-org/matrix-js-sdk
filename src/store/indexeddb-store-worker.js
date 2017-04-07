@@ -85,14 +85,8 @@ class IndexedDBStoreWorker {
                     return {};
                 });
                 break;
-            case 'loadUserPresenceEvents':
-                prom = this.backend.loadUserPresenceEvents();
-                break;
-            case 'loadAccountData':
-                prom = this.backend.loadAccountData();
-                break;
-            case 'loadSyncData':
-                prom = this.backend.loadSyncData();
+            case 'getUserPresenceEvents':
+                prom = this.backend.getUserPresenceEvents();
                 break;
         }
 

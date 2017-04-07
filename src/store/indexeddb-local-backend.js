@@ -133,6 +133,27 @@ LocalIndexedDBStoreBackend.prototype = {
             this.db.onversionchange = () => {
                 this.db.close();
             };
+
+            return this._init();
+        });
+    },
+
+    /**
+     * Having connected, load initial data from the database and prepare for use
+     * @return {Promise} Resolves on success
+     */
+    _init: function() {
+        return q.all([
+            this._loadAccountData(),
+            this._loadSyncData(),
+        ]).then(([accountData, syncData]) => {
+            this._syncAccumulator.accumulate({
+                next_batch: syncData.nextBatch,
+                rooms: syncData.roomsData,
+                account_data: {
+                    events: accountData,
+                },
+            });
         });
     },
 
@@ -250,7 +271,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * sync.
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
-    loadUserPresenceEvents: function() {
+    getUserPresenceEvents: function() {
         return q.try(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
@@ -264,7 +285,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * Load all the account data events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of raw global account events.
      */
-    loadAccountData: function() {
+    _loadAccountData: function() {
         return q.try(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
@@ -278,7 +299,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * Load the sync data from the database.
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
-    loadSyncData: function() {
+    _loadSyncData: function() {
         return q.try(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
