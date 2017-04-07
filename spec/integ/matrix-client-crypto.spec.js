@@ -373,8 +373,11 @@ function firstSync(testClient) {
             events: [],
         },
     };
+
     testClient.httpBackend.when("GET", "/sync").respond(200, syncData);
-    return testClient.httpBackend.flush("/sync", 1);
+    return testClient.httpBackend.flush("/sync", 1).then(() => {
+        return testUtils.syncPromise(testClient.client);
+    });
 }
 
 

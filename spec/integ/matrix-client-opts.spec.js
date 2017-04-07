@@ -114,6 +114,8 @@ describe("MatrixClient opts", function() {
                 return httpBackend.flush("/filter", 1);
             }).then(function() {
                 return httpBackend.flush("/sync", 1);
+            }).then(function() {
+                return utils.syncPromise(client);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
                     0, "Expected to see event types: " + expectedEventTypes,

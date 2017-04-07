@@ -573,7 +573,7 @@ SyncApi.prototype._sync = function(syncOptions) {
             );
             return this._currentSyncRequest;
         }
-    }).done(function(data) {
+    }).then(function(data) {
         //debuglog('Completed sync, next_batch=' + data.next_batch);
 
         // set the sync token NOW *before* processing the events. We do this so
@@ -584,17 +584,25 @@ SyncApi.prototype._sync = function(syncOptions) {
         // Reset after a successful sync
         self._failedSyncCount = 0;
 
+        // We need to wait until the sync data has been sent to the backend
+        // because it appears that the sync data gets modified somewhere in
+        // processing it in such a way as to make it no longer cloneable.
+        // XXX: Find out what is modifying it!
+        if (!isCachedResponse) {
+            // Don't give the store back its own cached data
+            return client.store.setSyncData(data).then(() => {
+                return data;
+            });
+        } else {
+            return q(data);
+        }
+    }).done((data) => {
         try {
             self._processSyncResponse(syncToken, data);
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
             console.error("Caught /sync error", e.stack || e);
-        }
-
-        // Don't give the store back its own cached data
-        if (!isCachedResponse) {
-            client.store.setSyncData(data);
         }
 
         // emit synced events

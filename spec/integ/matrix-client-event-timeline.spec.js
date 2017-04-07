@@ -639,6 +639,8 @@ describe("MatrixClient event timelines", function() {
                 // now let the sync complete, and check it again
                 return httpBackend.flush("/sync", 1);
             }).then(function() {
+                return utils.syncPromise(client);
+            }).then(function() {
                 return client.getEventTimeline(timelineSet, event.event_id);
             }).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(2);
@@ -665,6 +667,8 @@ describe("MatrixClient event timelines", function() {
             }).catch(utils.failTest).done(done);
 
             httpBackend.flush("/sync", 1).then(function() {
+                return utils.syncPromise(client);
+            }).then(function() {
                 return client.getEventTimeline(timelineSet, event.event_id);
             }).then(function(tl) {
                 console.log("getEventTimeline completed (1)");
