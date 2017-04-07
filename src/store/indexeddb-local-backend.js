@@ -225,7 +225,7 @@ LocalIndexedDBStoreBackend.prototype = {
     /**
      * Persist a list of [user id, presence event] they are for.
      * Users with the same 'userId' will be replaced.
-     * Prfesence events should be the event in its raw form (not the Event
+     * Presence events should be the event in its raw form (not the Event
      * object)
      * @param {Object[]} tuples An array of [userid, event] tuples
      * @return {Promise} Resolves if the users were persisted.
