@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: models/room-state.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: models/room-state.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2015, 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+"use strict";
+/**
+ * @module models/room-state
+ */
+
+var EventEmitter = require("events").EventEmitter;
+
+var utils = require("../utils");
+var RoomMember = require("./room-member");
+
+/**
+ * Construct room state.
+ * @constructor
+ * @param {?string} roomId Optional. The ID of the room which has this state.
+ * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
+ * @prop {Object.&lt;string, RoomMember>} members The room member dictionary, keyed
+ * on the user's ID.
+ * @prop {Object.&lt;string, Object.&lt;string, MatrixEvent>>} events The state
+ * events dictionary, keyed on the event type and then the state_key value.
+ * @prop {string} paginationToken The pagination token for this state.
+ */
+function RoomState(roomId) {
+    this.roomId = roomId;
+    this.members = {
+        // userId: RoomMember
+    };
+    this.events = {
+        // eventType: { stateKey: MatrixEvent }
+    };
+    this.paginationToken = null;
+
+    this._sentinels = {
+        // userId: RoomMember
+    };
+    this._updateModifiedTime();
+    this._displayNameToUserIds = {};
+    this._userIdsToDisplayNames = {};
+    this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
+}
+utils.inherits(RoomState, EventEmitter);
+
+/**
+ * Get all RoomMembers in this room.
+ * @return {Array&lt;RoomMember>} A list of RoomMembers.
+ */
+RoomState.prototype.getMembers = function () {
+    return utils.values(this.members);
+};
+
+/**
+ * Get a room member by their user ID.
+ * @param {string} userId The room member's user ID.
+ * @return {RoomMember} The member or null if they do not exist.
+ */
+RoomState.prototype.getMember = function (userId) {
+    return this.members[userId] || null;
+};
+
+/**
+ * Get a room member whose properties will not change with this room state. You
+ * typically want this if you want to attach a RoomMember to a MatrixEvent which
+ * may no longer be represented correctly by Room.currentState or Room.oldState.
+ * The term 'sentinel' refers to the fact that this RoomMember is an unchanging
+ * guardian for state at this particular point in time.
+ * @param {string} userId The room member's user ID.
+ * @return {RoomMember} The member or null if they do not exist.
+ */
+RoomState.prototype.getSentinelMember = function (userId) {
+    return this._sentinels[userId] || null;
+};
+
+/**
+ * Get state events from the state of the room.
+ * @param {string} eventType The event type of the state event.
+ * @param {string} stateKey Optional. The state_key of the state event. If
+ * this is &lt;code>undefined&lt;/code> then all matching state events will be
+ * returned.
+ * @return {MatrixEvent[]|MatrixEvent} A list of events if state_key was
+ * &lt;code>undefined&lt;/code>, else a single event (or null if no match found).
+ */
+RoomState.prototype.getStateEvents = function (eventType, stateKey) {
+    if (!this.events[eventType]) {
+        // no match
+        return stateKey === undefined ? [] : null;
+    }
+    if (stateKey === undefined) {
+        // return all values
+        return utils.values(this.events[eventType]);
+    }
+    var event = this.events[eventType][stateKey];
+    return event ? event : null;
+};
+
+/**
+ * Add an array of one or more state MatrixEvents, overwriting
+ * any existing state with the same {type, stateKey} tuple. Will fire
+ * "RoomState.events" for every event added. May fire "RoomState.members"
+ * if there are &lt;code>m.room.member&lt;/code> events.
+ * @param {MatrixEvent[]} stateEvents a list of state events for this room.
+ * @fires module:client~MatrixClient#event:"RoomState.members"
+ * @fires module:client~MatrixClient#event:"RoomState.newMember"
+ * @fires module:client~MatrixClient#event:"RoomState.events"
+ */
+RoomState.prototype.setStateEvents = function (stateEvents) {
+    var self = this;
+    this._updateModifiedTime();
+
+    // update the core event dict
+    utils.forEach(stateEvents, function (event) {
+        if (event.getRoomId() !== self.roomId) {
+            return;
+        }
+        if (!event.isState()) {
+            return;
+        }
+
+        if (self.events[event.getType()] === undefined) {
+            self.events[event.getType()] = {};
+        }
+        self.events[event.getType()][event.getStateKey()] = event;
+        if (event.getType() === "m.room.member") {
+            _updateDisplayNameCache(self, event.getStateKey(), event.getContent().displayname);
+            _updateThirdPartyTokenCache(self, event);
+        }
+        self.emit("RoomState.events", event, self);
+    });
+
+    // update higher level data structures. This needs to be done AFTER the
+    // core event dict as these structures may depend on other state events in
+    // the given array (e.g. disambiguating display names in one go to do both
+    // clashing names rather than progressively which only catches 1 of them).
+    utils.forEach(stateEvents, function (event) {
+        if (event.getRoomId() !== self.roomId) {
+            return;
+        }
+        if (!event.isState()) {
+            return;
+        }
+
+        if (event.getType() === "m.room.member") {
+            var userId = event.getStateKey();
+
+            // leave events apparently elide the displayname or avatar_url,
+            // so let's fake one up so that we don't leak user ids
+            // into the timeline
+            if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
+                event.getContent().displayname = event.getContent().displayname || event.getPrevContent().displayname;
+            }
+
+            var member = self.members[userId];
+            if (!member) {
+                member = new RoomMember(event.getRoomId(), userId);
+                self.emit("RoomState.newMember", event, self, member);
+            }
+            // Add a new sentinel for this change. We apply the same
+            // operations to both sentinel and member rather than deep copying
+            // so we don't make assumptions about the properties of RoomMember
+            // (e.g. and manage to break it because deep copying doesn't do
+            // everything).
+            var sentinel = new RoomMember(event.getRoomId(), userId);
+            utils.forEach([member, sentinel], function (roomMember) {
+                roomMember.setMembershipEvent(event, self);
+                // this member may have a power level already, so set it.
+                var pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
+                if (pwrLvlEvent) {
+                    roomMember.setPowerLevelEvent(pwrLvlEvent);
+                }
+            });
+
+            self._sentinels[userId] = sentinel;
+            self.members[userId] = member;
+            self.emit("RoomState.members", event, self, member);
+        } else if (event.getType() === "m.room.power_levels") {
+            var members = utils.values(self.members);
+            utils.forEach(members, function (member) {
+                member.setPowerLevelEvent(event);
+                self.emit("RoomState.members", event, self, member);
+            });
+        }
+    });
+};
+
+/**
+ * Set the current typing event for this room.
+ * @param {MatrixEvent} event The typing event
+ */
+RoomState.prototype.setTypingEvent = function (event) {
+    utils.forEach(utils.values(this.members), function (member) {
+        member.setTypingEvent(event);
+    });
+};
+
+/**
+ * Get the m.room.member event which has the given third party invite token.
+ *
+ * @param {string} token The token
+ * @return {?MatrixEvent} The m.room.member event or null
+ */
+RoomState.prototype.getInviteForThreePidToken = function (token) {
+    return this._tokenToInvite[token] || null;
+};
+
+/**
+ * Update the last modified time to the current time.
+ */
+RoomState.prototype._updateModifiedTime = function () {
+    this._modified = Date.now();
+};
+
+/**
+ * Get the timestamp when this room state was last updated. This timestamp is
+ * updated when this object has received new state events.
+ * @return {number} The timestamp
+ */
+RoomState.prototype.getLastModifiedTime = function () {
+    return this._modified;
+};
+
+/**
+ * Get user IDs with the specified display name.
+ * @param {string} displayName The display name to get user IDs from.
+ * @return {string[]} An array of user IDs or an empty array.
+ */
+RoomState.prototype.getUserIdsWithDisplayName = function (displayName) {
+    return this._displayNameToUserIds[displayName] || [];
+};
+
+/**
+ * Short-form for maySendEvent('m.room.message', userId)
+ * @param {string} userId The user ID of the user to test permission for
+ * @return {boolean} true if the given user ID should be permitted to send
+ *                   message events into the given room.
+ */
+RoomState.prototype.maySendMessage = function (userId) {
+    return this._maySendEventOfType('m.room.message', userId, false);
+};
+
+/**
+ * Returns true if the given user ID has permission to send a normal
+ * event of type `eventType` into this room.
+ * @param {string} eventType The type of event to test
+ * @param {string} userId The user ID of the user to test permission for
+ * @return {boolean} true if the given user ID should be permitted to send
+ *                        the given type of event into this room,
+ *                        according to the room's state.
+ */
+RoomState.prototype.maySendEvent = function (eventType, userId) {
+    return this._maySendEventOfType(eventType, userId, false);
+};
+
+/**
+ * Returns true if the given MatrixClient has permission to send a state
+ * event of type `stateEventType` into this room.
+ * @param {string} stateEventType The type of state events to test
+ * @param {MatrixClient} cli The client to test permission for
+ * @return {boolean} true if the given client should be permitted to send
+ *                        the given type of state event into this room,
+ *                        according to the room's state.
+ */
+RoomState.prototype.mayClientSendStateEvent = function (stateEventType, cli) {
+    if (cli.isGuest()) {
+        return false;
+    }
+    return this.maySendStateEvent(stateEventType, cli.credentials.userId);
+};
+
+/**
+ * Returns true if the given user ID has permission to send a state
+ * event of type `stateEventType` into this room.
+ * @param {string} stateEventType The type of state events to test
+ * @param {string} userId The user ID of the user to test permission for
+ * @return {boolean} true if the given user ID should be permitted to send
+ *                        the given type of state event into this room,
+ *                        according to the room's state.
+ */
+RoomState.prototype.maySendStateEvent = function (stateEventType, userId) {
+    return this._maySendEventOfType(stateEventType, userId, true);
+};
+
+/**
+ * Returns true if the given user ID has permission to send a normal or state
+ * event of type `eventType` into this room.
+ * @param {string} eventType The type of event to test
+ * @param {string} userId The user ID of the user to test permission for
+ * @param {boolean} state If true, tests if the user may send a state
+                          event of this type. Otherwise tests whether
+                          they may send a regular event.
+ * @return {boolean} true if the given user ID should be permitted to send
+ *                        the given type of event into this room,
+ *                        according to the room's state.
+ */
+RoomState.prototype._maySendEventOfType = function (eventType, userId, state) {
+    var member = this.getMember(userId);
+    if (!member || member.membership == 'leave') {
+        return false;
+    }
+
+    var power_levels_event = this.getStateEvents('m.room.power_levels', '');
+
+    var power_levels = void 0;
+    var events_levels = {};
+
+    var state_default = 0;
+    var events_default = 0;
+    if (power_levels_event) {
+        power_levels = power_levels_event.getContent();
+        events_levels = power_levels.events || {};
+
+        if (power_levels.state_default !== undefined) {
+            state_default = power_levels.state_default;
+        } else {
+            state_default = 50;
+        }
+        if (power_levels.events_default !== undefined) {
+            events_default = power_levels.events_default;
+        }
+    }
+
+    var required_level = state ? state_default : events_default;
+    if (events_levels[eventType] !== undefined) {
+        required_level = events_levels[eventType];
+    }
+    return member.powerLevel >= required_level;
+};
+
+/**
+ * The RoomState class.
+ */
+module.exports = RoomState;
+
+function _updateThirdPartyTokenCache(roomState, memberEvent) {
+    if (!memberEvent.getContent().third_party_invite) {
+        return;
+    }
+    var token = (memberEvent.getContent().third_party_invite.signed || {}).token;
+    if (!token) {
+        return;
+    }
+    var threePidInvite = roomState.getStateEvents("m.room.third_party_invite", token);
+    if (!threePidInvite) {
+        return;
+    }
+    roomState._tokenToInvite[token] = memberEvent;
+}
+
+function _updateDisplayNameCache(roomState, userId, displayName) {
+    var oldName = roomState._userIdsToDisplayNames[userId];
+    delete roomState._userIdsToDisplayNames[userId];
+    if (oldName) {
+        // Remove the old name from the cache.
+        // We clobber the user_id > name lookup but the name -> [user_id] lookup
+        // means we need to remove that user ID from that array rather than nuking
+        // the lot.
+        var existingUserIds = roomState._displayNameToUserIds[oldName] || [];
+        for (var i = 0; i &lt; existingUserIds.length; i++) {
+            if (existingUserIds[i] === userId) {
+                // remove this user ID from this array
+                existingUserIds.splice(i, 1);
+                i--;
+            }
+        }
+        roomState._displayNameToUserIds[oldName] = existingUserIds;
+    }
+
+    roomState._userIdsToDisplayNames[userId] = displayName;
+    if (!roomState._displayNameToUserIds[displayName]) {
+        roomState._displayNameToUserIds[displayName] = [];
+    }
+    roomState._displayNameToUserIds[displayName].push(userId);
+}
+
+/**
+ * Fires whenever the event dictionary in room state is updated.
+ * @event module:client~MatrixClient#"RoomState.events"
+ * @param {MatrixEvent} event The matrix event which caused this event to fire.
+ * @param {RoomState} state The room state whose RoomState.events dictionary
+ * was updated.
+ * @example
+ * matrixClient.on("RoomState.events", function(event, state){
+ *   var newStateEvent = event;
+ * });
+ */
+
+/**
+ * Fires whenever a member in the members dictionary is updated in any way.
+ * @event module:client~MatrixClient#"RoomState.members"
+ * @param {MatrixEvent} event The matrix event which caused this event to fire.
+ * @param {RoomState} state The room state whose RoomState.members dictionary
+ * was updated.
+ * @param {RoomMember} member The room member that was updated.
+ * @example
+ * matrixClient.on("RoomState.members", function(event, state, member){
+ *   var newMembershipState = member.membership;
+ * });
+ */
+
+/**
+* Fires whenever a member is added to the members dictionary. The RoomMember
+* will not be fully populated yet (e.g. no membership state).
+* @event module:client~MatrixClient#"RoomState.newMember"
+* @param {MatrixEvent} event The matrix event which caused this event to fire.
+* @param {RoomState} state The room state whose RoomState.members dictionary
+* was updated with a new entry.
+* @param {RoomMember} member The room member that was added.
+* @example
+* matrixClient.on("RoomState.newMember", function(event, state, member){
+*   // add event listeners on 'member'
+* });
+*/
+//# sourceMappingURL=room-state.js.map</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.html#.DecryptionAlgorithm">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.html#.EncryptionAlgorithm">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522send_event_error%2522">MatrixCall"send_event_error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#IndexedDbStoreWorker">IndexedDbStoreWorker</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Fri Apr 07 2017 16:45:32 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
