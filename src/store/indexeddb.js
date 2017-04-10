@@ -71,6 +71,8 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
  * class is provided for this purpose and requires the application to provide a
  * trivial wrapper script around it.
+ * @param {Object=} opts.workerApi The webWorker API object. If omitted, the global Worker
+ * object will be used if it exists.
  * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
  * this API if you need to perform specific indexeddb actions like deleting the
  * database.
@@ -83,7 +85,15 @@ const IndexedDBStore = function IndexedDBStore(opts) {
     }
 
     if (opts.workerScript) {
-        this.backend = new RemoteIndexedDBStoreBackend(opts.workerScript, opts.dbName);
+        // try & find a webworker-compatible API
+        let workerApi = opts.workerApi;
+        if (!workerApi) {
+            // default to the global Worker object (which is where it in a browser)
+            workerApi = global.Worker;
+        }
+        this.backend = new RemoteIndexedDBStoreBackend(
+            opts.workerScript, opts.dbName, workerApi,
+        );
     } else {
         this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
     }
