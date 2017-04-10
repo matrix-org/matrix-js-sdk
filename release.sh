@@ -238,6 +238,7 @@ fi
 # if it is a pre-release, leave it on the release branch for now.
 if [ $prerelease -eq 1 ]; then
     exit 0
+    git checkout "$rel_branch"
 fi
 
 # merge release branch to master
