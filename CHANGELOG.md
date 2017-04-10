@@ -1,3 +1,12 @@
+Changes in [0.7.6-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6-rc.2) (2017-04-10)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.6-rc.1...v0.7.6-rc.2)
+
+ * Add feature detection for webworkers
+   [\#416](https://github.com/matrix-org/matrix-js-sdk/pull/416)
+ * Fix release script
+   [\#415](https://github.com/matrix-org/matrix-js-sdk/pull/415)
+
 Changes in [0.7.6-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6-rc.1) (2017-04-07)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5...v0.7.6-rc.1)
