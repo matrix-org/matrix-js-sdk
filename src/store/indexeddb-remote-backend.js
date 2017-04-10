@@ -26,12 +26,13 @@ import q from "q";
  * @param {string} workerScript URL to the worker script
  * @param {string=} dbName Optional database name. The same name must be used
  * to open the same database.
+ * @param {Object} WorkerApi The web worker compatible interface object
  */
 const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
-    workerScript, dbName,
+    workerScript, dbName, WorkerApi,
 ) {
     this._dbName = dbName;
-    this._worker = new Worker(workerScript);
+    this._worker = new WorkerApi(workerScript);
     this._nextSeq = 0;
     // The currently in-flight requests to the actual backend
     this._inFlight = {
