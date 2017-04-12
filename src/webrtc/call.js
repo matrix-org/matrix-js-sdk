@@ -535,7 +535,12 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
     const self = this;
 
     const error = stream;
-    let constraints = null;
+    const constraints = {
+        'mandatory': {
+            'OfferToReceiveAudio': true,
+            'OfferToReceiveVideo': self.type === 'video',
+        },
+    };
     if (stream instanceof MediaStream) {
         const videoEl = this.getLocalVideoElement();
 
@@ -570,12 +575,6 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
     } else if (error.name === 'PermissionDeniedError') {
         debuglog('User denied access to camera/microphone.' +
             ' Or possibly you are using an insecure domain. Receiving only.');
-        constraints = {
-            'mandatory': {
-                'OfferToReceiveAudio': true,
-                'OfferToReceiveVideo': self.type == 'video',
-            },
-        };
         this.peerConn = _createPeerConnection(this);
     } else {
         debuglog('Failed to getUserMedia.');
@@ -633,7 +632,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     const constraints = {
         'mandatory': {
             'OfferToReceiveAudio': true,
-            'OfferToReceiveVideo': self.type == 'video',
+            'OfferToReceiveVideo': self.type === 'video',
         },
     };
     self.peerConn.createAnswer(function(description) {
