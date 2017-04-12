@@ -843,6 +843,43 @@ MatrixClient.prototype.setRoomAccountData = function(roomId, eventType,
 };
 
 /**
+ * @param {string} roomId ID of the room that has been read
+ * @param {string} eventId ID of the event that has been read
+ * @param {string} rrEvent the event tracked by the read receipt. This is here for
+ * convenience because the RR and the RM are commonly updated at the same time as each
+ * other. Optional.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent, callback) {
+    if (typeof rrEventId === 'function') {
+        callback = rrEvent;
+        rrEvent = undefined;
+    }
+
+    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
+        $roomId: roomId,
+    });
+    const content = {
+        "m.read_marker": eventId,
+    };
+
+    // Add the optional RR update, do local echo like `sendReceipt`
+    if (rrEvent) {
+        content["m.read"] = rrEvent.getId();
+        const room = this.getRoom(roomId);
+        if (room) {
+            room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
+        }
+    }
+
+    return this._http.authedRequest(
+        callback, "POST", path, undefined, content,
+    );
+};
+
+/**
  * Set a user's power level.
  * @param {string} roomId
  * @param {string} userId
