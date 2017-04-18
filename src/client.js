@@ -843,21 +843,18 @@ MatrixClient.prototype.setRoomAccountData = function(roomId, eventType,
 };
 
 /**
+ * Set a marker to represent which event the user was last reading in a room. This can
+ * be retrieved from room account data and displayed as a horizontal line in the client
+ * that is visually distinct to the position of the user's own read receipt.
  * @param {string} roomId ID of the room that has been read
  * @param {string} eventId ID of the event that has been read
  * @param {string} rrEvent the event tracked by the read receipt. This is here for
  * convenience because the RR and the RM are commonly updated at the same time as each
  * other. Optional.
- * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: (@see module:http-api.authedRequest)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent, callback) {
-    if (typeof rrEventId === 'function') {
-        callback = rrEvent;
-        rrEvent = undefined;
-    }
-
+MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
     const path = utils.encodeUri("/rooms/$roomId/read_marker", {
         $roomId: roomId,
     });
@@ -875,7 +872,7 @@ MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent, ca
     }
 
     return this._http.authedRequest(
-        callback, "POST", path, undefined, content,
+        null, "POST", path, undefined, content,
     );
 };
 
