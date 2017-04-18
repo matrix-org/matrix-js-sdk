@@ -483,12 +483,12 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setRoomReadMarkers = function(roomId, rmEventId, rrEventId) {
-    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
+    const path = utils.encodeUri("/rooms/$roomId/read_markers", {
         $roomId: roomId,
     });
 
     const content = {
-        "m.read_marker": rmEventId,
+        "m.fully_read": rmEventId,
         "m.read": rrEventId,
     };
 
