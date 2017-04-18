@@ -1214,25 +1214,19 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
-    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
-        $roomId: roomId,
-    });
-    const content = {
-        "m.read_marker": eventId,
-    };
+    const rmEventId = eventId;
+    let rrEventId;
 
     // Add the optional RR update, do local echo like `sendReceipt`
     if (rrEvent) {
-        content["m.read"] = rrEvent.getId();
+        rrEventId = rrEvent.getId();
         const room = this.getRoom(roomId);
         if (room) {
             room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
         }
     }
 
-    return this._http.authedRequest(
-        null, "POST", path, undefined, content,
-    );
+    return this.setRoomReadMarkers(roomId, rmEventId, rrEventId);
 };
 
 /**

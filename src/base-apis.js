@@ -470,6 +470,33 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
     );
 };
 
+/**
+ * Set a marker to represent which event the user was last reading in a room. This can
+ * be retrieved from room account data and displayed as a horizontal line in the client
+ * that is visually distinct to the position of the user's own read receipt.
+ * @param {string} roomId ID of the room that has been read
+ * @param {string} rmEventId ID of the event that has been read
+ * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
+ * for convenience because the RR and the RM are commonly updated at the same time as
+ * each other. Optional.
+ * @return {module:client.Promise} Resolves: (@see module:http-api.authedRequest)
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setRoomReadMarkers = function(roomId, rmEventId, rrEventId) {
+    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
+        $roomId: roomId,
+    });
+
+    const content = {
+        "m.read_marker": rmEventId,
+        "m.read": rrEventId,
+    };
+
+    return this._http.authedRequest(
+        null, "POST", path, undefined, content,
+    );
+};
+
 
 // Room Directory operations
 // =========================
