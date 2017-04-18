@@ -318,6 +318,13 @@ InteractiveAuth.prototype = {
         }
         this._currentStage = nextStage;
 
+        if (nextStage == 'm.login.dummy') {
+            this.submitAuthDict({
+                type: 'm.login.dummy',
+            });
+            return;
+        }
+
         if (this._data.errcode || this._data.error) {
             this._stateUpdatedCallback(nextStage, {
                 errcode: this._data.errcode || "",

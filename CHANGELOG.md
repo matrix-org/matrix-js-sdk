@@ -1,3 +1,121 @@
+Changes in [0.7.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6) (2017-04-12)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.6-rc.2...v0.7.6)
+
+ * No changes
+
+Changes in [0.7.6-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6-rc.2) (2017-04-10)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.6-rc.1...v0.7.6-rc.2)
+
+ * Add feature detection for webworkers
+   [\#416](https://github.com/matrix-org/matrix-js-sdk/pull/416)
+ * Fix release script
+   [\#415](https://github.com/matrix-org/matrix-js-sdk/pull/415)
+
+Changes in [0.7.6-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6-rc.1) (2017-04-07)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5...v0.7.6-rc.1)
+
+ * Make indexeddb save after the first sync
+   [\#414](https://github.com/matrix-org/matrix-js-sdk/pull/414)
+ * Make indexeddb startup faster
+   [\#413](https://github.com/matrix-org/matrix-js-sdk/pull/413)
+ * Add ability to do indexeddb sync work in webworker
+   [\#412](https://github.com/matrix-org/matrix-js-sdk/pull/412)
+ * Move more functionality to the indexeddb backend
+   [\#409](https://github.com/matrix-org/matrix-js-sdk/pull/409)
+ * Indicate syncState ERROR after many failed /syncs
+   [\#410](https://github.com/matrix-org/matrix-js-sdk/pull/410)
+ * Further reorganising of indexeddb sync code
+   [\#407](https://github.com/matrix-org/matrix-js-sdk/pull/407)
+ * Change interface of IndexedDBStore: hide internals
+   [\#406](https://github.com/matrix-org/matrix-js-sdk/pull/406)
+ * Don't be SYNCING until updating from the server
+   [\#405](https://github.com/matrix-org/matrix-js-sdk/pull/405)
+ * Don't log the entire /sync response
+   [\#403](https://github.com/matrix-org/matrix-js-sdk/pull/403)
+ * webrtc/call: Assign MediaStream to video element srcObject
+   [\#402](https://github.com/matrix-org/matrix-js-sdk/pull/402)
+ * Fix undefined reference in http-api
+   [\#400](https://github.com/matrix-org/matrix-js-sdk/pull/400)
+ * Add copyright header to event-timeline.js
+   [\#382](https://github.com/matrix-org/matrix-js-sdk/pull/382)
+ * client: fix docs for user-scoped account_data events
+   [\#397](https://github.com/matrix-org/matrix-js-sdk/pull/397)
+ * Add a CONTRIBUTING for js-sdk
+   [\#399](https://github.com/matrix-org/matrix-js-sdk/pull/399)
+ * Fix leaking room state objects on limited sync responses
+   [\#395](https://github.com/matrix-org/matrix-js-sdk/pull/395)
+ * Extend 'ignoreFailure' to be 'background'
+   [\#396](https://github.com/matrix-org/matrix-js-sdk/pull/396)
+ * Add x_show_msisdn parameter to register calls
+   [\#388](https://github.com/matrix-org/matrix-js-sdk/pull/388)
+ * Update event redaction to keep sender and origin_server_ts
+   [\#394](https://github.com/matrix-org/matrix-js-sdk/pull/394)
+ * Handle 'limited' timeline responses in the SyncAccumulator
+   [\#393](https://github.com/matrix-org/matrix-js-sdk/pull/393)
+ * Give a better error message if the HS doesn't support msisdn registeration
+   [\#391](https://github.com/matrix-org/matrix-js-sdk/pull/391)
+ * Add getEmailSid
+   [\#383](https://github.com/matrix-org/matrix-js-sdk/pull/383)
+ * Add m.login.email.identity support to UI auth
+   [\#380](https://github.com/matrix-org/matrix-js-sdk/pull/380)
+ * src/client.js: Fix incorrect roomId reference in VoIP glare code
+   [\#381](https://github.com/matrix-org/matrix-js-sdk/pull/381)
+ * add .editorconfig
+   [\#379](https://github.com/matrix-org/matrix-js-sdk/pull/379)
+ * Store account data in the same way as room data
+   [\#377](https://github.com/matrix-org/matrix-js-sdk/pull/377)
+ * Upload one-time keys on /sync rather than a timer
+   [\#376](https://github.com/matrix-org/matrix-js-sdk/pull/376)
+ * Increase the WRITE_DELAY on database syncing
+   [\#374](https://github.com/matrix-org/matrix-js-sdk/pull/374)
+ * Make deleteAllData() return a Promise
+   [\#373](https://github.com/matrix-org/matrix-js-sdk/pull/373)
+ * Don't include banned users in the room name
+   [\#372](https://github.com/matrix-org/matrix-js-sdk/pull/372)
+ * Support IndexedDB as a backing store
+   [\#363](https://github.com/matrix-org/matrix-js-sdk/pull/363)
+ * Poll /sync with a short timeout while catching up
+   [\#370](https://github.com/matrix-org/matrix-js-sdk/pull/370)
+ * Make test coverage work again
+   [\#368](https://github.com/matrix-org/matrix-js-sdk/pull/368)
+ * Add docs to event
+   [\#367](https://github.com/matrix-org/matrix-js-sdk/pull/367)
+ * Keep the device-sync token more up-to-date
+   [\#366](https://github.com/matrix-org/matrix-js-sdk/pull/366)
+ * Fix race conditions in device list download
+   [\#365](https://github.com/matrix-org/matrix-js-sdk/pull/365)
+ * Fix the unban method
+   [\#364](https://github.com/matrix-org/matrix-js-sdk/pull/364)
+ * Spread out device verification work
+   [\#362](https://github.com/matrix-org/matrix-js-sdk/pull/362)
+ * Clean up/improve e2e logging
+   [\#361](https://github.com/matrix-org/matrix-js-sdk/pull/361)
+ * Fix decryption of events whose key arrives later
+   [\#360](https://github.com/matrix-org/matrix-js-sdk/pull/360)
+ * Invalidate device lists when encryption is enabled in a room
+   [\#359](https://github.com/matrix-org/matrix-js-sdk/pull/359)
+ * Switch from jasmine to mocha + expect + lolex
+   [\#358](https://github.com/matrix-org/matrix-js-sdk/pull/358)
+ * Install source-map-support in each test
+   [\#356](https://github.com/matrix-org/matrix-js-sdk/pull/356)
+ * searchMessageText: avoid setting keys=undefined
+   [\#357](https://github.com/matrix-org/matrix-js-sdk/pull/357)
+ * realtime-callbacks: pass `global` as `this`
+   [\#355](https://github.com/matrix-org/matrix-js-sdk/pull/355)
+ * Make the tests work without olm
+   [\#354](https://github.com/matrix-org/matrix-js-sdk/pull/354)
+ * Tests: Factor out TestClient and use it in crypto tests
+   [\#353](https://github.com/matrix-org/matrix-js-sdk/pull/353)
+ * Fix some lint
+   [\#352](https://github.com/matrix-org/matrix-js-sdk/pull/352)
+ * Make a sig for source tarballs when releasing
+   [\#351](https://github.com/matrix-org/matrix-js-sdk/pull/351)
+ * When doing a pre-release, don't bother merging to master and develop.
+   [\#350](https://github.com/matrix-org/matrix-js-sdk/pull/350)
+
 Changes in [0.7.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.5) (2017-02-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.5-rc.3...v0.7.5)

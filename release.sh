@@ -217,6 +217,9 @@ fi
 rm "${release_text}"
 rm "${latest_changes}"
 
+# publish to npmjs
+npm publish
+
 if [ -z "$skip_jsdoc" ]; then
     echo "generating jsdocs"
     npm run gendoc
@@ -232,11 +235,9 @@ if [ -z "$skip_jsdoc" ]; then
     git commit --no-verify -m "Add jsdoc for $release" index.html "$release"
 fi
 
-# publish to npmjs
-npm publish
-
 # if it is a pre-release, leave it on the release branch for now.
 if [ $prerelease -eq 1 ]; then
+    git checkout "$rel_branch"
     exit 0
 fi
 
