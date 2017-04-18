@@ -843,40 +843,6 @@ MatrixClient.prototype.setRoomAccountData = function(roomId, eventType,
 };
 
 /**
- * Set a marker to represent which event the user was last reading in a room. This can
- * be retrieved from room account data and displayed as a horizontal line in the client
- * that is visually distinct to the position of the user's own read receipt.
- * @param {string} roomId ID of the room that has been read
- * @param {string} eventId ID of the event that has been read
- * @param {string} rrEvent the event tracked by the read receipt. This is here for
- * convenience because the RR and the RM are commonly updated at the same time as each
- * other. Optional.
- * @return {module:client.Promise} Resolves: (@see module:http-api.authedRequest)
- * @return {module:http-api.MatrixError} Rejects: with an error response.
- */
-MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
-    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
-        $roomId: roomId,
-    });
-    const content = {
-        "m.read_marker": eventId,
-    };
-
-    // Add the optional RR update, do local echo like `sendReceipt`
-    if (rrEvent) {
-        content["m.read"] = rrEvent.getId();
-        const room = this.getRoom(roomId);
-        if (room) {
-            room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
-        }
-    }
-
-    return this._http.authedRequest(
-        null, "POST", path, undefined, content,
-    );
-};
-
-/**
  * Set a user's power level.
  * @param {string} roomId
  * @param {string} userId
@@ -1235,6 +1201,39 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
     return this.sendReceipt(event, "m.read", callback);
 };
 
+/**
+ * Set a marker to represent which event the user was last reading in a room. This can
+ * be retrieved from room account data and displayed as a horizontal line in the client
+ * that is visually distinct to the position of the user's own read receipt.
+ * @param {string} roomId ID of the room that has been read
+ * @param {string} eventId ID of the event that has been read
+ * @param {string} rrEvent the event tracked by the read receipt. This is here for
+ * convenience because the RR and the RM are commonly updated at the same time as each
+ * other. Optional.
+ * @return {module:client.Promise} Resolves: (@see module:http-api.authedRequest)
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
+    const path = utils.encodeUri("/rooms/$roomId/read_marker", {
+        $roomId: roomId,
+    });
+    const content = {
+        "m.read_marker": eventId,
+    };
+
+    // Add the optional RR update, do local echo like `sendReceipt`
+    if (rrEvent) {
+        content["m.read"] = rrEvent.getId();
+        const room = this.getRoom(roomId);
+        if (room) {
+            room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
+        }
+    }
+
+    return this._http.authedRequest(
+        null, "POST", path, undefined, content,
+    );
+};
 
 /**
  * Get a preview of the given URL as of (roughly) the given point in time,
