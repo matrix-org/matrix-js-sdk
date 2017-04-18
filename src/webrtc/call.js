@@ -200,25 +200,26 @@ MatrixCall.prototype.placeScreenSharingCall =
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.playElement = function(element, queueId) {
-    this._debuglog("queuing play on " + queueId + " and element " + element);
+    const self = this;
+    self._debuglog("queuing play on " + queueId + " and element " + element);
     // XXX: FIXME: Does this leak elements, given the old promises
     // may hang around and retain a reference to them?
-    if (this.mediaPromises[queueId]) {
+    if (self.mediaPromises[queueId]) {
         // XXX: these promises can fail (e.g. by <video/> being unmounted whilst
         // pending receiving media to play - e.g. whilst switching between
         // rooms before answering an inbound call), and throw unhandled exceptions.
         // However, we should soldier on as best we can even if they fail, given
         // these failures may be non-fatal (as in the case of unmounts)
-        this.mediaPromises[queueId] =
-            this.mediaPromises[queueId].then(function() {
-                this._debuglog("previous promise completed for " + queueId);
+        self.mediaPromises[queueId] =
+            self.mediaPromises[queueId].then(function() {
+                self._debuglog("previous promise completed for " + queueId);
                 return element.play();
             }, function() {
-                this._debuglog("previous promise failed for " + queueId);
+                self._debuglog("previous promise failed for " + queueId);
                 return element.play();
             });
     } else {
-        this.mediaPromises[queueId] = element.play();
+        self.mediaPromises[queueId] = element.play();
     }
 };
 
@@ -229,20 +230,21 @@ MatrixCall.prototype.playElement = function(element, queueId) {
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.pauseElement = function(element, queueId) {
-    this._debuglog("queuing pause on " + queueId + " and element " + element);
-    if (this.mediaPromises[queueId]) {
-        this.mediaPromises[queueId] =
-            this.mediaPromises[queueId].then(function() {
-                this._debuglog("previous promise completed for " + queueId);
+    const self = this;
+    self._debuglog("queuing pause on " + queueId + " and element " + element);
+    if (self.mediaPromises[queueId]) {
+        self.mediaPromises[queueId] =
+            self.mediaPromises[queueId].then(function() {
+                self._debuglog("previous promise completed for " + queueId);
                 return element.pause();
             }, function() {
-                this._debuglog("previous promise failed for " + queueId);
+                self._debuglog("previous promise failed for " + queueId);
                 return element.pause();
             });
     } else {
         // pause doesn't actually return a promise, but do this for symmetry
         // and just in case it does in future.
-        this.mediaPromises[queueId] = element.pause();
+        self.mediaPromises[queueId] = element.pause();
     }
 };
 
@@ -255,15 +257,16 @@ MatrixCall.prototype.pauseElement = function(element, queueId) {
  * @param {string} queueId Arbitrary ID to track the chain of promises to be used
  */
 MatrixCall.prototype.assignElement = function(element, srcObject, queueId) {
-    this._debuglog("queuing assign on " + queueId + " element " + element + " for " +
+    const self = this;
+    self._debuglog("queuing assign on " + queueId + " element " + element + " for " +
         srcObject);
-    if (this.mediaPromises[queueId]) {
-        this.mediaPromises[queueId] =
-            this.mediaPromises[queueId].then(function() {
-                this._debuglog("previous promise completed for " + queueId);
+    if (self.mediaPromises[queueId]) {
+        self.mediaPromises[queueId] =
+            self.mediaPromises[queueId].then(function() {
+                self._debuglog("previous promise completed for " + queueId);
                 element.srcObject = srcObject;
             }, function() {
-                this._debuglog("previous promise failed for " + queueId);
+                self._debuglog("previous promise failed for " + queueId);
                 element.srcObject = srcObject;
             });
     } else {
