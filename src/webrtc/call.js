@@ -335,6 +335,7 @@ MatrixCall.prototype.setRemoteVideoElement = function(element) {
 MatrixCall.prototype.setRemoteAudioElement = function(element) {
     this.remoteVideoElement.muted = true;
     this.remoteAudioElement = element;
+    this.remoteAudioElement.muted = false;
     _tryPlayRemoteAudioStream(this);
 };
 
