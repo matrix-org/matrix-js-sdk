@@ -493,7 +493,7 @@ MatrixBaseApis.prototype.setRoomReadMarkers = function(roomId, rmEventId, rrEven
     };
 
     return this._http.authedRequest(
-        null, "POST", path, undefined, content,
+        undefined, "POST", path, undefined, content,
     );
 };
 
