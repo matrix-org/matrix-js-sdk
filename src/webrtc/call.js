@@ -94,7 +94,7 @@ function MatrixCall(opts) {
         utils.checkObjectHasKeys(server, ["urls"]);
     });
 
-    this.callId = "c" + new Date().getTime();
+    this.callId = "c" + new Date().getTime() + Math.random();
     this.state = 'fledgling';
     this.didConnect = false;
 
