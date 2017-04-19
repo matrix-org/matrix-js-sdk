@@ -1210,10 +1210,10 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
  * @param {string} eventId ID of the event that has been read
  * @param {string} rrEvent the event tracked by the read receipt. This is here for
  * convenience because the RR and the RM are commonly updated at the same time as each
- * other. Optional.
+ * other. The local echo of this receipt will be done if set. Optional.
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
-MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
+MatrixClient.prototype.setRoomReadMarkers = function(roomId, eventId, rrEvent) {
     const rmEventId = eventId;
     let rrEventId;
 
@@ -1226,7 +1226,7 @@ MatrixClient.prototype.setRoomReadMarker = function(roomId, eventId, rrEvent) {
         }
     }
 
-    return this.setRoomReadMarkers(roomId, rmEventId, rrEventId);
+    return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId);
 };
 
 /**

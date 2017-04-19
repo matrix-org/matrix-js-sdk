@@ -482,7 +482,8 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
  * each other. Optional.
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
-MatrixBaseApis.prototype.setRoomReadMarkers = function(roomId, rmEventId, rrEventId) {
+MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
+                                function(roomId, rmEventId, rrEventId) {
     const path = utils.encodeUri("/rooms/$roomId/read_markers", {
         $roomId: roomId,
     });
