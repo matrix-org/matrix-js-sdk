@@ -1201,6 +1201,33 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
     return this.sendReceipt(event, "m.read", callback);
 };
 
+/**
+ * Set a marker to indicate the point in a room before which the user has read every
+ * event. This can be retrieved from room account data (the event type is `m.fully_read`)
+ * and displayed as a horizontal line in the timeline that is visually distinct to the
+ * position of the user's own read receipt.
+ * @param {string} roomId ID of the room that has been read
+ * @param {string} eventId ID of the event that has been read
+ * @param {string} rrEvent the event tracked by the read receipt. This is here for
+ * convenience because the RR and the RM are commonly updated at the same time as each
+ * other. The local echo of this receipt will be done if set. Optional.
+ * @return {module:client.Promise} Resolves: the empty object, {}.
+ */
+MatrixClient.prototype.setRoomReadMarkers = function(roomId, eventId, rrEvent) {
+    const rmEventId = eventId;
+    let rrEventId;
+
+    // Add the optional RR update, do local echo like `sendReceipt`
+    if (rrEvent) {
+        rrEventId = rrEvent.getId();
+        const room = this.getRoom(roomId);
+        if (room) {
+            room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
+        }
+    }
+
+    return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId);
+};
 
 /**
  * Get a preview of the given URL as of (roughly) the given point in time,
