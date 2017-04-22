@@ -1317,9 +1317,10 @@ module.exports.MatrixCall = MatrixCall;
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
+ * @param {Object} options Additional configuration for the call.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-module.exports.createNewMatrixCall = function(client, roomId) {
+module.exports.createNewMatrixCall = function(client, roomId, options) {
     const w = global.window;
     const doc = global.document;
     if (!w || !doc) {
@@ -1376,5 +1377,10 @@ module.exports.createNewMatrixCall = function(client, roomId) {
         roomId: roomId,
         turnServers: client.getTurnServers(),
     };
+    if (options) {
+        Object.keys(options).forEach((key) => {
+            opts[key] = options[key];
+        });
+    }
     return new MatrixCall(opts);
 };
