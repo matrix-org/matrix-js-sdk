@@ -82,7 +82,7 @@ function MatrixCall(opts) {
     this.client = opts.client;
     this.webRtc = opts.webRtc;
     this.URL = opts.URL;
-    this.codecPriority = opts.codecPriority || ['H264'];
+    this.codecPriority = opts.codecPriority;
     // Array of Objects with urls, username, credential keys
     this.turnServers = opts.turnServers || [];
     if (this.turnServers.length === 0) {
