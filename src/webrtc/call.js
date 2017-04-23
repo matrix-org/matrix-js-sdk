@@ -698,6 +698,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
         description.sdp = self._reorderCodecs(description.sdp);
         self._debuglog("Created answer: " + description.sdp);
         self.peerConn.setLocalDescription(description, function() {
+            self._debuglog('Set local description success');
             const content = {
                 version: 0,
                 call_id: self.callId,
@@ -793,6 +794,7 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
     }
 
     self.peerConn.setLocalDescription(description, function() {
+        self._debuglog('Set local description success');
         const content = {
             version: 0,
             call_id: self.callId,
