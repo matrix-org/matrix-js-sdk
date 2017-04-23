@@ -365,6 +365,7 @@ MatrixCall.prototype._initWithInvite = function(event) {
     this.msg = event.getContent();
     this.peerConn = _createPeerConnection(this);
     const self = this;
+    this._debuglog('Received offer:', this.msg.offer);
     if (this.peerConn) {
         this.peerConn.setRemoteDescription(
             new this.webRtc.RtcSessionDescription(this.msg.offer),
@@ -695,7 +696,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     };
     self.peerConn.createAnswer(function(description) {
         description.sdp = self._reorderCodecs(description.sdp);
-        self._debuglog("Created answer: " + description);
+        self._debuglog("Created answer: " + description.sdp);
         self.peerConn.setLocalDescription(description, function() {
             const content = {
                 version: 0,
@@ -767,6 +768,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
     }
 
     const self = this;
+    this._debuglog('Received answer:', msg.answer);
     this.peerConn.setRemoteDescription(
         new this.webRtc.RtcSessionDescription(msg.answer),
         hookCallback(self, self._onSetRemoteDescriptionSuccess),
@@ -783,7 +785,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
 MatrixCall.prototype._gotLocalOffer = function(description) {
     const self = this;
     description.sdp = self._reorderCodecs(description.sdp);
-    self._debuglog("Created offer: " + description);
+    self._debuglog("Created offer: " + description.sdp);
 
     if (self.state == 'ended') {
         self._debuglog("Ignoring newly created offer because the call has ended");
