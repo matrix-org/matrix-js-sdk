@@ -37,7 +37,9 @@ const DEBUG = true;
 // beyond that and wedge forever, so we need to track how long we are willing
 // to keep open the connection. This constant is *ADDED* to the timeout= value
 // to determine the max time we're willing to wait.
-const BUFFER_PERIOD_MS = 80 * 1000;
+//
+// Increased from 80s to 20mins to fix https://github.com/vector-im/riot-web/issues/2737
+const BUFFER_PERIOD_MS = (60 * 20) * 1000;
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
