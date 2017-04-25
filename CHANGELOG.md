@@ -1,3 +1,18 @@
+Changes in [0.7.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.7) (2017-04-25)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.7-rc.1...v0.7.7)
+
+ * No changes
+
+
+Changes in [0.7.7-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.7-rc.1) (2017-04-21)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.6...v0.7.7-rc.1)
+
+ * Automatically complete dummy auth
+   [\#420](https://github.com/matrix-org/matrix-js-sdk/pull/420)
+
+
 Changes in [0.7.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.6) (2017-04-12)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.6-rc.2...v0.7.6)
