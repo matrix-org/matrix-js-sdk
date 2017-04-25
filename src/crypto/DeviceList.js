@@ -26,34 +26,34 @@ import q from 'q';
 import DeviceInfo from './deviceinfo';
 import olmlib from './olmlib';
 
+// constants for DeviceList._deviceTrackingStatus
+// const TRACKING_STATUS_NOT_TRACKED = 0;
+const TRACKING_STATUS_PENDING_DOWNLOAD = 1;
+const TRACKING_STATUS_DOWNLOAD_IN_PROGRESS = 2;
+const TRACKING_STATUS_UP_TO_DATE = 3;
+
 /**
  * @alias module:crypto/DeviceList
  */
 export default class DeviceList {
     constructor(baseApis, sessionStore, olmDevice) {
-        this._baseApis = baseApis;
         this._sessionStore = sessionStore;
-        this._olmDevice = olmDevice;
+        this._serialiser = new DeviceListUpdateSerialiser(
+            baseApis, sessionStore, olmDevice,
+        );
 
-        // users with outdated device lists
-        // userId -> true
-        this._pendingUsersWithNewDevices = {};
+        // which users we are tracking device status for.
+        // userId -> TRACKING_STATUS_*
+        this._deviceTrackingStatus = sessionStore.getEndToEndDeviceTrackingStatus() || {};
+        for (const u of Object.keys(this._deviceTrackingStatus)) {
+            // if a download was in progress when we got shut down, it isn't any more.
+            if (this._deviceTrackingStatus[u] == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
+                this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
+            }
+        }
 
-        // userId -> true
+        // userId -> promise
         this._keyDownloadsInProgressByUser = {};
-
-        // deferred which is resolved when the current device query resolves.
-        // (null if there is no current request).
-        this._currentQueryDeferred = null;
-
-        // deferred which is resolved when the *next* device query resolves.
-        //
-        // Normally it is meaningless for this to be non-null when
-        // _currentQueryDeferred is null, but it can happen if the previous
-        // query has finished but the next one has not yet started (because the
-        // previous query failed, in which case we deliberately delay starting
-        // the next query to avoid tight-looping).
-        this._queuedQueryDeferred = null;
 
         this.lastKnownSyncToken = null;
     }
@@ -68,43 +68,27 @@ export default class DeviceList {
      * module:crypto/deviceinfo|DeviceInfo}.
      */
     downloadKeys(userIds, forceDownload) {
-        let needsRefresh = false;
-        let waitForCurrentQuery = false;
+        const usersToDownload = [];
+        const promises = [];
 
         userIds.forEach((u) => {
-            if (this._pendingUsersWithNewDevices[u]) {
-                // we already know this user's devices are outdated
-                needsRefresh = true;
-            } else if (this._keyDownloadsInProgressByUser[u]) {
-                // already a download in progress - just wait for it.
-                // (even if forceDownload is true)
-                waitForCurrentQuery = true;
-            } else if (forceDownload) {
-                console.log("Invalidating device list for " + u +
-                            " for forceDownload");
-                this.invalidateUserDeviceList(u);
-                needsRefresh = true;
-            } else if (!this.getStoredDevicesForUser(u)) {
-                console.log("Invalidating device list for " + u +
-                            " due to empty cache");
-                this.invalidateUserDeviceList(u);
-                needsRefresh = true;
+            const trackingStatus = this._deviceTrackingStatus[u];
+            if (this._keyDownloadsInProgressByUser[u]) {
+                // already a key download in progress/queued for this user; its results
+                // will be good enough for us.
+                promises.push(this._keyDownloadsInProgressByUser[u]);
+            } else if (forceDownload || trackingStatus != TRACKING_STATUS_UP_TO_DATE) {
+                usersToDownload.push(u);
             }
         });
 
-        let promise;
-        if (needsRefresh) {
-            console.log("downloadKeys: waiting for next key query");
-            promise = this._startOrQueueDeviceQuery();
-        } else if(waitForCurrentQuery) {
-            console.log("downloadKeys: waiting for in-flight query to complete");
-            promise = this._currentQueryDeferred.promise;
-        } else {
-            // we're all up-to-date.
-            promise = q();
+        if (usersToDownload.length != 0) {
+            console.log("downloadKeys: downloading for", usersToDownload);
+            const downloadPromise = this._doKeyDownload(usersToDownload);
+            promises.push(downloadPromise);
         }
 
-        return promise.then(() => {
+        return q.all(promises).then(() => {
             return this._getDevicesFromStore(userIds);
         });
     }
@@ -216,14 +200,15 @@ export default class DeviceList {
     }
 
     /**
-     * Mark the cached device list for the given user outdated.
+     * flag the given user for device-list tracking, if they are not already.
      *
-     * This doesn't set off an update, so that several users can be batched
-     * together. Call refreshOutdatedDeviceLists() for that.
+     * This will mean that a subsequent call to refreshOutdatedDeviceLists()
+     * will download the device list for the user, and that subsequent calls to
+     * invalidateUserDeviceList will trigger more updates.
      *
      * @param {String} userId
      */
-    invalidateUserDeviceList(userId) {
+    startTrackingDeviceList(userId) {
         // sanity-check the userId. This is mostly paranoia, but if synapse
         // can't parse the userId we give it as an mxid, it 500s the whole
         // request and we can never update the device lists again (because
@@ -234,124 +219,218 @@ export default class DeviceList {
         if (typeof userId !== 'string') {
             throw new Error('userId must be a string; was '+userId);
         }
-        this._pendingUsersWithNewDevices[userId] = true;
+        if (!this._deviceTrackingStatus[userId]) {
+            console.log('Now tracking device list for ' + userId);
+            this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
+        }
+        // we don't yet persist the tracking status, since there may be a lot
+        // of calls; instead we wait for the forthcoming
+        // refreshOutdatedDeviceLists.
     }
 
     /**
-     * If there is not already a device list query in progress, and we have
-     * users who have outdated device lists, start a query now.
+     * Mark the cached device list for the given user outdated.
+     *
+     * If we are not tracking this user's devices, we'll do nothing. Otherwise
+     * we flag the user as needing an update.
+     *
+     * This doesn't actually set off an update, so that several users can be
+     * batched together. Call refreshOutdatedDeviceLists() for that.
+     *
+     * @param {String} userId
+     */
+    invalidateUserDeviceList(userId) {
+        if (this._deviceTrackingStatus[userId]) {
+            console.log("Marking device list outdated for", userId);
+            this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
+        }
+        // we don't yet persist the tracking status, since there may be a lot
+        // of calls; instead we wait for the forthcoming
+        // refreshOutdatedDeviceLists.
+    }
+
+    /**
+     * Mark all tracked device lists as outdated.
+     *
+     * This will flag each user whose devices we are tracking as in need of an
+     * update.
+     */
+    invalidateAllDeviceLists() {
+        for (const userId of Object.keys(this._deviceTrackingStatus)) {
+            this.invalidateUserDeviceList(userId);
+        }
+    }
+
+    /**
+     * If we have users who have outdated device lists, start key downloads for them
      */
     refreshOutdatedDeviceLists() {
-        if (this._currentQueryDeferred) {
-            // request already in progress - do nothing. (We will automatically
-            // make another request if there are more users with outdated
-            // device lists when the current request completes).
+        const usersToDownload = [];
+        for (const userId of Object.keys(this._deviceTrackingStatus)) {
+            const stat = this._deviceTrackingStatus[userId];
+            if (stat == TRACKING_STATUS_PENDING_DOWNLOAD) {
+                usersToDownload.push(userId);
+            }
+        }
+        if (usersToDownload.length == 0) {
             return;
         }
 
-        this._startDeviceQuery();
+        // we didn't persist the tracking status during
+        // invalidateUserDeviceList, so do it now.
+        this._persistDeviceTrackingStatus();
+
+        this._doKeyDownload(usersToDownload);
+    }
+
+
+    /**
+     * Fire off download update requests for the given users, and update the
+     * device list tracking status for them, and the
+     * _keyDownloadsInProgressByUser map for them.
+     *
+     * @param {String[]} users  list of userIds
+     *
+     * @return {module:client.Promise} resolves when all the users listed have
+     *     been updated. rejects if there was a problem updating any of the
+     *     users.
+     */
+    _doKeyDownload(users) {
+        if (users.length === 0) {
+            // nothing to do
+            return q();
+        }
+
+        const prom = this._serialiser.updateDevicesForUsers(
+            users, this.lastKnownSyncToken,
+        ).then(() => {
+            finished(true);
+        }, (e) => {
+            console.error(
+                'Error downloading keys for ' + users + ":", e,
+            );
+            finished(false);
+            throw e;
+        });
+
+        users.forEach((u) => {
+            this._keyDownloadsInProgressByUser[u] = prom;
+            const stat = this._deviceTrackingStatus[u];
+            if (stat == TRACKING_STATUS_PENDING_DOWNLOAD) {
+                this._deviceTrackingStatus[u] = TRACKING_STATUS_DOWNLOAD_IN_PROGRESS;
+            }
+        });
+
+        const finished = (success) => {
+            users.forEach((u) => {
+                delete this._keyDownloadsInProgressByUser[u];
+                const stat = this._deviceTrackingStatus[u];
+                if (stat == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
+                    if (success) {
+                        // we didn't get any new invalidations since this download started:
+                        // this user's device list is now up to date.
+                        this._deviceTrackingStatus[u] = TRACKING_STATUS_UP_TO_DATE;
+                        console.log("Device list for", u, "now up to date");
+                    } else {
+                        this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
+                    }
+                }
+            });
+            this._persistDeviceTrackingStatus();
+        };
+
+        return prom;
+    }
+
+    _persistDeviceTrackingStatus() {
+        this._sessionStore.storeEndToEndDeviceTrackingStatus(this._deviceTrackingStatus);
+    }
+}
+
+/**
+ * Serialises updates to device lists
+ *
+ * Ensures that results from /keys/query are not overwritten if a second call
+ * completes *before* an earlier one.
+ *
+ * It currently does this by ensuring only one call to /keys/query happens at a
+ * time (and queuing other requests up).
+ */
+class DeviceListUpdateSerialiser {
+    constructor(baseApis, sessionStore, olmDevice) {
+        this._baseApis = baseApis;
+        this._sessionStore = sessionStore;
+        this._olmDevice = olmDevice;
+
+        this._downloadInProgress = false;
+
+        // users which are queued for download
+        // userId -> true
+        this._keyDownloadsQueuedByUser = {};
+
+        // deferred which is resolved when the queued users are downloaded.
+        //
+        // non-null indicates that we have users queued for download.
+        this._queuedQueryDeferred = null;
+
+        // sync token to be used for the next query: essentially the
+        // most recent one we know about
+        this._nextSyncToken = null;
     }
 
     /**
-     * If there is currently a device list query in progress, returns a promise
-     * which will resolve when the *next* query completes. Otherwise, starts
-     * a new query, and returns a promise which resolves when it completes.
+     * Make a key query request for the given users
      *
-     * @return {Promise}
+     * @param {String[]} users list of user ids
+     *
+     * @param {String} syncToken sync token to pass in the query request, to
+     *     help the HS give the most recent results
+     *
+     * @return {module:client.Promise} resolves when all the users listed have
+     *     been updated. rejects if there was a problem updating any of the
+     *     users.
      */
-    _startOrQueueDeviceQuery() {
-        if (!this._currentQueryDeferred) {
-            this._startDeviceQuery();
-            if (!this._currentQueryDeferred) {
-                return q();
-            }
-
-            return this._currentQueryDeferred.promise;
-        }
+    updateDevicesForUsers(users, syncToken) {
+        users.forEach((u) => {
+            this._keyDownloadsQueuedByUser[u] = true;
+        });
+        this._nextSyncToken = syncToken;
 
         if (!this._queuedQueryDeferred) {
             this._queuedQueryDeferred = q.defer();
         }
 
-        return this._queuedQueryDeferred.promise;
-    }
-
-    /**
-     * kick off a new device query
-     *
-     * Throws if there is already a query in progress.
-     */
-    _startDeviceQuery() {
-        if (this._currentQueryDeferred) {
-            throw new Error("DeviceList._startDeviceQuery called with request active");
+        if (this._downloadInProgress) {
+            // just queue up these users
+            console.log('Queued key download for', users);
+            return this._queuedQueryDeferred.promise;
         }
 
-        this._currentQueryDeferred = this._queuedQueryDeferred || q.defer();
+        // start a new download.
+        return this._doQueuedQueries();
+    }
+
+    _doQueuedQueries() {
+        if (this._downloadInProgress) {
+            throw new Error(
+                "DeviceListUpdateSerialiser._doQueuedQueries called with request active",
+            );
+        }
+
+        const downloadUsers = Object.keys(this._keyDownloadsQueuedByUser);
+        this._keyDownloadsQueuedByUser = {};
+        const deferred = this._queuedQueryDeferred;
         this._queuedQueryDeferred = null;
 
-        const users = Object.keys(this._pendingUsersWithNewDevices);
-        if (users.length === 0) {
-            // nothing to do
-            this._currentQueryDeferred.resolve();
-            this._currentQueryDeferred = null;
+        console.log('Starting key download for', downloadUsers);
+        this._downloadInProgress = true;
 
-            // that means we're up-to-date with the lastKnownSyncToken.
-            const token = this.lastKnownSyncToken;
-            if (token !== null) {
-                this._sessionStore.storeEndToEndDeviceSyncToken(token);
-            }
-
-            return;
-        }
-
-        this._doKeyDownloadForUsers(users).done(() => {
-            users.forEach((u) => {
-                delete this._keyDownloadsInProgressByUser[u];
-            });
-
-            this._currentQueryDeferred.resolve();
-            this._currentQueryDeferred = null;
-
-            // flush out any more requests that were blocked up while that
-            // was going on.
-            this._startDeviceQuery();
-        }, (e) => {
-            console.error(
-                'Error updating device key cache for ' + users + ":", e,
-            );
-
-            // reinstate the pending flags on any users which failed; this will
-            // mean that we will do another download in the future (actually on
-            // the next /sync).
-            users.forEach((u) => {
-                delete this._keyDownloadsInProgressByUser[u];
-                this._pendingUsersWithNewDevices[u] = true;
-            });
-
-            this._currentQueryDeferred.reject(e);
-            this._currentQueryDeferred = null;
-        });
-
-        users.forEach((u) => {
-            delete this._pendingUsersWithNewDevices[u];
-            this._keyDownloadsInProgressByUser[u] = true;
-        });
-    }
-
-    /**
-     * @param {string[]} downloadUsers list of userIds
-     *
-     * @return {Promise}
-     */
-    _doKeyDownloadForUsers(downloadUsers) {
-        console.log('Starting key download for ' + downloadUsers);
-
-        const token = this.lastKnownSyncToken;
         const opts = {};
-        if (token) {
-            opts.token = token;
+        if (this._nextSyncToken) {
+            opts.token = this._nextSyncToken;
         }
-        return this._baseApis.downloadKeysForUsers(
+
+        this._baseApis.downloadKeysForUsers(
             downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
@@ -369,12 +448,23 @@ export default class DeviceList {
             }
 
             return prom;
-        }).then(() => {
-            if (token !== null) {
-                this._sessionStore.storeEndToEndDeviceSyncToken(token);
-            }
+        }).done(() => {
             console.log('Completed key download for ' + downloadUsers);
+
+            this._downloadInProgress = false;
+            deferred.resolve();
+
+            // if we have queued users, fire off another request.
+            if (this._queuedQueryDeferred) {
+                this._doQueuedQueries();
+            }
+        }, (e) => {
+            console.warn('Error downloading keys for ' + downloadUsers + ':', e);
+            this._downloadInProgressInProgress = false;
+            deferred.reject(e);
         });
+
+        return deferred.promise;
     }
 
     _processQueryResponseForUser(userId, response) {

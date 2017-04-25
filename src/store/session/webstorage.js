@@ -99,6 +99,14 @@ WebStorageSessionStore.prototype = {
         return getJsonItem(this.store, keyEndToEndDevicesForUser(userId));
     },
 
+    storeEndToEndDeviceTrackingStatus: function(statusMap) {
+        setJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS, statusMap);
+    },
+
+    getEndToEndDeviceTrackingStatus: function() {
+        return getJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
+    },
+
     /**
      * Store the sync token corresponding to the device list.
      *
@@ -202,6 +210,7 @@ WebStorageSessionStore.prototype = {
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
 const KEY_END_TO_END_DEVICE_SYNC_TOKEN = E2E_PREFIX + "device_sync_token";
+const KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS = E2E_PREFIX + "device_tracking";
 
 function keyEndToEndDevicesForUser(userId) {
     return E2E_PREFIX + "devices/" + userId;
