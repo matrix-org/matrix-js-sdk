@@ -403,29 +403,6 @@ describe("MatrixClient crypto", function() {
         bobTestClient.httpBackend.verifyNoOutstandingExpectation();
     });
 
-    it('Ali knows the difference between a new user and one with no devices',
-        function(done) {
-            aliTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
-                device_keys: {
-                    '@bob:id': {},
-                },
-            });
-
-            const p1 = aliTestClient.client.downloadKeys(['@bob:id']);
-            const p2 = aliTestClient.httpBackend.flush('/keys/query', 1);
-
-            q.all([p1, p2]).then(function() {
-                const devices = aliTestClient.storage.getEndToEndDevicesForUser(
-                    '@bob:id',
-                );
-                expect(utils.keys(devices).length).toEqual(0);
-
-                // request again: should be no more requests
-                return aliTestClient.client.downloadKeys(['@bob:id']);
-            }).nodeify(done);
-        },
-    );
-
     it("Bob uploads device keys", function() {
         return q()
             .then(bobUploadsDeviceKeys);
@@ -673,6 +650,27 @@ describe("MatrixClient crypto", function() {
         return q()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))
+
+            // ali will only care about bob's new_device if she is tracking
+            // bob's devices, which she will do if we enable encryption
+            .then(aliEnablesEncryption)
+
+            .then(() => {
+                aliTestClient.expectKeyQuery({
+                    device_keys: {
+                        [aliUserId]: {},
+                        [bobUserId]: {},
+                    },
+                });
+                return aliTestClient.httpBackend.flush('/keys/query', 1);
+            })
+
+            // make sure that the initial key download has completed
+            // (downloadKeys will wait until it does)
+            .then(() => {
+                return aliTestClient.client.downloadKeys([bobUserId]);
+            })
+
             .then(function() {
                 const syncData = {
                     next_batch: '2',

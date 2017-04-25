@@ -1001,7 +1001,19 @@ describe("megolm", function() {
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
            }).then((flushed) => {
                expect(flushed).toEqual(0);
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               if (bobStat != 1 && bobStat != 2) {
+                   throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
+                                   bobStat);
+               }
+
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+               if (chrisStat != 1 && chrisStat != 2) {
+                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
+                                   bobStat);
+               }
 
                // now add an expectation for a query for bob's devices, and let
                // it complete.
@@ -1020,7 +1032,15 @@ describe("megolm", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@bob:xyz']);
            }).then(() => {
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(2);
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               expect(bobStat).toEqual(3);
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+               if (chrisStat != 1 && chrisStat != 2) {
+                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
+                                   bobStat);
+               }
 
                // now let the query for chris's devices complete.
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
@@ -1030,55 +1050,16 @@ describe("megolm", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@chris:abc']);
            }).then(() => {
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+
+               expect(bobStat).toEqual(3);
+               expect(chrisStat).toEqual(3);
                expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(3);
            });
        });
-
-    it("Device list downloads before /changes shouldn't affect sync token",
-        () => {
-            // https://github.com/vector-im/riot-web/issues/3126#issuecomment-279374939
-            aliceTestClient.storage.storeEndToEndDeviceSyncToken(0);
-            aliceTestClient.storage.storeEndToEndRoom(ROOM_ID, {
-                algorithm: 'm.megolm.v1.aes-sha2',
-            });
-
-            return aliceTestClient.start().then(() => {
-               aliceTestClient.httpBackend.when('GET', '/sync').respond(
-                   200, getSyncResponse([aliceTestClient.userId, '@bob:xyz']));
-               return aliceTestClient.httpBackend.flush('/sync', 1);
-            }).then(() => {
-                aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
-                    200, {device_keys: {'@bob:xyz': {}}},
-                );
-                return q.all([
-                    aliceTestClient.client.downloadKeys(['@bob:xyz']),
-                    aliceTestClient.httpBackend.flush('/keys/query', 1),
-                ]);
-           }).then(() => {
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(0);
-
-               aliceTestClient.httpBackend.when(
-                   'GET', '/keys/changes',
-               ).check((req) => {
-                   expect(req.queryParams.from).toEqual(0);
-                   expect(req.queryParams.to).toEqual(1);
-               }).respond(200, {changed: ['@bob:xyz']});
-
-               return aliceTestClient.httpBackend.flush('/keys/changes');
-           }).then((flushed) => {
-               aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
-                   200, {device_keys: {'@bob:xyz': {}}},
-               );
-               return aliceTestClient.httpBackend.flush('/keys/query');
-           }).then((flushed) => {
-               expect(flushed).toEqual(1);
-
-               // let the client finish processing the keys
-               return q.delay(10);
-           }).then(() => {
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
-           });
-        });
 
     it("Alice exports megolm keys and imports them to a new device", function(done) {
         let messageEncrypted;

@@ -60,6 +60,7 @@ TestClient.prototype.toString = function() {
  * @return {Promise}
  */
 TestClient.prototype.start = function() {
+    console.log(this + ': starting');
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectDeviceKeyUpload();

@@ -61,7 +61,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
-    this._initialDeviceListInvalidationDone = false;
+    this._initialDeviceListInvalidationPending = false;
 
     this._clientRunning = false;
 
@@ -558,9 +558,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * Configure a room to use encryption (ie, save a flag in the sessionstore).
  *
  * @param {string} roomId The room ID to enable encryption in.
+ *
  * @param {object} config The encryption config for the room.
+ *
+ * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
+ *   users in the room (for now)
  */
-Crypto.prototype.setRoomEncryption = function(roomId, config) {
+Crypto.prototype.setRoomEncryption = function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
     const existingConfig = this._sessionStore.getEndToEndRoom(roomId);
@@ -590,21 +594,16 @@ Crypto.prototype.setRoomEncryption = function(roomId, config) {
     });
     this._roomEncryptors[roomId] = alg;
 
-    // if encryption was not previously enabled in this room, we will have been
-    // ignoring new device events for these users so far. We may well have
-    // up-to-date lists for some users, for instance if we were sharing other
-    // e2e rooms with them, so there is room for optimisation here, but for now
-    // we just invalidate everyone in the room.
-    if (!existingConfig) {
-        console.log("Enabling encryption in " + roomId + " for the first time; " +
-                    "invalidating device lists for all users therein");
-        const room = this._clientStore.getRoom(roomId);
-        const members = room.getJoinedMembers();
-        members.forEach((m) => {
-            this._deviceList.invalidateUserDeviceList(m.userId);
-        });
-        // the actual refresh happens once we've finished processing the sync,
-        // in _onSyncCompleted.
+    // make sure we are tracking the device lists for all users in this room.
+    console.log("Enabling encryption in " + roomId + "; " +
+                "starting to track device lists for all users therein");
+    const room = this._clientStore.getRoom(roomId);
+    const members = room.getJoinedMembers();
+    members.forEach((m) => {
+        this._deviceList.startTrackingDeviceList(m.userId);
+    });
+    if (!inhibitDeviceQuery) {
+        this._deviceList.refreshOutdatedDeviceLists();
     }
 };
 
@@ -795,7 +794,9 @@ Crypto.prototype._onCryptoEvent = function(event) {
     const content = event.getContent();
 
     try {
-        this.setRoomEncryption(roomId, content);
+        // inhibit the device list refresh for now - it will happen once we've
+        // finished processing the sync, in _onSyncCompleted.
+        this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
                       ":", e);
@@ -814,6 +815,8 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
     if (!syncData.oldSyncToken) {
+        console.log("Completed initial sync");
+
         // an initialsync.
         this._sendNewDeviceEvents();
 
@@ -821,36 +824,39 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         // invalidate devices which have changed since then.
         const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
         if (oldSyncToken !== null) {
+            this._initialDeviceListInvalidationPending = true;
             this._invalidateDeviceListsSince(
                 oldSyncToken, nextSyncToken,
             ).catch((e) => {
                 // if that failed, we fall back to invalidating everyone.
                 console.warn("Error fetching changed device list", e);
-                this._invalidateDeviceListForAllActiveUsers();
+                this._deviceList.invalidateAllDeviceLists();
             }).done(() => {
-                this._initialDeviceListInvalidationDone = true;
+                this._initialDeviceListInvalidationPending = false;
                 this._deviceList.lastKnownSyncToken = nextSyncToken;
                 this._deviceList.refreshOutdatedDeviceLists();
             });
         } else {
             // otherwise, we have to invalidate all devices for all users we
-            // share a room with.
+            // are tracking.
             console.log("Completed first initialsync; invalidating all " +
                         "device list caches");
-            this._invalidateDeviceListForAllActiveUsers();
-            this._initialDeviceListInvalidationDone = true;
+            this._deviceList.invalidateAllDeviceLists();
         }
     }
 
-    if (this._initialDeviceListInvalidationDone) {
-        // if we've got an up-to-date list of users with outdated device lists,
-        // tell the device list about the new sync token (but not otherwise, because
-        // otherwise we'll start thinking we're more in sync than we are.)
-        this._deviceList.lastKnownSyncToken = nextSyncToken;
-
-        // catch up on any new devices we got told about during the sync.
-        this._deviceList.refreshOutdatedDeviceLists();
+    if (!this._initialDeviceListInvalidationPending) {
+        // we can now store our sync token so that we can get an update on
+        // restart rather than having to invalidate everyone.
+        //
+        // (we don't really need to do this on every sync - we could just
+        // do it periodically)
+        this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
     }
+
+    // catch up on any new devices we got told about during the sync.
+    this._deviceList.lastKnownSyncToken = nextSyncToken;
+    this._deviceList.refreshOutdatedDeviceLists();
 
     // we don't start uploading one-time keys until we've caught up with
     // to-device messages, to help us avoid throwing away one-time-keys that we
@@ -928,47 +934,16 @@ Crypto.prototype._invalidateDeviceListsSince = function(
     return this._baseApis.getKeyChanges(
         oldSyncToken, lastKnownSyncToken,
     ).then((r) => {
+        console.log("got key changes since", oldSyncToken, ":", r.changed);
+
         if (!r.changed || !Array.isArray(r.changed)) {
             return;
         }
 
-        // only invalidate users we share an e2e room with - we don't
-        // care about users in non-e2e rooms.
-        const filteredUserIds = this._getE2eRoomMembers();
         r.changed.forEach((u) => {
-            if (u in filteredUserIds) {
-                this._deviceList.invalidateUserDeviceList(u);
-            }
+            this._deviceList.invalidateUserDeviceList(u);
         });
     });
-};
-
-/**
- * Invalidate any stored device list for any users we share an e2e room with
- *
- * @private
- */
-Crypto.prototype._invalidateDeviceListForAllActiveUsers = function() {
-    Object.keys(this._getE2eRoomMembers()).forEach((m) => {
-        this._deviceList.invalidateUserDeviceList(m);
-    });
-};
-
-/**
- * get the users we share an e2e-enabled room with
- *
- * @returns {Object<string>} userid->userid map (should be a Set but argh ES6)
- */
-Crypto.prototype._getE2eRoomMembers = function() {
-    const userIds = Object.create(null);
-
-    const rooms = this._getE2eRooms();
-    for (const r of rooms) {
-        const members = r.getJoinedMembers();
-        members.forEach((m) => { userIds[m.userId] = m.userId; });
-    }
-
-    return userIds;
 };
 
 /**
@@ -1037,6 +1012,12 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     if (!alg) {
         // not encrypting in this room
         return;
+    }
+
+    if (member.membership == 'join') {
+        console.log('Join event for ' + member.userId + ' in ' + roomId);
+        // make sure we are tracking the deviceList for this user
+        this._deviceList.startTrackingDeviceList(member.userId);
     }
 
     alg.onRoomMembership(event, member, oldMembership);
