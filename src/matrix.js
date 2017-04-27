@@ -73,6 +73,23 @@ module.exports.InteractiveAuth = require("./interactive-auth");
  */
 module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCall;
 
+
+/**
+ * Set an audio input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setMatrixCallAudioInput = require('./webrtc/call').setAudioInput;
+/**
+ * Set a video input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setMatrixCallVideoInput = require('./webrtc/call').setVideoInput;
+
+
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
 let request;
