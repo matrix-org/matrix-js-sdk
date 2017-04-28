@@ -600,7 +600,7 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
             'OfferToReceiveVideo': self.type === 'video',
         },
     };
-    if (stream instanceof MediaStream) {
+    if (stream instanceof this.webRtc.MediaStream) {
         const videoEl = this.getLocalVideoElement();
 
         if (videoEl && this.type == 'video') {
@@ -661,7 +661,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     }
 
     const error = stream;
-    if (stream instanceof MediaStream) {
+    if (stream instanceof this.webRtc.MediaStream) {
         const localVidEl = self.getLocalVideoElement();
 
         if (localVidEl && self.type == 'video') {
@@ -1361,6 +1361,9 @@ module.exports.createNewMatrixCall = function(client, roomId, options) {
     );
     webRtc.RtcIceCandidate = (
         w.RTCIceCandidate || w.webkitRTCIceCandidate || w.mozRTCIceCandidate
+    );
+    webRtc.MediaStream = (
+        w.MediaStream || w.webkitMediaStream
     );
     webRtc.vendor = null;
     if (w.mozRTCPeerConnection) {
