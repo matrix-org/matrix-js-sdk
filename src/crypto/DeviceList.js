@@ -263,6 +263,9 @@ export default class DeviceList {
 
     /**
      * If we have users who have outdated device lists, start key downloads for them
+     *
+     * @returns {Promise} which completes when the download completes; normally there
+     *    is no need to wait for this (it's mostly for the unit tests).
      */
     refreshOutdatedDeviceLists() {
         const usersToDownload = [];
@@ -280,7 +283,7 @@ export default class DeviceList {
         // invalidateUserDeviceList, so do it now.
         this._persistDeviceTrackingStatus();
 
-        this._doKeyDownload(usersToDownload);
+        return this._doKeyDownload(usersToDownload);
     }
 
 
@@ -323,6 +326,14 @@ export default class DeviceList {
 
         const finished = (success) => {
             users.forEach((u) => {
+                // we may have queued up another download request for this user
+                // since we started this request. If that happens, we should
+                // ignore the completion of the first one.
+                if (this._keyDownloadsInProgressByUser[u] !== prom) {
+                    console.log('Another update in the queue for', u,
+                                '- not marking up-to-date');
+                    return;
+                }
                 delete this._keyDownloadsInProgressByUser[u];
                 const stat = this._deviceTrackingStatus[u];
                 if (stat == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
