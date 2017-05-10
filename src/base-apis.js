@@ -121,6 +121,20 @@ MatrixBaseApis.prototype.makeTxnId = function() {
 // =============================
 
 /**
+ * Check whether a username is available prior to registration. An error response
+ * indicates an invalid/unavailable username.
+ * @param {string} username The username to check the availability of.
+ * @return {module:client.Promise} Resolves: to `true`.
+ */
+MatrixBaseApis.prototype.isUsernameAvailable = function(username) {
+    return this._http.authedRequest(
+        undefined, "POST", '/register/available', null, { username: username },
+    ).then((response) => {
+        return response.available;
+    });
+};
+
+/**
  * @param {string} username
  * @param {string} password
  * @param {string} sessionId
