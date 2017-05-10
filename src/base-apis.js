@@ -128,7 +128,7 @@ MatrixBaseApis.prototype.makeTxnId = function() {
  */
 MatrixBaseApis.prototype.isUsernameAvailable = function(username) {
     return this._http.authedRequest(
-        undefined, "POST", '/register/available', null, { username: username },
+        undefined, "GET", '/register/available', { username: username },
     ).then((response) => {
         return response.available;
     });
