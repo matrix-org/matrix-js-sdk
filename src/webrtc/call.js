@@ -155,7 +155,7 @@ MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoEle
 /**
  * Place a screen-sharing call to this room. This includes audio.
  * <b>This method is EXPERIMENTAL and subject to change without warning. It
- * only works in Google Chrome.</b>
+ * only works in Google Chrome and Firefox >= 44.</b>
  * @param {Element} remoteVideoElement a <code>&lt;video&gt;</code> DOM element
  * to render video to.
  * @param {Element} localVideoElement a <code>&lt;video&gt;</code> DOM element
@@ -166,7 +166,7 @@ MatrixCall.prototype.placeScreenSharingCall =
     function(remoteVideoElement, localVideoElement) {
     debuglog("placeScreenSharingCall");
     checkForErrorListener(this);
-    const screenConstraints = _getChromeScreenSharingConstraints(this);
+    const screenConstraints = _getScreenSharingConstraints(this);
     if (!screenConstraints) {
         return;
     }
@@ -1193,7 +1193,7 @@ const _createPeerConnection = function(self) {
     return pc;
 };
 
-const _getChromeScreenSharingConstraints = function(call) {
+const _getScreenSharingConstraints = function(call) {
     const screen = global.screen;
     if (!screen) {
         call.emit("error", callError(
@@ -1205,6 +1205,7 @@ const _getChromeScreenSharingConstraints = function(call) {
 
     return {
         video: {
+            mediaSource: 'screen',
             mandatory: {
                 chromeMediaSource: "screen",
                 chromeMediaSourceId: "" + Date.now(),
