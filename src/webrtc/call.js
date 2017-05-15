@@ -1221,16 +1221,25 @@ const _getScreenSharingConstraints = function(call) {
 const _getUserMediaVideoContraints = function(callType) {
     switch (callType) {
         case 'voice':
-            return ({audio: true, video: false});
+            return {
+                audio: {
+                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                }, video: false,
+            };
         case 'video':
-            return ({audio: true, video: {
-                mandatory: {
-                    minWidth: 640,
-                    maxWidth: 640,
-                    minHeight: 360,
-                    maxHeight: 360,
+            return {
+                audio: {
+                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                }, video: {
+                    deviceId: videoInput ? {exact: videoInput} : undefined,
+                    mandatory: {
+                        minWidth: 640,
+                        maxWidth: 640,
+                        minHeight: 360,
+                        maxHeight: 360,
+                    },
                 },
-            }});
+            };
     }
 };
 
@@ -1262,6 +1271,22 @@ const forAllTracksOnStream = function(s, f) {
 /** The MatrixCall class. */
 module.exports.MatrixCall = MatrixCall;
 
+let audioInput;
+let videoInput;
+/**
+ * Set an audio input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setAudioInput = function(deviceId) { audioInput = deviceId; };
+/**
+ * Set a video input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
 
 /**
  * Create a new Matrix call for the browser.
