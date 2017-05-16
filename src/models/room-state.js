@@ -272,19 +272,19 @@ RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
 RoomState.prototype._hasSufficientPowerLevelFor = function(type, userId) {
     const member = this.getMember(userId);
 
-    const power_levels_event = this.getStateEvents('m.room.power_levels', '');
+    const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
 
-    let power_levels;
-    if (power_levels_event) {
-        power_levels = power_levels_event.getContent();
+    let powerLevels;
+    if (powerLevelsEvent) {
+        powerLevels = powerLevelsEvent.getContent();
     }
 
-    let required_level = power_levels.state_default || 50;
-    if (power_levels[type] !== undefined) {
-        required_level = power_levels[type];
+    let requiredLevel = powerLevels.state_default || 50;
+    if (powerLevels[type] !== undefined) {
+        requiredLevel = powerLevels[type];
     }
 
-    return member.powerLevel >= required_level;
+    return member.powerLevel >= requiredLevel;
 };
 
 /**
