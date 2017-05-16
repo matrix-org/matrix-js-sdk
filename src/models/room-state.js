@@ -257,7 +257,7 @@ RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
     const member = this.getMember(userId);
     if (!member || member.membership === 'leave') return false;
 
-    if (mxEvent.isRedacted()) return false;
+    if (mxEvent.status || mxEvent.isRedacted()) return false;
     if (mxEvent.getSender() === userId) return true;
 
     return this._hasSufficientPowerLevelFor('redact', userId);
