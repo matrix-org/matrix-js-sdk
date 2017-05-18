@@ -352,6 +352,36 @@ module.exports.MatrixHttpApi.prototype = {
     },
 
     /**
+     * Generate a WebSocket that can be extended with callback on the calling site
+     */
+    generateWebSocket: function (queryParams) {
+        if (!queryParams) {
+            queryParams = {};
+        }
+        if (!queryParams.access_token) {
+            queryParams.access_token = this.opts.accessToken;
+        }
+
+        let ws_prot = "ws://";
+        let ws_path = this.opts.baseUrl.substr("http://".length-1);
+        if (this.opts.baseUrl.startsWith("https://")) {
+            ws_prot = "wss://";
+            ws_path = this.opts.baseUrl.substr("https://".length-1);
+        }
+
+        //TODO: find/implement queryParams => urlencode
+        let ws_params = "?"
+        ws_params = ws_params + "access_token=" + queryParams.access_token;
+        if (queryParams.since) {
+            ws_params += "&since=" + queryParams.since;
+        }
+        if (queryParams.filter) {
+            ws_params += "&filter=" + queryParams.filter;
+        }
+        return new WebSocket(ws_prot + ws_path + "/_matrix/client/unstable/stream" + ws_params, "m.json");
+    },
+
+    /**
      * Perform an authorised request to the homeserver.
      * @param {Function} callback Optional. The callback to invoke on
      * success/failure. See the promise return values for more information.
