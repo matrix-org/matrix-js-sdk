@@ -362,6 +362,7 @@ module.exports.MatrixHttpApi.prototype = {
             queryParams.access_token = this.opts.accessToken;
         }
 
+	//TODO find a better way to distinguish between http and https
         let ws_prot = "ws://";
         let ws_path = this.opts.baseUrl.substr("http://".length-1);
         if (this.opts.baseUrl.startsWith("https://")) {
@@ -378,6 +379,7 @@ module.exports.MatrixHttpApi.prototype = {
         if (queryParams.filter) {
             ws_params += "&filter=" + queryParams.filter;
         }
+        //TODO make query-path configuration somewhere else
         return new WebSocket(ws_prot + ws_path + "/_matrix/client/unstable/stream" + ws_params, "m.json");
     },
 

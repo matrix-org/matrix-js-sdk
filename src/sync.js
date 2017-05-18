@@ -468,6 +468,9 @@ SyncApi.prototype.stop = function() {
         clearTimeout(this._keepAliveTimer);
         this._keepAliveTimer = null;
     }
+    if (this.ws) {
+	this.ws.close();
+    }
 };
 
 /**
@@ -534,31 +537,32 @@ SyncApi.prototype._websocket = function(syncOptions) {
 
     if (self.ws_syncToken) {
         qps.since = self.ws_syncToken;
-    } else {
-        // use a cachebuster for initialsyncs, to make sure that
-        // we don't get a stale sync
-        // (https://github.com/vector-im/vector-web/issues/1354)
-        qps._cacheBuster = Date.now();
-    }
-
-    if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
-        // we think the connection is dead. If it comes back up, we won't know
-        // about it till /sync returns. If the timeout= is high, this could
-        // be a long time. Set it to 0 when doing retries so we don't have to wait
-        // for an event or a timeout before emiting the SYNCING event.
-//        qps.timeout = 0;
     }
 
     this._ws = client._http.generateWebSocket(qps);
     this._ws.onopen = function(ev) {
-        debuglog("Connected to WebSocket: " + ev);
+        debuglog("Connected to WebSocket: ", ev);
     }
     this._ws.onclose = function(ev) {
         if (ev.wasClean) {
-           debuglog("Socket closed");
+            debuglog("Socket closed");
         } else {
-           debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
-                   "error");
+            debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
+                "error");
+
+            if (self.ws_syncOptions.hasSyncedBefore) {
+                // assume connection to websocket lost by mistake
+                debuglog("Reinit Connection via WebSocket");
+                self._websocket(self.ws_syncOptions);
+            } else {
+                debuglog("Connection via WebSocket seems to be not available. "
+                    + "Fallback to Long-Polling");
+                // remove variables used by WebSockets
+                let syncOptions = self.ws_syncOptions;
+                self.ws_syncOptions = null;
+                self.ws_syncToken = null;
+                self._sync(syncOptions);
+            }
         }
         //self._running = false;
         //self.ws_syncOptions = null;
@@ -567,12 +571,13 @@ SyncApi.prototype._websocket = function(syncOptions) {
 
     this._ws.onmessage = function(in_data) {
         let data = JSON.parse(in_data.data);
-        //debuglog('Completed sync, next_batch=' + data.next_batch);
+        //debuglog('Got new data from socket, next_batch=' + data.next_batch);
 
         // set the sync token NOW *before* processing the events. We do this so
         // if something barfs on an event we can skip it rather than constantly
         // polling with the same token.
         client.store.setSyncData(data);
+        client.store.setSyncToken(data.next_batch);
 
         // Reset after a successful sync
         self._failedSyncCount = 0;
@@ -582,7 +587,7 @@ SyncApi.prototype._websocket = function(syncOptions) {
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
-            console.error("Caught /sync error", e.stack || e);
+            console.error("Caught /sync error (via WebSocket)", e.stack || e);
         }
 
         // emit synced events
@@ -595,7 +600,7 @@ SyncApi.prototype._websocket = function(syncOptions) {
         if (!self.ws_syncOptions.hasSyncedBefore) {
             self._updateSyncState("PREPARED", syncEventData);
             self.ws_syncOptions.hasSyncedBefore = true;
-        } else {
+	} else {
             self._updateSyncState("SYNCING", syncEventData);
 
             // tell databases that everything is now in a consistent state and can be
@@ -616,7 +621,7 @@ SyncApi.prototype._websocket = function(syncOptions) {
             self._updateSyncState("STOPPED");
             return;
         }
-        console.error("/sync error %s", err);
+        console.error("Websocket error %s", err);
         console.error(err);
 
         self._failedSyncCount++;
@@ -632,7 +637,7 @@ SyncApi.prototype._websocket = function(syncOptions) {
         // if they wish.
         self._startKeepAlives().done(function() {
             debuglog("Restart Websocket");
-            self._websocket(this._ws_syncOptions.syncOptions);
+            self._websocket(self._ws_syncOptions);
         });
         self._currentSyncRequest = null;
         // Transition from RECONNECTING to ERROR after a given number of failed syncs
