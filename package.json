@@ -70,7 +70,7 @@
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
-    "uglifyjs": "^2.4.10",
+    "uglify-js": "^2.8.26",
     "watchify": "^3.2.1"
   },
   "optionalDependencies": {

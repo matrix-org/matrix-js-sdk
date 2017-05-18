@@ -155,7 +155,7 @@ MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoEle
 /**
  * Place a screen-sharing call to this room. This includes audio.
  * <b>This method is EXPERIMENTAL and subject to change without warning. It
- * only works in Google Chrome.</b>
+ * only works in Google Chrome and Firefox >= 44.</b>
  * @param {Element} remoteVideoElement a <code>&lt;video&gt;</code> DOM element
  * to render video to.
  * @param {Element} localVideoElement a <code>&lt;video&gt;</code> DOM element
@@ -166,7 +166,7 @@ MatrixCall.prototype.placeScreenSharingCall =
     function(remoteVideoElement, localVideoElement) {
     debuglog("placeScreenSharingCall");
     checkForErrorListener(this);
-    const screenConstraints = _getChromeScreenSharingConstraints(this);
+    const screenConstraints = _getScreenSharingConstraints(this);
     if (!screenConstraints) {
         return;
     }
@@ -1193,7 +1193,7 @@ const _createPeerConnection = function(self) {
     return pc;
 };
 
-const _getChromeScreenSharingConstraints = function(call) {
+const _getScreenSharingConstraints = function(call) {
     const screen = global.screen;
     if (!screen) {
         call.emit("error", callError(
@@ -1205,6 +1205,7 @@ const _getChromeScreenSharingConstraints = function(call) {
 
     return {
         video: {
+            mediaSource: 'screen',
             mandatory: {
                 chromeMediaSource: "screen",
                 chromeMediaSourceId: "" + Date.now(),
@@ -1220,16 +1221,25 @@ const _getChromeScreenSharingConstraints = function(call) {
 const _getUserMediaVideoContraints = function(callType) {
     switch (callType) {
         case 'voice':
-            return ({audio: true, video: false});
+            return {
+                audio: {
+                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                }, video: false,
+            };
         case 'video':
-            return ({audio: true, video: {
-                mandatory: {
-                    minWidth: 640,
-                    maxWidth: 640,
-                    minHeight: 360,
-                    maxHeight: 360,
+            return {
+                audio: {
+                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                }, video: {
+                    deviceId: videoInput ? {exact: videoInput} : undefined,
+                    mandatory: {
+                        minWidth: 640,
+                        maxWidth: 640,
+                        minHeight: 360,
+                        maxHeight: 360,
+                    },
                 },
-            }});
+            };
     }
 };
 
@@ -1261,6 +1271,22 @@ const forAllTracksOnStream = function(s, f) {
 /** The MatrixCall class. */
 module.exports.MatrixCall = MatrixCall;
 
+let audioInput;
+let videoInput;
+/**
+ * Set an audio input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setAudioInput = function(deviceId) { audioInput = deviceId; };
+/**
+ * Set a video input device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
 
 /**
  * Create a new Matrix call for the browser.
