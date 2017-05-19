@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: store/indexeddb-local-backend.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: store/indexeddb-local-backend.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i &amp;&amp; _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n &amp;&amp; _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }(); /*
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Copyright 2017 Vector Creations Ltd
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Licensed under the Apache License, Version 2.0 (the "License");
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         you may not use this file except in compliance with the License.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         You may obtain a copy of the License at
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             http://www.apache.org/licenses/LICENSE-2.0
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         Unless required by applicable law or agreed to in writing, software
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         distributed under the License is distributed on an "AS IS" BASIS,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         See the License for the specific language governing permissions and
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         limitations under the License.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         */
+
+var _q = require("q");
+
+var _q2 = _interopRequireDefault(_q);
+
+var _syncAccumulator = require("../sync-accumulator");
+
+var _syncAccumulator2 = _interopRequireDefault(_syncAccumulator);
+
+var _utils = require("../utils");
+
+var _utils2 = _interopRequireDefault(_utils);
+
+function _interopRequireDefault(obj) { return obj &amp;&amp; obj.__esModule ? obj : { default: obj }; }
+
+var VERSION = 1;
+
+function createDatabase(db) {
+    // Make user store, clobber based on user ID. (userId property of User objects)
+    db.createObjectStore("users", { keyPath: ["userId"] });
+
+    // Make account data store, clobber based on event type.
+    // (event.type property of MatrixEvent objects)
+    db.createObjectStore("accountData", { keyPath: ["type"] });
+
+    // Make /sync store (sync tokens, room data, etc), always clobber (const key).
+    db.createObjectStore("sync", { keyPath: ["clobber"] });
+}
+
+/**
+ * Helper method to collect results from a Cursor and promiseify it.
+ * @param {ObjectStore|Index} store The store to perform openCursor on.
+ * @param {IDBKeyRange=} keyRange Optional key range to apply on the cursor.
+ * @param {Function} resultMapper A function which is repeatedly called with a
+ * Cursor.
+ * Return the data you want to keep.
+ * @return {Promise&lt;T[]>} Resolves to an array of whatever you returned from
+ * resultMapper.
+ */
+function selectQuery(store, keyRange, resultMapper) {
+    var query = store.openCursor(keyRange);
+    return _q2.default.Promise(function (resolve, reject) {
+        /*eslint new-cap: 0*/
+        var results = [];
+        query.onerror = function (event) {
+            reject(new Error("Query failed: " + event.target.errorCode));
+        };
+        // collect results
+        query.onsuccess = function (event) {
+            var cursor = event.target.result;
+            if (!cursor) {
+                resolve(results);
+                return; // end of results
+            }
+            results.push(resultMapper(cursor));
+            cursor.continue();
+        };
+    });
+}
+
+function promiseifyTxn(txn) {
+    return new _q2.default.Promise(function (resolve, reject) {
+        txn.oncomplete = function (event) {
+            resolve(event);
+        };
+        txn.onerror = function (event) {
+            reject(event);
+        };
+    });
+}
+
+function promiseifyRequest(req) {
+    return new _q2.default.Promise(function (resolve, reject) {
+        req.onsuccess = function (event) {
+            resolve(event);
+        };
+        req.onerror = function (event) {
+            reject(event);
+        };
+    });
+}
+
+/**
+ * Does the actual reading from and writing to the indexeddb
+ *
+ * Construct a new Indexed Database store backend. This requires a call to
+ * &lt;code>connect()&lt;/code> before this store can be used.
+ * @constructor
+ * @param {Object} indexedDBInterface The Indexed DB interface e.g
+ * &lt;code>window.indexedDB&lt;/code>
+ * @param {string=} dbName Optional database name. The same name must be used
+ * to open the same database.
+ */
+var LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(indexedDBInterface, dbName) {
+    this.indexedDB = indexedDBInterface;
+    this._dbName = "matrix-js-sdk:" + (dbName || "default");
+    this.db = null;
+    this._syncAccumulator = new _syncAccumulator2.default();
+};
+
+LocalIndexedDBStoreBackend.prototype = {
+    /**
+     * Attempt to connect to the database. This can fail if the user does not
+     * grant permission.
+     * @return {Promise} Resolves if successfully connected.
+     */
+    connect: function connect() {
+        var _this = this;
+
+        if (this.db) {
+            return (0, _q2.default)();
+        }
+        var req = this.indexedDB.open(this._dbName, VERSION);
+        req.onupgradeneeded = function (ev) {
+            var db = ev.target.result;
+            var oldVersion = ev.oldVersion;
+            if (oldVersion &lt; 1) {
+                // The database did not previously exist.
+                createDatabase(db);
+            }
+            // Expand as needed.
+        };
+
+        return promiseifyRequest(req).then(function (ev) {
+            _this.db = ev.target.result;
+
+            // add a poorly-named listener for when deleteDatabase is called
+            // so we can close our db connections.
+            _this.db.onversionchange = function () {
+                _this.db.close();
+            };
+
+            return _this._init();
+        });
+    },
+
+    /**
+     * Having connected, load initial data from the database and prepare for use
+     * @return {Promise} Resolves on success
+     */
+    _init: function _init() {
+        var _this2 = this;
+
+        return _q2.default.all([this._loadAccountData(), this._loadSyncData()]).then(function (_ref) {
+            var _ref2 = _slicedToArray(_ref, 2),
+                accountData = _ref2[0],
+                syncData = _ref2[1];
+
+            _this2._syncAccumulator.accumulate({
+                next_batch: syncData.nextBatch,
+                rooms: syncData.roomsData,
+                account_data: {
+                    events: accountData
+                }
+            });
+        });
+    },
+
+    /**
+     * Clear the entire database. This should be used when logging out of a client
+     * to prevent mixing data between accounts.
+     * @return {Promise} Resolved when the database is cleared.
+     */
+    clearDatabase: function clearDatabase() {
+        console.log("Removing indexeddb instance: ", this._dbName);
+        return promiseifyRequest(this.indexedDB.deleteDatabase(this._dbName));
+    },
+
+    /**
+     * @param {boolean=} copy If false, the data returned is from internal
+     * buffers and must not be muated. Otherwise, a copy is made before
+     * returning such that the data can be safely mutated. Default: true.
+     *
+     * @return {Promise} Resolves with a sync response to restore the
+     * client state to where it was at the last save, or null if there
+     * is no saved sync data.
+     */
+    getSavedSync: function getSavedSync(copy) {
+        if (copy === undefined) copy = true;
+
+        var data = this._syncAccumulator.getJSON();
+        if (!data.nextBatch) return (0, _q2.default)(null);
+        if (copy) {
+            // We must deep copy the stored data so that the /sync processing code doesn't
+            // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
+            return (0, _q2.default)(_utils2.default.deepCopy(data));
+        } else {
+            return (0, _q2.default)(data);
+        }
+    },
+
+    setSyncData: function setSyncData(syncData) {
+        var _this3 = this;
+
+        return (0, _q2.default)().then(function () {
+            _this3._syncAccumulator.accumulate(syncData);
+        });
+    },
+
+    syncToDatabase: function syncToDatabase(userTuples) {
+        var syncData = this._syncAccumulator.getJSON();
+
+        return _q2.default.all([this._persistUserPresenceEvents(userTuples), this._persistAccountData(syncData.accountData), this._persistSyncData(syncData.nextBatch, syncData.roomsData)]);
+    },
+
+    /**
+     * Persist rooms /sync data along with the next batch token.
+     * @param {string} nextBatch The next_batch /sync value.
+     * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
+     * @return {Promise} Resolves if the data was persisted.
+     */
+    _persistSyncData: function _persistSyncData(nextBatch, roomsData) {
+        var _this4 = this;
+
+        console.log("Persisting sync data up to ", nextBatch);
+        return _q2.default.try(function () {
+            var txn = _this4.db.transaction(["sync"], "readwrite");
+            var store = txn.objectStore("sync");
+            store.put({
+                clobber: "-", // constant key so will always clobber
+                nextBatch: nextBatch,
+                roomsData: roomsData
+            }); // put == UPSERT
+            return promiseifyTxn(txn);
+        });
+    },
+
+    /**
+     * Persist a list of account data events. Events with the same 'type' will
+     * be replaced.
+     * @param {Object[]} accountData An array of raw user-scoped account data events
+     * @return {Promise} Resolves if the events were persisted.
+     */
+    _persistAccountData: function _persistAccountData(accountData) {
+        var _this5 = this;
+
+        return _q2.default.try(function () {
+            var txn = _this5.db.transaction(["accountData"], "readwrite");
+            var store = txn.objectStore("accountData");
+            for (var i = 0; i &lt; accountData.length; i++) {
+                store.put(accountData[i]); // put == UPSERT
+            }
+            return promiseifyTxn(txn);
+        });
+    },
+
+    /**
+     * Persist a list of [user id, presence event] they are for.
+     * Users with the same 'userId' will be replaced.
+     * Presence events should be the event in its raw form (not the Event
+     * object)
+     * @param {Object[]} tuples An array of [userid, event] tuples
+     * @return {Promise} Resolves if the users were persisted.
+     */
+    _persistUserPresenceEvents: function _persistUserPresenceEvents(tuples) {
+        var _this6 = this;
+
+        return _q2.default.try(function () {
+            var txn = _this6.db.transaction(["users"], "readwrite");
+            var store = txn.objectStore("users");
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
+
+            try {
+                for (var _iterator = tuples[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var tuple = _step.value;
+
+                    store.put({
+                        userId: tuple[0],
+                        event: tuple[1]
+                    }); // put == UPSERT
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion &amp;&amp; _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
+            }
+
+            return promiseifyTxn(txn);
+        });
+    },
+
+    /**
+     * Load all user presence events from the database. This is not cached.
+     * FIXME: It would probably be more sensible to store the events in the
+     * sync.
+     * @return {Promise&lt;Object[]>} A list of presence events in their raw form.
+     */
+    getUserPresenceEvents: function getUserPresenceEvents() {
+        var _this7 = this;
+
+        return _q2.default.try(function () {
+            var txn = _this7.db.transaction(["users"], "readonly");
+            var store = txn.objectStore("users");
+            return selectQuery(store, undefined, function (cursor) {
+                return [cursor.value.userId, cursor.value.event];
+            });
+        });
+    },
+
+    /**
+     * Load all the account data events from the database. This is not cached.
+     * @return {Promise&lt;Object[]>} A list of raw global account events.
+     */
+    _loadAccountData: function _loadAccountData() {
+        var _this8 = this;
+
+        return _q2.default.try(function () {
+            var txn = _this8.db.transaction(["accountData"], "readonly");
+            var store = txn.objectStore("accountData");
+            return selectQuery(store, undefined, function (cursor) {
+                return cursor.value;
+            });
+        });
+    },
+
+    /**
+     * Load the sync data from the database.
+     * @return {Promise&lt;Object>} An object with "roomsData" and "nextBatch" keys.
+     */
+    _loadSyncData: function _loadSyncData() {
+        var _this9 = this;
+
+        return _q2.default.try(function () {
+            var txn = _this9.db.transaction(["sync"], "readonly");
+            var store = txn.objectStore("sync");
+            return selectQuery(store, undefined, function (cursor) {
+                return cursor.value;
+            }).then(function (results) {
+                if (results.length > 1) {
+                    console.warn("loadSyncData: More than 1 sync row found.");
+                }
+                return results.length > 0 ? results[0] : {};
+            });
+        });
+    }
+};
+
+exports.default = LocalIndexedDBStoreBackend;
+//# sourceMappingURL=indexeddb-local-backend.js.map</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-store_webstorage.html">store/webstorage</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.html#.DecryptionAlgorithm">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.html#.EncryptionAlgorithm">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-store_webstorage-WebStorageStore.html">WebStorageStore</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522send_event_error%2522">MatrixCall"send_event_error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="global.html#IndexedDbStoreWorker">IndexedDbStoreWorker</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.3</a> on Fri May 19 2017 10:35:41 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
