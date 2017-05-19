@@ -342,7 +342,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
                 self._updateSyncState("RECONNECTING");
                 self._startKeepAlives().done(function() {
                     debuglog("Restart Websocket");
-                    self._start(self._ws_syncOptions);
+                    self._start(self.ws_syncOptions);
                 });
             } else {
                 debuglog("Connection via WebSocket seems to be not available. "
@@ -432,7 +432,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         self._updateSyncState("RECONNECTING");
         self._startKeepAlives().done(function() {
             debuglog("Restart Websocket");
-            self._start(self._ws_syncOptions);
+            self._start(self.ws_syncOptions);
         });
         // Transition from RECONNECTING to ERROR after a given number of failed syncs
         self._updateSyncState(
