@@ -32,6 +32,7 @@ const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 
 const DEBUG = true;
+const USE_WEBSOCKET = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -71,14 +72,13 @@ function debuglog() {
  * there are other references to the timelines for this room.
  * Default: returns false.
  */
-function SyncApi(client, opts) {
+function WebSocketApi(client, opts) {
     this.client = client;
     opts = opts || {};
     opts.initialSyncLimit = (
         opts.initialSyncLimit === undefined ? 8 : opts.initialSyncLimit
     );
     opts.resolveInvitesToProfiles = opts.resolveInvitesToProfiles || false;
-    opts.pollTimeout = opts.pollTimeout || (30 * 1000);
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
     if (!opts.canResetEntireTimeline) {
         opts.canResetEntireTimeline = function(roomId) {
@@ -86,8 +86,7 @@ function SyncApi(client, opts) {
         };
     }
     this.opts = opts;
-    this._peekRoomId = null;
-    this._currentSyncRequest = null;
+    this._websocket = null;
     this._syncState = null;
     this._catchingUp = false;
     this._running = false;
@@ -102,11 +101,17 @@ function SyncApi(client, opts) {
     }
 }
 
+WebSocketApi.prototype.reconnectNow = function() {
+    console.err("WebSocketApi.reconnectNow() not implemented");
+    //TODO Implement
+    return false;
+}
+
 /**
  * @param {string} roomId
  * @return {Room}
  */
-SyncApi.prototype.createRoom = function(roomId) {
+WebSocketApi.prototype.createRoom = function(roomId) {
     const client = this.client;
     const room = new Room(roomId, {
         pendingEventOrdering: this.opts.pendingEventOrdering,
@@ -126,7 +131,7 @@ SyncApi.prototype.createRoom = function(roomId) {
  * @param {Room} room
  * @private
  */
-SyncApi.prototype._registerStateListeners = function(room) {
+WebSocketApi.prototype._registerStateListeners = function(room) {
     const client = this.client;
     // we need to also re-emit room state and room member events, so hook it up
     // to the client now. We need to add a listener for RoomState.members in
@@ -150,219 +155,11 @@ SyncApi.prototype._registerStateListeners = function(room) {
  * @param {Room} room
  * @private
  */
-SyncApi.prototype._deregisterStateListeners = function(room) {
+WebSocketApi.prototype._deregisterStateListeners = function(room) {
     // could do with a better way of achieving this.
     room.currentState.removeAllListeners("RoomState.events");
     room.currentState.removeAllListeners("RoomState.members");
     room.currentState.removeAllListeners("RoomState.newMember");
-};
-
-
-/**
- * Sync rooms the user has left.
- * @return {Promise} Resolved when they've been added to the store.
- */
-SyncApi.prototype.syncLeftRooms = function() {
-    const client = this.client;
-    const self = this;
-
-    // grab a filter with limit=1 and include_leave=true
-    const filter = new Filter(this.client.credentials.userId);
-    filter.setTimelineLimit(1);
-    filter.setIncludeLeaveRooms(true);
-
-    const localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
-    const qps = {
-        timeout: 0, // don't want to block since this is a single isolated req
-    };
-
-    return client.getOrCreateFilter(
-        getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
-    ).then(function(filterId) {
-        qps.filter = filterId;
-        return client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, localTimeoutMs,
-        );
-    }).then(function(data) {
-        let leaveRooms = [];
-        if (data.rooms && data.rooms.leave) {
-            leaveRooms = self._mapSyncResponseToRoomArray(data.rooms.leave);
-        }
-        const rooms = [];
-        leaveRooms.forEach(function(leaveObj) {
-            const room = leaveObj.room;
-            rooms.push(room);
-            if (!leaveObj.isBrandNewRoom) {
-                // the intention behind syncLeftRooms is to add in rooms which were
-                // *omitted* from the initial /sync. Rooms the user were joined to
-                // but then left whilst the app is running will appear in this list
-                // and we do not want to bother with them since they will have the
-                // current state already (and may get dupe messages if we add
-                // yet more timeline events!), so skip them.
-                // NB: When we persist rooms to localStorage this will be more
-                //     complicated...
-                return;
-            }
-            leaveObj.timeline = leaveObj.timeline || {};
-            const timelineEvents =
-                self._mapSyncEventsFormat(leaveObj.timeline, room);
-            const stateEvents = self._mapSyncEventsFormat(leaveObj.state, room);
-
-            // set the back-pagination token. Do this *before* adding any
-            // events so that clients can start back-paginating.
-            room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch,
-                                                      EventTimeline.BACKWARDS);
-
-            self._processRoomEvents(room, stateEvents, timelineEvents);
-
-            room.recalculate(client.credentials.userId);
-            client.store.storeRoom(room);
-            client.emit("Room", room);
-        });
-        return rooms;
-    });
-};
-
-/**
- * Peek into a room. This will result in the room in question being synced so it
- * is accessible via getRooms(). Live updates for the room will be provided.
- * @param {string} roomId The room ID to peek into.
- * @return {Promise} A promise which resolves once the room has been added to the
- * store.
- */
-SyncApi.prototype.peek = function(roomId) {
-    const self = this;
-    const client = this.client;
-    this._peekRoomId = roomId;
-    return this.client.roomInitialSync(roomId, 20).then(function(response) {
-        // make sure things are init'd
-        response.messages = response.messages || {};
-        response.messages.chunk = response.messages.chunk || [];
-        response.state = response.state || [];
-
-        const peekRoom = self.createRoom(roomId);
-
-        // FIXME: Mostly duplicated from _processRoomEvents but not entirely
-        // because "state" in this API is at the BEGINNING of the chunk
-        const oldStateEvents = utils.map(
-            utils.deepCopy(response.state), client.getEventMapper(),
-        );
-        const stateEvents = utils.map(
-            response.state, client.getEventMapper(),
-        );
-        const messages = utils.map(
-            response.messages.chunk, client.getEventMapper(),
-        );
-
-        // XXX: copypasted from /sync until we kill off this
-        // minging v1 API stuff)
-        // handle presence events (User objects)
-        if (response.presence && utils.isArray(response.presence)) {
-            response.presence.map(client.getEventMapper()).forEach(
-            function(presenceEvent) {
-                let user = client.store.getUser(presenceEvent.getContent().user_id);
-                if (user) {
-                    user.setPresenceEvent(presenceEvent);
-                } else {
-                    user = createNewUser(client, presenceEvent.getContent().user_id);
-                    user.setPresenceEvent(presenceEvent);
-                    client.store.storeUser(user);
-                }
-                client.emit("event", presenceEvent);
-            });
-        }
-
-        // set the pagination token before adding the events in case people
-        // fire off pagination requests in response to the Room.timeline
-        // events.
-        if (response.messages.start) {
-            peekRoom.oldState.paginationToken = response.messages.start;
-        }
-
-        // set the state of the room to as it was after the timeline executes
-        peekRoom.oldState.setStateEvents(oldStateEvents);
-        peekRoom.currentState.setStateEvents(stateEvents);
-
-        self._resolveInvites(peekRoom);
-        peekRoom.recalculate(self.client.credentials.userId);
-
-        // roll backwards to diverge old state. addEventsToTimeline
-        // will overwrite the pagination token, so make sure it overwrites
-        // it with the right thing.
-        peekRoom.addEventsToTimeline(messages.reverse(), true,
-                                     peekRoom.getLiveTimeline(),
-                                     response.messages.start);
-
-        client.store.storeRoom(peekRoom);
-        client.emit("Room", peekRoom);
-
-        self._peekPoll(roomId);
-        return peekRoom;
-    });
-};
-
-/**
- * Stop polling for updates in the peeked room. NOPs if there is no room being
- * peeked.
- */
-SyncApi.prototype.stopPeeking = function() {
-    this._peekRoomId = null;
-};
-
-/**
- * Do a peek room poll.
- * @param {string} roomId
- * @param {string} token from= token
- */
-SyncApi.prototype._peekPoll = function(roomId, token) {
-    if (this._peekRoomId !== roomId) {
-        debuglog("Stopped peeking in room %s", roomId);
-        return;
-    }
-
-    const self = this;
-    // FIXME: gut wrenching; hard-coded timeout values
-    this.client._http.authedRequest(undefined, "GET", "/events", {
-        room_id: roomId,
-        timeout: 30 * 1000,
-        from: token,
-    }, undefined, 50 * 1000).done(function(res) {
-        // We have a problem that we get presence both from /events and /sync
-        // however, /sync only returns presence for users in rooms
-        // you're actually joined to.
-        // in order to be sure to get presence for all of the users in the
-        // peeked room, we handle presence explicitly here. This may result
-        // in duplicate presence events firing for some users, which is a
-        // performance drain, but such is life.
-        // XXX: copypasted from /sync until we can kill this minging v1 stuff.
-
-        res.chunk.filter(function(e) {
-            return e.type === "m.presence";
-        }).map(self.client.getEventMapper()).forEach(function(presenceEvent) {
-            let user = self.client.store.getUser(presenceEvent.getContent().user_id);
-            if (user) {
-                user.setPresenceEvent(presenceEvent);
-            } else {
-                user = createNewUser(self.client, presenceEvent.getContent().user_id);
-                user.setPresenceEvent(presenceEvent);
-                self.client.store.storeUser(user);
-            }
-            self.client.emit("event", presenceEvent);
-        });
-
-        // strip out events which aren't for the given room_id (e.g presence)
-        const events = res.chunk.filter(function(e) {
-            return e.room_id === roomId;
-        }).map(self.client.getEventMapper());
-        const room = self.client.getRoom(roomId);
-        room.addLiveEvents(events);
-        self._peekPoll(roomId, res.end);
-    }, function(err) {
-        console.error("[%s] Peek poll failed: %s", roomId, err);
-        setTimeout(function() {
-            self._peekPoll(roomId, token);
-        }, 30 * 1000);
-    });
 };
 
 /**
@@ -370,16 +167,22 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
  * @see module:client~MatrixClient#event:"sync"
  * @return {?String}
  */
-SyncApi.prototype.getSyncState = function() {
+WebSocketApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
 /**
  * Main entry point
  */
-SyncApi.prototype.sync = function() {
+WebSocketApi.prototype.start = function() {
     const client = this.client;
     const self = this;
+
+    if (this._websocket) {
+        debuglog("Websocket already existing. Killing it");
+        this._websocket.close();
+        this._websocket = null;
+    }
 
     this._running = true;
 
@@ -425,7 +228,8 @@ SyncApi.prototype.sync = function() {
             // /notifications API somehow.
             client.resetNotifTimelineSet();
 
-            self._sync({ filterId: filterId });
+            self._start({ filterId: filterId });
+
         }, function(err) {
             self._startKeepAlives().done(function() {
                 getFilter();
@@ -436,7 +240,7 @@ SyncApi.prototype.sync = function() {
 
     if (client.isGuest()) {
         // no push rules for guests, no access to POST filter for guests.
-        self._sync({});
+        self._start({});
     } else {
         getPushRules();
     }
@@ -445,19 +249,19 @@ SyncApi.prototype.sync = function() {
 /**
  * Stops the sync object from syncing.
  */
-SyncApi.prototype.stop = function() {
-    debuglog("SyncApi.stop");
+WebSocketApi.prototype.stop = function() {
+    debuglog("WebSocketApi.stop");
     if (global.document) {
         global.document.removeEventListener("online", this._onOnlineBound, false);
         this._onOnlineBound = undefined;
     }
     this._running = false;
-    if (this._currentSyncRequest) {
-        this._currentSyncRequest.abort();
-    }
     if (this._keepAliveTimer) {
         clearTimeout(this._keepAliveTimer);
         this._keepAliveTimer = null;
+    }
+    if (this.ws) {
+	this.ws.close();
     }
 };
 
@@ -466,7 +270,7 @@ SyncApi.prototype.stop = function() {
  * the user <b>explicitly</b> attempts to retry their lost connection.
  * @return {boolean} True if this resulted in a request being retried.
  */
-SyncApi.prototype.retryImmediately = function() {
+WebSocketApi.prototype.retryImmediately = function() {
     if (!this._connectionReturnedDefer) {
         return false;
     }
@@ -475,12 +279,173 @@ SyncApi.prototype.retryImmediately = function() {
 };
 
 /**
+ * Alternative to use WebSockets instead of _sync (Long Polling) *
+ * Invoke me as alternative to avoid /sync calls but use WebSocket instead
+ * @param {Object} syncOptions
+ * @param {string} syncOptions.filterId
+ * @param {boolean} syncOptions.hasSyncedBefore
+ */
+WebSocketApi.prototype._start = function(syncOptions) {
+    const client = this.client;
+    const self = this;
+
+    self.ws_syncOptions = syncOptions;
+
+    if (!this._running) {
+        debuglog("Sync no longer running: exiting.");
+        if (self._connectionReturnedDefer) {
+            self._connectionReturnedDefer.reject();
+            self._connectionReturnedDefer = null;
+        }
+        this._updateSyncState("STOPPED");
+        return;
+    }
+
+    let filterId = self.ws_syncOptions.filterId;
+    if (client.isGuest() && !filterId) {
+        filterId = this._getGuestFilter();
+    }
+
+    self.ws_syncToken = client.store.getSyncToken();
+
+    if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
+        // unless we are happily syncing already, we want the server to return
+        // as quickly as possible, even if there are no events queued. This
+        // serves two purposes:
+        //
+        // * When the connection dies, we want to know asap when it comes back,
+        //   so that we can hide the error from the user. (We don't want to
+        //   have to wait for an event or a timeout).
+        //
+        // * We want to know if the server has any to_device messages queued up
+        //   for us. We do that by calling it with a zero timeout until it
+        //   doesn't give us any more to_device messages.
+        this._catchingUp = true;
+    }
+
+    const qps = {
+        filter: filterId,
+    };
+
+    if (self.ws_syncToken) {
+        qps.since = self.ws_syncToken;
+    }
+
+    this._websocket = client._http.generateWebSocket(qps);
+    this._websocket.onopen = function(ev) {
+        debuglog("Connected to WebSocket: ", ev);
+    }
+    this._websocket.onclose = function(ev) {
+        if (ev.wasClean) {
+            debuglog("Socket closed");
+        } else {
+            debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
+                "error");
+
+            if (self.ws_syncOptions.hasSyncedBefore) {
+                // assume connection to websocket lost by mistake
+                debuglog("Reinit Connection via WebSocket");
+                self._start(self.ws_syncOptions);
+            } else {
+                debuglog("Connection via WebSocket seems to be not available. "
+                    + "Fallback to Long-Polling");
+                // remove variables used by WebSockets
+                self.ws_syncOptions = null;
+                self.ws_syncToken = null;
+                // Fallback /sync Long Polling
+                client.connFallback(self.opts);
+            }
+        }
+        //self._running = false;
+        //self.ws_syncOptions = null;
+        //self.ws_syncToken = null;
+    }
+
+    this._websocket.onmessage = function(in_data) {
+        let data = JSON.parse(in_data.data);
+        //debuglog('Got new data from socket, next_batch=' + data.next_batch);
+
+        // set the sync token NOW *before* processing the events. We do this so
+        // if something barfs on an event we can skip it rather than constantly
+        // polling with the same token.
+        client.store.setSyncData(data);
+        client.store.setSyncToken(data.next_batch);
+
+        // Reset after a successful sync
+        self._failedSyncCount = 0;
+
+        try {
+            self._processSyncResponse(self.ws_syncToken, data);
+        } catch (e) {
+            // log the exception with stack if we have it, else fall back
+            // to the plain description
+            console.error("Caught /sync error (via WebSocket)", e.stack || e);
+        }
+
+        // emit synced events
+        const syncEventData = {
+            oldSyncToken: self.ws_syncToken,
+            nextSyncToken: data.next_batch,
+            catchingUp: self._catchingUp,
+        };
+
+        if (!self.ws_syncOptions.hasSyncedBefore) {
+            self._updateSyncState("PREPARED", syncEventData);
+            self.ws_syncOptions.hasSyncedBefore = true;
+	} else {
+            self._updateSyncState("SYNCING", syncEventData);
+
+            // tell databases that everything is now in a consistent state and can be
+            // saved (no point doing so if we only have the data we just got out of the
+            // store).
+            client.store.save();
+        }
+        self.ws_syncToken = data.next_batch;
+    }
+
+    this._websocket.onerror = function(err) {
+        debuglog("WebSocket.onerror() called", err);
+        if (!self._running) {
+            debuglog("Sync no longer running: exiting");
+            if (self._connectionReturnedDefer) {
+                self._connectionReturnedDefer.reject();
+                self._connectionReturnedDefer = null;
+            }
+            self._updateSyncState("STOPPED");
+            return;
+        }
+        console.error("Websocket error %s", err);
+        console.error(err);
+
+        console.log('Number of consecutive failed sync requests:', self._failedSyncCount);
+
+        debuglog("Starting keep-alive");
+        // Note that we do *not* mark the sync connection as
+        // lost yet: we only do this if a keepalive poke
+        // fails, since long lived HTTP connections will
+        // go away sometimes and we shouldn't treat this as
+        // erroneous. We set the state to 'reconnecting'
+        // instead, so that clients can onserve this state
+        // if they wish.
+        self._startKeepAlives().done(function() {
+            debuglog("Restart Websocket");
+            self._start(self._ws_syncOptions);
+        });
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        self._updateSyncState(
+            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+                "ERROR" : "RECONNECTING",
+        );
+    }
+};
+
+/**
  * Invoke me to do /sync calls
  * @param {Object} syncOptions
  * @param {string} syncOptions.filterId
  * @param {boolean} syncOptions.hasSyncedBefore
  */
-SyncApi.prototype._sync = function(syncOptions) {
+WebSocketApi.prototype._sync = function(syncOptions) {
     const client = this.client;
     const self = this;
 
@@ -674,7 +639,7 @@ SyncApi.prototype._sync = function(syncOptions) {
  *    sync request.
  * @param {Object} data The response from /sync
  */
-SyncApi.prototype._processSyncResponse = function(syncToken, data) {
+WebSocketApi.prototype._processSyncResponse = function(syncToken, data) {
     const client = this.client;
     const self = this;
 
@@ -985,7 +950,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
  *        tightlooping if /versions succeeds but /sync etc. fail).
  * @return {promise} which resolves once the connection returns
  */
-SyncApi.prototype._startKeepAlives = function(delay) {
+WebSocketApi.prototype._startKeepAlives = function(delay) {
     if (delay === undefined) {
         delay = 2000 + Math.floor(Math.random() * 5000);
     }
@@ -1015,7 +980,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
  * On failure, schedules a call back to itself. On success, resolves
  * this._connectionReturnedDefer.
  */
-SyncApi.prototype._pokeKeepAlive = function() {
+WebSocketApi.prototype._pokeKeepAlive = function() {
     const self = this;
     function success() {
         clearTimeout(self._keepAliveTimer);
@@ -1064,7 +1029,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
  * @param {Object} obj
  * @return {Object[]}
  */
-SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
+WebSocketApi.prototype._mapSyncResponseToRoomArray = function(obj) {
     // Maps { roomid: {stuff}, roomid: {stuff} }
     // to
     // [{stuff+Room+isBrandNewRoom}, {stuff+Room+isBrandNewRoom}]
@@ -1089,7 +1054,7 @@ SyncApi.prototype._mapSyncResponseToRoomArray = function(obj) {
  * @param {Room} room
  * @return {MatrixEvent[]}
  */
-SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
+WebSocketApi.prototype._mapSyncEventsFormat = function(obj, room) {
     if (!obj || !utils.isArray(obj.events)) {
         return [];
     }
@@ -1105,7 +1070,7 @@ SyncApi.prototype._mapSyncEventsFormat = function(obj, room) {
 /**
  * @param {Room} room
  */
-SyncApi.prototype._resolveInvites = function(room) {
+WebSocketApi.prototype._resolveInvites = function(room) {
     if (!room || !this.opts.resolveInvitesToProfiles) {
         return;
     }
@@ -1154,7 +1119,7 @@ SyncApi.prototype._resolveInvites = function(room) {
  * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
  * is earlier in time. Higher index is later.
  */
-SyncApi.prototype._processRoomEvents = function(room, stateEventList,
+WebSocketApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
     timelineEventList = timelineEventList || [];
     const client = this.client;
@@ -1205,7 +1170,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
 /**
  * @return {string}
  */
-SyncApi.prototype._getGuestFilter = function() {
+WebSocketApi.prototype._getGuestFilter = function() {
     const guestRooms = this.client._guestRooms; // FIXME: horrible gut-wrenching
     if (!guestRooms) {
         return "{}";
@@ -1226,7 +1191,7 @@ SyncApi.prototype._getGuestFilter = function() {
  * @param {String} newState The new state string
  * @param {Object} data Object of additional data to emit in the event
  */
-SyncApi.prototype._updateSyncState = function(newState, data) {
+WebSocketApi.prototype._updateSyncState = function(newState, data) {
     const old = this._syncState;
     this._syncState = newState;
     this.client.emit("sync", this._syncState, old, data);
@@ -1238,7 +1203,7 @@ SyncApi.prototype._updateSyncState = function(newState, data) {
  * varies between browsers, so we poll for connectivity too,
  * but this might help us reconnect a little faster.
  */
-SyncApi.prototype._onOnline = function() {
+WebSocketApi.prototype._onOnline = function() {
     debuglog("Browser thinks we are back online");
     this._startKeepAlives(0);
 };
@@ -1271,4 +1236,4 @@ function reEmit(reEmitEntity, emittableEntity, eventNames) {
 }
 
 /** */
-module.exports = SyncApi;
+module.exports = WebSocketApi;
