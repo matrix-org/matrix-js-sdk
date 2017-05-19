@@ -331,7 +331,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     this._websocket.onclose = function(ev) {
         if (ev.wasClean) {
             debuglog("Socket closed");
-            this._updateSyncState("STOPPED");
+            self._updateSyncState("STOPPED");
         } else {
             debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
                 "error");
@@ -339,7 +339,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
             if (self.ws_syncOptions.hasSyncedBefore) {
                 // assume connection to websocket lost by mistake
                 debuglog("Reinit Connection via WebSocket");
-                this._updateSyncState("RECONNECTING");
+                self._updateSyncState("RECONNECTING");
                 self._startKeepAlives().done(function() {
                     debuglog("Restart Websocket");
                     self._start(self._ws_syncOptions);
@@ -409,7 +409,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         if (self.ws_syncOptions.hasSyncedBefore) {
             // assume connection to websocket lost by mistake
             debuglog("Reinit Connection via WebSocket");
-            this._updateSyncState("RECONNECTING");
+            self._updateSyncState("RECONNECTING");
             self._start(self.ws_syncOptions);
         } else {
             debuglog("Connection via WebSocket seems to be not available. "
@@ -429,7 +429,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         // erroneous. We set the state to 'reconnecting'
         // instead, so that clients can onserve this state
         // if they wish.
-        this._updateSyncState("RECONNECTING");
+        self._updateSyncState("RECONNECTING");
         self._startKeepAlives().done(function() {
             debuglog("Restart Websocket");
             self._start(self._ws_syncOptions);
