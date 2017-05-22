@@ -272,7 +272,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     self.ws_syncOptions = syncOptions;
 
     if (!this._running) {
-        debuglog("Sync no longer running: exiting.");
+        debuglog("WebSocket no longer running: exiting.");
         if (self._connectionReturnedDefer) {
             self._connectionReturnedDefer.reject();
             self._connectionReturnedDefer = null;
@@ -299,6 +299,30 @@ WebSocketApi.prototype._start = function(syncOptions) {
     this._websocket.onopen = function(ev) {
         debuglog("Connected to WebSocket: ", ev);
     }
+
+    this._websocket.onerror = function(err) {
+        debuglog("WebSocket.onerror() called", err);
+
+/*        debuglog("Starting keep-alive");
+        // Note that we do *not* mark the sync connection as
+        // lost yet: we only do this if a keepalive poke
+        // fails, since long lived HTTP connections will
+        // go away sometimes and we shouldn't treat this as
+        // erroneous. We set the state to 'reconnecting'
+        // instead, so that clients can onserve this state
+        // if they wish.
+        self._updateSyncState("RECONNECTING");
+        self._startKeepAlives().done(function() {
+            debuglog("Restart Websocket");
+            self._start(self.ws_syncOptions);
+        });
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        self._updateSyncState(
+            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+                "ERROR" : "RECONNECTING",
+        );*/
+    }
+
     this._websocket.onclose = function(ev) {
         if (ev.wasClean) {
             debuglog("Socket closed");
@@ -322,7 +346,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
                 self.ws_syncOptions = null;
                 self.ws_syncToken = null;
                 // Fallback /sync Long Polling
-                client.connFallback(self.opts);
+                client.connectionFallback(self.opts);
             }
         }
         //self._running = false;
@@ -369,46 +393,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
             client.store.save();
         }
         self.ws_syncToken = data.next_batch;
-    }
-
-    this._websocket.onerror = function(err) {
-        debuglog("WebSocket.onerror() called", err);
-
-//      console.log('Number of consecutive failed sync requests:', self._failedSyncCount);
-
-        if (self.ws_syncOptions.hasSyncedBefore) {
-            // assume connection to websocket lost by mistake
-            debuglog("Reinit Connection via WebSocket");
-            self._updateSyncState("RECONNECTING");
-            self._start(self.ws_syncOptions);
-        } else {
-            debuglog("Connection via WebSocket seems to be not available. "
-                + "Fallback to Long-Polling");
-            // remove variables used by WebSockets
-            self.ws_syncOptions = null;
-            self.ws_syncToken = null;
-            // Fallback /sync Long Polling
-            client.connFallback(self.opts);
-        }
-
-/*        debuglog("Starting keep-alive");
-        // Note that we do *not* mark the sync connection as
-        // lost yet: we only do this if a keepalive poke
-        // fails, since long lived HTTP connections will
-        // go away sometimes and we shouldn't treat this as
-        // erroneous. We set the state to 'reconnecting'
-        // instead, so that clients can onserve this state
-        // if they wish.
-        self._updateSyncState("RECONNECTING");
-        self._startKeepAlives().done(function() {
-            debuglog("Restart Websocket");
-            self._start(self.ws_syncOptions);
-        });
-        // Transition from RECONNECTING to ERROR after a given number of failed syncs
-        self._updateSyncState(
-            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
-                "ERROR" : "RECONNECTING",
-        );*/
     }
 }
 
