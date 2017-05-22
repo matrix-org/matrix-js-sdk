@@ -76,7 +76,6 @@ function WebSocketApi(client, opts) {
     this.opts = opts;
     this._websocket = null;
     this._syncState = null;
-    this._catchingUp = false;
     this._running = false;
     this._keepAliveTimer = null;
     this._connectionReturnedDefer = null;
@@ -301,21 +300,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
 
     self.ws_syncToken = client.store.getSyncToken();
 
-    if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
-        // unless we are happily syncing already, we want the server to return
-        // as quickly as possible, even if there are no events queued. This
-        // serves two purposes:
-        //
-        // * When the connection dies, we want to know asap when it comes back,
-        //   so that we can hide the error from the user. (We don't want to
-        //   have to wait for an event or a timeout).
-        //
-        // * We want to know if the server has any to_device messages queued up
-        //   for us. We do that by calling it with a zero timeout until it
-        //   doesn't give us any more to_device messages.
-        this._catchingUp = true;
-    }
-
     const qps = {
         filter: filterId,
     };
@@ -384,7 +368,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
         const syncEventData = {
             oldSyncToken: self.ws_syncToken,
             nextSyncToken: data.next_batch,
-            catchingUp: self._catchingUp,
         };
 
         if (!self.ws_syncOptions.hasSyncedBefore) {
@@ -548,9 +531,6 @@ WebSocketApi.prototype._processSyncResponse = function(syncToken, data) {
                     client.emit("toDeviceEvent", toDeviceEvent);
                 },
             );
-    } else {
-        // no more to-device events: we can stop polling with a short timeout.
-        this._catchingUp = false;
     }
 
     // the returned json structure is a bit crap, so make it into a
