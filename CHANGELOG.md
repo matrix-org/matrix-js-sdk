@@ -1,3 +1,33 @@
+Changes in [0.7.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8) (2017-05-22)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8-rc.1...v0.7.8)
+
+ * No changes
+
+
+Changes in [0.7.8-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8-rc.1) (2017-05-19)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.7...v0.7.8-rc.1)
+
+ * Attempt to rework the release-tarball-signing stuff
+   [\#438](https://github.com/matrix-org/matrix-js-sdk/pull/438)
+ * ability to specify webrtc audio/video inputs for the lib to request
+   [\#427](https://github.com/matrix-org/matrix-js-sdk/pull/427)
+ * make screen sharing call FF friendly :D
+   [\#434](https://github.com/matrix-org/matrix-js-sdk/pull/434)
+ * Fix race in device list updates
+   [\#431](https://github.com/matrix-org/matrix-js-sdk/pull/431)
+ * WebRTC: Support recvonly for video for those without a webcam
+   [\#424](https://github.com/matrix-org/matrix-js-sdk/pull/424)
+ * Update istanbul to remove minimatch DoS Warning
+   [\#422](https://github.com/matrix-org/matrix-js-sdk/pull/422)
+ * webrtc/call: Make it much less likely that callIds collide locally
+   [\#423](https://github.com/matrix-org/matrix-js-sdk/pull/423)
+ * Automatically complete dummy auth
+   [\#420](https://github.com/matrix-org/matrix-js-sdk/pull/420)
+ * Don't leave the gh-pages branch checked out
+   [\#418](https://github.com/matrix-org/matrix-js-sdk/pull/418)
+
 Changes in [0.7.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.7) (2017-04-25)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.7-rc.1...v0.7.7)

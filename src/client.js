@@ -377,6 +377,21 @@ MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
 };
 
 /**
+ * Get the stored device key for a user id and device id
+ *
+ * @param {string} userId the user to list keys for.
+ * @param {string} deviceId unique identifier for the device
+ *
+ * @return {?module:crypto-deviceinfo} device or null
+ */
+MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getStoredDevice(userId, deviceId) || null;
+};
+
+/**
  * Mark the given device as verified
  *
  * @param {string} userId owner of the device
