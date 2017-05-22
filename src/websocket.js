@@ -259,19 +259,6 @@ WebSocketApi.prototype.stop = function() {
 };
 
 /**
- * Retry a backed off syncing request immediately. This should only be used when
- * the user <b>explicitly</b> attempts to retry their lost connection.
- * @return {boolean} True if this resulted in a request being retried.
- */
-WebSocketApi.prototype.retryImmediately = function() {
-    if (!this._connectionReturnedDefer) {
-        return false;
-    }
-    this._startKeepAlives(0);
-    return true;
-};
-
-/**
  * Alternative to use WebSockets instead of _sync (Long Polling) *
  * Invoke me as alternative to avoid /sync calls but use WebSocket instead
  * @param {Object} syncOptions
