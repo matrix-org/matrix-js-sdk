@@ -248,7 +248,7 @@ RoomState.prototype.getUserIdsWithDisplayName = function(displayName) {
 
 /**
  * Returns true if userId is in room, event is not redacted and either sender of
- * mxEvent or has powerlevel sufficient to redact events other than their own.
+ * mxEvent or has power level sufficient to redact events other than their own.
  * @param {MatrixEvent} mxEvent The event to test permission for
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given used ID can redact given event
@@ -260,18 +260,16 @@ RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
     if (mxEvent.status || mxEvent.isRedacted()) return false;
     if (mxEvent.getSender() === userId) return true;
 
-    return this._hasSufficientPowerLevelFor('redact', userId);
+    return this._hasSufficientPowerLevelFor('redact', member.powerLevel);
 };
 
 /**
- * Returns true if the given user ID has sufficient power level for type
- * @param {string} type The type of power level to check against
- * @param {string} userId The user ID of the user to test permission for
- * @return {boolean} true if the given user ID has sufficient power level
+ * Returns true if the given power level is sufficient for action
+ * @param {string} action The type of power level to check
+ * @param {number} powerLevel The power level of the member
+ * @return {boolean} true if the given power level is sufficient
  */
-RoomState.prototype._hasSufficientPowerLevelFor = function(type, userId) {
-    const member = this.getMember(userId);
-
+RoomState.prototype._hasSufficientPowerLevelFor = function(action, powerLevel) {
     const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
 
     let powerLevels;
@@ -279,12 +277,12 @@ RoomState.prototype._hasSufficientPowerLevelFor = function(type, userId) {
         powerLevels = powerLevelsEvent.getContent();
     }
 
-    let requiredLevel = powerLevels.state_default || 50;
-    if (powerLevels[type] !== undefined) {
-        requiredLevel = powerLevels[type];
+    let requiredLevel = 50;
+    if (powerLevels[action] !== undefined) {
+        requiredLevel = powerLevels[action];
     }
 
-    return member.powerLevel >= requiredLevel;
+    return powerLevel >= requiredLevel;
 };
 
 /**
