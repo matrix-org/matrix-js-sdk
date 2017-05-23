@@ -1121,11 +1121,6 @@ Crypto.prototype._signObject = function(obj) {
     obj.signatures = sigs;
 };
 
-/**
- * @see module:crypto/algorithms/base.DecryptionError
- */
-Crypto.DecryptionError = algorithms.DecryptionError;
-
 
 /** */
 module.exports = Crypto;

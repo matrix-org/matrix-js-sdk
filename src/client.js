@@ -567,7 +567,7 @@ function _decryptEvent(client, event) {
         console.warn(
             `Error decrypting event (id=${event.getId()}): ${e}`,
         );
-        if (!(e instanceof Crypto.DecryptionError)) {
+        if (e.name !== "DecryptionError") {
             throw e;
         }
         _badEncryptedMessage(event, e.message);
