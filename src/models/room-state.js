@@ -272,7 +272,7 @@ RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
 RoomState.prototype._hasSufficientPowerLevelFor = function(action, powerLevel) {
     const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
 
-    let powerLevels;
+    let powerLevels = {};
     if (powerLevelsEvent) {
         powerLevels = powerLevelsEvent.getContent();
     }
