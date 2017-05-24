@@ -255,7 +255,7 @@ WebSocketApi.prototype.stop = function() {
         this._websocket.close();
         this._websocket = null;
     }
-    self._updateSyncState("STOPPED");
+    this._updateSyncState("STOPPED");
 };
 
 /**
@@ -298,6 +298,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     this._websocket = client._http.generateWebSocket(qps);
     this._websocket.onopen = function(ev) {
         debuglog("Connected to WebSocket: ", ev);
+        self.ws_possible = true;
     }
 
     this._websocket.onerror = function(err) {
@@ -331,7 +332,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
             debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
                 "error");
 
-            if (self.ws_syncOptions.hasSyncedBefore) {
+            if (self.ws_possible) {
                 // assume connection to websocket lost by mistake
                 debuglog("Reinit Connection via WebSocket");
                 self._updateSyncState("RECONNECTING");
@@ -368,7 +369,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         self._failedSyncCount = 0;
 
         try {
-            self.client._syncApi._processSyncResponse(self.ws_syncToken, data);
+            client._syncApi._processSyncResponse(self.ws_syncToken, data);
         } catch (e) {
             // log the exception with stack if we have it, else fall back
             // to the plain description
