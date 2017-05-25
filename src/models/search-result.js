@@ -46,14 +46,14 @@ function SearchResult(rank, eventContext) {
 
 SearchResult.fromJson = function(jsonObj, eventMapper) {
     const jsonContext = jsonObj.context || {};
-    const events_before = jsonContext.events_before || [];
-    const events_after = jsonContext.events_after || [];
+    const eventsBefore = jsonContext.eventsBefore || [];
+    const eventsAfter = jsonContext.eventsAfter || [];
 
     const context = new EventContext(eventMapper(jsonObj.result));
 
     context.setPaginateToken(jsonContext.start, true);
-    context.addEvents(utils.map(events_before, eventMapper), true);
-    context.addEvents(utils.map(events_after, eventMapper), false);
+    context.addEvents(utils.map(eventsBefore, eventMapper), true);
+    context.addEvents(utils.map(eventsAfter, eventMapper), false);
     context.setPaginateToken(jsonContext.end, false);
 
     return new SearchResult(jsonObj.rank, context);

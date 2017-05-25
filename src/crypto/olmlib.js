@@ -161,12 +161,12 @@ module.exports.ensureOlmSessionsForDevices = function(
     return baseApis.claimOneTimeKeys(
         devicesWithoutSession, oneTimeKeyAlgorithm,
     ).then(function(res) {
-        const otk_res = res.one_time_keys || {};
+        const otkRes = res.one_time_keys || {};
         for (const userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
                 continue;
             }
-            const userRes = otk_res[userId] || {};
+            const userRes = otkRes[userId] || {};
             const devices = devicesByUser[userId];
             for (let j = 0; j < devices.length; j++) {
                 const deviceInfo = devices[j];

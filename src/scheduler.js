@@ -265,9 +265,9 @@ function _removeNextEvent(scheduler, queueName) {
     return queue.shift();
 }
 
-function debuglog() {
+function debuglog(...args) {
     if (DEBUG) {
-        console.log(...arguments);
+        console.log(...args);
     }
 }
 

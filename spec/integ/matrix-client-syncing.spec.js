@@ -20,6 +20,7 @@ describe("MatrixClient syncing", function() {
     const userC = "@claire:bar";
     const roomOne = "!foo:localhost";
     const roomTwo = "!bar:localhost";
+    const roomOneTopic = "Room One Topic";
 
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -333,6 +334,11 @@ describe("MatrixClient syncing", function() {
                         type: "m.room.name", room: roomOne, user: selfUserId,
                         content: { name: "A new room name" },
                     }),
+                    utils.mkEvent({
+                        type: "m.room.topic", room: roomOne, user: selfUserId,
+                        content: { topic: roomOneTopic },
+                    }),
+
                 ],
             },
         };
@@ -421,8 +427,19 @@ describe("MatrixClient syncing", function() {
 
         });
 
-        xit("should update the room topic", function() {
+        it("should update the room topic", function(done) {
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
+            client.startClient();
+
+            httpBackend.flush().done(function() {
+                const room = client.getRoom(roomOne);
+
+                expect(room.topic).toEqual(roomOneTopic);
+                expect(room.summary.info.desc).toEqual(roomOneTopic);
+                done();
+            });
         });
     });
 

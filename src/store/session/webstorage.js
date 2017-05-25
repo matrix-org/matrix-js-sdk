@@ -244,9 +244,9 @@ function setJsonItem(store, key, val) {
     store.setItem(key, JSON.stringify(val));
 }
 
-function debuglog() {
+function debuglog(...args) {
     if (DEBUG) {
-        console.log(...arguments);
+        console.log(...args);
     }
 }
 

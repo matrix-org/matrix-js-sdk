@@ -354,10 +354,10 @@ const deepCompare = module.exports.deepCompare = function(x, y) {
  *
  * @return {Object} target
  */
-module.exports.extend = function() {
-    const target = arguments[0] || {};
-    for (let i = 1; i < arguments.length; i++) {
-        const source = arguments[i];
+module.exports.extend = function(...args) {
+    const target = args[0] || {};
+    for (let i = 1; i < args.length; i++) {
+        const source = args[i];
         for (const propName in source) { // eslint-disable-line guard-for-in
             target[propName] = source[propName];
         }
@@ -414,7 +414,8 @@ module.exports.runPolyfills = function() {
     // Reference: http://es5.github.io/#x15.4.4.19
     if (!Array.prototype.map) {
       Array.prototype.map = function(callback, thisArg) {
-        let T, k;
+        let T;
+        let k;
 
         if (this === null || this === undefined) {
           throw new TypeError(' this is null or not defined');
@@ -450,7 +451,8 @@ module.exports.runPolyfills = function() {
 
         // 8. Repeat, while k < len
         while (k < len) {
-          var kValue, mappedValue;
+          let kValue;
+          let mappedValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator
@@ -504,7 +506,8 @@ module.exports.runPolyfills = function() {
     // Reference: http://es5.github.io/#x15.4.4.18
     if (!Array.prototype.forEach) {
       Array.prototype.forEach = function(callback, thisArg) {
-        let T, k;
+        let T;
+        let k;
 
         if (this === null || this === undefined) {
           throw new TypeError(' this is null or not defined');
@@ -535,7 +538,7 @@ module.exports.runPolyfills = function() {
 
         // 7. Repeat, while k < len
         while (k < len) {
-          var kValue;
+          let kValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator

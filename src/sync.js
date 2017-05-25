@@ -50,11 +50,11 @@ function getFilterName(userId, suffix) {
     return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
 }
 
-function debuglog() {
+function debuglog(...args) {
     if (!DEBUG) {
         return;
     }
-    console.log(...arguments);
+    console.log(...args);
 }
 
 
@@ -112,7 +112,7 @@ SyncApi.prototype.createRoom = function(roomId) {
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
-    reEmit(client, room, ["Room.name", "Room.timeline", "Room.redaction",
+    reEmit(client, room, ["Room.name", "Room.timeline", "Room.topic", "Room.redaction",
                           "Room.receipt", "Room.tags",
                           "Room.timelineReset",
                           "Room.localEchoUpdated",
@@ -1255,15 +1255,15 @@ function createNewUser(client, userId) {
 function reEmit(reEmitEntity, emittableEntity, eventNames) {
     utils.forEach(eventNames, function(eventName) {
         // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
+        emittableEntity.on(eventName, function(...args) {
             // take the args from the listener and reuse them, adding the
             // event name to the arg list so it works with .emit()
             // Transformation Example:
             // listener on "foo" => function(a,b) { ... }
             // Re-emit on "thing" => thing.emit("foo", a, b)
             const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
+            for (let i = 0; i < args.length; i++) {
+                newArgs.push(args[i]);
             }
             reEmitEntity.emit(...newArgs);
         });

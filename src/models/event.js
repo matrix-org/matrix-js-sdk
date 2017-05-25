@@ -257,20 +257,20 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @internal
      *
-     * @param {string} crypto_type type of the encrypted event - typically
+     * @param {string} cryptoType type of the encrypted event - typically
      * <tt>"m.room.encrypted"</tt>
      *
-     * @param {object} crypto_content raw 'content' for the encrypted event.
+     * @param {object} cryptoContent raw 'content' for the encrypted event.
      * @param {object} keys The local keys claimed and proved by this event.
      */
-    makeEncrypted: function(crypto_type, crypto_content, keys) {
+    makeEncrypted: function(cryptoType, cryptoContent, keys) {
         // keep the plain-text data for 'view source'
         this._clearEvent = {
             type: this.event.type,
             content: this.event.content,
         };
-        this.event.type = crypto_type;
-        this.event.content = crypto_content;
+        this.event.type = cryptoType;
+        this.event.content = cryptoContent;
         this._keysProved = keys;
         this._keysClaimed = keys;
     },
@@ -350,13 +350,13 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
-     * @param {module:models/event.MatrixEvent} redaction_event
+     * @param {module:models/event.MatrixEvent} redactionEvent
      *     event causing the redaction
      */
-    makeRedacted: function(redaction_event) {
+    makeRedacted: function(redactionEvent) {
         // quick sanity-check
-        if (!redaction_event.event) {
-            throw new Error("invalid redaction_event in makeRedacted");
+        if (!redactionEvent.event) {
+            throw new Error("invalid redactionEvent in makeRedacted");
         }
 
         // we attempt to replicate what we would see from the server if
@@ -368,7 +368,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
-        this.event.unsigned.redacted_because = redaction_event.event;
+        this.event.unsigned.redacted_because = redactionEvent.event;
 
         let key;
         for (key in this.event) {

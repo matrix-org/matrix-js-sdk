@@ -106,33 +106,33 @@ Filter.prototype.setDefinition = function(definition) {
     //   "event_fields": ["type", "content", "sender"]
     // }
 
-    const room_filter_json = definition.room;
+    const roomFilterJson = definition.room;
 
     // consider the top level rooms/not_rooms filter
-    const room_filter_fields = {};
-    if (room_filter_json) {
-        if (room_filter_json.rooms) {
-            room_filter_fields.rooms = room_filter_json.rooms;
+    const roomFilterFields = {};
+    if (roomFilterJson) {
+        if (roomFilterJson.rooms) {
+            roomFilterFields.rooms = roomFilterJson.rooms;
         }
-        if (room_filter_json.rooms) {
-            room_filter_fields.not_rooms = room_filter_json.not_rooms;
+        if (roomFilterJson.rooms) {
+            roomFilterFields.not_rooms = roomFilterJson.not_rooms;
         }
 
-        this._include_leave = room_filter_json.include_leave || false;
+        this._include_leave = roomFilterJson.include_leave || false;
     }
 
-    this._room_filter = new FilterComponent(room_filter_fields);
+    this._room_filter = new FilterComponent(roomFilterFields);
     this._room_timeline_filter = new FilterComponent(
-        room_filter_json ? (room_filter_json.timeline || {}) : {},
+        roomFilterJson ? (roomFilterJson.timeline || {}) : {},
     );
 
     // don't bother porting this from synapse yet:
     // this._room_state_filter =
-    //     new FilterComponent(room_filter_json.state || {});
+    //     new FilterComponent(roomFilterJson.state || {});
     // this._room_ephemeral_filter =
-    //     new FilterComponent(room_filter_json.ephemeral || {});
+    //     new FilterComponent(roomFilterJson.ephemeral || {});
     // this._room_account_data_filter =
-    //     new FilterComponent(room_filter_json.account_data || {});
+    //     new FilterComponent(roomFilterJson.account_data || {});
     // this._presence_filter =
     //     new FilterComponent(definition.presence || {});
     // this._account_data_filter =

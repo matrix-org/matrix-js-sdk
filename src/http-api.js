@@ -55,7 +55,7 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
 /**
  * Construct a MatrixHttpApi.
  * @constructor
- * @param {EventEmitter} event_emitter The event emitter to use for emitting events
+ * @param {EventEmitter} eventEmitter The event emitter to use for emitting events
  * @param {Object} opts The options to use for this HTTP API.
  * @param {string} opts.baseUrl Required. The base client-server URL e.g.
  * 'http://localhost:8008'.
@@ -75,10 +75,10 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {Number=} opts.localTimeoutMs The default maximum amount of time to wait
  * before timing out the request. If not specified, there is no timeout.
  */
-module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
+module.exports.MatrixHttpApi = function MatrixHttpApi(eventEmitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
-    this.event_emitter = event_emitter;
+    this.eventEmitter = eventEmitter;
     this.opts = opts;
     this.uploads = [];
 };
@@ -219,20 +219,20 @@ module.exports.MatrixHttpApi.prototype = {
             upload.xhr = xhr;
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
 
-            const timeout_fn = function() {
+            const timeoutFn = function() {
                 xhr.abort();
                 cb(new Error('Timeout'));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get
             // a progress notification
-            xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
+            xhr.timeout_timer = callbacks.setTimeout(timeoutFn, 30000);
 
             xhr.onreadystatechange = function() {
+                let resp;
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(xhr.timeout_timer);
-                        var resp;
                         try {
                             if (!xhr.responseText) {
                                 throw new Error('No response body.');
@@ -254,7 +254,7 @@ module.exports.MatrixHttpApi.prototype = {
                 callbacks.clearTimeout(xhr.timeout_timer);
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;
-                xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
+                xhr.timeout_timer = callbacks.setTimeout(timeoutFn, 30000);
                 defer.notify(ev);
             });
             let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
@@ -389,20 +389,20 @@ module.exports.MatrixHttpApi.prototype = {
             queryParams.access_token = this.opts.accessToken;
         }
 
-        const request_promise = this.request(
+        const requestPromise = this.request(
             callback, method, path, queryParams, data, opts,
         );
 
         const self = this;
-        request_promise.catch(function(err) {
+        requestPromise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                self.event_emitter.emit("Session.logged_out");
+                self.eventEmitter.emit("Session.logged_out");
             }
         });
 
         // return the original promise, otherwise tests break due to it having to
         // go around the event loop one more time to process the result of the request
-        return request_promise;
+        return requestPromise;
     },
 
     /**

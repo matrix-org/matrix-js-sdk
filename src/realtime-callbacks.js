@@ -184,8 +184,8 @@ function _runCallbacks() {
  */
 function binarySearch(array, func) {
     // min is inclusive, max exclusive.
-    let min = 0,
-        max = array.length;
+    let min = 0;
+    let max = array.length;
 
     while (min < max) {
         const mid = (min + max) >> 1;

@@ -246,15 +246,15 @@ MatrixBaseApis.prototype.loginFlows = function(callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.login = function(loginType, data, callback) {
-    const login_data = {
+    const loginData = {
         type: loginType,
     };
 
-    // merge data into login_data
-    utils.extend(login_data, data);
+    // merge data into loginData
+    utils.extend(loginData, data);
 
     return this._http.authedRequest(
-        callback, "POST", "/login", undefined, login_data,
+        callback, "POST", "/login", undefined, loginData,
     );
 };
 
@@ -538,17 +538,17 @@ MatrixBaseApis.prototype.publicRooms = function(options, callback) {
         options = {};
     }
 
-    const query_params = {};
+    const queryParams = {};
     if (options.server) {
-        query_params.server = options.server;
+        queryParams.server = options.server;
         delete options.server;
     }
 
-    if (Object.keys(options).length === 0 && Object.keys(query_params).length === 0) {
+    if (Object.keys(options).length === 0 && Object.keys(queryParams).length === 0) {
         return this._http.authedRequest(callback, "GET", "/publicRooms");
     } else {
         return this._http.authedRequest(
-            callback, "POST", "/publicRooms", query_params, options,
+            callback, "POST", "/publicRooms", queryParams, options,
         );
     }
 };
@@ -857,14 +857,14 @@ MatrixBaseApis.prototype.getDevices = function() {
 /**
  * Update the given device
  *
- * @param {string} device_id  device to update
+ * @param {string} deviceId  device to update
  * @param {Object} body       body of request
  * @return {module:client.Promise} Resolves: result object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
-    const path = utils.encodeUri("/devices/$device_id", {
-        $device_id: device_id,
+MatrixBaseApis.prototype.setDeviceDetails = function(deviceId, body) {
+    const path = utils.encodeUri("/devices/$deviceId", {
+        $deviceId: deviceId,
     });
 
 
@@ -877,14 +877,14 @@ MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
 /**
  * Delete the given device
  *
- * @param {string} device_id  device to delete
+ * @param {string} deviceId  device to delete
  * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
  * @return {module:client.Promise} Resolves: result object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
-    const path = utils.encodeUri("/devices/$device_id", {
-        $device_id: device_id,
+MatrixBaseApis.prototype.deleteDevice = function(deviceId, auth) {
+    const path = utils.encodeUri("/devices/$deviceId", {
+        $deviceId: deviceId,
     });
 
     const body = {};
@@ -1053,7 +1053,7 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
  *
  * @param {Object=} opts
  *
- * @param {string=} opts.device_id  explicit device_id to use for upload
+ * @param {string=} opts.deviceId  explicit deviceId to use for upload
  *    (default is to use the same as that used during auth).
  *
  * @param {module:client.callback=} callback
@@ -1063,7 +1063,7 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
  */
 MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     opts = opts || {};
-    const deviceId = opts.device_id;
+    const deviceId = opts.deviceId;
     let path;
     if (deviceId) {
         path = utils.encodeUri("/keys/upload/$deviceId", {
@@ -1120,16 +1120,16 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
  *
  * @param {string[]} devices  a list of [userId, deviceId] pairs
  *
- * @param {string} [key_algorithm = signed_curve25519]  desired key type
+ * @param {string} [keyAlgorithm = signed_curve25519]  desired key type
  *
  * @return {module:client.Promise} Resolves: result object. Rejects: with
  *     an error response ({@link module:http-api.MatrixError}).
  */
-MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
+MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, keyAlgorithm) {
     const queries = {};
 
-    if (key_algorithm === undefined) {
-        key_algorithm = "signed_curve25519";
+    if (keyAlgorithm === undefined) {
+        keyAlgorithm = "signed_curve25519";
     }
 
     for (let i = 0; i < devices.length; ++i) {
@@ -1137,7 +1137,7 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
         const deviceId = devices[i][1];
         const query = queries[userId] || {};
         queries[userId] = query;
-        query[deviceId] = key_algorithm;
+        query[deviceId] = keyAlgorithm;
     }
     const content = {one_time_keys: queries};
     return this._http.authedRequestWithPrefix(
@@ -1266,7 +1266,7 @@ MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
  *
  * @param {string} eventType  type of event to send
  * @param {Object.<string, Object<string, Object>>} contentMap
- *    content to send. Map from user_id to device_id to content object.
+ *    content to send. Map from user_id to deviceId to content object.
  * @param {string=} txnId     transaction id. One will be made up if not
  *    supplied.
  * @return {module:client.Promise} Resolves to the result object
