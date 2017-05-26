@@ -293,15 +293,50 @@ WebSocketApi.prototype._start = function(syncOptions) {
 
     if (self.ws_syncToken) {
         qps.since = self.ws_syncToken;
+        this._websocket = client._http.generateWebSocket(qps);
+        this._websocket.onopen    = _ws_onopen;
+        this._websocket.onclose   = _ws_onclose;
+        this._websocket.onerror   = _ws_onerror;
+        this._websocket.onmessage = _ws_onmessage;
+    } else {
+        // do initial sync via requesting /sync to avoid errors of throttling
+        // (initial request is so big that the buffer on the server overflows)
+        //TODO replace 999999 by something appropriate
+        client._http.authedRequest(
+            undefined, "GET", "/sync", qps, undefined, {
+                prefix: "/_matrix/client/v2_alpha", },
+        ).then((data) => {
+            client.store.setSyncToken(data.next_batch);
+            try {
+                client._syncApi._processSyncResponse(self.ws_syncToken, data);
+            } catch (e) {
+                console.error("Caught /sync error", e.stack || e);
+            }
+            const syncEventData = {
+                oldSyncToken: self.ws_syncToken,
+                nextSyncToken: data.next_batch,
+                catchingUp: true,
+            };
+
+            if (!syncOptions.hasSyncedBefore) {
+                self._updateSyncState("PREPARED", syncEventData);
+                syncOptions.hasSyncedBefore = true;
+            }
+            qps.since = data.next_batch;
+            this._websocket = client._http.generateWebSocket(qps);
+            this._websocket.onopen    = _ws_onopen;
+            this._websocket.onclose   = _ws_onclose;
+            this._websocket.onerror   = _ws_onerror;
+            this._websocket.onmessage = _ws_onmessage;
+        });
     }
 
-    this._websocket = client._http.generateWebSocket(qps);
-    this._websocket.onopen = function(ev) {
+    function _ws_onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
         self.ws_possible = true;
     }
 
-    this._websocket.onerror = function(err) {
+    function _ws_onerror(err) {
         debuglog("WebSocket.onerror() called", err);
 
 /*        debuglog("Starting keep-alive");
@@ -324,7 +359,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         );*/
     }
 
-    this._websocket.onclose = function(ev) {
+    function _ws_onclose(ev) {
         if (ev.wasClean) {
             debuglog("Socket closed");
             self._updateSyncState("STOPPED");
@@ -355,7 +390,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         //self.ws_syncToken = null;
     }
 
-    this._websocket.onmessage = function(in_data) {
+    function _ws_onmessage(in_data) {
         let data = JSON.parse(in_data.data);
         //debuglog('Got new data from socket, next_batch=' + data.next_batch);
 
@@ -382,17 +417,12 @@ WebSocketApi.prototype._start = function(syncOptions) {
             nextSyncToken: data.next_batch,
         };
 
-        if (!self.ws_syncOptions.hasSyncedBefore) {
-            self._updateSyncState("PREPARED", syncEventData);
-            self.ws_syncOptions.hasSyncedBefore = true;
-	} else {
-            self._updateSyncState("SYNCING", syncEventData);
+        self._updateSyncState("SYNCING", syncEventData);
 
-            // tell databases that everything is now in a consistent state and can be
-            // saved (no point doing so if we only have the data we just got out of the
-            // store).
-            client.store.save();
-        }
+        // tell databases that everything is now in a consistent state and can be
+        // saved (no point doing so if we only have the data we just got out of the
+        // store).
+        client.store.save();
         self.ws_syncToken = data.next_batch;
     }
 }
