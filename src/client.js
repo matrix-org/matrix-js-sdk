@@ -1658,34 +1658,34 @@ function _presenceList(callback, client, opts, method) {
 }
 
 /**
-* Retrieve current user presence list.
-* @param {module:client.callback} callback Optional.
-* @return {module:client.Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-*/
+ * Retrieve current user presence list.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
 MatrixClient.prototype.getPresenceList = function(callback) {
   return _presenceList(callback, this, undefined, "GET");
 };
 
 /**
-* Add users to the current user presence list.
-* @param {module:client.callback} callback Optional.
-* @param {string[]} userIds
-* @return {module:client.Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-*/
+ * Add users to the current user presence list.
+ * @param {module:client.callback} callback Optional.
+ * @param {string[]} userIds
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
 MatrixClient.prototype.inviteToPresenceList = function(callback, userIds) {
   const opts = {"invite": userIds};
   return _presenceList(callback, this, opts, "POST");
 };
 
 /**
-* Drop users from the current user presence list.
-* @param {module:client.callback} callback Optional.
-* @param {string[]} userIds
-* @return {module:client.Promise} Resolves: TODO
-* @return {module:http-api.MatrixError} Rejects: with an error response.
-**/
+ * Drop users from the current user presence list.
+ * @param {module:client.callback} callback Optional.
+ * @param {string[]} userIds
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
 MatrixClient.prototype.dropFromPresenceList = function(callback, userIds) {
   const opts = {"drop": userIds};
   return _presenceList(callback, this, opts, "POST");
@@ -2873,6 +2873,8 @@ MatrixClient.prototype.startClient = function(opts) {
     };
     this._clientOpts = opts;
 
+    // WebsocketAPI uses some of SyncApi-functions - so need to be created before
+    // TODO check if methods can be made static or moved to another class
     this._syncApi = new SyncApi(this, opts);
     if (this.useWebSockets) {
         this._websocketApi = new WebSocketApi(this, opts);
@@ -2901,7 +2903,7 @@ MatrixClient.prototype.stopClient = function() {
 };
 
 /**
- * Called by WebSocketAPI to fallback to Longpolling (SyncAPI)
+ * Called by WebSocketApi to fallback to Longpolling (SyncAPI)
  */
 MatrixClient.prototype.connectionFallback = function(opts) {
     this.useWebSockets = false;
@@ -3505,14 +3507,14 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @param {Object} data The data returned, the "resolved" value.
  */
 
- /**
-  * {@link https://github.com/kriskowal/q|A promise implementation (Q)}. Functions
-  * which return this will specify 2 return arguments. These arguments map to the
-  * "onFulfilled" and "onRejected" values of the Promise.
-  * @typedef {Object} Promise
-  * @static
-  * @property {Function} then promise.then(onFulfilled, onRejected, onProgress)
-  * @property {Function} catch promise.catch(onRejected)
-  * @property {Function} finally promise.finally(callback)
-  * @property {Function} done promise.done(onFulfilled, onRejected, onProgress)
-  */
+/**
+ * {@link https://github.com/kriskowal/q|A promise implementation (Q)}. Functions
+ * which return this will specify 2 return arguments. These arguments map to the
+ * "onFulfilled" and "onRejected" values of the Promise.
+ * @typedef {Object} Promise
+ * @static
+ * @property {Function} then promise.then(onFulfilled, onRejected, onProgress)
+ * @property {Function} catch promise.catch(onRejected)
+ * @property {Function} finally promise.finally(callback)
+ * @property {Function} done promise.done(onFulfilled, onRejected, onProgress)
+ */
