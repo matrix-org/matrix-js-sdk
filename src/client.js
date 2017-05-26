@@ -181,6 +181,18 @@ utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
 
 /**
+ * Get the user-id of the logged-in user
+ *
+ * @return {?string} MXID for the logged-in user, or null if not logged in
+ */
+MatrixClient.prototype.getUserId = function() {
+    if (this.credentials && this.credentials.userId) {
+        return this.credentials.userId;
+    }
+    return null;
+};
+
+/**
  * Get the domain for this client's MXID
  * @return {?string} Domain of this MXID
  */
@@ -587,7 +599,7 @@ function _decryptEvent(client, event) {
         console.warn(
             `Error decrypting event (id=${event.getId()}): ${e}`,
         );
-        if (!(e instanceof Crypto.DecryptionError)) {
+        if (e.name !== "DecryptionError") {
             throw e;
         }
         _badEncryptedMessage(event, e.message);
