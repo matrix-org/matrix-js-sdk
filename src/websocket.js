@@ -95,26 +95,6 @@ WebSocketApi.prototype.reconnectNow = function() {
 }
 
 /**
- * @param {string} roomId
- * @return {Room}
- */
-WebSocketApi.prototype.createRoom = function(roomId) {
-    const client = this.client;
-    const room = new Room(roomId, {
-        pendingEventOrdering: this.opts.pendingEventOrdering,
-        timelineSupport: client.timelineSupport,
-    });
-    reEmit(client, room, ["Room.name", "Room.timeline", "Room.redaction",
-                          "Room.receipt", "Room.tags",
-                          "Room.timelineReset",
-                          "Room.localEchoUpdated",
-                          "Room.accountData",
-                         ]);
-    this._registerStateListeners(room);
-    return room;
-};
-
-/**
  * @param {Room} room
  * @private
  */
