@@ -308,7 +308,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         ).then((data) => {
             client.store.setSyncToken(data.next_batch);
             try {
-                client._syncApi._processSyncResponse(self.ws_syncToken, data);
+                client._syncApi._processSyncResponse(null, data);
             } catch (e) {
                 console.error("Caught /sync error", e.stack || e);
             }
