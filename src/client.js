@@ -160,6 +160,7 @@ function MatrixClient(opts) {
             opts.sessionStore,
             userId, this.deviceId,
             this.store,
+            opts.cryptoStore,
         );
 
         this.olmVersion = Crypto.getOlmVersion();

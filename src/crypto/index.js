@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 "use strict";
-
 
 /**
  * @module crypto
@@ -50,14 +50,18 @@ const DeviceList = require('./DeviceList').default;
  * @param {string} deviceId The identifier for this device.
  *
  * @param {Object} clientStore the MatrixClient data store.
+ *
+ * @param {module:crypto/store/base~CryptoStore} cryptoStore
+ *    storage for the crypto layer.
  */
 function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
-                clientStore) {
+                clientStore, cryptoStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
     this._deviceId = deviceId;
     this._clientStore = clientStore;
+    this._cryptoStore = cryptoStore;
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);

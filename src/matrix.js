@@ -63,6 +63,11 @@ module.exports.TimelineWindow = require("./timeline-window").TimelineWindow;
 module.exports.InteractiveAuth = require("./interactive-auth");
 
 
+module.exports.MemoryCryptoStore =
+    require("./crypto/store/memory-crypto-store").default;
+module.exports.IndexedDBCryptoStore =
+    require("./crypto/store/indexeddb-crypto-store").default;
+
 /**
  * Create a new Matrix Call.
  * @function
@@ -124,6 +129,19 @@ module.exports.wrapRequest = function(wrapper) {
     };
 };
 
+
+let cryptoStoreFactory = () => new module.exports.MemoryCryptoStore;
+
+/**
+ * Configure a different factory to be used for creating crypto stores
+ *
+ * @param {Function} fac  a funciton which will return a new
+ *    {@link module:crypto.store.base~CryptoStore}.
+ */
+module.exports.setCryptoStoreFactory = function(fac) {
+    cryptoStoreFactory = fac;
+};
+
 /**
  * Construct a Matrix Client. Similar to {@link module:client~MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
@@ -136,6 +154,11 @@ module.exports.wrapRequest = function(wrapper) {
  * {@link module:scheduler~MatrixScheduler}.
  * @param {requestFunction} opts.request If not set, defaults to the function
  * supplied to {@link request} which defaults to the request module from NPM.
+ *
+ * @param {module:crypto.store.base~CryptoStore=} opts.cryptoStore
+ *    crypto store implementation. Calls the factory supplied to
+ *    {@link setCryptoStoreFactory if unspecified}
+ *
  * @return {MatrixClient} A new matrix client.
  * @see {@link module:client~MatrixClient} for the full list of options for
  * <code>opts</code>.
@@ -151,6 +174,7 @@ module.exports.createClient = function(opts) {
       localStorage: global.localStorage,
     });
     opts.scheduler = opts.scheduler || new module.exports.MatrixScheduler();
+    opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
     return new module.exports.MatrixClient(opts);
 };
 
