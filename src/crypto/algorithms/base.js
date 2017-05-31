@@ -140,6 +140,26 @@ class DecryptionAlgorithm {
     importRoomKey(session) {
         // ignore by default
     }
+
+    /**
+     * Determine if we have the keys necessary to respond to a room key request
+     *
+     * @param {module:crypto#RoomKeyRequest} keyRequest
+     * @return {boolean} true if we have the keys and could (theoretically) share
+     *  them; else false.
+     */
+    hasKeysForKeyRequest(keyRequest) {
+        return false;
+    }
+
+    /**
+     * Send the response to a room key request
+     *
+     * @param {module:crypto#RoomKeyRequest} keyRequest
+     */
+    shareKeysWithDevice(keyRequest) {
+        throw new Error("shareKeysWithDevice not supported for this DecryptionAlgorithm");
+    }
 }
 export {DecryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
 
