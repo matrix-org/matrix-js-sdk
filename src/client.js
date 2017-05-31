@@ -104,6 +104,9 @@ try {
  * disabled by default for compatibility with older clients - in particular to
  * maintain support for back-paginating the live timeline after a '/sync'
  * result with a gap.
+ *
+ * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
+ *    crypto store implementation.
  */
 function MatrixClient(opts) {
     MatrixBaseApis.call(this, opts);
@@ -154,6 +157,7 @@ function MatrixClient(opts) {
 
     this._crypto = null;
     if (CRYPTO_ENABLED && Boolean(opts.sessionStore) &&
+            Boolean(opts.cryptoStore) &&
             userId !== null && this.deviceId !== null) {
         this._crypto = new Crypto(
             this, this,

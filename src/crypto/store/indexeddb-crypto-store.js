@@ -28,6 +28,12 @@ const VERSION = 1;
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export default class IndexedDBCryptoStore {
+    /**
+     * Create a new IndexedDBCryptoStore
+     *
+     * @param {IDBFactory} indexedDB  global indexedDB instance
+     * @param {string} dbName   name of db to connect to
+     */
     constructor(indexedDB, dbName) {
         if (!indexedDB) {
             throw new Error("must pass indexedDB into IndexedDBCryptoStore");

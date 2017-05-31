@@ -135,7 +135,7 @@ let cryptoStoreFactory = () => new module.exports.MemoryCryptoStore;
 /**
  * Configure a different factory to be used for creating crypto stores
  *
- * @param {Function} fac  a funciton which will return a new
+ * @param {Function} fac  a function which will return a new
  *    {@link module:crypto.store.base~CryptoStore}.
  */
 module.exports.setCryptoStoreFactory = function(fac) {
@@ -157,7 +157,9 @@ module.exports.setCryptoStoreFactory = function(fac) {
  *
  * @param {module:crypto.store.base~CryptoStore=} opts.cryptoStore
  *    crypto store implementation. Calls the factory supplied to
- *    {@link setCryptoStoreFactory if unspecified}
+ *    {@link setCryptoStoreFactory} if unspecified; or if no factory has been
+ *    specified, uses a default implementation (indexeddb in the browser,
+ *    in-memory otherwise).
  *
  * @return {MatrixClient} A new matrix client.
  * @see {@link module:client~MatrixClient} for the full list of options for
