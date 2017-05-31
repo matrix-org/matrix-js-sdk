@@ -31,6 +31,8 @@ const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 
+import reEmit from './reemit';
+
 const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
@@ -1250,24 +1252,6 @@ function createNewUser(client, userId) {
         "User.currentlyActive", "User.lastPresenceTs",
     ]);
     return user;
-}
-
-function reEmit(reEmitEntity, emittableEntity, eventNames) {
-    utils.forEach(eventNames, function(eventName) {
-        // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
-            // take the args from the listener and reuse them, adding the
-            // event name to the arg list so it works with .emit()
-            // Transformation Example:
-            // listener on "foo" => function(a,b) { ... }
-            // Re-emit on "thing" => thing.emit("foo", a, b)
-            const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
-            }
-            reEmitEntity.emit(...newArgs);
-        });
-    });
 }
 
 /** */
