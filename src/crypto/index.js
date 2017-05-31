@@ -1238,6 +1238,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
         userId: this._userId,
         crypto: this,
         olmDevice: this._olmDevice,
+        baseApis: this._baseApis,
         roomId: roomId,
     });
 
