@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import q from 'q';
+
 /**
  * Internal module. in-memory storage for e2e.
  *
@@ -25,5 +27,14 @@ limitations under the License.
  */
 export default class MemoryCryptoStore {
     constructor() {
+    }
+
+    /**
+     * Delete all data from this store.
+     *
+     * @returns {Promise} Promise which resolves when the store has been cleared.
+     */
+    deleteAllData() {
+        return q();
     }
 }

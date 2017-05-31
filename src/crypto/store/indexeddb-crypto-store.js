@@ -88,6 +88,28 @@ export default class IndexedDBCryptoStore {
         });
         return this._dbPromise;
     }
+
+    /**
+     * Delete all data from this store.
+     *
+     * @returns {Promise} resolves when the store has been cleared.
+     */
+    deleteAllData() {
+        return new q.Promise((resolve, reject) => {
+            console.log(`Removing indexeddb instance: ${this._dbName}`);
+            const req = this._indexedDB.deleteDatabase(this._dbName);
+            req.onerror = (ev) => {
+                reject(new Error(
+                    "unable to delete indexeddb: " + ev.target.error,
+                ));
+            };
+
+            req.onsuccess = () => {
+                console.log(`Removed indexeddb instance: ${this._dbName}`);
+                resolve();
+            };
+        });
+    }
 }
 
 function createDatabase(db) {
