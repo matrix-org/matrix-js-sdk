@@ -658,6 +658,14 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         content.session_key, event.getKeysClaimed(),
     );
 
+    // cancel any outstanding room key requests for this session
+    this._crypto.cancelRoomKeyRequest({
+        algorithm: content.algorithm,
+        room_id: content.room_id,
+        session_id: content.session_id,
+        sender_key: senderKey,
+    });
+
     // have another go at decrypting events sent with this session.
     this._retryDecryption(senderKey, sessionId);
 };
