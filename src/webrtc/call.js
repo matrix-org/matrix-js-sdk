@@ -1219,6 +1219,8 @@ const _getScreenSharingConstraints = function(call) {
 };
 
 const _getUserMediaVideoContraints = function(callType) {
+    const isWebkit = !!global.window.navigator.webkitGetUserMedia;
+
     switch (callType) {
         case 'voice':
             return {
@@ -1232,12 +1234,11 @@ const _getUserMediaVideoContraints = function(callType) {
                     deviceId: audioInput ? {exact: audioInput} : undefined,
                 }, video: {
                     deviceId: videoInput ? {exact: videoInput} : undefined,
-                    mandatory: {
-                        minWidth: 640,
-                        maxWidth: 640,
-                        minHeight: 360,
-                        maxHeight: 360,
-                    },
+                    /* We want 640x360.  Chrome will give it only if we ask exactly,
+                       FF refuses entirely if we ask exactly, so have to ask for ideal
+                       instead */
+                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
+                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
                 },
             };
     }
