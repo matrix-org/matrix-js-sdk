@@ -170,6 +170,7 @@ function MatrixClient(opts) {
         );
         reEmit(this, this._crypto, [
             "crypto.roomKeyRequest",
+            "crypto.roomKeyRequestCancellation",
         ]);
 
         this.olmVersion = Crypto.getOlmVersion();

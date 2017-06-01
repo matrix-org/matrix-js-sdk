@@ -94,8 +94,10 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 
     this._globalBlacklistUnverifiedDevices = false;
 
-    // list of IncomingRoomKeyRequests we received in the current sync.
+    // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
+    // we received in the current sync.
     this._receivedRoomKeyRequests = [];
+    this._receivedRoomKeyRequestCancellations = [];
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -1079,6 +1081,9 @@ Crypto.prototype._onRoomKeyRequestEvent = function(event) {
         // room before passing them on to the app.
         const req = new IncomingRoomKeyRequest(event);
         this._receivedRoomKeyRequests.push(req);
+    } else if (content.action === "request_cancellation") {
+        const req = new IncomingRoomKeyRequestCancellation(event);
+        this._receivedRoomKeyRequestCancellations.push(req);
     }
 };
 
@@ -1100,7 +1105,7 @@ Crypto.prototype._processReceivedRoomKeyRequests = function() {
         const alg = body.algorithm;
 
         console.log(`m.room_key_request from ${userId}:${deviceId}` +
-                ` for ${roomId} / ${body.session_id}`);
+                ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
         if (userId !== this._userId) {
             // TODO: determine if we sent this device the keys already: in
@@ -1146,6 +1151,20 @@ Crypto.prototype._processReceivedRoomKeyRequests = function() {
         }
 
         this.emit("crypto.roomKeyRequest", req);
+    }
+
+    const cancellations = this._receivedRoomKeyRequestCancellations;
+    this._receivedRoomKeyRequestCancellations = [];
+    for (const cancellation of cancellations) {
+        console.log(
+            `m.room_key_request cancellation for ${cancellation.userId}:` +
+            `${cancellation.deviceId} (id ${cancellation.requestId})`,
+        );
+
+        // we should probably only notify the app of cancellations we told it
+        // about, but we don't currently have a record of that, so we just pass
+        // everything through.
+        this.emit("crypto.roomKeyRequestCancellation", cancellation);
     }
 };
 
@@ -1223,6 +1242,7 @@ Crypto.prototype._signObject = function(obj) {
  *
  * @property {string} userId    user requesting the key
  * @property {string} deviceId  device requesting the key
+ * @property {string} requestId unique id for the request
  * @property {RoomKeyRequestBody} requestBody
  */
 class IncomingRoomKeyRequest {
@@ -1231,6 +1251,7 @@ class IncomingRoomKeyRequest {
 
         this.userId = event.getSender();
         this.deviceId = content.requesting_device_id;
+        this.requestId = content.request_id;
         this.requestBody = content.body || {};
         this._shareCallback = null;
     }
@@ -1249,10 +1270,34 @@ class IncomingRoomKeyRequest {
 }
 
 /**
+ * Represents a received m.room_key_request cancellation
+ *
+ * @property {string} userId    user requesting the cancellation
+ * @property {string} deviceId  device requesting the cancellation
+ * @property {string} requestId unique id for the request to be cancelled
+ */
+class IncomingRoomKeyRequestCancellation {
+    constructor(event) {
+        const content = event.getContent();
+
+        this.userId = event.getSender();
+        this.deviceId = content.requesting_device_id;
+        this.requestId = content.request_id;
+    }
+}
+
+/**
  * Fires when we receive a room key request
  *
  * @event module:client~MatrixClient#"crypto.roomKeyRequest"
  * @param {module:crypto~IncomingRoomKeyRequest} req  request details
+ */
+
+/**
+ * Fires when we receive a room key request cancellation
+ *
+ * @event module:client~MatrixClient#"crypto.roomKeyRequestCancellation"
+ * @param {module:crypto~IncomingRoomKeyRequestCancellation} req
  */
 
 /** */
