@@ -55,6 +55,7 @@ export default class IndexedDBCryptoStore {
         }
 
         this._dbPromise = new q.Promise((resolve, reject) => {
+            console.log(`connecting to indexeddb ${this._dbName}`);
             const req = this._indexedDB.open(this._dbName, VERSION);
 
             req.onupgradeneeded = (ev) => {
@@ -83,7 +84,16 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onsuccess = (r) => {
-                resolve(r.target.result);
+                const db = r.target.result;
+
+                // make sure we close the db on `onversionchange` - otherwise
+                // attempts to delete the database will block (and subsequent
+                // attempts to re-create it will also block).
+                db.onversionchange = (ev) => {
+                    db.close();
+                };
+
+                resolve(db);
             };
         });
         return this._dbPromise;
@@ -98,6 +108,13 @@ export default class IndexedDBCryptoStore {
         return new q.Promise((resolve, reject) => {
             console.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this._indexedDB.deleteDatabase(this._dbName);
+
+            req.onblocked = () => {
+                reject(new Error(
+                    "unable to delete indexeddb because it is open elsewhere",
+                ));
+            };
+
             req.onerror = (ev) => {
                 reject(new Error(
                     "unable to delete indexeddb: " + ev.target.error,
