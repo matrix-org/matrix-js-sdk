@@ -362,25 +362,19 @@ module.exports.MatrixHttpApi.prototype = {
             queryParams.access_token = this.opts.accessToken;
         }
 
-	//TODO find a better way to distinguish between http and https
-        let ws_prot = "ws://";
-        let ws_path = this.opts.baseUrl.substr("http://".length-1);
+        //TODO find a better way to distinguish between http and https
+        let ws_base = "ws://" + this.opts.baseUrl.substr("http://".length);
         if (this.opts.baseUrl.startsWith("https://")) {
-            ws_prot = "wss://";
-            ws_path = this.opts.baseUrl.substr("https://".length-1);
+            ws_base = "wss://" + this.opts.baseUrl.substr("https://".length);
         }
 
-        //TODO: find/implement queryParams => urlencode
-        let ws_params = "?"
-        ws_params = ws_params + "access_token=" + queryParams.access_token;
-        if (queryParams.since) {
-            ws_params += "&since=" + queryParams.since;
-        }
-        if (queryParams.filter) {
-            ws_params += "&filter=" + queryParams.filter;
+        let ws_params = {
+            filter: queryParams.filter,
+            since: queryParams.since,
+            access_token: queryParams.access_token,
         }
         //TODO make query-path configuration somewhere else
-        return new WebSocket(ws_prot + ws_path + "/_matrix/client/unstable/stream" + ws_params, "m.json");
+        return new WebSocket(ws_base + "/_matrix/client/unstable/stream?" + utils.encodeParams(ws_params), "m.json");
     },
 
     /**
