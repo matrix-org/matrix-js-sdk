@@ -77,7 +77,9 @@ function WebSocketApi(client, opts) {
     this._websocket = null;
     this._syncState = null;
     this._running = false;
-    this._keepAliveTimer = null;
+
+    this.ws_timeout = 20000;
+    this.ws_keepAliveTimer = null;
     this._connectionReturnedDefer = null;
     this._notifEvents = []; // accumulator of sync events in the current sync response
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
@@ -218,6 +220,34 @@ WebSocketApi.prototype.start = function() {
 };
 
 /**
+ * Sends ping-messages via WebSocket as connection-keepAlive
+ */
+WebSocketApi.prototype.ws_keepAlive = function () {
+    debuglog("WebSocketApi.ws_keepAlive");
+    if (!this._websocket) {
+        console.error("this._websocket does not exist", this);
+        return;
+    }
+    if (this._websocket.readyState == this._websocket.OPEN) {
+        //TODO find function to generate id
+        this.send_ping();
+    }
+    this.ws_keepAliveTimer = setTimeout(this.ws_keepAlive.bind(this), this.ws_timeout);
+};
+
+/**
+ * (Re-)inits the timer for the next ping-event
+ * So there will only be send a ping-message if there was
+ * not send a message in the last ws_timeout milliseconds
+ */
+WebSocketApi.prototype._init_keepalive = function () {
+    if (this.ws_keepAliveTimer) {
+        clearTimeout(this.ws_keepAliveTimer);
+    }
+    this.ws_keepAliveTimer = setTimeout(this.ws_keepAlive.bind(this), this.ws_timeout);
+}
+
+/**
  * Stops the sync object from syncing.
  */
 WebSocketApi.prototype.stop = function() {
@@ -308,6 +338,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     function _ws_onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
         self.ws_possible = true;
+        this._init_keepalive();
     }
 
     function _ws_onerror(err) {
@@ -334,6 +365,10 @@ WebSocketApi.prototype._start = function(syncOptions) {
     }
 
     function _ws_onclose(ev) {
+        if (self.ws_keepAliveTimer) {
+            clearTimeout(self.ws_keepAliveTimer);
+            self.ws_keepAliveTimer = null;
+        }
         if (ev.wasClean) {
             debuglog("Socket closed");
         } else {
