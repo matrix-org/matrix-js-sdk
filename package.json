@@ -73,16 +73,9 @@
     "uglify-js": "^2.8.26",
     "watchify": "^3.2.1"
   },
-  "optionalDependencies": {
-    "olm": "https://matrix.org/packages/npm/olm/olm-2.2.1.tgz"
-  },
   "browserify": {
     "transform": [
-      "sourceify",
-      "browserify-shim"
+      "sourceify"
     ]
-  },
-  "browserify-shim": {
-    "olm": "global:Olm"
   }
 }
