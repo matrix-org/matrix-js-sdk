@@ -174,7 +174,7 @@ WebSocketApi.prototype.start = function() {
             client.pushRules = result;
             getFilter(); // Now get the filter
         }, function(err) {
-            self._startKeepAlives().done(function() {
+            client._syncApi._startKeepAlives().done(function() {
                 getPushRules();
             });
             self._updateSyncState("ERROR", { error: err });
@@ -202,7 +202,7 @@ WebSocketApi.prototype.start = function() {
             self._start({ filterId: filterId });
 
         }, function(err) {
-            self._startKeepAlives().done(function() {
+            client._syncApi._startKeepAlives().done(function() {
                 getFilter();
             });
             self._updateSyncState("ERROR", { error: err });
@@ -227,10 +227,6 @@ WebSocketApi.prototype.stop = function() {
         this._onOnlineBound = undefined;
     }
     this._running = false;
-    if (this._keepAliveTimer) {
-        clearTimeout(this._keepAliveTimer);
-        this._keepAliveTimer = null;
-    }
     if (this._websocket) {
         this._websocket.close();
         this._websocket = null;
@@ -351,7 +347,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
                 // assume connection to websocket lost by mistake
                 debuglog("Reinit Connection via WebSocket");
                 self._updateSyncState("RECONNECTING");
-                self._startKeepAlives().done(function() {
+                client._syncApi._startKeepAlives().done(function() {
                     debuglog("Restart Websocket");
                     self._start(self.ws_syncOptions);
                 });
@@ -407,134 +403,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
     }
 }
 
-
-/**
- * Starts polling the connectivity check endpoint
- * @param {number} delay How long to delay until the first poll.
- *        defaults to a short, randomised interval (to prevent
- *        tightlooping if /versions succeeds but /sync etc. fail).
- * @return {promise} which resolves once the connection returns
- */
-WebSocketApi.prototype._startKeepAlives = function(delay) {
-    if (delay === undefined) {
-        delay = 2000 + Math.floor(Math.random() * 5000);
-    }
-
-    if (this._keepAliveTimer !== null) {
-        clearTimeout(this._keepAliveTimer);
-    }
-    const self = this;
-    if (delay > 0) {
-        self._keepAliveTimer = setTimeout(
-            self._pokeKeepAlive.bind(self),
-            delay,
-        );
-    } else {
-        self._pokeKeepAlive();
-    }
-    if (!this._connectionReturnedDefer) {
-        this._connectionReturnedDefer = q.defer();
-    }
-    return this._connectionReturnedDefer.promise;
-};
-
-/**
- * Make a dummy call to /_matrix/client/versions, to see if the HS is
- * reachable.
- *
- * On failure, schedules a call back to itself. On success, resolves
- * this._connectionReturnedDefer.
- */
-WebSocketApi.prototype._pokeKeepAlive = function() {
-    const self = this;
-    function success() {
-        clearTimeout(self._keepAliveTimer);
-        if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.resolve();
-            self._connectionReturnedDefer = null;
-        }
-    }
-
-    this.client._http.request(
-        undefined, // callback
-        "GET", "/_matrix/client/versions",
-        undefined, // queryParams
-        undefined, // data
-        {
-            prefix: '',
-            localTimeoutMs: 15 * 1000,
-        },
-    ).done(function() {
-        success();
-    }, function(err) {
-        if (err.httpStatus == 400) {
-            // treat this as a success because the server probably just doesn't
-            // support /versions: point is, we're getting a response.
-            // We wait a short time though, just in case somehow the server
-            // is in a mode where it 400s /versions responses and sync etc.
-            // responses fail, this will mean we don't hammer in a loop.
-            self._keepAliveTimer = setTimeout(success, 2000);
-        } else {
-            self._keepAliveTimer = setTimeout(
-                self._pokeKeepAlive.bind(self),
-                5000 + Math.floor(Math.random() * 5000),
-            );
-            // A keepalive has failed, so we emit the
-            // error state (whether or not this is the
-            // first failure).
-            // Note we do this after setting the timer:
-            // this lets the unit tests advance the mock
-            // clock when the get the error.
-            self._updateSyncState("ERROR", { error: err });
-        }
-    });
-};
-
-/**
- * @param {Room} room
- */
-WebSocketApi.prototype._resolveInvites = function(room) {
-    if (!room || !this.opts.resolveInvitesToProfiles) {
-        return;
-    }
-    const client = this.client;
-    // For each invited room member we want to give them a displayname/avatar url
-    // if they have one (the m.room.member invites don't contain this).
-    room.getMembersWithMembership("invite").forEach(function(member) {
-        if (member._requestedProfileInfo) {
-            return;
-        }
-        member._requestedProfileInfo = true;
-        // try to get a cached copy first.
-        const user = client.getUser(member.userId);
-        let promise;
-        if (user) {
-            promise = q({
-                avatar_url: user.avatarUrl,
-                displayname: user.displayName,
-            });
-        } else {
-            promise = client.getProfileInfo(member.userId);
-        }
-        promise.done(function(info) {
-            // slightly naughty by doctoring the invite event but this means all
-            // the code paths remain the same between invite/join display name stuff
-            // which is a worthy trade-off for some minor pollution.
-            const inviteEvent = member.events.member;
-            if (inviteEvent.getContent().membership !== "invite") {
-                // between resolving and now they have since joined, so don't clobber
-                return;
-            }
-            inviteEvent.getContent().avatar_url = info.avatar_url;
-            inviteEvent.getContent().displayname = info.displayname;
-            // fire listeners
-            member.setMembershipEvent(inviteEvent, room.currentState);
-        }, function(err) {
-            // OH WELL.
-        });
-    });
-};
-
 /**
  * Sets the sync state and emits an event to say so
  * @param {String} newState The new state string
@@ -554,17 +422,8 @@ WebSocketApi.prototype._updateSyncState = function(newState, data) {
  */
 WebSocketApi.prototype._onOnline = function() {
     debuglog("Browser thinks we are back online");
-    this._startKeepAlives(0);
+    client._syncApi._startKeepAlives(0);
 };
-
-function createNewUser(client, userId) {
-    const user = new User(userId);
-    reEmit(client, user, [
-        "User.avatarUrl", "User.displayName", "User.presence",
-        "User.currentlyActive", "User.lastPresenceTs",
-    ]);
-    return user;
-}
 
 function reEmit(reEmitEntity, emittableEntity, eventNames) {
     utils.forEach(eventNames, function(eventName) {
