@@ -47,8 +47,7 @@ try {
     var Crypto = require("./crypto");
     CRYPTO_ENABLED = true;
 } catch (e) {
-    console.error("olm load error", e);
-    // Olm not installed.
+    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
 }
 
 /**

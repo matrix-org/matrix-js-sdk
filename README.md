@@ -236,6 +236,24 @@ host the API reference from the source files like this:
 
 Then visit ``http://localhost:8005`` to see the API docs.
 
+End-to-end encryption support
+=============================
+
+The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
+[libolm](http://matrix.org/git/olm). It is left up to the application to make
+libolm available, via the ``Olm`` global.
+
+To enable support in a browser application:
+
+ * download the transpiled libolm (either via ``npm install olm``, or from
+   https://matrix.org/packages/npm/olm/).
+ * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
+ 
+To enable support in a node.js application:
+
+ * ``npm install olm``
+ * ``require('olm');`` *before* ``matrix-js-sdk``.
+
 Contributing
 ============
 *This section is for people who want to modify the SDK. If you just
