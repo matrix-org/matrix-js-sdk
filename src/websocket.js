@@ -500,6 +500,7 @@ WebSocketApi.prototype.send_event = function (event) {
     }
 
     this._websocket.send(JSON.stringify(message))
+    this._init_keepalive();
 
     //TODO handle promise
     return q(null);
