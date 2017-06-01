@@ -49,7 +49,7 @@ function debuglog() {
 
 /**
  * <b>Internal class - unstable.</b>
- * Construct an entity which is able to sync with a homeserver.
+ * Construct an entity which is able to use Websockets to comunicate with a homeserver.
  * @constructor
  * @param {MatrixClient} client The matrix client instance to use.
  * @param {Object} opts Config options
@@ -365,6 +365,40 @@ WebSocketApi.prototype._start = function(syncOptions) {
 
     function _ws_onmessage(in_data) {
         let data = JSON.parse(in_data.data);
+
+        if (data.method) {
+            switch (data.method) {
+                case "ping":
+                    self._websocket.send(JSON.stringify({
+                        id: data.id,
+                    }))
+                break;
+                case "sync":
+                    self.handle_sync(data.data);
+                    break;
+                default:
+                    console.error("Received message with unknown method \"" + data.method + "\"", data);
+            }
+        }
+        if (data.result) {
+            //TODO handle response of client-initiated operation
+            self.handle_response(data);
+        }
+
+        //TODO change server-message to make this step obsolete
+        if (data.next_batch) {
+            // message is Update-Message
+            self.handle_sync(data);
+        }
+    }
+};
+
+/**
+ * handle message from server which was identified to be a /sync-response
+ */
+WebSocketApi.prototype.handle_sync = function (data) {
+        const client = this.client;
+        const self = this;
         //debuglog('Got new data from socket, next_batch=' + data.next_batch);
 
         // set the sync token NOW *before* processing the events. We do this so
@@ -397,7 +431,50 @@ WebSocketApi.prototype._start = function(syncOptions) {
         // store).
         client.store.save();
         self.ws_syncToken = data.next_batch;
+};
+
+/**
+ * Sends ping-message to server
+ */
+WebSocketApi.prototype.send_ping = function () {
+    this._websocket.send(JSON.stringify({
+        id: this.client.makeTxnId(),
+        method: "ping",
+    }));
+}
+
+/**
+ * Send message to server
+ */
+WebSocketApi.prototype.send_event = function (event) {
+    const txnId = event._txnId ? event._txnId : client.makeTxnId();
+
+    let message = {
+        id: txnId,
+        method: "send",
+        param: {
+            room_id: event.getRoomId(),
+            event_type: event.getWireType(),
+            content: event.getWireContent(),
+        }
+    };
+
+    if (event.isState() && event.getStateKey() && event.getStateKey().length > 0) {
+        message.method = "state"
+        message.param.state_key = event.getStateKey();
     }
+
+    this._websocket.send(JSON.stringify(message))
+
+    //TODO handle promise
+    return q(null);
+}
+
+/**
+ * Handle response from server
+ */
+WebSocketApi.prototype.handle_response = function (response) {
+    console.error("WebSocketApi.handle_response not implemented");
 }
 
 /**
