@@ -206,7 +206,9 @@ if [ -n "$signing_id" ]; then
 
     tarfile="$tag.tar.gz"
     gh_project_url=$(git remote get-url origin |
-                            sed -e 's#^git@github.com:#https://github.com/#' -e 's/\.git$//')
+                            sed -e 's#^git@github\.com:#https://github.com/#' \
+                                -e 's#^git\+ssh://git@github\.com/#https://github.com/#' \
+                                -e 's/\.git$//')
     project_name="${gh_project_url##*/}"
     curl -L "${gh_project_url}/archive/${tarfile}" -o "${tarfile}"
 
