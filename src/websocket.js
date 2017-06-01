@@ -277,10 +277,8 @@ WebSocketApi.prototype._start = function(syncOptions) {
     } else {
         // do initial sync via requesting /sync to avoid errors of throttling
         // (initial request is so big that the buffer on the server overflows)
-        //TODO replace 999999 by something appropriate
         client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, {
-                prefix: "/_matrix/client/v2_alpha", },
+            undefined, "GET", "/sync", qps, undefined, {},
         ).then((data) => {
             client.store.setSyncToken(data.next_batch);
             try {
@@ -338,7 +336,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
     function _ws_onclose(ev) {
         if (ev.wasClean) {
             debuglog("Socket closed");
-            self._updateSyncState("STOPPED");
         } else {
             debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
                 "error");
