@@ -1,3 +1,23 @@
+Changes in [0.7.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.9) (2017-06-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8...v0.7.9)
+
+ * Initial framework for indexeddb-backed crypto store
+   [\#445](https://github.com/matrix-org/matrix-js-sdk/pull/445)
+ * Factor out reEmit to a common module
+   [\#444](https://github.com/matrix-org/matrix-js-sdk/pull/444)
+ * crypto/algorithms/base.js: Convert to es6
+   [\#443](https://github.com/matrix-org/matrix-js-sdk/pull/443)
+ * maySendRedactionForEvent for userId
+   [\#435](https://github.com/matrix-org/matrix-js-sdk/pull/435)
+ * MatrixClient: add getUserId()
+   [\#441](https://github.com/matrix-org/matrix-js-sdk/pull/441)
+ * Run jsdoc on a custom babeling of the source
+   [\#442](https://github.com/matrix-org/matrix-js-sdk/pull/442)
+ * Add in a public api getStoredDevice allowing clients to get a specific
+   device
+   [\#439](https://github.com/matrix-org/matrix-js-sdk/pull/439)
+
 Changes in [0.7.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8) (2017-05-22)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8-rc.1...v0.7.8)
