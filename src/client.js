@@ -48,8 +48,7 @@ try {
     var Crypto = require("./crypto");
     CRYPTO_ENABLED = true;
 } catch (e) {
-    console.error("olm load error", e);
-    // Olm not installed.
+    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
 }
 
 /**
@@ -109,6 +108,9 @@ try {
  * disabled by default for compatibility with older clients - in particular to
  * maintain support for back-paginating the live timeline after a '/sync'
  * result with a gap.
+ *
+ * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
+ *    crypto store implementation.
  */
 function MatrixClient(opts) {
     MatrixBaseApis.call(this, opts);
@@ -165,13 +167,16 @@ function MatrixClient(opts) {
     }
 
     this._crypto = null;
+    this._cryptoStore = opts.cryptoStore;
     if (CRYPTO_ENABLED && Boolean(opts.sessionStore) &&
+            Boolean(this._cryptoStore) &&
             userId !== null && this.deviceId !== null) {
         this._crypto = new Crypto(
             this, this,
             opts.sessionStore,
             userId, this.deviceId,
             this.store,
+            opts.cryptoStore,
         );
 
         this.olmVersion = Crypto.getOlmVersion();
@@ -179,6 +184,25 @@ function MatrixClient(opts) {
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+/**
+ * Clear any data out of the persistent stores used by the client.
+ *
+ * @returns {Promise} Promise which resolves when the stores have been cleared.
+ */
+MatrixClient.prototype.clearStores = function() {
+    if (this._clientRunning) {
+        throw new Error("Cannot clear stores while client is running");
+    }
+
+    const promises = [];
+
+    promises.push(this.store.deleteAllData());
+    if (this._cryptoStore) {
+        promises.push(this._cryptoStore.deleteAllData());
+    }
+    return q.all(promises);
+};
 
 /**
  * Get the user-id of the logged-in user

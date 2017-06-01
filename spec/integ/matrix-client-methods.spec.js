@@ -299,6 +299,10 @@ describe("MatrixClient", function() {
 
 
     describe("downloadKeys", function() {
+        if (!sdk.CRYPTO_ENABLED) {
+            return;
+        }
+
         it("should do an HTTP request and then store the keys", function(done) {
             const ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
             // ed25519key = client.getDeviceEd25519Key();
