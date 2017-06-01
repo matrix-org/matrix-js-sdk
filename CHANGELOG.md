@@ -1,3 +1,11 @@
+unreleased changes
+==================
+
+ * BREAKING CHANGE: The SDK no longer ``require``s ``olm`` - instead it expects
+   libolm to be provided as an ``Olm`` global. This will only affect
+   applications which use end-to-end encryption. See the
+   [README](README.md#end-to-end-encryption-support) for details.
+
 Changes in [0.7.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8) (2017-05-22)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8-rc.1...v0.7.8)
