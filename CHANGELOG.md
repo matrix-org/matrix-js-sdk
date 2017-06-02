@@ -1,10 +1,16 @@
-unreleased changes
-==================
+Changes in [0.7.10](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.10) (2017-06-02)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.9...v0.7.10)
 
  * BREAKING CHANGE: The SDK no longer ``require``s ``olm`` - instead it expects
    libolm to be provided as an ``Olm`` global. This will only affect
    applications which use end-to-end encryption. See the
    [README](README.md#end-to-end-encryption-support) for details.
+
+ * indexeddb-crypto-store: fix db deletion
+   [\#447](https://github.com/matrix-org/matrix-js-sdk/pull/447)
+ * Load Olm from the global rather than requiring it.
+   [\#446](https://github.com/matrix-org/matrix-js-sdk/pull/446)
 
 Changes in [0.7.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.9) (2017-06-01)
 ================================================================================================
