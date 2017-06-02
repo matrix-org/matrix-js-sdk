@@ -84,6 +84,8 @@ function WebSocketApi(client, opts) {
     this._notifEvents = []; // accumulator of sync events in the current sync response
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
 
+    this._awaiting_responses = {};
+
     if (client.getNotifTimelineSet()) {
         reEmit(client, client.getNotifTimelineSet(),
                ["Room.timeline", "Room.timelineReset"]);
@@ -230,7 +232,7 @@ WebSocketApi.prototype.ws_keepAlive = function () {
     }
     if (this._websocket.readyState == this._websocket.OPEN) {
         //TODO find function to generate id
-        this.send_ping();
+        this.sendPing();
     }
     this.ws_keepAliveTimer = setTimeout(this.ws_keepAlive.bind(this), this.ws_timeout);
 };
@@ -409,21 +411,20 @@ WebSocketApi.prototype._start = function(syncOptions) {
                     }))
                 break;
                 case "sync":
-                    self.handle_sync(data.data);
+                    self.handleSync(data.data);
                     break;
                 default:
                     console.error("Received message with unknown method \"" + data.method + "\"", data);
             }
         }
-        if (data.result) {
-            //TODO handle response of client-initiated operation
-            self.handle_response(data);
+        if (data.result || data.error) {
+            self.handleResponse(data);
         }
 
         //TODO change server-message to make this step obsolete
         if (data.next_batch) {
             // message is Update-Message
-            self.handle_sync(data);
+            self.handleSync(data);
         }
     }
 };
@@ -431,7 +432,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
 /**
  * handle message from server which was identified to be a /sync-response
  */
-WebSocketApi.prototype.handle_sync = function (data) {
+WebSocketApi.prototype.handleSync = function (data) {
         const client = this.client;
         const self = this;
         //debuglog('Got new data from socket, next_batch=' + data.next_batch);
@@ -471,7 +472,7 @@ WebSocketApi.prototype.handle_sync = function (data) {
 /**
  * Sends ping-message to server
  */
-WebSocketApi.prototype.send_ping = function () {
+WebSocketApi.prototype.sendPing = function () {
     this._websocket.send(JSON.stringify({
         id: this.client.makeTxnId(),
         method: "ping",
@@ -481,7 +482,7 @@ WebSocketApi.prototype.send_ping = function () {
 /**
  * Send message to server
  */
-WebSocketApi.prototype.send_event = function (event) {
+WebSocketApi.prototype.sendEvent = function (event) {
     const txnId = event._txnId ? event._txnId : client.makeTxnId();
 
     let message = {
@@ -502,15 +503,31 @@ WebSocketApi.prototype.send_event = function (event) {
     this._websocket.send(JSON.stringify(message))
     this._init_keepalive();
 
-    //TODO handle promise
-    return q(null);
+    let defer = q.defer();
+    this._awaiting_responses.txnId = defer;
+    return defer.promise;
 }
 
 /**
- * Handle response from server
+ * Handle responses from the server
  */
-WebSocketApi.prototype.handle_response = function (response) {
-    console.error("WebSocketApi.handle_response not implemented");
+WebSocketApi.prototype.handleResponse = function (response) {
+    const txnId = response.txnId;
+    if (response.result) {
+        // success
+        if (this._awaiting_responses.txnId) {
+            this._awaiting_responses.txnId.resolve(response.result);
+            this._awaiting_responses.txnId = null;
+        }
+    } else if (response.error) {
+        //error
+        if (this._awaiting_responses.txnId) {
+            this._awaiting_responses.txnId.reject(response.error);
+            this._awaiting_responses.txnId = null;
+        }
+    } else {
+        console.error("unknown response", response);
+    }
 }
 
 /**
