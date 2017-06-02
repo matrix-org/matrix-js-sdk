@@ -80,7 +80,6 @@ function WebSocketApi(client, opts) {
 
     this.ws_timeout = 20000;
     this.ws_keepAliveTimer = null;
-    this._connectionReturnedDefer = null;
     this._notifEvents = []; // accumulator of sync events in the current sync response
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
 
@@ -281,10 +280,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
 
     if (!this._running) {
         debuglog("WebSocket no longer running: exiting.");
-        if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.reject();
-            self._connectionReturnedDefer = null;
-        }
         return;
     }
 
@@ -340,7 +335,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     function _ws_onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
         self.ws_possible = true;
-        this._init_keepalive();
+        self._init_keepalive();
     }
 
     function _ws_onerror(err) {
@@ -488,7 +483,7 @@ WebSocketApi.prototype.sendEvent = function (event) {
     let message = {
         id: txnId,
         method: "send",
-        param: {
+        params: {
             room_id: event.getRoomId(),
             event_type: event.getWireType(),
             content: event.getWireContent(),
