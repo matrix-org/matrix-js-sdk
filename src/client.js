@@ -2888,6 +2888,9 @@ MatrixClient.prototype.stopClient = function() {
         this._syncApi.stop();
         this._syncApi = null;
     }
+    if (this._peekSync) {
+        this._peekSync.stopPeeking();
+    }
     global.clearTimeout(this._checkTurnServersTimeoutID);
 };
 

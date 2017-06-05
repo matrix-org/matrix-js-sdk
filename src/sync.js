@@ -329,6 +329,10 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
         timeout: 30 * 1000,
         from: token,
     }, undefined, 50 * 1000).done(function(res) {
+        if (self._peekRoomId !== roomId) {
+            debuglog("Stopped peeking in room %s", roomId);
+            return;
+        }
         // We have a problem that we get presence both from /events and /sync
         // however, /sync only returns presence for users in rooms
         // you're actually joined to.
