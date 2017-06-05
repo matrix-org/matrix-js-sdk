@@ -245,10 +245,10 @@ The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](http://matrix.org/git/olm). It is left up to the application to make
 libolm available, via the ``Olm`` global.
 
-If the ``Olm`` global is not available, the SDK will throw an error:
+If the ``Olm`` global is not available, the SDK will show a warning:
 
 ```
- Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined
+Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined
 ```
 
 The SDK will continue to work for unencrypted rooms, but it will not support
