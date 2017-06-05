@@ -1138,7 +1138,7 @@ Crypto.prototype._processReceivedRoomKeyRequests = function() {
             continue;
         }
 
-        req._shareCallback = () => {
+        req.share = () => {
             decryptor.shareKeysWithDevice(req);
         };
 
@@ -1244,6 +1244,9 @@ Crypto.prototype._signObject = function(obj) {
  * @property {string} deviceId  device requesting the key
  * @property {string} requestId unique id for the request
  * @property {RoomKeyRequestBody} requestBody
+ * @property {Function} share  callback which, when called, will ask
+ *    the relevant crypto algorithm implementation to share the keys for
+ *    this request.
  */
 class IncomingRoomKeyRequest {
     constructor(event) {
@@ -1253,19 +1256,9 @@ class IncomingRoomKeyRequest {
         this.deviceId = content.requesting_device_id;
         this.requestId = content.request_id;
         this.requestBody = content.body || {};
-        this._shareCallback = null;
-    }
-
-    /**
-     * Ask the relevant crypto algorithm implementation to share the keys for
-     * this request
-     */
-    share() {
-        if (this._shareCallback) {
-            this._shareCallback();
-            return;
-        }
-        throw new Error("don't know how to share keys for this request yet");
+        this.share = () => {
+            throw new Error("don't know how to share keys for this request yet");
+        };
     }
 }
 
