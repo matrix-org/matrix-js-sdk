@@ -14,7 +14,7 @@ module.exports = {
     rules: {
         // rules we've always adhered to or now do
         "max-len": ["error", {
-            code: 90,
+            code: 120,
             ignoreComments: true,
         }],
         curly: ["error", "multi-line"],
