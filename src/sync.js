@@ -298,7 +298,7 @@ SyncApi.prototype.peek = function(roomId) {
         client.store.storeRoom(peekRoom);
         client.emit("Room", peekRoom);
 
-        self._peekPoll(roomId);
+        self._peekPoll(peekRoom);
         return peekRoom;
     });
 };
@@ -313,24 +313,24 @@ SyncApi.prototype.stopPeeking = function() {
 
 /**
  * Do a peek room poll.
- * @param {string} roomId
+ * @param {Room} peekRoom
  * @param {string} token from= token
  */
-SyncApi.prototype._peekPoll = function(roomId, token) {
-    if (this._peekRoomId !== roomId) {
-        debuglog("Stopped peeking in room %s", roomId);
+SyncApi.prototype._peekPoll = function(peekRoom, token) {
+    if (this._peekRoomId !== peekRoom.roomId) {
+        debuglog("Stopped peeking in room %s", peekRoom.roomId);
         return;
     }
 
     const self = this;
     // FIXME: gut wrenching; hard-coded timeout values
     this.client._http.authedRequest(undefined, "GET", "/events", {
-        room_id: roomId,
+        room_id: peekRoom.roomId,
         timeout: 30 * 1000,
         from: token,
     }, undefined, 50 * 1000).done(function(res) {
-        if (self._peekRoomId !== roomId) {
-            debuglog("Stopped peeking in room %s", roomId);
+        if (self._peekRoomId !== peekRoom.roomId) {
+            debuglog("Stopped peeking in room %s", peekRoom.roomId);
             return;
         }
         // We have a problem that we get presence both from /events and /sync
@@ -358,15 +358,15 @@ SyncApi.prototype._peekPoll = function(roomId, token) {
 
         // strip out events which aren't for the given room_id (e.g presence)
         const events = res.chunk.filter(function(e) {
-            return e.room_id === roomId;
+            return e.room_id === peekRoom.roomId;
         }).map(self.client.getEventMapper());
-        const room = self.client.getRoom(roomId);
-        room.addLiveEvents(events);
-        self._peekPoll(roomId, res.end);
+
+        peekRoom.addLiveEvents(events);
+        self._peekPoll(peekRoom, res.end);
     }, function(err) {
-        console.error("[%s] Peek poll failed: %s", roomId, err);
+        console.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
         setTimeout(function() {
-            self._peekPoll(roomId, token);
+            self._peekPoll(peekRoom, token);
         }, 30 * 1000);
     });
 };
