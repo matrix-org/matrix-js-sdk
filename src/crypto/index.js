@@ -32,6 +32,8 @@ const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 
+import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
+
 /**
  * Cryptography bits
  *
@@ -94,11 +96,15 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 
     this._globalBlacklistUnverifiedDevices = false;
 
+    this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
+         baseApis, this._deviceId, this._cryptoStore,
+    );
+
     // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
     // we received in the current sync.
     this._receivedRoomKeyRequests = [];
     this._receivedRoomKeyRequestCancellations = [];
-
+  
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
     );
@@ -132,8 +138,10 @@ function _registerEventHandlers(crypto, eventEmitter) {
         try {
             if (syncState === "STOPPED") {
                 crypto._clientRunning = false;
+                crypto._outgoingRoomKeyRequestManager.stop();
             } else if (syncState === "PREPARED") {
                 crypto._clientRunning = true;
+                crypto._outgoingRoomKeyRequestManager.start();
             }
             if (syncState === "SYNCING") {
                 crypto._onSyncCompleted(data);
@@ -798,6 +806,23 @@ Crypto.prototype.userDeviceListChanged = function(userId) {
 };
 
 /**
+ * Send a request for some room keys, if we have not already done so
+ *
+ * @param {module:crypto~RoomKeyRequestBody} requestBody
+ * @param {Array<{userId: string, deviceId: string}>} recipients
+ */
+Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
+    this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
+        requestBody, recipients,
+    ).catch((e) => {
+        // this normally means we couldn't talk to the store
+        console.error(
+            'Error requesting key for event', e,
+        );
+    }).done();
+};
+
+/**
  * handle an m.room.encryption event
  *
  * @private
@@ -1236,6 +1261,14 @@ Crypto.prototype._signObject = function(obj) {
     obj.signatures = sigs;
 };
 
+
+/**
+ * The parameters of a room key request. The details of the request may
+ * vary with the crypto algorithm, but the management and storage layers for
+ * outgoing requests expect it to have 'room_id' and 'session_id' properties.
+ *
+ * @typedef {Object} RoomKeyRequestBody
+ */
 
 /**
  * Represents a received m.room_key_request event

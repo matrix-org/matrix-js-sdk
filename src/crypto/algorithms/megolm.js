@@ -527,6 +527,14 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *   problem decrypting the event
  */
 MegolmDecryption.prototype.decryptEvent = function(event) {
+    this._decryptEvent(event, true);
+};
+
+
+// helper for the real decryptEvent and for _retryDecryption. If
+// requestKeysOnFail is true, we'll send an m.room_key_request when we fail
+// to decrypt the event due to missing megolm keys.
+MegolmDecryption.prototype._decryptEvent = function(event, requestKeysOnFail) {
     const content = event.getWireContent();
 
     if (!content.sender_key || !content.session_id ||
@@ -543,6 +551,9 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
     } catch (e) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._addEventToPendingList(event);
+            if (requestKeysOnFail) {
+                this._requestKeysForEvent(event);
+            }
         }
         throw new base.DecryptionError(
             e.toString(), {
@@ -554,6 +565,9 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
     if (res === null) {
         // We've got a message for a session we don't have.
         this._addEventToPendingList(event);
+        if (requestKeysOnFail) {
+            this._requestKeysForEvent(event);
+        }
         throw new base.DecryptionError(
             "The sender's device has not sent us the keys for this message.",
             {
@@ -576,6 +590,28 @@ MegolmDecryption.prototype.decryptEvent = function(event) {
     event.setClearData(payload, res.keysProved, res.keysClaimed);
 };
 
+MegolmDecryption.prototype._requestKeysForEvent = function(event) {
+    const sender = event.getSender();
+    const wireContent = event.getWireContent();
+
+    // send the request to all of our own devices, and the
+    // original sending device if it wasn't us.
+    const recipients = [{
+        userId: this._userId, deviceId: '*',
+    }];
+    if (sender != this._userId) {
+        recipients.push({
+            userId: sender, deviceId: wireContent.device_id,
+        });
+    }
+
+    this._crypto.requestRoomKey({
+        room_id: event.getRoomId(),
+        algorithm: wireContent.algorithm,
+        sender_key: wireContent.sender_key,
+        session_id: wireContent.session_id,
+    }, recipients);
+};
 
 /**
  * Add an event to the list of those we couldn't decrypt the first time we
@@ -657,7 +693,8 @@ MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
 
     for (let i = 0; i < pending.length; i++) {
         try {
-            this.decryptEvent(pending[i]);
+            // no point sending another m.room_key_request here.
+            this._decryptEvent(pending[i], false);
             console.log("successful re-decryption of", pending[i]);
         } catch (e) {
             console.log("Still can't decrypt", pending[i], e.stack || e);

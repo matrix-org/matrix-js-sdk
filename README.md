@@ -13,7 +13,8 @@ In a browser
 Download either the full or minified version from
 https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
 ``<script>`` to your page. There will be a global variable ``matrixcs``
-attached to ``window`` through which you can access the SDK.
+attached to ``window`` through which you can access the SDK. See below for how to
+include libolm to enable end-to-end-encryption.
 
 Please check [the working browser example](examples/browser) for more information.
 
@@ -29,8 +30,9 @@ In Node.js
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
 ```
+See below for how to include libolm to enable end-to-end-encryption. Please check
+[the Node.js terminal app](examples/node) for a more complex example.
 
-Please check [the Node.js terminal app](examples/node) for a more complex example.
 
 What does this SDK do?
 ----------------------
@@ -243,16 +245,32 @@ The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](http://matrix.org/git/olm). It is left up to the application to make
 libolm available, via the ``Olm`` global.
 
-To enable support in a browser application:
+If the ``Olm`` global is not available, the SDK will show a warning:
 
- * download the transpiled libolm (either via ``npm install olm``, or from
-   https://matrix.org/packages/npm/olm/).
+```
+Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined
+```
+
+The SDK will continue to work for unencrypted rooms, but it will not support
+the E2E parts of the Matrix specification.
+
+To enable E2E support in a browser application:
+
+ * download the transpiled libolm (from https://matrix.org/packages/npm/olm/).
  * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
  
-To enable support in a node.js application:
+To enable E2E support in a node.js application:
 
- * ``npm install olm``
- * ``require('olm');`` *before* ``matrix-js-sdk``.
+ * ``npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz``
+   (replace the URL with the latest version you want to use from
+    https://matrix.org/packages/npm/olm/)
+ * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
+
+If you want to package Olm as dependency for your node.js application, you
+can use ``npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz 
+--save-optional`` (if your application also works without e2e crypto enabled)
+or ``--save`` (if it doesn't) to do so.
+
 
 Contributing
 ============
