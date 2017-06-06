@@ -40,6 +40,8 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
+import reEmit from './reemit';
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -166,6 +168,10 @@ function MatrixClient(opts) {
             this.store,
             opts.cryptoStore,
         );
+        reEmit(this, this._crypto, [
+            "crypto.roomKeyRequest",
+            "crypto.roomKeyRequestCancellation",
+        ]);
 
         this.olmVersion = Crypto.getOlmVersion();
     }
