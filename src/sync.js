@@ -313,7 +313,7 @@ SyncApi.prototype.stopPeeking = function() {
 
 /**
  * Do a peek room poll.
- * @param {string} roomId
+ * @param {Room} peekRoom
  * @param {string} token from= token
  */
 SyncApi.prototype._peekPoll = function(peekRoom, token) {
