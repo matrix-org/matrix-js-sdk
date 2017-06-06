@@ -104,7 +104,7 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
     // we received in the current sync.
     this._receivedRoomKeyRequests = [];
     this._receivedRoomKeyRequestCancellations = [];
-  
+
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
     );
