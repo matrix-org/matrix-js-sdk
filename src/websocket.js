@@ -415,18 +415,46 @@ WebSocketApi.prototype._start = function(syncOptions) {
                 default:
                     console.error("Received message with unknown method \"" + data.method + "\"", data);
             }
-        }
-        if (data.result || data.error) {
+        } else if (data.result || data.error) {
             self.handleResponse(data);
-        }
-
-        //TODO change server-message to make this step obsolete
-        if (data.next_batch) {
+        } else if (data.next_batch) {
+            //TODO make this step obsolete
             // message is Update-Message
             self.handleSync(data);
+        } else {
+            console.error("Unrecognised message format received via WebSocket", data);
         }
     }
 };
+
+/**
+ * Handle responses from the server
+ */
+WebSocketApi.prototype.handleResponse = function (response) {
+    if (! response.id) {
+        console.error("response id missing", response);
+        return false;
+    }
+    const txnId = response.id;
+
+    if (! this._awaiting_responses[txnId]) {
+        console.error("response id unknown", response);
+        return false;
+    }
+
+    if (response.result) {
+        // success
+        this._awaiting_responses[txnId].resolve(response.result);
+        return delete this._awaiting_responses[txnId];
+    } else if (response.error) {
+        //error
+        this._awaiting_responses[txnId].reject(response.error);
+        return delete this._awaiting_responses[txnId];
+    } else {
+        console.error("response does not contain result or error", response);
+        return false;
+    }
+}
 
 /**
  * handle message from server which was identified to be a /sync-response
@@ -558,35 +586,6 @@ WebSocketApi.prototype.sendTyping = function (roomId, isTyping, timeoutMs, callb
     const defer = q.defer();
     this._awaiting_responses[txnId] = defer;
     return defer.promise;
-}
-
-/**
- * Handle responses from the server
- */
-WebSocketApi.prototype.handleResponse = function (response) {
-    if (! response.id) {
-        console.error("response id missing", response);
-        return false;
-    }
-    const txnId = response.id;
-
-    if (! this._awaiting_responses[txnId]) {
-        console.error("response id unknown", response);
-        return false;
-    }
-
-    if (response.result) {
-        // success
-        this._awaiting_responses[txnId].resolve(response.result);
-        return delete this._awaiting_responses[txnId];
-    } else if (response.error) {
-        //error
-        this._awaiting_responses[txnId].reject(response.error);
-        return delete this._awaiting_responses[txnId];
-    } else {
-        console.error("response does not contain result or error", response);
-        return false;
-    }
 }
 
 /**
