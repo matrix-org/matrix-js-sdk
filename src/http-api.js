@@ -353,8 +353,14 @@ module.exports.MatrixHttpApi.prototype = {
 
     /**
      * Generate a WebSocket that can be extended with callback on the calling site
+     * @param {Object} queryParams Params to Setup WebSocket-Connection; can be empty
+     * @param {string} queryParams.access_token Access-Token to overwrite
+     *     the token which can be accessed via this.opts
+     * @param {string} queryParams.filter Filter definition for the sync-messages
+     * @param {string} queryParams.since Timestamp to do a differential
+     * @returns {WebSocket} set up with values of queryParams of with default-values accessible by this
      */
-    generateWebSocket: function (queryParams) {
+    generateWebSocket: function(queryParams) {
         if (!queryParams) {
             queryParams = {};
         }
@@ -363,18 +369,19 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         //TODO find a better way to distinguish between http and https
-        let ws_base = "ws://" + this.opts.baseUrl.substr("http://".length);
+        let _base = "ws://" + this.opts.baseUrl.substr("http://".length);
         if (this.opts.baseUrl.startsWith("https://")) {
-            ws_base = "wss://" + this.opts.baseUrl.substr("https://".length);
+            _base = "wss://" + this.opts.baseUrl.substr("https://".length);
         }
 
-        let ws_params = {
+        const _params = {
             filter: queryParams.filter,
             since: queryParams.since,
             access_token: queryParams.access_token,
-        }
+        };
         //TODO make query-path configuration somewhere else
-        return new WebSocket(ws_base + "/_matrix/client/unstable/stream?" + utils.encodeParams(ws_params), "m.json");
+        return new WebSocket(_base + "/_matrix/client/unstable/stream?"
+            + utils.encodeParams(_params), "m.json");
     },
 
     /**

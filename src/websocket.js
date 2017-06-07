@@ -25,11 +25,8 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 const q = require("q");
-const User = require("./models/user");
-const Room = require("./models/room");
 const utils = require("./utils");
 const Filter = require("./filter");
-const EventTimeline = require("./models/event-timeline");
 
 const DEBUG = true;
 
@@ -95,7 +92,7 @@ WebSocketApi.prototype.reconnectNow = function() {
     console.err("WebSocketApi.reconnectNow() not implemented");
     //TODO Implement
     return false;
-}
+};
 
 /**
  * @param {Room} room
@@ -150,7 +147,7 @@ WebSocketApi.prototype.start = function() {
 
     if (this._running) {
         console.log("WebSocketApi is already running. Do nothing");
-        return false;
+        return;
     }
     this._running = true;
 
@@ -203,7 +200,6 @@ WebSocketApi.prototype.start = function() {
             client.resetNotifTimelineSet();
 
             self._start({ filterId: filterId });
-
         }, function(err) {
             client._syncApi._startKeepAlives().done(function() {
                 getFilter();
@@ -223,7 +219,7 @@ WebSocketApi.prototype.start = function() {
 /**
  * Sends ping-messages via WebSocket as connection-keepAlive
  */
-WebSocketApi.prototype.ws_keepAlive = function () {
+WebSocketApi.prototype.ws_keepAlive = function() {
     debuglog("WebSocketApi.ws_keepAlive");
     if (!this._websocket) {
         console.error("this._websocket does not exist", this);
@@ -241,12 +237,12 @@ WebSocketApi.prototype.ws_keepAlive = function () {
  * So there will only be send a ping-message if there was
  * not send a message in the last ws_timeout milliseconds
  */
-WebSocketApi.prototype._init_keepalive = function () {
+WebSocketApi.prototype._init_keepalive = function() {
     if (this.ws_keepAliveTimer) {
         clearTimeout(this.ws_keepAliveTimer);
     }
     this.ws_keepAliveTimer = setTimeout(this.ws_keepAlive.bind(this), this.ws_timeout);
-}
+};
 
 /**
  * Stops the sync object from syncing.
@@ -297,10 +293,10 @@ WebSocketApi.prototype._start = function(syncOptions) {
     if (self.ws_syncToken) {
         qps.since = self.ws_syncToken;
         this._websocket = client._http.generateWebSocket(qps);
-        this._websocket.onopen    = _ws_onopen;
-        this._websocket.onclose   = _ws_onclose;
-        this._websocket.onerror   = _ws_onerror;
-        this._websocket.onmessage = _ws_onmessage;
+        this._websocket.onopen = _onopen;
+        this._websocket.onclose = _onclose;
+        this._websocket.onerror = _onerror;
+        this._websocket.onmessage = _onmessage;
     } else {
         // do initial sync via requesting /sync to avoid errors of throttling
         // (initial request is so big that the buffer on the server overflows)
@@ -325,20 +321,20 @@ WebSocketApi.prototype._start = function(syncOptions) {
             }
             qps.since = data.next_batch;
             this._websocket = client._http.generateWebSocket(qps);
-            this._websocket.onopen    = _ws_onopen;
-            this._websocket.onclose   = _ws_onclose;
-            this._websocket.onerror   = _ws_onerror;
-            this._websocket.onmessage = _ws_onmessage;
+            this._websocket.onopen = _onopen;
+            this._websocket.onclose = _onclose;
+            this._websocket.onerror = _onerror;
+            this._websocket.onmessage = _onmessage;
         });
     }
 
-    function _ws_onopen(ev) {
+    function _onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
         self.ws_possible = true;
         self._init_keepalive();
     }
 
-    function _ws_onerror(err) {
+    function _onerror(err) {
         debuglog("WebSocket.onerror() called", err);
 
 /*        debuglog("Starting keep-alive");
@@ -361,7 +357,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         );*/
     }
 
-    function _ws_onclose(ev) {
+    function _onclose(ev) {
         if (self.ws_keepAliveTimer) {
             clearTimeout(self.ws_keepAliveTimer);
             self.ws_keepAliveTimer = null;
@@ -395,25 +391,26 @@ WebSocketApi.prototype._start = function(syncOptions) {
         //self.ws_syncToken = null;
     }
 
-    function _ws_onmessage(in_data) {
+    function _onmessage(inData) {
         // TODO: Design
         // as there was a message on the channel reset keepalive-timout
         self._init_keepalive();
 
-        let data = JSON.parse(in_data.data);
+        const data = JSON.parse(inData.data);
 
         if (data.method) {
             switch (data.method) {
                 case "ping":
                     self._websocket.send(JSON.stringify({
                         id: data.id,
-                    }))
+                    }));
                 break;
                 case "sync":
                     self.handleSync(data.data);
                     break;
                 default:
-                    console.error("Received message with unknown method \"" + data.method + "\"", data);
+                    console.error("Received message with unknown method \"" + data.method
+                        + "\"", data);
             }
         } else if (data.result || data.error) {
             self.handleResponse(data);
@@ -429,8 +426,11 @@ WebSocketApi.prototype._start = function(syncOptions) {
 
 /**
  * Handle responses from the server
+ * @param {Object} response Message from WebSocket that is a response to
+ *  previous initiated Request
+ * @return {boolean} true if response could be handled successfully; false if not
  */
-WebSocketApi.prototype.handleResponse = function (response) {
+WebSocketApi.prototype.handleResponse = function(response) {
     if (! response.id) {
         console.error("response id missing", response);
         return false;
@@ -454,12 +454,13 @@ WebSocketApi.prototype.handleResponse = function (response) {
         console.error("response does not contain result or error", response);
         return false;
     }
-}
+};
 
 /**
  * handle message from server which was identified to be a /sync-response
+ * @param {Object} data Object that contains the /sync-response
  */
-WebSocketApi.prototype.handleSync = function (data) {
+WebSocketApi.prototype.handleSync = function(data) {
         const client = this.client;
         const self = this;
         //debuglog('Got new data from socket, next_batch=' + data.next_batch);
@@ -498,95 +499,110 @@ WebSocketApi.prototype.handleSync = function (data) {
 
 /**
  * Send message to server
+ * @param {Object} event The Event to be send to the Server
+ * @return {module:client.Promise} Resolves: the event-Id.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
  * TODO: Handle Timeout
  */
-WebSocketApi.prototype.sendEvent = function (event) {
-    const txnId = event._txnId ? event._txnId : client.makeTxnId();
+WebSocketApi.prototype.sendEvent = function(event) {
+    const txnId = event._txnId ? event._txnId : this.client.makeTxnId();
 
-    let message = {
+    const message = {
         id: txnId,
         method: "send",
         params: {
             room_id: event.getRoomId(),
             event_type: event.getWireType(),
             content: event.getWireContent(),
-        }
+        },
     };
 
     if (event.isState() && event.getStateKey() && event.getStateKey().length > 0) {
-        message.method = "state"
+        message.method = "state";
         message.param.state_key = event.getStateKey();
     }
 
-    this._websocket.send(JSON.stringify(message))
-    this._init_keepalive();
-
-    let defer = q.defer();
-    this._awaiting_responses[txnId] = defer;
-    return defer.promise;
-}
-
-/**
- * Sends ping-message to server
- */
-WebSocketApi.prototype.sendPing = function () {
-    this._websocket.send(JSON.stringify({
-        id: this.client.makeTxnId(),
-        method: "ping",
-    }));
-}
-
-/**
- * Send ReadMarkers via WebSocket to server
- */
-WebSocketApi.prototype.sendReadMarkers = function (roomId, rmEventId, rrEventId) {
-    const txnId = this.client.makeTxnId();
-
-    let message = {
-        id: txnId,
-        method: "read_markers",
-        params: {
-            room_id: roomId,
-            "m.fully_read": rmEventId,
-            "m.read": rrEventId,
-        }
-    };
-
-    this._websocket.send(JSON.stringify(message))
+    this._websocket.send(JSON.stringify(message));
     this._init_keepalive();
 
     const defer = q.defer();
     this._awaiting_responses[txnId] = defer;
     return defer.promise;
-}
+};
+
+/**
+ * Sends ping-message to server
+ */
+WebSocketApi.prototype.sendPing = function() {
+    this._websocket.send(JSON.stringify({
+        id: this.client.makeTxnId(),
+        method: "ping",
+    }));
+};
+
+/**
+ * Send ReadMarkers via WebSocket to server
+ * @param {string} roomId ID of the room that has been read
+ * @param {string} rmEventId ID of the event that has been read
+ * @param {string} rrEventId the event tracked by the read receipt. This is here for
+ * convenience because the RR and the RM are commonly updated at the same time as each
+ * other. The local echo of this receipt will be done if set. Optional.
+ * @return {module:client.Promise} Resolves: the empty object, {}.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+WebSocketApi.prototype.sendReadMarkers = function(roomId, rmEventId, rrEventId) {
+    const txnId = this.client.makeTxnId();
+
+    const message = {
+        id: txnId,
+        method: "read_markers",
+        params: {
+            "room_id": roomId,
+            "m.fully_read": rmEventId,
+            "m.read": rrEventId,
+        },
+    };
+
+    this._websocket.send(JSON.stringify(message));
+    this._init_keepalive();
+
+    const defer = q.defer();
+    this._awaiting_responses[txnId] = defer;
+    return defer.promise;
+};
 
 /**
  * Send Typing via WebSocket to Server
- * TODO: make use of callback
+ * @param {string} roomId
+ * @param {boolean} isTyping
+ * @param {Number} timeoutMs
+ * @param {module:client.callback} callback Optional. TODO: Implement usage
+ * @return {module:client.Promise} Resolves: the empty object, {}.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-WebSocketApi.prototype.sendTyping = function (roomId, isTyping, timeoutMs, callback) {
+WebSocketApi.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callback) {
     const txnId = this.client.makeTxnId();
 
-    let message = {
+    const message = {
         id: txnId,
         method: "typing",
         params: {
             room_id: roomId,
             typing: isTyping,
-        }
+        },
     };
 
     if (isTyping) {
         message.params.timeout = timeoutMs ? timeoutMs : 20000;
     }
 
-    this._websocket.send(JSON.stringify(message))
+    this._websocket.send(JSON.stringify(message));
     this._init_keepalive();
 
     const defer = q.defer();
     this._awaiting_responses[txnId] = defer;
     return defer.promise;
-}
+};
 
 /**
  * Sets the sync state and emits an event to say so
@@ -607,7 +623,7 @@ WebSocketApi.prototype._updateSyncState = function(newState, data) {
  */
 WebSocketApi.prototype._onOnline = function() {
     debuglog("Browser thinks we are back online");
-    client._syncApi._startKeepAlives(0);
+    this.client._syncApi._startKeepAlives(0);
 };
 
 function reEmit(reEmitEntity, emittableEntity, eventNames) {
