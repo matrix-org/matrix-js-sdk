@@ -1310,6 +1310,9 @@ MatrixClient.prototype.setRoomReadMarkers = function(roomId, eventId, rrEvent) {
         }
     }
 
+    if (this.useWebSockets && this._websocketApi) {
+        return this._websocketApi.sendReadMarkers(roomId, rmEventId, rrEventId)
+    }
     return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId);
 };
 

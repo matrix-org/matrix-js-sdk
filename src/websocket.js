@@ -509,6 +509,30 @@ WebSocketApi.prototype.sendPing = function () {
 }
 
 /**
+ * Send ReadMarkers via WebSocket to server
+ */
+WebSocketApi.prototype.sendReadMarkers = function (roomId, rmEventId, rrEventId) {
+    const txnId = this.client.makeTxnId();
+
+    let message = {
+        id: txnId,
+        method: "read_markers",
+        params: {
+            room_id: roomId,
+            "m.fully_read": rmEventId,
+            "m.read": rrEventId,
+        }
+    };
+
+    this._websocket.send(JSON.stringify(message))
+    this._init_keepalive();
+
+    const defer = q.defer();
+    this._awaiting_responses[txnId] = defer;
+    return defer.promise;
+}
+
+/**
  * Send Typing via WebSocket to Server
  * TODO: make use of callback
  */
