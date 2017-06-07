@@ -499,7 +499,7 @@ WebSocketApi.prototype.sendEvent = function (event) {
     this._init_keepalive();
 
     let defer = q.defer();
-    this._awaiting_responses.txnId = defer;
+    this._awaiting_responses[txnId] = defer;
     return defer.promise;
 }
 
@@ -507,21 +507,28 @@ WebSocketApi.prototype.sendEvent = function (event) {
  * Handle responses from the server
  */
 WebSocketApi.prototype.handleResponse = function (response) {
-    const txnId = response.txnId;
+    if (! response.id) {
+        console.error("response id missing", response);
+        return false;
+    }
+    const txnId = response.id;
+
+    if (! this._awaiting_responses[txnId]) {
+        console.error("response id unknown", response);
+        return false;
+    }
+
     if (response.result) {
         // success
-        if (this._awaiting_responses.txnId) {
-            this._awaiting_responses.txnId.resolve(response.result);
-            this._awaiting_responses.txnId = null;
-        }
+        this._awaiting_responses[txnId].resolve(response.result);
+        return delete this._awaiting_responses[txnId];
     } else if (response.error) {
         //error
-        if (this._awaiting_responses.txnId) {
-            this._awaiting_responses.txnId.reject(response.error);
-            this._awaiting_responses.txnId = null;
-        }
+        this._awaiting_responses[txnId].reject(response.error);
+        return delete this._awaiting_responses[txnId];
     } else {
-        console.error("unknown response", response);
+        console.error("response does not contain result or error", response);
+        return false;
     }
 }
 
