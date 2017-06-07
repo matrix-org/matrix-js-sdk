@@ -1,4 +1,4 @@
-/*
+    /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 
@@ -675,6 +675,27 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibilityAppService =
     });
     return this._http.authedRequest(
         callback, "PUT", path, undefined, { "visibility": visibility },
+    );
+};
+
+// User Directory Operations
+// =========================
+
+/**
+ * Query the user directory with a term matching user IDs, display names and domains.
+ * @param {object} opts options
+ * @param {string} opts.term the term with which to search.
+ * @param {number=} opts.limit the maximum number of results to return. Defaults to 20.
+ * @return {module:client.Promise} Resolves: an array of results.
+ */
+MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
+    const body = {
+        search_term: opts.term,
+        limit: opts.limit || 20,
+    };
+
+    return this._http.authedRequest(
+        undefined, "POST", "/user_directory/search", undefined, body,
     );
 };
 
