@@ -144,68 +144,73 @@ export default class OutgoingRoomKeyRequestManager {
                 // no request was made for this key
                 return;
             }
-
-            if (req.state === ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING) {
-                // nothing to do here
-                return;
-            }
-
-            if (req.state === ROOM_KEY_REQUEST_STATES.UNSENT) {
-                // just delete it
-
-                // FIXME: ghahah we may have attempted to send it, and
-                // not yet got a successful response. So the server
-                // may have seen it, so we still need to send a cancellation
-                // in that case :/
-
-                console.log(
-                    'deleting unnecessary room key request for ' +
-                    stringifyRequestBody(requestBody),
-                );
-                return this._cryptoStore.deleteOutgoingRoomKeyRequest(
-                    req.requestId, ROOM_KEY_REQUEST_STATES.UNSENT,
-                );
-            }
-
-            // by elimination, we are in ROOM_KEY_REQUEST_STATES.SENT
-
-            // send a cancellation.
-            return this._cryptoStore.updateOutgoingRoomKeyRequest(
-                req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
-                    state: ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
-                    cancellationTxnId: this._baseApis.makeTxnId(),
-                },
-            ).then((updatedReq) => {
-                if (!updatedReq) {
-                    // we raced with another tab to mark the request cancelled
-                    // - no point in sending another cancellation
-                    console.log(
-                        'Tried to cancel room key request for ' +
-                        stringifyRequestBody(requestBody) +
-                        ' but it was already cancelled in another tab',
-                    );
+            switch (req.state) {
+                case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING:
+                    // nothing to do here
                     return;
-                }
 
-                // We don't want to wait for the timer, so we send it
-                // immediately. (We might actually end up racing with the timer,
-                // but that's ok: even if we make the request twice, we'll do it
-                // with the same transaction_id, so only one message will get
-                // sent).
-                //
-                // (We also don't want to wait for the response from the server
-                // here, as it will slow down processing of received keys if we
-                // do.)
-                this._sendOutgoingRoomKeyRequestCancellation(
-                    updatedReq,
-                ).catch((e) => {
-                    console.error(
-                        "Error sending room key request cancellation; will retry later.",
-                        e,
+                case ROOM_KEY_REQUEST_STATES.UNSENT:
+                    // just delete it
+
+                    // FIXME: ghahah we may have attempted to send it, and
+                    // not yet got a successful response. So the server
+                    // may have seen it, so we still need to send a cancellation
+                    // in that case :/
+
+                    console.log(
+                        'deleting unnecessary room key request for ' +
+                        stringifyRequestBody(requestBody),
                     );
-                    this._startTimer();
-                }).done();
-            });
+                    return this._cryptoStore.deleteOutgoingRoomKeyRequest(
+                        req.requestId, ROOM_KEY_REQUEST_STATES.UNSENT,
+                    );
+
+                case ROOM_KEY_REQUEST_STATES.SENT:
+                    // send a cancellation.
+                    return this._cryptoStore.updateOutgoingRoomKeyRequest(
+                        req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
+                            state: ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
+                            cancellationTxnId: this._baseApis.makeTxnId(),
+                        },
+                    ).then((updatedReq) => {
+                        if (!updatedReq) {
+                            // updateOutgoingRoomKeyRequest couldn't find the
+                            // request in state ROOM_KEY_REQUEST_STATES.SENT,
+                            // so we must have raced with another tab to mark
+                            // the request cancelled. There is no point in
+                            // sending another cancellation since the other tab
+                            // will do it.
+                            console.log(
+                                'Tried to cancel room key request for ' +
+                                stringifyRequestBody(requestBody) +
+                                ' but it was already cancelled in another tab',
+                            );
+                            return;
+                        }
+
+                        // We don't want to wait for the timer, so we send it
+                        // immediately. (We might actually end up racing with the timer,
+                        // but that's ok: even if we make the request twice, we'll do it
+                        // with the same transaction_id, so only one message will get
+                        // sent).
+                        //
+                        // (We also don't want to wait for the response from the server
+                        // here, as it will slow down processing of received keys if we
+                        // do.)
+                        this._sendOutgoingRoomKeyRequestCancellation(
+                            updatedReq,
+                        ).catch((e) => {
+                            console.error(
+                                "Error sending room key request cancellation;"
+                                + " will retry later.", e,
+                            );
+                            this._startTimer();
+                        }).done();
+                    });
+
+                default:
+                    throw new Error('unhandled state: ' + req.state);
+            }
         });
     }
 
