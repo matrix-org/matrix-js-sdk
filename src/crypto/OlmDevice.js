@@ -797,6 +797,62 @@ OlmDevice.prototype.decryptGroupMessage = function(
 };
 
 /**
+ * Determine if we have the keys for a given megolm session
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {sring} sessionId session identifier
+ *
+ * @returns {boolean} true if we have the keys to this session
+ */
+OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionId) {
+    const s = this._sessionStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId,
+    );
+
+    if (s === null) {
+        return false;
+    }
+
+    const r = JSON.parse(s);
+    if (roomId !== r.room_id) {
+        console.warn(
+            `requested keys for inbound group session ${senderKey}|` +
+            `${sessionId}, with incorrect room_id (expected ${r.room_id}, ` +
+            `was ${roomId})`,
+        );
+        return false;
+    }
+
+    return true;
+};
+
+/**
+ * Extract the keys to a given megolm session, for sharing
+ *
+ * @param {string} roomId    room in which the message was received
+ * @param {string} senderKey base64-encoded curve25519 key of the sender
+ * @param {string} sessionId session identifier
+ *
+ * @returns {{chain_index: number, key: string}} details of the session key. The
+ *    key is a base64-encoded megolm key in export format.
+ */
+OlmDevice.prototype.getInboundGroupSessionKey = function(roomId, senderKey, sessionId) {
+    function getKey(session, keysClaimed) {
+        const messageIndex = session.first_known_index();
+
+        return {
+            "chain_index": messageIndex,
+            "key": session.export_session(messageIndex),
+        };
+    }
+
+    return this._getInboundGroupSession(
+        roomId, senderKey, sessionId, getKey,
+    );
+};
+
+/**
  * Export an inbound group session
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender

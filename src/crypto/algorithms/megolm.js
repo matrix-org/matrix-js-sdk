@@ -662,6 +662,93 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     this._retryDecryption(senderKey, sessionId);
 };
 
+/**
+ * @inheritdoc
+ */
+MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
+    const body = keyRequest.requestBody;
+
+    return this._olmDevice.hasInboundSessionKeys(
+        body.room_id,
+        body.sender_key,
+        body.session_id,
+        // TODO: ratchet index
+    );
+};
+
+/**
+ * @inheritdoc
+ */
+MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
+    const userId = keyRequest.userId;
+    const deviceId = keyRequest.deviceId;
+    const deviceInfo = this._crypto.getStoredDevice(userId, deviceId);
+    const body = keyRequest.requestBody;
+
+    olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, {
+            [userId]: [deviceInfo],
+        },
+    ).then((devicemap) => {
+        const olmSessionResult = devicemap[userId][deviceId];
+        if (!olmSessionResult.sessionId) {
+            // no session with this device, probably because there
+            // were no one-time keys.
+            //
+            // ensureOlmSessionsForUsers has already done the logging,
+            // so just skip it.
+            return;
+        }
+
+        console.log(
+            "sharing keys for session " + body.sender_key + "|"
+            + body.session_id + " with device "
+            + userId + ":" + deviceId,
+        );
+
+        const key = this._olmDevice.getInboundGroupSessionKey(
+            body.room_id, body.sender_key, body.session_id,
+        );
+
+        const payload = {
+            type: "m.forwarded_room_key",
+            content: {
+                algorithm: olmlib.MEGOLM_ALGORITHM,
+                room_id: body.room_id,
+                sender_key: body.sender_key,
+                session_id: body.session_id,
+                session_key: key.key,
+                chain_index: key.chain_index,
+            },
+        };
+
+        const encryptedContent = {
+            algorithm: olmlib.OLM_ALGORITHM,
+            sender_key: this._olmDevice.deviceCurve25519Key,
+            ciphertext: {},
+        };
+
+        olmlib.encryptMessageForDevice(
+            encryptedContent.ciphertext,
+            this._userId,
+            this._deviceId,
+            this._olmDevice,
+            userId,
+            deviceInfo,
+            payload,
+        );
+
+        const contentMap = {
+            [userId]: {
+                [deviceId]: encryptedContent,
+            },
+        };
+
+        // TODO: retries
+        return this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+    }).done();
+};
+
 
 /**
  * @inheritdoc
