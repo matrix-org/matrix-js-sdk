@@ -469,17 +469,8 @@ WebSocketApi.prototype.handleSync = function (data) {
 };
 
 /**
- * Sends ping-message to server
- */
-WebSocketApi.prototype.sendPing = function () {
-    this._websocket.send(JSON.stringify({
-        id: this.client.makeTxnId(),
-        method: "ping",
-    }));
-}
-
-/**
  * Send message to server
+ * TODO: Handle Timeout
  */
 WebSocketApi.prototype.sendEvent = function (event) {
     const txnId = event._txnId ? event._txnId : client.makeTxnId();
@@ -503,6 +494,44 @@ WebSocketApi.prototype.sendEvent = function (event) {
     this._init_keepalive();
 
     let defer = q.defer();
+    this._awaiting_responses[txnId] = defer;
+    return defer.promise;
+}
+
+/**
+ * Sends ping-message to server
+ */
+WebSocketApi.prototype.sendPing = function () {
+    this._websocket.send(JSON.stringify({
+        id: this.client.makeTxnId(),
+        method: "ping",
+    }));
+}
+
+/**
+ * Send Typing via WebSocket to Server
+ * TODO: make use of callback
+ */
+WebSocketApi.prototype.sendTyping = function (roomId, isTyping, timeoutMs, callback) {
+    const txnId = this.client.makeTxnId();
+
+    let message = {
+        id: txnId,
+        method: "typing",
+        params: {
+            room_id: roomId,
+            typing: isTyping,
+        }
+    };
+
+    if (isTyping) {
+        message.params.timeout = timeoutMs ? timeoutMs : 20000;
+    }
+
+    this._websocket.send(JSON.stringify(message))
+    this._init_keepalive();
+
+    const defer = q.defer();
     this._awaiting_responses[txnId] = defer;
     return defer.promise;
 }
