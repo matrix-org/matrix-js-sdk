@@ -33,6 +33,24 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
 
 /** possible states for a room key request
  *
+ * The state machine looks like:
+ *
+ *     |
+ *     V         (cancellation requested)
+ *   UNSENT  -----------------------------+
+ *     |                                  |
+ *     | (send successful)                |
+ *     V                                  |
+ *    SENT                                |
+ *     |                                  |
+ *     | (cancellation requested)         |
+ *     V                                  |
+ * CANCELLATION_PENDING                   |
+ *     |                                  |
+ *     | (cancellation sent)              |
+ *     V                                  |
+ * (deleted)  <---------------------------+
+ *
  * @enum {number}
  */
 const ROOM_KEY_REQUEST_STATES = {
@@ -127,8 +145,19 @@ export default class OutgoingRoomKeyRequestManager {
                 return;
             }
 
+            if (req.state === ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING) {
+                // nothing to do here
+                return;
+            }
+
             if (req.state === ROOM_KEY_REQUEST_STATES.UNSENT) {
                 // just delete it
+
+                // FIXME: ghahah we may have attempted to send it, and
+                // not yet got a successful response. So the server
+                // may have seen it, so we still need to send a cancellation
+                // in that case :/
+
                 console.log(
                     'deleting unnecessary room key request for ' +
                     stringifyRequestBody(requestBody),
@@ -138,10 +167,7 @@ export default class OutgoingRoomKeyRequestManager {
                 );
             }
 
-            if (req.state !== ROOM_KEY_REQUEST_STATES.SENT) {
-                // the only other option is cancellation_pending, in which case
-                // there is nothing else to do here
-            }
+            // by elimination, we are in ROOM_KEY_REQUEST_STATES.SENT
 
             // send a cancellation.
             return this._cryptoStore.updateOutgoingRoomKeyRequest(
