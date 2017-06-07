@@ -637,8 +637,10 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
  */
 MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     const content = event.getContent();
-    const senderKey = event.getSenderKey();
     const sessionId = content.session_id;
+    let senderKey = event.getSenderKey();
+    let exportFormat = false;
+    let keysClaimed = {};
 
     if (!content.room_id ||
         !sessionId ||
@@ -647,15 +649,29 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         console.error("key event is missing fields");
         return;
     }
-    if (!senderKey) {
-        console.error("key event has no sender key (not encrypted?)");
-        return;
+
+    if (event.getType() == "m.forwarded_room_key") {
+        exportFormat = true;
+        senderKey = content.sender_key;
+        if (!senderKey) {
+            console.error("forwarded_room_key event is missing sender_key field");
+            return;
+        }
+    } else {
+        if (!senderKey) {
+            console.error("key event has no sender key (not encrypted?)");
+            return;
+        }
+
+        // inherit the claimed ed25519 key from the setup message
+        keysClaimed = event.getKeysClaimed();
     }
 
     console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
     this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, sessionId,
-        content.session_key, event.getKeysClaimed(),
+        content.session_key, keysClaimed,
+        exportFormat,
     );
 
     // cancel any outstanding room key requests for this session

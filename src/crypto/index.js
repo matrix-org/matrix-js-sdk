@@ -161,7 +161,8 @@ function _registerEventHandlers(crypto, eventEmitter) {
 
     eventEmitter.on("toDeviceEvent", function(event) {
         try {
-            if (event.getType() == "m.room_key") {
+            if (event.getType() == "m.room_key"
+                    || event.getType() == "m.forwarded_room_key") {
                 crypto._onRoomKeyEvent(event);
             } else if (event.getType() == "m.new_device") {
                 crypto._onNewDeviceEvent(event);

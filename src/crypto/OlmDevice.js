@@ -659,9 +659,12 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {string} sessionId  session identifier
  * @param {string} sessionKey base64-encoded secret key
  * @param {Object<string, string>} keysClaimed Other keys the sender claims.
+ * @param {boolean} exportFormat true if the megolm keys are in export format
+ *    (ie, they lack an ed25519 signature)
  */
 OlmDevice.prototype.addInboundGroupSession = function(
     roomId, senderKey, sessionId, sessionKey, keysClaimed,
+    exportFormat,
 ) {
     const self = this;
 
@@ -684,7 +687,11 @@ OlmDevice.prototype.addInboundGroupSession = function(
     // new session.
     const session = new Olm.InboundGroupSession();
     try {
-        session.create(sessionKey);
+        if (exportFormat) {
+            session.import_session(sessionKey);
+        } else {
+            session.create(sessionKey);
+        }
         if (sessionId != session.session_id()) {
             throw new Error(
                 "Mismatched group session ID from senderKey: " + senderKey,
