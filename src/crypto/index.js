@@ -1277,8 +1277,8 @@ Crypto.prototype._signObject = function(obj) {
  * @property {string} userId    user requesting the key
  * @property {string} deviceId  device requesting the key
  * @property {string} requestId unique id for the request
- * @property {RoomKeyRequestBody} requestBody
- * @property {Function} share  callback which, when called, will ask
+ * @property {module:crypto~RoomKeyRequestBody} requestBody
+ * @property {function()} share  callback which, when called, will ask
  *    the relevant crypto algorithm implementation to share the keys for
  *    this request.
  */

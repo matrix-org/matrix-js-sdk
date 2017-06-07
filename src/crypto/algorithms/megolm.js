@@ -662,7 +662,9 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     this._retryDecryption(senderKey, sessionId);
 };
 
-
+/**
+ * @inheritdoc
+ */
 MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
     const body = keyRequest.requestBody;
 
@@ -674,7 +676,9 @@ MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
     );
 };
 
-
+/**
+ * @inheritdoc
+ */
 MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
     const userId = keyRequest.userId;
     const deviceId = keyRequest.deviceId;
