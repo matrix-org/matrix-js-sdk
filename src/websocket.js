@@ -396,6 +396,10 @@ WebSocketApi.prototype._start = function(syncOptions) {
     }
 
     function _ws_onmessage(in_data) {
+        // TODO: Design
+        // as there was a message on the channel reset keepalive-timout
+        self._init_keepalive();
+
         let data = JSON.parse(in_data.data);
 
         if (data.method) {
