@@ -691,8 +691,11 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibilityAppService =
 MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
     const body = {
         search_term: opts.term,
-        limit: opts.limit,
     };
+
+    if (opts.limit !== undefined) {
+        body.limit = opts.limit;
+    }
 
     return this._http.authedRequest(
         undefined, "POST", "/user_directory/search", undefined, body,
