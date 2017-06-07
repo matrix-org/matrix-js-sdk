@@ -823,6 +823,19 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
 };
 
 /**
+ * Cancel any earlier room key request
+ *
+ * @param {module:crypto~RoomKeyRequestBody} requestBody
+ *    parameters to match for cancellation
+ */
+Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
+    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
+    .catch((e) => {
+        console.warn("Error clearing pending room key requests", e);
+    }).done();
+};
+
+/**
  * handle an m.room.encryption event
  *
  * @private
