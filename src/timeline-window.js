@@ -109,17 +109,25 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     // We avoid delaying the resolution of the promise by a reactor tick if
     // we already have the data we need, which is important to keep room-switching
     // feeling snappy.
-    //
-    // TODO: ideally we'd spot getEventTimeline returning a resolved promise and
-    // skip straight to the find-event loop.
     if (initialEventId) {
+        // Attempt to find an event timeline synchronously
+        const tl = this._timelineSet.getTimelineForEvent(initialEventId);
+        if (tl) {
+            // make sure that our window includes the event
+            for (let i = 0; i < tl.getEvents().length; i++) {
+                if (tl.getEvents()[i].getId() == initialEventId) {
+                    initFields(tl, i);
+                    return q();
+                }
+            }
+        }
         return this._client.getEventTimeline(this._timelineSet, initialEventId)
             .then(function(tl) {
                 // make sure that our window includes the event
                 for (let i = 0; i < tl.getEvents().length; i++) {
                     if (tl.getEvents()[i].getId() == initialEventId) {
                         initFields(tl, i);
-                        return;
+                        return q();
                     }
                 }
                 throw new Error("getEventTimeline result didn't include requested event");
