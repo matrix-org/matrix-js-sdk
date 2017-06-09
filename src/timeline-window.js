@@ -95,10 +95,30 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     const self = this;
     initialWindowSize = initialWindowSize || 20;
 
-    // given an EventTimeline, and an event index within it, initialise our
+    // given an EventTimeline, find the event we were looking for, and initialise our
     // fields so that the event in question is in the middle of the window.
-    const initFields = function(timeline, eventIndex) {
-        const endIndex = Math.min(timeline.getEvents().length,
+    const initFields = function(timeline) {
+        let eventIndex;
+
+        const events = timeline.getEvents();
+
+        if (!initialEventId) {
+            // we were looking for the live timeline: initialise to the end
+            eventIndex = events.length;
+        } else {
+            for (let i = 0; i < events.length; i++) {
+                if (events[i].getId() == initialEventId) {
+                    eventIndex = i;
+                    break;
+                }
+            }
+
+            if (eventIndex === undefined) {
+                throw new Error("getEventTimeline result didn't include requested event");
+            }
+        }
+
+        const endIndex = Math.min(events.length,
                                 eventIndex + Math.ceil(initialWindowSize / 2));
         const startIndex = Math.max(0, endIndex - initialWindowSize);
         self._start = new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
@@ -110,24 +130,19 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     // we already have the data we need, which is important to keep room-switching
     // feeling snappy.
     //
-    // TODO: ideally we'd spot getEventTimeline returning a resolved promise and
-    // skip straight to the find-event loop.
     if (initialEventId) {
-        return this._client.getEventTimeline(this._timelineSet, initialEventId)
-            .then(function(tl) {
-                // make sure that our window includes the event
-                for (let i = 0; i < tl.getEvents().length; i++) {
-                    if (tl.getEvents()[i].getId() == initialEventId) {
-                        initFields(tl, i);
-                        return;
-                    }
-                }
-                throw new Error("getEventTimeline result didn't include requested event");
-            });
+        const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
+
+        const promState = prom.inspect();
+        if (promState.state == 'fulfilled') {
+            initFields(promState.value);
+            return q();
+        } else {
+            return prom.then(initFields);
+        }
     } else {
-        // start with the most recent events
         const tl = this._timelineSet.getLiveTimeline();
-        initFields(tl, tl.getEvents().length);
+        initFields(tl);
         return q();
     }
 };
