@@ -357,7 +357,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     function _onerror(err) {
         debuglog("WebSocket.onerror() called", err);
 
-/*        debuglog("Starting keep-alive");
+        /* debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
         // lost yet: we only do this if a keepalive poke
         // fails, since long lived HTTP connections will
@@ -387,24 +387,24 @@ WebSocketApi.prototype._start = function(syncOptions) {
         } else {
             debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
                 "error");
+        }
 
-            if (self.ws_possible) {
-                // assume connection to websocket lost by mistake
-                debuglog("Reinit Connection via WebSocket");
-                self._updateSyncState("RECONNECTING");
-                client._syncApi._startKeepAlives().done(function() {
-                    debuglog("Restart Websocket");
-                    self._start(self.ws_syncOptions);
-                });
-            } else {
-                debuglog("Connection via WebSocket seems to be not available. "
-                    + "Fallback to Long-Polling");
-                // remove variables used by WebSockets
-                self.ws_syncOptions = null;
-                self.ws_syncToken = null;
-                // Fallback /sync Long Polling
-                client.connectionFallback(self.opts);
-            }
+        if (self.ws_possible) {
+            // assume connection to websocket lost by mistake
+            debuglog("Reinit Connection via WebSocket");
+            self._updateSyncState("RECONNECTING");
+            client._syncApi._startKeepAlives().done(function() {
+                debuglog("Restart Websocket");
+                self._start(self.ws_syncOptions);
+            });
+        } else {
+            debuglog("Connection via WebSocket seems to be not available. "
+                + "Fallback to Long-Polling");
+            // remove variables used by WebSockets
+            self.ws_syncOptions = null;
+            self.ws_syncToken = null;
+            // Fallback /sync Long Polling
+            client.connectionFallback(self.opts);
         }
         //self._running = false;
         //self.ws_syncOptions = null;
