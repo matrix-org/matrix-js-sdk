@@ -503,6 +503,25 @@ WebSocketApi.prototype.handleSync = function(data) {
         self.ws_syncToken = data.next_batch;
 };
 
+WebSocketApi.prototype.sendObject = function(message) {
+    const defer = q.defer();
+    if (!message.method) {
+        return defer.reject("No method in sending object");
+    }
+    message.id = message.id || this.client.makeTxnId();
+
+    if (this._websocket.readyState == WebSocket.CONNECTING) {
+        //TODO implement catch
+        return defer.reject("Websocket is not ready");
+    }
+
+    this._websocket.send(JSON.stringify(message));
+    this._init_keepalive();
+
+    this._awaiting_responses[message.id] = defer;
+    return defer.promise;
+};
+
 /**
  * Send message to server
  * @param {Object} event The Event to be send to the Server
@@ -528,12 +547,7 @@ WebSocketApi.prototype.sendEvent = function(event) {
         message.param.state_key = event.getStateKey();
     }
 
-    this._websocket.send(JSON.stringify(message));
-    this._init_keepalive();
-
-    const defer = q.defer();
-    this._awaiting_responses[txnId] = defer;
-    return defer.promise;
+    return this.sendObject(message);
 };
 
 /**
@@ -569,12 +583,7 @@ WebSocketApi.prototype.sendReadMarkers = function(roomId, rmEventId, rrEventId) 
         },
     };
 
-    this._websocket.send(JSON.stringify(message));
-    this._init_keepalive();
-
-    const defer = q.defer();
-    this._awaiting_responses[txnId] = defer;
-    return defer.promise;
+    return this.sendObject(message);
 };
 
 /**
@@ -602,12 +611,7 @@ WebSocketApi.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callba
         message.params.timeout = timeoutMs ? timeoutMs : 20000;
     }
 
-    this._websocket.send(JSON.stringify(message));
-    this._init_keepalive();
-
-    const defer = q.defer();
-    this._awaiting_responses[txnId] = defer;
-    return defer.promise;
+    return this.sendObject(message);
 };
 
 /**
