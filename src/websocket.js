@@ -81,6 +81,7 @@ function WebSocketApi(client, opts) {
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
 
     this._awaiting_responses = {};
+    this._pendingSend = [];
 
     if (client.getNotifTimelineSet()) {
         reEmit(client, client.getNotifTimelineSet(),
@@ -338,6 +339,12 @@ WebSocketApi.prototype._start = function(syncOptions) {
         debuglog("Connected to WebSocket: ", ev);
         self.ws_possible = true;
         self._init_keepalive();
+
+        self._pendingSend.forEach((message) => {
+            debuglog("Send postponed message via WebSocket", message);
+            self._websocket.send(JSON.stringify(message));
+        });
+        self._pendingSend = [];
     }
 
     function _onerror(err) {
@@ -511,12 +518,12 @@ WebSocketApi.prototype.sendObject = function(message) {
     message.id = message.id || this.client.makeTxnId();
 
     if (this._websocket.readyState == WebSocket.CONNECTING) {
-        //TODO implement catch
-        return defer.reject("Websocket is not ready");
+        debuglog("WebSocket is not ready. Postponing", message);
+        this._pendingSend.push(message);
+    } else {
+        this._websocket.send(JSON.stringify(message));
+        this._init_keepalive();
     }
-
-    this._websocket.send(JSON.stringify(message));
-    this._init_keepalive();
 
     this._awaiting_responses[message.id] = defer;
     return defer.promise;
