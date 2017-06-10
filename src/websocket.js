@@ -279,7 +279,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         return;
     }
 
-    let filterId = self.ws_syncOptions.filterId;
+    let filterId = syncOptions.filterId;
     if (client.isGuest() && !filterId) {
         filterId = client._syncApi._getGuestFilter();
     }
@@ -292,55 +292,41 @@ WebSocketApi.prototype._start = function(syncOptions) {
         if (cachedSync) {
             debuglog("Use cached Sync", cachedSync);
             client._syncApi._processSyncResponse(null, {
-                    next_batch: cachedSync.nextBatch,
-                    rooms: cachedSync.roomsData,
-                    account_data: {
-                        events: cachedSync.accountData,
-                    },
+                next_batch: cachedSync.nextBatch,
+                rooms: cachedSync.roomsData,
+                account_data: {
+                    events: cachedSync.accountData,
+                },
             });
-            const syncEventData = {
-                oldSyncToken: null,
-                nextSyncToken: cachedSync.nextBatch,
-                catchingUp: true,
-            };
-            self._updateSyncState("PREPARED", syncEventData);
             client.store.setSyncToken(cachedSync.nextBatch);
             return cachedSync.nextBatch;
         } else {
             debuglog("No cached Sync");
-            return client.store.getSyncToken();
-        }
-    }).then((syncToken) => {
-        if (!syncToken || syncToken === "undefined") {
-            // do initial sync via requesting /sync to avoid errors of throttling
-            // (initial request is so big that the buffer on the server overflows)
-            client._http.authedRequest(
+            return client._http.authedRequest(
                 undefined, "GET", "/sync", qps, undefined, {},
             ).then((data) => {
                 client.store.setSyncToken(data.next_batch);
+                return client.store.setSyncData(data).then(() => {
+                    return data;
+                });
+            }).then((data) => {
                 try {
                     client._syncApi._processSyncResponse(null, data);
                 } catch (e) {
                     console.error("Caught /sync error", e.stack || e);
                 }
-                const syncEventData = {
-                    oldSyncToken: syncToken,
-                    nextSyncToken: data.next_batch,
-                    catchingUp: true,
-                };
-
-                if (!syncOptions.hasSyncedBefore) {
-                    self._updateSyncState("PREPARED", syncEventData);
-                    syncOptions.hasSyncedBefore = true;
-                }
                 return data.next_batch;
             });
-        } else {
-            return syncToken;
         }
     }).then((syncToken) => {
+        const syncEventData = {
+            oldSyncToken: null,
+            nextSyncToken: syncToken,
+        };
+        self._updateSyncState("PREPARED", syncEventData);
+
         self.ws_syncToken = syncToken;
-        qps.since = self.ws_syncToken;
+        qps.since = syncToken;
         this._websocket = client._http.generateWebSocket(qps);
         this._websocket.onopen = _onopen;
         this._websocket.onclose = _onclose;
