@@ -284,49 +284,69 @@ WebSocketApi.prototype._start = function(syncOptions) {
         filterId = client._syncApi._getGuestFilter();
     }
 
-    self.ws_syncToken = client.store.getSyncToken();
-
     const qps = {
         filter: filterId,
     };
 
-    if (self.ws_syncToken) {
+    client.store.getSavedSync().then((cachedSync) => {
+        if (cachedSync) {
+            debuglog("Use cached Sync", cachedSync);
+            client._syncApi._processSyncResponse(null, {
+                    next_batch: cachedSync.nextBatch,
+                    rooms: cachedSync.roomsData,
+                    account_data: {
+                        events: cachedSync.accountData,
+                    },
+            });
+            const syncEventData = {
+                oldSyncToken: null,
+                nextSyncToken: cachedSync.nextBatch,
+                catchingUp: true,
+            };
+            self._updateSyncState("PREPARED", syncEventData);
+            client.store.setSyncToken(cachedSync.nextBatch);
+            return cachedSync.nextBatch;
+        } else {
+            debuglog("No cached Sync");
+            return client.store.getSyncToken();
+        }
+    }).then((syncToken) => {
+        if (!syncToken || syncToken === "undefined") {
+            // do initial sync via requesting /sync to avoid errors of throttling
+            // (initial request is so big that the buffer on the server overflows)
+            client._http.authedRequest(
+                undefined, "GET", "/sync", qps, undefined, {},
+            ).then((data) => {
+                client.store.setSyncToken(data.next_batch);
+                try {
+                    client._syncApi._processSyncResponse(null, data);
+                } catch (e) {
+                    console.error("Caught /sync error", e.stack || e);
+                }
+                const syncEventData = {
+                    oldSyncToken: syncToken,
+                    nextSyncToken: data.next_batch,
+                    catchingUp: true,
+                };
+
+                if (!syncOptions.hasSyncedBefore) {
+                    self._updateSyncState("PREPARED", syncEventData);
+                    syncOptions.hasSyncedBefore = true;
+                }
+                return data.next_batch;
+            });
+        } else {
+            return syncToken;
+        }
+    }).then((syncToken) => {
+        self.ws_syncToken = syncToken;
         qps.since = self.ws_syncToken;
         this._websocket = client._http.generateWebSocket(qps);
         this._websocket.onopen = _onopen;
         this._websocket.onclose = _onclose;
         this._websocket.onerror = _onerror;
         this._websocket.onmessage = _onmessage;
-    } else {
-        // do initial sync via requesting /sync to avoid errors of throttling
-        // (initial request is so big that the buffer on the server overflows)
-        client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, {},
-        ).then((data) => {
-            client.store.setSyncToken(data.next_batch);
-            try {
-                client._syncApi._processSyncResponse(null, data);
-            } catch (e) {
-                console.error("Caught /sync error", e.stack || e);
-            }
-            const syncEventData = {
-                oldSyncToken: self.ws_syncToken,
-                nextSyncToken: data.next_batch,
-                catchingUp: true,
-            };
-
-            if (!syncOptions.hasSyncedBefore) {
-                self._updateSyncState("PREPARED", syncEventData);
-                syncOptions.hasSyncedBefore = true;
-            }
-            qps.since = data.next_batch;
-            this._websocket = client._http.generateWebSocket(qps);
-            this._websocket.onopen = _onopen;
-            this._websocket.onclose = _onclose;
-            this._websocket.onerror = _onerror;
-            this._websocket.onmessage = _onmessage;
-        });
-    }
+    });
 
     function _onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
