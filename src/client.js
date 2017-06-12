@@ -941,6 +941,8 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         txnId = this.makeTxnId();
     }
 
+    console.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
+
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
     // the client has no scheduler or store.
@@ -1065,7 +1067,12 @@ function _sendEventHttpRequest(client, event) {
 
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
-    );
+    ).then((res) => {
+        console.log(
+            `Event sent to ${event.getRoomId()} with event id ${res.event_id}`,
+        );
+        return res;
+    });
 }
 
 /**
