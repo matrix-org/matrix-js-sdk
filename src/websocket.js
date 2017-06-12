@@ -382,7 +382,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
         this._websocket = client._http.generateWebSocket(qps);
         this._websocket.onopen = _onopen;
         this._websocket.onclose = _onclose;
-        this._websocket.onerror = _onerror;
         this._websocket.onmessage = _onmessage;
     });
 
@@ -396,29 +395,6 @@ WebSocketApi.prototype._start = function(syncOptions) {
             self._websocket.send(JSON.stringify(message));
         });
         self._pendingSend = [];
-    }
-
-    function _onerror(err) {
-        debuglog("WebSocket.onerror() called", err);
-
-        /* debuglog("Starting keep-alive");
-        // Note that we do *not* mark the sync connection as
-        // lost yet: we only do this if a keepalive poke
-        // fails, since long lived HTTP connections will
-        // go away sometimes and we shouldn't treat this as
-        // erroneous. We set the state to 'reconnecting'
-        // instead, so that clients can onserve this state
-        // if they wish.
-        self._updateSyncState("RECONNECTING");
-        self._startKeepAlives().done(function() {
-            debuglog("Restart Websocket");
-            self._start(self.ws_syncOptions);
-        });
-        // Transition from RECONNECTING to ERROR after a given number of failed syncs
-        self._updateSyncState(
-            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
-                "ERROR" : "RECONNECTING",
-        );*/
     }
 
     function _onclose(ev) {
@@ -450,14 +426,10 @@ WebSocketApi.prototype._start = function(syncOptions) {
             // Fallback /sync Long Polling
             client.connectionFallback(self.opts);
         }
-        //self._running = false;
-        //self.ws_syncOptions = null;
-        //self.ws_syncToken = null;
     }
 
     function _onmessage(inData) {
-        // TODO: Design
-        // as there was a message on the channel reset keepalive-timout
+        // Design-TODO: Shall we reset the keepalive-timer when a message receives?
         self._init_keepalive();
 
         const data = JSON.parse(inData.data);
@@ -479,8 +451,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
         } else if (data.result || data.error) {
             self.handleResponse(data);
         } else if (data.next_batch) {
-            //TODO make this step obsolete
-            // message is Update-Message
+            // message is plain /sync-response.
             self.handleSync(data);
         } else {
             console.error("Unrecognised message format received via WebSocket", data);
