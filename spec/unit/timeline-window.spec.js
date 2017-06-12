@@ -12,6 +12,22 @@ import expect from 'expect';
 const ROOM_ID = "roomId";
 const USER_ID = "userId";
 
+function createTimelineSet() {
+    // XXX: this is a horrid hack
+    return {
+        room: {
+            roomId: ROOM_ID,
+            getUnfilteredTimelineSet: function() {
+                return this;
+            },
+        },
+        getTimelineForEvent: function() {
+            return this.timeline;
+        },
+        timeline: null, // Must be set after creation
+    };
+}
+
 /*
  * create a timeline with a bunch (default 3) events.
  * baseIndex is 1 by default.
@@ -24,13 +40,9 @@ function createTimeline(numEvents, baseIndex) {
         baseIndex = 1;
     }
 
-    // XXX: this is a horrid hack
-    const timelineSet = { room: { roomId: ROOM_ID }};
-    timelineSet.room.getUnfilteredTimelineSet = function() {
-        return timelineSet;
-    };
-
+    const timelineSet = createTimelineSet();
     const timeline = new EventTimeline(timelineSet);
+    timelineSet.timeline = timeline;
 
     // add the events after the baseIndex first
     addEventsToTimeline(timeline, numEvents - baseIndex, false);
@@ -153,7 +165,8 @@ describe("TimelineWindow", function() {
     let timelineSet;
     let client;
     function createWindow(timeline, opts) {
-        timelineSet = {};
+        timelineSet = createTimelineSet();
+        timelineSet.timeline = timeline;
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
@@ -186,7 +199,7 @@ describe("TimelineWindow", function() {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {};
+            const timelineSet = createTimelineSet();
             const client = {};
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
@@ -209,7 +222,7 @@ describe("TimelineWindow", function() {
 
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {};
+            const timelineSet = createTimelineSet();
             const client = {};
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
