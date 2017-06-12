@@ -528,19 +528,19 @@ WebSocketApi.prototype.handleResponse = function(response) {
  * @param {Object} data Object that contains the /sync-response
  */
 WebSocketApi.prototype.handleSync = function(data) {
-        const client = this.client;
-        const self = this;
-        //debuglog('Got new data from socket, next_batch=' + data.next_batch);
+    const client = this.client;
+    const self = this;
+    //debuglog('Got new data from socket, next_batch=' + data.next_batch);
 
-        // set the sync token NOW *before* processing the events. We do this so
-        // if something barfs on an event we can skip it rather than constantly
-        // polling with the same token.
-        client.store.setSyncData(data);
-        client.store.setSyncToken(data.next_batch);
+    // set the sync token NOW *before* processing the events. We do this so
+    // if something barfs on an event we can skip it rather than constantly
+    // polling with the same token.
+    client.store.setSyncToken(data.next_batch);
 
-        // Reset after a successful sync
-        self._failedSyncCount = 0;
+    // Reset after a successful sync
+    self._failedSyncCount = 0;
 
+    client.store.setSyncData(data).then(() => {
         try {
             client._syncApi._processSyncResponse(self.ws_syncToken, data);
         } catch (e) {
@@ -562,6 +562,7 @@ WebSocketApi.prototype.handleSync = function(data) {
         // store).
         client.store.save();
         self.ws_syncToken = data.next_batch;
+    });
 };
 
 WebSocketApi.prototype.sendObject = function(message) {
