@@ -398,6 +398,11 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
     return this._http.authedRequest(callback, "GET", path);
 };
 
+MatrixBaseApis.prototype.getGroupSummary = function(groupId, callback) {
+    const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
+    return this._http.authedRequest(callback, "GET", path);
+};
+
 /**
  * Retrieve a state event.
  * @param {string} roomId
