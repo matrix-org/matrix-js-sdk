@@ -274,6 +274,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
     const self = this;
 
     self.ws_syncOptions = syncOptions;
+    self.ws_syncToken = client.store.getSyncToken();
 
     if (!this._running) {
         debuglog("WebSocket no longer running: exiting.");
@@ -289,45 +290,63 @@ WebSocketApi.prototype._start = function(syncOptions) {
         filter: filterId,
     };
 
-    client.store.getSavedSync().then((cachedSync) => {
-        if (cachedSync) {
-            debuglog("Use cached Sync", cachedSync);
-            client._syncApi._processSyncResponse(null, {
-                next_batch: cachedSync.nextBatch,
-                rooms: cachedSync.roomsData,
-                account_data: {
-                    events: cachedSync.accountData,
-                },
-            });
-            client.store.setSyncToken(cachedSync.nextBatch);
-            return cachedSync.nextBatch;
-        } else {
-            debuglog("No cached Sync");
-            return client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, {},
-            ).then((data) => {
-                client.store.setSyncToken(data.next_batch);
-                return client.store.setSyncData(data).then(() => {
-                    return data;
+    let syncPromise;
+    if (!syncOptions.hasSyncedBefore) {
+        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
+        // if there is data there.
+        syncPromise = client.store.getSavedSync().then((cachedSync) => {
+            if (cachedSync) {
+                debuglog("Use cached Sync", cachedSync);
+                client._syncApi._processSyncResponse(null, {
+                    next_batch: cachedSync.nextBatch,
+                    rooms: cachedSync.roomsData,
+                    account_data: {
+                        events: cachedSync.accountData,
+                    },
                 });
-            }).then((data) => {
-                try {
-                    client._syncApi._processSyncResponse(null, data);
-                } catch (e) {
-                    console.error("Caught /sync error", e.stack || e);
-                }
-                return data.next_batch;
-            });
-        }
-    }).then((syncToken) => {
-        const syncEventData = {
-            oldSyncToken: null,
-            nextSyncToken: syncToken,
-        };
-        self._updateSyncState("PREPARED", syncEventData);
+                client.store.setSyncToken(cachedSync.nextBatch);
+                return cachedSync.nextBatch;
+            } else {
+                debuglog("No cached Sync");
+                return client._http.authedRequest(
+                    undefined, "GET", "/sync", qps, undefined, {},
+                ).then((data) => {
+                    client.store.setSyncToken(data.next_batch);
+                    return client.store.setSyncData(data).then(() => {
+                        return data;
+                    });
+                }).then((data) => {
+                    try {
+                        client._syncApi._processSyncResponse(null, data);
+                    } catch (e) {
+                        console.error("Caught /sync error", e.stack || e);
+                    }
+                    return data.next_batch;
+                });
+            }
+        });
+    } else {
+        syncPromise = q(null);
+    }
 
-        self.ws_syncToken = syncToken;
-        qps.since = syncToken;
+    syncPromise.then((syncToken) => {
+        if (syncToken) {
+            // last data got fetched via cache or /sync;
+            // So this is a client boot-up
+            const syncEventData = {
+                oldSyncToken: null,
+                nextSyncToken: syncToken,
+            };
+            self._updateSyncState("PREPARED", syncEventData);
+
+            self.ws_syncToken = syncToken;
+            self.ws_syncOptions.hasSyncedBefore = true;
+        } else {
+            // we are reconnecting right now
+            // So nothing to do right here
+            debuglog("Reconnect of WebSocket initiated.");
+        }
+        qps.since = self.ws_syncToken;
         this._websocket = client._http.generateWebSocket(qps);
         this._websocket.onopen = _onopen;
         this._websocket.onclose = _onclose;
