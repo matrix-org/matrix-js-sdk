@@ -183,6 +183,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         }
 
         if (!session) {
+            console.log(`Starting new megolm session for room ${self._roomId}`);
             session = self._prepareNewSession();
         }
 
@@ -353,6 +354,8 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         // TODO: retries
         return self._baseApis.sendToDevice("m.room.encrypted", contentMap);
     }).then(function() {
+        console.log(`Completed megolm keyshare in ${self._roomId}`);
+
         // Add the devices we have shared with to session.sharedWithDevices.
         //
         // we deliberately iterate over devicesByUser (ie, the devices we
@@ -387,6 +390,8 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
  */
 MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     const self = this;
+    console.log(`Starting to encrypt event for ${this._roomId}`);
+
     return this._getDevicesInRoom(room).then(function(devicesInRoom) {
         // check if any of these devices are not yet known to the user.
         // if so, warn the user so they can verify or ignore.

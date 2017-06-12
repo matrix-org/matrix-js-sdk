@@ -76,6 +76,10 @@ export default class DeviceList {
             if (this._keyDownloadsInProgressByUser[u]) {
                 // already a key download in progress/queued for this user; its results
                 // will be good enough for us.
+                console.log(
+                    `downloadKeys: already have a download in progress for ` +
+                    `${u}: awaiting its result`,
+                );
                 promises.push(this._keyDownloadsInProgressByUser[u]);
             } else if (forceDownload || trackingStatus != TRACKING_STATUS_UP_TO_DATE) {
                 usersToDownload.push(u);
@@ -86,6 +90,10 @@ export default class DeviceList {
             console.log("downloadKeys: downloading for", usersToDownload);
             const downloadPromise = this._doKeyDownload(usersToDownload);
             promises.push(downloadPromise);
+        }
+
+        if (promises.length === 0) {
+            console.log("downloadKeys: already have all necessary keys");
         }
 
         return q.all(promises).then(() => {
