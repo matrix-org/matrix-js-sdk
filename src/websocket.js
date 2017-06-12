@@ -27,6 +27,7 @@ limitations under the License.
 const q = require("q");
 const utils = require("./utils");
 const Filter = require("./filter");
+const MatrixError = require("./http-api").MatrixError;
 
 const DEBUG = true;
 
@@ -231,6 +232,37 @@ WebSocketApi.prototype.ws_keepAlive = function() {
         this.sendPing();
     }
     this.ws_keepAliveTimer = setTimeout(this.ws_keepAlive.bind(this), this.ws_timeout);
+};
+
+WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
+    if (this._awaiting_responses[messageId]) {
+        debuglog("Run MessageTimeout for message", messageId);
+        const curObj = this._awaiting_responses[messageId];
+        if (curObj == "ping") {
+            console.error("Timeout for sending ping-request. Try reconnecting");
+            // as reconnection will be handled in _close this is enough for here
+            this._websocket.close();
+            return;
+        }
+        if (curObj.retried > 1) {
+            curObj.defer.reject(new MatrixError({
+                error: "Locally timed out waiting for a response",
+                errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
+                timeout: this.ws_timeout * 2,
+            }));
+            return;
+        }
+        if (this._websocket.readyState != WebSocket.OPEN) {
+            debuglog("WebSocket is not ready. Postponing", curObj.message);
+            this._pendingSend.push(curObj.message);
+        } else {
+            this._websocket.send(JSON.stringify(curObj.message));
+        }
+        this._awaiting_responses[messageId].retried = curObj.retried + 1 || 1;
+
+        setTimeout(this._handleResponseTimeout.bind(this, messageId),
+            this.ws_timeout * 2/3);
+    }
 };
 
 /**
@@ -473,14 +505,17 @@ WebSocketApi.prototype.handleResponse = function(response) {
         console.error("response id unknown", response);
         return false;
     }
+    if (this._awaiting_responses[txnId] == "ping") {
+        return delete this._awaiting_responses[txnId];
+    }
 
     if (response.result) {
         // success
-        this._awaiting_responses[txnId].resolve(response.result);
+        this._awaiting_responses[txnId].defer.resolve(response.result);
         return delete this._awaiting_responses[txnId];
     } else if (response.error) {
         //error
-        this._awaiting_responses[txnId].reject(response.error);
+        this._awaiting_responses[txnId].defer.reject(response.error);
         return delete this._awaiting_responses[txnId];
     } else {
         console.error("response does not contain result or error", response);
@@ -536,15 +571,18 @@ WebSocketApi.prototype.sendObject = function(message) {
     }
     message.id = message.id || this.client.makeTxnId();
 
-    if (this._websocket.readyState == WebSocket.CONNECTING) {
+    if (this._websocket.readyState != WebSocket.OPEN) {
         debuglog("WebSocket is not ready. Postponing", message);
         this._pendingSend.push(message);
     } else {
         this._websocket.send(JSON.stringify(message));
-        this._init_keepalive();
     }
 
-    this._awaiting_responses[message.id] = defer;
+    this._awaiting_responses[message.id] = {
+        message: message,
+        defer: defer,
+    };
+    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout * 2/3);
     return defer.promise;
 };
 
@@ -580,10 +618,13 @@ WebSocketApi.prototype.sendEvent = function(event) {
  * Sends ping-message to server
  */
 WebSocketApi.prototype.sendPing = function() {
+    const txnId = this.client.makeTxnId();
     this._websocket.send(JSON.stringify({
-        id: this.client.makeTxnId(),
+        id: txnId,
         method: "ping",
     }));
+    this._awaiting_responses[txnId] = "ping";
+    setTimeout(this._handleResponseTimeout.bind(this, txnId), this.ws_timeout);
 };
 
 /**
