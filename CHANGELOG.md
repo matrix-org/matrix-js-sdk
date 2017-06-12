@@ -1,3 +1,10 @@
+Changes in [0.7.11](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11) (2017-06-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11-rc.1...v0.7.11)
+
+ * Add a bunch of logging around sending messages
+   [\#460](https://github.com/matrix-org/matrix-js-sdk/pull/460)
+
 Changes in [0.7.11-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11-rc.1) (2017-06-09)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.10...v0.7.11-rc.1)
