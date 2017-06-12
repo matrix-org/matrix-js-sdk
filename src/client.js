@@ -2960,15 +2960,27 @@ MatrixClient.prototype.stopClient = function() {
 
 /**
  * Called by WebSocketApi to fallback to Longpolling (SyncAPI)
- * @param {Object} opts the same Object as defined for SyncApi or WebSocketApi
+ * @param {Object} opts The same Object as defined for SyncApi or WebSocketApi (to init)
+ * @param {Object} syncOptions Parameter to start syncApi._sync() with to
+ *     not beeing forced to run initialization of the client again
+ * TODO: Find a not so hacky way to implement this
  */
-MatrixClient.prototype.connectionFallback = function(opts) {
+MatrixClient.prototype.connectionFallback = function(opts, syncOptions) {
     this.useWebSockets = false;
     console.log("Do Fallback to SyncAPI");
     if (! this._syncApi) {
         this._syncApi = new SyncApi(this, opts);
     }
-    this._syncApi.sync();
+    const sync = this._syncApi;
+    sync._running = true;
+    if (global.document) {
+        sync._onOnlineBound = sync._onOnline.bind(sync);
+        global.document.addEventListener("online", sync._onOnlineBound, false);
+    }
+
+    sync._sync(syncOptions);
+    this._websocketApi.stop();
+    this._websocketApi = null;
 
     const self = this;
     this.scheduler.setProcessFunction(function(eventToSend) {

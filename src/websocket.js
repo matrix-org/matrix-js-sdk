@@ -420,11 +420,11 @@ WebSocketApi.prototype._start = function(syncOptions) {
         } else {
             debuglog("Connection via WebSocket seems to be not available. "
                 + "Fallback to Long-Polling");
+            // Fallback /sync Long Polling
+            client.connectionFallback(self.opts, self.ws_syncOptions);
             // remove variables used by WebSockets
             self.ws_syncOptions = null;
             self.ws_syncToken = null;
-            // Fallback /sync Long Polling
-            client.connectionFallback(self.opts);
         }
     }
 
