@@ -391,8 +391,10 @@ WebSocketApi.prototype._start = function(syncOptions) {
         self._init_keepalive();
 
         self._pendingSend.forEach((message) => {
-            debuglog("Send postponed message via WebSocket", message);
-            self._websocket.send(JSON.stringify(message));
+            if (self._awaiting_responses[message.id]) {
+                debuglog("Send postponed message via WebSocket", message);
+                self._websocket.send(JSON.stringify(message));
+            }
         });
         self._pendingSend = [];
     }
