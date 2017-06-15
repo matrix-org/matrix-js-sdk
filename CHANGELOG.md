@@ -1,3 +1,10 @@
+Changes in [0.7.12-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12-rc.1) (2017-06-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11...v0.7.12-rc.1)
+
+ * allow setting iceTransportPolicy to relay through forceTURN option
+   [\#462](https://github.com/matrix-org/matrix-js-sdk/pull/462)
+
 Changes in [0.7.11](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11) (2017-06-12)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11-rc.1...v0.7.11)
