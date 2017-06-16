@@ -385,8 +385,20 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (!queryParams.access_token) {
-            queryParams.access_token = this.opts.accessToken;
+        if (isFinite(opts)) {
+            // opts used to be localTimeoutMs
+            opts = {
+                localTimeoutMs: opts,
+            };
+        }
+        if (!opts) {
+            opts = {};
+        }
+        if (!opts.headers) {
+            opts.headers = {};
+        }
+        if (!opts.headers.Authorization) {
+            opts.headers.Authorization = "Bearer " + this.opts.accessToken;
         }
 
         const request_promise = this.request(
