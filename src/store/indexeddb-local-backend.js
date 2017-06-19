@@ -163,8 +163,27 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        console.log("Removing indexeddb instance: ", this._dbName);
-        return promiseifyRequest(this.indexedDB.deleteDatabase(this._dbName));
+        return new q.Promise((resolve, reject) => {
+            console.log(`Removing indexeddb instance: ${this._dbName}`);
+            const req = this.indexedDB.deleteDatabase(this._dbName);
+
+            req.onblocked = () => {
+                reject(new Error(
+                    "unable to delete indexeddb because it is open elsewhere",
+                ));
+            };
+
+            req.onerror = (ev) => {
+                reject(new Error(
+                    "unable to delete indexeddb: " + ev.target.error,
+                ));
+            };
+
+            req.onsuccess = () => {
+                console.log(`Removed indexeddb instance: ${this._dbName}`);
+                resolve();
+            };
+        });
     },
 
     /**
