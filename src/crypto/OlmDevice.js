@@ -581,26 +581,27 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
 // =====================
 
 /**
+ * data stored in the session store about an inbound group session
+ *
+ * @typedef {Object} InboundGroupSessionData
+ * @property {string} room_Id
+ * @property {string} session   pickled Olm.InboundGroupSession
+ * @property {Object<string, string>} keysClaimed
+ */
+
+/**
  * store an InboundGroupSession in the session store
  *
- * @param {string} roomId
  * @param {string} senderCurve25519Key
  * @param {string} sessionId
- * @param {Olm.InboundGroupSession} session
- * @param {object} keysClaimed Other keys the sender claims.
+ * @param {InboundGroupSessionData} sessionData
  * @private
  */
 OlmDevice.prototype._saveInboundGroupSession = function(
-    roomId, senderCurve25519Key, sessionId, session, keysClaimed,
+    senderCurve25519Key, sessionId, sessionData,
 ) {
-    const r = {
-        room_id: roomId,
-        session: session.pickle(this._pickleKey),
-        keysClaimed: keysClaimed,
-    };
-
     this._sessionStore.storeEndToEndInboundGroupSession(
-        senderCurve25519Key, sessionId, JSON.stringify(r),
+        senderCurve25519Key, sessionId, JSON.stringify(sessionData),
     );
 };
 
@@ -610,8 +611,8 @@ OlmDevice.prototype._saveInboundGroupSession = function(
  * @param {string} roomId
  * @param {string} senderKey
  * @param {string} sessionId
- * @param {function(Olm.InboundGroupSession, Object<string, string>): T} func
- *   function to call. Second argument is the map of keys claimed by the session.
+ * @param {function(Olm.InboundGroupSession, InboundGroupSessionData): T} func
+ *   function to call.
  *
  * @return {null} the sessionId is unknown
  *
@@ -645,7 +646,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
     const session = new Olm.InboundGroupSession();
     try {
         session.unpickle(this._pickleKey, r.session);
-        return func(session, r.keysClaimed || {});
+        return func(session, r);
     } finally {
         session.free();
     }
@@ -666,7 +667,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
     const self = this;
 
     /* if we already have this session, consider updating it */
-    function updateSession(session) {
+    function updateSession(session, sessionData) {
         console.log("Update for megolm session " + senderKey + "/" + sessionId);
         // for now we just ignore updates. TODO: implement something here
 
@@ -690,8 +691,15 @@ OlmDevice.prototype.addInboundGroupSession = function(
                 "Mismatched group session ID from senderKey: " + senderKey,
             );
         }
+
+        const sessionData = {
+            room_id: roomId,
+            session: session.pickle(this._pickleKey),
+            keysClaimed: keysClaimed,
+        };
+
         self._saveInboundGroupSession(
-            roomId, senderKey, sessionId, session, keysClaimed,
+            senderKey, sessionId, sessionData,
         );
     } finally {
         session.free();
@@ -706,7 +714,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
  */
 OlmDevice.prototype.importInboundGroupSession = function(data) {
     /* if we already have this session, consider updating it */
-    function updateSession(session) {
+    function updateSession(session, sessionData) {
         console.log("Update for megolm session " + data.sender_key + "|" +
                     data.session_id);
         // for now we just ignore updates. TODO: implement something here
@@ -731,9 +739,16 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
                 "Mismatched group session ID from senderKey: " + data.sender_key,
             );
         }
+
+        const sessionData = {
+            room_id: data.room_id,
+            session: session.pickle(this._pickleKey),
+            keysClaimed: data.sender_claimed_keys,
+            forwardingCurve25519KeyChain: data.forwarding_curve25519_key_chain,
+        };
+
         this._saveInboundGroupSession(
-            data.room_id, data.sender_key, data.session_id, session,
-            data.sender_claimed_keys,
+            data.sender_key, data.session_id, sessionData,
         );
     } finally {
         session.free();
@@ -758,7 +773,7 @@ OlmDevice.prototype.decryptGroupMessage = function(
 ) {
     const self = this;
 
-    function decrypt(session, keysClaimed) {
+    function decrypt(session, sessionData) {
         const res = session.decrypt(body);
 
         let plaintext = res.plaintext;
@@ -777,12 +792,13 @@ OlmDevice.prototype.decryptGroupMessage = function(
             self._inboundGroupSessionMessageIndexes[messageIndexKey] = true;
         }
 
+        sessionData.session = session.pickle(self._pickleKey);
         self._saveInboundGroupSession(
-            roomId, senderKey, sessionId, session, keysClaimed,
+            senderKey, sessionId, sessionData,
         );
         return {
             result: plaintext,
-            keysClaimed: keysClaimed,
+            keysClaimed: sessionData.keysClaimed || {},
             senderKey: senderKey,
         };
     }
@@ -834,7 +850,7 @@ OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionI
  *    key is a base64-encoded megolm key in export format.
  */
 OlmDevice.prototype.getInboundGroupSessionKey = function(roomId, senderKey, sessionId) {
-    function getKey(session, keysClaimed) {
+    function getKey(session, sessionData) {
         const messageIndex = session.first_known_index();
 
         return {
