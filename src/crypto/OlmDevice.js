@@ -750,7 +750,7 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
  *
  * @return {null} the sessionId is unknown
  *
- * @return {{result: string, keysProved: Object<string, string>, keysClaimed:
+ * @return {{result: string, senderKey: string, keysClaimed:
  *    Object<string, string>}} result
  */
 OlmDevice.prototype.decryptGroupMessage = function(
@@ -777,17 +777,13 @@ OlmDevice.prototype.decryptGroupMessage = function(
             self._inboundGroupSessionMessageIndexes[messageIndexKey] = true;
         }
 
-        // the sender must have had the senderKey to persuade us to save the
-        // session.
-        const keysProved = {curve25519: senderKey};
-
         self._saveInboundGroupSession(
             roomId, senderKey, sessionId, session, keysClaimed,
         );
         return {
             result: plaintext,
             keysClaimed: keysClaimed,
-            keysProved: keysProved,
+            senderKey: senderKey,
         };
     }
 

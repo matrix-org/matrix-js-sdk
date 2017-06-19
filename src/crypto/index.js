@@ -558,7 +558,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     //
     // (see https://github.com/vector-im/vector-web/issues/2215)
 
-    const claimedKey = event.getKeysClaimed().ed25519;
+    const claimedKey = event.getClaimedEd25519Key();
     if (!claimedKey) {
         console.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
@@ -765,18 +765,15 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
         return null;
     }
 
-    // We can claim and prove ownership of all our device keys in the local
-    // echo of the event since we know that all the local echos come from
-    // this device.
-    const myKeys = {
-        curve25519: this._olmDevice.deviceCurve25519Key,
-        ed25519: this._olmDevice.deviceEd25519Key,
-    };
-
     return alg.encryptMessage(
         room, event.getType(), event.getContent(),
-    ).then(function(encryptedContent) {
-        event.makeEncrypted("m.room.encrypted", encryptedContent, myKeys);
+    ).then((encryptedContent) => {
+        event.makeEncrypted(
+            "m.room.encrypted",
+            encryptedContent,
+            this._olmDevice.deviceCurve25519Key,
+            this._olmDevice.deviceEd25519Key,
+        );
     });
 };
 

@@ -592,7 +592,7 @@ MegolmDecryption.prototype._decryptEvent = function(event, requestKeysOnFail) {
         );
     }
 
-    event.setClearData(payload, res.keysProved, res.keysClaimed);
+    event.setClearData(payload, res.senderKey, res.keysClaimed.ed25519);
 };
 
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {
