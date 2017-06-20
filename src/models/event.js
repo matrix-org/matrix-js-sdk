@@ -122,6 +122,12 @@ module.exports.MatrixEvent = function MatrixEvent(
      * the megolm session (for megolm) claims to own. See getClaimedEd25519Key()
      */
     this._claimedEd25519Key = null;
+
+    /* curve25519 keys of devices involved in telling us about the
+     * _senderCurve25519Key and _claimedEd25519Key.
+     * See getForwardingCurve25519KeyChain().
+     */
+    this._forwardingCurve25519KeyChain = [];
 };
 utils.inherits(module.exports.MatrixEvent, EventEmitter);
 
@@ -309,11 +315,21 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @param {string=} claimedEd25519Key ed25519 key claimed by the sender of
      *    this event. See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
+     *
+     * @param {string[]=} forwardingCurve25519KeyChain list of curve25519 keys
+     *     involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     *     See {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
      */
-    setClearData: function(clearEvent, senderCurve25519Key, claimedEd25519Key) {
+    setClearData: function(
+        clearEvent,
+        senderCurve25519Key,
+        claimedEd25519Key,
+        forwardingCurve25519KeyChain,
+    ) {
         this._clearEvent = clearEvent;
         this._senderCurve25519Key = senderCurve25519Key || null;
         this._claimedEd25519Key = claimedEd25519Key || null;
+        this._forwardingCurve25519KeyChain = forwardingCurve25519KeyChain || [];
         this.emit("Event.decrypted", this);
     },
 
@@ -374,6 +390,24 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      */
     getClaimedEd25519Key: function() {
         return this._claimedEd25519Key;
+    },
+
+    /**
+     * Get the curve25519 keys of the devices which were involved in telling us
+     * about the claimedEd25519Key and sender curve25519 key.
+     *
+     * Normally this will be empty, but in the case of a forwarded megolm
+     * session, the sender keys are sent to us by another device (the forwarding
+     * device), which we need to trust to do this. In that case, the result will
+     * be a list consisting of one entry.
+     *
+     * If the device that sent us the key (A) got it from another device which
+     * it wasn't prepared to vouch for (B), the result will be [A, B]. And so on.
+     *
+     * @return {string[]} base64-encoded curve25519 keys, from oldest to newest.
+     */
+    getForwardingCurve25519KeyChain: function() {
+        return this._forwardingCurve25519KeyChain;
     },
 
     getUnsigned: function() {
