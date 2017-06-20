@@ -246,15 +246,15 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
  * @return {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  */
 MegolmEncryption.prototype._prepareNewSession = function() {
-    const session_id = this._olmDevice.createOutboundGroupSession();
-    const key = this._olmDevice.getOutboundGroupSessionKey(session_id);
+    const sessionId = this._olmDevice.createOutboundGroupSession();
+    const key = this._olmDevice.getOutboundGroupSessionKey(sessionId);
 
     this._olmDevice.addInboundGroupSession(
-        this._roomId, this._olmDevice.deviceCurve25519Key, session_id,
+        this._roomId, this._olmDevice.deviceCurve25519Key, [], sessionId,
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
-    return new OutboundSessionInfo(session_id);
+    return new OutboundSessionInfo(sessionId);
 };
 
 /**
@@ -520,6 +520,9 @@ function MegolmDecryption(params) {
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
     // senderKey|sessionId to list of MatrixEvents
     this._pendingEvents = {};
+
+    // this gets stubbed out by the unit tests.
+    this.olmlib = olmlib;
 }
 utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
 
@@ -592,7 +595,8 @@ MegolmDecryption.prototype._decryptEvent = function(event, requestKeysOnFail) {
         );
     }
 
-    event.setClearData(payload, res.keysProved, res.keysClaimed);
+    event.setClearData(payload, res.senderKey, res.keysClaimed.ed25519,
+        res.forwardingCurve25519KeyChain);
 };
 
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {
@@ -642,8 +646,11 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
  */
 MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     const content = event.getContent();
-    const senderKey = event.getSenderKey();
     const sessionId = content.session_id;
+    let senderKey = event.getSenderKey();
+    let forwardingKeyChain = [];
+    let exportFormat = false;
+    let keysClaimed;
 
     if (!content.room_id ||
         !sessionId ||
@@ -652,15 +659,49 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         console.error("key event is missing fields");
         return;
     }
+
     if (!senderKey) {
         console.error("key event has no sender key (not encrypted?)");
         return;
     }
 
+    if (event.getType() == "m.forwarded_room_key") {
+        exportFormat = true;
+        forwardingKeyChain = content.forwarding_curve25519_key_chain;
+        if (!utils.isArray(forwardingKeyChain)) {
+            forwardingKeyChain = [];
+        }
+
+        // copy content before we modify it
+        forwardingKeyChain = forwardingKeyChain.slice();
+        forwardingKeyChain.push(senderKey);
+
+        senderKey = content.sender_key;
+        if (!senderKey) {
+            console.error("forwarded_room_key event is missing sender_key field");
+            return;
+        }
+
+        const ed25519Key = content.sender_claimed_ed25519_key;
+        if (!ed25519Key) {
+            console.error(
+                `forwarded_room_key_event is missing sender_claimed_ed25519_key field`,
+            );
+            return;
+        }
+
+        keysClaimed = {
+            ed25519: ed25519Key,
+        };
+    } else {
+        keysClaimed = event.getKeysClaimed();
+    }
+
     console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
     this._olmDevice.addInboundGroupSession(
-        content.room_id, senderKey, sessionId,
-        content.session_key, event.getKeysClaimed(),
+        content.room_id, senderKey, forwardingKeyChain, sessionId,
+        content.session_key, keysClaimed,
+        exportFormat,
     );
 
     // cancel any outstanding room key requests for this session
@@ -698,7 +739,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
     const deviceInfo = this._crypto.getStoredDevice(userId, deviceId);
     const body = keyRequest.requestBody;
 
-    olmlib.ensureOlmSessionsForDevices(
+    this.olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, {
             [userId]: [deviceInfo],
         },
@@ -719,21 +760,9 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             + userId + ":" + deviceId,
         );
 
-        const key = this._olmDevice.getInboundGroupSessionKey(
+        const payload = this._buildKeyForwardingMessage(
             body.room_id, body.sender_key, body.session_id,
         );
-
-        const payload = {
-            type: "m.forwarded_room_key",
-            content: {
-                algorithm: olmlib.MEGOLM_ALGORITHM,
-                room_id: body.room_id,
-                sender_key: body.sender_key,
-                session_id: body.session_id,
-                session_key: key.key,
-                chain_index: key.chain_index,
-            },
-        };
 
         const encryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
@@ -741,7 +770,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             ciphertext: {},
         };
 
-        olmlib.encryptMessageForDevice(
+        this.olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
             this._userId,
             this._deviceId,
@@ -762,6 +791,27 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
     }).done();
 };
 
+MegolmDecryption.prototype._buildKeyForwardingMessage = function(
+    roomId, senderKey, sessionId,
+) {
+    const key = this._olmDevice.getInboundGroupSessionKey(
+        roomId, senderKey, sessionId,
+    );
+
+    return {
+        type: "m.forwarded_room_key",
+        content: {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: roomId,
+            sender_key: senderKey,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            session_id: sessionId,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            forwarding_curve25519_key_chain: key.forwarding_curve25519_key_chain,
+        },
+    };
+};
 
 /**
  * @inheritdoc

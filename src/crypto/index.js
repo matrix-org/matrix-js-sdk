@@ -161,7 +161,8 @@ function _registerEventHandlers(crypto, eventEmitter) {
 
     eventEmitter.on("toDeviceEvent", function(event) {
         try {
-            if (event.getType() == "m.room_key") {
+            if (event.getType() == "m.room_key"
+                    || event.getType() == "m.forwarded_room_key") {
                 crypto._onRoomKeyEvent(event);
             } else if (event.getType() == "m.new_device") {
                 crypto._onNewDeviceEvent(event);
@@ -537,6 +538,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
         return null;
     }
 
+    const forwardingChain = event.getForwardingCurve25519KeyChain();
+    if (forwardingChain.length > 0) {
+        // we got this event from somewhere else
+        // TODO: check if we can trust the forwarders.
+        return null;
+    }
+
     // senderKey is the Curve25519 identity key of the device which the event
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.
@@ -558,7 +566,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     //
     // (see https://github.com/vector-im/vector-web/issues/2215)
 
-    const claimedKey = event.getKeysClaimed().ed25519;
+    const claimedKey = event.getClaimedEd25519Key();
     if (!claimedKey) {
         console.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
@@ -765,18 +773,15 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
         return null;
     }
 
-    // We can claim and prove ownership of all our device keys in the local
-    // echo of the event since we know that all the local echos come from
-    // this device.
-    const myKeys = {
-        curve25519: this._olmDevice.deviceCurve25519Key,
-        ed25519: this._olmDevice.deviceEd25519Key,
-    };
-
     return alg.encryptMessage(
         room, event.getType(), event.getContent(),
-    ).then(function(encryptedContent) {
-        event.makeEncrypted("m.room.encrypted", encryptedContent, myKeys);
+    ).then((encryptedContent) => {
+        event.makeEncrypted(
+            "m.room.encrypted",
+            encryptedContent,
+            this._olmDevice.deviceCurve25519Key,
+            this._olmDevice.deviceEd25519Key,
+        );
     });
 };
 
