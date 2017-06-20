@@ -16,18 +16,10 @@ limitations under the License.
 
 "use strict";
 
-import 'source-map-support/register';
-
-let Olm = null;
-try {
-    Olm = require('olm');
-} catch (e) {}
-
 const anotherjson = require('another-json');
 const q = require('q');
 import expect from 'expect';
 
-const sdk = require('../..');
 const utils = require('../../lib/utils');
 const testUtils = require('../test-utils');
 const TestClient = require('../TestClient').default;
@@ -46,7 +38,7 @@ function createOlmSession(olmAccount, recipientTestClient) {
         const otkId = utils.keys(keys)[0];
         const otk = keys[otkId];
 
-        const session = new Olm.Session();
+        const session = new global.Olm.Session();
         session.create_outbound(
             olmAccount, recipientTestClient.getDeviceKey(), otk.key,
         );
@@ -209,9 +201,11 @@ function getSyncResponse(roomMembers) {
 
 
 describe("megolm", function() {
-    if (!sdk.CRYPTO_ENABLED) {
+    if (!global.Olm) {
+        console.warn('not running megolm tests: Olm not present');
         return;
     }
+    const Olm = global.Olm;
 
     let testOlmAccount;
     let testSenderKey;

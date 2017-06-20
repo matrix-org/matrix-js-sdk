@@ -2,7 +2,10 @@
 import expect from 'expect';
 import q from 'q';
 
-const sdk = require("..");
+// load olm before the sdk if possible
+import './olm-loader';
+
+import sdk from '..';
 const MatrixEvent = sdk.MatrixEvent;
 
 /**
