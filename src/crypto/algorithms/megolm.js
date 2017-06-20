@@ -246,15 +246,15 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
  * @return {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  */
 MegolmEncryption.prototype._prepareNewSession = function() {
-    const session_id = this._olmDevice.createOutboundGroupSession();
-    const key = this._olmDevice.getOutboundGroupSessionKey(session_id);
+    const sessionId = this._olmDevice.createOutboundGroupSession();
+    const key = this._olmDevice.getOutboundGroupSessionKey(sessionId);
 
     this._olmDevice.addInboundGroupSession(
-        this._roomId, this._olmDevice.deviceCurve25519Key, session_id,
+        this._roomId, this._olmDevice.deviceCurve25519Key, sessionId,
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
-    return new OutboundSessionInfo(session_id);
+    return new OutboundSessionInfo(sessionId);
 };
 
 /**
