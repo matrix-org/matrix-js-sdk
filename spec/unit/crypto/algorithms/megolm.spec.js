@@ -5,6 +5,7 @@ try {
 }
 
 import expect from 'expect';
+import q from 'q';
 
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
@@ -104,6 +105,56 @@ describe("MegolmDecryption", function() {
 
             megolmDecryption.decryptEvent(event);
             expect(event.getContent()).toEqual('testytest');
+        });
+
+        it('can respond to a key request event', function() {
+            const keyRequest = {
+                userId: '@alice:foo',
+                deviceId: 'alidevice',
+                requestBody: {
+                    room_id: ROOM_ID,
+                    sender_key: "SENDER_CURVE25519",
+                    session_id: groupSession.session_id(),
+                },
+            };
+
+            expect(megolmDecryption.hasKeysForKeyRequest(keyRequest))
+                .toBe(true);
+
+            // set up some pre-conditions for the share call
+            const deviceInfo = {};
+            mockCrypto.getStoredDevice.andReturn(deviceInfo);
+            mockOlmLib.ensureOlmSessionsForDevices.andReturn(
+                q({'@alice:foo': {'alidevice': {
+                    sessionId: 'alisession',
+                }}}),
+            );
+            mockBaseApis.sendToDevice = expect.createSpy();
+
+
+            // do the share
+            megolmDecryption.shareKeysWithDevice(keyRequest);
+
+            // it's asynchronous, so we have to wait a bit
+            return q.delay(1).then(() => {
+                // check that it called encryptMessageForDevice with
+                // appropriate args.
+                expect(mockOlmLib.encryptMessageForDevice.calls.length)
+                    .toEqual(1);
+
+                const call = mockOlmLib.encryptMessageForDevice.calls[0];
+                const payload = call.arguments[6];
+
+                expect(payload.type).toEqual("m.forwarded_room_key");
+                expect(payload.content).toInclude({
+                    sender_key: "SENDER_CURVE25519",
+                    sender_claimed_ed25519_key: "SENDER_ED25519",
+                    session_id: groupSession.session_id(),
+                    chain_index: 0,
+                    forwarding_curve25519_key_chain: [],
+                });
+                expect(payload.content.session_key).toExist();
+            });
         });
     });
 });
