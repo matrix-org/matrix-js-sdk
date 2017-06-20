@@ -8,3 +8,6 @@ npm run lint
 npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz
 
 npm run test
+
+npm run gendoc
+
