@@ -520,6 +520,9 @@ function MegolmDecryption(params) {
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
     // senderKey|sessionId to list of MatrixEvents
     this._pendingEvents = {};
+
+    // this gets stubbed out by the unit tests.
+    this.olmlib = olmlib;
 }
 utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
 
@@ -698,7 +701,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
     const deviceInfo = this._crypto.getStoredDevice(userId, deviceId);
     const body = keyRequest.requestBody;
 
-    olmlib.ensureOlmSessionsForDevices(
+    this.olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, {
             [userId]: [deviceInfo],
         },
@@ -741,7 +744,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             ciphertext: {},
         };
 
-        olmlib.encryptMessageForDevice(
+        this.olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
             this._userId,
             this._deviceId,
