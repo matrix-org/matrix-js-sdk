@@ -91,9 +91,11 @@ export default class IndexedDBCryptoStore {
                 // attempts to delete the database will block (and subsequent
                 // attempts to re-create it will also block).
                 db.onversionchange = (ev) => {
+                    console.log(`versionchange for indexeddb ${this._dbName}: closing`);
                     db.close();
                 };
 
+                console.log(`connected to indexeddb ${this._dbName}`);
                 resolve(db);
             };
         });
