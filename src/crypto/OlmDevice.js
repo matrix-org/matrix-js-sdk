@@ -589,7 +589,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  * @property {string} room_Id
  * @property {string} session   pickled Olm.InboundGroupSession
  * @property {Object<string, string>} keysClaimed
- * @property {[string]} forwardingCurve25519KeyChain  Devices involved in forwarding
+ * @property {Array<string>} forwardingCurve25519KeyChain  Devices involved in forwarding
  *     this session to us (normally empty).
  */
 
@@ -661,7 +661,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
  *
  * @param {string} roomId     room in which this session will be used
  * @param {string} senderKey  base64-encoded curve25519 key of the sender
- * @param {string[]} forwardingCurve25519KeyChain  Devices involved in forwarding
+ * @param {Array<string>} forwardingCurve25519KeyChain  Devices involved in forwarding
  *     this session to us.
  * @param {string} sessionId  session identifier
  * @param {string} sessionKey base64-encoded secret key
@@ -781,7 +781,7 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
  * @return {null} the sessionId is unknown
  *
  * @return {{result: string, senderKey: string,
- *    forwardingCurve25519KeyChain: [string],
+ *    forwardingCurve25519KeyChain: Array<string>,
  *    keysClaimed: Object<string, string>}}
  */
 OlmDevice.prototype.decryptGroupMessage = function(
@@ -864,8 +864,8 @@ OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionI
  * @param {string} sessionId session identifier
  *
  * @returns {{chain_index: number, key: string,
- *        forwarding_curve25519_key_chain: [string],
- *        sender_claimed_ed25519_key: string,
+ *        forwarding_curve25519_key_chain: Array<string>,
+ *        sender_claimed_ed25519_key: string
  *    }}
  *    details of the session key. The key is a base64-encoded megolm key in
  *    export format.
