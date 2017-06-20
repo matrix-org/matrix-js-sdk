@@ -70,8 +70,6 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
     this._initialDeviceListInvalidationPending = false;
 
-    this._clientRunning = false;
-
     // the last time we did a check for the number of one-time-keys on the
     // server.
     this._lastOneTimeKeyCheck = null;
@@ -136,13 +134,6 @@ utils.inherits(Crypto, EventEmitter);
 function _registerEventHandlers(crypto, eventEmitter) {
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
-            if (syncState === "STOPPED") {
-                crypto._clientRunning = false;
-                crypto._outgoingRoomKeyRequestManager.stop();
-            } else if (syncState === "PREPARED") {
-                crypto._clientRunning = true;
-                crypto._outgoingRoomKeyRequestManager.start();
-            }
             if (syncState === "SYNCING") {
                 crypto._onSyncCompleted(data);
             }
@@ -185,6 +176,16 @@ function _registerEventHandlers(crypto, eventEmitter) {
         }
     });
 }
+
+/** Start background processes related to crypto */
+Crypto.prototype.start = function() {
+    this._outgoingRoomKeyRequestManager.start();
+};
+
+/** Stop background processes related to crypto */
+Crypto.prototype.stop = function() {
+    this._outgoingRoomKeyRequestManager.stop();
+};
 
 /**
  * @return {string} The version of Olm.

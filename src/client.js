@@ -2863,6 +2863,7 @@ MatrixClient.prototype.startClient = function(opts) {
 
     if (this._crypto) {
         this._crypto.uploadDeviceKeys().done();
+        this._crypto.start();
     }
 
     // periodically poll for turn servers if we support voip
@@ -2895,11 +2896,16 @@ MatrixClient.prototype.startClient = function(opts) {
  * clean shutdown.
  */
 MatrixClient.prototype.stopClient = function() {
+    console.log('stopping MatrixClient');
+
     this.clientRunning = false;
     // TODO: f.e. Room => self.store.storeRoom(room) ?
     if (this._syncApi) {
         this._syncApi.stop();
         this._syncApi = null;
+    }
+    if (this._crypto) {
+        this._crypto.stop();
     }
     if (this._peekSync) {
         this._peekSync.stopPeeking();
