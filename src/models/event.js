@@ -316,7 +316,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {string=} claimedEd25519Key ed25519 key claimed by the sender of
      *    this event. See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
      *
-     * @param {string[]=} forwardingCurve25519KeyChain list of curve25519 keys
+     * @param {Array<string>=} forwardingCurve25519KeyChain list of curve25519 keys
      *     involved in telling us about the senderCurve25519Key and claimedEd25519Key.
      *     See {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
      */
