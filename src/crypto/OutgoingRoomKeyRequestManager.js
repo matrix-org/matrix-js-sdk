@@ -96,6 +96,7 @@ export default class OutgoingRoomKeyRequestManager {
      * Called when the client is stopped. Stops any running background processes.
      */
     stop() {
+        console.log('stopping OutgoingRoomKeyRequestManager');
         // stop the timer on the next run
         this._clientRunning = false;
     }
@@ -229,6 +230,12 @@ export default class OutgoingRoomKeyRequestManager {
 
             this._sendOutgoingRoomKeyRequests().finally(() => {
                 this._sendOutgoingRoomKeyRequestsRunning = false;
+            }).catch((e) => {
+                // this should only happen if there is an indexeddb error,
+                // in which case we're a bit stuffed anyway.
+                console.warn(
+                    `error in OutgoingRoomKeyRequestManager: ${e}`,
+                );
             }).done();
         };
 
