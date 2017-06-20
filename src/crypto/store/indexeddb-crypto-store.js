@@ -72,9 +72,9 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onblocked = () => {
-                reject(new Error(
-                    "unable to upgrade indexeddb because it is open elsewhere",
-                ));
+                console.log(
+                    `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
+                );
             };
 
             req.onerror = (ev) => {
@@ -110,9 +110,9 @@ export default class IndexedDBCryptoStore {
             const req = this._indexedDB.deleteDatabase(this._dbName);
 
             req.onblocked = () => {
-                reject(new Error(
-                    "unable to delete indexeddb because it is open elsewhere",
-                ));
+                console.log(
+                    `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
+                );
             };
 
             req.onerror = (ev) => {
