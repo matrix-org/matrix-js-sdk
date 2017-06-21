@@ -163,8 +163,32 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        console.log("Removing indexeddb instance: ", this._dbName);
-        return promiseifyRequest(this.indexedDB.deleteDatabase(this._dbName));
+        return new q.Promise((resolve, reject) => {
+            console.log(`Removing indexeddb instance: ${this._dbName}`);
+            const req = this.indexedDB.deleteDatabase(this._dbName);
+
+            req.onblocked = () => {
+                console.log(
+                    `can't yet delete indexeddb ${this._dbName}` +
+                    ` because it is open elsewhere`,
+                );
+            };
+
+            req.onerror = (ev) => {
+                // in firefox, with indexedDB disabled, this fails with a
+                // DOMError. We treat this as non-fatal, so that we can still
+                // use the app.
+                console.warn(
+                    `unable to delete js-sdk store indexeddb: ${ev.target.error}`,
+                );
+                resolve();
+            };
+
+            req.onsuccess = () => {
+                console.log(`Removed indexeddb instance: ${this._dbName}`);
+                resolve();
+            };
+        });
     },
 
     /**
