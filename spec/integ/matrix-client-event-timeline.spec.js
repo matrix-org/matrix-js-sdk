@@ -91,8 +91,10 @@ function startClient(httpBackend, client) {
         deferred.resolve();
     });
 
-    httpBackend.flush();
-    return deferred.promise;
+    return q.all([
+        httpBackend.flush(),
+        deferred.promise,
+    ]);
 }
 
 describe("getEventTimeline support", function() {
@@ -202,8 +204,11 @@ describe("getEventTimeline support", function() {
                 end: "pagin_end",
             });
 
-
             return httpBackend.flush("/sync", 2);
+        }).then(() => {
+            // the sync isn't processed immediately; give the promise chain
+            // a chance to complete.
+            return q.delay(0);
         }).then(function() {
             expect(room.timeline.length).toEqual(1);
             expect(room.timeline[0].event).toEqual(EVENTS[1]);
@@ -225,7 +230,7 @@ describe("MatrixClient event timelines", function() {
     let client = null;
     let httpBackend = null;
 
-    beforeEach(function(done) {
+    beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
@@ -237,8 +242,7 @@ describe("MatrixClient event timelines", function() {
             timelineSupport: true,
         });
 
-        startClient(httpBackend, client)
-            .catch(utils.failTest).done(done);
+        return startClient(httpBackend, client);
     });
 
     afterEach(function() {
