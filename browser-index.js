@@ -3,7 +3,7 @@ matrixcs.request(require("browser-request"));
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.
-let indexedDB;
+var indexedDB;
 try {
     indexedDB = global.indexedDB;
 } catch(e) {}
