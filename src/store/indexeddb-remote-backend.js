@@ -40,6 +40,11 @@ const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     };
 
     this._worker.onmessage = this._onWorkerMessage.bind(this);
+
+    // tell the worker the db name.
+    this._startPromise = this._doCmd('_setupWorker', [this._dbName]).then(() => {
+        console.log("IndexedDB worker is ready");
+    });
 };
 
 
@@ -50,10 +55,7 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        return this._doCmd('_setupWorker', [this._dbName]).then(() => {
-            console.log("IndexedDB worker is ready");
-            return this._doCmd('connect');
-        });
+        return this._startPromise.then(() => this._doCmd('connect'));
     },
 
     /**
@@ -62,7 +64,7 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        return this._doCmd('clearDatabase');
+        return this._startPromise.then(() => this._doCmd('clearDatabase'));
     },
 
     /**

@@ -1,3 +1,12 @@
+Changes in [0.7.13](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.13) (2017-06-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12...v0.7.13)
+
+ * Fix failure on Tor browser
+   [\#473](https://github.com/matrix-org/matrix-js-sdk/pull/473)
+ * Fix issues with firefox private browsing
+   [\#472](https://github.com/matrix-org/matrix-js-sdk/pull/472)
+
 Changes in [0.7.12](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12) (2017-06-19)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12-rc.1...v0.7.12)

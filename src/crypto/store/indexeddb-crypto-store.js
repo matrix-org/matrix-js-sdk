@@ -119,9 +119,11 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onerror = (ev) => {
-                reject(new Error(
-                    "unable to delete indexeddb: " + ev.target.error,
-                ));
+                // in firefox, with indexedDB disabled, this fails with a
+                // DOMError. We treat this as non-fatal, so that people can
+                // still use the app.
+                console.warn(`unable to delete IndexedDBCryptoStore: ${ev.target.error}`);
+                resolve();
             };
 
             req.onsuccess = () => {

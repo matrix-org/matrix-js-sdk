@@ -168,15 +168,20 @@ LocalIndexedDBStoreBackend.prototype = {
             const req = this.indexedDB.deleteDatabase(this._dbName);
 
             req.onblocked = () => {
-                reject(new Error(
-                    "unable to delete indexeddb because it is open elsewhere",
-                ));
+                console.log(
+                    `can't yet delete indexeddb ${this._dbName}` +
+                    ` because it is open elsewhere`,
+                );
             };
 
             req.onerror = (ev) => {
-                reject(new Error(
-                    "unable to delete indexeddb: " + ev.target.error,
-                ));
+                // in firefox, with indexedDB disabled, this fails with a
+                // DOMError. We treat this as non-fatal, so that we can still
+                // use the app.
+                console.warn(
+                    `unable to delete js-sdk store indexeddb: ${ev.target.error}`,
+                );
+                resolve();
             };
 
             req.onsuccess = () => {
