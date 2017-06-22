@@ -15,7 +15,9 @@ limitations under the License.
 */
 
 import q from 'q';
-import utils from '../../utils';
+
+import MemoryCryptoStore from './memory-crypto-store';
+import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -23,9 +25,10 @@ import utils from '../../utils';
  * @module
  */
 
-const VERSION = 1;
-
 /**
+ * An implementation of CryptoStore, which is normally backed by an indexeddb,
+ * but with fallback to MemoryCryptoStore.
+ *
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export default class IndexedDBCryptoStore {
@@ -36,40 +39,39 @@ export default class IndexedDBCryptoStore {
      * @param {string} dbName   name of db to connect to
      */
     constructor(indexedDB, dbName) {
-        if (!indexedDB) {
-            throw new Error("must pass indexedDB into IndexedDBCryptoStore");
-        }
         this._indexedDB = indexedDB;
         this._dbName = dbName;
-        this._dbPromise = null;
+        this._backendPromise = null;
     }
 
     /**
-     * Ensure the database exists and is up-to-date
+     * Ensure the database exists and is up-to-date, or fall back to
+     * an in-memory store.
      *
-     * @return {Promise} resolves to an instance of IDBDatabase when
-     * the database is ready
+     * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
+     * or a MemoryCryptoStore
      */
-    connect() {
-        if (this._dbPromise) {
-            return this._dbPromise;
+    _connect() {
+        if (this._backendPromise) {
+            return this._backendPromise;
         }
 
-        this._dbPromise = new q.Promise((resolve, reject) => {
+        this._backendPromise = new q.Promise((resolve, reject) => {
+            if (!this._indexedDB) {
+                reject(new Error('no indexeddb support available'));
+                return;
+            }
+
             console.log(`connecting to indexeddb ${this._dbName}`);
-            const req = this._indexedDB.open(this._dbName, VERSION);
+
+            const req = this._indexedDB.open(
+                this._dbName, IndexedDBCryptoStoreBackend.VERSION,
+            );
 
             req.onupgradeneeded = (ev) => {
                 const db = ev.target.result;
                 const oldVersion = ev.oldVersion;
-                console.log(
-                    `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
-                    + ` to ${VERSION}`,
-                );
-                if (oldVersion < 1) { // The database did not previously exist.
-                    createDatabase(db);
-                }
-                // Expand as needed.
+                IndexedDBCryptoStoreBackend.upgradeDatabase(db, oldVersion);
             };
 
             req.onblocked = () => {
@@ -79,27 +81,24 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onerror = (ev) => {
-                reject(new Error(
-                    "unable to connect to indexeddb: " + ev.target.error,
-                ));
+                reject(ev.target.error);
             };
 
             req.onsuccess = (r) => {
                 const db = r.target.result;
 
-                // make sure we close the db on `onversionchange` - otherwise
-                // attempts to delete the database will block (and subsequent
-                // attempts to re-create it will also block).
-                db.onversionchange = (ev) => {
-                    console.log(`versionchange for indexeddb ${this._dbName}: closing`);
-                    db.close();
-                };
-
                 console.log(`connected to indexeddb ${this._dbName}`);
-                resolve(db);
+                resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
+        }).catch((e) => {
+            console.warn(
+                `unable to connect to indexeddb ${this._dbName}` +
+                    `: falling back to in-memory store: ${e}`,
+            );
+            return new MemoryCryptoStore();
         });
-        return this._dbPromise;
+
+        return this._backendPromise;
     }
 
     /**
@@ -109,6 +108,11 @@ export default class IndexedDBCryptoStore {
      */
     deleteAllData() {
         return new q.Promise((resolve, reject) => {
+            if (!this._indexedDB) {
+                reject(new Error('no indexeddb support available'));
+                return;
+            }
+
             console.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this._indexedDB.deleteDatabase(this._dbName);
 
@@ -119,17 +123,18 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onerror = (ev) => {
-                // in firefox, with indexedDB disabled, this fails with a
-                // DOMError. We treat this as non-fatal, so that people can
-                // still use the app.
-                console.warn(`unable to delete IndexedDBCryptoStore: ${ev.target.error}`);
-                resolve();
+                reject(ev.target.error);
             };
 
             req.onsuccess = () => {
                 console.log(`Removed indexeddb instance: ${this._dbName}`);
                 resolve();
             };
+        }).catch((e) => {
+            // in firefox, with indexedDB disabled, this fails with a
+            // DOMError. We treat this as non-fatal, so that people can
+            // still use the app.
+            console.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
     }
 
@@ -144,38 +149,8 @@ export default class IndexedDBCryptoStore {
      *    same instance as passed in, or the existing one.
      */
     getOrAddOutgoingRoomKeyRequest(request) {
-        const requestBody = request.requestBody;
-
-        return this.connect().then((db) => {
-            const deferred = q.defer();
-            const txn = db.transaction("outgoingRoomKeyRequests", "readwrite");
-            txn.onerror = deferred.reject;
-
-            // first see if we already have an entry for this request.
-            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-                if (existing) {
-                    // this entry matches the request - return it.
-                    console.log(
-                        `already have key request outstanding for ` +
-                        `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                        `not sending another`,
-                    );
-                    deferred.resolve(existing);
-                    return;
-                }
-
-                // we got to the end of the list without finding a match
-                // - add the new request.
-                console.log(
-                    `enqueueing key request for ${requestBody.room_id} / ` +
-                    requestBody.session_id,
-                );
-                const store = txn.objectStore("outgoingRoomKeyRequests");
-                store.add(request);
-                txn.onsuccess = () => { deferred.resolve(request); };
-            });
-
-            return deferred.promise;
+        return this._connect().then((backend) => {
+            return backend.getOrAddOutgoingRoomKeyRequest(request);
         });
     }
 
@@ -190,59 +165,9 @@ export default class IndexedDBCryptoStore {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        return this.connect().then((db) => {
-            const deferred = q.defer();
-
-            const txn = db.transaction("outgoingRoomKeyRequests", "readonly");
-            txn.onerror = deferred.reject;
-
-            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-                deferred.resolve(existing);
-            });
-            return deferred.promise;
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequest(requestBody);
         });
-    }
-
-    /**
-     * look for an existing room key request in the db
-     *
-     * @private
-     * @param {IDBTransaction} txn  database transaction
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
-     * @param {Function} callback  function to call with the results of the
-     *    search. Either passed a matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
-     *    not found.
-     */
-    _getOutgoingRoomKeyRequest(txn, requestBody, callback) {
-        const store = txn.objectStore("outgoingRoomKeyRequests");
-
-        const idx = store.index("session");
-        const cursorReq = idx.openCursor([
-            requestBody.room_id,
-            requestBody.session_id,
-        ]);
-
-        cursorReq.onsuccess = (ev) => {
-            const cursor = ev.target.result;
-            if(!cursor) {
-                // no match found
-                callback(null);
-                return;
-            }
-
-            const existing = cursor.value;
-
-            if (utils.deepCompare(existing.requestBody, requestBody)) {
-                // got a match
-                callback(existing);
-                return;
-            }
-
-            // look at the next entry in the index
-            cursor.continue();
-        };
     }
 
     /**
@@ -256,47 +181,8 @@ export default class IndexedDBCryptoStore {
      *    requests in those states, an arbitrary one is chosen.
      */
     getOutgoingRoomKeyRequestByState(wantedStates) {
-        if (wantedStates.length === 0) {
-            return q(null);
-        }
-
-        // this is a bit tortuous because we need to make sure we do the lookup
-        // in a single transaction, to avoid having a race with the insertion
-        // code.
-
-        // index into the wantedStates array
-        let stateIndex = 0;
-        let result;
-
-        function onsuccess(ev) {
-            const cursor = ev.target.result;
-            if (cursor) {
-                // got a match
-                result = cursor.value;
-                return;
-            }
-
-            // try the next state in the list
-            stateIndex++;
-            if (stateIndex >= wantedStates.length) {
-                // no matches
-                return;
-            }
-
-            const wantedState = wantedStates[stateIndex];
-            const cursorReq = ev.target.source.openCursor(wantedState);
-            cursorReq.onsuccess = onsuccess;
-        }
-
-        return this.connect().then((db) => {
-            const txn = db.transaction("outgoingRoomKeyRequests", "readonly");
-            const store = txn.objectStore("outgoingRoomKeyRequests");
-
-            const wantedState = wantedStates[stateIndex];
-            const cursorReq = store.index("state").openCursor(wantedState);
-            cursorReq.onsuccess = onsuccess;
-
-            return promiseifyTxn(txn).then(() => result);
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequestByState(wantedStates);
         });
     }
 
@@ -313,32 +199,10 @@ export default class IndexedDBCryptoStore {
      *    updated request, or null if no matching row was found
      */
     updateOutgoingRoomKeyRequest(requestId, expectedState, updates) {
-        let result = null;
-
-        function onsuccess(ev) {
-            const cursor = ev.target.result;
-            if (!cursor) {
-                return;
-            }
-            const data = cursor.value;
-            if (data.state != expectedState) {
-                console.warn(
-                    `Cannot update room key request from ${expectedState} ` +
-                    `as it was already updated to ${data.state}`,
-                );
-                return;
-            }
-            Object.assign(data, updates);
-            cursor.update(data);
-            result = data;
-        }
-
-        return this.connect().then((db) => {
-            const txn = db.transaction("outgoingRoomKeyRequests", "readwrite");
-            const cursorReq = txn.objectStore("outgoingRoomKeyRequests")
-                .openCursor(requestId);
-            cursorReq.onsuccess = onsuccess;
-            return promiseifyTxn(txn).then(() => result);
+        return this._connect().then((backend) => {
+            return backend.updateOutgoingRoomKeyRequest(
+                requestId, expectedState, updates,
+            );
         });
     }
 
@@ -352,46 +216,8 @@ export default class IndexedDBCryptoStore {
      * @returns {Promise} resolves once the operation is completed
      */
     deleteOutgoingRoomKeyRequest(requestId, expectedState) {
-        return this.connect().then((db) => {
-            const txn = db.transaction("outgoingRoomKeyRequests", "readwrite");
-            const cursorReq = txn.objectStore("outgoingRoomKeyRequests")
-                .openCursor(requestId);
-            cursorReq.onsuccess = (ev) => {
-                const cursor = ev.target.result;
-                if (!cursor) {
-                    return;
-                }
-                const data = cursor.value;
-                if (data.state != expectedState) {
-                    console.warn(
-                        `Cannot delete room key request in state ${data.state} `
-                        + `(expected ${expectedState})`,
-                    );
-                    return;
-                }
-                cursor.delete();
-            };
-            return promiseifyTxn(txn);
+        return this._connect().then((backend) => {
+            return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
         });
     }
-}
-
-function createDatabase(db) {
-    const outgoingRoomKeyRequestsStore =
-        db.createObjectStore("outgoingRoomKeyRequests", { keyPath: "requestId" });
-
-    // we assume that the RoomKeyRequestBody will have room_id and session_id
-    // properties, to make the index efficient.
-    outgoingRoomKeyRequestsStore.createIndex("session",
-        ["requestBody.room_id", "requestBody.session_id"],
-    );
-
-    outgoingRoomKeyRequestsStore.createIndex("state", "state");
-}
-
-function promiseifyTxn(txn) {
-    return new q.Promise((resolve, reject) => {
-        txn.oncomplete = resolve;
-        txn.onerror = reject;
-    });
 }
