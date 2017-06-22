@@ -1,12 +1,19 @@
 var matrixcs = require("./lib/matrix");
 matrixcs.request(require("browser-request"));
 
+// just *accessing* indexedDB throws an exception in firefox with
+// indexeddb disabled.
+var indexedDB;
+try {
+    indexedDB = global.indexedDB;
+} catch(e) {}
+
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
-if (global.indexedDB) {
+if (indexedDB) {
     matrixcs.setCryptoStoreFactory(
         function() {
             return new matrixcs.IndexedDBCryptoStore(
-                global.indexedDB, "matrix-js-sdk:crypto"
+                indexedDB, "matrix-js-sdk:crypto"
             );
         }
     );
