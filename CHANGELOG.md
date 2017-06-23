@@ -1,3 +1,44 @@
+Changes in [0.7.13](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.13) (2017-06-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12...v0.7.13)
+
+ * Fix failure on Tor browser
+   [\#473](https://github.com/matrix-org/matrix-js-sdk/pull/473)
+ * Fix issues with firefox private browsing
+   [\#472](https://github.com/matrix-org/matrix-js-sdk/pull/472)
+
+Changes in [0.7.12](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12) (2017-06-19)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12-rc.1...v0.7.12)
+
+ * No changes
+
+
+Changes in [0.7.12-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12-rc.1) (2017-06-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11...v0.7.12-rc.1)
+
+ * allow setting iceTransportPolicy to relay through forceTURN option
+   [\#462](https://github.com/matrix-org/matrix-js-sdk/pull/462)
+
+Changes in [0.7.11](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11) (2017-06-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11-rc.1...v0.7.11)
+
+ * Add a bunch of logging around sending messages
+   [\#460](https://github.com/matrix-org/matrix-js-sdk/pull/460)
+
+Changes in [0.7.11-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11-rc.1) (2017-06-09)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.10...v0.7.11-rc.1)
+
+ * Make TimelineWindow.load resolve quicker if we have the events
+   [\#458](https://github.com/matrix-org/matrix-js-sdk/pull/458)
+ * Stop peeking when a matrix client is stopped
+   [\#451](https://github.com/matrix-org/matrix-js-sdk/pull/451)
+ * Update README: Clarify how to install libolm
+   [\#450](https://github.com/matrix-org/matrix-js-sdk/pull/450)
+
 Changes in [0.7.10](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.10) (2017-06-02)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.9...v0.7.10)

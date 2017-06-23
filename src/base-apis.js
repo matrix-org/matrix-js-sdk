@@ -683,6 +683,31 @@ MatrixBaseApis.prototype.setRoomDirectoryVisibilityAppService =
     );
 };
 
+// User Directory Operations
+// =========================
+
+/**
+ * Query the user directory with a term matching user IDs, display names and domains.
+ * @param {object} opts options
+ * @param {string} opts.term the term with which to search.
+ * @param {number} opts.limit the maximum number of results to return. The server will
+ *                 apply a limit if unspecified.
+ * @return {module:client.Promise} Resolves: an array of results.
+ */
+MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
+    const body = {
+        search_term: opts.term,
+    };
+
+    if (opts.limit !== undefined) {
+        body.limit = opts.limit;
+    }
+
+    return this._http.authedRequest(
+        undefined, "POST", "/user_directory/search", undefined, body,
+    );
+};
+
 
 // Media operations
 // ================

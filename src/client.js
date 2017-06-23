@@ -40,6 +40,8 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
+import reEmit from './reemit';
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -166,6 +168,10 @@ function MatrixClient(opts) {
             this.store,
             opts.cryptoStore,
         );
+        reEmit(this, this._crypto, [
+            "crypto.roomKeyRequest",
+            "crypto.roomKeyRequestCancellation",
+        ]);
 
         this.olmVersion = Crypto.getOlmVersion();
     }
@@ -941,6 +947,8 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         txnId = this.makeTxnId();
     }
 
+    console.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
+
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
     // the client has no scheduler or store.
@@ -1065,7 +1073,12 @@ function _sendEventHttpRequest(client, event) {
 
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
-    );
+    ).then((res) => {
+        console.log(
+            `Event sent to ${event.getRoomId()} with event id ${res.event_id}`,
+        );
+        return res;
+    });
 }
 
 /**
@@ -2850,6 +2863,7 @@ MatrixClient.prototype.startClient = function(opts) {
 
     if (this._crypto) {
         this._crypto.uploadDeviceKeys().done();
+        this._crypto.start();
     }
 
     // periodically poll for turn servers if we support voip
@@ -2882,11 +2896,19 @@ MatrixClient.prototype.startClient = function(opts) {
  * clean shutdown.
  */
 MatrixClient.prototype.stopClient = function() {
+    console.log('stopping MatrixClient');
+
     this.clientRunning = false;
     // TODO: f.e. Room => self.store.storeRoom(room) ?
     if (this._syncApi) {
         this._syncApi.stop();
         this._syncApi = null;
+    }
+    if (this._crypto) {
+        this._crypto.stop();
+    }
+    if (this._peekSync) {
+        this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
 };

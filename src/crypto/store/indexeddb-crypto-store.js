@@ -16,15 +16,19 @@ limitations under the License.
 
 import q from 'q';
 
+import MemoryCryptoStore from './memory-crypto-store';
+import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
+
 /**
  * Internal module. indexeddb storage for e2e.
  *
  * @module
  */
 
-const VERSION = 1;
-
 /**
+ * An implementation of CryptoStore, which is normally backed by an indexeddb,
+ * but with fallback to MemoryCryptoStore.
+ *
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export default class IndexedDBCryptoStore {
@@ -35,68 +39,66 @@ export default class IndexedDBCryptoStore {
      * @param {string} dbName   name of db to connect to
      */
     constructor(indexedDB, dbName) {
-        if (!indexedDB) {
-            throw new Error("must pass indexedDB into IndexedDBCryptoStore");
-        }
         this._indexedDB = indexedDB;
         this._dbName = dbName;
-        this._dbPromise = null;
+        this._backendPromise = null;
     }
 
     /**
-     * Ensure the database exists and is up-to-date
+     * Ensure the database exists and is up-to-date, or fall back to
+     * an in-memory store.
      *
-     * @return {Promise} resolves to an instance of IDBDatabase when
-     * the database is ready
+     * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
+     * or a MemoryCryptoStore
      */
-    connect() {
-        if (this._dbPromise) {
-            return this._dbPromise;
+    _connect() {
+        if (this._backendPromise) {
+            return this._backendPromise;
         }
 
-        this._dbPromise = new q.Promise((resolve, reject) => {
+        this._backendPromise = new q.Promise((resolve, reject) => {
+            if (!this._indexedDB) {
+                reject(new Error('no indexeddb support available'));
+                return;
+            }
+
             console.log(`connecting to indexeddb ${this._dbName}`);
-            const req = this._indexedDB.open(this._dbName, VERSION);
+
+            const req = this._indexedDB.open(
+                this._dbName, IndexedDBCryptoStoreBackend.VERSION,
+            );
 
             req.onupgradeneeded = (ev) => {
                 const db = ev.target.result;
                 const oldVersion = ev.oldVersion;
-                console.log(
-                    `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
-                    + ` to ${VERSION}`,
-                );
-                if (oldVersion < 1) { // The database did not previously exist.
-                    createDatabase(db);
-                }
-                // Expand as needed.
+                IndexedDBCryptoStoreBackend.upgradeDatabase(db, oldVersion);
             };
 
             req.onblocked = () => {
-                reject(new Error(
-                    "unable to upgrade indexeddb because it is open elsewhere",
-                ));
+                console.log(
+                    `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
+                );
             };
 
             req.onerror = (ev) => {
-                reject(new Error(
-                    "unable to connect to indexeddb: " + ev.target.error,
-                ));
+                reject(ev.target.error);
             };
 
             req.onsuccess = (r) => {
                 const db = r.target.result;
 
-                // make sure we close the db on `onversionchange` - otherwise
-                // attempts to delete the database will block (and subsequent
-                // attempts to re-create it will also block).
-                db.onversionchange = (ev) => {
-                    db.close();
-                };
-
-                resolve(db);
+                console.log(`connected to indexeddb ${this._dbName}`);
+                resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
+        }).catch((e) => {
+            console.warn(
+                `unable to connect to indexeddb ${this._dbName}` +
+                    `: falling back to in-memory store: ${e}`,
+            );
+            return new MemoryCryptoStore();
         });
-        return this._dbPromise;
+
+        return this._backendPromise;
     }
 
     /**
@@ -106,38 +108,116 @@ export default class IndexedDBCryptoStore {
      */
     deleteAllData() {
         return new q.Promise((resolve, reject) => {
+            if (!this._indexedDB) {
+                reject(new Error('no indexeddb support available'));
+                return;
+            }
+
             console.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this._indexedDB.deleteDatabase(this._dbName);
 
             req.onblocked = () => {
-                reject(new Error(
-                    "unable to delete indexeddb because it is open elsewhere",
-                ));
+                console.log(
+                    `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
+                );
             };
 
             req.onerror = (ev) => {
-                reject(new Error(
-                    "unable to delete indexeddb: " + ev.target.error,
-                ));
+                reject(ev.target.error);
             };
 
             req.onsuccess = () => {
                 console.log(`Removed indexeddb instance: ${this._dbName}`);
                 resolve();
             };
+        }).catch((e) => {
+            // in firefox, with indexedDB disabled, this fails with a
+            // DOMError. We treat this as non-fatal, so that people can
+            // still use the app.
+            console.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
     }
-}
 
-function createDatabase(db) {
-    const outgoingRoomKeyRequestsStore =
-        db.createObjectStore("outgoingRoomKeyRequests", { keyPath: "requestId" });
+    /**
+     * Look for an existing outgoing room key request, and if none is found,
+     * add a new one
+     *
+     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
+     *
+     * @returns {Promise} resolves to
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     *    same instance as passed in, or the existing one.
+     */
+    getOrAddOutgoingRoomKeyRequest(request) {
+        return this._connect().then((backend) => {
+            return backend.getOrAddOutgoingRoomKeyRequest(request);
+        });
+    }
 
-    // we assume that the RoomKeyRequestBody will have room_id and session_id
-    // properties, to make the index efficient.
-    outgoingRoomKeyRequestsStore.createIndex("session",
-        ["requestBody.room_id", "requestBody.session_id"],
-    );
+    /**
+     * Look for an existing room key request
+     *
+     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     *    existing request to look for
+     *
+     * @return {Promise} resolves to the matching
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    not found
+     */
+    getOutgoingRoomKeyRequest(requestBody) {
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequest(requestBody);
+        });
+    }
 
-    outgoingRoomKeyRequestsStore.createIndex("state", "state");
+    /**
+     * Look for room key requests by state
+     *
+     * @param {Array<Number>} wantedStates list of acceptable states
+     *
+     * @return {Promise} resolves to the a
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    there are no pending requests in those states. If there are multiple
+     *    requests in those states, an arbitrary one is chosen.
+     */
+    getOutgoingRoomKeyRequestByState(wantedStates) {
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequestByState(wantedStates);
+        });
+    }
+
+    /**
+     * Look for an existing room key request by id and state, and update it if
+     * found
+     *
+     * @param {string} requestId      ID of request to update
+     * @param {number} expectedState  state we expect to find the request in
+     * @param {Object} updates        name/value map of updates to apply
+     *
+     * @returns {Promise} resolves to
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    updated request, or null if no matching row was found
+     */
+    updateOutgoingRoomKeyRequest(requestId, expectedState, updates) {
+        return this._connect().then((backend) => {
+            return backend.updateOutgoingRoomKeyRequest(
+                requestId, expectedState, updates,
+            );
+        });
+    }
+
+    /**
+     * Look for an existing room key request by id and state, and delete it if
+     * found
+     *
+     * @param {string} requestId      ID of request to update
+     * @param {number} expectedState  state we expect to find the request in
+     *
+     * @returns {Promise} resolves once the operation is completed
+     */
+    deleteOutgoingRoomKeyRequest(requestId, expectedState) {
+        return this._connect().then((backend) => {
+            return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
+        });
+    }
 }

@@ -752,6 +752,8 @@ ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  */
 Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
+    console.log(`setting pendingEvent status to ${newStatus} in ${event.getRoomId()}`);
+
     // if the message was sent, we expect an event id
     if (newStatus == EventStatus.SENT && !newEventId) {
         throw new Error("updatePendingEvent called with status=SENT, " +
