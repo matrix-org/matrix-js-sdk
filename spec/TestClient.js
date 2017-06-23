@@ -17,6 +17,9 @@ limitations under the License.
 
 "use strict";
 
+// load olm before the sdk if possible
+import './olm-loader';
+
 import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from './mock-request';

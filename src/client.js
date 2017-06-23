@@ -41,6 +41,8 @@ const WebSocketApi = require("./websocket");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
+import reEmit from './reemit';
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -161,7 +163,7 @@ function MatrixClient(opts) {
     this.urlPreviewCache = {};
     this._notifTimelineSet = null;
 
-    this.useWebSockets = true;
+    this.useWebSockets = false;
     if (opts.useWebSocket) {
         this.useWebSockets = Boolean(opts.useWebSocket);
     }
@@ -178,6 +180,10 @@ function MatrixClient(opts) {
             this.store,
             opts.cryptoStore,
         );
+        reEmit(this, this._crypto, [
+            "crypto.roomKeyRequest",
+            "crypto.roomKeyRequestCancellation",
+        ]);
 
         this.olmVersion = Crypto.getOlmVersion();
     }
@@ -2888,6 +2894,7 @@ MatrixClient.prototype.startClient = function(opts) {
 
     if (this._crypto) {
         this._crypto.uploadDeviceKeys().done();
+        this._crypto.start();
     }
 
     // periodically poll for turn servers if we support voip
@@ -2942,6 +2949,8 @@ MatrixClient.prototype.startClient = function(opts) {
  * clean shutdown.
  */
 MatrixClient.prototype.stopClient = function() {
+    console.log('stopping MatrixClient');
+
     this.clientRunning = false;
     // TODO: f.e. Room => self.store.storeRoom(room) ?
     if (this._syncApi) {
@@ -2951,6 +2960,9 @@ MatrixClient.prototype.stopClient = function() {
     if (this._websocketApi) {
         this._websocketApi.stop();
         this._websocketApi = null;
+    }
+    if (this._crypto) {
+        this._crypto.stop();
     }
     if (this._peekSync) {
         this._peekSync.stopPeeking();

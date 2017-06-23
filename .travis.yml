@@ -2,5 +2,4 @@ language: node_js
 node_js:
     - node # Latest stable version of nodejs.
 script:
-    - npm run lint
-    - npm run test
+    - ./travis.sh
