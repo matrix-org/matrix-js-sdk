@@ -97,41 +97,6 @@ WebSocketApi.prototype.reconnectNow = function() {
 };
 
 /**
- * @param {Room} room
- * @private
- */
-WebSocketApi.prototype._registerStateListeners = function(room) {
-    const client = this.client;
-    // we need to also re-emit room state and room member events, so hook it up
-    // to the client now. We need to add a listener for RoomState.members in
-    // order to hook them correctly. (TODO: find a better way?)
-    reEmit(client, room.currentState, [
-        "RoomState.events", "RoomState.members", "RoomState.newMember",
-    ]);
-    room.currentState.on("RoomState.newMember", function(event, state, member) {
-        member.user = client.getUser(member.userId);
-        reEmit(
-            client, member,
-            [
-                "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
-                "RoomMember.membership",
-            ],
-        );
-    });
-};
-
-/**
- * @param {Room} room
- * @private
- */
-WebSocketApi.prototype._deregisterStateListeners = function(room) {
-    // could do with a better way of achieving this.
-    room.currentState.removeAllListeners("RoomState.events");
-    room.currentState.removeAllListeners("RoomState.members");
-    room.currentState.removeAllListeners("RoomState.newMember");
-};
-
-/**
  * Returns the current state of this sync object
  * @see module:client~MatrixClient#event:"sync"
  * @return {?String}
