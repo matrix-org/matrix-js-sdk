@@ -51,7 +51,10 @@ describe("MatrixClient", function() {
             ).check(function(req) {
                 expect(req.data).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
-                expect(req.queryParams.access_token).toEqual(accessToken);
+                if (!(req.queryParams.access_token == accessToken ||
+                        req.headers["Authorization"] == "Bearer " + accessToken)) {
+                    expect(true).toBe(false);
+                }
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 expect(req.opts.json).toBeFalsy();
                 expect(req.opts.timeout).toBe(undefined);
