@@ -1,3 +1,108 @@
+Changes in [0.7.13](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.13) (2017-06-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12...v0.7.13)
+
+ * Fix failure on Tor browser
+   [\#473](https://github.com/matrix-org/matrix-js-sdk/pull/473)
+ * Fix issues with firefox private browsing
+   [\#472](https://github.com/matrix-org/matrix-js-sdk/pull/472)
+
+Changes in [0.7.12](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12) (2017-06-19)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12-rc.1...v0.7.12)
+
+ * No changes
+
+
+Changes in [0.7.12-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.12-rc.1) (2017-06-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11...v0.7.12-rc.1)
+
+ * allow setting iceTransportPolicy to relay through forceTURN option
+   [\#462](https://github.com/matrix-org/matrix-js-sdk/pull/462)
+
+Changes in [0.7.11](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11) (2017-06-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.11-rc.1...v0.7.11)
+
+ * Add a bunch of logging around sending messages
+   [\#460](https://github.com/matrix-org/matrix-js-sdk/pull/460)
+
+Changes in [0.7.11-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.11-rc.1) (2017-06-09)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.10...v0.7.11-rc.1)
+
+ * Make TimelineWindow.load resolve quicker if we have the events
+   [\#458](https://github.com/matrix-org/matrix-js-sdk/pull/458)
+ * Stop peeking when a matrix client is stopped
+   [\#451](https://github.com/matrix-org/matrix-js-sdk/pull/451)
+ * Update README: Clarify how to install libolm
+   [\#450](https://github.com/matrix-org/matrix-js-sdk/pull/450)
+
+Changes in [0.7.10](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.10) (2017-06-02)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.9...v0.7.10)
+
+ * BREAKING CHANGE: The SDK no longer ``require``s ``olm`` - instead it expects
+   libolm to be provided as an ``Olm`` global. This will only affect
+   applications which use end-to-end encryption. See the
+   [README](README.md#end-to-end-encryption-support) for details.
+
+ * indexeddb-crypto-store: fix db deletion
+   [\#447](https://github.com/matrix-org/matrix-js-sdk/pull/447)
+ * Load Olm from the global rather than requiring it.
+   [\#446](https://github.com/matrix-org/matrix-js-sdk/pull/446)
+
+Changes in [0.7.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.9) (2017-06-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8...v0.7.9)
+
+ * Initial framework for indexeddb-backed crypto store
+   [\#445](https://github.com/matrix-org/matrix-js-sdk/pull/445)
+ * Factor out reEmit to a common module
+   [\#444](https://github.com/matrix-org/matrix-js-sdk/pull/444)
+ * crypto/algorithms/base.js: Convert to es6
+   [\#443](https://github.com/matrix-org/matrix-js-sdk/pull/443)
+ * maySendRedactionForEvent for userId
+   [\#435](https://github.com/matrix-org/matrix-js-sdk/pull/435)
+ * MatrixClient: add getUserId()
+   [\#441](https://github.com/matrix-org/matrix-js-sdk/pull/441)
+ * Run jsdoc on a custom babeling of the source
+   [\#442](https://github.com/matrix-org/matrix-js-sdk/pull/442)
+ * Add in a public api getStoredDevice allowing clients to get a specific
+   device
+   [\#439](https://github.com/matrix-org/matrix-js-sdk/pull/439)
+
+Changes in [0.7.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8) (2017-05-22)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.8-rc.1...v0.7.8)
+
+ * No changes
+
+
+Changes in [0.7.8-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.8-rc.1) (2017-05-19)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.7...v0.7.8-rc.1)
+
+ * Attempt to rework the release-tarball-signing stuff
+   [\#438](https://github.com/matrix-org/matrix-js-sdk/pull/438)
+ * ability to specify webrtc audio/video inputs for the lib to request
+   [\#427](https://github.com/matrix-org/matrix-js-sdk/pull/427)
+ * make screen sharing call FF friendly :D
+   [\#434](https://github.com/matrix-org/matrix-js-sdk/pull/434)
+ * Fix race in device list updates
+   [\#431](https://github.com/matrix-org/matrix-js-sdk/pull/431)
+ * WebRTC: Support recvonly for video for those without a webcam
+   [\#424](https://github.com/matrix-org/matrix-js-sdk/pull/424)
+ * Update istanbul to remove minimatch DoS Warning
+   [\#422](https://github.com/matrix-org/matrix-js-sdk/pull/422)
+ * webrtc/call: Make it much less likely that callIds collide locally
+   [\#423](https://github.com/matrix-org/matrix-js-sdk/pull/423)
+ * Automatically complete dummy auth
+   [\#420](https://github.com/matrix-org/matrix-js-sdk/pull/420)
+ * Don't leave the gh-pages branch checked out
+   [\#418](https://github.com/matrix-org/matrix-js-sdk/pull/418)
+
 Changes in [0.7.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.7) (2017-04-25)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.7-rc.1...v0.7.7)

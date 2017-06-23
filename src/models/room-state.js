@@ -247,6 +247,45 @@ RoomState.prototype.getUserIdsWithDisplayName = function(displayName) {
 };
 
 /**
+ * Returns true if userId is in room, event is not redacted and either sender of
+ * mxEvent or has power level sufficient to redact events other than their own.
+ * @param {MatrixEvent} mxEvent The event to test permission for
+ * @param {string} userId The user ID of the user to test permission for
+ * @return {boolean} true if the given used ID can redact given event
+ */
+RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
+    const member = this.getMember(userId);
+    if (!member || member.membership === 'leave') return false;
+
+    if (mxEvent.status || mxEvent.isRedacted()) return false;
+    if (mxEvent.getSender() === userId) return true;
+
+    return this._hasSufficientPowerLevelFor('redact', member.powerLevel);
+};
+
+/**
+ * Returns true if the given power level is sufficient for action
+ * @param {string} action The type of power level to check
+ * @param {number} powerLevel The power level of the member
+ * @return {boolean} true if the given power level is sufficient
+ */
+RoomState.prototype._hasSufficientPowerLevelFor = function(action, powerLevel) {
+    const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
+
+    let powerLevels = {};
+    if (powerLevelsEvent) {
+        powerLevels = powerLevelsEvent.getContent();
+    }
+
+    let requiredLevel = 50;
+    if (powerLevels[action] !== undefined) {
+        requiredLevel = powerLevels[action];
+    }
+
+    return powerLevel >= requiredLevel;
+};
+
+/**
  * Short-form for maySendEvent('m.room.message', userId)
  * @param {string} userId The user ID of the user to test permission for
  * @return {boolean} true if the given user ID should be permitted to send
@@ -268,7 +307,6 @@ RoomState.prototype.maySendMessage = function(userId) {
 RoomState.prototype.maySendEvent = function(eventType, userId) {
     return this._maySendEventOfType(eventType, userId, false);
 };
-
 
 /**
  * Returns true if the given MatrixClient has permission to send a state

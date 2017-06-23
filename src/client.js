@@ -40,6 +40,8 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
+import reEmit from './reemit';
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -47,8 +49,7 @@ try {
     var Crypto = require("./crypto");
     CRYPTO_ENABLED = true;
 } catch (e) {
-    console.error("olm load error", e);
-    // Olm not installed.
+    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
 }
 
 /**
@@ -104,6 +105,9 @@ try {
  * disabled by default for compatibility with older clients - in particular to
  * maintain support for back-paginating the live timeline after a '/sync'
  * result with a gap.
+ *
+ * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
+ *    crypto store implementation.
  */
 function MatrixClient(opts) {
     MatrixBaseApis.call(this, opts);
@@ -153,20 +157,58 @@ function MatrixClient(opts) {
     this._notifTimelineSet = null;
 
     this._crypto = null;
+    this._cryptoStore = opts.cryptoStore;
     if (CRYPTO_ENABLED && Boolean(opts.sessionStore) &&
+            Boolean(this._cryptoStore) &&
             userId !== null && this.deviceId !== null) {
         this._crypto = new Crypto(
             this, this,
             opts.sessionStore,
             userId, this.deviceId,
             this.store,
+            opts.cryptoStore,
         );
+        reEmit(this, this._crypto, [
+            "crypto.roomKeyRequest",
+            "crypto.roomKeyRequestCancellation",
+        ]);
 
         this.olmVersion = Crypto.getOlmVersion();
     }
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+/**
+ * Clear any data out of the persistent stores used by the client.
+ *
+ * @returns {Promise} Promise which resolves when the stores have been cleared.
+ */
+MatrixClient.prototype.clearStores = function() {
+    if (this._clientRunning) {
+        throw new Error("Cannot clear stores while client is running");
+    }
+
+    const promises = [];
+
+    promises.push(this.store.deleteAllData());
+    if (this._cryptoStore) {
+        promises.push(this._cryptoStore.deleteAllData());
+    }
+    return q.all(promises);
+};
+
+/**
+ * Get the user-id of the logged-in user
+ *
+ * @return {?string} MXID for the logged-in user, or null if not logged in
+ */
+MatrixClient.prototype.getUserId = function() {
+    if (this.credentials && this.credentials.userId) {
+        return this.credentials.userId;
+    }
+    return null;
+};
 
 /**
  * Get the domain for this client's MXID
@@ -357,6 +399,21 @@ MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
         throw new Error("End-to-end encryption disabled");
     }
     return this._crypto.getStoredDevicesForUser(userId) || [];
+};
+
+/**
+ * Get the stored device key for a user id and device id
+ *
+ * @param {string} userId the user to list keys for.
+ * @param {string} deviceId unique identifier for the device
+ *
+ * @return {?module:crypto-deviceinfo} device or null
+ */
+MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getStoredDevice(userId, deviceId) || null;
 };
 
 /**
@@ -552,7 +609,7 @@ function _decryptEvent(client, event) {
         console.warn(
             `Error decrypting event (id=${event.getId()}): ${e}`,
         );
-        if (!(e instanceof Crypto.DecryptionError)) {
+        if (e.name !== "DecryptionError") {
             throw e;
         }
         _badEncryptedMessage(event, e.message);
@@ -890,6 +947,8 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         txnId = this.makeTxnId();
     }
 
+    console.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
+
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
     // the client has no scheduler or store.
@@ -1014,7 +1073,12 @@ function _sendEventHttpRequest(client, event) {
 
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
-    );
+    ).then((res) => {
+        console.log(
+            `Event sent to ${event.getRoomId()} with event id ${res.event_id}`,
+        );
+        return res;
+    });
 }
 
 /**
@@ -2799,6 +2863,7 @@ MatrixClient.prototype.startClient = function(opts) {
 
     if (this._crypto) {
         this._crypto.uploadDeviceKeys().done();
+        this._crypto.start();
     }
 
     // periodically poll for turn servers if we support voip
@@ -2831,11 +2896,19 @@ MatrixClient.prototype.startClient = function(opts) {
  * clean shutdown.
  */
 MatrixClient.prototype.stopClient = function() {
+    console.log('stopping MatrixClient');
+
     this.clientRunning = false;
     // TODO: f.e. Room => self.store.storeRoom(room) ?
     if (this._syncApi) {
         this._syncApi.stop();
         this._syncApi = null;
+    }
+    if (this._crypto) {
+        this._crypto.stop();
+    }
+    if (this._peekSync) {
+        this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
 };

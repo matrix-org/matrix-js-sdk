@@ -71,6 +71,7 @@ const DEBUG = true;  // set true to enable console logging.
  * @param {Object} opts Config options.
  * @param {string} opts.roomId The room ID for this call.
  * @param {Object} opts.webRtc The WebRTC globals from the browser.
+ * @param {boolean} opts.forceTURN whether relay through TURN should be forced.
  * @param {Object} opts.URL The URL global.
  * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
@@ -79,6 +80,7 @@ function MatrixCall(opts) {
     this.roomId = opts.roomId;
     this.client = opts.client;
     this.webRtc = opts.webRtc;
+    this.forceTURN = opts.forceTURN;
     this.URL = opts.URL;
     // Array of Objects with urls, username, credential keys
     this.turnServers = opts.turnServers || [];
@@ -1184,6 +1186,7 @@ const _createPeerConnection = function(self) {
     }
 
     const pc = new self.webRtc.RtcPeerConnection({
+        iceTransportPolicy: self.forceTURN ? 'relay' : undefined,
         iceServers: servers,
     });
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
@@ -1219,6 +1222,8 @@ const _getScreenSharingConstraints = function(call) {
 };
 
 const _getUserMediaVideoContraints = function(callType) {
+    const isWebkit = !!global.window.navigator.webkitGetUserMedia;
+
     switch (callType) {
         case 'voice':
             return {
@@ -1232,12 +1237,11 @@ const _getUserMediaVideoContraints = function(callType) {
                     deviceId: audioInput ? {exact: audioInput} : undefined,
                 }, video: {
                     deviceId: videoInput ? {exact: videoInput} : undefined,
-                    mandatory: {
-                        minWidth: 640,
-                        maxWidth: 640,
-                        minHeight: 360,
-                        maxHeight: 360,
-                    },
+                    /* We want 640x360.  Chrome will give it only if we ask exactly,
+                       FF refuses entirely if we ask exactly, so have to ask for ideal
+                       instead */
+                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
+                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
                 },
             };
     }
@@ -1292,9 +1296,11 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
+ * @param {Object?} options optional options map.
+ * @param {boolean} options.forceTURN whether relay through TURN should be forced.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-module.exports.createNewMatrixCall = function(client, roomId) {
+module.exports.createNewMatrixCall = function(client, roomId, options) {
     const w = global.window;
     const doc = global.document;
     if (!w || !doc) {
@@ -1350,6 +1356,8 @@ module.exports.createNewMatrixCall = function(client, roomId) {
         URL: w.URL,
         roomId: roomId,
         turnServers: client.getTurnServers(),
+        // call level options
+        forceTURN: options ? options.forceTURN : false,
     };
     return new MatrixCall(opts);
 };

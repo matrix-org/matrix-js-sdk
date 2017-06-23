@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2017 Vector Creations Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,13 +16,13 @@ limitations under the License.
 */
 "use strict";
 
-
 /**
  * @module crypto
  */
 
 const anotherjson = require('another-json');
 const q = require("q");
+import {EventEmitter} from 'events';
 
 const utils = require("../utils");
 const OlmDevice = require("./OlmDevice");
@@ -30,6 +31,8 @@ const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
+
+import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 
 /**
  * Cryptography bits
@@ -50,20 +53,22 @@ const DeviceList = require('./DeviceList').default;
  * @param {string} deviceId The identifier for this device.
  *
  * @param {Object} clientStore the MatrixClient data store.
+ *
+ * @param {module:crypto/store/base~CryptoStore} cryptoStore
+ *    storage for the crypto layer.
  */
 function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
-                clientStore) {
+                clientStore, cryptoStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
     this._deviceId = deviceId;
     this._clientStore = clientStore;
+    this._cryptoStore = cryptoStore;
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
     this._initialDeviceListInvalidationPending = false;
-
-    this._clientRunning = false;
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -88,6 +93,15 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
         this._olmDevice.deviceCurve25519Key;
 
     this._globalBlacklistUnverifiedDevices = false;
+
+    this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
+         baseApis, this._deviceId, this._cryptoStore,
+    );
+
+    // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
+    // we received in the current sync.
+    this._receivedRoomKeyRequests = [];
+    this._receivedRoomKeyRequestCancellations = [];
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -114,15 +128,12 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
 
     _registerEventHandlers(this, eventEmitter);
 }
+utils.inherits(Crypto, EventEmitter);
+
 
 function _registerEventHandlers(crypto, eventEmitter) {
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
-            if (syncState === "STOPPED") {
-                crypto._clientRunning = false;
-            } else if (syncState === "PREPARED") {
-                crypto._clientRunning = true;
-            }
             if (syncState === "SYNCING") {
                 crypto._onSyncCompleted(data);
             }
@@ -141,10 +152,13 @@ function _registerEventHandlers(crypto, eventEmitter) {
 
     eventEmitter.on("toDeviceEvent", function(event) {
         try {
-            if (event.getType() == "m.room_key") {
+            if (event.getType() == "m.room_key"
+                    || event.getType() == "m.forwarded_room_key") {
                 crypto._onRoomKeyEvent(event);
             } else if (event.getType() == "m.new_device") {
                 crypto._onNewDeviceEvent(event);
+            } else if (event.getType() == "m.room_key_request") {
+                crypto._onRoomKeyRequestEvent(event);
             }
         } catch (e) {
             console.error("Error handling toDeviceEvent:", e);
@@ -162,6 +176,16 @@ function _registerEventHandlers(crypto, eventEmitter) {
         }
     });
 }
+
+/** Start background processes related to crypto */
+Crypto.prototype.start = function() {
+    this._outgoingRoomKeyRequestManager.start();
+};
+
+/** Stop background processes related to crypto */
+Crypto.prototype.stop = function() {
+    this._outgoingRoomKeyRequestManager.stop();
+};
 
 /**
  * @return {string} The version of Olm.
@@ -515,6 +539,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
         return null;
     }
 
+    const forwardingChain = event.getForwardingCurve25519KeyChain();
+    if (forwardingChain.length > 0) {
+        // we got this event from somewhere else
+        // TODO: check if we can trust the forwarders.
+        return null;
+    }
+
     // senderKey is the Curve25519 identity key of the device which the event
     // was sent from. In the case of Megolm, it's actually the Curve25519
     // identity key of the device which set up the Megolm session.
@@ -536,7 +567,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     //
     // (see https://github.com/vector-im/vector-web/issues/2215)
 
-    const claimedKey = event.getKeysClaimed().ed25519;
+    const claimedKey = event.getClaimedEd25519Key();
     if (!claimedKey) {
         console.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
@@ -743,18 +774,15 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
         return null;
     }
 
-    // We can claim and prove ownership of all our device keys in the local
-    // echo of the event since we know that all the local echos come from
-    // this device.
-    const myKeys = {
-        curve25519: this._olmDevice.deviceCurve25519Key,
-        ed25519: this._olmDevice.deviceEd25519Key,
-    };
-
     return alg.encryptMessage(
         room, event.getType(), event.getContent(),
-    ).then(function(encryptedContent) {
-        event.makeEncrypted("m.room.encrypted", encryptedContent, myKeys);
+    ).then((encryptedContent) => {
+        event.makeEncrypted(
+            "m.room.encrypted",
+            encryptedContent,
+            this._olmDevice.deviceCurve25519Key,
+            this._olmDevice.deviceEd25519Key,
+        );
     });
 };
 
@@ -781,6 +809,36 @@ Crypto.prototype.userDeviceListChanged = function(userId) {
 
     // don't flush the outdated device list yet - we do it once we finish
     // processing the sync.
+};
+
+/**
+ * Send a request for some room keys, if we have not already done so
+ *
+ * @param {module:crypto~RoomKeyRequestBody} requestBody
+ * @param {Array<{userId: string, deviceId: string}>} recipients
+ */
+Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
+    this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
+        requestBody, recipients,
+    ).catch((e) => {
+        // this normally means we couldn't talk to the store
+        console.error(
+            'Error requesting key for event', e,
+        );
+    }).done();
+};
+
+/**
+ * Cancel any earlier room key request
+ *
+ * @param {module:crypto~RoomKeyRequestBody} requestBody
+ *    parameters to match for cancellation
+ */
+Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
+    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
+    .catch((e) => {
+        console.warn("Error clearing pending room key requests", e);
+    }).done();
 };
 
 /**
@@ -864,6 +922,7 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
     // (https://github.com/vector-im/riot-web/issues/2782).
     if (!syncData.catchingUp) {
         _maybeUploadOneTimeKeys(this);
+        this._processReceivedRoomKeyRequests();
     }
 };
 
@@ -1052,6 +1111,106 @@ Crypto.prototype._onNewDeviceEvent = function(event) {
     this._deviceList.invalidateUserDeviceList(userId);
 };
 
+/**
+ * Called when we get an m.room_key_request event.
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event key request event
+ */
+Crypto.prototype._onRoomKeyRequestEvent = function(event) {
+    const content = event.getContent();
+    if (content.action === "request") {
+        // Queue it up for now, because they tend to arrive before the room state
+        // events at initial sync, and we want to see if we know anything about the
+        // room before passing them on to the app.
+        const req = new IncomingRoomKeyRequest(event);
+        this._receivedRoomKeyRequests.push(req);
+    } else if (content.action === "request_cancellation") {
+        const req = new IncomingRoomKeyRequestCancellation(event);
+        this._receivedRoomKeyRequestCancellations.push(req);
+    }
+};
+
+/**
+ * Process any m.room_key_request events which were queued up during the
+ * current sync.
+ *
+ * @private
+ */
+Crypto.prototype._processReceivedRoomKeyRequests = function() {
+    const requests = this._receivedRoomKeyRequests;
+    this._receivedRoomKeyRequests = [];
+    for (const req of requests) {
+        const userId = req.userId;
+        const deviceId = req.deviceId;
+
+        const body = req.requestBody;
+        const roomId = body.room_id;
+        const alg = body.algorithm;
+
+        console.log(`m.room_key_request from ${userId}:${deviceId}` +
+                ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
+
+        if (userId !== this._userId) {
+            // TODO: determine if we sent this device the keys already: in
+            // which case we can do so again.
+            console.log("Ignoring room key request from other user for now");
+            return;
+        }
+
+        // todo: should we queue up requests we don't yet have keys for,
+        // in case they turn up later?
+
+        // if we don't have a decryptor for this room/alg, we don't have
+        // the keys for the requested events, and can drop the requests.
+        if (!this._roomDecryptors[roomId]) {
+            console.log(`room key request for unencrypted room ${roomId}`);
+            continue;
+        }
+
+        const decryptor = this._roomDecryptors[roomId][alg];
+        if (!decryptor) {
+            console.log(`room key request for unknown alg ${alg} in room ${roomId}`);
+            continue;
+        }
+
+        if (!decryptor.hasKeysForKeyRequest(req)) {
+            console.log(
+                `room key request for unknown session ${roomId} / ` +
+                body.session_id,
+            );
+            continue;
+        }
+
+        req.share = () => {
+            decryptor.shareKeysWithDevice(req);
+        };
+
+        // if the device is is verified already, share the keys
+        const device = this._deviceList.getStoredDevice(userId, deviceId);
+        if (device && device.isVerified()) {
+            console.log('device is already verified: sharing keys');
+            req.share();
+            return;
+        }
+
+        this.emit("crypto.roomKeyRequest", req);
+    }
+
+    const cancellations = this._receivedRoomKeyRequestCancellations;
+    this._receivedRoomKeyRequestCancellations = [];
+    for (const cancellation of cancellations) {
+        console.log(
+            `m.room_key_request cancellation for ${cancellation.userId}:` +
+            `${cancellation.deviceId} (id ${cancellation.requestId})`,
+        );
+
+        // we should probably only notify the app of cancellations we told it
+        // about, but we don't currently have a record of that, so we just pass
+        // everything through.
+        this.emit("crypto.roomKeyRequestCancellation", cancellation);
+    }
+};
 
 /**
  * Get a decryptor for a given room and algorithm.
@@ -1098,6 +1257,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
         userId: this._userId,
         crypto: this,
         olmDevice: this._olmDevice,
+        baseApis: this._baseApis,
         roomId: roomId,
     });
 
@@ -1121,11 +1281,70 @@ Crypto.prototype._signObject = function(obj) {
     obj.signatures = sigs;
 };
 
-/**
- * @see module:crypto/algorithms/base.DecryptionError
- */
-Crypto.DecryptionError = algorithms.DecryptionError;
 
+/**
+ * The parameters of a room key request. The details of the request may
+ * vary with the crypto algorithm, but the management and storage layers for
+ * outgoing requests expect it to have 'room_id' and 'session_id' properties.
+ *
+ * @typedef {Object} RoomKeyRequestBody
+ */
+
+/**
+ * Represents a received m.room_key_request event
+ *
+ * @property {string} userId    user requesting the key
+ * @property {string} deviceId  device requesting the key
+ * @property {string} requestId unique id for the request
+ * @property {module:crypto~RoomKeyRequestBody} requestBody
+ * @property {function()} share  callback which, when called, will ask
+ *    the relevant crypto algorithm implementation to share the keys for
+ *    this request.
+ */
+class IncomingRoomKeyRequest {
+    constructor(event) {
+        const content = event.getContent();
+
+        this.userId = event.getSender();
+        this.deviceId = content.requesting_device_id;
+        this.requestId = content.request_id;
+        this.requestBody = content.body || {};
+        this.share = () => {
+            throw new Error("don't know how to share keys for this request yet");
+        };
+    }
+}
+
+/**
+ * Represents a received m.room_key_request cancellation
+ *
+ * @property {string} userId    user requesting the cancellation
+ * @property {string} deviceId  device requesting the cancellation
+ * @property {string} requestId unique id for the request to be cancelled
+ */
+class IncomingRoomKeyRequestCancellation {
+    constructor(event) {
+        const content = event.getContent();
+
+        this.userId = event.getSender();
+        this.deviceId = content.requesting_device_id;
+        this.requestId = content.request_id;
+    }
+}
+
+/**
+ * Fires when we receive a room key request
+ *
+ * @event module:client~MatrixClient#"crypto.roomKeyRequest"
+ * @param {module:crypto~IncomingRoomKeyRequest} req  request details
+ */
+
+/**
+ * Fires when we receive a room key request cancellation
+ *
+ * @event module:client~MatrixClient#"crypto.roomKeyRequestCancellation"
+ * @param {module:crypto~IncomingRoomKeyRequestCancellation} req
+ */
 
 /** */
 module.exports = Crypto;

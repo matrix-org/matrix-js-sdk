@@ -112,8 +112,22 @@ module.exports.MatrixEvent = function MatrixEvent(
         new Date(this.event.origin_server_ts) : null;
 
     this._clearEvent = {};
-    this._keysProved = {};
-    this._keysClaimed = {};
+
+    /* curve25519 key which we believe belongs to the sender of the event. See
+     * getSenderKey()
+     */
+    this._senderCurve25519Key = null;
+
+    /* ed25519 key which the sender of this event (for olm) or the creator of
+     * the megolm session (for megolm) claims to own. See getClaimedEd25519Key()
+     */
+    this._claimedEd25519Key = null;
+
+    /* curve25519 keys of devices involved in telling us about the
+     * _senderCurve25519Key and _claimedEd25519Key.
+     * See getForwardingCurve25519KeyChain().
+     */
+    this._forwardingCurve25519KeyChain = [];
 };
 utils.inherits(module.exports.MatrixEvent, EventEmitter);
 
@@ -261,9 +275,18 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * <tt>"m.room.encrypted"</tt>
      *
      * @param {object} crypto_content raw 'content' for the encrypted event.
-     * @param {object} keys The local keys claimed and proved by this event.
+     *
+     * @param {string} senderCurve25519Key curve25519 key to record for the
+     *   sender of this event.
+     *   See {@link module:models/event.MatrixEvent#getSenderKey}.
+     *
+     * @param {string} claimedEd25519Key claimed ed25519 key to record for the
+     *   sender if this event.
+     *   See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}
      */
-    makeEncrypted: function(crypto_type, crypto_content, keys) {
+    makeEncrypted: function(
+        crypto_type, crypto_content, senderCurve25519Key, claimedEd25519Key,
+    ) {
         // keep the plain-text data for 'view source'
         this._clearEvent = {
             type: this.event.type,
@@ -271,8 +294,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         };
         this.event.type = crypto_type;
         this.event.content = crypto_content;
-        this._keysProved = keys;
-        this._keysClaimed = keys;
+        this._senderCurve25519Key = senderCurve25519Key;
+        this._claimedEd25519Key = claimedEd25519Key;
     },
 
     /**
@@ -287,16 +310,26 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {Object} clearEvent The plaintext payload for the event
      *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
      *
-     * @param {Object=} keysProved Keys owned by the sender of this event.
-     *    See {@link module:models/event.MatrixEvent#getKeysProved}.
+     * @param {string=} senderCurve25519Key Key owned by the sender of this event.
+     *    See {@link module:models/event.MatrixEvent#getSenderKey}.
      *
-     * @param {Object=} keysClaimed Keys the sender of this event claims.
-     *    See {@link module:models/event.MatrixEvent#getKeysClaimed}.
+     * @param {string=} claimedEd25519Key ed25519 key claimed by the sender of
+     *    this event. See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
+     *
+     * @param {Array<string>=} forwardingCurve25519KeyChain list of curve25519 keys
+     *     involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     *     See {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
      */
-    setClearData: function(clearEvent, keysProved, keysClaimed) {
+    setClearData: function(
+        clearEvent,
+        senderCurve25519Key,
+        claimedEd25519Key,
+        forwardingCurve25519KeyChain,
+    ) {
         this._clearEvent = clearEvent;
-        this._keysProved = keysProved || {};
-        this._keysClaimed = keysClaimed || {};
+        this._senderCurve25519Key = senderCurve25519Key || null;
+        this._claimedEd25519Key = claimedEd25519Key || null;
+        this._forwardingCurve25519KeyChain = forwardingCurve25519KeyChain || [];
         this.emit("Event.decrypted", this);
     },
 
@@ -309,37 +342,72 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * The curve25519 key that sent this event
+     * The curve25519 key for the device that we think sent this event
+     *
+     * For an Olm-encrypted event, this is inferred directly from the DH
+     * exchange at the start of the session: the curve25519 key is involved in
+     * the DH exchange, so only a device which holds the private part of that
+     * key can establish such a session.
+     *
+     * For a megolm-encrypted event, it is inferred from the Olm message which
+     * established the megolm session
+     *
      * @return {string}
      */
     getSenderKey: function() {
-        return this.getKeysProved().curve25519 || null;
-    },
-
-    /**
-     * The keys that must have been owned by the sender of this encrypted event.
-     * <p>
-     * These don't necessarily have to come from this event itself, but may be
-     * implied by the cryptographic session.
-     *
-     * @return {Object<string, string>}
-     */
-    getKeysProved: function() {
-        return this._keysProved;
+        return this._senderCurve25519Key;
     },
 
     /**
      * The additional keys the sender of this encrypted event claims to possess.
-     * <p>
-     * These don't necessarily have to come from this event itself, but may be
-     * implied by the cryptographic session.
-     * For example megolm messages don't claim keys directly, but instead
-     * inherit a claim from the olm message that established the session.
+     *
+     * Just a wrapper for #getClaimedEd25519Key (q.v.)
      *
      * @return {Object<string, string>}
      */
     getKeysClaimed: function() {
-        return this._keysClaimed;
+        return {
+            ed25519: this._claimedEd25519Key,
+        };
+    },
+
+    /**
+     * Get the ed25519 the sender of this event claims to own.
+     *
+     * For Olm messages, this claim is encoded directly in the plaintext of the
+     * event itself. For megolm messages, it is implied by the m.room_key event
+     * which established the megolm session.
+     *
+     * Until we download the device list of the sender, it's just a claim: the
+     * device list gives a proof that the owner of the curve25519 key used for
+     * this event (and returned by #getSenderKey) also owns the ed25519 key by
+     * signing the public curve25519 key with the ed25519 key.
+     *
+     * In general, applications should not use this method directly, but should
+     * instead use MatrixClient.getEventSenderDeviceInfo.
+     *
+     * @return {string}
+     */
+    getClaimedEd25519Key: function() {
+        return this._claimedEd25519Key;
+    },
+
+    /**
+     * Get the curve25519 keys of the devices which were involved in telling us
+     * about the claimedEd25519Key and sender curve25519 key.
+     *
+     * Normally this will be empty, but in the case of a forwarded megolm
+     * session, the sender keys are sent to us by another device (the forwarding
+     * device), which we need to trust to do this. In that case, the result will
+     * be a list consisting of one entry.
+     *
+     * If the device that sent us the key (A) got it from another device which
+     * it wasn't prepared to vouch for (B), the result will be [A, B]. And so on.
+     *
+     * @return {string[]} base64-encoded curve25519 keys, from oldest to newest.
+     */
+    getForwardingCurve25519KeyChain: function() {
+        return this._forwardingCurve25519KeyChain;
     },
 
     getUnsigned: function() {

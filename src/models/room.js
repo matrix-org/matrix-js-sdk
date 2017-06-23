@@ -27,6 +27,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
+import reEmit from '../reemit';
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -751,6 +752,8 @@ ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  */
 Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
+    console.log(`setting pendingEvent status to ${newStatus} in ${event.getRoomId()}`);
+
     // if the message was sent, we expect an event id
     if (newStatus == EventStatus.SENT && !newEventId) {
         throw new Error("updatePendingEvent called with status=SENT, " +
@@ -1250,25 +1253,6 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
             otherMembers[0].name + " and " + (otherMembers.length - 1) + " others"
         );
     }
-}
-
-// FIXME: copypasted from sync.js
-function reEmit(reEmitEntity, emittableEntity, eventNames) {
-    utils.forEach(eventNames, function(eventName) {
-        // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
-            // take the args from the listener and reuse them, adding the
-            // event name to the arg list so it works with .emit()
-            // Transformation Example:
-            // listener on "foo" => function(a,b) { ... }
-            // Re-emit on "thing" => thing.emit("foo", a, b)
-            const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
-            }
-            reEmitEntity.emit(...newArgs);
-        });
-    });
 }
 
 /**

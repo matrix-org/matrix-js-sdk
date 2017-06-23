@@ -150,7 +150,7 @@ IndexedDBStore.prototype.deleteAllData = function() {
     return this.backend.clearDatabase().then(() => {
         console.log("Deleted indexeddb data.");
     }, (err) => {
-        console.error("Failed to delete indexeddb data: ", err);
+        console.error(`Failed to delete indexeddb data: ${err}`);
         throw err;
     });
 };

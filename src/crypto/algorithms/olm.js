@@ -222,7 +222,8 @@ OlmDecryption.prototype.decryptEvent = function(event) {
         );
     }
 
-    event.setClearData(payload, {curve25519: deviceKey}, payload.keys || {});
+    const claimedKeys = payload.keys || {};
+    event.setClearData(payload, deviceKey, claimedKeys.ed25519 || null);
 };
 
 
