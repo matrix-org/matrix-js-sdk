@@ -163,7 +163,7 @@ function MatrixClient(opts) {
     this.urlPreviewCache = {};
     this._notifTimelineSet = null;
 
-    this.useWebSockets = false;
+    this.useWebSockets = true;
     if (opts.useWebSockets) {
         this.useWebSockets = Boolean(opts.useWebSockets);
     }
@@ -2926,7 +2926,7 @@ MatrixClient.prototype.startClient = function(opts) {
     // WebsocketAPI uses some of SyncApi-functions - so need to be created before
     // TODO check if methods can be made static or moved to another class
     this._syncApi = new SyncApi(this, opts);
-    if (this.useWebSockets && this._websocketApi) {
+    if (this.useWebSockets) {
         this._websocketApi = new WebSocketApi(this, opts);
         this._websocketApi.start();
 

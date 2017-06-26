@@ -47,6 +47,7 @@ export default function TestClient(userId, deviceId, accessToken) {
         deviceId: deviceId,
         sessionStore: this.storage,
         request: this.httpBackend.requestFn,
+        useWebSockets: false,
     });
 
     this.deviceKeys = null;
