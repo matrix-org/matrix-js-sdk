@@ -398,9 +398,14 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
     return this._http.authedRequest(callback, "GET", path);
 };
 
-MatrixBaseApis.prototype.getGroupSummary = function(groupId, callback) {
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group summary object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
     const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
-    return this._http.authedRequest(callback, "GET", path);
+    return this._http.authedRequest(undefined, "GET", path);
 };
 
 /**
