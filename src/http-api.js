@@ -385,20 +385,27 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (isFinite(opts)) {
-            // opts used to be localTimeoutMs
-            opts = {
-                localTimeoutMs: opts,
-            };
-        }
-        if (!opts) {
-            opts = {};
-        }
-        if (!opts.headers) {
-            opts.headers = {};
-        }
-        if (!opts.headers.Authorization) {
-            opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+        if (this.authorization_header_supported === undefined ||
+            this.authorization_header_supported) {
+            if (isFinite(opts)) {
+                // opts used to be localTimeoutMs
+                opts = {
+                    localTimeoutMs: opts,
+                };
+            }
+            if (!opts) {
+                opts = {};
+            }
+            if (!opts.headers) {
+                opts.headers = {};
+            }
+            if (!opts.headers.Authorization) {
+                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+            }
+        } else {
+            if (!queryParams.access_token) {
+                queryParams.access_token = this.opts.accessToken;
+            }
         }
 
         const request_promise = this.request(
@@ -408,6 +415,11 @@ module.exports.MatrixHttpApi.prototype = {
         const self = this;
         request_promise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
+                if (self.authorization_header_supported === undefined) {
+                    self.authorization_header_supported = false;
+                    return self.authedRequest(
+                        callback, method, path, queryParams, data, opts);
+                }
                 self.event_emitter.emit("Session.logged_out");
             }
         });
