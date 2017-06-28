@@ -409,6 +409,15 @@ MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
 };
 
 /**
+ * @return {module:client.Promise} Resolves: The groups to which the user is joined
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedGroups = function() {
+    const path = utils.encodeUri("/joined_groups");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
  * Retrieve a state event.
  * @param {string} roomId
  * @param {string} eventType
