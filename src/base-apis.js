@@ -418,6 +418,20 @@ MatrixBaseApis.prototype.getJoinedGroups = function() {
 };
 
 /**
+ * @param {Object} content Request content
+ * @param {string} content.localpart The local part of the desired group ID
+ * @param {Object} content.profile Group profile object
+ * @return {module:client.Promise} Resolves: Object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.createGroup = function(content) {
+    const path = utils.encodeUri("/create_group");
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, content,
+    );
+};
+
+/**
  * Retrieve a state event.
  * @param {string} roomId
  * @param {string} eventType
