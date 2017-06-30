@@ -421,7 +421,7 @@ MatrixBaseApis.prototype.getJoinedGroups = function() {
  * @param {Object} content Request content
  * @param {string} content.localpart The local part of the desired group ID
  * @param {Object} content.profile Group profile object
- * @return {module:client.Promise} Resolves: Object
+ * @return {module:client.Promise} Resolves: Object with key group_id: id of the created group
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.createGroup = function(content) {
