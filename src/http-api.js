@@ -386,7 +386,7 @@ module.exports.MatrixHttpApi.prototype = {
             queryParams = {};
         }
         if (this.authorization_header_supported === undefined ||
-            this.authorization_header_supported) {
+                this.authorization_header_supported) {
             if (isFinite(opts)) {
                 // opts used to be localTimeoutMs
                 opts = {
@@ -400,7 +400,15 @@ module.exports.MatrixHttpApi.prototype = {
                 opts.headers = {};
             }
             if (!opts.headers.Authorization) {
-                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+                if (queryParams.access_token) {
+                    opts.headers.Authorization = "Bearer " + queryParams.access_token;
+                    delete queryParams.access_token;
+                } else {
+                    opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+                }
+            }
+            if (queryParams.access_token) {
+                delete queryParams.access_token;
             }
         } else {
             if (!queryParams.access_token) {
@@ -408,25 +416,30 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        const request_promise = this.request(
+        const requestPromise = this.request(
             callback, method, path, queryParams, data, opts,
         );
 
         const self = this;
-        request_promise.catch(function(err) {
+
+        requestPromise.catch(function(err) {
+            if (err.toString().indexOf("Error: CORS request rejected") != -1) {
+                self.authorization_header_supported = false;
+                queryParams.access_token = opts.headers.Authorization.substr(7);
+                delete opts.headers.Authorization;
+                const secondPromise = self.request(
+                    callback, method, path, queryParams, data, opts,
+                );
+                requestPromise.abort = secondPromise.abort;
+            }
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                if (self.authorization_header_supported === undefined) {
-                    self.authorization_header_supported = false;
-                    return self.authedRequest(
-                        callback, method, path, queryParams, data, opts);
-                }
                 self.event_emitter.emit("Session.logged_out");
             }
         });
 
         // return the original promise, otherwise tests break due to it having to
         // go around the event loop one more time to process the result of the request
-        return request_promise;
+        return requestPromise;
     },
 
     /**
