@@ -423,7 +423,8 @@ module.exports.MatrixHttpApi.prototype = {
         const self = this;
 
         requestPromise.catch(function(err) {
-            if (err.toString().indexOf("Error: CORS request rejected") != -1) {
+            if (err.errcode == 'M_MISSING_TOKEN' ||
+                    err.toString().indexOf("Error: CORS request rejected") != -1) {
                 self.authorization_header_supported = false;
                 queryParams.access_token = opts.headers.Authorization.substr(7);
                 delete opts.headers.Authorization;
@@ -431,6 +432,7 @@ module.exports.MatrixHttpApi.prototype = {
                     callback, method, path, queryParams, data, opts,
                 );
                 requestPromise.abort = secondPromise.abort;
+                return secondPromise;
             }
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
