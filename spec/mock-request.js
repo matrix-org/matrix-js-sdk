@@ -126,9 +126,14 @@ HttpBackend.prototype = {
                 }
                 testResponse = matchingReq.response;
                 console.log("    responding to %s", matchingReq.path);
+
                 let body = testResponse.body;
                 if (Object.prototype.toString.call(body) == "[object Function]") {
                     body = body(req.path, req.data);
+                }
+
+                if (!testResponse.rawBody) {
+                    body = JSON.stringify(body);
                 }
                 req.callback(
                     testResponse.err, testResponse.response, body,
@@ -210,17 +215,22 @@ ExpectedRequest.prototype = {
     /**
      * Respond with the given data when this request is satisfied.
      * @param {Number} code The HTTP status code.
-     * @param {Object|Function} data The HTTP JSON body. If this is a function,
-     * it will be invoked when the JSON body is required (which should be returned).
+     * @param {Object|Function?} data The response body object. If this is a function,
+     * it will be invoked when the response body is required (which should be returned).
+     * @param {Boolean} rawBody true if the response should be returned directly rather
+     * than json-stringifying it first.
      */
-    respond: function(code, data) {
+    respond: function(code, data, rawBody) {
         this.response = {
             response: {
                 statusCode: code,
-                headers: {},
+                headers: {
+                    'content-type': 'application/json',
+                },
             },
-            body: data,
+            body: data || "",
             err: null,
+            rawBody: rawBody || false,
         };
     },
 
@@ -265,6 +275,12 @@ function Request(opts, callback) {
     });
 
     Object.defineProperty(this, 'data', {
+        get: function() {
+            return opts.body ? JSON.parse(opts.body) : opts.body;
+        },
+    });
+
+    Object.defineProperty(this, 'rawData', {
         get: function() {
             return opts.body;
         },
