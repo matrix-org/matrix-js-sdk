@@ -22,7 +22,7 @@ import './olm-loader';
 
 import sdk from '..';
 import testUtils from './test-utils';
-import MockHttpBackend from './mock-request';
+import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
 import q from 'q';
 
