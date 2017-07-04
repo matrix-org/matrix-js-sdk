@@ -337,9 +337,7 @@ describe("megolm", function() {
             };
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush("/sync", 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
@@ -387,9 +385,7 @@ describe("megolm", function() {
             };
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush("/sync", 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
@@ -404,9 +400,7 @@ describe("megolm", function() {
             };
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush("/sync", 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
@@ -474,9 +468,10 @@ describe("megolm", function() {
             };
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse2);
 
-            return aliceTestClient.httpBackend.flush("/sync", 2);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            // flush both syncs
+            return aliceTestClient.flushSync().then(() => {
+                return aliceTestClient.flushSync();
+            });
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
@@ -504,9 +499,7 @@ describe("megolm", function() {
             syncResponse.to_device = { events: [olmEvent] };
 
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush('/sync', 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             // start out with the device unknown - the send should be rejected.
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
@@ -571,9 +564,7 @@ describe("megolm", function() {
             const syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-            return aliceTestClient.httpBackend.flush('/sync', 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             console.log("Forcing alice to download our device keys");
 
@@ -620,9 +611,7 @@ describe("megolm", function() {
             syncResponse.to_device = { events: [olmEvent] };
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-            return aliceTestClient.httpBackend.flush('/sync', 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             console.log('Forcing alice to download our device keys');
 
@@ -673,9 +662,7 @@ describe("megolm", function() {
             syncResponse.to_device = { events: [olmEvent] };
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
 
-            return aliceTestClient.httpBackend.flush('/sync', 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             console.log("Fetching bob's devices and marking known");
 
@@ -904,9 +891,7 @@ describe("megolm", function() {
             syncResponse.to_device = { events: [olmEvent] };
 
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush('/sync', 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             console.log('Forcing alice to download our device keys');
 
@@ -938,9 +923,7 @@ describe("megolm", function() {
            return aliceTestClient.start().then(() => {
                aliceTestClient.httpBackend.when('GET', '/sync').respond(
                    200, getSyncResponse(['@bob:xyz', '@chris:abc']));
-               return aliceTestClient.httpBackend.flush('/sync', 1);
-           }).then(() => {
-               return testUtils.syncPromise(aliceTestClient.client);
+               return aliceTestClient.flushSync();
            }).then(() => {
                // to make sure the initial device queries are flushed out, we
                // attempt to send a message.
@@ -979,9 +962,10 @@ describe("megolm", function() {
                        changed: ['@chris:abc'],
                    },
                });
-               return aliceTestClient.httpBackend.flush('/sync', 2);
-           }).then(() => {
-               return testUtils.syncPromise(aliceTestClient.client);
+               // flush both syncs
+               return aliceTestClient.flushSync().then(() => {
+                   return aliceTestClient.flushSync();
+               });
            }).then(() => {
                // check that we don't yet have a request for chris's devices.
                aliceTestClient.httpBackend.when('POST', '/keys/query', {
@@ -1006,7 +990,7 @@ describe("megolm", function() {
                      .getEndToEndDeviceTrackingStatus()['@chris:abc'];
                if (chrisStat != 1 && chrisStat != 2) {
                    throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
-                                   bobStat);
+                                   chrisStat);
                }
 
                // now add an expectation for a query for bob's devices, and let
@@ -1098,9 +1082,7 @@ describe("megolm", function() {
             };
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush("/sync", 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
@@ -1132,9 +1114,7 @@ describe("megolm", function() {
             };
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            return aliceTestClient.httpBackend.flush("/sync", 1);
-        }).then(function() {
-            return testUtils.syncPromise(aliceTestClient.client);
+            return aliceTestClient.flushSync();
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
