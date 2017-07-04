@@ -25,6 +25,10 @@ limitations under the License.
 
 "use strict";
 import 'source-map-support/register';
+
+// load olm before the sdk if possible
+import '../olm-loader';
+
 import expect from 'expect';
 const sdk = require("../..");
 const q = require("q");
@@ -375,9 +379,7 @@ function firstSync(testClient) {
     };
 
     testClient.httpBackend.when("GET", "/sync").respond(200, syncData);
-    return testClient.httpBackend.flush("/sync", 1).then(() => {
-        return testUtils.syncPromise(testClient.client);
-    });
+    return testClient.flushSync();
 }
 
 

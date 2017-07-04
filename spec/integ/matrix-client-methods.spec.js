@@ -1,7 +1,7 @@
 "use strict";
 import 'source-map-support/register';
 const sdk = require("../..");
-const HttpBackend = require("../mock-request");
+const HttpBackend = require("matrix-mock-request");
 const publicGlobals = require("../../lib/matrix");
 const Room = publicGlobals.Room;
 const MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
