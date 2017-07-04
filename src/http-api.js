@@ -385,8 +385,8 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (this.authorization_header_supported === undefined ||
-                this.authorization_header_supported) {
+        if (this.authorizationHeaderSupported === undefined ||
+                this.authorizationHeaderSupported) {
             if (isFinite(opts)) {
                 // opts used to be localTimeoutMs
                 opts = {
@@ -422,18 +422,44 @@ module.exports.MatrixHttpApi.prototype = {
 
         const self = this;
 
+        if (this.authorizationHeaderSupported === undefined) {
+            const defer = q.defer();
+            const returnPromise = defer.promise;
+            returnPromise.abort = requestPromise.abort;
+
+            requestPromise.then((resp) => {
+                self.authorizationHeaderSupported = true;
+                defer.resolve(resp);
+            }, (err) => {
+                if (err.errcode == 'M_MISSING_TOKEN' ||
+                        err.toString().indexOf("Error: CORS request rejected") != -1) {
+                    self.authorizationHeaderSupported = false;
+                    queryParams.access_token = opts.headers.Authorization.substr(7);
+                    delete opts.headers.Authorization;
+                    const secondPromise = self.request(
+                        callback, method, path, queryParams, data, opts,
+                    );
+                    returnPromise.abort = secondPromise.abort;
+                    secondPromise.then((resp) => {
+                        defer.resolve(resp);
+                    }, (err) => {
+                        if (err.errcode == 'M_UNKNOWN_TOKEN') {
+                            self.event_emitter.emit("Session.logged_out");
+                        }
+                        defer.reject(err);
+                    });
+                } else if (err.errcode == 'M_UNKNOWN_TOKEN') {
+                    self.event_emitter.emit("Session.logged_out");
+                    defer.reject(err);
+                } else {
+                    defer.reject(err);
+                }
+            });
+
+            return returnPromise;
+        }
+
         requestPromise.catch(function(err) {
-            if (err.errcode == 'M_MISSING_TOKEN' ||
-                    err.toString().indexOf("Error: CORS request rejected") != -1) {
-                self.authorization_header_supported = false;
-                queryParams.access_token = opts.headers.Authorization.substr(7);
-                delete opts.headers.Authorization;
-                const secondPromise = self.request(
-                    callback, method, path, queryParams, data, opts,
-                );
-                requestPromise.abort = secondPromise.abort;
-                return secondPromise;
-            }
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
             }
