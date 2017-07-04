@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const q = require("q");
 const sdk = require("../..");
-const HttpBackend = require("../mock-request");
+const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const EventTimeline = sdk.EventTimeline;
 
