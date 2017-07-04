@@ -6,6 +6,7 @@ const HttpBackend = require("../mock-request");
 const utils = require("../test-utils");
 
 import expect from 'expect';
+import q from 'q';
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
@@ -113,9 +114,10 @@ describe("MatrixClient opts", function() {
             httpBackend.flush("/pushrules", 1).then(function() {
                 return httpBackend.flush("/filter", 1);
             }).then(function() {
-                return httpBackend.flush("/sync", 1);
-            }).then(function() {
-                return utils.syncPromise(client);
+                return q.all([
+                    httpBackend.flush("/sync", 1),
+                    utils.syncPromise(client),
+                ]);
             }).done(function() {
                 expect(expectedEventTypes.length).toEqual(
                     0, "Expected to see event types: " + expectedEventTypes,

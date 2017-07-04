@@ -187,3 +187,16 @@ TestClient.prototype.getSigningKey = function() {
     const keyId = 'ed25519:' + this.deviceId;
     return this.deviceKeys.keys[keyId];
 };
+
+/**
+ * flush a single /sync request, and wait for the syncing event
+ *
+ * @returns {Promise} promise which completes once the sync has been flushed
+ */
+TestClient.prototype.flushSync = function() {
+    console.log(`${this}: flushSync`);
+    return q.all([
+        this.httpBackend.flush('/sync', 1),
+        testUtils.syncPromise(this.client),
+    ]);
+};
