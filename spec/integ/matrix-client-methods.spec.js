@@ -49,13 +49,13 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
-                expect(req.data).toEqual(buf);
+                expect(req.rawData).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
                 expect(req.queryParams.access_token).toEqual(accessToken);
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 expect(req.opts.json).toBeFalsy();
                 expect(req.opts.timeout).toBe(undefined);
-            }).respond(200, "content");
+            }).respond(200, "content", true);
 
             const prom = client.uploadContent({
                 stream: buf,
@@ -86,7 +86,7 @@ describe("MatrixClient", function() {
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
                 expect(req.opts.json).toBeFalsy();
-            }).respond(200, JSON.stringify({ "content_uri": "uri" }));
+            }).respond(200, { "content_uri": "uri" });
 
             client.uploadContent({
                 stream: buf,
@@ -102,16 +102,15 @@ describe("MatrixClient", function() {
         });
 
         it("should parse errors into a MatrixError", function(done) {
-            // opts.json is false, so request returns unparsed json.
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
-                expect(req.data).toEqual(buf);
+                expect(req.rawData).toEqual(buf);
                 expect(req.opts.json).toBeFalsy();
-            }).respond(400, JSON.stringify({
+            }).respond(400, {
                 "errcode": "M_SNAFU",
                 "error": "broken",
-            }));
+            });
 
             client.uploadContent({
                 stream: buf,

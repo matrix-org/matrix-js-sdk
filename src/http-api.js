@@ -19,6 +19,8 @@ limitations under the License.
  * @module http-api
  */
 const q = require("q");
+const parseContentType = require('content-type').parse;
+
 const utils = require("./utils");
 
 // we use our own implementation of setTimeout, so that if we get suspended in
@@ -623,7 +625,31 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
+        const headers = utils.extend({}, opts.headers || {});
         const json = opts.json === undefined ? true : opts.json;
+        let bodyParser = opts.bodyParser;
+
+        // we handle the json encoding/decoding here, because request and
+        // browser-request make a mess of it. Specifically, they attempt to
+        // json-decode plain-text error responses, which in turn means that the
+        // actual error gets swallowed by a SyntaxError.
+
+        if (json) {
+            if (data) {
+                data = JSON.stringify(data);
+                headers['content-type'] = 'application/json';
+            }
+
+            if (!headers['accept']) {
+                headers['accept'] = 'application/json';
+            }
+
+            if (bodyParser === undefined) {
+                bodyParser = function(rawBody) {
+                    return JSON.parse(rawBody);
+                };
+            }
+        }
 
         const defer = q.defer();
 
@@ -662,7 +688,7 @@ module.exports.MatrixHttpApi.prototype = {
                     withCredentials: false,
                     qs: queryParams,
                     body: data,
-                    json: json,
+                    json: false,
                     timeout: localTimeoutMs,
                     headers: opts.headers || {},
                     _matrix_opts: this.opts,
@@ -675,13 +701,9 @@ module.exports.MatrixHttpApi.prototype = {
                         }
                     }
 
-                    // if json is falsy, we won't parse any error response, so need
-                    // to do so before turning it into a MatrixError
-                    const parseErrorJson = !json;
                     const handlerFn = requestCallback(
                         defer, callback, self.opts.onlyData,
-                        parseErrorJson,
-                        opts.bodyParser,
+                        bodyParser,
                     );
                     handlerFn(err, response, body);
                 },
@@ -718,15 +740,18 @@ module.exports.MatrixHttpApi.prototype = {
  * that will either resolve or reject the given defer as well as invoke the
  * given userDefinedCallback (if any).
  *
- * If onlyData is true, the defer/callback is invoked with the body of the
- * response, otherwise the result code.
+ * HTTP errors are transformed into javascript errors and the deferred is rejected.
  *
- * If parseErrorJson is true, we will JSON.parse the body if we get a 4xx error.
+ * If bodyParser is given, it is used to transform the body of the successful
+ * responses before passing to the defer/callback.
+ *
+ * If onlyData is true, the defer/callback is invoked with the body of the
+ * response, otherwise the result object (with `code` and `data` fields)
  *
  */
 const requestCallback = function(
     defer, userDefinedCallback, onlyData,
-    parseErrorJson, bodyParser,
+    bodyParser,
 ) {
     userDefinedCallback = userDefinedCallback || function() {};
 
@@ -734,19 +759,12 @@ const requestCallback = function(
         if (!err) {
             try {
                 if (response.statusCode >= 400) {
-                    if (parseErrorJson) {
-                        // we won't have json-decoded the response.
-                        body = JSON.parse(body);
-                    }
-                    err = new module.exports.MatrixError(body);
+                    err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
                     body = bodyParser(body);
                 }
             } catch (e) {
-                err = e;
-            }
-            if (err) {
-                err.httpStatus = response.statusCode;
+                err = new Error(`Error parsing server response: ${e}`);
             }
         }
 
@@ -756,6 +774,9 @@ const requestCallback = function(
         } else {
             const res = {
                 code: response.statusCode,
+
+                // XXX: why do we bother with this? it doesn't work for
+                // XMLHttpRequest, so clearly we don't use it.
                 headers: response.headers,
                 data: body,
             };
@@ -764,6 +785,67 @@ const requestCallback = function(
         }
     };
 };
+
+/**
+ * Attempt to turn an HTTP error response into a Javascript Error.
+ *
+ * If it is a JSON response, we will parse it into a MatrixError. Otherwise
+ * we return a generic Error.
+ *
+ * @param {XMLHttpRequest|http.IncomingMessage} response response object
+ * @param {String} body raw body of the response
+ * @returns {Error}
+ */
+function parseErrorResponse(response, body) {
+    const httpStatus = response.statusCode;
+    const contentType = getResponseContentType(response);
+
+    let err;
+    if (contentType) {
+        if (contentType.type === 'application/json') {
+            err = new module.exports.MatrixError(JSON.parse(body));
+        } else if (contentType.type === 'text/plain') {
+            err = new Error(`Server returned ${httpStatus} error: ${body}`);
+        }
+    }
+
+    if (!err) {
+        err = new Error(`Server returned ${httpStatus} error`);
+    }
+    err.httpStatus = httpStatus;
+    return err;
+}
+
+
+/**
+ * extract the Content-Type header from the response object, and
+ * parse it to a `{type, parameters}` object.
+ *
+ * returns null if no content-type header could be found.
+ *
+ * @param {XMLHttpRequest|http.IncomingMessage} response response object
+ * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
+ */
+function getResponseContentType(response) {
+    let contentType;
+    if (response.getResponseHeader) {
+        // XMLHttpRequest provides getResponseHeader
+        contentType = response.getResponseHeader("Content-Type");
+    } else if (response.headers) {
+        // request provides http.IncomingMessage which has a message.headers map
+        contentType = response.headers['content-type'] || null;
+    }
+
+    if (!contentType) {
+        return null;
+    }
+
+    try {
+        return parseContentType(contentType);
+    } catch(e) {
+        throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
+    }
+}
 
 /**
  * Construct a Matrix error. This is a JavaScript Error with additional
