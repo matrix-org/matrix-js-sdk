@@ -399,6 +399,16 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 };
 
 /**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group summary object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
  * Retrieve a state event.
  * @param {string} roomId
  * @param {string} eventType
