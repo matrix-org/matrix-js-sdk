@@ -1326,7 +1326,15 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
     return this._http.authedRequestWithPrefix(
         undefined, "GET", "/thirdparty/protocols", undefined, undefined,
         httpApi.PREFIX_UNSTABLE,
-    );
+    ).then((response) => {
+        // sanity check
+        if (!response || typeof(response) !== 'object') {
+            throw new Error(
+                `/thirdparty/protocols did not return an object: ${response}`,
+            );
+        }
+        return response;
+    });
 };
 
 /**
