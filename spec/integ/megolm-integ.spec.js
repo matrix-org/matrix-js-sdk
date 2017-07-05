@@ -943,7 +943,7 @@ describe("megolm", function() {
                return q.all([
                    aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                    aliceTestClient.httpBackend.flush('/keys/query', 1).then(
-                       () => aliceTestClient.httpBackend.flush('/send/', 1, 20),
+                       () => aliceTestClient.httpBackend.flush('/send/', 1),
                    ),
                ]);
            }).then(() => {
