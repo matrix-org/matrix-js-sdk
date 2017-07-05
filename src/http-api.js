@@ -74,12 +74,18 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * requests.
  * @param {Number=} opts.localTimeoutMs The default maximum amount of time to wait
  * before timing out the request. If not specified, there is no timeout.
+ * @param {bool=} opts.useAuthorizationHeader True to use Authorization header instead of
+ * query param to send the access token to the server. Defaults to false
  */
 module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
     this.event_emitter = event_emitter;
     this.opts = opts;
+    this.useAuthorizationHeader = false;
+    if (opts.useAuthorizationHeader) {
+        this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
+    }
     this.uploads = [];
 };
 
@@ -385,8 +391,7 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (this.authorizationHeaderSupported === undefined ||
-                this.authorizationHeaderSupported) {
+        if (this.useAuthorizationHeader) {
             if (isFinite(opts)) {
                 // opts used to be localTimeoutMs
                 opts = {
@@ -400,12 +405,7 @@ module.exports.MatrixHttpApi.prototype = {
                 opts.headers = {};
             }
             if (!opts.headers.Authorization) {
-                if (queryParams.access_token) {
-                    opts.headers.Authorization = "Bearer " + queryParams.access_token;
-                    delete queryParams.access_token;
-                } else {
-                    opts.headers.Authorization = "Bearer " + this.opts.accessToken;
-                }
+                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
             }
             if (queryParams.access_token) {
                 delete queryParams.access_token;
@@ -421,44 +421,6 @@ module.exports.MatrixHttpApi.prototype = {
         );
 
         const self = this;
-
-        if (this.authorizationHeaderSupported === undefined) {
-            const defer = q.defer();
-            const returnPromise = defer.promise;
-            returnPromise.abort = requestPromise.abort;
-
-            requestPromise.then((resp) => {
-                self.authorizationHeaderSupported = true;
-                defer.resolve(resp);
-            }, (err) => {
-                if (err.errcode == 'M_MISSING_TOKEN' ||
-                        err.toString().indexOf("Error: CORS request rejected") != -1) {
-                    self.authorizationHeaderSupported = false;
-                    queryParams.access_token = opts.headers.Authorization.substr(7);
-                    delete opts.headers.Authorization;
-                    const secondPromise = self.request(
-                        callback, method, path, queryParams, data, opts,
-                    );
-                    returnPromise.abort = secondPromise.abort;
-                    secondPromise.then((resp) => {
-                        defer.resolve(resp);
-                    }, (err) => {
-                        if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                            self.event_emitter.emit("Session.logged_out");
-                        }
-                        defer.reject(err);
-                    });
-                } else if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                    self.event_emitter.emit("Session.logged_out");
-                    defer.reject(err);
-                } else {
-                    defer.reject(err);
-                }
-            });
-
-            return returnPromise;
-        }
-
         requestPromise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
