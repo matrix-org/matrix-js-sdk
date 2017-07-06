@@ -402,6 +402,39 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 };
 
 /**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group summary object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @return {module:client.Promise} Resolves: The groups to which the user is joined
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedGroups = function() {
+    const path = utils.encodeUri("/joined_groups");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {Object} content Request content
+ * @param {string} content.localpart The local part of the desired group ID
+ * @param {Object} content.profile Group profile object
+ * @return {module:client.Promise} Resolves: Object with key group_id: id of the created group
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.createGroup = function(content) {
+    const path = utils.encodeUri("/create_group");
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, content,
+    );
+};
+
+/**
  * Retrieve a state event.
  * @param {string} roomId
  * @param {string} eventType
