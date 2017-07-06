@@ -647,60 +647,6 @@ describe("MatrixClient crypto", function() {
             }).then(aliRecvMessage);
     });
 
-
-    it("Ali does a key query when she gets a new_device event", function() {
-        return q()
-            .then(() => aliTestClient.start())
-            .then(() => firstSync(aliTestClient))
-
-            // ali will only care about bob's new_device if she is tracking
-            // bob's devices, which she will do if we enable encryption
-            .then(aliEnablesEncryption)
-
-            .then(() => {
-                aliTestClient.expectKeyQuery({
-                    device_keys: {
-                        [aliUserId]: {},
-                        [bobUserId]: {},
-                    },
-                });
-                return aliTestClient.httpBackend.flush('/keys/query', 1);
-            })
-
-            // make sure that the initial key download has completed
-            // (downloadKeys will wait until it does)
-            .then(() => {
-                return aliTestClient.client.downloadKeys([bobUserId]);
-            })
-
-            .then(function() {
-                const syncData = {
-                    next_batch: '2',
-                    to_device: {
-                        events: [
-                            testUtils.mkEvent({
-                                content: {
-                                    device_id: 'TEST_DEVICE',
-                                    rooms: [],
-                                },
-                                sender: bobUserId,
-                                type: 'm.new_device',
-                            }),
-                        ],
-                    },
-                };
-                aliTestClient.httpBackend.when('GET', '/sync').respond(200, syncData);
-                return aliTestClient.httpBackend.flush('/sync', 1);
-            }).then(() => {
-                aliTestClient.expectKeyQuery({
-                    device_keys: {
-                        [bobUserId]: {},
-                    },
-                });
-                return aliTestClient.httpBackend.flush('/keys/query', 1);
-            });
-    });
-
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
