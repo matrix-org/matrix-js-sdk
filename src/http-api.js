@@ -66,7 +66,7 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {string} opts.prefix Required. The matrix client prefix to use, e.g.
  * '/_matrix/client/r0'. See PREFIX_R0 and PREFIX_UNSTABLE for constants.
  *
- * @param {bool=} opts.onlyData True to return only the 'data' component of the
+ * @param {boolean} opts.onlyData True to return only the 'data' component of the
  * response (e.g. the parsed HTTP body). If false, requests will return an
  * object with the properties <tt>code</tt>, <tt>headers</tt> and <tt>data</tt>.
  *
@@ -76,12 +76,15 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * requests.
  * @param {Number=} opts.localTimeoutMs The default maximum amount of time to wait
  * before timing out the request. If not specified, there is no timeout.
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
  */
 module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
     this.event_emitter = event_emitter;
     this.opts = opts;
+    this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
     this.uploads = [];
 };
 
@@ -366,7 +369,8 @@ module.exports.MatrixHttpApi.prototype = {
      *
      * @param {Object} data The HTTP JSON body.
      *
-     * @param {Object=} opts additional options
+     * @param {Object|Number=} opts additional options. If a number is specified,
+     * this is treated as `opts.localTimeoutMs`.
      *
      * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
@@ -387,16 +391,37 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (!queryParams.access_token) {
-            queryParams.access_token = this.opts.accessToken;
+        if (this.useAuthorizationHeader) {
+            if (isFinite(opts)) {
+                // opts used to be localTimeoutMs
+                opts = {
+                    localTimeoutMs: opts,
+                };
+            }
+            if (!opts) {
+                opts = {};
+            }
+            if (!opts.headers) {
+                opts.headers = {};
+            }
+            if (!opts.headers.Authorization) {
+                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+            }
+            if (queryParams.access_token) {
+                delete queryParams.access_token;
+            }
+        } else {
+            if (!queryParams.access_token) {
+                queryParams.access_token = this.opts.accessToken;
+            }
         }
 
-        const request_promise = this.request(
+        const requestPromise = this.request(
             callback, method, path, queryParams, data, opts,
         );
 
         const self = this;
-        request_promise.catch(function(err) {
+        requestPromise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
             }
@@ -404,7 +429,7 @@ module.exports.MatrixHttpApi.prototype = {
 
         // return the original promise, otherwise tests break due to it having to
         // go around the event loop one more time to process the result of the request
-        return request_promise;
+        return requestPromise;
     },
 
     /**

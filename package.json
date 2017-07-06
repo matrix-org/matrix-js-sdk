@@ -13,7 +13,7 @@
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
-    "lint": "eslint --max-warnings 112 src spec",
+    "lint": "eslint --max-warnings 110 src spec",
     "prepublish": "npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
