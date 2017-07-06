@@ -99,6 +99,9 @@ try {
  * @param {Number=} opts.localTimeoutMs Optional. The default maximum amount of
  * time to wait before timing out HTTP requests. If not specified, there is no timeout.
  *
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
+ *
  * @param {boolean} [opts.timelineSupport = false] Set to true to enable
  * improved timeline support ({@link
  * module:client~MatrixClient#getEventTimeline getEventTimeline}). It is

@@ -54,6 +54,8 @@ const utils = require("./utils");
  * to all requests with this client. Useful for application services which require
  * <code>?user_id=</code>.
  *
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
  */
 function MatrixBaseApis(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
@@ -70,6 +72,7 @@ function MatrixBaseApis(opts) {
         onlyData: true,
         extraParams: opts.queryParams,
         localTimeoutMs: opts.localTimeoutMs,
+        useAuthorizationHeader: opts.useAuthorizationHeader,
     };
     this._http = new httpApi.MatrixHttpApi(this, httpOpts);
 

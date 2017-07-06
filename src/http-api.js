@@ -64,7 +64,7 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {string} opts.prefix Required. The matrix client prefix to use, e.g.
  * '/_matrix/client/r0'. See PREFIX_R0 and PREFIX_UNSTABLE for constants.
  *
- * @param {bool=} opts.onlyData True to return only the 'data' component of the
+ * @param {boolean} opts.onlyData True to return only the 'data' component of the
  * response (e.g. the parsed HTTP body). If false, requests will return an
  * object with the properties <tt>code</tt>, <tt>headers</tt> and <tt>data</tt>.
  *
@@ -74,18 +74,15 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * requests.
  * @param {Number=} opts.localTimeoutMs The default maximum amount of time to wait
  * before timing out the request. If not specified, there is no timeout.
- * @param {bool=} opts.useAuthorizationHeader True to use Authorization header instead of
- * query param to send the access token to the server. Defaults to false
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
  */
 module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
     this.event_emitter = event_emitter;
     this.opts = opts;
-    this.useAuthorizationHeader = false;
-    if (opts.useAuthorizationHeader) {
-        this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
-    }
+    this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
     this.uploads = [];
 };
 
@@ -370,7 +367,8 @@ module.exports.MatrixHttpApi.prototype = {
      *
      * @param {Object} data The HTTP JSON body.
      *
-     * @param {Object=} opts additional options
+     * @param {Object|Number=} opts additional options. If a number is specified,
+     * this is treated as `opts.localTimeoutMs`.
      *
      * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
