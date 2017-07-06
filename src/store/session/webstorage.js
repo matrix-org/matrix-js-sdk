@@ -66,22 +66,6 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
-     * Store a flag indicating that we have announced the new device.
-     */
-    setDeviceAnnounced: function() {
-        this.store.setItem(KEY_END_TO_END_ANNOUNCED, "true");
-    },
-
-    /**
-     * Check if the "device announced" flag is set
-     *
-     * @return {boolean} true if the "device announced" flag has been set.
-     */
-    getDeviceAnnounced: function() {
-        return this.store.getItem(KEY_END_TO_END_ANNOUNCED) == "true";
-    },
-
-    /**
      * Stores the known devices for a user.
      * @param {string} userId The user's ID.
      * @param {object} devices A map from device ID to keys for the device.
@@ -208,7 +192,6 @@ WebStorageSessionStore.prototype = {
 };
 
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
-const KEY_END_TO_END_ANNOUNCED = E2E_PREFIX + "announced";
 const KEY_END_TO_END_DEVICE_SYNC_TOKEN = E2E_PREFIX + "device_sync_token";
 const KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS = E2E_PREFIX + "device_tracking";
 
