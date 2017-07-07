@@ -274,8 +274,8 @@ function expectSendMessageRequest(httpBackend) {
         };
     });
 
-    // it can take a while to process the key query, so give it 20ms
-    return httpBackend.flush(path, 1, 20).then(() => deferred.promise);
+    // it can take a while to process the key query
+    return httpBackend.flush(path, 1).then(() => deferred.promise);
 }
 
 function aliRecvMessage() {
@@ -542,19 +542,18 @@ describe("MatrixClient crypto", function() {
             .nodeify(done);
     });
 
-    it("Bob receives a message", function(done) {
-        Promise.resolve()
+    it("Bob receives a message", function() {
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(aliEnablesEncryption)
             .then(aliSendsFirstMessage)
-            .then(bobRecvMessage)
-            .nodeify(done);
+            .then(bobRecvMessage);
     });
 
-    it("Bob receives a message with a bogus sender", function(done) {
-        Promise.resolve()
+    it("Bob receives a message with a bogus sender", function() {
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -594,20 +593,28 @@ describe("MatrixClient crypto", function() {
                         return;
                     }
 
-                    expect(event.getType()).toEqual("m.room.message");
-                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
                     expect(event.isEncrypted()).toBeTruthy();
 
-                    bobTestClient.client.removeListener("event", onEvent);
-                    deferred.resolve();
+                    // it will still be encrypted at first - wait for it to be decrypted.
+                    expect(event.getType()).toEqual("m.room.encrypted");
+                    expect(event.isBeingDecrypted()).toBe(true);
+
+                    console.log(
+                        `bob waiting for event to be decrypted`,
+                    );
+                    event.once('Event.decrypted', (ev) => {
+                        expect(ev).toBe(event);
+                        expect(event.getType()).toEqual("m.room.message");
+                        expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
+                        deferred.resolve();
+                    });
                 };
 
-                bobTestClient.client.on("event", onEvent);
+                bobTestClient.client.once("event", onEvent);
 
                 bobTestClient.httpBackend.flush();
                 return deferred.promise;
-            })
-            .nodeify(done);
+            });
     });
 
     it("Ali blocks Bob's device", function(done) {

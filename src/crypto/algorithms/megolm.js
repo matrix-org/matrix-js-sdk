@@ -531,11 +531,13 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * @throws {module:crypto/algorithms/base.DecryptionError} if there is a
- *   problem decrypting the event
+ * @return {Promise} resolves once we have finished decrypting. Rejects with an
+ * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
 MegolmDecryption.prototype.decryptEvent = function(event) {
-    this._decryptEvent(event, true);
+    return Promise.try(() => {
+        this._decryptEvent(event, true);
+    });
 };
 
 

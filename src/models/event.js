@@ -25,6 +25,8 @@ const EventEmitter = require("events").EventEmitter;
 
 const utils = require('../utils.js');
 
+import Promise from 'bluebird';
+
 /**
  * Enum for event statuses.
  * @readonly
@@ -128,6 +130,15 @@ module.exports.MatrixEvent = function MatrixEvent(
      * See getForwardingCurve25519KeyChain().
      */
     this._forwardingCurve25519KeyChain = [];
+
+    /* flag to indicate if we have a process decrypting this event */
+    this._decrypting = false;
+
+    /* flag to indicate if we should retry decrypting this event after the
+     * first attempt (eg, we have received new data which means that a second
+     * attempt may succeed)
+     */
+    this._retryDecryption = false;
 };
 utils.inherits(module.exports.MatrixEvent, EventEmitter);
 
@@ -299,7 +310,16 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Attempt to decrypt this event.
+     * Check if this event is currently being decrypted.
+     *
+     * @return {boolean} True if this event is currently being decrypted, else false.
+     */
+    isBeingDecrypted: function() {
+        return this._decrypting;
+    },
+
+    /**
+     * Start the process of trying to decrypt this event.
      *
      * (This is used within the SDK: it isn't intended for use by applications)
      *
@@ -327,17 +347,50 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             );
         }
 
-        try {
-            crypto.decryptEvent(this);
-        } catch (e) {
-            console.warn(
-                `Error decrypting event (id=${this.getId()}): ${e}`,
+        if (this._decrypting) {
+            console.log(
+                `Event ${this.getId()} already being decrypted; queueing a retry`,
             );
-            if (e.name !== "DecryptionError") {
-                throw e;
-            }
-            this._badEncryptedMessage(e.message);
+            this._retryDecryption = true;
+            return;
         }
+
+        this._decrypting = true;
+
+        this._doDecryption(crypto).finally(() => {
+            this._decrypting = false;
+            this._retryDecryption = false;
+        });
+    },
+
+    _doDecryption: function(crypto) {
+        return Promise.try(() => {
+            return crypto.decryptEvent(this);
+        }).catch((e) => {
+            if (e.name !== "DecryptionError") {
+                // not a decryption error: log the whole exception as an error.
+                console.error(
+                    `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
+                );
+                return null;
+            } else if (this._retryDecryption) {
+                // decryption error, but we have a retry queued.
+                console.log(
+                    `Got error decrypting event (id=${this.getId()}), but retrying`,
+                );
+                this._retryDecryption = false;
+                return this._doDecryption(crypto);
+            } else {
+                // decryption error, no retries queued. Warn about the error and
+                // set it to m.bad.encrypted.
+                console.warn(
+                    `Error decrypting event (id=${this.getId()}): ${e}`,
+                );
+
+                this._badEncryptedMessage(e.message);
+                return null;
+            }
+        });
     },
 
     _badEncryptedMessage: function(reason) {
