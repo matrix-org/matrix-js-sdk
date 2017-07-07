@@ -6,6 +6,7 @@
   "scripts": {
     "test:build": "babel -s -d specbuild spec",
     "test:run": "istanbul cover --report text --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" _mocha -- --recursive specbuild --colors --reporter mocha-jenkins-reporter --reporter-options junit_report_path=reports/test-results.xml",
+    "test:watch": "mocha --watch --compilers js:babel-core/register --recursive spec --colors",
     "test": "npm run test:build && npm run test:run",
     "check": "npm run test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel --no-babelrc -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
