@@ -7,6 +7,7 @@ const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
 import expect from 'expect';
+import q from 'q';
 
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
@@ -451,7 +452,7 @@ describe("MatrixClient syncing", function() {
             httpBackend.flush();
         });
 
-        it("should set the back-pagination token on new rooms", function(done) {
+        it("should set the back-pagination token on new rooms", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -471,16 +472,15 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            httpBackend.flush().then(function() {
+            return httpBackend.flush().then(function() {
                 const room = client.getRoom(roomTwo);
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
-                done();
-            }).catch(utils.failTest).done();
+            });
         });
 
-        it("should set the back-pagination token on gappy syncs", function(done) {
+        it("should set the back-pagination token on gappy syncs", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -511,13 +511,12 @@ describe("MatrixClient syncing", function() {
                 expect(tok).toEqual("newerTok");
             });
 
-            httpBackend.flush().then(function() {
+            return httpBackend.flush().then(function() {
                 const room = client.getRoom(roomOne);
                 const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
                 expect(resetCallCount).toEqual(1);
-                done();
-            }).catch(utils.failTest).done();
+            });
         });
     });
 
@@ -627,29 +626,34 @@ describe("MatrixClient syncing", function() {
             });
         });
 
-        it("should create and use an appropriate filter", function(done) {
+        it("should create and use an appropriate filter", function() {
             httpBackend.when("POST", "/filter").check(function(req) {
                 expect(req.data).toEqual({
                     room: { timeline: {limit: 1},
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
+            const defer = q.defer();
+
             httpBackend.when("GET", "/sync").check(function(req) {
                 expect(req.queryParams.filter).toEqual("another_id");
-                done();
+                defer.resolve();
             }).respond(200, {});
 
             client.syncLeftRooms();
 
             // first flush the filter request; this will make syncLeftRooms
             // make its /sync call
-            httpBackend.flush("/filter").then(function() {
-                // flush the syncs
-                return httpBackend.flush();
-            }).catch(utils.failTest);
+            return q.all([
+                httpBackend.flush("/filter").then(function() {
+                    // flush the syncs
+                    return httpBackend.flush();
+                }),
+                defer.promise,
+            ]);
         });
 
-        it("should set the back-pagination token on left rooms", function(done) {
+        it("should set the back-pagination token on left rooms", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -674,20 +678,21 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            client.syncLeftRooms().then(function() {
-                const room = client.getRoom(roomTwo);
-                const tok = room.getLiveTimeline().getPaginationToken(
-                    EventTimeline.BACKWARDS);
+            return q.all([
+                client.syncLeftRooms().then(function() {
+                    const room = client.getRoom(roomTwo);
+                    const tok = room.getLiveTimeline().getPaginationToken(
+                        EventTimeline.BACKWARDS);
 
-                expect(tok).toEqual("pagTok");
-                done();
-            }).catch(utils.failTest).done();
+                    expect(tok).toEqual("pagTok");
+                }),
 
-            // first flush the filter request; this will make syncLeftRooms
-            // make its /sync call
-            httpBackend.flush("/filter").then(function() {
-                return httpBackend.flush();
-            }).catch(utils.failTest);
+                // first flush the filter request; this will make syncLeftRooms
+                // make its /sync call
+                httpBackend.flush("/filter").then(function() {
+                    return httpBackend.flush();
+                }),
+            ]);
         });
     });
 });

@@ -465,10 +465,10 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        q.all(
+        q.all([
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
-        ).then(function() {
+        ]).then(function() {
             // should get an empty list
             expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
             expect(aliTestClient.client.listDeviceKeys(eveUserId)).toEqual([]);
@@ -502,10 +502,10 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        q.all(
+        q.all([
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
-        ).then(function() {
+        ]).then(function() {
             // should get an empty list
             expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
         }).nodeify(done);
@@ -529,7 +529,7 @@ describe("MatrixClient crypto", function() {
             .then(() => firstSync(aliTestClient))
             .then(aliEnablesEncryption)
             .then(aliSendsFirstMessage)
-            .catch(testUtils.failTest).nodeify(done);
+            .nodeify(done);
     });
 
     it("Bob receives a message", function(done) {
