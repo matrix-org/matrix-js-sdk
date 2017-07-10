@@ -284,7 +284,7 @@ function createDatabase(db) {
 }
 
 function promiseifyTxn(txn) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         txn.oncomplete = resolve;
         txn.onerror = reject;
     });

@@ -44,7 +44,7 @@ function createDatabase(db) {
  */
 function selectQuery(store, keyRange, resultMapper) {
     const query = store.openCursor(keyRange);
-    return q.Promise((resolve, reject) => { /*eslint new-cap: 0*/
+    return Promise((resolve, reject) => { /*eslint new-cap: 0*/
         const results = [];
         query.onerror = (event) => {
             reject(new Error("Query failed: " + event.target.errorCode));
@@ -63,7 +63,7 @@ function selectQuery(store, keyRange, resultMapper) {
 }
 
 function promiseifyTxn(txn) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
             resolve(event);
         };
@@ -74,7 +74,7 @@ function promiseifyTxn(txn) {
 }
 
 function promiseifyRequest(req) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         req.onsuccess = function(event) {
             resolve(event);
         };
@@ -163,7 +163,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        return new q.Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             console.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this.indexedDB.deleteDatabase(this._dbName);
 
