@@ -2153,7 +2153,7 @@ MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
         });
     }
 
-    return q.all(readPromise, writePromise);
+    return q.all([readPromise, writePromise]);
 };
 
 // Registration/Login operations
