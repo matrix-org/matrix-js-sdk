@@ -31,7 +31,7 @@ import '../olm-loader';
 
 import expect from 'expect';
 const sdk = require("../..");
-const q = require("q");
+import Promise from 'bluebird';
 const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
 const TestClient = require('../TestClient').default;

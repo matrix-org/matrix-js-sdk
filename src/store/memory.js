@@ -21,7 +21,7 @@ limitations under the License.
  */
  const utils = require("../utils");
  const User = require("../models/user");
- const q = require("q");
+import Promise from 'bluebird';
 
 /**
  * Construct a new in-memory data store for the Matrix Client.

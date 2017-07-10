@@ -1,4 +1,4 @@
-import q from 'q';
+import Promise from 'bluebird';
 import utils from '../../utils';
 
 export const VERSION = 1;

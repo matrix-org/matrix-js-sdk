@@ -2,7 +2,7 @@
 /* eslint new-cap: "off" */
 
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const MatrixScheduler = sdk.MatrixScheduler;
 const MatrixError = sdk.MatrixError;

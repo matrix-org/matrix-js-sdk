@@ -20,7 +20,7 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-const q = require('q');
+import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
 const utils = require("../utils");

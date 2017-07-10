@@ -21,7 +21,7 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-const q = require("q");
+import Promise from 'bluebird';
 
 const utils = require("../../utils");
 const olmlib = require("../olmlib");

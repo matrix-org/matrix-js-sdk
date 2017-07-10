@@ -7,7 +7,7 @@ const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";

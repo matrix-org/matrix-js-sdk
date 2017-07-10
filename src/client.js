@@ -23,7 +23,7 @@ const PushProcessor = require('./pushprocessor');
  * @module client
  */
 const EventEmitter = require("events").EventEmitter;
-const q = require("q");
+import Promise from 'bluebird';
 const url = require('url');
 
 const httpApi = require("./http-api");

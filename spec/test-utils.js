@@ -1,6 +1,6 @@
 "use strict";
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 // load olm before the sdk if possible
 import './olm-loader';

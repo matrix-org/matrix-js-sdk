@@ -5,7 +5,7 @@ const EventStatus = sdk.EventStatus;
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
-import q from 'q';
+import Promise from 'bluebird';
 import expect from 'expect';
 
 describe("MatrixClient room timelines", function() {

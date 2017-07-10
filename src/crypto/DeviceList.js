@@ -21,7 +21,7 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import q from 'q';
+import Promise from 'bluebird';
 
 import DeviceInfo from './deviceinfo';
 import olmlib from './olmlib';

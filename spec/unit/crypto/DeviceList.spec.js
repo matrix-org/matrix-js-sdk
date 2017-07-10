@@ -5,7 +5,7 @@ import testUtils from '../../test-utils';
 import utils from '../../../lib/utils';
 
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 const signedDeviceList = {
     "failures": {},

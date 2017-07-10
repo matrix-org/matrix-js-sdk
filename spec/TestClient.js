@@ -24,7 +24,7 @@ import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient

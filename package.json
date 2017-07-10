@@ -49,9 +49,9 @@
   ],
   "dependencies": {
     "another-json": "^0.2.0",
+    "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
     "content-type": "^1.0.2",
-    "q": "^1.4.1",
     "regenerator-runtime": "^0.10.5",
     "request": "^2.53.0"
   },

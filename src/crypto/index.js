@@ -21,7 +21,7 @@ limitations under the License.
  */
 
 const anotherjson = require('another-json');
-const q = require("q");
+import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
 const utils = require("../utils");

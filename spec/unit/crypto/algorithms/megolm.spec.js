@@ -5,7 +5,7 @@ try {
 }
 
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';

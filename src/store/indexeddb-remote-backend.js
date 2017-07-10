@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from "q";
+import Promise from 'bluebird';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web

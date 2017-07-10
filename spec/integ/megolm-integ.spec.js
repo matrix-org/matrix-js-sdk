@@ -17,7 +17,7 @@ limitations under the License.
 "use strict";
 
 const anotherjson = require('another-json');
-const q = require('q');
+import Promise from 'bluebird';
 import expect from 'expect';
 
 const utils = require('../../lib/utils');

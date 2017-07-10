@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;

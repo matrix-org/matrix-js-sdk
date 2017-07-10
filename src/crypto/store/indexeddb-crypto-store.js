@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from 'q';
+import Promise from 'bluebird';
 
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
