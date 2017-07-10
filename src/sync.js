@@ -1009,7 +1009,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
         self._pokeKeepAlive();
     }
     if (!this._connectionReturnedDefer) {
-        this._connectionReturnedDefer = q.defer();
+        this._connectionReturnedDefer = Promise.defer();
     }
     return this._connectionReturnedDefer.promise;
 };

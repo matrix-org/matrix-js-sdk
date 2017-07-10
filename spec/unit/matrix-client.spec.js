@@ -84,7 +84,7 @@ describe("MatrixClient", function() {
                 );
             }
             pendingLookup = {
-                promise: q.defer().promise,
+                promise: Promise.defer().promise,
                 method: method,
                 path: path,
             };
@@ -109,7 +109,7 @@ describe("MatrixClient", function() {
             }
 
             if (next.error) {
-                return q.reject({
+                return Promise.reject({
                     errcode: next.error.errcode,
                     httpStatus: next.error.httpStatus,
                     name: next.error.errcode,
@@ -120,7 +120,7 @@ describe("MatrixClient", function() {
             return Promise.resolve(next.data);
         }
         expect(true).toBe(false, "Expected different request. " + logLine);
-        return q.defer().promise;
+        return Promise.defer().promise;
     }
 
     beforeEach(function() {
@@ -174,10 +174,10 @@ describe("MatrixClient", function() {
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
         client._http.authedRequest.andCall(function() {
-            return q.defer().promise;
+            return Promise.defer().promise;
         });
         client._http.authedRequestWithPrefix.andCall(function() {
-            return q.defer().promise;
+            return Promise.defer().promise;
         });
     });
 

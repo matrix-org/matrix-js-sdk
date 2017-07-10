@@ -64,7 +64,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = q.defer();
+        const queryDefer1 = Promise.defer();
         downloadSpy.andReturn(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -83,7 +83,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = q.defer();
+        const queryDefer1 = Promise.defer();
         downloadSpy.andReturn(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -91,7 +91,7 @@ describe('DeviceList', function() {
         downloadSpy.reset();
 
         // outdated notif arrives while the request is in flight.
-        const queryDefer2 = q.defer();
+        const queryDefer2 = Promise.defer();
         downloadSpy.andReturn(queryDefer2.promise);
 
         dl.invalidateUserDeviceList('@test1:sw1v.org');
@@ -110,7 +110,7 @@ describe('DeviceList', function() {
             console.log("Creating new devicelist to simulate app reload");
             downloadSpy.reset();
             const dl2 = createTestDeviceList();
-            const queryDefer3 = q.defer();
+            const queryDefer3 = Promise.defer();
             downloadSpy.andReturn(queryDefer3.promise);
 
             const prom3 = dl2.refreshOutdatedDeviceLists();

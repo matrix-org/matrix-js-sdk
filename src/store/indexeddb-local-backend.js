@@ -143,7 +143,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves on success
      */
     _init: function() {
-        return q.all([
+        return Promise.all([
             this._loadAccountData(),
             this._loadSyncData(),
         ]).then(([accountData, syncData]) => {
@@ -223,7 +223,7 @@ LocalIndexedDBStoreBackend.prototype = {
     syncToDatabase: function(userTuples) {
         const syncData = this._syncAccumulator.getJSON();
 
-        return q.all([
+        return Promise.all([
             this._persistUserPresenceEvents(userTuples),
             this._persistAccountData(syncData.accountData),
             this._persistSyncData(syncData.nextBatch, syncData.roomsData),
@@ -238,7 +238,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _persistSyncData: function(nextBatch, roomsData) {
         console.log("Persisting sync data up to ", nextBatch);
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
@@ -257,7 +257,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the events were persisted.
      */
     _persistAccountData: function(accountData) {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
@@ -276,7 +276,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     _persistUserPresenceEvents: function(tuples) {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
@@ -296,7 +296,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
     getUserPresenceEvents: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
@@ -310,7 +310,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of raw global account events.
      */
     _loadAccountData: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
@@ -324,7 +324,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
     _loadSyncData: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {

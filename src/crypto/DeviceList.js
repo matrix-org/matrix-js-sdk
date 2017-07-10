@@ -96,7 +96,7 @@ export default class DeviceList {
             console.log("downloadKeys: already have all necessary keys");
         }
 
-        return q.all(promises).then(() => {
+        return Promise.all(promises).then(() => {
             return this._getDevicesFromStore(userIds);
         });
     }
@@ -416,7 +416,7 @@ class DeviceListUpdateSerialiser {
         this._nextSyncToken = syncToken;
 
         if (!this._queuedQueryDeferred) {
-            this._queuedQueryDeferred = q.defer();
+            this._queuedQueryDeferred = Promise.defer();
         }
 
         if (this._downloadInProgress) {

@@ -195,7 +195,7 @@ TestClient.prototype.getSigningKey = function() {
  */
 TestClient.prototype.flushSync = function() {
     console.log(`${this}: flushSync`);
-    return q.all([
+    return Promise.all([
         this.httpBackend.flush('/sync', 1),
         testUtils.syncPromise(this.client),
     ]);

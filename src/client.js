@@ -198,7 +198,7 @@ MatrixClient.prototype.clearStores = function() {
     if (this._cryptoStore) {
         promises.push(this._cryptoStore.deleteAllData());
     }
-    return q.all(promises);
+    return Promise.all(promises);
 };
 
 /**
@@ -368,7 +368,7 @@ MatrixClient.prototype.uploadKeys = function() {
  */
 MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
     if (this._crypto === null) {
-        return q.reject(new Error("End-to-end encryption disabled"));
+        return Promise.reject(new Error("End-to-end encryption disabled"));
     }
     return this._crypto.downloadKeys(userIds, forceDownload);
 };
@@ -577,7 +577,7 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
  */
 MatrixClient.prototype.exportRoomKeys = function() {
     if (!this._crypto) {
-        return q.reject(new Error("End-to-end encryption disabled"));
+        return Promise.reject(new Error("End-to-end encryption disabled"));
     }
     return this._crypto.exportRoomKeys();
 };
@@ -742,7 +742,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         );
     }
 
-    const defer = q.defer();
+    const defer = Promise.defer();
 
     const self = this;
     sign_promise.then(function(signed_invite_object) {
@@ -1402,7 +1402,7 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
 
     let identityServerUrl = this.getIdentityServerUrl();
     if (!identityServerUrl) {
-        return q.reject(new MatrixError({
+        return Promise.reject(new MatrixError({
             error: "No supplied identity server URL",
             errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
         }));
@@ -1761,7 +1761,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
         limit: limit,
         dir: 'b',
     };
-    const defer = q.defer();
+    const defer = Promise.defer();
     info = {
         promise: defer.promise,
         errorTs: null,
@@ -1769,7 +1769,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     const self = this;
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
-    q.delay(timeToWaitMs).then(function() {
+    Promise.delay(timeToWaitMs).then(function() {
         return self._http.authedRequest(callback, "GET", path, params);
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
@@ -1812,7 +1812,7 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
     const token = eventContext.getPaginateToken(backwards);
     if (!token) {
         // no more results.
-        return q.reject(new Error("No paginate token"));
+        return Promise.reject(new Error("No paginate token"));
     }
 
     const dir = backwards ? 'b' : 'f';
@@ -2153,7 +2153,7 @@ MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
         });
     }
 
-    return q.all([readPromise, writePromise]);
+    return Promise.all([readPromise, writePromise]);
 };
 
 // Registration/Login operations
@@ -2421,7 +2421,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         } else if (!hasDontNotifyRule) {
             // Remove the existing one before setting the mute push rule
             // This is a workaround to SYN-590 (Push rule update fails)
-            deferred = q.defer();
+            deferred = Promise.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
             .done(function() {
                 self.addPushRule(scope, "room", roomId, {
@@ -2441,7 +2441,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
 
     if (deferred) {
         // Update this.pushRules when the operation completes
-        const ruleRefreshDeferred = q.defer();
+        const ruleRefreshDeferred = Promise.defer();
         deferred.done(function() {
             self.getPushRules().done(function(result) {
                 self.pushRules = result;
@@ -2555,7 +2555,7 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
     // nicely with HTTP errors.
 
     if (!searchResults.next_batch) {
-        return q.reject(new Error("Cannot backpaginate event search any further"));
+        return Promise.reject(new Error("Cannot backpaginate event search any further"));
     }
 
     if (searchResults.pendingRequest) {

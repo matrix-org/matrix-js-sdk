@@ -634,7 +634,7 @@ describe("MatrixClient syncing", function() {
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
-            const defer = q.defer();
+            const defer = Promise.defer();
 
             httpBackend.when("GET", "/sync").check(function(req) {
                 expect(req.queryParams.filter).toEqual("another_id");
@@ -645,7 +645,7 @@ describe("MatrixClient syncing", function() {
 
             // first flush the filter request; this will make syncLeftRooms
             // make its /sync call
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/filter").then(function() {
                     // flush the syncs
                     return httpBackend.flushAllExpected();
@@ -679,7 +679,7 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            return q.all([
+            return Promise.all([
                 client.syncLeftRooms().then(function() {
                     const room = client.getRoom(roomTwo);
                     const tok = room.getLiveTimeline().getPaginationToken(

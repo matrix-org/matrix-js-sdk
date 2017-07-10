@@ -136,7 +136,7 @@ describe("MegolmDecryption", function() {
             megolmDecryption.shareKeysWithDevice(keyRequest);
 
             // it's asynchronous, so we have to wait a bit
-            return q.delay(1).then(() => {
+            return Promise.delay(1).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.
                 expect(mockOlmLib.encryptMessageForDevice.calls.length)

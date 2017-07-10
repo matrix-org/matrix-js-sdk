@@ -98,7 +98,7 @@ RemoteIndexedDBStoreBackend.prototype = {
         // the promise automatically gets rejected
         return Promise.resolve().then(() => {
             const seq = this._nextSeq++;
-            const def = q.defer();
+            const def = Promise.defer();
 
             this._inFlight[seq] = def;
 

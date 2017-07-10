@@ -15,7 +15,7 @@ const MatrixEvent = sdk.MatrixEvent;
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
 module.exports.syncPromise = function(client) {
-    const def = q.defer();
+    const def = Promise.defer();
     const cb = (state) => {
         if (state == 'SYNCING') {
             def.resolve();

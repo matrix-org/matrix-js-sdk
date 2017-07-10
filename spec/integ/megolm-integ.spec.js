@@ -506,7 +506,7 @@ describe("megolm", function() {
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test').then(() => {
                     throw new Error("sendTextMessage failed on an unknown device");
                 }, (e) => {
@@ -552,7 +552,7 @@ describe("megolm", function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const pendingMsg = room.getPendingEvents()[0];
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.resendEvent(pendingMsg, room),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -574,7 +574,7 @@ describe("megolm", function() {
                 },
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.downloadKeys(['@bob:xyz']),
                 aliceTestClient.httpBackend.flush('/keys/query', 1),
             ]);
@@ -587,7 +587,7 @@ describe("megolm", function() {
                     event_id: '$event_id',
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -619,7 +619,7 @@ describe("megolm", function() {
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.downloadKeys(['@bob:xyz']),
                 aliceTestClient.httpBackend.flush('/keys/query', 1),
             ]);
@@ -634,7 +634,7 @@ describe("megolm", function() {
                 event_id: '$event_id',
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -670,7 +670,7 @@ describe("megolm", function() {
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.downloadKeys(['@bob:xyz']),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]).then((keys) => {
@@ -703,7 +703,7 @@ describe("megolm", function() {
                 };
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -722,7 +722,7 @@ describe("megolm", function() {
                 };
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test2'),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -824,7 +824,7 @@ describe("megolm", function() {
                 };
             });
 
-            return q.all([
+            return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flushAllExpected(),
             ]);
@@ -875,7 +875,7 @@ describe("megolm", function() {
 
             return aliceTestClient.httpBackend.flushAllExpected();
         }).then(function() {
-            return q.all([downloadPromise, sendPromise]);
+            return Promise.all([downloadPromise, sendPromise]);
         });
     });
 
@@ -903,7 +903,7 @@ describe("megolm", function() {
                aliceTestClient.httpBackend.when('PUT', '/send/').respond(
                    200, {event_id: '$event1'});
 
-               return q.all([
+               return Promise.all([
                    aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                    aliceTestClient.httpBackend.flush('/keys/query', 1).then(
                        () => aliceTestClient.httpBackend.flush('/send/', 1),

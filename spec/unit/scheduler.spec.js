@@ -41,7 +41,7 @@ describe("MatrixScheduler", function() {
         });
         retryFn = null;
         queueFn = null;
-        defer = q.defer();
+        defer = Promise.defer();
     });
 
     afterEach(function() {
@@ -55,8 +55,8 @@ describe("MatrixScheduler", function() {
         queueFn = function() {
             return "one_big_queue";
         };
-        const deferA = q.defer();
-        const deferB = q.defer();
+        const deferA = Promise.defer();
+        const deferB = Promise.defer();
         let resolvedA = false;
         scheduler.setProcessFunction(function(event) {
             if (resolvedA) {
@@ -80,7 +80,7 @@ describe("MatrixScheduler", function() {
     it("should invoke the retryFn on failure and wait the amount of time specified",
     function(done) {
         const waitTimeMs = 1500;
-        const retryDefer = q.defer();
+        const retryDefer = Promise.defer();
         retryFn = function() {
             retryDefer.resolve();
             return waitTimeMs;
@@ -97,7 +97,7 @@ describe("MatrixScheduler", function() {
                 return defer.promise;
             } else if (procCount === 2) {
                 // don't care about this defer
-                return q.defer().promise;
+                return Promise.defer().promise;
             }
             expect(procCount).toBeLessThan(3);
         });
@@ -125,8 +125,8 @@ describe("MatrixScheduler", function() {
  return "yep";
 };
 
-        const deferA = q.defer();
-        const deferB = q.defer();
+        const deferA = Promise.defer();
+        const deferB = Promise.defer();
         let procCount = 0;
         scheduler.setProcessFunction(function(ev) {
             procCount += 1;
@@ -177,7 +177,7 @@ describe("MatrixScheduler", function() {
         const expectOrder = [
             eventA.getId(), eventB.getId(), eventD.getId(),
         ];
-        const deferA = q.defer();
+        const deferA = Promise.defer();
         scheduler.setProcessFunction(function(event) {
             const id = expectOrder.shift();
             expect(id).toEqual(event.getId());

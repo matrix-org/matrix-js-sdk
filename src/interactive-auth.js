@@ -115,7 +115,7 @@ InteractiveAuth.prototype = {
      *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
-        this._completionDeferred = q.defer();
+        this._completionDeferred = Promise.defer();
 
         // wrap in a promise so that if _startNextAuthStage
         // throws, it rejects the promise in a consistent way
@@ -263,7 +263,7 @@ InteractiveAuth.prototype = {
         try {
             prom = this._requestCallback(auth, background);
         } catch (e) {
-            prom = q.reject(e);
+            prom = Promise.reject(e);
         }
 
         prom = prom.then(
