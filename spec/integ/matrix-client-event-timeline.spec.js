@@ -127,7 +127,7 @@ describe("getEventTimeline support", function() {
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
             }).toThrow();
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 
     it("timeline support works when enabled", function(done) {
@@ -145,7 +145,7 @@ describe("getEventTimeline support", function() {
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
             }).toNotThrow();
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
 
         httpBackend.flush().catch(utils.failTest);
     });
@@ -220,7 +220,7 @@ describe("getEventTimeline support", function() {
             expect(room.timeline[0].event).toEqual(EVENTS[0]);
             expect(room.timeline[1].event).toEqual(EVENTS[1]);
             expect(room.oldState.paginationToken).toEqual("pagin_end");
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 });
 
@@ -279,7 +279,7 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -311,7 +311,7 @@ describe("MatrixClient event timelines", function() {
                 expect(tl.getEvents()[1].sender.name).toEqual(userName);
                 expect(tl.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("f_1_1");
                 // expect(tl.getPaginationToken(EventTimeline.FORWARDS)).toEqual("s_5_4");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -460,7 +460,7 @@ describe("MatrixClient event timelines", function() {
                     .toBe(null);
                 expect(tl3.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token3");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -487,7 +487,7 @@ describe("MatrixClient event timelines", function() {
                 expect(true).toBeFalsy();
             }).catch(function(e) {
                 expect(String(e)).toMatch(/'event'/);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -539,7 +539,7 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token1");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token0");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -591,7 +591,7 @@ describe("MatrixClient event timelines", function() {
                     .toEqual("start_token0");
                 expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                     .toEqual("end_token1");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush().catch(utils.failTest);
         });
@@ -650,7 +650,7 @@ describe("MatrixClient event timelines", function() {
             }).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(2);
                 expect(tl.getEvents()[1].event).toEqual(event);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush("/send/m.room.message/" + TXN_ID, 1).catch(utils.failTest);
         });
@@ -669,7 +669,7 @@ describe("MatrixClient event timelines", function() {
                 console.log("getEventTimeline completed (2)");
                 expect(tl.getEvents().length).toEqual(2);
                 expect(tl.getEvents()[1].getContent().body).toEqual("a body");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             q.all([
                 httpBackend.flush("/sync", 1),
@@ -750,6 +750,6 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(1);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 });

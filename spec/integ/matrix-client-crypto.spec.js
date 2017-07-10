@@ -414,7 +414,7 @@ describe("MatrixClient crypto", function() {
         q()
             .then(bobUploadsDeviceKeys)
             .then(aliDownloadsKeys)
-            .catch(testUtils.failTest).done(done);
+            .nodeify(done);
     });
 
     it("Ali gets keys with an invalid signature", function(done) {
@@ -433,7 +433,7 @@ describe("MatrixClient crypto", function() {
                 // should get an empty list
                 expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
             })
-            .catch(testUtils.failTest).done(done);
+            .nodeify(done);
     });
 
     it("Ali gets keys with an incorrect userId", function(done) {
@@ -472,7 +472,7 @@ describe("MatrixClient crypto", function() {
             // should get an empty list
             expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
             expect(aliTestClient.client.listDeviceKeys(eveUserId)).toEqual([]);
-        }).catch(testUtils.failTest).done(done);
+        }).nodeify(done);
     });
 
     it("Ali gets keys with an incorrect deviceId", function(done) {
@@ -508,7 +508,7 @@ describe("MatrixClient crypto", function() {
         ).then(function() {
             // should get an empty list
             expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
-        }).catch(testUtils.failTest).done(done);
+        }).nodeify(done);
     });
 
 
@@ -540,7 +540,7 @@ describe("MatrixClient crypto", function() {
             .then(aliEnablesEncryption)
             .then(aliSendsFirstMessage)
             .then(bobRecvMessage)
-            .catch(testUtils.failTest).done(done);
+            .nodeify(done);
     });
 
     it("Bob receives a message with a bogus sender", function(done) {
@@ -597,7 +597,7 @@ describe("MatrixClient crypto", function() {
                 bobTestClient.httpBackend.flush();
                 return deferred.promise;
             })
-            .catch(testUtils.failTest).done(done);
+            .nodeify(done);
     });
 
     it("Ali blocks Bob's device", function(done) {
@@ -629,7 +629,7 @@ describe("MatrixClient crypto", function() {
             .then(bobRecvMessage)
             .then(aliSendsMessage)
             .then(bobRecvMessage)
-            .catch(testUtils.failTest).done(done);
+            .nodeify(done);
     });
 
     it("Bob replies to the message", function() {

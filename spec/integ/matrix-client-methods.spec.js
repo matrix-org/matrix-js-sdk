@@ -79,7 +79,7 @@ describe("MatrixClient", function() {
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -99,7 +99,7 @@ describe("MatrixClient", function() {
                 rawResponse: false,
             }).then(function(response) {
                 expect(response.content_uri).toEqual("uri");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -125,7 +125,7 @@ describe("MatrixClient", function() {
                 expect(error.httpStatus).toEqual(400);
                 expect(error.errcode).toEqual("M_SNAFU");
                 expect(error.message).toEqual("broken");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -149,7 +149,7 @@ describe("MatrixClient", function() {
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             const r = client.cancelUpload(prom);
             expect(r).toBe(true);
@@ -381,7 +381,7 @@ describe("MatrixClient", function() {
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -398,7 +398,7 @@ describe("MatrixClient", function() {
 
             client.deleteDevice(
                 "my_device", auth,
-            ).catch(utils.failTest).done(done);
+            ).nodeify(done);
 
             httpBackend.flush();
         });

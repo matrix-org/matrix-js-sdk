@@ -94,7 +94,7 @@ describe("MatrixClient retrying", function() {
             client.cancelPendingEvent(ev1);
             expect(ev1.status).toEqual(EventStatus.CANCELLED);
             expect(tl.length).toEqual(0);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 
     describe("resending", function() {

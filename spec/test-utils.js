@@ -202,7 +202,7 @@ module.exports.mkMessage = function(opts) {
  * it("should not throw", function(done) {
  *    asynchronousMethod().then(function() {
  *       // some tests
- *    }).catch(utils.failTest).done(done);
+ *    }).nodeify(done);
  * });
  */
 module.exports.failTest = function(err) {
