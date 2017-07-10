@@ -558,7 +558,7 @@ SyncApi.prototype._sync = function(syncOptions) {
         // if there is data there.
         syncPromise = client.store.getSavedSync();
     } else {
-        syncPromise = q(null);
+        syncPromise = Promise.resolve(null);
     }
 
     syncPromise.then((savedSync) => {
@@ -600,7 +600,7 @@ SyncApi.prototype._sync = function(syncOptions) {
                 return data;
             });
         } else {
-            return q(data);
+            return Promise.resolve(data);
         }
     }).done((data) => {
         try {
@@ -1127,7 +1127,7 @@ SyncApi.prototype._resolveInvites = function(room) {
         const user = client.getUser(member.userId);
         let promise;
         if (user) {
-            promise = q({
+            promise = Promise.resolve({
                 avatar_url: user.avatarUrl,
                 displayname: user.displayName,
             });

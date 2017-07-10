@@ -60,7 +60,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
 
     if (this._sessionPrepared) {
         // prep already done
-        return q();
+        return Promise.resolve();
     }
 
     const self = this;

@@ -125,7 +125,7 @@ describe("MegolmDecryption", function() {
             const deviceInfo = {};
             mockCrypto.getStoredDevice.andReturn(deviceInfo);
             mockOlmLib.ensureOlmSessionsForDevices.andReturn(
-                q({'@alice:foo': {'alidevice': {
+                Promise.resolve({'@alice:foo': {'alidevice': {
                     sessionId: 'alisession',
                 }}}),
             );

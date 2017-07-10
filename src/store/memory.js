@@ -284,7 +284,7 @@ module.exports.MatrixInMemoryStore.prototype = {
      * @return {Promise} An immediately resolved promise.
      */
     setSyncData: function(syncData) {
-        return q();
+        return Promise.resolve();
     },
 
     /**
@@ -297,7 +297,7 @@ module.exports.MatrixInMemoryStore.prototype = {
      * @return {Promise} An immediately resolved promise.
      */
     startup: function() {
-        return q();
+        return Promise.resolve();
     },
 
     /**
@@ -306,7 +306,7 @@ module.exports.MatrixInMemoryStore.prototype = {
      * is no saved sync data.
      */
     getSavedSync: function() {
-        return q(null);
+        return Promise.resolve(null);
     },
 
     /**
@@ -329,6 +329,6 @@ module.exports.MatrixInMemoryStore.prototype = {
         this.accountData = {
             // type : content
         };
-        return q();
+        return Promise.resolve();
     },
 };

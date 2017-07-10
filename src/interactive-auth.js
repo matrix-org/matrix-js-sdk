@@ -119,7 +119,7 @@ InteractiveAuth.prototype = {
 
         // wrap in a promise so that if _startNextAuthStage
         // throws, it rejects the promise in a consistent way
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
@@ -258,7 +258,7 @@ InteractiveAuth.prototype = {
 
         // hackery to make sure that synchronous exceptions end up in the catch
         // handler (without the additional event loop entailed by q.fcall or an
-        // extra q().then)
+        // extra Promise.resolve().then)
         let prom;
         try {
             prom = this._requestCallback(auth, background);

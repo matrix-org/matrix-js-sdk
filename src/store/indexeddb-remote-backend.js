@@ -96,7 +96,7 @@ RemoteIndexedDBStoreBackend.prototype = {
     _doCmd: function(cmd, args) {
         // wrap in a q so if the postMessage throws,
         // the promise automatically gets rejected
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             const seq = this._nextSeq++;
             const def = q.defer();
 

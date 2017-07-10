@@ -189,7 +189,7 @@ StubStore.prototype = {
      * @return {Promise} An immediately resolved promise.
      */
     setSyncData: function(syncData) {
-        return q();
+        return Promise.resolve();
     },
 
     /**
@@ -202,7 +202,7 @@ StubStore.prototype = {
      * @return {Promise} An immediately resolved promise.
      */
     startup: function() {
-        return q();
+        return Promise.resolve();
     },
 
     /**
@@ -211,7 +211,7 @@ StubStore.prototype = {
      * is no saved sync data.
      */
     getSavedSync: function() {
-        return q(null);
+        return Promise.resolve(null);
     },
 
     /**
@@ -220,7 +220,7 @@ StubStore.prototype = {
      * @return {Promise} An immediately resolved promise.
      */
     deleteAllData: function() {
-        return q();
+        return Promise.resolve();
     },
 };
 

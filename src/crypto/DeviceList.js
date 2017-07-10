@@ -309,7 +309,7 @@ export default class DeviceList {
     _doKeyDownload(users) {
         if (users.length === 0) {
             // nothing to do
-            return q();
+            return Promise.resolve();
         }
 
         const prom = this._serialiser.updateDevicesForUsers(
@@ -459,7 +459,7 @@ class DeviceListUpdateSerialiser {
             //
             // of course we ought to do this in a web worker or similar, but
             // this serves as an easy solution for now.
-            let prom = q();
+            let prom = Promise.resolve();
             for (const userId of downloadUsers) {
                 prom = prom.delay(5).then(() => {
                     this._processQueryResponseForUser(userId, dk[userId]);

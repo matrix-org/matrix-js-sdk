@@ -118,7 +118,7 @@ TestClient.prototype.expectDeviceKeyUpload = function() {
 TestClient.prototype.awaitOneTimeKeyUpload = function() {
     if (Object.keys(this.oneTimeKeys).length != 0) {
         // already got one-time keys
-        return q(this.oneTimeKeys);
+        return Promise.resolve(this.oneTimeKeys);
     }
 
     this.httpBackend.when("POST", "/keys/upload")

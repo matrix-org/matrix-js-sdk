@@ -148,7 +148,7 @@ module.exports.ensureOlmSessionsForDevices = function(
     }
 
     if (devicesWithoutSession.length === 0) {
-        return q(result);
+        return Promise.resolve(result);
     }
 
     // TODO: this has a race condition - if we try to send another message

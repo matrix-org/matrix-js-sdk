@@ -287,7 +287,7 @@ function _maybeUploadOneTimeKeys(crypto) {
     }
 
     crypto._oneTimeKeyCheckInProgress = true;
-    q().then(() => {
+    Promise.resolve().then(() => {
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
             device_id: crypto._deviceId,
@@ -701,7 +701,7 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
  *    session export objects
  */
 Crypto.prototype.exportRoomKeys = function() {
-    return q(
+    return Promise.resolve(
         this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
             (s) => {
                 const sess = this._olmDevice.exportInboundGroupSession(

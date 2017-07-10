@@ -81,7 +81,7 @@ describe("InteractiveAuth", function() {
                 type: "logintype",
                 foo: "bar",
             });
-            return q(requestRes);
+            return Promise.resolve(requestRes);
         });
 
         ia.attemptAuth().then(function(res) {
@@ -138,7 +138,7 @@ describe("InteractiveAuth", function() {
                     type: "logintype",
                     foo: "bar",
                 });
-                return q(requestRes);
+                return Promise.resolve(requestRes);
             });
 
             ia.submitAuthDict({

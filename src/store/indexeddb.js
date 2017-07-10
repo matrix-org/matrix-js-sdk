@@ -115,7 +115,7 @@ utils.inherits(IndexedDBStore, MatrixInMemoryStore);
   */
 IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
-        return q();
+        return Promise.resolve();
     }
 
     return this.backend.connect().then(() => {
@@ -164,7 +164,7 @@ IndexedDBStore.prototype.save = function() {
     if (now - this._syncTs > WRITE_DELAY_MS) {
         return this._reallySave();
     }
-    return q();
+    return Promise.resolve();
 };
 
 IndexedDBStore.prototype._reallySave = function() {

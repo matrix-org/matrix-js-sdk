@@ -146,7 +146,7 @@ export class Backend {
      */
     getOutgoingRoomKeyRequestByState(wantedStates) {
         if (wantedStates.length === 0) {
-            return q(null);
+            return Promise.resolve(null);
         }
 
         // this is a bit tortuous because we need to make sure we do the lookup

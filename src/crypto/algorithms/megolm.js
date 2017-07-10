@@ -132,7 +132,7 @@ function MegolmEncryption(params) {
     // are using, and which devices we have shared the keys with. It resolves
     // with an OutboundSessionInfo (or undefined, for the first message in the
     // room).
-    this._setupPromise = q();
+    this._setupPromise = Promise.resolve();
 
     // default rotation periods
     this._sessionRotationPeriodMsgs = 100;
@@ -348,7 +348,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         }
 
         if (!haveTargets) {
-            return q();
+            return Promise.resolve();
         }
 
         // TODO: retries

@@ -113,7 +113,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     connect: function() {
         if (this.db) {
-            return q();
+            return Promise.resolve();
         }
         const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
@@ -204,18 +204,18 @@ LocalIndexedDBStoreBackend.prototype = {
         if (copy === undefined) copy = true;
 
         const data = this._syncAccumulator.getJSON();
-        if (!data.nextBatch) return q(null);
+        if (!data.nextBatch) return Promise.resolve(null);
         if (copy) {
             // We must deep copy the stored data so that the /sync processing code doesn't
             // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
-            return q(utils.deepCopy(data));
+            return Promise.resolve(utils.deepCopy(data));
         } else {
-            return q(data);
+            return Promise.resolve(data);
         }
     },
 
     setSyncData: function(syncData) {
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             this._syncAccumulator.accumulate(syncData);
         });
     },

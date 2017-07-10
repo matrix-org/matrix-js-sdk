@@ -61,7 +61,7 @@ class IndexedDBStoreWorker {
                     // because it's a web worker and there is no window).
                     indexedDB, msg.args[0],
                 );
-                prom = q();
+                prom = Promise.resolve();
                 break;
             case 'connect':
                 prom = this.backend.connect();

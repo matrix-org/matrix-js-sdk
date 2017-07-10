@@ -406,19 +406,19 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob uploads device keys", function() {
-        return q()
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys);
     });
 
     it("Ali downloads Bobs device keys", function(done) {
-        q()
+        Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(aliDownloadsKeys)
             .nodeify(done);
     });
 
     it("Ali gets keys with an invalid signature", function(done) {
-        q()
+        Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(function() {
                 // tamper bob's keys
@@ -515,7 +515,7 @@ describe("MatrixClient crypto", function() {
 
 
     it("Bob starts his client and uploads device keys and one-time keys", function() {
-        return q()
+        return Promise.resolve()
             .then(() => bobTestClient.start())
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
             .then((keys) => {
@@ -525,7 +525,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali sends a message", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -535,7 +535,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -546,7 +546,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message with a bogus sender", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -603,7 +603,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali blocks Bob's device", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -622,7 +622,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives two pre-key messages", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -635,7 +635,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob replies to the message", function() {
-        return q()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -652,7 +652,7 @@ describe("MatrixClient crypto", function() {
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
-        return q()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(() => {
