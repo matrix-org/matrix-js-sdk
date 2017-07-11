@@ -44,7 +44,7 @@ function createDatabase(db) {
  */
 function selectQuery(store, keyRange, resultMapper) {
     const query = store.openCursor(keyRange);
-    return Promise((resolve, reject) => { /*eslint new-cap: 0*/
+    return new Promise((resolve, reject) => {
         const results = [];
         query.onerror = (event) => {
             reject(new Error("Query failed: " + event.target.errorCode));
