@@ -133,9 +133,8 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     if (initialEventId) {
         const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
 
-        const promState = prom.inspect();
-        if (promState.state == 'fulfilled') {
-            initFields(promState.value);
+        if (prom.isFulfilled()) {
+            initFields(prom.value());
             return Promise.resolve();
         } else {
             return prom.then(initFields);
