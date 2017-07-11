@@ -426,8 +426,10 @@ describe("MatrixClient crypto", function() {
                 expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeTruthy();
                 bobDeviceKeys.keys["curve25519:" + bobDeviceId] += "abc";
 
-                return q.all(aliTestClient.client.downloadKeys([bobUserId]),
-                             expectAliQueryKeys());
+                return q.all([
+                    aliTestClient.client.downloadKeys([bobUserId]),
+                    expectAliQueryKeys(),
+                ]);
             })
             .then(function() {
                 // should get an empty list
