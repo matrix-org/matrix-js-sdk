@@ -88,7 +88,7 @@ describe("InteractiveAuth", function() {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(1);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 
     it("should make a request if no authdata is provided", function(done) {
@@ -151,6 +151,6 @@ describe("InteractiveAuth", function() {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(2);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 });

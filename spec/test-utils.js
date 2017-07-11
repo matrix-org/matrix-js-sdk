@@ -182,35 +182,6 @@ module.exports.mkMessage = function(opts) {
 
 
 /**
- * make the test fail, with the given exception
- *
- * <p>This is useful for use with integration tests which use asyncronous
- * methods: it can be added as a 'catch' handler in a promise chain.
- *
- * @param {Error} err   exception to be reported
- *
- * @deprecated
- * It turns out there are easier ways of doing this. Just use nodeify():
- *
- * it("should not throw", function(done) {
- *    asynchronousMethod().then(function() {
- *       // some tests
- *    }).nodeify(done);
- * });
- *
- * @example
- * it("should not throw", function(done) {
- *    asynchronousMethod().then(function() {
- *       // some tests
- *    }).catch(utils.failTest).done(done);
- * });
- */
-module.exports.failTest = function(err) {
-    expect(true).toBe(false, "Testfunc threw: " + err.stack);
-};
-
-
-/**
  * A mock implementation of webstorage
  *
  * @constructor

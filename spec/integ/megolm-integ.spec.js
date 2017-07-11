@@ -297,7 +297,7 @@ describe("megolm", function() {
         aliceTestClient.stop();
     });
 
-    it("Alice receives a megolm message", function(done) {
+    it("Alice receives a megolm message", function() {
         return aliceTestClient.start().then(() => {
             return createOlmSession(testOlmAccount, aliceTestClient);
         }).then((p2pSession) => {
@@ -342,10 +342,10 @@ describe("megolm", function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
-        }).nodeify(done);
+        });
     });
 
-    it("Alice receives a megolm message before the session keys", function(done) {
+    it("Alice receives a megolm message before the session keys", function() {
         // https://github.com/vector-im/riot-web/issues/2273
         let roomKeyEncrypted;
 
@@ -405,10 +405,10 @@ describe("megolm", function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
-        }).nodeify(done);
+        });
     });
 
-    it("Alice gets a second room_key message", function(done) {
+    it("Alice gets a second room_key message", function() {
         return aliceTestClient.start().then(() => {
             return createOlmSession(testOlmAccount, aliceTestClient);
         }).then((p2pSession) => {
@@ -476,10 +476,10 @@ describe("megolm", function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
-        }).nodeify(done);
+        });
     });
 
-    it('Alice sends a megolm message', function(done) {
+    it('Alice sends a megolm message', function() {
         let p2pSession;
 
         return aliceTestClient.start().then(() => {
@@ -556,10 +556,10 @@ describe("megolm", function() {
                 aliceTestClient.client.resendEvent(pendingMsg, room),
                 aliceTestClient.httpBackend.flush(),
             ]);
-        }).nodeify(done);
+        });
     });
 
-    it("Alice shouldn't do a second /query for non-e2e-capable devices", function(done) {
+    it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {
         return aliceTestClient.start().then(function() {
             const syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
@@ -591,11 +591,11 @@ describe("megolm", function() {
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flush(),
             ]);
-        }).nodeify(done);
+        });
     });
 
 
-    it("We shouldn't attempt to send to blocked devices", function(done) {
+    it("We shouldn't attempt to send to blocked devices", function() {
         return aliceTestClient.start().then(() => {
             // establish an olm session with alice
             return createOlmSession(testOlmAccount, aliceTestClient);
@@ -638,10 +638,10 @@ describe("megolm", function() {
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
                 aliceTestClient.httpBackend.flush(),
             ]);
-        }).nodeify(done);
+        });
     });
 
-    it("We should start a new megolm session when a device is blocked", function(done) {
+    it("We should start a new megolm session when a device is blocked", function() {
         let p2pSession;
         let megolmSessionId;
 
@@ -726,11 +726,11 @@ describe("megolm", function() {
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test2'),
                 aliceTestClient.httpBackend.flush(),
             ]);
-        }).nodeify(done);
+        });
     });
 
     // https://github.com/vector-im/riot-web/issues/2676
-    it("Alice should send to her other devices", function(done) {
+    it("Alice should send to her other devices", function() {
         // for this test, we make the testOlmAccount be another of Alice's devices.
         // it ought to get included in messages Alice sends.
 
@@ -834,12 +834,12 @@ describe("megolm", function() {
         }).then(function() {
             expect(decrypted.type).toEqual('m.room.message');
             expect(decrypted.content.body).toEqual('test');
-        }).nodeify(done);
+        });
     });
 
 
     it('Alice should wait for device list to complete when sending a megolm message',
-    function(done) {
+    function() {
         let p2pSession;
         let inboundGroupSession;
 
@@ -913,7 +913,7 @@ describe("megolm", function() {
             return aliceTestClient.httpBackend.flush();
         }).then(function() {
             return q.all([downloadPromise, sendPromise]);
-        }).nodeify(done);
+        });
     });
 
 
@@ -1039,7 +1039,7 @@ describe("megolm", function() {
            });
        });
 
-    it("Alice exports megolm keys and imports them to a new device", function(done) {
+    it("Alice exports megolm keys and imports them to a new device", function() {
         let messageEncrypted;
 
         return aliceTestClient.start().then(() => {
@@ -1119,6 +1119,6 @@ describe("megolm", function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.getContent().body).toEqual('42');
-        }).nodeify(done);
+        });
     });
 });
