@@ -52,7 +52,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -66,7 +66,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -133,7 +133,8 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+
+            httpBackend.flushAllExpected().done(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Boss");
                 expect(
@@ -161,7 +162,7 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Ghost");
                 done();
@@ -193,7 +194,7 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(latestFiredName).toEqual("The Ghost");
                 done();
             });
@@ -210,7 +211,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual(userC);
                 expect(
@@ -242,7 +243,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(client.getUser(userA).presence).toEqual("online");
                 expect(client.getUser(userB).presence).toEqual("unavailable");
                 done();
@@ -362,7 +363,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(
@@ -378,7 +379,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const room = client.getRoom(roomTwo);
                 // should have added the message from /events
                 expect(room.timeline.length).toEqual(2);
@@ -392,7 +393,7 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const room = client.getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
@@ -406,7 +407,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const room = client.getRoom(roomTwo);
                 let member = room.getMember(otherUserId);
                 expect(member).toBeTruthy();
@@ -449,7 +450,7 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
-            httpBackend.flush();
+            return httpBackend.flushAllExpected();
         });
 
         it("should set the back-pagination token on new rooms", function() {
@@ -472,7 +473,7 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            return httpBackend.flush().then(function() {
+            return httpBackend.flushAllExpected().then(function() {
                 const room = client.getRoom(roomTwo);
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
@@ -511,7 +512,7 @@ describe("MatrixClient syncing", function() {
                 expect(tok).toEqual("newerTok");
             });
 
-            return httpBackend.flush().then(function() {
+            return httpBackend.flushAllExpected().then(function() {
                 const room = client.getRoom(roomOne);
                 const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
@@ -587,7 +588,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 const room = client.getRoom(roomOne);
                 expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
                     type: "m.read",
@@ -616,7 +617,7 @@ describe("MatrixClient syncing", function() {
         beforeEach(function(done) {
             client.startClient();
 
-            httpBackend.flush().then(function() {
+            httpBackend.flushAllExpected().then(function() {
                 // the /sync call from syncLeftRooms ends up in the request
                 // queue behind the call from the running client; add a response
                 // to flush the client's one out.
@@ -647,7 +648,7 @@ describe("MatrixClient syncing", function() {
             return q.all([
                 httpBackend.flush("/filter").then(function() {
                     // flush the syncs
-                    return httpBackend.flush();
+                    return httpBackend.flushAllExpected();
                 }),
                 defer.promise,
             ]);
@@ -690,7 +691,7 @@ describe("MatrixClient syncing", function() {
                 // first flush the filter request; this will make syncLeftRooms
                 // make its /sync call
                 httpBackend.flush("/filter").then(function() {
-                    return httpBackend.flush();
+                    return httpBackend.flushAllExpected();
                 }),
             ]);
         });

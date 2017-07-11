@@ -77,7 +77,7 @@ TestClient.prototype.start = function() {
         pendingEventOrdering: 'detached',
     });
 
-    return this.httpBackend.flush().then(() => {
+    return this.httpBackend.flushAllExpected().then(() => {
         console.log(this + ': started');
     });
 };
