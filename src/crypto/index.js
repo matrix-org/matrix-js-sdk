@@ -246,8 +246,12 @@ Crypto.prototype.uploadDeviceKeys = function() {
     });
 };
 
+Crypto.prototype.updateCurrentKeyCount = function(currentKeyCount) {
+     _maybeUploadOneTimeKeys(this, currentKeyCount);
+};
+
 // check if it's time to upload one-time keys, and do so if so.
-function _maybeUploadOneTimeKeys(crypto) {
+function _maybeUploadOneTimeKeys(crypto, currentKeyCount) {
     // frequency with which to check & upload one-time keys
     const uploadPeriod = 1000 * 60; // one minute
 
@@ -266,7 +270,10 @@ function _maybeUploadOneTimeKeys(crypto) {
         now - crypto._lastOneTimeKeyCheck < uploadPeriod
        ) {
         // we've done a key upload recently.
-        return;
+        if (currentKeyCount === undefined) {
+            // only return when currentCount (from /sync-response) is not set
+            return;
+        }
     }
 
     crypto._lastOneTimeKeyCheck = now;
@@ -288,11 +295,19 @@ function _maybeUploadOneTimeKeys(crypto) {
 
     crypto._oneTimeKeyCheckInProgress = true;
     q().then(() => {
+        if (currentKeyCount !== undefined && isFinite(currentKeyCount)) {
+            // previously this parameter was not defined.
+            // if we get this param, then we just send it further without asking
+            // the server
+            return q(currentKeyCount);
+        }
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
             device_id: crypto._deviceId,
+        }).then((res) => {
+            return res.one_time_key_counts.signed_curve25519 || 0;
         });
-    }).then((res) => {
+    }).then((keyCount) => {
         // We need to keep a pool of one time public keys on the server so that
         // other devices can start conversations with us. But we can only store
         // a finite number of private keys in the olm Account object.
@@ -305,8 +320,6 @@ function _maybeUploadOneTimeKeys(crypto) {
         // So we need some kind of enginering compromise to balance all of
         // these factors.
 
-        // We first find how many keys the server has for us.
-        const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
         // We then check how many keys we can store in the Account object.
         const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
         // Try to keep at most half that number on the server. This leaves the
