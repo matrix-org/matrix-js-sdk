@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  * @module http-api
  */
-const q = require("q");
+import Promise from 'bluebird';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
@@ -219,7 +219,7 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         if (global.XMLHttpRequest) {
-            const defer = q.defer();
+            const defer = Promise.defer();
             const xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
@@ -343,7 +343,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts.form = params;
         }
 
-        const defer = q.defer();
+        const defer = Promise.defer();
         this.opts.request(
             opts,
             requestCallback(defer, callback, this.opts.onlyData),
@@ -676,7 +676,7 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        const defer = q.defer();
+        const defer = Promise.defer();
 
         let timeoutId;
         let timedOut = false;

@@ -20,7 +20,7 @@ limitations under the License.
  *
  * @module crypto/algorithms/olm
  */
-const q = require('q');
+import Promise from 'bluebird';
 
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
@@ -60,7 +60,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
 
     if (this._sessionPrepared) {
         // prep already done
-        return q();
+        return Promise.resolve();
     }
 
     const self = this;

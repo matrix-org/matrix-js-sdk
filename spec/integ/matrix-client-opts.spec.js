@@ -6,7 +6,7 @@ const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
@@ -114,7 +114,7 @@ describe("MatrixClient opts", function() {
             httpBackend.flush("/pushrules", 1).then(function() {
                 return httpBackend.flush("/filter", 1);
             }).then(function() {
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]);

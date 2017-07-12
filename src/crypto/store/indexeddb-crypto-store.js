@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from 'q';
+import Promise from 'bluebird';
 
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
@@ -56,7 +56,7 @@ export default class IndexedDBCryptoStore {
             return this._backendPromise;
         }
 
-        this._backendPromise = new q.Promise((resolve, reject) => {
+        this._backendPromise = new Promise((resolve, reject) => {
             if (!this._indexedDB) {
                 reject(new Error('no indexeddb support available'));
                 return;
@@ -107,7 +107,7 @@ export default class IndexedDBCryptoStore {
      * @returns {Promise} resolves when the store has been cleared.
      */
     deleteAllData() {
-        return new q.Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             if (!this._indexedDB) {
                 reject(new Error('no indexeddb support available'));
                 return;

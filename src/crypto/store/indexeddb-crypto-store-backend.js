@@ -1,4 +1,4 @@
-import q from 'q';
+import Promise from 'bluebird';
 import utils from '../../utils';
 
 export const VERSION = 1;
@@ -39,7 +39,7 @@ export class Backend {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        const deferred = q.defer();
+        const deferred = Promise.defer();
         const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
         txn.onerror = deferred.reject;
 
@@ -81,7 +81,7 @@ export class Backend {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        const deferred = q.defer();
+        const deferred = Promise.defer();
 
         const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
         txn.onerror = deferred.reject;
@@ -146,7 +146,7 @@ export class Backend {
      */
     getOutgoingRoomKeyRequestByState(wantedStates) {
         if (wantedStates.length === 0) {
-            return q(null);
+            return Promise.resolve(null);
         }
 
         // this is a bit tortuous because we need to make sure we do the lookup
@@ -284,7 +284,7 @@ function createDatabase(db) {
 }
 
 function promiseifyTxn(txn) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         txn.oncomplete = resolve;
         txn.onerror = reject;
     });

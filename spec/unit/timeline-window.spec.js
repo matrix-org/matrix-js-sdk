@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;
@@ -157,7 +157,7 @@ describe("TimelineWindow", function() {
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
-            return q(timeline);
+            return Promise.resolve(timeline);
         };
 
         return new TimelineWindow(client, timelineSet, opts);
@@ -191,7 +191,7 @@ describe("TimelineWindow", function() {
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
                 expect(eventId0).toEqual(eventId);
-                return q(timeline);
+                return Promise.resolve(timeline);
             };
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
@@ -219,7 +219,7 @@ describe("TimelineWindow", function() {
                     .toBe(false);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(false);
-                return q(timeline);
+                return Promise.resolve(timeline);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -383,7 +383,7 @@ describe("TimelineWindow", function() {
                 expect(opts.limit).toEqual(2);
 
                 addEventsToTimeline(timeline, 3, false);
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -416,7 +416,7 @@ describe("TimelineWindow", function() {
                 expect(opts.limit).toEqual(2);
 
                 addEventsToTimeline(timeline, 3, true);
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -449,7 +449,7 @@ describe("TimelineWindow", function() {
                 expect(opts.backwards).toBe(false);
                 expect(opts.limit).toEqual(2);
                 paginateCount += 1;
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {

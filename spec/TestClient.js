@@ -24,7 +24,7 @@ import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -118,7 +118,7 @@ TestClient.prototype.expectDeviceKeyUpload = function() {
 TestClient.prototype.awaitOneTimeKeyUpload = function() {
     if (Object.keys(this.oneTimeKeys).length != 0) {
         // already got one-time keys
-        return q(this.oneTimeKeys);
+        return Promise.resolve(this.oneTimeKeys);
     }
 
     this.httpBackend.when("POST", "/keys/upload")
@@ -195,7 +195,7 @@ TestClient.prototype.getSigningKey = function() {
  */
 TestClient.prototype.flushSync = function() {
     console.log(`${this}: flushSync`);
-    return q.all([
+    return Promise.all([
         this.httpBackend.flush('/sync', 1),
         testUtils.syncPromise(this.client),
     ]);
