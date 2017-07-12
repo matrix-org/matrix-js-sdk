@@ -92,7 +92,7 @@ function startClient(httpBackend, client) {
     });
 
     return q.all([
-        httpBackend.flush(),
+        httpBackend.flushAllExpected(),
         deferred.promise,
     ]);
 }
@@ -138,16 +138,13 @@ describe("getEventTimeline support", function() {
             timelineSupport: true,
         });
 
-        return q.all([
-            startClient(httpBackend, client).then(function() {
-                const room = client.getRoom(roomId);
-                const timelineSet = room.getTimelineSets()[0];
-                expect(function() {
-                    client.getEventTimeline(timelineSet, "event");
-                }).toNotThrow();
-            }),
-            httpBackend.flush(),
-        ]);
+        return startClient(httpBackend, client).then(() => {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+            expect(function() {
+                client.getEventTimeline(timelineSet, "event");
+            }).toNotThrow();
+        });
     });
 
 
@@ -281,7 +278,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token");
                 }),
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
             ]);
         });
 
@@ -304,20 +301,17 @@ describe("MatrixClient event timelines", function() {
                 },
             });
 
-            return q.all([
-                httpBackend.flush("/sync").then(function() {
-                    return client.getEventTimeline(timelineSet, EVENTS[0].event_id);
-                }).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[1].event).toEqual(EVENTS[0]);
-                    expect(tl.getEvents()[1].sender.name).toEqual(userName);
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
-                        .toEqual("f_1_1");
-                    // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
-                    //    .toEqual("s_5_4");
-                }),
-                httpBackend.flush(),
-            ]);
+            return httpBackend.flush("/sync").then(function() {
+                return client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+            }).then(function(tl) {
+                expect(tl.getEvents().length).toEqual(2);
+                expect(tl.getEvents()[1].event).toEqual(EVENTS[0]);
+                expect(tl.getEvents()[1].sender.name).toEqual(userName);
+                expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    .toEqual("f_1_1");
+                // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                //    .toEqual("s_5_4");
+            });
         });
 
         it("should update timelines where they overlap a previous /sync", function() {
@@ -369,7 +363,7 @@ describe("MatrixClient event timelines", function() {
             });
 
             return q.all([
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
                 deferred.promise,
             ]);
         });
@@ -466,7 +460,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl3.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token3");
                 }),
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
             ]);
         });
 
@@ -494,7 +488,7 @@ describe("MatrixClient event timelines", function() {
                 }, function(e) {
                     expect(String(e)).toMatch(/'event'/);
                 }),
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -547,7 +541,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token0");
                 }),
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
             ]);
         });
 
@@ -600,7 +594,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token1");
                 }),
-                httpBackend.flush(),
+                httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -732,7 +726,7 @@ describe("MatrixClient event timelines", function() {
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        httpBackend.flush().then(function() {
+        httpBackend.flushAllExpected().then(function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(3);
@@ -757,7 +751,7 @@ describe("MatrixClient event timelines", function() {
             };
             httpBackend.when("GET", "/sync").respond(200, sync2);
 
-            return httpBackend.flush();
+            return httpBackend.flushAllExpected();
         }).then(function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
