@@ -512,7 +512,7 @@ describe("megolm", function() {
                 }, (e) => {
                     expect(e.name).toEqual("UnknownDeviceError");
                 }),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         }).then(function() {
             // mark the device as known, and resend.
@@ -554,7 +554,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.resendEvent(pendingMsg, room),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -589,7 +589,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -636,7 +636,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -672,7 +672,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.downloadKeys(['@bob:xyz']),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]).then((keys) => {
                 aliceTestClient.client.setDeviceKnown('@bob:xyz', 'DEVICE_ID');
             });
@@ -705,7 +705,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         }).then(function() {
             console.log('Telling alice to block our device');
@@ -724,7 +724,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test2'),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         });
     });
@@ -772,7 +772,7 @@ describe("megolm", function() {
                 getTestKeysQueryResponse(aliceTestClient.userId),
             );
 
-            return aliceTestClient.httpBackend.flush();
+            return aliceTestClient.httpBackend.flushAllExpected();
         }).then(function() {
             // start out with the device unknown - the send should be rejected.
             return q.all([
@@ -784,7 +784,7 @@ describe("megolm", function() {
                     expect(Object.keys(e.devices[aliceTestClient.userId])).
                         toEqual(['DEVICE_ID']);
                 }),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         }).then(function() {
             // mark the device as known, and resend.
@@ -829,7 +829,7 @@ describe("megolm", function() {
 
             return q.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flush(),
+                aliceTestClient.httpBackend.flushAllExpected(),
             ]);
         }).then(function() {
             expect(decrypted.type).toEqual('m.room.message');
@@ -909,7 +909,7 @@ describe("megolm", function() {
                 200, getTestKeysQueryResponse('@bob:xyz'),
             );
 
-            return aliceTestClient.httpBackend.flush();
+            return aliceTestClient.httpBackend.flushAllExpected();
         }).then(function() {
             return q.all([downloadPromise, sendPromise]);
         });
