@@ -83,6 +83,8 @@ MatrixScheduler.prototype.removeEventFromQueue = function(event) {
     let removed = false;
     utils.removeElement(this._queues[name], function(element) {
         if (element.event.getId() === event.getId()) {
+            // XXX we should probably reject the promise?
+            // https://github.com/matrix-org/matrix-js-sdk/issues/496
             removed = true;
             return true;
         }

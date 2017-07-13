@@ -1,5 +1,7 @@
 "use strict";
 import 'source-map-support/register';
+import Promise from 'bluebird';
+
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
@@ -52,14 +54,19 @@ describe("MatrixClient retrying", function() {
 
     });
 
-    it("should mark events as EventStatus.CANCELLED when cancelled", function(done) {
+    it("should mark events as EventStatus.CANCELLED when cancelled", function() {
         // send a couple of events; the second will be queued
-        client.sendMessage(roomId, "m1").then(function(ev) {
-            expect(ev).toEqual(ev1);
+        const p1 = client.sendMessage(roomId, "m1").then(function(ev) {
+            // we expect the first message to fail
+            throw new Error('Message 1 unexpectedly sent successfully');
+        }, (e) => {
+            // this is expected
         });
-        client.sendMessage(roomId, "m2").then(function(ev) {
-            expect(ev).toEqual(ev2);
-        });
+
+        // XXX: it turns out that the promise returned by this message
+        // never gets resolved.
+        // https://github.com/matrix-org/matrix-js-sdk/issues/496
+        client.sendMessage(roomId, "m2");
 
         // both events should be in the timeline at this point
         const tl = room.getLiveTimeline().getEvents();
@@ -86,7 +93,7 @@ describe("MatrixClient retrying", function() {
             }).toThrow();
         }).respond(400); // fail the first message
 
-        httpBackend.flush().then(function() {
+        const p3 = httpBackend.flush().then(function() {
             expect(ev1.status).toEqual(EventStatus.NOT_SENT);
             expect(tl.length).toEqual(1);
 
@@ -94,7 +101,9 @@ describe("MatrixClient retrying", function() {
             client.cancelPendingEvent(ev1);
             expect(ev1.status).toEqual(EventStatus.CANCELLED);
             expect(tl.length).toEqual(0);
-        }).nodeify(done);
+        });
+
+        return Promise.all([p1, p3]);
     });
 
     describe("resending", function() {
