@@ -524,6 +524,41 @@ describe("MatrixClient crypto", function() {
             });
     });
 
+    it("React on device_one_time_keys send by /sync", function() {
+        // Send a response which causes a key upload
+        const syncDataEmpty = {
+            next_batch: "d",
+            device_one_time_keys_count: {
+                signed_curve25519: 0
+            },
+        };
+        const syncDataFull = {
+            next_batch: "e",
+            device_one_time_keys_count: {
+                signed_curve25519: 70
+            },
+        };
+
+        bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
+        return q()
+            .then(() => bobTestClient.start())
+            .then(() => bobTestClient.flushSync())
+            .then(() => bobTestClient.awaitOneTimeKeyUpload())
+            .then((keys) => {
+                expect(Object.keys(keys).length).toEqual(5);
+                expect(Object.keys(bobTestClient.deviceKeys).length).toNotEqual(0);
+
+                bobTestClient.httpBackend.when("POST", "/keys/upload")
+                    .respond(200, (path, content) => {
+                        // This endpoint should now not be called anymore
+                        expect(2).toBe(3);
+                    });
+                bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncFull);
+            })
+            .then(() => bobTestClient.httpBackend.flush('/sync', 2));
+            // As the key store assumes to be full there should be two syncs in a row
+    });
+
     it("Ali sends a message", function(done) {
         q()
             .then(() => aliTestClient.start())
