@@ -696,4 +696,59 @@ describe("MatrixClient syncing", function() {
             ]);
         });
     });
+
+    describe("device_one_time_keys", function() {
+        if (!sdk.CRYPTO_ENABLED) {
+            return;
+        }
+
+        it("React on device_one_time_keys send by /sync", function() {
+            // Send a response which causes a key upload
+            const syncDataEmpty = {
+                next_batch: "d",
+                device_one_time_keys_count: {
+                    signed_curve25519: 0,
+                },
+            };
+            const syncDataFull = {
+                next_batch: "e",
+                device_one_time_keys_count: {
+                    signed_curve25519: 70,
+                },
+            };
+
+            client.startClient();
+            httpBackend.flushAllExpected();
+
+            // enqueue expectations:
+            // * Sync with empty one_time_keys => upload keys
+            // * Sync with more then needed keys => no request
+            // * Sync with empty one_time_keys => upload keys
+            httpBackend.when("GET", "/sync")
+                .respond(200, syncDataEmpty);
+            httpBackend.when("POST", "/keys/upload")
+                .respond(200, (path, content) => {
+                    expect(content.one_time_keys).toBeTruthy();
+                    expect(content.one_time_keys).toNotEqual({});
+                    console.log('received %i one-time keys',
+                                Object.keys(content.one_time_keys).length);
+                });
+            httpBackend.when("GET", "/sync")
+                .respond(200, syncDataFull);
+            httpBackend.when("GET", "/sync")
+                .respond(200, syncDataEmpty);
+            httpBackend.when("POST", "/keys/upload")
+                .respond(200, (path, content) => {
+                    expect(content.one_time_keys).toBeTruthy();
+                    expect(content.one_time_keys).toNotEqual({});
+                    console.log('received %i one-time keys',
+                                Object.keys(content.one_time_keys).length);
+                });
+
+            httpBackend.flushAllExpected().then((flushed) => {
+                // flush 3 /sync und 2 /keys/upload
+                expect(flushed).toEqual(5);
+            });
+        });
+    });
 });
