@@ -23,7 +23,7 @@ const PushProcessor = require('./pushprocessor');
  * @module client
  */
 const EventEmitter = require("events").EventEmitter;
-const q = require("q");
+import Promise from 'bluebird';
 const url = require('url');
 
 const httpApi = require("./http-api");
@@ -198,7 +198,7 @@ MatrixClient.prototype.clearStores = function() {
     if (this._cryptoStore) {
         promises.push(this._cryptoStore.deleteAllData());
     }
-    return q.all(promises);
+    return Promise.all(promises);
 };
 
 /**
@@ -368,7 +368,7 @@ MatrixClient.prototype.uploadKeys = function() {
  */
 MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
     if (this._crypto === null) {
-        return q.reject(new Error("End-to-end encryption disabled"));
+        return Promise.reject(new Error("End-to-end encryption disabled"));
     }
     return this._crypto.downloadKeys(userIds, forceDownload);
 };
@@ -551,7 +551,7 @@ MatrixClient.prototype.setRoomEncryption = function(roomId, config) {
         throw new Error("End-to-End encryption disabled");
     }
     this._crypto.setRoomEncryption(roomId, config);
-    return q();
+    return Promise.resolve();
 };
 
 /**
@@ -577,7 +577,7 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
  */
 MatrixClient.prototype.exportRoomKeys = function() {
     if (!this._crypto) {
-        return q.reject(new Error("End-to-end encryption disabled"));
+        return Promise.reject(new Error("End-to-end encryption disabled"));
     }
     return this._crypto.exportRoomKeys();
 };
@@ -730,10 +730,10 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
 
     const room = this.getRoom(roomIdOrAlias);
     if (room && room.hasMembershipState(this.credentials.userId, "join")) {
-        return q(room);
+        return Promise.resolve(room);
     }
 
-    let sign_promise = q();
+    let sign_promise = Promise.resolve();
 
     if (opts.inviteSignUrl) {
         sign_promise = this._http.requestOtherUrl(
@@ -742,7 +742,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         );
     }
 
-    const defer = q.defer();
+    const defer = Promise.defer();
 
     const self = this;
     sign_promise.then(function(signed_invite_object) {
@@ -761,7 +761,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
             // v2 will do this for us
             // return syncApi.syncRoom(room);
         }
-        return q(room);
+        return Promise.resolve(room);
     }).done(function(room) {
         _resolve(callback, defer, room);
     }, function(err) {
@@ -981,10 +981,10 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
 // marks the event as sent/unsent
 // returns a promise which resolves with the result of the send request
 function _sendEvent(client, room, event, callback) {
-    // Add an extra q() to turn synchronous exceptions into promise rejections,
+    // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
     // so that we can handle synchronous and asynchronous exceptions with the
     // same code path.
-    return q().then(function() {
+    return Promise.resolve().then(function() {
         let encryptionPromise = null;
         if (client._crypto) {
             encryptionPromise = client._crypto.encryptEventIfNeeded(event, room);
@@ -1238,7 +1238,7 @@ MatrixClient.prototype.sendHtmlEmote = function(roomId, body, htmlBody, callback
  */
 MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
     if (this.isGuest()) {
-        return q({}); // guests cannot send receipts so don't bother.
+        return Promise.resolve({}); // guests cannot send receipts so don't bother.
     }
 
     const path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
@@ -1315,7 +1315,7 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
     const key = ts + "_" + url;
     const og = this.urlPreviewCache[key];
     if (og) {
-        return q(og);
+        return Promise.resolve(og);
     }
 
     const self = this;
@@ -1341,7 +1341,7 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
  */
 MatrixClient.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callback) {
     if (this.isGuest()) {
-        return q({}); // guests cannot send typing notifications so don't bother.
+        return Promise.resolve({}); // guests cannot send typing notifications so don't bother.
     }
 
     const path = utils.encodeUri("/rooms/$roomId/typing/$userId", {
@@ -1402,7 +1402,7 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
 
     let identityServerUrl = this.getIdentityServerUrl();
     if (!identityServerUrl) {
-        return q.reject(new MatrixError({
+        return Promise.reject(new MatrixError({
             error: "No supplied identity server URL",
             errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
         }));
@@ -1742,13 +1742,13 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     }
 
     if (room.oldState.paginationToken === null) {
-        return q(room); // already at the start.
+        return Promise.resolve(room); // already at the start.
     }
     // attempt to grab more events from the store first
     const numAdded = this.store.scrollback(room, limit).length;
     if (numAdded === limit) {
         // store contained everything we needed.
-        return q(room);
+        return Promise.resolve(room);
     }
     // reduce the required number of events appropriately
     limit = limit - numAdded;
@@ -1761,7 +1761,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
         limit: limit,
         dir: 'b',
     };
-    const defer = q.defer();
+    const defer = Promise.defer();
     info = {
         promise: defer.promise,
         errorTs: null,
@@ -1769,7 +1769,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     const self = this;
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
-    q.delay(timeToWaitMs).then(function() {
+    Promise.delay(timeToWaitMs).then(function() {
         return self._http.authedRequest(callback, "GET", path, params);
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
@@ -1812,7 +1812,7 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
     const token = eventContext.getPaginateToken(backwards);
     if (!token) {
         // no more results.
-        return q.reject(new Error("No paginate token"));
+        return Promise.reject(new Error("No paginate token"));
     }
 
     const dir = backwards ? 'b' : 'f';
@@ -1881,7 +1881,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     }
 
     if (timelineSet.getTimelineForEvent(eventId)) {
-        return q(timelineSet.getTimelineForEvent(eventId));
+        return Promise.resolve(timelineSet.getTimelineForEvent(eventId));
     }
 
     const path = utils.encodeUri(
@@ -1969,7 +1969,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
     const token = eventTimeline.getPaginationToken(dir);
     if (!token) {
         // no token - no results.
-        return q(false);
+        return Promise.resolve(false);
     }
 
     const pendingRequest = eventTimeline._paginationRequests[dir];
@@ -2146,14 +2146,14 @@ MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
         guest_access: opts.allowJoin ? "can_join" : "forbidden",
     });
 
-    let readPromise = q();
+    let readPromise = Promise.resolve();
     if (opts.allowRead) {
         readPromise = this.sendStateEvent(roomId, "m.room.history_visibility", {
             history_visibility: "world_readable",
         });
     }
 
-    return q.all([readPromise, writePromise]);
+    return Promise.all([readPromise, writePromise]);
 };
 
 // Registration/Login operations
@@ -2421,7 +2421,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         } else if (!hasDontNotifyRule) {
             // Remove the existing one before setting the mute push rule
             // This is a workaround to SYN-590 (Push rule update fails)
-            deferred = q.defer();
+            deferred = Promise.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
             .done(function() {
                 self.addPushRule(scope, "room", roomId, {
@@ -2441,7 +2441,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
 
     if (deferred) {
         // Update this.pushRules when the operation completes
-        const ruleRefreshDeferred = q.defer();
+        const ruleRefreshDeferred = Promise.defer();
         deferred.done(function() {
             self.getPushRules().done(function(result) {
                 self.pushRules = result;
@@ -2555,7 +2555,7 @@ MatrixClient.prototype.backPaginateRoomEventsSearch = function(searchResults) {
     // nicely with HTTP errors.
 
     if (!searchResults.next_batch) {
-        return q.reject(new Error("Cannot backpaginate event search any further"));
+        return Promise.reject(new Error("Cannot backpaginate event search any further"));
     }
 
     if (searchResults.pendingRequest) {
@@ -2624,7 +2624,7 @@ MatrixClient.prototype._processRoomEventsSearch = function(searchResults, respon
 MatrixClient.prototype.syncLeftRooms = function() {
     // Guard against multiple calls whilst ongoing and multiple calls post success
     if (this._syncedLeftRooms) {
-        return q([]); // don't call syncRooms again if it succeeded.
+        return Promise.resolve([]); // don't call syncRooms again if it succeeded.
     }
     if (this._syncLeftRoomsPromise) {
         return this._syncLeftRoomsPromise; // return the ongoing request
@@ -2683,7 +2683,7 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
     if (allowCached) {
         const filter = this.store.getFilter(userId, filterId);
         if (filter) {
-            return q(filter);
+            return Promise.resolve(filter);
         }
     }
 
@@ -2712,7 +2712,7 @@ MatrixClient.prototype.getFilter = function(userId, filterId, allowCached) {
  */
 MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
     const filterId = this.store.getFilterIdByName(filterName);
-    let promise = q();
+    let promise = Promise.resolve();
     const self = this;
 
     if (filterId) {
@@ -2727,7 +2727,7 @@ MatrixClient.prototype.getOrCreateFilter = function(filterName, filter) {
                 // super, just use that.
                 // debuglog("Using existing filter ID %s: %s", filterId,
                 //          JSON.stringify(oldDef));
-                return q(filterId);
+                return Promise.resolve(filterId);
             }
             // debuglog("Existing filter ID %s: %s; new filter: %s",
             //          filterId, JSON.stringify(oldDef), JSON.stringify(newDef));

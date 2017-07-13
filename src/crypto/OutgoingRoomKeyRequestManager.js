@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from 'q';
+import Promise from 'bluebird';
 
 import utils from '../utils';
 
@@ -251,7 +251,7 @@ export default class OutgoingRoomKeyRequestManager {
     _sendOutgoingRoomKeyRequests() {
         if (!this._clientRunning) {
             this._sendOutgoingRoomKeyRequestsTimer = null;
-            return q();
+            return Promise.resolve();
         }
 
         console.log("Looking for queued outgoing room key requests");

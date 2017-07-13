@@ -5,7 +5,7 @@ const EventStatus = sdk.EventStatus;
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
-import q from 'q';
+import Promise from 'bluebird';
 import expect from 'expect';
 
 describe("MatrixClient room timelines", function() {
@@ -394,7 +394,7 @@ describe("MatrixClient room timelines", function() {
             ];
             setNextSyncData(eventData);
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
@@ -409,7 +409,7 @@ describe("MatrixClient room timelines", function() {
                 });
 
                 httpBackend.flush("/messages", 1);
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
@@ -436,12 +436,12 @@ describe("MatrixClient room timelines", function() {
             eventData[1].__prev_event = USER_MEMBERSHIP_EVENT;
             setNextSyncData(eventData);
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
                 const room = client.getRoom(roomId);
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
@@ -462,7 +462,7 @@ describe("MatrixClient room timelines", function() {
             secondRoomNameEvent.__prev_event = ROOM_NAME_EVENT;
             setNextSyncData([secondRoomNameEvent]);
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
@@ -472,7 +472,7 @@ describe("MatrixClient room timelines", function() {
                     nameEmitCount += 1;
                 });
 
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
@@ -487,7 +487,7 @@ describe("MatrixClient room timelines", function() {
                     thirdRoomNameEvent.__prev_event = secondRoomNameEvent;
                     setNextSyncData([thirdRoomNameEvent]);
                     httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
-                    return q.all([
+                    return Promise.all([
                         httpBackend.flush("/sync", 1),
                         utils.syncPromise(client),
                     ]);
@@ -513,12 +513,12 @@ describe("MatrixClient room timelines", function() {
             eventData[1].__prev_event = null;
             setNextSyncData(eventData);
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
                 const room = client.getRoom(roomId);
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
@@ -544,14 +544,14 @@ describe("MatrixClient room timelines", function() {
             setNextSyncData(eventData);
             NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
                 const room = client.getRoom(roomId);
 
                 httpBackend.flush("/messages", 1);
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
@@ -577,7 +577,7 @@ describe("MatrixClient room timelines", function() {
             setNextSyncData(eventData);
             NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
@@ -590,7 +590,7 @@ describe("MatrixClient room timelines", function() {
                 });
 
                 httpBackend.flush("/messages", 1);
-                return q.all([
+                return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {

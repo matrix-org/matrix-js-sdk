@@ -17,7 +17,7 @@ limitations under the License.
 
 /** @module timeline-window */
 
-const q = require("q");
+import Promise from 'bluebird';
 const EventTimeline = require("./models/event-timeline");
 
 /**
@@ -133,17 +133,16 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     if (initialEventId) {
         const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
 
-        const promState = prom.inspect();
-        if (promState.state == 'fulfilled') {
-            initFields(promState.value);
-            return q();
+        if (prom.isFulfilled()) {
+            initFields(prom.value());
+            return Promise.resolve();
         } else {
             return prom.then(initFields);
         }
     } else {
         const tl = this._timelineSet.getLiveTimeline();
         initFields(tl);
-        return q();
+        return Promise.resolve();
     }
 };
 
@@ -235,7 +234,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
 
     if (!tl) {
         debuglog("TimelineWindow: no timeline yet");
-        return q(false);
+        return Promise.resolve(false);
     }
 
     if (tl.pendingPaginate) {
@@ -255,20 +254,20 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
         if (excess > 0) {
             this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
         }
-        return q(true);
+        return Promise.resolve(true);
     }
 
     if (!makeRequest || requestLimit === 0) {
         // todo: should we return something different to indicate that there
         // might be more events out there, but we haven't found them yet?
-        return q(false);
+        return Promise.resolve(false);
     }
 
     // try making a pagination request
     const token = tl.timeline.getPaginationToken(direction);
     if (!token) {
         debuglog("TimelineWindow: no token");
-        return q(false);
+        return Promise.resolve(false);
     }
 
     debuglog("TimelineWindow: starting request");

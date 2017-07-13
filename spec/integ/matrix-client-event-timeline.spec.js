@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
@@ -82,7 +82,7 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    const deferred = q.defer();
+    const deferred = Promise.defer();
     client.on("sync", function(state) {
         console.log("sync", state);
         if (state != "SYNCING") {
@@ -91,7 +91,7 @@ function startClient(httpBackend, client) {
         deferred.resolve();
     });
 
-    return q.all([
+    return Promise.all([
         httpBackend.flushAllExpected(),
         deferred.promise,
     ]);
@@ -205,7 +205,7 @@ describe("getEventTimeline support", function() {
         }).then(() => {
             // the sync isn't processed immediately; give the promise chain
             // a chance to complete.
-            return q.delay(0);
+            return Promise.delay(0);
         }).then(function() {
             expect(room.timeline.length).toEqual(1);
             expect(room.timeline[0].event).toEqual(EVENTS[1]);
@@ -266,7 +266,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            return q.all([
+            return Promise.all([
                 client.getEventTimeline(timelineSet, "event1:bar").then(function(tl) {
                     expect(tl.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
@@ -346,7 +346,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const deferred = q.defer();
+            const deferred = Promise.defer();
             client.on("sync", function() {
                 client.getEventTimeline(timelineSet, EVENTS[2].event_id,
                 ).then(function(tl) {
@@ -362,7 +362,7 @@ describe("MatrixClient event timelines", function() {
                         (e) => deferred.reject(e));
             });
 
-            return q.all([
+            return Promise.all([
                 httpBackend.flushAllExpected(),
                 deferred.promise,
             ]);
@@ -429,7 +429,7 @@ describe("MatrixClient event timelines", function() {
 
             let tl0;
             let tl3;
-            return q.all([
+            return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id,
                 ).then(function(tl) {
                     expect(tl.getEvents().length).toEqual(1);
@@ -480,7 +480,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            return q.all([
+            return Promise.all([
                 client.getEventTimeline(timelineSet, "event1",
                 ).then(function(tl) {
                     // could do with a fail()
@@ -525,7 +525,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             let tl;
-            return q.all([
+            return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id,
                 ).then(function(tl0) {
                     tl = tl0;
@@ -577,7 +577,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             let tl;
-            return q.all([
+            return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id,
                 ).then(function(tl0) {
                     tl = tl0;
@@ -634,7 +634,7 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
 
-            return q.all([
+            return Promise.all([
                 client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
                     expect(res.event_id).toEqual(event.event_id);
                     return client.getEventTimeline(timelineSet, event.event_id);
@@ -644,7 +644,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getEvents()[1].getContent().body).toEqual("a body");
 
                     // now let the sync complete, and check it again
-                    return q.all([
+                    return Promise.all([
                         httpBackend.flush("/sync", 1),
                         utils.syncPromise(client),
                     ]);
@@ -663,7 +663,7 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
 
-            return q.all([
+            return Promise.all([
                 // initiate the send, and set up checks to be done when it completes
                 // - but note that it won't complete until after the /sync does, below.
                 client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
@@ -676,7 +676,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl.getEvents()[1].getContent().body).toEqual("a body");
                 }),
 
-                q.all([
+                Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {

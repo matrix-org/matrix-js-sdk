@@ -5,7 +5,7 @@ try {
 }
 
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
@@ -125,7 +125,7 @@ describe("MegolmDecryption", function() {
             const deviceInfo = {};
             mockCrypto.getStoredDevice.andReturn(deviceInfo);
             mockOlmLib.ensureOlmSessionsForDevices.andReturn(
-                q({'@alice:foo': {'alidevice': {
+                Promise.resolve({'@alice:foo': {'alidevice': {
                     sessionId: 'alisession',
                 }}}),
             );
@@ -136,7 +136,7 @@ describe("MegolmDecryption", function() {
             megolmDecryption.shareKeysWithDevice(keyRequest);
 
             // it's asynchronous, so we have to wait a bit
-            return q.delay(1).then(() => {
+            return Promise.delay(1).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.
                 expect(mockOlmLib.encryptMessageForDevice.calls.length)

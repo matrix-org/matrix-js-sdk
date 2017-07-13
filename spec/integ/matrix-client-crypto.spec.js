@@ -31,7 +31,7 @@ import '../olm-loader';
 
 import expect from 'expect';
 const sdk = require("../..");
-const q = require("q");
+import Promise from 'bluebird';
 const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
 const TestClient = require('../TestClient').default;
@@ -50,7 +50,7 @@ let bobMessages;
 
 function bobUploadsDeviceKeys() {
     bobTestClient.expectDeviceKeyUpload();
-    return q.all([
+    return Promise.all([
         bobTestClient.client.uploadKeys(),
         bobTestClient.httpBackend.flush(),
     ]).then(() => {
@@ -157,7 +157,7 @@ function aliDownloadsKeys() {
 
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
-    return q.all([p1, p2]).then(function() {
+    return Promise.all([p1, p2]).then(function() {
         const devices = aliTestClient.storage.getEndToEndDevicesForUser(bobUserId);
         expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
         expect(devices[bobDeviceId].verified).
@@ -188,7 +188,7 @@ function bobEnablesEncryption() {
  * @return {promise} which resolves to the ciphertext for Bob's device.
  */
 function aliSendsFirstMessage() {
-    return q.all([
+    return Promise.all([
         sendMessage(aliTestClient.client),
         expectAliQueryKeys()
             .then(expectAliClaimKeys)
@@ -205,7 +205,7 @@ function aliSendsFirstMessage() {
  * @return {promise} which resolves to the ciphertext for Bob's device.
  */
 function aliSendsMessage() {
-    return q.all([
+    return Promise.all([
         sendMessage(aliTestClient.client),
         expectAliSendMessageRequest(),
     ]).spread(function(_, ciphertext) {
@@ -220,7 +220,7 @@ function aliSendsMessage() {
  * @return {promise} which resolves to the ciphertext for Ali's device.
  */
 function bobSendsReplyMessage() {
-    return q.all([
+    return Promise.all([
         sendMessage(bobTestClient.client),
         expectBobQueryKeys()
             .then(expectBobSendMessageRequest),
@@ -269,7 +269,7 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    const deferred = q.defer();
+    const deferred = Promise.defer();
     httpBackend.when("PUT", path).respond(200, function(path, content) {
         deferred.resolve(content);
         return {
@@ -317,7 +317,7 @@ function recvMessage(httpBackend, client, sender, message) {
         },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
-    const deferred = q.defer();
+    const deferred = Promise.defer();
     const onEvent = function(event) {
         console.log(client.credentials.userId + " received event",
                     event);
@@ -406,19 +406,19 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob uploads device keys", function() {
-        return q()
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys);
     });
 
     it("Ali downloads Bobs device keys", function(done) {
-        q()
+        Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(aliDownloadsKeys)
             .nodeify(done);
     });
 
     it("Ali gets keys with an invalid signature", function(done) {
-        q()
+        Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(function() {
                 // tamper bob's keys
@@ -426,7 +426,7 @@ describe("MatrixClient crypto", function() {
                 expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeTruthy();
                 bobDeviceKeys.keys["curve25519:" + bobDeviceId] += "abc";
 
-                return q.all([
+                return Promise.all([
                     aliTestClient.client.downloadKeys([bobUserId]),
                     expectAliQueryKeys(),
                 ]);
@@ -467,7 +467,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        q.all([
+        Promise.all([
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -504,7 +504,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        q.all([
+        Promise.all([
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -515,7 +515,7 @@ describe("MatrixClient crypto", function() {
 
 
     it("Bob starts his client and uploads device keys and one-time keys", function() {
-        return q()
+        return Promise.resolve()
             .then(() => bobTestClient.start())
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
             .then((keys) => {
@@ -540,7 +540,7 @@ describe("MatrixClient crypto", function() {
         };
 
         bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
-        return q()
+        return Promise.resolve()
             .then(() => bobTestClient.start())
             .then(() => bobTestClient.flushSync())
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
@@ -560,7 +560,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali sends a message", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -570,7 +570,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -581,7 +581,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message with a bogus sender", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -611,7 +611,7 @@ describe("MatrixClient crypto", function() {
                 };
                 bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncData);
 
-                const deferred = q.defer();
+                const deferred = Promise.defer();
                 const onEvent = function(event) {
                     console.log(bobUserId + " received event",
                                 event);
@@ -638,7 +638,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali blocks Bob's device", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -652,12 +652,12 @@ describe("MatrixClient crypto", function() {
                           // no unblocked devices, so the ciphertext should be empty
                           expect(sentContent.ciphertext).toEqual({});
                       });
-                return q.all([p1, p2]);
+                return Promise.all([p1, p2]);
             }).nodeify(done);
     });
 
     it("Bob receives two pre-key messages", function(done) {
-        q()
+        Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -670,7 +670,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob replies to the message", function() {
-        return q()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -687,7 +687,7 @@ describe("MatrixClient crypto", function() {
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
-        return q()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(() => {

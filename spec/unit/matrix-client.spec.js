@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const MatrixClient = sdk.MatrixClient;
 const utils = require("../test-utils");
@@ -62,7 +62,7 @@ describe("MatrixClient", function() {
     let pendingLookup = null;
     function httpReq(cb, method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
-            return q();
+            return Promise.resolve();
         }
         const next = httpLookups.shift();
         const logLine = (
@@ -84,7 +84,7 @@ describe("MatrixClient", function() {
                 );
             }
             pendingLookup = {
-                promise: q.defer().promise,
+                promise: Promise.defer().promise,
                 method: method,
                 path: path,
             };
@@ -109,7 +109,7 @@ describe("MatrixClient", function() {
             }
 
             if (next.error) {
-                return q.reject({
+                return Promise.reject({
                     errcode: next.error.errcode,
                     httpStatus: next.error.httpStatus,
                     name: next.error.errcode,
@@ -117,10 +117,10 @@ describe("MatrixClient", function() {
                     data: next.error,
                 });
             }
-            return q(next.data);
+            return Promise.resolve(next.data);
         }
         expect(true).toBe(false, "Expected different request. " + logLine);
-        return q.defer().promise;
+        return Promise.defer().promise;
     }
 
     beforeEach(function() {
@@ -136,8 +136,8 @@ describe("MatrixClient", function() {
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
             "getSyncAccumulator", "startup", "deleteAllData",
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
-        store.getSavedSync = expect.createSpy().andReturn(q(null));
-        store.setSyncData = expect.createSpy().andReturn(q(null));
+        store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+        store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -174,10 +174,10 @@ describe("MatrixClient", function() {
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
         client._http.authedRequest.andCall(function() {
-            return q.defer().promise;
+            return Promise.defer().promise;
         });
         client._http.authedRequestWithPrefix.andCall(function() {
-            return q.defer().promise;
+            return Promise.defer().promise;
         });
     });
 
