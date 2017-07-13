@@ -247,11 +247,10 @@ Crypto.prototype.uploadDeviceKeys = function() {
 };
 
 /**
- * Stores the value transmitted by the server to be handled later in
- * through a call of _onSyncCompleted()
+ * Stores the current key count which will be handled postponed (in a call of
+ * _onSyncCompleted)
  *
- * @param {Number} currentKeyCount to be stored and handled later with a call
- * of _onSyncCompleted()
+ * @param {Number} currentKeyCount to be stored and handled later
  */
 Crypto.prototype.updateCurrentKeyCount = function(currentKeyCount) {
     if (isFinite(currentKeyCount)) {
@@ -280,7 +279,9 @@ function _maybeUploadOneTimeKeys(crypto) {
        ) {
         // we've done a key upload recently.
         if (crypto._currentKeyCount === undefined) {
-            // this._currentKeyCount is not set so handling of it is not postponed.
+            // there was no /sync-response which sets this value so we return here.
+            // This is to be backwards compatible for servers which do not respond
+            // this value.
             return;
         }
     }
@@ -307,7 +308,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         if (crypto._currentKeyCount !== undefined) {
             // this._currentKeyCount and the handling got postponed. Use this value
             // instead of asking the server for the current key count
-            return q(crypto._currentKeyCount);
+            return Promise.resolve(crypto._currentKeyCount);
         }
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
@@ -347,6 +348,8 @@ function _maybeUploadOneTimeKeys(crypto) {
     }).catch((e) => {
         console.error("Error uploading one-time keys", e.stack || e);
     }).finally(() => {
+        // reset _currentKeyCount to prevent start uploading based on old data.
+        // it will be set again on the next /sync-response
         crypto._currentKeyCount = undefined;
         crypto._oneTimeKeyCheckInProgress = false;
     }).done();

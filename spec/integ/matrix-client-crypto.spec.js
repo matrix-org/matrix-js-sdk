@@ -529,20 +529,19 @@ describe("MatrixClient crypto", function() {
         const syncDataEmpty = {
             next_batch: "d",
             device_one_time_keys_count: {
-                signed_curve25519: 0
+                signed_curve25519: 0,
             },
         };
         const syncDataFull = {
             next_batch: "e",
             device_one_time_keys_count: {
-                signed_curve25519: 70
+                signed_curve25519: 70,
             },
         };
 
         bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
         return Promise.resolve()
             .then(() => bobTestClient.start())
-            .then(() => bobTestClient.flushSync())
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
             .then((keys) => {
                 expect(Object.keys(keys).length).toEqual(5);
@@ -551,11 +550,14 @@ describe("MatrixClient crypto", function() {
                 bobTestClient.httpBackend.when("POST", "/keys/upload")
                     .respond(200, (path, content) => {
                         // This endpoint should now not be called anymore
-                        expect(2).toBe(3);
+                        expect(2).toEqual(3);
                     });
-                bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncFull);
+                bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncDataFull);
             })
-            .then(() => bobTestClient.httpBackend.flush('/sync', 2));
+            .then(() => bobTestClient.httpBackend.flush('/sync', 2).then((flushed) => {
+                expect(flushed).toEqual(2);
+            }))
+            .done();
             // As the key store assumes to be full there should be two syncs in a row
     });
 
