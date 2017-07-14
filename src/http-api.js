@@ -134,6 +134,10 @@ module.exports.MatrixHttpApi.prototype = {
      *    invoke on success/failure. See the promise return values for more
      *    information.
      *
+     * @param {Function=} opts.progressHandler Optional. Called when a chunk of
+     *    data has been uploaded, with an object containing the fields `loaded`
+     *    (number of bytes transferred) and `total` (total size, if known).
+     *
      * @return {module:client.Promise} Resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
@@ -260,7 +264,12 @@ module.exports.MatrixHttpApi.prototype = {
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;
                 xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
-                defer.notify(ev);
+                if (opts.progressHandler) {
+                    opts.progressHandler({
+                        loaded: ev.loaded,
+                        total: ev.total,
+                    });
+                }
             });
             let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
             url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
