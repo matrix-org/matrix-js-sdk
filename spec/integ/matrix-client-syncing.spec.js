@@ -724,30 +724,18 @@ describe("MatrixClient syncing", function() {
     });
 
     /**
-     * waits for the MatrixClient to emit one or more 'sync' events. resolves to the
-     * latest sync state.
+     * waits for the MatrixClient to emit one or more 'sync' events.
      *
      * @param {Number?} numSyncs number of syncs to wait for
-     * @return {Promise<string>}
      */
     async function awaitSyncEvent(numSyncs) {
         if (numSyncs === undefined) {
             numSyncs = 1;
         }
 
-        function wait() {
-            return new Promise((resolve, reject) => {
-                client.once("sync", (state, prevState, data) => {
-                    resolve(state);
-                });
-            });
-        }
-
-        let lastState = undefined;
         while (numSyncs > 0) {
-            lastState = await wait();
-            numSyncs --;
+            await utils.syncPromise(client);
+            numSyncs--;
         }
-        return lastState;
     }
 });
