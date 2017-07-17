@@ -22,9 +22,9 @@ import './olm-loader';
 
 import sdk from '..';
 import testUtils from './test-utils';
-import MockHttpBackend from './mock-request';
+import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -78,7 +78,7 @@ TestClient.prototype.start = function() {
         pendingEventOrdering: 'detached',
     });
 
-    return this.httpBackend.flush().then(() => {
+    return this.httpBackend.flushAllExpected().then(() => {
         console.log(this + ': started');
     });
 };
@@ -119,7 +119,7 @@ TestClient.prototype.expectDeviceKeyUpload = function() {
 TestClient.prototype.awaitOneTimeKeyUpload = function() {
     if (Object.keys(this.oneTimeKeys).length != 0) {
         // already got one-time keys
-        return q(this.oneTimeKeys);
+        return Promise.resolve(this.oneTimeKeys);
     }
 
     this.httpBackend.when("POST", "/keys/upload")
@@ -187,4 +187,17 @@ TestClient.prototype.getDeviceKey = function() {
 TestClient.prototype.getSigningKey = function() {
     const keyId = 'ed25519:' + this.deviceId;
     return this.deviceKeys.keys[keyId];
+};
+
+/**
+ * flush a single /sync request, and wait for the syncing event
+ *
+ * @returns {Promise} promise which completes once the sync has been flushed
+ */
+TestClient.prototype.flushSync = function() {
+    console.log(`${this}: flushSync`);
+    return Promise.all([
+        this.httpBackend.flush('/sync', 1),
+        testUtils.syncPromise(this.client),
+    ]);
 };

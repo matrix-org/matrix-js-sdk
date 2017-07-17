@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from "q";
+import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
@@ -44,7 +44,7 @@ function createDatabase(db) {
  */
 function selectQuery(store, keyRange, resultMapper) {
     const query = store.openCursor(keyRange);
-    return q.Promise((resolve, reject) => { /*eslint new-cap: 0*/
+    return new Promise((resolve, reject) => {
         const results = [];
         query.onerror = (event) => {
             reject(new Error("Query failed: " + event.target.errorCode));
@@ -63,7 +63,7 @@ function selectQuery(store, keyRange, resultMapper) {
 }
 
 function promiseifyTxn(txn) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
             resolve(event);
         };
@@ -74,7 +74,7 @@ function promiseifyTxn(txn) {
 }
 
 function promiseifyRequest(req) {
-    return new q.Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         req.onsuccess = function(event) {
             resolve(event);
         };
@@ -113,7 +113,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     connect: function() {
         if (this.db) {
-            return q();
+            return Promise.resolve();
         }
         const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
@@ -143,7 +143,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves on success
      */
     _init: function() {
-        return q.all([
+        return Promise.all([
             this._loadAccountData(),
             this._loadSyncData(),
         ]).then(([accountData, syncData]) => {
@@ -163,7 +163,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        return new q.Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             console.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this.indexedDB.deleteDatabase(this._dbName);
 
@@ -204,18 +204,18 @@ LocalIndexedDBStoreBackend.prototype = {
         if (copy === undefined) copy = true;
 
         const data = this._syncAccumulator.getJSON();
-        if (!data.nextBatch) return q(null);
+        if (!data.nextBatch) return Promise.resolve(null);
         if (copy) {
             // We must deep copy the stored data so that the /sync processing code doesn't
             // corrupt the internal state of the sync accumulator (it adds non-clonable keys)
-            return q(utils.deepCopy(data));
+            return Promise.resolve(utils.deepCopy(data));
         } else {
-            return q(data);
+            return Promise.resolve(data);
         }
     },
 
     setSyncData: function(syncData) {
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             this._syncAccumulator.accumulate(syncData);
         });
     },
@@ -223,7 +223,7 @@ LocalIndexedDBStoreBackend.prototype = {
     syncToDatabase: function(userTuples) {
         const syncData = this._syncAccumulator.getJSON();
 
-        return q.all([
+        return Promise.all([
             this._persistUserPresenceEvents(userTuples),
             this._persistAccountData(syncData.accountData),
             this._persistSyncData(syncData.nextBatch, syncData.roomsData),
@@ -238,7 +238,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _persistSyncData: function(nextBatch, roomsData) {
         console.log("Persisting sync data up to ", nextBatch);
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
@@ -257,7 +257,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the events were persisted.
      */
     _persistAccountData: function(accountData) {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
@@ -276,7 +276,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     _persistUserPresenceEvents: function(tuples) {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
@@ -296,7 +296,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
     getUserPresenceEvents: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
@@ -310,7 +310,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of raw global account events.
      */
     _loadAccountData: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
@@ -324,7 +324,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
     _loadSyncData: function() {
-        return q.try(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {

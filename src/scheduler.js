@@ -20,7 +20,7 @@ limitations under the License.
  * @module scheduler
  */
 const utils = require("./utils");
-const q = require("q");
+import Promise from 'bluebird';
 
 const DEBUG = false;  // set true to enable console logging.
 
@@ -83,6 +83,8 @@ MatrixScheduler.prototype.removeEventFromQueue = function(event) {
     let removed = false;
     utils.removeElement(this._queues[name], function(element) {
         if (element.event.getId() === event.getId()) {
+            // XXX we should probably reject the promise?
+            // https://github.com/matrix-org/matrix-js-sdk/issues/496
             removed = true;
             return true;
         }
@@ -118,7 +120,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    const defer = q.defer();
+    const defer = Promise.defer();
     this._queues[queueName].push({
         event: event,
         defer: defer,

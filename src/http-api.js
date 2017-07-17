@@ -18,7 +18,9 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  * @module http-api
  */
-const q = require("q");
+import Promise from 'bluebird';
+const parseContentType = require('content-type').parse;
+
 const utils = require("./utils");
 
 // we use our own implementation of setTimeout, so that if we get suspended in
@@ -64,7 +66,7 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {string} opts.prefix Required. The matrix client prefix to use, e.g.
  * '/_matrix/client/r0'. See PREFIX_R0 and PREFIX_UNSTABLE for constants.
  *
- * @param {bool=} opts.onlyData True to return only the 'data' component of the
+ * @param {boolean} opts.onlyData True to return only the 'data' component of the
  * response (e.g. the parsed HTTP body). If false, requests will return an
  * object with the properties <tt>code</tt>, <tt>headers</tt> and <tt>data</tt>.
  *
@@ -74,12 +76,15 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * requests.
  * @param {Number=} opts.localTimeoutMs The default maximum amount of time to wait
  * before timing out the request. If not specified, there is no timeout.
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
  */
 module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
     this.event_emitter = event_emitter;
     this.opts = opts;
+    this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
     this.uploads = [];
 };
 
@@ -128,6 +133,10 @@ module.exports.MatrixHttpApi.prototype = {
      * @param {Function=} opts.callback Deprecated. Optional. The callback to
      *    invoke on success/failure. See the promise return values for more
      *    information.
+     *
+     * @param {Function=} opts.progressHandler Optional. Called when a chunk of
+     *    data has been uploaded, with an object containing the fields `loaded`
+     *    (number of bytes transferred) and `total` (total size, if known).
      *
      * @return {module:client.Promise} Resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
@@ -214,7 +223,7 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         if (global.XMLHttpRequest) {
-            const defer = q.defer();
+            const defer = Promise.defer();
             const xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
@@ -255,7 +264,12 @@ module.exports.MatrixHttpApi.prototype = {
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;
                 xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
-                defer.notify(ev);
+                if (opts.progressHandler) {
+                    opts.progressHandler({
+                        loaded: ev.loaded,
+                        total: ev.total,
+                    });
+                }
             });
             let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
             url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
@@ -338,7 +352,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts.form = params;
         }
 
-        const defer = q.defer();
+        const defer = Promise.defer();
         this.opts.request(
             opts,
             requestCallback(defer, callback, this.opts.onlyData),
@@ -397,7 +411,8 @@ module.exports.MatrixHttpApi.prototype = {
      *
      * @param {Object} data The HTTP JSON body.
      *
-     * @param {Object=} opts additional options
+     * @param {Object|Number=} opts additional options. If a number is specified,
+     * this is treated as `opts.localTimeoutMs`.
      *
      * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
@@ -418,16 +433,37 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
-        if (!queryParams.access_token) {
-            queryParams.access_token = this.opts.accessToken;
+        if (this.useAuthorizationHeader) {
+            if (isFinite(opts)) {
+                // opts used to be localTimeoutMs
+                opts = {
+                    localTimeoutMs: opts,
+                };
+            }
+            if (!opts) {
+                opts = {};
+            }
+            if (!opts.headers) {
+                opts.headers = {};
+            }
+            if (!opts.headers.Authorization) {
+                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+            }
+            if (queryParams.access_token) {
+                delete queryParams.access_token;
+            }
+        } else {
+            if (!queryParams.access_token) {
+                queryParams.access_token = this.opts.accessToken;
+            }
         }
 
-        const request_promise = this.request(
+        const requestPromise = this.request(
             callback, method, path, queryParams, data, opts,
         );
 
         const self = this;
-        request_promise.catch(function(err) {
+        requestPromise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
             }
@@ -435,7 +471,7 @@ module.exports.MatrixHttpApi.prototype = {
 
         // return the original promise, otherwise tests break due to it having to
         // go around the event loop one more time to process the result of the request
-        return request_promise;
+        return requestPromise;
     },
 
     /**
@@ -656,9 +692,33 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
+        const headers = utils.extend({}, opts.headers || {});
         const json = opts.json === undefined ? true : opts.json;
+        let bodyParser = opts.bodyParser;
 
-        const defer = q.defer();
+        // we handle the json encoding/decoding here, because request and
+        // browser-request make a mess of it. Specifically, they attempt to
+        // json-decode plain-text error responses, which in turn means that the
+        // actual error gets swallowed by a SyntaxError.
+
+        if (json) {
+            if (data) {
+                data = JSON.stringify(data);
+                headers['content-type'] = 'application/json';
+            }
+
+            if (!headers['accept']) {
+                headers['accept'] = 'application/json';
+            }
+
+            if (bodyParser === undefined) {
+                bodyParser = function(rawBody) {
+                    return JSON.parse(rawBody);
+                };
+            }
+        }
+
+        const defer = Promise.defer();
 
         let timeoutId;
         let timedOut = false;
@@ -695,7 +755,7 @@ module.exports.MatrixHttpApi.prototype = {
                     withCredentials: false,
                     qs: queryParams,
                     body: data,
-                    json: json,
+                    json: false,
                     timeout: localTimeoutMs,
                     headers: opts.headers || {},
                     _matrix_opts: this.opts,
@@ -708,13 +768,9 @@ module.exports.MatrixHttpApi.prototype = {
                         }
                     }
 
-                    // if json is falsy, we won't parse any error response, so need
-                    // to do so before turning it into a MatrixError
-                    const parseErrorJson = !json;
                     const handlerFn = requestCallback(
                         defer, callback, self.opts.onlyData,
-                        parseErrorJson,
-                        opts.bodyParser,
+                        bodyParser,
                     );
                     handlerFn(err, response, body);
                 },
@@ -751,15 +807,18 @@ module.exports.MatrixHttpApi.prototype = {
  * that will either resolve or reject the given defer as well as invoke the
  * given userDefinedCallback (if any).
  *
- * If onlyData is true, the defer/callback is invoked with the body of the
- * response, otherwise the result code.
+ * HTTP errors are transformed into javascript errors and the deferred is rejected.
  *
- * If parseErrorJson is true, we will JSON.parse the body if we get a 4xx error.
+ * If bodyParser is given, it is used to transform the body of the successful
+ * responses before passing to the defer/callback.
+ *
+ * If onlyData is true, the defer/callback is invoked with the body of the
+ * response, otherwise the result object (with `code` and `data` fields)
  *
  */
 const requestCallback = function(
     defer, userDefinedCallback, onlyData,
-    parseErrorJson, bodyParser,
+    bodyParser,
 ) {
     userDefinedCallback = userDefinedCallback || function() {};
 
@@ -767,19 +826,12 @@ const requestCallback = function(
         if (!err) {
             try {
                 if (response.statusCode >= 400) {
-                    if (parseErrorJson) {
-                        // we won't have json-decoded the response.
-                        body = JSON.parse(body);
-                    }
-                    err = new module.exports.MatrixError(body);
+                    err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
                     body = bodyParser(body);
                 }
             } catch (e) {
-                err = e;
-            }
-            if (err) {
-                err.httpStatus = response.statusCode;
+                err = new Error(`Error parsing server response: ${e}`);
             }
         }
 
@@ -789,6 +841,9 @@ const requestCallback = function(
         } else {
             const res = {
                 code: response.statusCode,
+
+                // XXX: why do we bother with this? it doesn't work for
+                // XMLHttpRequest, so clearly we don't use it.
                 headers: response.headers,
                 data: body,
             };
@@ -797,6 +852,67 @@ const requestCallback = function(
         }
     };
 };
+
+/**
+ * Attempt to turn an HTTP error response into a Javascript Error.
+ *
+ * If it is a JSON response, we will parse it into a MatrixError. Otherwise
+ * we return a generic Error.
+ *
+ * @param {XMLHttpRequest|http.IncomingMessage} response response object
+ * @param {String} body raw body of the response
+ * @returns {Error}
+ */
+function parseErrorResponse(response, body) {
+    const httpStatus = response.statusCode;
+    const contentType = getResponseContentType(response);
+
+    let err;
+    if (contentType) {
+        if (contentType.type === 'application/json') {
+            err = new module.exports.MatrixError(JSON.parse(body));
+        } else if (contentType.type === 'text/plain') {
+            err = new Error(`Server returned ${httpStatus} error: ${body}`);
+        }
+    }
+
+    if (!err) {
+        err = new Error(`Server returned ${httpStatus} error`);
+    }
+    err.httpStatus = httpStatus;
+    return err;
+}
+
+
+/**
+ * extract the Content-Type header from the response object, and
+ * parse it to a `{type, parameters}` object.
+ *
+ * returns null if no content-type header could be found.
+ *
+ * @param {XMLHttpRequest|http.IncomingMessage} response response object
+ * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
+ */
+function getResponseContentType(response) {
+    let contentType;
+    if (response.getResponseHeader) {
+        // XMLHttpRequest provides getResponseHeader
+        contentType = response.getResponseHeader("Content-Type");
+    } else if (response.headers) {
+        // request provides http.IncomingMessage which has a message.headers map
+        contentType = response.headers['content-type'] || null;
+    }
+
+    if (!contentType) {
+        return null;
+    }
+
+    try {
+        return parseContentType(contentType);
+    } catch(e) {
+        throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
+    }
+}
 
 /**
  * Construct a Matrix error. This is a JavaScript Error with additional

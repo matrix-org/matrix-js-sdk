@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from 'q';
+import Promise from 'bluebird';
 
 import utils from '../../utils';
 
@@ -38,7 +38,7 @@ export default class MemoryCryptoStore {
      * @returns {Promise} Promise which resolves when the store has been cleared.
      */
     deleteAllData() {
-        return q();
+        return Promise.resolve();
     }
 
     /**
@@ -54,8 +54,10 @@ export default class MemoryCryptoStore {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        // first see if we already have an entry for this request.
-        return this.getOutgoingRoomKeyRequest(requestBody).then((existing) => {
+        return Promise.try(() => {
+            // first see if we already have an entry for this request.
+            const existing = this._getOutgoingRoomKeyRequest(requestBody);
+
             if (existing) {
                 // this entry matches the request - return it.
                 console.log(
@@ -88,12 +90,27 @@ export default class MemoryCryptoStore {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
+        return Promise.resolve(this._getOutgoingRoomKeyRequest(requestBody));
+    }
+
+    /**
+     * Looks for existing room key request, and returns the result synchronously.
+     *
+     * @internal
+     *
+     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     *    existing request to look for
+     *
+     * @return {module:crypto/store/base~OutgoingRoomKeyRequest?}
+     *    the matching request, or null if not found
+     */
+    _getOutgoingRoomKeyRequest(requestBody) {
         for (const existing of this._outgoingRoomKeyRequests) {
             if (utils.deepCompare(existing.requestBody, requestBody)) {
-                return q(existing);
+                return existing;
             }
         }
-        return q(null);
+        return null;
     }
 
     /**
@@ -109,11 +126,11 @@ export default class MemoryCryptoStore {
         for (const req of this._outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
                 if (req.state === state) {
-                    return q(req);
+                    return Promise.resolve(req);
                 }
             }
         }
-        return q(null);
+        return Promise.resolve(null);
     }
 
     /**
@@ -139,13 +156,13 @@ export default class MemoryCryptoStore {
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${req.state}`,
                 );
-                return q(null);
+                return Promise.resolve(null);
             }
             Object.assign(req, updates);
-            return q(req);
+            return Promise.resolve(req);
         }
 
-        return q(null);
+        return Promise.resolve(null);
     }
 
     /**
@@ -170,13 +187,13 @@ export default class MemoryCryptoStore {
                     `Cannot delete room key request in state ${req.state} `
                     + `(expected ${expectedState})`,
                 );
-                return q(null);
+                return Promise.resolve(null);
             }
 
             this._outgoingRoomKeyRequests.splice(i, 1);
-            return q(req);
+            return Promise.resolve(req);
         }
 
-        return q(null);
+        return Promise.resolve(null);
     }
 }

@@ -1,6 +1,6 @@
 "use strict";
 import expect from 'expect';
-import q from 'q';
+import Promise from 'bluebird';
 
 // load olm before the sdk if possible
 import './olm-loader';
@@ -15,7 +15,7 @@ const MatrixEvent = sdk.MatrixEvent;
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
 module.exports.syncPromise = function(client) {
-    const def = q.defer();
+    const def = Promise.defer();
     const cb = (state) => {
         if (state == 'SYNCING') {
             def.resolve();
@@ -178,35 +178,6 @@ module.exports.mkMessage = function(opts) {
         body: opts.msg,
     };
     return module.exports.mkEvent(opts);
-};
-
-
-/**
- * make the test fail, with the given exception
- *
- * <p>This is useful for use with integration tests which use asyncronous
- * methods: it can be added as a 'catch' handler in a promise chain.
- *
- * @param {Error} err   exception to be reported
- *
- * @deprecated
- * It turns out there are easier ways of doing this. Just use nodeify():
- *
- * it("should not throw", function(done) {
- *    asynchronousMethod().then(function() {
- *       // some tests
- *    }).nodeify(done);
- * });
- *
- * @example
- * it("should not throw", function(done) {
- *    asynchronousMethod().then(function() {
- *       // some tests
- *    }).catch(utils.failTest).done(done);
- * });
- */
-module.exports.failTest = function(err) {
-    expect(true).toBe(false, "Testfunc threw: " + err.stack);
 };
 
 

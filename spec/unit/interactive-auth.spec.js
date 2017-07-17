@@ -16,7 +16,7 @@ limitations under the License.
 "use strict";
 
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const utils = require("../test-utils");
 
@@ -81,14 +81,14 @@ describe("InteractiveAuth", function() {
                 type: "logintype",
                 foo: "bar",
             });
-            return q(requestRes);
+            return Promise.resolve(requestRes);
         });
 
         ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(1);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 
     it("should make a request if no authdata is provided", function(done) {
@@ -138,7 +138,7 @@ describe("InteractiveAuth", function() {
                     type: "logintype",
                     foo: "bar",
                 });
-                return q(requestRes);
+                return Promise.resolve(requestRes);
             });
 
             ia.submitAuthDict({
@@ -151,6 +151,6 @@ describe("InteractiveAuth", function() {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(2);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).catch(utils.failTest).done(done);
+        }).nodeify(done);
     });
 });

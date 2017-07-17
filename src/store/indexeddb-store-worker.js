@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from "q";
+import Promise from 'bluebird';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 
 /**
@@ -61,7 +61,7 @@ class IndexedDBStoreWorker {
                     // because it's a web worker and there is no window).
                     indexedDB, msg.args[0],
                 );
-                prom = q();
+                prom = Promise.resolve();
                 break;
             case 'connect':
                 prom = this.backend.connect();

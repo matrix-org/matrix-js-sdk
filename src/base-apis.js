@@ -54,6 +54,8 @@ const utils = require("./utils");
  * to all requests with this client. Useful for application services which require
  * <code>?user_id=</code>.
  *
+ * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
+ * Authorization header instead of query param to send the access token to the server.
  */
 function MatrixBaseApis(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
@@ -70,6 +72,7 @@ function MatrixBaseApis(opts) {
         onlyData: true,
         extraParams: opts.queryParams,
         localTimeoutMs: opts.localTimeoutMs,
+        useAuthorizationHeader: opts.useAuthorizationHeader,
     };
     this._http = new httpApi.MatrixHttpApi(this, httpOpts);
 
@@ -396,6 +399,39 @@ MatrixBaseApis.prototype.createRoom = function(options, callback) {
 MatrixBaseApis.prototype.roomState = function(roomId, callback) {
     const path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
     return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group summary object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/summary", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @return {module:client.Promise} Resolves: The groups to which the user is joined
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedGroups = function() {
+    const path = utils.encodeUri("/joined_groups");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {Object} content Request content
+ * @param {string} content.localpart The local part of the desired group ID
+ * @param {Object} content.profile Group profile object
+ * @return {module:client.Promise} Resolves: Object with key group_id: id of the created group
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.createGroup = function(content) {
+    const path = utils.encodeUri("/create_group");
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, content,
+    );
 };
 
 /**
@@ -734,6 +770,10 @@ MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
  * @param {Function=} opts.callback Deprecated. Optional. The callback to
  *    invoke on success/failure. See the promise return values for more
  *    information.
+ *
+ * @param {Function=} opts.progressHandler Optional. Called when a chunk of
+ *    data has been uploaded, with an object containing the fields `loaded`
+ *    (number of bytes transferred) and `total` (total size, if known).
  *
  * @return {module:client.Promise} Resolves to response object, as
  *    determined by this.opts.onlyData, opts.rawResponse, and
@@ -1326,7 +1366,15 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
     return this._http.authedRequestWithPrefix(
         undefined, "GET", "/thirdparty/protocols", undefined, undefined,
         httpApi.PREFIX_UNSTABLE,
-    );
+    ).then((response) => {
+        // sanity check
+        if (!response || typeof(response) !== 'object') {
+            throw new Error(
+                `/thirdparty/protocols did not return an object: ${response}`,
+            );
+        }
+        return response;
+    });
 };
 
 /**

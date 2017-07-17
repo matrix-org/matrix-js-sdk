@@ -1,12 +1,13 @@
 "use strict";
 import 'source-map-support/register';
 const sdk = require("../..");
-const HttpBackend = require("../mock-request");
+const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
 import expect from 'expect';
+import Promise from 'bluebird';
 
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
@@ -52,7 +53,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -66,7 +67,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -114,7 +115,7 @@ describe("MatrixClient syncing", function() {
             };
         });
 
-        it("should resolve incoming invites from /sync", function(done) {
+        it("should resolve incoming invites from /sync", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
@@ -133,17 +134,20 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Boss");
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false),
                 ).toBeTruthy();
-                done();
             });
         });
 
-        it("should use cached values from m.presence wherever possible", function(done) {
+        it("should use cached values from m.presence wherever possible", function() {
             syncData.presence.events = [
                 utils.mkPresence({
                     user: userC, presence: "online", name: "The Ghost",
@@ -161,14 +165,16 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Ghost");
-                done();
             });
         });
 
-        it("should result in events on the room member firing", function(done) {
+        it("should result in events on the room member firing", function() {
             syncData.presence.events = [
                 utils.mkPresence({
                     user: userC, presence: "online", name: "The Ghost",
@@ -193,13 +199,15 @@ describe("MatrixClient syncing", function() {
                 resolveInvitesToProfiles: true,
             });
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 expect(latestFiredName).toEqual("The Ghost");
-                done();
             });
         });
 
-        it("should no-op if resolveInvitesToProfiles is not set", function(done) {
+        it("should no-op if resolveInvitesToProfiles is not set", function() {
             syncData.rooms.join[roomOne].state.events.push(
                 utils.mkMembership({
                     room: roomOne, mship: "invite", user: userC,
@@ -210,13 +218,15 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const member = client.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual(userC);
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false),
                 ).toBe(null);
-                done();
             });
         });
     });
@@ -237,15 +247,17 @@ describe("MatrixClient syncing", function() {
         };
 
         it("should create users for presence events from /sync",
-        function(done) {
+        function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 expect(client.getUser(userA).presence).toEqual("online");
                 expect(client.getUser(userB).presence).toEqual("unavailable");
-                done();
             });
         });
     });
@@ -356,57 +368,66 @@ describe("MatrixClient syncing", function() {
             },
         };
 
-        it("should continually recalculate the right room name.", function(done) {
+        it("should continually recalculate the right room name.", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(2),
+            ]).then(function() {
                 const room = client.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(
                     nextSyncData.rooms.join[roomOne].state.events[0].content.name,
                 );
-                done();
             });
         });
 
-        it("should store the right events in the timeline.", function(done) {
+        it("should store the right events in the timeline.", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(2),
+            ]).then(function() {
                 const room = client.getRoom(roomTwo);
                 // should have added the message from /events
                 expect(room.timeline.length).toEqual(2);
                 expect(room.timeline[1].getContent().body).toEqual(msgText);
-                done();
             });
         });
 
-        it("should set the right room name.", function(done) {
+        it("should set the right room name.", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(2),
+            ]).then(function() {
                 const room = client.getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
-                done();
             });
         });
 
-        it("should set the right user's typing flag.", function(done) {
+        it("should set the right user's typing flag.", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(2),
+            ]).then(function() {
                 const room = client.getRoom(roomTwo);
                 let member = room.getMember(otherUserId);
                 expect(member).toBeTruthy();
@@ -414,7 +435,6 @@ describe("MatrixClient syncing", function() {
                 member = room.getMember(selfUserId);
                 expect(member).toBeTruthy();
                 expect(member.typing).toEqual(false);
-                done();
             });
         });
 
@@ -449,10 +469,10 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
-            httpBackend.flush();
+            return httpBackend.flushAllExpected();
         });
 
-        it("should set the back-pagination token on new rooms", function(done) {
+        it("should set the back-pagination token on new rooms", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -472,16 +492,18 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            httpBackend.flush().then(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const room = client.getRoom(roomTwo);
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
-                done();
-            }).catch(utils.failTest).done();
+            });
         });
 
-        it("should set the back-pagination token on gappy syncs", function(done) {
+        it("should set the back-pagination token on gappy syncs", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -512,13 +534,15 @@ describe("MatrixClient syncing", function() {
                 expect(tok).toEqual("newerTok");
             });
 
-            httpBackend.flush().then(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const room = client.getRoom(roomOne);
                 const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
                 expect(resetCallCount).toEqual(1);
-                done();
-            }).catch(utils.failTest).done();
+            });
         });
     });
 
@@ -571,7 +595,7 @@ describe("MatrixClient syncing", function() {
             };
         });
 
-        it("should sync receipts from /sync.", function(done) {
+        it("should sync receipts from /sync.", function() {
             const ackEvent = syncData.rooms.join[roomOne].timeline.events[0];
             const receipt = {};
             receipt[ackEvent.event_id] = {
@@ -589,7 +613,10 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(function() {
                 const room = client.getRoom(roomOne);
                 expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
                     type: "m.read",
@@ -598,7 +625,6 @@ describe("MatrixClient syncing", function() {
                         ts: 176592842636,
                     },
                 }]);
-                done();
             });
         });
     });
@@ -618,7 +644,7 @@ describe("MatrixClient syncing", function() {
         beforeEach(function(done) {
             client.startClient();
 
-            httpBackend.flush().then(function() {
+            httpBackend.flushAllExpected().then(function() {
                 // the /sync call from syncLeftRooms ends up in the request
                 // queue behind the call from the running client; add a response
                 // to flush the client's one out.
@@ -628,29 +654,34 @@ describe("MatrixClient syncing", function() {
             });
         });
 
-        it("should create and use an appropriate filter", function(done) {
+        it("should create and use an appropriate filter", function() {
             httpBackend.when("POST", "/filter").check(function(req) {
                 expect(req.data).toEqual({
                     room: { timeline: {limit: 1},
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
+            const defer = Promise.defer();
+
             httpBackend.when("GET", "/sync").check(function(req) {
                 expect(req.queryParams.filter).toEqual("another_id");
-                done();
+                defer.resolve();
             }).respond(200, {});
 
             client.syncLeftRooms();
 
             // first flush the filter request; this will make syncLeftRooms
             // make its /sync call
-            httpBackend.flush("/filter").then(function() {
-                // flush the syncs
-                return httpBackend.flush();
-            }).catch(utils.failTest);
+            return Promise.all([
+                httpBackend.flush("/filter").then(function() {
+                    // flush the syncs
+                    return httpBackend.flushAllExpected();
+                }),
+                defer.promise,
+            ]);
         });
 
-        it("should set the back-pagination token on left rooms", function(done) {
+        it("should set the back-pagination token on left rooms", function() {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
@@ -675,20 +706,37 @@ describe("MatrixClient syncing", function() {
 
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
-            client.syncLeftRooms().then(function() {
-                const room = client.getRoom(roomTwo);
-                const tok = room.getLiveTimeline().getPaginationToken(
-                    EventTimeline.BACKWARDS);
+            return Promise.all([
+                client.syncLeftRooms().then(function() {
+                    const room = client.getRoom(roomTwo);
+                    const tok = room.getLiveTimeline().getPaginationToken(
+                        EventTimeline.BACKWARDS);
 
-                expect(tok).toEqual("pagTok");
-                done();
-            }).catch(utils.failTest).done();
+                    expect(tok).toEqual("pagTok");
+                }),
 
-            // first flush the filter request; this will make syncLeftRooms
-            // make its /sync call
-            httpBackend.flush("/filter").then(function() {
-                return httpBackend.flush();
-            }).catch(utils.failTest);
+                // first flush the filter request; this will make syncLeftRooms
+                // make its /sync call
+                httpBackend.flush("/filter").then(function() {
+                    return httpBackend.flushAllExpected();
+                }),
+            ]);
         });
     });
+
+    /**
+     * waits for the MatrixClient to emit one or more 'sync' events.
+     *
+     * @param {Number?} numSyncs number of syncs to wait for
+     */
+    async function awaitSyncEvent(numSyncs) {
+        if (numSyncs === undefined) {
+            numSyncs = 1;
+        }
+
+        while (numSyncs > 0) {
+            await utils.syncPromise(client);
+            numSyncs--;
+        }
+    }
 });

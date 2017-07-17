@@ -17,7 +17,7 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-const q = require("q");
+import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");
@@ -115,11 +115,11 @@ InteractiveAuth.prototype = {
      *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
-        this._completionDeferred = q.defer();
+        this._completionDeferred = Promise.defer();
 
         // wrap in a promise so that if _startNextAuthStage
         // throws, it rejects the promise in a consistent way
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
@@ -258,12 +258,12 @@ InteractiveAuth.prototype = {
 
         // hackery to make sure that synchronous exceptions end up in the catch
         // handler (without the additional event loop entailed by q.fcall or an
-        // extra q().then)
+        // extra Promise.resolve().then)
         let prom;
         try {
             prom = this._requestCallback(auth, background);
         } catch (e) {
-            prom = q.reject(e);
+            prom = Promise.reject(e);
         }
 
         prom = prom.then(

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from "q";
+import Promise from 'bluebird';
 import {MatrixInMemoryStore} from "./memory";
 import utils from "../utils";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
@@ -115,7 +115,7 @@ utils.inherits(IndexedDBStore, MatrixInMemoryStore);
   */
 IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
-        return q();
+        return Promise.resolve();
     }
 
     return this.backend.connect().then(() => {
@@ -164,7 +164,7 @@ IndexedDBStore.prototype.save = function() {
     if (now - this._syncTs > WRITE_DELAY_MS) {
         return this._reallySave();
     }
-    return q();
+    return Promise.resolve();
 };
 
 IndexedDBStore.prototype._reallySave = function() {

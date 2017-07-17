@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import q from "q";
+import Promise from 'bluebird';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web
@@ -96,9 +96,9 @@ RemoteIndexedDBStoreBackend.prototype = {
     _doCmd: function(cmd, args) {
         // wrap in a q so if the postMessage throws,
         // the promise automatically gets rejected
-        return q().then(() => {
+        return Promise.resolve().then(() => {
             const seq = this._nextSeq++;
-            const def = q.defer();
+            const def = Promise.defer();
 
             this._inFlight[seq] = def;
 

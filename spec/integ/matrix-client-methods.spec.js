@@ -1,7 +1,7 @@
 "use strict";
 import 'source-map-support/register';
 const sdk = require("../..");
-const HttpBackend = require("../mock-request");
+const HttpBackend = require("matrix-mock-request");
 const publicGlobals = require("../../lib/matrix");
 const Room = publicGlobals.Room;
 const MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
@@ -49,13 +49,16 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
-                expect(req.data).toEqual(buf);
+                expect(req.rawData).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
-                expect(req.queryParams.access_token).toEqual(accessToken);
+                if (!(req.queryParams.access_token == accessToken ||
+                        req.headers["Authorization"] == "Bearer " + accessToken)) {
+                    expect(true).toBe(false);
+                }
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 expect(req.opts.json).toBeFalsy();
                 expect(req.opts.timeout).toBe(undefined);
-            }).respond(200, "content");
+            }).respond(200, "content", true);
 
             const prom = client.uploadContent({
                 stream: buf,
@@ -76,7 +79,7 @@ describe("MatrixClient", function() {
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -86,7 +89,7 @@ describe("MatrixClient", function() {
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
                 expect(req.opts.json).toBeFalsy();
-            }).respond(200, JSON.stringify({ "content_uri": "uri" }));
+            }).respond(200, { "content_uri": "uri" });
 
             client.uploadContent({
                 stream: buf,
@@ -96,22 +99,21 @@ describe("MatrixClient", function() {
                 rawResponse: false,
             }).then(function(response) {
                 expect(response.content_uri).toEqual("uri");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
 
         it("should parse errors into a MatrixError", function(done) {
-            // opts.json is false, so request returns unparsed json.
             httpBackend.when(
                 "POST", "/_matrix/media/v1/upload",
             ).check(function(req) {
-                expect(req.data).toEqual(buf);
+                expect(req.rawData).toEqual(buf);
                 expect(req.opts.json).toBeFalsy();
-            }).respond(400, JSON.stringify({
+            }).respond(400, {
                 "errcode": "M_SNAFU",
                 "error": "broken",
-            }));
+            });
 
             client.uploadContent({
                 stream: buf,
@@ -123,7 +125,7 @@ describe("MatrixClient", function() {
                 expect(error.httpStatus).toEqual(400);
                 expect(error.errcode).toEqual("M_SNAFU");
                 expect(error.message).toEqual("broken");
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -147,7 +149,7 @@ describe("MatrixClient", function() {
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             const r = client.cancelUpload(prom);
             expect(r).toBe(true);
@@ -379,7 +381,7 @@ describe("MatrixClient", function() {
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
 
             httpBackend.flush();
         });
@@ -396,7 +398,7 @@ describe("MatrixClient", function() {
 
             client.deleteDevice(
                 "my_device", auth,
-            ).catch(utils.failTest).done(done);
+            ).nodeify(done);
 
             httpBackend.flush();
         });

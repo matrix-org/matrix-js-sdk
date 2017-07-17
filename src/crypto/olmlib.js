@@ -20,7 +20,7 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-const q = require('q');
+import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
 const utils = require("../utils");
@@ -148,7 +148,7 @@ module.exports.ensureOlmSessionsForDevices = function(
     }
 
     if (devicesWithoutSession.length === 0) {
-        return q(result);
+        return Promise.resolve(result);
     }
 
     // TODO: this has a race condition - if we try to send another message

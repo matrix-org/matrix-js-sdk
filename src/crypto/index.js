@@ -21,7 +21,7 @@ limitations under the License.
  */
 
 const anotherjson = require('another-json');
-const q = require("q");
+import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
 const utils = require("../utils");
@@ -155,8 +155,6 @@ function _registerEventHandlers(crypto, eventEmitter) {
             if (event.getType() == "m.room_key"
                     || event.getType() == "m.forwarded_room_key") {
                 crypto._onRoomKeyEvent(event);
-            } else if (event.getType() == "m.new_device") {
-                crypto._onNewDeviceEvent(event);
             } else if (event.getType() == "m.room_key_request") {
                 crypto._onRoomKeyRequestEvent(event);
             }
@@ -289,7 +287,7 @@ function _maybeUploadOneTimeKeys(crypto) {
     }
 
     crypto._oneTimeKeyCheckInProgress = true;
-    q().then(() => {
+    Promise.resolve().then(() => {
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
             device_id: crypto._deviceId,
@@ -703,7 +701,7 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
  *    session export objects
  */
 Crypto.prototype.exportRoomKeys = function() {
-    return q(
+    return Promise.resolve(
         this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
             (s) => {
                 const sess = this._olmDevice.exportInboundGroupSession(
@@ -875,9 +873,6 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
     if (!syncData.oldSyncToken) {
         console.log("Completed initial sync");
 
-        // an initialsync.
-        this._sendNewDeviceEvents();
-
         // if we have a deviceSyncToken, we can tell the deviceList to
         // invalidate devices which have changed since then.
         const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
@@ -924,57 +919,6 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         _maybeUploadOneTimeKeys(this);
         this._processReceivedRoomKeyRequests();
     }
-};
-
-/**
- * Send m.new_device messages to any devices we share a room with.
- *
- * (TODO: we can get rid of this once a suitable number of homeservers and
- * clients support the more reliable device list update stream mechanism)
- *
- * @private
- */
-Crypto.prototype._sendNewDeviceEvents = function() {
-    if (this._sessionStore.getDeviceAnnounced()) {
-        return;
-    }
-
-    // we need to tell all the devices in all the rooms we are members of that
-    // we have arrived.
-    // build a list of rooms for each user.
-    const roomsByUser = {};
-    for (const room of this._getE2eRooms()) {
-        const members = room.getJoinedMembers();
-        for (let j = 0; j < members.length; j++) {
-            const m = members[j];
-            if (!roomsByUser[m.userId]) {
-                roomsByUser[m.userId] = [];
-            }
-            roomsByUser[m.userId].push(room.roomId);
-        }
-    }
-
-    // build a per-device message for each user
-    const content = {};
-    for (const userId in roomsByUser) {
-        if (!roomsByUser.hasOwnProperty(userId)) {
-            continue;
-        }
-        content[userId] = {
-            "*": {
-                device_id: this._deviceId,
-                rooms: roomsByUser[userId],
-            },
-        };
-    }
-
-    const self = this;
-    this._baseApis.sendToDevice(
-        "m.new_device", // OH HAI!
-        content,
-    ).done(function() {
-        self._sessionStore.setDeviceAnnounced();
-    });
 };
 
 /**
@@ -1082,34 +1026,6 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     alg.onRoomMembership(event, member, oldMembership);
 };
 
-
-/**
- * Called when a new device announces itself
- *
- * @private
- * @param {module:models/event.MatrixEvent} event announcement event
- */
-Crypto.prototype._onNewDeviceEvent = function(event) {
-    const content = event.getContent();
-    const userId = event.getSender();
-    const deviceId = content.device_id;
-    const rooms = content.rooms;
-
-    if (!rooms || !deviceId) {
-        console.warn("new_device event missing keys");
-        return;
-    }
-
-    console.log("m.new_device event from " + userId + ":" + deviceId +
-                " for rooms " + rooms);
-
-    if (this.getStoredDevice(userId, deviceId)) {
-        console.log("Known device; ignoring");
-        return;
-    }
-
-    this._deviceList.invalidateUserDeviceList(userId);
-};
 
 /**
  * Called when we get an m.room_key_request event.

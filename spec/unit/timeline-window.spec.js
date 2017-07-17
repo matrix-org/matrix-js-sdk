@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const q = require("q");
+import Promise from 'bluebird';
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;
@@ -157,7 +157,7 @@ describe("TimelineWindow", function() {
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
-            return q(timeline);
+            return Promise.resolve(timeline);
         };
 
         return new TimelineWindow(client, timelineSet, opts);
@@ -179,7 +179,7 @@ describe("TimelineWindow", function() {
             timelineWindow.load(undefined, 2).then(function() {
                 const expectedEvents = liveTimeline.getEvents().slice(1);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("should initialise from a specific event", function(done) {
@@ -191,14 +191,14 @@ describe("TimelineWindow", function() {
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
                 expect(eventId0).toEqual(eventId);
-                return q(timeline);
+                return Promise.resolve(timeline);
             };
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
             timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("canPaginate should return false until load has returned",
@@ -219,7 +219,7 @@ describe("TimelineWindow", function() {
                     .toBe(false);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(false);
-                return q(timeline);
+                return Promise.resolve(timeline);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -229,7 +229,7 @@ describe("TimelineWindow", function() {
                     .toBe(true);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(true);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
     });
 
@@ -277,7 +277,7 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.BACKWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("should advance into next timeline", function(done) {
@@ -322,7 +322,7 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.FORWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("should retreat into previous timeline", function(done) {
@@ -367,7 +367,7 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.BACKWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("should make forward pagination requests", function(done) {
@@ -383,7 +383,7 @@ describe("TimelineWindow", function() {
                 expect(opts.limit).toEqual(2);
 
                 addEventsToTimeline(timeline, 3, false);
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -399,7 +399,7 @@ describe("TimelineWindow", function() {
                 expect(success).toBe(true);
                 const expectedEvents = timeline.getEvents().slice(0, 5);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
 
@@ -416,7 +416,7 @@ describe("TimelineWindow", function() {
                 expect(opts.limit).toEqual(2);
 
                 addEventsToTimeline(timeline, 3, true);
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -432,7 +432,7 @@ describe("TimelineWindow", function() {
                 expect(success).toBe(true);
                 const expectedEvents = timeline.getEvents().slice(1, 6);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
 
         it("should limit the number of unsuccessful pagination requests",
@@ -449,7 +449,7 @@ describe("TimelineWindow", function() {
                 expect(opts.backwards).toBe(false);
                 expect(opts.limit).toEqual(2);
                 paginateCount += 1;
-                return q(true);
+                return Promise.resolve(true);
             };
 
             timelineWindow.load(eventId, 3).then(function() {
@@ -471,7 +471,7 @@ describe("TimelineWindow", function() {
                     .toBe(false);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(true);
-            }).catch(utils.failTest).done(done);
+            }).nodeify(done);
         });
     });
 });

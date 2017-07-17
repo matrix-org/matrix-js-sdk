@@ -1,7 +1,7 @@
 "use strict";
 import 'source-map-support/register';
 const sdk = require("../..");
-const HttpBackend = require("../mock-request");
+const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
 import expect from 'expect';
@@ -130,7 +130,7 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(expectedEvents.length).toEqual(
                     0, "Failed to see all events from /sync calls",
                 );
@@ -157,7 +157,7 @@ describe("MatrixClient events", function() {
             });
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(fired).toBe(true, "User.presence didn't fire.");
                 done();
             });
@@ -183,7 +183,7 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(roomInvokeCount).toEqual(
                     1, "Room fired wrong number of times.",
                 );
@@ -232,7 +232,7 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(membersInvokeCount).toEqual(
                     1, "RoomState.members fired wrong number of times",
                 );
@@ -271,7 +271,7 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(typingInvokeCount).toEqual(
                     1, "RoomMember.typing fired wrong number of times",
                 );
@@ -298,7 +298,7 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flush().done(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(sessionLoggedOutCount).toEqual(
                     1, "Session.logged_out fired wrong number of times",
                 );
