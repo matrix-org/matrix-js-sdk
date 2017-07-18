@@ -690,7 +690,7 @@ describe("MatrixClient crypto", function() {
             });
     });
 
-    it("React on device_one_time_keys send by /sync", function(done) {
+    it("React on device_one_time_keys send by /sync", function() {
         // Send a response which causes a key upload
         const self = aliTestClient;
         const httpBackend = self.httpBackend;
@@ -730,13 +730,21 @@ describe("MatrixClient crypto", function() {
                     expect(content.one_time_keys).toNotEqual({});
                     console.log('received %i one-time keys',
                                 Object.keys(content.one_time_keys).length);
-                    return {};
+                    // cancel futher calls by telling the client
+                    // we have more than we need
+                    return {
+                       device_one_time_keys_count: {
+                           signed_curve25519: 70,
+                       },
+                    };
                 }))
             .then(() => httpBackend.flushAllExpected())
             .then((flushed) => {
                 // 1x /keys/upload
                 expect(flushed).toEqual(1);
-                done();
-            });
+                // ignore all following request
+            })
+            .then(() => self.client.stopClient())
+            .then(() => httpBackend.flush());
     });
 });

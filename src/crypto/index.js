@@ -283,6 +283,28 @@ function _maybeUploadOneTimeKeys(crypto) {
 
     crypto._lastOneTimeKeyCheck = now;
 
+    // We need to keep a pool of one time public keys on the server so that
+    // other devices can start conversations with us. But we can only store
+    // a finite number of private keys in the olm Account object.
+    // To complicate things further then can be a delay between a device
+    // claiming a public one time key from the server and it sending us a
+    // message. We need to keep the corresponding private key locally until
+    // we receive the message.
+    // But that message might never arrive leaving us stuck with duff
+    // private keys clogging up our local storage.
+    // So we need some kind of enginering compromise to balance all of
+    // these factors.
+
+    // We then check how many keys we can store in the Account object.
+    const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
+    // Try to keep at most half that number on the server. This leaves the
+    // rest of the slots free to hold keys that have been claimed from the
+    // server but we haven't recevied a message for.
+    // If we run out of slots when generating new keys then olm will
+    // discard the oldest private keys first. This will eventually clean
+    // out stale private keys that won't receive a message.
+    const keyLimit = Math.floor(maxOneTimeKeys / 2);
+
     function uploadLoop(numberToGenerate) {
         if (numberToGenerate <= 0) {
             // If we don't need to generate any more keys then we are done.
@@ -293,7 +315,11 @@ function _maybeUploadOneTimeKeys(crypto) {
 
         // Ask olm to generate new one time keys, then upload them to synapse.
         crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
-        return _uploadOneTimeKeys(crypto).then(() => {
+        return _uploadOneTimeKeys(crypto).then((res) => {
+            const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
+            if (keyCount != 0) {
+                return uploadLoop(Math.max(keyLimit - keyCount, 0));
+            }
             return uploadLoop(numberToGenerate - keysThisLoop);
         });
     }
@@ -312,28 +338,6 @@ function _maybeUploadOneTimeKeys(crypto) {
             return res.one_time_key_counts.signed_curve25519 || 0;
         });
     }).then((keyCount) => {
-        // We need to keep a pool of one time public keys on the server so that
-        // other devices can start conversations with us. But we can only store
-        // a finite number of private keys in the olm Account object.
-        // To complicate things further then can be a delay between a device
-        // claiming a public one time key from the server and it sending us a
-        // message. We need to keep the corresponding private key locally until
-        // we receive the message.
-        // But that message might never arrive leaving us stuck with duff
-        // private keys clogging up our local storage.
-        // So we need some kind of enginering compromise to balance all of
-        // these factors.
-
-        // We then check how many keys we can store in the Account object.
-        const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
-        // Try to keep at most half that number on the server. This leaves the
-        // rest of the slots free to hold keys that have been claimed from the
-        // server but we haven't recevied a message for.
-        // If we run out of slots when generating new keys then olm will
-        // discard the oldest private keys first. This will eventually clean
-        // out stale private keys that won't receive a message.
-        const keyLimit = Math.floor(maxOneTimeKeys / 2);
-
         // We work out how many new keys we need to create to top up the server
         // If there are too many keys on the server then we don't need to
         // create any more keys.
