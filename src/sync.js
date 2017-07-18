@@ -120,23 +120,24 @@ SyncApi.prototype.createRoom = function(roomId) {
                           "Room.localEchoUpdated",
                           "Room.accountData",
                          ]);
-    this._registerStateListeners(room);
+    this._registerStateListeners(room, room.currentState);
     return room;
 };
 
 /**
  * @param {Room} room
+ * @param {RoomState} currentState The current state of the room's live, unfiltered timeline
  * @private
  */
-SyncApi.prototype._registerStateListeners = function(room) {
+SyncApi.prototype._registerStateListeners = function(room, currentState) {
     const client = this.client;
     // we need to also re-emit room state and room member events, so hook it up
     // to the client now. We need to add a listener for RoomState.members in
     // order to hook them correctly. (TODO: find a better way?)
-    reEmit(client, room.currentState, [
+    reEmit(client, currentState, [
         "RoomState.events", "RoomState.members", "RoomState.newMember",
     ]);
-    room.currentState.on("RoomState.newMember", function(event, state, member) {
+    currentState.on("RoomState.newMember", function(event, state, member) {
         member.user = client.getUser(member.userId);
         reEmit(
             client, member,
@@ -892,14 +893,18 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
                     self.opts.canResetEntireTimeline(room.roomId),
+                    (newLiveTimeline) => {
+                        self._registerStateListeners(
+                            room,
+                            newLiveTimeline.getState(EventTimeline.FORWARDS),
+                        );
+                    },
                 );
 
                 // We have to assume any gap in any timeline is
                 // reason to stop incrementally tracking notifications and
                 // reset the timeline.
                 client.resetNotifTimelineSet();
-
-                self._registerStateListeners(room);
             }
         }
 

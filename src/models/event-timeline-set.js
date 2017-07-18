@@ -150,10 +150,14 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
  *
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
  * @param {?bool} flush  Whether to flush the non-live timelines too.
+ * @param {?function} onNewLiveTimeline Called with the new unfiltered, live timeline
+ * as soon as it's available. This can be used to set event listeners.
  *
  * @fires module:client~MatrixClient#event:"Room.timelineReset"
  */
-EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
+EventTimelineSet.prototype.resetLiveTimeline = function(
+    backPaginationToken, flush, onNewLiveTimeline,
+) {
     // if timeline support is disabled, forget about the old timelines
     const resetAllTimelines = !this._timelineSupport || flush;
 
@@ -165,6 +169,12 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
     } else {
         newTimeline = this.addTimeline();
     }
+
+    // Allow event listeners to be set up before we start injecting events
+    // as otherwise events will be missed: most importantly the RoomState.newMember
+    // events which are used to set up reEmit on Member events and only fired when
+    // room members are first created.
+    if (onNewLiveTimeline) onNewLiveTimeline(newTimeline);
 
     // initialise the state in the new timeline from our last known state
     const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
