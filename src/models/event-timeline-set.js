@@ -155,7 +155,9 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
  *
  * @fires module:client~MatrixClient#event:"Room.timelineReset"
  */
-EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flush, onNewLiveTimeline) {
+EventTimelineSet.prototype.resetLiveTimeline = function(
+    backPaginationToken, flush, onNewLiveTimeline,
+) {
     // if timeline support is disabled, forget about the old timelines
     const resetAllTimelines = !this._timelineSupport || flush;
 

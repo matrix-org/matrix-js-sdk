@@ -126,6 +126,7 @@ SyncApi.prototype.createRoom = function(roomId) {
 
 /**
  * @param {Room} room
+ * @param {RoomState} currentState The current state of the room's live, unfiltered timeline
  * @private
  */
 SyncApi.prototype._registerStateListeners = function(room, currentState) {
@@ -893,8 +894,11 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
                     joinObj.timeline.prev_batch,
                     self.opts.canResetEntireTimeline(room.roomId),
                     (newLiveTimeline) => {
-                        self._registerStateListeners(room, newLiveTimeline.getState(EventTimeline.FORWARDS));
-                    }
+                        self._registerStateListeners(
+                            room,
+                            newLiveTimeline.getState(EventTimeline.FORWARDS),
+                        );
+                    },
                 );
 
                 // We have to assume any gap in any timeline is

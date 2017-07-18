@@ -211,9 +211,13 @@ Room.prototype.getLiveTimeline = function() {
  * once it has been created, but before it has had any event inserted into it. This can be
  * used to add any event listeners.
  */
-Room.prototype.resetLiveTimeline = function(backPaginationToken, flush, onNewLiveTimeline) {
+Room.prototype.resetLiveTimeline = function(
+    backPaginationToken, flush, onNewLiveTimeline,
+) {
     // The unfiltered timeline set (we pass the onNewLiveTimeline callback here)
-    this._timelineSets[0].resetLiveTimeline(backPaginationToken, flush, onNewLiveTimeline);
+    this._timelineSets[0].resetLiveTimeline(
+        backPaginationToken, flush, onNewLiveTimeline,
+    );
 
     // any other timeline sets
     for (let i = 1; i < this._timelineSets.length; i++) {
