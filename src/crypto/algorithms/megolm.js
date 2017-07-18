@@ -842,13 +842,7 @@ MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
     delete this._pendingEvents[k];
 
     for (let i = 0; i < pending.length; i++) {
-        try {
-            // no point sending another m.room_key_request here.
-            this._decryptEvent(pending[i], false);
-            console.log("successful re-decryption of", pending[i]);
-        } catch (e) {
-            console.log("Still can't decrypt", pending[i], e.stack || e);
-        }
+        pending[i].attemptDecryption(this._crypto);
     }
 };
 

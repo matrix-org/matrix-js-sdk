@@ -299,6 +299,58 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Attempt to decrypt this event.
+     *
+     * (This is used within the SDK: it isn't intended for use by applications)
+     *
+     * @internal
+     *
+     * @param {module:crypto} crypto crypto module
+     */
+    attemptDecryption: function(crypto) {
+        if (!crypto) {
+            this._badEncryptedMessage("Encryption not enabled");
+            return;
+        }
+
+        if (!this.isEncrypted()) {
+            throw new Error("Attempt to decrypt event which isn't encrypted");
+        }
+
+        if (
+            this._clearEvent && this._clearEvent.content &&
+                this._clearEvent.content.msgtype !== "m.bad.encrypted"
+        ) {
+            // we may want to just ignore this? let's start with rejecting it.
+            throw new Error(
+                "Attempt to decrypt event which has already been encrypted",
+            );
+        }
+
+        try {
+            crypto.decryptEvent(this);
+        } catch (e) {
+            console.warn(
+                `Error decrypting event (id=${this.getId()}): ${e}`,
+            );
+            if (e.name !== "DecryptionError") {
+                throw e;
+            }
+            this._badEncryptedMessage(e.message);
+        }
+    },
+
+    _badEncryptedMessage: function(reason) {
+        this.setClearData({
+            type: "m.room.message",
+            content: {
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: " + reason + " **",
+            },
+        });
+    },
+
+    /**
      * Update the cleartext data on this event.
      *
      * (This is used after decrypting an event; it should not be used by applications).
