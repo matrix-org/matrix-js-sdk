@@ -388,11 +388,14 @@ describe("MatrixClient crypto", function() {
         return;
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
+        await aliTestClient.client.initCrypto();
+
         bobTestClient = new TestClient(bobUserId, bobDeviceId, bobAccessToken);
+        await bobTestClient.client.initCrypto();
 
         aliMessages = [];
         bobMessages = [];

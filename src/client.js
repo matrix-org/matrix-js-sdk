@@ -161,21 +161,9 @@ function MatrixClient(opts) {
 
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
-    if (CRYPTO_ENABLED && Boolean(opts.sessionStore) &&
-            Boolean(this._cryptoStore) &&
-            userId !== null && this.deviceId !== null) {
-        this._crypto = new Crypto(
-            this, this,
-            opts.sessionStore,
-            userId, this.deviceId,
-            this.store,
-            opts.cryptoStore,
-        );
-        reEmit(this, this._crypto, [
-            "crypto.roomKeyRequest",
-            "crypto.roomKeyRequestCancellation",
-        ]);
+    this._sessionStore = opts.sessionStore;
 
+    if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
 }
@@ -322,6 +310,72 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
 
 // Crypto bits
 // ===========
+
+/**
+ * Initialise support for end-to-end encryption in this client
+ *
+ * You should call this method after creating the matrixclient, but *before*
+ * calling `startClient`, if you want to support end-to-end encryption.
+ *
+ * It will return a Promise which will resolve when the crypto layer has been
+ * successfully initialised.
+ */
+MatrixClient.prototype.initCrypto = async function() {
+    if (this._crypto) {
+        console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
+        return;
+    }
+
+    if (!CRYPTO_ENABLED) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
+    if (!this._sessionStore) {
+        // this is temporary, the sessionstore is supposed to be going away
+        throw new Error(`Cannot enable encryption: no sessionStore provided`);
+    }
+    if (!this._cryptoStore) {
+        // the cryptostore is provided by sdk.createClient, so this shouldn't happen
+        throw new Error(`Cannot enable encryption: no cryptoStore provided`);
+    }
+
+    const userId = this.getUserId();
+    if (userId === null) {
+        throw new Error(
+            `Cannot enable encryption on MatrixClient with unknown userId: ` +
+                `ensure userId is passed in createClient().`,
+        );
+    }
+    if (this.deviceId === null) {
+        throw new Error(
+            `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
+                `ensure deviceId is passed in createClient().`,
+        );
+    }
+
+    const crypto = new Crypto(
+        this,
+        this._sessionStore,
+        userId, this.deviceId,
+        this.store,
+        this._cryptoStore,
+    );
+
+    reEmit(this, crypto, [
+        "crypto.roomKeyRequest",
+        "crypto.roomKeyRequestCancellation",
+    ]);
+
+    await crypto.init();
+
+    // if crypto initialisation was sucessful, tell it to attach its event handlers.
+    crypto.registerEventHandlers(this);
+    this._crypto = crypto;
+};
+
 
 /**
  * Is end-to-end crypto enabled for this client.

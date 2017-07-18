@@ -245,21 +245,27 @@ The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](http://matrix.org/git/olm). It is left up to the application to make
 libolm available, via the ``Olm`` global.
 
-If the ``Olm`` global is not available, the SDK will show a warning:
+It is also necessry to call ``matrixClient.initCrypto()`` after creating a new
+``MatrixClient`` (but **before** calling ``matrixClient.startClient()``) to
+initialise the crypto layer.
+
+If the ``Olm`` global is not available, the SDK will show a warning, as shown
+below; ``initCrypto()`` will also fail.
 
 ```
 Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined
 ```
 
-The SDK will continue to work for unencrypted rooms, but it will not support
-the E2E parts of the Matrix specification.
+If the crypto layer is not (successfully) initialised, the SDK will continue to
+work for unencrypted rooms, but it will not support the E2E parts of the Matrix
+specification.
 
-To enable E2E support in a browser application:
+To provide the Olm library in a browser application:
 
  * download the transpiled libolm (from https://matrix.org/packages/npm/olm/).
  * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
  
-To enable E2E support in a node.js application:
+To provide the Olm library in a node.js application:
 
  * ``npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz``
    (replace the URL with the latest version you want to use from
