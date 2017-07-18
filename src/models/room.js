@@ -207,9 +207,16 @@ Room.prototype.getLiveTimeline = function() {
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
  * @param {boolean=} flush True to remove all events in all timelines. If false, only
  * the live timeline is reset.
+ * @param {Object=} onNewLiveTimeline Function called with the new live timeline object
+ * once it has been created, but before it has had any event inserted into it. This can be
+ * used to add any event listeners.
  */
-Room.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
-    for (let i = 0; i < this._timelineSets.length; i++) {
+Room.prototype.resetLiveTimeline = function(backPaginationToken, flush, onNewLiveTimeline) {
+    // The unfiltered timeline set (we pass the onNewLiveTimeline callback here)
+    this._timelineSets[0].resetLiveTimeline(backPaginationToken, flush, onNewLiveTimeline);
+
+    // any other timeline sets
+    for (let i = 1; i < this._timelineSets.length; i++) {
         this._timelineSets[i].resetLiveTimeline(backPaginationToken, flush);
     }
 
