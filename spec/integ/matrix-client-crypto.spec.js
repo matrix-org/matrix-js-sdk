@@ -689,4 +689,54 @@ describe("MatrixClient crypto", function() {
                 return aliTestClient.httpBackend.flush('/keys/query', 1);
             });
     });
+
+    it("React on device_one_time_keys send by /sync", function(done) {
+        // Send a response which causes a key upload
+        const self = aliTestClient;
+        const httpBackend = self.httpBackend;
+        const syncDataEmpty = {
+            next_batch: "a",
+            device_one_time_keys_count: {
+                signed_curve25519: 0,
+            },
+        };
+
+        // enqueue expectations:
+        // * Sync with empty one_time_keys => upload keys
+
+        return Promise.resolve()
+            .then(() => {
+                console.log(self + ': starting');
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+                self.expectDeviceKeyUpload();
+
+                // we let the client do a very basic initial sync, which it needs before
+                // it will upload one-time keys.
+                httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
+
+                self.client.startClient({
+                    // set this so that we can get hold of failed events
+                    pendingEventOrdering: 'detached',
+                });
+
+                return httpBackend.flushAllExpected().then(() => {
+                    console.log(self + ': started');
+                });
+            })
+            .then(() => httpBackend.when("POST", "/keys/upload")
+                .respond(200, (path, content) => {
+                    expect(content.one_time_keys).toBeTruthy();
+                    expect(content.one_time_keys).toNotEqual({});
+                    console.log('received %i one-time keys',
+                                Object.keys(content.one_time_keys).length);
+                    return {};
+                }))
+            .then(() => httpBackend.flushAllExpected())
+            .then((flushed) => {
+                // 1x /keys/upload
+                expect(flushed).toEqual(1);
+                done();
+            });
+    });
 });

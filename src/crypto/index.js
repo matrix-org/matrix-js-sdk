@@ -301,8 +301,8 @@ function _maybeUploadOneTimeKeys(crypto) {
     crypto._oneTimeKeyCheckInProgress = true;
     Promise.resolve().then(() => {
         if (crypto._currentKeyCount !== undefined) {
-            // this._currentKeyCount and the handling got postponed. Use this value
-            // instead of asking the server for the current key count
+            // this._currentKeyCount got set and the handling got postponed.
+            // Use this value instead of asking the server for the current key count
             return Promise.resolve(crypto._currentKeyCount);
         }
         // ask the server how many keys we have
