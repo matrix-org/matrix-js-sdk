@@ -1,3 +1,41 @@
+Unreleased changes
+==================
+
+BREAKING CHANGE
+---------------
+
+In order to support a move to a more scalable storage backend, we need to make
+a number of the APIs related end-to-end encryption asynchronous.
+
+This release of the JS-SDK includes the following changes which will affect
+applications which support end-to-end encryption:
+
+1. `MatrixClient` now provides a new (asynchronous) method,
+   `initCrypto`. Applications which support end-to-end encryption must call
+   this method (and wait for it to complete) before calling `startClient`, to
+   give the crypto layer a chance to initialise.
+
+2. The following APIs have been changed to return promises:
+
+   * `MatrixClient.getStoredDevicesForUser`
+   * `MatrixClient.getStoredDevice`
+   * `MatrixClient.setDeviceVerified`
+   * `MatrixClient.setDeviceBlocked`
+   * `MatrixClient.setDeviceKnown`
+   * `MatrixClient.getEventSenderDeviceInfo`
+   * `MatrixClient.isEventSenderVerified`
+   * `MatrixClient.importRoomKeys`
+
+   Applications using the results of any of the above methods will need to be
+   updated to wait for the result of the promise.
+
+
+3. `MatrixClient.listDeviceKeys` has been removed altogether. It's been
+   deprecated for some time. Applications using it should insted be changed to
+   use `MatrixClient.getStoredDevices`, which is similar but returns its results
+   in a slightly different format.
+
+
 Changes in [0.7.13](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.13) (2017-06-22)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.12...v0.7.13)
