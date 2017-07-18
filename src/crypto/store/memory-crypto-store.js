@@ -54,8 +54,10 @@ export default class MemoryCryptoStore {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        // first see if we already have an entry for this request.
-        return this.getOutgoingRoomKeyRequest(requestBody).then((existing) => {
+        return Promise.try(() => {
+            // first see if we already have an entry for this request.
+            const existing = this._getOutgoingRoomKeyRequest(requestBody);
+
             if (existing) {
                 // this entry matches the request - return it.
                 console.log(
@@ -88,12 +90,27 @@ export default class MemoryCryptoStore {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
+        return Promise.resolve(this._getOutgoingRoomKeyRequest(requestBody));
+    }
+
+    /**
+     * Looks for existing room key request, and returns the result synchronously.
+     *
+     * @internal
+     *
+     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     *    existing request to look for
+     *
+     * @return {module:crypto/store/base~OutgoingRoomKeyRequest?}
+     *    the matching request, or null if not found
+     */
+    _getOutgoingRoomKeyRequest(requestBody) {
         for (const existing of this._outgoingRoomKeyRequests) {
             if (utils.deepCompare(existing.requestBody, requestBody)) {
-                return Promise.resolve(existing);
+                return existing;
             }
         }
-        return Promise.resolve(null);
+        return null;
     }
 
     /**

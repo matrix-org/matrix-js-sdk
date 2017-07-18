@@ -252,11 +252,14 @@ describe("MatrixClient room timelines", function() {
                 client.scrollback(room).done(function() {
                     expect(room.timeline.length).toEqual(1);
                     expect(room.oldState.paginationToken).toBe(null);
-                    done();
+
+                    // still have a sync to flush
+                    httpBackend.flush("/sync", 1).then(() => {
+                        done();
+                    });
                 });
 
                 httpBackend.flush("/messages", 1);
-                httpBackend.flush("/sync", 1);
             });
             httpBackend.flush("/sync", 1);
         });
@@ -318,11 +321,14 @@ describe("MatrixClient room timelines", function() {
                     expect(oldMsg.sender.name).toEqual("Old Alice");
                     const newMsg = room.timeline[3];
                     expect(newMsg.sender.name).toEqual(userName);
-                    done();
+
+                    // still have a sync to flush
+                    httpBackend.flush("/sync", 1).then(() => {
+                        done();
+                    });
                 });
 
                 httpBackend.flush("/messages", 1);
-                httpBackend.flush("/sync", 1);
             });
             httpBackend.flush("/sync", 1);
         });
@@ -349,11 +355,14 @@ describe("MatrixClient room timelines", function() {
                     expect(room.timeline.length).toEqual(3);
                     expect(room.timeline[0].event).toEqual(sbEvents[1]);
                     expect(room.timeline[1].event).toEqual(sbEvents[0]);
-                    done();
+
+                    // still have a sync to flush
+                    httpBackend.flush("/sync", 1).then(() => {
+                        done();
+                    });
                 });
 
                 httpBackend.flush("/messages", 1);
-                httpBackend.flush("/sync", 1);
             });
             httpBackend.flush("/sync", 1);
         });
@@ -377,9 +386,11 @@ describe("MatrixClient room timelines", function() {
                     expect(room.oldState.paginationToken).toEqual(sbEndTok);
                 });
 
-                httpBackend.flush("/sync", 1);
                 httpBackend.flush("/messages", 1).done(function() {
-                    done();
+                    // still have a sync to flush
+                    httpBackend.flush("/sync", 1).then(() => {
+                        done();
+                    });
                 });
             });
             httpBackend.flush("/sync", 1);

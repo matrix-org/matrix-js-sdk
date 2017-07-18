@@ -554,7 +554,11 @@ describe("megolm", function() {
 
             return Promise.all([
                 aliceTestClient.client.resendEvent(pendingMsg, room),
-                aliceTestClient.httpBackend.flushAllExpected(),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
             ]);
         });
     });
@@ -589,7 +593,11 @@ describe("megolm", function() {
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flushAllExpected(),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
             ]);
         });
     });
@@ -636,7 +644,11 @@ describe("megolm", function() {
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flushAllExpected(),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
             ]);
         });
     });
@@ -705,7 +717,11 @@ describe("megolm", function() {
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flushAllExpected(),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
             ]);
         }).then(function() {
             console.log('Telling alice to block our device');
@@ -826,7 +842,11 @@ describe("megolm", function() {
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
-                aliceTestClient.httpBackend.flushAllExpected(),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
             ]);
         }).then(function() {
             expect(decrypted.type).toEqual('m.room.message');
