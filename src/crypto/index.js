@@ -410,49 +410,6 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
 };
 
 /**
- * List the stored device keys for a user id
- *
- * @deprecated prefer {@link module:crypto#getStoredDevicesForUser}
- *
- * @param {string} userId the user to list keys for.
- *
- * @return {object[]} list of devices with "id", "verified", "blocked",
- *    "key", and "display_name" parameters.
- */
-Crypto.prototype.listDeviceKeys = function(userId) {
-    const devices = this.getStoredDevicesForUser(userId) || [];
-
-    const result = [];
-
-    for (let i = 0; i < devices.length; ++i) {
-        const device = devices[i];
-        const ed25519Key = device.getFingerprint();
-        if (ed25519Key) {
-            result.push({
-                id: device.deviceId,
-                key: ed25519Key,
-                verified: Boolean(device.isVerified()),
-                blocked: Boolean(device.isBlocked()),
-                display_name: device.getDisplayName(),
-            });
-        }
-    }
-
-    // sort by deviceid
-    result.sort(function(a, b) {
-        if (a.deviceId < b.deviceId) {
-            return -1;
-        }
-        if (a.deviceId > b.deviceId) {
-            return 1;
-        }
-        return 0;
-    });
-
-    return result;
-};
-
-/**
  * Update the blocked/verified state of the given device
  *
  * @param {string} userId owner of the device
