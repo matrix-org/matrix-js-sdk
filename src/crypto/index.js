@@ -278,12 +278,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         now - crypto._lastOneTimeKeyCheck < uploadPeriod
        ) {
         // we've done a key upload recently.
-        if (crypto._currentKeyCount === undefined) {
-            // there was no /sync-response which sets this value so we return here.
-            // This is to be backwards compatible for servers which do not respond
-            // this value.
-            return;
-        }
+        return;
     }
 
     crypto._lastOneTimeKeyCheck = now;
