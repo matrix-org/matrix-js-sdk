@@ -229,14 +229,15 @@ Crypto.prototype.uploadDeviceKeys = function() {
         keys: crypto._deviceKeys,
         user_id: userId,
     };
-    crypto._signObject(deviceKeys);
 
-    return crypto._baseApis.uploadKeysRequest({
-        device_keys: deviceKeys,
-    }, {
-        // for now, we set the device id explicitly, as we may not be using the
-        // same one as used in login.
-        device_id: deviceId,
+    return crypto._signObject(deviceKeys).then(() => {
+        crypto._baseApis.uploadKeysRequest({
+            device_keys: deviceKeys,
+        }, {
+            // for now, we set the device id explicitly, as we may not be using the
+            // same one as used in login.
+            device_id: deviceId,
+        });
     });
 };
 
@@ -353,30 +354,34 @@ function _maybeUploadOneTimeKeys(crypto) {
 }
 
 // returns a promise which resolves to the response
-function _uploadOneTimeKeys(crypto) {
+async function _uploadOneTimeKeys(crypto) {
     const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
+
+    const promises = [];
 
     for (const keyId in oneTimeKeys.curve25519) {
         if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
             const k = {
                 key: oneTimeKeys.curve25519[keyId],
             };
-            crypto._signObject(k);
             oneTimeJson["signed_curve25519:" + keyId] = k;
+            promises.push(crypto._signObject(k));
         }
     }
 
-    return crypto._baseApis.uploadKeysRequest({
+    await Promise.all(promises);
+
+    const res = await crypto._baseApis.uploadKeysRequest({
         one_time_keys: oneTimeJson,
     }, {
         // for now, we set the device id explicitly, as we may not be using the
         // same one as used in login.
         device_id: crypto._deviceId,
-    }).then(function(res) {
-        crypto._olmDevice.markKeysAsPublished();
-        return res;
     });
+
+    crypto._olmDevice.markKeysAsPublished();
+    return res;
 }
 
 /**
@@ -1187,7 +1192,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
  *
  * @param {Object} obj  Object to which we will add a 'signatures' property
  */
-Crypto.prototype._signObject = function(obj) {
+Crypto.prototype._signObject = async function(obj) {
     const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
