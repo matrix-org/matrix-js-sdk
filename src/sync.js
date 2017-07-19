@@ -691,6 +691,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     //    account_data: { events: [] },
     //    device_lists: { changed: ["@user:server", ... ]},
     //    to_device: { events: [] },
+    //    device_one_time_keys_count: { signed_curve25519: 42 },
     //    rooms: {
     //      invite: {
     //        $roomid: {
@@ -981,6 +982,12 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         data.device_lists.changed.forEach((u) => {
             this.opts.crypto.userDeviceListChanged(u);
         });
+    }
+
+    // Handle one_time_keys_count
+    if (this.opts.crypto && data.device_one_time_keys_count) {
+        const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
+        this.opts.crypto.updateOneTimeKeyCount(currentCount);
     }
 };
 

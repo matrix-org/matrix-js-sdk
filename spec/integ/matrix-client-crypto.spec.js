@@ -689,4 +689,53 @@ describe("MatrixClient crypto", function() {
                 return aliTestClient.httpBackend.flush('/keys/query', 1);
             });
     });
+
+    it("Upload new oneTimeKeys based on a /sync request - no count-asking", function() {
+        // Send a response which causes a key upload
+        const httpBackend = aliTestClient.httpBackend;
+        const syncDataEmpty = {
+            next_batch: "a",
+            device_one_time_keys_count: {
+                signed_curve25519: 0,
+            },
+        };
+
+        // enqueue expectations:
+        // * Sync with empty one_time_keys => upload keys
+
+        return Promise.resolve()
+            .then(() => {
+                console.log(aliTestClient + ': starting');
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+                aliTestClient.expectDeviceKeyUpload();
+
+                // we let the client do a very basic initial sync, which it needs before
+                // it will upload one-time keys.
+                httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
+
+                aliTestClient.client.startClient({});
+
+                return httpBackend.flushAllExpected().then(() => {
+                    console.log(aliTestClient + ': started');
+                });
+            })
+            .then(() => httpBackend.when("POST", "/keys/upload")
+                .respond(200, (path, content) => {
+                    expect(content.one_time_keys).toBeTruthy();
+                    expect(content.one_time_keys).toNotEqual({});
+                    expect(Object.keys(content.one_time_keys).length)
+                        .toBeGreaterThanOrEqualTo(1);
+                    console.log('received %i one-time keys',
+                                Object.keys(content.one_time_keys).length);
+                    // cancel futher calls by telling the client
+                    // we have more than we need
+                    return {
+                       one_time_key_counts: {
+                           signed_curve25519: 70,
+                       },
+                    };
+                }))
+            .then(() => httpBackend.flushAllExpected());
+    });
 });
