@@ -180,8 +180,6 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
         // we just stole it and put it on the new live timeline
         // (If we're resetting all timelines, don't bother because the old live
         // timeline is about to be thrown away anyway.
-        this._liveTimeline._startState = new RoomState(this._roomId);
-        this._liveTimeline._endState = new RoomState(this._roomId);
         const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
         const events = [];
         for (const evtype in evMap) {
@@ -195,6 +193,8 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
                 events.push(evMap[evtype][stateKey]);
             }
         }
+        this._liveTimeline._startState = new RoomState(this._roomId);
+        this._liveTimeline._endState = new RoomState(this._roomId);
         this._liveTimeline.initialiseState(events);
 
         this._liveTimeline.setPaginationToken(
