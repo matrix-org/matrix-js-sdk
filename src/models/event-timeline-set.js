@@ -193,12 +193,11 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
     // objects for the 'live' set of members with any listeners still attached
     newTimeline._endState = this._liveTimeline._endState;
 
+    // If we're not resetting all timelines, we need to fix up the old live timeline
     if (!resetAllTimelines) {
-        // We just stole the old timeline's end state, so it needs a new one.
+        // Firstly, we just stole the old timeline's end state, so it needs a new one.
         // Just swap them around and give it the one we just generated for the
         // new live timeline.
-        // (If we're resetting all timelines, don't bother because the old live
-        // timeline is about to be thrown away anyway.
         this._liveTimeline._endState = freshEndState;
 
         this._liveTimeline.setPaginationToken(

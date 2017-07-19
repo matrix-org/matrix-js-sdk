@@ -206,7 +206,9 @@ Room.prototype.getLiveTimeline = function() {
  *
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
  * @param {string=} forwardPaginationToken token for forward-paginating the old live timeline,
- * if absent or null, all timelines are reset.
+ * if absent or null, all timelines are reset, removing old ones (including the previous live
+ * timeline which would otherwise be unable to paginate forwards without this token).
+ * Removing just the old live timeline whilst preserving previous ones is not supported.
  */
 Room.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
     for (let i = 0; i < this._timelineSets.length; i++) {
