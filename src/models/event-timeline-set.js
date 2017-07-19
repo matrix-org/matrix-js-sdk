@@ -170,32 +170,37 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
         newTimeline = this.addTimeline();
     }
 
-    // move the state objects over from the old live timeline, then we'll
-    // keep using the same RoomMember objects for the 'live' set of members
-    newTimeline._startState = this._liveTimeline._startState;
+    // Collect the state events from the old timeline
+    const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
+    const events = [];
+    for (const evtype in evMap) {
+        if (!evMap.hasOwnProperty(evtype)) {
+            continue;
+        }
+        for (const stateKey in evMap[evtype]) {
+            if (!evMap[evtype].hasOwnProperty(stateKey)) {
+                continue;
+            }
+            events.push(evMap[evtype][stateKey]);
+        }
+    }
+
+    // Use those events to initialise the state of the new live timeline
+    newTimeline.initialiseState(events);
+
+    const freshEndState = newTimeline._endState;
+    // Now clobber the end state with that from the previous live timeline.
+    // It will be identical except that we'll keep using the same RoomMember
+    // objects for the 'live' set of members with any listeners still attached
     newTimeline._endState = this._liveTimeline._endState;
 
     if (!resetAllTimelines) {
-        // Now regenerate the state for the previously-live timeline, because
-        // we just stole it and put it on the new live timeline
+        // We just stole the old timeline's end state, so it needs a new one.
+        // Just swap them around and give it the one we just generated for the
+        // new live timeline.
         // (If we're resetting all timelines, don't bother because the old live
         // timeline is about to be thrown away anyway.
-        const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
-        const events = [];
-        for (const evtype in evMap) {
-            if (!evMap.hasOwnProperty(evtype)) {
-                continue;
-            }
-            for (const stateKey in evMap[evtype]) {
-                if (!evMap[evtype].hasOwnProperty(stateKey)) {
-                    continue;
-                }
-                events.push(evMap[evtype][stateKey]);
-            }
-        }
-        this._liveTimeline._startState = new RoomState(this._roomId);
-        this._liveTimeline._endState = new RoomState(this._roomId);
-        this._liveTimeline.initialiseState(events);
+        this._liveTimeline._endState = freshEndState;
 
         this._liveTimeline.setPaginationToken(
             forwardPaginationToken, EventTimeline.FORWARDS,
