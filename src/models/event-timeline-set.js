@@ -188,9 +188,10 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
     newTimeline.initialiseState(events);
 
     const freshEndState = newTimeline._endState;
-    // Now clobber the end state with that from the previous live timeline.
-    // It will be identical except that we'll keep using the same RoomMember
-    // objects for the 'live' set of members with any listeners still attached
+    // Now clobber the end state of the new live timeline with that from the
+    // previous live timeline. It will be identical except that we'll keep
+    // using the same RoomMember objects for the 'live' set of members with any
+    // listeners still attached
     newTimeline._endState = this._liveTimeline._endState;
 
     // If we're not resetting all timelines, we need to fix up the old live timeline
@@ -200,6 +201,8 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
         // new live timeline.
         this._liveTimeline._endState = freshEndState;
 
+        // Now set the forward pagination token on the old live timeline
+        // so it can be forward-paginated.
         this._liveTimeline.setPaginationToken(
             forwardPaginationToken, EventTimeline.FORWARDS,
         );
@@ -210,6 +213,7 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
     // stuck without realising that they *can* back-paginate.
     newTimeline.setPaginationToken(backPaginationToken, EventTimeline.BACKWARDS);
 
+    // Now we can swap the live timeline to the new one.
     this._liveTimeline = newTimeline;
     this.emit("Room.timelineReset", this.room, this, resetAllTimelines);
 };
