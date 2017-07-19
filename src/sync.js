@@ -987,7 +987,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     // Handle one_time_keys_count
     if (this.opts.crypto && data.device_one_time_keys_count) {
         const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
-        this.opts.crypto.updateCurrentKeyCount(currentCount);
+        this.opts.crypto.updateOneTimeKeyCount(currentCount);
     }
 };
 

@@ -690,10 +690,9 @@ describe("MatrixClient crypto", function() {
             });
     });
 
-    it("React on device_one_time_keys send by /sync", function() {
+    it("Upload new oneTimeKeys based on a /sync request - no count-asking", function() {
         // Send a response which causes a key upload
-        const self = aliTestClient;
-        const httpBackend = self.httpBackend;
+        const httpBackend = aliTestClient.httpBackend;
         const syncDataEmpty = {
             next_batch: "a",
             device_one_time_keys_count: {
@@ -706,45 +705,37 @@ describe("MatrixClient crypto", function() {
 
         return Promise.resolve()
             .then(() => {
-                console.log(self + ': starting');
+                console.log(aliTestClient + ': starting');
                 httpBackend.when("GET", "/pushrules").respond(200, {});
                 httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-                self.expectDeviceKeyUpload();
+                aliTestClient.expectDeviceKeyUpload();
 
                 // we let the client do a very basic initial sync, which it needs before
                 // it will upload one-time keys.
                 httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
 
-                self.client.startClient({
-                    // set this so that we can get hold of failed events
-                    pendingEventOrdering: 'detached',
-                });
+                aliTestClient.client.startClient({});
 
                 return httpBackend.flushAllExpected().then(() => {
-                    console.log(self + ': started');
+                    console.log(aliTestClient + ': started');
                 });
             })
             .then(() => httpBackend.when("POST", "/keys/upload")
                 .respond(200, (path, content) => {
                     expect(content.one_time_keys).toBeTruthy();
                     expect(content.one_time_keys).toNotEqual({});
+                    expect(Object.keys(content.one_time_keys).length)
+                        .toBeGreaterThanOrEqualTo(1);
                     console.log('received %i one-time keys',
                                 Object.keys(content.one_time_keys).length);
                     // cancel futher calls by telling the client
                     // we have more than we need
                     return {
-                       device_one_time_keys_count: {
+                       one_time_key_counts: {
                            signed_curve25519: 70,
                        },
                     };
                 }))
-            .then(() => httpBackend.flushAllExpected())
-            .then((flushed) => {
-                // 1x /keys/upload
-                expect(flushed).toEqual(1);
-                // ignore all following request
-            })
-            .then(() => self.client.stopClient())
-            .then(() => httpBackend.flush());
+            .then(() => httpBackend.flushAllExpected());
     });
 });

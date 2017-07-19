@@ -247,14 +247,16 @@ Crypto.prototype.uploadDeviceKeys = function() {
 };
 
 /**
- * Stores the current key count which will be handled postponed (in a call of
- * _onSyncCompleted)
+ * Stores the current one_time_key count which will be handled later (in a call of
+ * _onSyncCompleted). The count is e.g. coming from a /sync response.
  *
- * @param {Number} currentKeyCount to be stored and handled later
+ * @param {Number} currentCount The current count of one_time_keys to be stored
  */
-Crypto.prototype.updateCurrentKeyCount = function(currentKeyCount) {
-    if (isFinite(currentKeyCount)) {
-        this._currentKeyCount = currentKeyCount;
+Crypto.prototype.updateOneTimeKeyCount = function(currentCount) {
+    if (isFinite(currentCount)) {
+        this._oneTimeKeyCount = currentCount;
+    } else {
+        throw new TypeError("Parameter for updateOneTimeKeyCount has to be a number");
     }
 };
 
@@ -295,7 +297,7 @@ function _maybeUploadOneTimeKeys(crypto) {
     // So we need some kind of enginering compromise to balance all of
     // these factors.
 
-    // We then check how many keys we can store in the Account object.
+    // Check how many keys we can store in the Account object.
     const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
     // Try to keep at most half that number on the server. This leaves the
     // rest of the slots free to hold keys that have been claimed from the
@@ -305,31 +307,33 @@ function _maybeUploadOneTimeKeys(crypto) {
     // out stale private keys that won't receive a message.
     const keyLimit = Math.floor(maxOneTimeKeys / 2);
 
-    function uploadLoop(numberToGenerate) {
-        if (numberToGenerate <= 0) {
+    function uploadLoop(keyCount) {
+        if (keyLimit <= keyCount) {
             // If we don't need to generate any more keys then we are done.
             return;
         }
 
-        const keysThisLoop = Math.min(numberToGenerate, maxKeysPerCycle);
+        const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
 
         // Ask olm to generate new one time keys, then upload them to synapse.
         crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
         return _uploadOneTimeKeys(crypto).then((res) => {
-            const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
-            if (keyCount != 0) {
-                return uploadLoop(Math.max(keyLimit - keyCount, 0));
+            if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
+                // if the response contains a more up2date value use this
+                // for the next loop
+                return uploadLoop(res.one_time_key_counts.signed_curve25519);
+            } else {
+                return uploadLoop(keyCount + keysThisLoop);
             }
-            return uploadLoop(numberToGenerate - keysThisLoop);
         });
     }
 
     crypto._oneTimeKeyCheckInProgress = true;
     Promise.resolve().then(() => {
-        if (crypto._currentKeyCount !== undefined) {
-            // this._currentKeyCount got set and the handling got postponed.
-            // Use this value instead of asking the server for the current key count
-            return Promise.resolve(crypto._currentKeyCount);
+        if (crypto._oneTimeKeyCount !== undefined) {
+            // We already have the current one_time_key count from a /sync response.
+            // Use this value instead of asking the server for the current key count.
+            return Promise.resolve(crypto._oneTimeKeyCount);
         }
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
@@ -338,18 +342,17 @@ function _maybeUploadOneTimeKeys(crypto) {
             return res.one_time_key_counts.signed_curve25519 || 0;
         });
     }).then((keyCount) => {
-        // We work out how many new keys we need to create to top up the server
+        // Start the uploadLoop with the current keyCount. The function checks if
+        // we need to upload new keys or not.
         // If there are too many keys on the server then we don't need to
         // create any more keys.
-        const numberToGenerate = Math.max(keyLimit - keyCount, 0);
-
-        return uploadLoop(numberToGenerate);
+        return uploadLoop(keyCount);
     }).catch((e) => {
         console.error("Error uploading one-time keys", e.stack || e);
     }).finally(() => {
-        // reset _currentKeyCount to prevent start uploading based on old data.
+        // reset _oneTimeKeyCount to prevent start uploading based on old data.
         // it will be set again on the next /sync-response
-        crypto._currentKeyCount = undefined;
+        crypto._oneTimeKeyCount = undefined;
         crypto._oneTimeKeyCheckInProgress = false;
     }).done();
 }
