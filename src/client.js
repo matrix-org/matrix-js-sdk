@@ -371,7 +371,8 @@ MatrixClient.prototype.initCrypto = async function() {
 
     await crypto.init();
 
-    // if crypto initialisation was sucessful, tell it to attach its event handlers.
+    // if crypto initialisation was successful, tell it to attach its event
+    // handlers.
     crypto.registerEventHandlers(this);
     this._crypto = crypto;
 };

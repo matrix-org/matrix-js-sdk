@@ -31,7 +31,7 @@ applications which support end-to-end encryption:
 
 
 3. `MatrixClient.listDeviceKeys` has been removed altogether. It's been
-   deprecated for some time. Applications using it should insted be changed to
+   deprecated for some time. Applications using it should instead be changed to
    use `MatrixClient.getStoredDevices`, which is similar but returns its results
    in a slightly different format.
 
