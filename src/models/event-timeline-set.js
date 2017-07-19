@@ -20,7 +20,6 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
-const RoomState = require("./room-state");
 
 // var DEBUG = false;
 const DEBUG = true;
