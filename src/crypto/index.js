@@ -319,11 +319,12 @@ function _maybeUploadOneTimeKeys(crypto) {
         crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
         return _uploadOneTimeKeys(crypto).then((res) => {
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
-                // if the response contains a more up2date value use this
+                // if the response contains a more up to date value use this
                 // for the next loop
                 return uploadLoop(res.one_time_key_counts.signed_curve25519);
             } else {
-                return uploadLoop(keyCount + keysThisLoop);
+                throw new Error("response for uploading keys does not contain "
+                              + "one_time_key_counts.signed_curve25519");
             }
         });
     }
