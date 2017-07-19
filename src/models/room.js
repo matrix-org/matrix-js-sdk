@@ -210,7 +210,9 @@ Room.prototype.getLiveTimeline = function() {
  */
 Room.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
     for (let i = 0; i < this._timelineSets.length; i++) {
-        this._timelineSets[i].resetLiveTimeline(backPaginationToken, forwardPaginationToken);
+        this._timelineSets[i].resetLiveTimeline(
+            backPaginationToken, forwardPaginationToken,
+        );
     }
 
     this._fixUpLegacyTimelineFields();

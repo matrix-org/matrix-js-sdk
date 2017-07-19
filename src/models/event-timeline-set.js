@@ -20,6 +20,7 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
+const RoomState = require("./room-state");
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -154,7 +155,9 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
  *
  * @fires module:client~MatrixClient#event:"Room.timelineReset"
  */
-EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
+EventTimelineSet.prototype.resetLiveTimeline = function(
+    backPaginationToken, forwardPaginationToken,
+) {
     // if timeline support is disabled, forget about the old timelines
     const resetAllTimelines = !this._timelineSupport || !forwardPaginationToken;
 
@@ -194,7 +197,9 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, for
         }
         this._liveTimeline.initialiseState(events);
 
-        this._liveTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+        this._liveTimeline.setPaginationToken(
+            forwardPaginationToken, EventTimeline.FORWARDS,
+        );
     }
 
     // make sure we set the pagination token before firing timelineReset,
