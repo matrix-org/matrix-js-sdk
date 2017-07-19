@@ -37,13 +37,14 @@ import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 /**
  * Cryptography bits
  *
+ * This module is internal to the js-sdk; the public API is via MatrixClient.
+ *
  * @constructor
  * @alias module:crypto
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+ * @internal
  *
- * @param {external:EventEmitter} eventEmitter event source where we can register
- *    for event notifications
+ * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
  *
  * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
  *    Store to be used for end-to-end crypto session data
@@ -57,7 +58,7 @@ import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
  * @param {module:crypto/store/base~CryptoStore} cryptoStore
  *    storage for the crypto layer.
  */
-function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
+function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -85,8 +86,9 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
         algorithms.DECRYPTION_CLASSES,
     );
 
-    // build our device keys: these will later be uploaded
     this._deviceKeys = {};
+
+    // build our device keys: these will later be uploaded
     this._deviceKeys["ed25519:" + this._deviceId] =
         this._olmDevice.deviceEd25519Key;
     this._deviceKeys["curve25519:" + this._deviceId] =
@@ -125,13 +127,24 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
             this._userId, myDevices,
         );
     }
-
-    _registerEventHandlers(this, eventEmitter);
 }
 utils.inherits(Crypto, EventEmitter);
 
+/**
+ * Initialise the crypto module so that it is ready for use
+ */
+Crypto.prototype.init = async function() {
+};
 
-function _registerEventHandlers(crypto, eventEmitter) {
+/**
+ * Tell the crypto module to register for MatrixClient events which it needs to
+ * listen for
+ *
+ * @param {external:EventEmitter} eventEmitter event source where we can register
+ *    for event notifications
+ */
+Crypto.prototype.registerEventHandlers = function(eventEmitter) {
+    const crypto = this;
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
             if (syncState === "SYNCING") {
@@ -173,7 +186,8 @@ function _registerEventHandlers(crypto, eventEmitter) {
             console.error("Error handling crypto event:", e);
         }
     });
-}
+};
+
 
 /** Start background processes related to crypto */
 Crypto.prototype.start = function() {
@@ -421,49 +435,6 @@ Crypto.prototype.getStoredDevicesForUser = function(userId) {
  */
 Crypto.prototype.getStoredDevice = function(userId, deviceId) {
     return this._deviceList.getStoredDevice(userId, deviceId);
-};
-
-/**
- * List the stored device keys for a user id
- *
- * @deprecated prefer {@link module:crypto#getStoredDevicesForUser}
- *
- * @param {string} userId the user to list keys for.
- *
- * @return {object[]} list of devices with "id", "verified", "blocked",
- *    "key", and "display_name" parameters.
- */
-Crypto.prototype.listDeviceKeys = function(userId) {
-    const devices = this.getStoredDevicesForUser(userId) || [];
-
-    const result = [];
-
-    for (let i = 0; i < devices.length; ++i) {
-        const device = devices[i];
-        const ed25519Key = device.getFingerprint();
-        if (ed25519Key) {
-            result.push({
-                id: device.deviceId,
-                key: ed25519Key,
-                verified: Boolean(device.isVerified()),
-                blocked: Boolean(device.isBlocked()),
-                display_name: device.getDisplayName(),
-            });
-        }
-    }
-
-    // sort by deviceid
-    result.sort(function(a, b) {
-        if (a.deviceId < b.deviceId) {
-            return -1;
-        }
-        if (a.deviceId > b.deviceId) {
-            return 1;
-        }
-        return 0;
-    });
-
-    return result;
 };
 
 /**

@@ -145,13 +145,10 @@ function aliDownloadsKeys() {
     expect(bobTestClient.getSigningKey()).toBeTruthy();
 
     const p1 = aliTestClient.client.downloadKeys([bobUserId]).then(function() {
-        expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([{
-            id: "bvcxz",
-            key: bobTestClient.getSigningKey(),
-            verified: false,
-            blocked: false,
-            display_name: null,
-        }]);
+        return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+    }).then((devices) => {
+        expect(devices.length).toEqual(1);
+        expect(devices[0].deviceId).toEqual("bvcxz");
     });
     const p2 = expectAliQueryKeys();
 
@@ -388,11 +385,14 @@ describe("MatrixClient crypto", function() {
         return;
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
+        await aliTestClient.client.initCrypto();
+
         bobTestClient = new TestClient(bobUserId, bobDeviceId, bobAccessToken);
+        await bobTestClient.client.initCrypto();
 
         aliMessages = [];
         bobMessages = [];
@@ -430,10 +430,11 @@ describe("MatrixClient crypto", function() {
                     aliTestClient.client.downloadKeys([bobUserId]),
                     expectAliQueryKeys(),
                 ]);
-            })
-            .then(function() {
+            }).then(function() {
+                return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+            }).then((devices) => {
                 // should get an empty list
-                expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
+                expect(devices).toEqual([]);
             })
             .nodeify(done);
     });
@@ -471,9 +472,14 @@ describe("MatrixClient crypto", function() {
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
+            return Promise.all([
+                aliTestClient.client.getStoredDevicesForUser(bobUserId),
+                aliTestClient.client.getStoredDevicesForUser(eveUserId),
+            ]);
+        }).spread((bobDevices, eveDevices) => {
             // should get an empty list
-            expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
-            expect(aliTestClient.client.listDeviceKeys(eveUserId)).toEqual([]);
+            expect(bobDevices).toEqual([]);
+            expect(eveDevices).toEqual([]);
         }).nodeify(done);
     });
 
@@ -508,8 +514,10 @@ describe("MatrixClient crypto", function() {
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
+            return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+        }).then((devices) => {
             // should get an empty list
-            expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
+            expect(devices).toEqual([]);
         }).nodeify(done);
     });
 
