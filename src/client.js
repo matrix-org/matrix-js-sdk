@@ -632,12 +632,15 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ *
+ * @return {module:client.Promise} a promise which resolves when the keys
+ *    have been imported
  */
-MatrixClient.prototype.importRoomKeys = async function(keys) {
+MatrixClient.prototype.importRoomKeys = function(keys) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
-    this._crypto.importRoomKeys(keys);
+    return this._crypto.importRoomKeys(keys);
 };
 
 // Room ops
