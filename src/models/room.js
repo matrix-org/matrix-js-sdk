@@ -205,12 +205,12 @@ Room.prototype.getLiveTimeline = function() {
  * <p>This is used when /sync returns a 'limited' timeline.
  *
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
- * @param {boolean=} flush True to remove all events in all timelines. If false, only
- * the live timeline is reset.
+ * @param {string=} forwardPaginationToken token for forward-paginating the old live timeline,
+ * if absent or null, all timelines are reset.
  */
-Room.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
+Room.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
     for (let i = 0; i < this._timelineSets.length; i++) {
-        this._timelineSets[i].resetLiveTimeline(backPaginationToken, flush);
+        this._timelineSets[i].resetLiveTimeline(backPaginationToken, forwardPaginationToken);
     }
 
     this._fixUpLegacyTimelineFields();

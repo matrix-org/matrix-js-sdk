@@ -149,13 +149,14 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
  * <p>This is used when /sync returns a 'limited' timeline.
  *
  * @param {string=} backPaginationToken   token for back-paginating the new timeline
- * @param {?bool} flush  Whether to flush the non-live timelines too.
+ * @param {string=} forwardPaginationToken token for forward-paginating the old live timeline,
+ * if absent or null, all timelines are reset.
  *
  * @fires module:client~MatrixClient#event:"Room.timelineReset"
  */
-EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flush) {
+EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, forwardPaginationToken) {
     // if timeline support is disabled, forget about the old timelines
-    const resetAllTimelines = !this._timelineSupport || flush;
+    const resetAllTimelines = !this._timelineSupport || !forwardPaginationToken;
 
     let newTimeline;
     if (resetAllTimelines) {
@@ -166,21 +167,35 @@ EventTimelineSet.prototype.resetLiveTimeline = function(backPaginationToken, flu
         newTimeline = this.addTimeline();
     }
 
-    // initialise the state in the new timeline from our last known state
-    const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
-    const events = [];
-    for (const evtype in evMap) {
-        if (!evMap.hasOwnProperty(evtype)) {
-            continue;
-        }
-        for (const stateKey in evMap[evtype]) {
-            if (!evMap[evtype].hasOwnProperty(stateKey)) {
+    // move the state objects over from the old live timeline, then we'll
+    // keep using the same RoomMember objects for the 'live' set of members
+    newTimeline._startState = this._liveTimeline._startState;
+    newTimeline._endState = this._liveTimeline._endState;
+
+    if (!resetAllTimelines) {
+        // Now regenerate the state for the previously-live timeline, because
+        // we just stole it and put it on the new live timeline
+        // (If we're resetting all timelines, don't bother because the old live
+        // timeline is about to be thrown away anyway.
+        this._liveTimeline._startState = new RoomState(this._roomId);
+        this._liveTimeline._endState = new RoomState(this._roomId);
+        const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
+        const events = [];
+        for (const evtype in evMap) {
+            if (!evMap.hasOwnProperty(evtype)) {
                 continue;
             }
-            events.push(evMap[evtype][stateKey]);
+            for (const stateKey in evMap[evtype]) {
+                if (!evMap[evtype].hasOwnProperty(stateKey)) {
+                    continue;
+                }
+                events.push(evMap[evtype][stateKey]);
+            }
         }
+        this._liveTimeline.initialiseState(events);
+
+        this._liveTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
     }
-    newTimeline.initialiseState(events);
 
     // make sure we set the pagination token before firing timelineReset,
     // otherwise clients which start back-paginating will fail, and then get
