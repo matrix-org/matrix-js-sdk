@@ -30,7 +30,6 @@ describe("MatrixClient syncing", function() {
             baseUrl: baseUrl,
             userId: selfUserId,
             accessToken: selfAccessToken,
-            useWebSockets: false,
         });
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });

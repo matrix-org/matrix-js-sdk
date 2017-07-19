@@ -24,10 +24,11 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-const q = require("q");
-const utils = require("./utils");
+import Promise from 'bluebird';
 const Filter = require("./filter");
 const MatrixError = require("./http-api").MatrixError;
+
+import reEmit from './reemit';
 
 const DEBUG = true;
 
@@ -200,34 +201,39 @@ WebSocketApi.prototype.ws_keepAlive = function() {
 };
 
 WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
-    if (this._awaiting_responses[messageId]) {
-        debuglog("Run MessageTimeout for message", messageId);
-        const curObj = this._awaiting_responses[messageId];
-        if (curObj == "ping") {
-            console.error("Timeout for sending ping-request. Try reconnecting");
-            // as reconnection will be handled in _close this is enough for here
-            this._websocket.close();
-            return;
-        }
-        if (curObj.retried > 1) {
-            curObj.defer.reject(new MatrixError({
-                error: "Locally timed out waiting for a response",
-                errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-                timeout: this.ws_timeout * 2,
-            }));
-            return;
-        }
-        if (this._websocket.readyState != WebSocket.OPEN) {
-            debuglog("WebSocket is not ready. Postponing", curObj.message);
-            this._pendingSend.push(curObj.message);
-        } else {
-            this._websocket.send(JSON.stringify(curObj.message));
-        }
-        this._awaiting_responses[messageId].retried = curObj.retried + 1 || 1;
-
-        setTimeout(this._handleResponseTimeout.bind(this, messageId),
-            this.ws_timeout * 2/3);
+    if (! this._awaiting_responses[messageId]) {
+        return;
     }
+    debuglog("Run MessageTimeout for message", messageId);
+    const curObj = this._awaiting_responses[messageId];
+    if (curObj == "ping") {
+        console.error("Timeout for sending ping-request. Try reconnecting");
+        // as reconnection will be handled in _close this is enough for here
+        this._websocket.close();
+        return;
+    }
+    if (curObj.retried > 1) {
+        curObj.defer.reject(new MatrixError({
+            error: "Locally timed out waiting for a response",
+            errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
+            timeout: this.ws_timeout * 2,
+        }));
+        delete this._awaiting_responses[messageId];
+        return;
+    }
+    if (this._websocket.readyState != WebSocket.OPEN) {
+        debuglog("WebSocket is not ready. Postponing", curObj.message);
+        if (!curObj.pending) {
+            this._awaiting_responses[messageId].pending = true;
+            this._pendingSend.push(curObj.message);
+        }
+    } else {
+        this._websocket.send(JSON.stringify(curObj.message));
+    }
+    this._awaiting_responses[messageId].retried = curObj.retried + 1 || 1;
+
+    setTimeout(this._handleResponseTimeout.bind(this, messageId),
+        this.ws_timeout * 2/3);
 };
 
 /**
@@ -323,7 +329,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
             }
         });
     } else {
-        syncPromise = q(null);
+        syncPromise = Promise.resolve(null);
     }
 
     syncPromise.then((syncToken) => {
@@ -504,23 +510,25 @@ WebSocketApi.prototype.handleSync = function(data) {
 };
 
 WebSocketApi.prototype.sendObject = function(message) {
-    const defer = q.defer();
+    const defer = Promise.defer();
     if (!message.method) {
         return defer.reject("No method in sending object");
     }
     message.id = message.id || this.client.makeTxnId();
 
-    if (this._websocket.readyState != WebSocket.OPEN) {
-        debuglog("WebSocket is not ready. Postponing", message);
-        this._pendingSend.push(message);
-    } else {
-        this._websocket.send(JSON.stringify(message));
-    }
-
     this._awaiting_responses[message.id] = {
         message: message,
         defer: defer,
     };
+
+    if (this._websocket.readyState != WebSocket.OPEN) {
+        debuglog("WebSocket is not ready. Postponing", message);
+        this._pendingSend.push(message);
+        this._awaiting_responses[message.id].pending = true;
+    } else {
+        this._websocket.send(JSON.stringify(message));
+    }
+
     setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout * 2/3);
     return defer.promise;
 };
@@ -564,6 +572,35 @@ WebSocketApi.prototype.sendPing = function() {
     }));
     this._awaiting_responses[txnId] = "ping";
     setTimeout(this._handleResponseTimeout.bind(this, txnId), this.ws_timeout);
+};
+
+/**
+ * @param {Object} opts Options to apply
+ * @param {string} opts.presence One of "online", "offline" or "unavailable"
+ * @param {string} opts.status_msg The status message to attach.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ * @throws If 'presence' isn't a valid presence enum value.
+ */
+WebSocketApi.prototype.sendPresence = function(opts) {
+    const validStates = ["offline", "online", "unavailable"];
+    if (validStates.indexOf(opts.presence) == -1) {
+        throw new Error("Bad presence value: " + opts.presence);
+    }
+
+    const txnId = this.client.makeTxnId();
+    const message = {
+        id: txnId,
+        method: "presence",
+        params: {
+            "presence": opts.presence,
+        },
+    };
+    if (opts.status_msg) {
+        message.params.status_msg = opts.status_msg;
+    }
+
+    return this.sendObject(message);
 };
 
 /**
@@ -641,24 +678,6 @@ WebSocketApi.prototype._onOnline = function() {
     debuglog("Browser thinks we are back online");
     this.client._syncApi._startKeepAlives(0);
 };
-
-function reEmit(reEmitEntity, emittableEntity, eventNames) {
-    utils.forEach(eventNames, function(eventName) {
-        // setup a listener on the entity (the Room, User, etc) for this event
-        emittableEntity.on(eventName, function() {
-            // take the args from the listener and reuse them, adding the
-            // event name to the arg list so it works with .emit()
-            // Transformation Example:
-            // listener on "foo" => function(a,b) { ... }
-            // Re-emit on "thing" => thing.emit("foo", a, b)
-            const newArgs = [eventName];
-            for (let i = 0; i < arguments.length; i++) {
-                newArgs.push(arguments[i]);
-            }
-            reEmitEntity.emit(...newArgs);
-        });
-    });
-}
 
 /** */
 module.exports = WebSocketApi;
