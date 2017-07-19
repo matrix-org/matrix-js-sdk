@@ -404,7 +404,7 @@ describe("Room", function() {
         it("should copy state from previous timeline", function() {
             room.addLiveEvents([events[0], events[1]]);
             expect(room.getLiveTimeline().getEvents().length).toEqual(2);
-            room.resetLiveTimeline();
+            room.resetLiveTimeline('sometoken', 'someothertoken');
 
             room.addLiveEvents([events[2]]);
             const oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
@@ -417,7 +417,7 @@ describe("Room", function() {
         it("should reset the legacy timeline fields", function() {
             room.addLiveEvents([events[0], events[1]]);
             expect(room.timeline.length).toEqual(2);
-            room.resetLiveTimeline();
+            room.resetLiveTimeline('sometoken', 'someothertoken');
 
             room.addLiveEvents([events[2]]);
             const newLiveTimeline = room.getLiveTimeline();
@@ -451,7 +451,7 @@ describe("Room", function() {
             room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
             const firstLiveTimeline = room.getLiveTimeline();
-            room.resetLiveTimeline();
+            room.resetLiveTimeline('sometoken', 'someothertoken');
 
             const tl = room.getTimelineForEvent(events[0].getId());
             expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
