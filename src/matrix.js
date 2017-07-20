@@ -16,9 +16,6 @@ limitations under the License.
 */
 "use strict";
 
-// make sure that the regenerator-runtime has been loaded
-import 'regenerator-runtime/runtime';
-
 /** The {@link module:models/event.MatrixEvent|MatrixEvent} class. */
 module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 /** The {@link module:models/event.EventStatus|EventStatus} enum. */
