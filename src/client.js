@@ -2135,7 +2135,7 @@ MatrixClient.prototype.resetNotifTimelineSet = function() {
     // know about /notifications, so we have no choice but to start paginating
     // from the current point in time.  This may well overlap with historical
     // notifs which are then inserted into the timeline by /sync responses.
-    this._notifTimelineSet.resetLiveTimeline('end', true);
+    this._notifTimelineSet.resetLiveTimeline('end', null);
 
     // we could try to paginate a single event at this point in order to get
     // a more valid pagination token, but it just ends up with an out of order

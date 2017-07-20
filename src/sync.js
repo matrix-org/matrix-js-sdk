@@ -885,14 +885,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             }
 
             if (limited) {
-                // save the old 'next_batch' token as the
-                // forward-pagination token for the previously-active
-                // timeline.
-                room.currentState.paginationToken = syncToken;
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId),
+                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncToken,
                 );
 
                 // We have to assume any gap in any timeline is
