@@ -177,8 +177,10 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
         newTimeline = this.addTimeline();
     }
 
+    const oldTimeline = this._liveTimeline;
+
     // Collect the state events from the old timeline
-    const evMap = this._liveTimeline.getState(EventTimeline.FORWARDS).events;
+    const evMap = oldTimeline.getState(EventTimeline.FORWARDS).events;
     const events = [];
     for (const evtype in evMap) {
         if (!evMap.hasOwnProperty(evtype)) {
@@ -200,18 +202,18 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
     // previous live timeline. It will be identical except that we'll keep
     // using the same RoomMember objects for the 'live' set of members with any
     // listeners still attached
-    newTimeline._endState = this._liveTimeline._endState;
+    newTimeline._endState = oldTimeline._endState;
 
     // If we're not resetting all timelines, we need to fix up the old live timeline
     if (!resetAllTimelines) {
         // Firstly, we just stole the old timeline's end state, so it needs a new one.
         // Just swap them around and give it the one we just generated for the
         // new live timeline.
-        this._liveTimeline._endState = freshEndState;
+        oldTimeline._endState = freshEndState;
 
         // Now set the forward pagination token on the old live timeline
         // so it can be forward-paginated.
-        this._liveTimeline.setPaginationToken(
+        oldTimeline.setPaginationToken(
             forwardPaginationToken, EventTimeline.FORWARDS,
         );
     }
