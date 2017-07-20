@@ -157,6 +157,14 @@ EventTimelineSet.prototype.replaceEventId = function(oldEventId, newEventId) {
 EventTimelineSet.prototype.resetLiveTimeline = function(
     backPaginationToken, forwardPaginationToken,
 ) {
+    // Each EventTimeline has RoomState objects tracking the state at the start
+    // and end of that timeline. The copies at the end of the live timeline are
+    // special because they will have listeners attached to monitor changes to
+    // the current room state, so we move this RoomState from the end of the
+    // current live timeline to the end of the new one and, if necessary,
+    // replace it with the fresh one created for the new timeline. We also make
+    // a copy for the start of the new timeline.
+
     // if timeline support is disabled, forget about the old timelines
     const resetAllTimelines = !this._timelineSupport || !forwardPaginationToken;
 
