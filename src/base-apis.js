@@ -412,6 +412,30 @@ MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
 };
 
 /**
+ * @param {string} groupId
+ * @param {Object} profile The group profile object, with name, avatar_url,
+ * short_description and long_description keys.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
+    const path = utils.encodeUri("/groups/$groupId/profile", {$groupId: groupId});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, profile,
+    );
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group users list object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/users", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
  * @return {module:client.Promise} Resolves: The groups to which the user is joined
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
