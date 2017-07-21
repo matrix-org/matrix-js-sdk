@@ -175,17 +175,6 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
             console.error("Error handling toDeviceEvent:", e);
         }
     });
-
-    eventEmitter.on("event", function(event) {
-        try {
-            if (!event.isState() || event.getType() != "m.room.encryption") {
-                return;
-            }
-            crypto._onCryptoEvent(event);
-        } catch (e) {
-            console.error("Error handling crypto event:", e);
-        }
-    });
 };
 
 
@@ -841,10 +830,9 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
 /**
  * handle an m.room.encryption event
  *
- * @private
  * @param {module:models/event.MatrixEvent} event encryption event
  */
-Crypto.prototype._onCryptoEvent = function(event) {
+Crypto.prototype.onCryptoEvent = async function(event) {
     const roomId = event.getRoomId();
     const content = event.getContent();
 
