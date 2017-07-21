@@ -439,10 +439,11 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
  * @param {?boolean} known whether to mark that the user has been made aware of
  *      the existence of this device. Null to leave unchanged
  *
- * @return {module:crypto/deviceinfo} updated DeviceInfo
+ * @return {Promise<module:crypto/deviceinfo>} updated DeviceInfo
  */
-Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
-                                                  blocked, known) {
+Crypto.prototype.setDeviceVerification = async function(
+    userId, deviceId, verified, blocked, known,
+) {
     const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);

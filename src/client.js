@@ -523,7 +523,7 @@ async function _setDeviceVerification(
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    const dev = client._crypto.setDeviceVerification(
+    const dev = await client._crypto.setDeviceVerification(
         userId, deviceId, verified, blocked, known,
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
