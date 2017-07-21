@@ -590,14 +590,13 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
  * Enable end-to-end encryption for a room.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
- * @return {Object} A promise that will resolve when encryption is setup.
+ * @return {Promise} A promise that will resolve when encryption is set up.
  */
 MatrixClient.prototype.setRoomEncryption = function(roomId, config) {
     if (!this._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    this._crypto.setRoomEncryption(roomId, config);
-    return Promise.resolve();
+    return this._crypto.setRoomEncryption(roomId, config);
 };
 
 /**

@@ -580,7 +580,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
  *   users in the room (for now)
  */
-Crypto.prototype.setRoomEncryption = function(roomId, config, inhibitDeviceQuery) {
+Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
     const existingConfig = this._sessionStore.getEndToEndRoom(roomId);
@@ -842,7 +842,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
     try {
         // inhibit the device list refresh for now - it will happen once we've
         // finished processing the sync, in _onSyncCompleted.
-        this.setRoomEncryption(roomId, content, true);
+        await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
                       ":", e);
