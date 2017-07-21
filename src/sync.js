@@ -52,11 +52,11 @@ function getFilterName(userId, suffix) {
     return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
 }
 
-function debuglog() {
+function debuglog(...params) {
     if (!DEBUG) {
         return;
     }
-    console.log(...arguments);
+    console.log(...params);
 }
 
 
