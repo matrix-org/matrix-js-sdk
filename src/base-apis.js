@@ -413,8 +413,11 @@ MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
 
 /**
  * @param {string} groupId
- * @param {Object} profile The group profile object, with name, avatar_url,
- * short_description and long_description keys.
+ * @param {Object} profile The group profile object
+ * @param {string=} profile.name Name of the group
+ * @param {string=} profile.avatar_url MXC avatar URL
+ * @param {string=} profile.short_description A short description of the room
+ * @param {string=} profile.long_description A longer HTML description of the room
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
