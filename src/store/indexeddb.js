@@ -115,12 +115,16 @@ utils.inherits(IndexedDBStore, MatrixInMemoryStore);
   */
 IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
+        console.log(`IndexedDBStore.startup: already started`);
         return Promise.resolve();
     }
 
+    console.log(`IndexedDBStore.startup: connecting to backend`);
     return this.backend.connect().then(() => {
+        console.log(`IndexedDBStore.startup: loading presence events`);
         return this.backend.getUserPresenceEvents();
     }).then((userPresenceEvents) => {
+        console.log(`IndexedDBStore.startup: processing presence events`);
         userPresenceEvents.forEach(([userId, rawEvent]) => {
             const u = new User(userId);
             if (rawEvent) {
