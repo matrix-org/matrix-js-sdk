@@ -60,7 +60,8 @@ describe("MegolmDecryption", function() {
         // we stub out the olm encryption bits
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = expect.createSpy();
-        mockOlmLib.encryptMessageForDevice = expect.createSpy();
+        mockOlmLib.encryptMessageForDevice =
+            expect.createSpy().andReturn(Promise.resolve());
         megolmDecryption.olmlib = mockOlmLib;
     });
 

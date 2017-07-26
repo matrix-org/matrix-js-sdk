@@ -288,7 +288,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
     return olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
     ).then(function(devicemap) {
-        let haveTargets = false;
+        const promises = [];
 
         for (const userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
@@ -328,31 +328,35 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                     ciphertext: {},
                 };
 
-                olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    self._userId,
-                    self._deviceId,
-                    self._olmDevice,
-                    userId,
-                    deviceInfo,
-                    payload,
-                );
-
                 if (!contentMap[userId]) {
                     contentMap[userId] = {};
                 }
 
                 contentMap[userId][deviceId] = encryptedContent;
-                haveTargets = true;
+
+                promises.push(
+                    olmlib.encryptMessageForDevice(
+                        encryptedContent.ciphertext,
+                        self._userId,
+                        self._deviceId,
+                        self._olmDevice,
+                        userId,
+                        deviceInfo,
+                        payload,
+                    ),
+                );
             }
         }
 
-        if (!haveTargets) {
+        if (promises.length === 0) {
+            // no devices to send to
             return Promise.resolve();
         }
 
-        // TODO: retries
-        return self._baseApis.sendToDevice("m.room.encrypted", contentMap);
+        return Promise.all(promises).then(() => {
+            // TODO: retries
+            return self._baseApis.sendToDevice("m.room.encrypted", contentMap);
+        });
     }).then(function() {
         console.log(`Completed megolm keyshare in ${self._roomId}`);
 
@@ -753,7 +757,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             //
             // ensureOlmSessionsForUsers has already done the logging,
             // so just skip it.
-            return;
+            return null;
         }
 
         console.log(
@@ -772,7 +776,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             ciphertext: {},
         };
 
-        this.olmlib.encryptMessageForDevice(
+        return this.olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
             this._userId,
             this._deviceId,
@@ -780,16 +784,16 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             userId,
             deviceInfo,
             payload,
-        );
+        ).then(() => {
+            const contentMap = {
+                [userId]: {
+                    [deviceId]: encryptedContent,
+                },
+            };
 
-        const contentMap = {
-            [userId]: {
-                [deviceId]: encryptedContent,
-            },
-        };
-
-        // TODO: retries
-        return this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+            // TODO: retries
+            return this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+        });
     }).done();
 };
 

@@ -48,8 +48,11 @@ module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
  * @param {string} recipientUserId
  * @param {module:crypto/deviceinfo} recipientDevice
  * @param {object} payloadFields fields to include in the encrypted payload
+ *
+ * Returns a promise which resolves (to undefined) when the payload
+ *    has been encrypted into `resultsObject`
  */
-module.exports.encryptMessageForDevice = function(
+module.exports.encryptMessageForDevice = async function(
     resultsObject,
     ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
     payloadFields,
