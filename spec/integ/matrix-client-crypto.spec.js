@@ -595,19 +595,9 @@ describe("MatrixClient crypto", function() {
 
                     expect(event.isEncrypted()).toBeTruthy();
 
-                    // it will still be encrypted at first - wait for it to be decrypted.
-                    expect(event.getType()).toEqual("m.room.encrypted");
-                    expect(event.isBeingDecrypted()).toBe(true);
-
-                    console.log(
-                        `bob waiting for event to be decrypted`,
-                    );
-                    event.once('Event.decrypted', (ev) => {
-                        expect(ev).toBe(event);
-                        expect(event.getType()).toEqual("m.room.message");
-                        expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
-                        deferred.resolve();
-                    });
+                    expect(event.getType()).toEqual("m.room.message");
+                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
+                    deferred.resolve();
                 };
 
                 bobTestClient.client.once("event", onEvent);
