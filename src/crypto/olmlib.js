@@ -121,7 +121,7 @@ module.exports.encryptMessageForDevice = async function(
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
-module.exports.ensureOlmSessionsForDevices = function(
+module.exports.ensureOlmSessionsForDevices = async function(
     olmDevice, baseApis, devicesByUser,
 ) {
     const devicesWithoutSession = [
@@ -151,7 +151,7 @@ module.exports.ensureOlmSessionsForDevices = function(
     }
 
     if (devicesWithoutSession.length === 0) {
-        return Promise.resolve(result);
+        return result;
     }
 
     // TODO: this has a race condition - if we try to send another message
@@ -161,52 +161,54 @@ module.exports.ensureOlmSessionsForDevices = function(
     // That should eventually resolve itself, but it's poor form.
 
     const oneTimeKeyAlgorithm = "signed_curve25519";
-    return baseApis.claimOneTimeKeys(
+    const res = await baseApis.claimOneTimeKeys(
         devicesWithoutSession, oneTimeKeyAlgorithm,
-    ).then(function(res) {
-        const otk_res = res.one_time_keys || {};
-        const promises = [];
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
+    );
+
+    const otk_res = res.one_time_keys || {};
+    const promises = [];
+    for (const userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
+        const userRes = otk_res[userId] || {};
+        const devices = devicesByUser[userId];
+        for (let j = 0; j < devices.length; j++) {
+            const deviceInfo = devices[j];
+            const deviceId = deviceInfo.deviceId;
+            if (result[userId][deviceId].sessionId) {
+                // we already have a result for this device
                 continue;
             }
-            const userRes = otk_res[userId] || {};
-            const devices = devicesByUser[userId];
-            for (let j = 0; j < devices.length; j++) {
-                const deviceInfo = devices[j];
-                const deviceId = deviceInfo.deviceId;
-                if (result[userId][deviceId].sessionId) {
-                    // we already have a result for this device
-                    continue;
-                }
 
-                const deviceRes = userRes[deviceId] || {};
-                let oneTimeKey = null;
-                for (const keyId in deviceRes) {
-                    if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
-                        oneTimeKey = deviceRes[keyId];
-                    }
+            const deviceRes = userRes[deviceId] || {};
+            let oneTimeKey = null;
+            for (const keyId in deviceRes) {
+                if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
+                    oneTimeKey = deviceRes[keyId];
                 }
-
-                if (!oneTimeKey) {
-                    console.warn(
-                        "No one-time keys (alg=" + oneTimeKeyAlgorithm +
-                            ") for device " + userId + ":" + deviceId,
-                    );
-                    continue;
-                }
-
-                promises.push(
-                    _verifyKeyAndStartSession(
-                        olmDevice, oneTimeKey, userId, deviceInfo,
-                    ).then((sid) => {
-                        result[userId][deviceId].sessionId = sid;
-                    }),
-                );
             }
+
+            if (!oneTimeKey) {
+                console.warn(
+                    "No one-time keys (alg=" + oneTimeKeyAlgorithm +
+                        ") for device " + userId + ":" + deviceId,
+                );
+                continue;
+            }
+
+            promises.push(
+                _verifyKeyAndStartSession(
+                    olmDevice, oneTimeKey, userId, deviceInfo,
+                ).then((sid) => {
+                    result[userId][deviceId].sessionId = sid;
+                }),
+            );
         }
-        return Promise.all(promises).return(result);
-    });
+    }
+
+    await Promise.all(promises);
+    return result;
 };
 
 async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
