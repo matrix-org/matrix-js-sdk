@@ -37,13 +37,14 @@ import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 /**
  * Cryptography bits
  *
+ * This module is internal to the js-sdk; the public API is via MatrixClient.
+ *
  * @constructor
  * @alias module:crypto
  *
- * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
+ * @internal
  *
- * @param {external:EventEmitter} eventEmitter event source where we can register
- *    for event notifications
+ * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
  *
  * @param {module:store/session/webstorage~WebStorageSessionStore} sessionStore
  *    Store to be used for end-to-end crypto session data
@@ -57,7 +58,7 @@ import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
  * @param {module:crypto/store/base~CryptoStore} cryptoStore
  *    storage for the crypto layer.
  */
-function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
+function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -85,8 +86,9 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
         algorithms.DECRYPTION_CLASSES,
     );
 
-    // build our device keys: these will later be uploaded
     this._deviceKeys = {};
+
+    // build our device keys: these will later be uploaded
     this._deviceKeys["ed25519:" + this._deviceId] =
         this._olmDevice.deviceEd25519Key;
     this._deviceKeys["curve25519:" + this._deviceId] =
@@ -125,13 +127,24 @@ function Crypto(baseApis, eventEmitter, sessionStore, userId, deviceId,
             this._userId, myDevices,
         );
     }
-
-    _registerEventHandlers(this, eventEmitter);
 }
 utils.inherits(Crypto, EventEmitter);
 
+/**
+ * Initialise the crypto module so that it is ready for use
+ */
+Crypto.prototype.init = async function() {
+};
 
-function _registerEventHandlers(crypto, eventEmitter) {
+/**
+ * Tell the crypto module to register for MatrixClient events which it needs to
+ * listen for
+ *
+ * @param {external:EventEmitter} eventEmitter event source where we can register
+ *    for event notifications
+ */
+Crypto.prototype.registerEventHandlers = function(eventEmitter) {
+    const crypto = this;
     eventEmitter.on("sync", function(syncState, oldState, data) {
         try {
             if (syncState === "SYNCING") {
@@ -151,29 +164,10 @@ function _registerEventHandlers(crypto, eventEmitter) {
     });
 
     eventEmitter.on("toDeviceEvent", function(event) {
-        try {
-            if (event.getType() == "m.room_key"
-                    || event.getType() == "m.forwarded_room_key") {
-                crypto._onRoomKeyEvent(event);
-            } else if (event.getType() == "m.room_key_request") {
-                crypto._onRoomKeyRequestEvent(event);
-            }
-        } catch (e) {
-            console.error("Error handling toDeviceEvent:", e);
-        }
+        crypto._onToDeviceEvent(event);
     });
+};
 
-    eventEmitter.on("event", function(event) {
-        try {
-            if (!event.isState() || event.getType() != "m.room.encryption") {
-                return;
-            }
-            crypto._onCryptoEvent(event);
-        } catch (e) {
-            console.error("Error handling crypto event:", e);
-        }
-    });
-}
 
 /** Start background processes related to crypto */
 Crypto.prototype.start = function() {
@@ -246,6 +240,20 @@ Crypto.prototype.uploadDeviceKeys = function() {
     });
 };
 
+/**
+ * Stores the current one_time_key count which will be handled later (in a call of
+ * _onSyncCompleted). The count is e.g. coming from a /sync response.
+ *
+ * @param {Number} currentCount The current count of one_time_keys to be stored
+ */
+Crypto.prototype.updateOneTimeKeyCount = function(currentCount) {
+    if (isFinite(currentCount)) {
+        this._oneTimeKeyCount = currentCount;
+    } else {
+        throw new TypeError("Parameter for updateOneTimeKeyCount has to be a number");
+    }
+};
+
 // check if it's time to upload one-time keys, and do so if so.
 function _maybeUploadOneTimeKeys(crypto) {
     // frequency with which to check & upload one-time keys
@@ -271,61 +279,75 @@ function _maybeUploadOneTimeKeys(crypto) {
 
     crypto._lastOneTimeKeyCheck = now;
 
-    function uploadLoop(numberToGenerate) {
-        if (numberToGenerate <= 0) {
+    // We need to keep a pool of one time public keys on the server so that
+    // other devices can start conversations with us. But we can only store
+    // a finite number of private keys in the olm Account object.
+    // To complicate things further then can be a delay between a device
+    // claiming a public one time key from the server and it sending us a
+    // message. We need to keep the corresponding private key locally until
+    // we receive the message.
+    // But that message might never arrive leaving us stuck with duff
+    // private keys clogging up our local storage.
+    // So we need some kind of enginering compromise to balance all of
+    // these factors.
+
+    // Check how many keys we can store in the Account object.
+    const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
+    // Try to keep at most half that number on the server. This leaves the
+    // rest of the slots free to hold keys that have been claimed from the
+    // server but we haven't recevied a message for.
+    // If we run out of slots when generating new keys then olm will
+    // discard the oldest private keys first. This will eventually clean
+    // out stale private keys that won't receive a message.
+    const keyLimit = Math.floor(maxOneTimeKeys / 2);
+
+    function uploadLoop(keyCount) {
+        if (keyLimit <= keyCount) {
             // If we don't need to generate any more keys then we are done.
             return;
         }
 
-        const keysThisLoop = Math.min(numberToGenerate, maxKeysPerCycle);
+        const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
 
         // Ask olm to generate new one time keys, then upload them to synapse.
         crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
-        return _uploadOneTimeKeys(crypto).then(() => {
-            return uploadLoop(numberToGenerate - keysThisLoop);
+        return _uploadOneTimeKeys(crypto).then((res) => {
+            if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
+                // if the response contains a more up to date value use this
+                // for the next loop
+                return uploadLoop(res.one_time_key_counts.signed_curve25519);
+            } else {
+                throw new Error("response for uploading keys does not contain "
+                              + "one_time_key_counts.signed_curve25519");
+            }
         });
     }
 
     crypto._oneTimeKeyCheckInProgress = true;
     Promise.resolve().then(() => {
+        if (crypto._oneTimeKeyCount !== undefined) {
+            // We already have the current one_time_key count from a /sync response.
+            // Use this value instead of asking the server for the current key count.
+            return Promise.resolve(crypto._oneTimeKeyCount);
+        }
         // ask the server how many keys we have
         return crypto._baseApis.uploadKeysRequest({}, {
             device_id: crypto._deviceId,
+        }).then((res) => {
+            return res.one_time_key_counts.signed_curve25519 || 0;
         });
-    }).then((res) => {
-        // We need to keep a pool of one time public keys on the server so that
-        // other devices can start conversations with us. But we can only store
-        // a finite number of private keys in the olm Account object.
-        // To complicate things further then can be a delay between a device
-        // claiming a public one time key from the server and it sending us a
-        // message. We need to keep the corresponding private key locally until
-        // we receive the message.
-        // But that message might never arrive leaving us stuck with duff
-        // private keys clogging up our local storage.
-        // So we need some kind of enginering compromise to balance all of
-        // these factors.
-
-        // We first find how many keys the server has for us.
-        const keyCount = res.one_time_key_counts.signed_curve25519 || 0;
-        // We then check how many keys we can store in the Account object.
-        const maxOneTimeKeys = crypto._olmDevice.maxNumberOfOneTimeKeys();
-        // Try to keep at most half that number on the server. This leaves the
-        // rest of the slots free to hold keys that have been claimed from the
-        // server but we haven't recevied a message for.
-        // If we run out of slots when generating new keys then olm will
-        // discard the oldest private keys first. This will eventually clean
-        // out stale private keys that won't receive a message.
-        const keyLimit = Math.floor(maxOneTimeKeys / 2);
-
-        // We work out how many new keys we need to create to top up the server
+    }).then((keyCount) => {
+        // Start the uploadLoop with the current keyCount. The function checks if
+        // we need to upload new keys or not.
         // If there are too many keys on the server then we don't need to
         // create any more keys.
-        const numberToGenerate = Math.max(keyLimit - keyCount, 0);
-
-        return uploadLoop(numberToGenerate);
+        return uploadLoop(keyCount);
     }).catch((e) => {
         console.error("Error uploading one-time keys", e.stack || e);
     }).finally(() => {
+        // reset _oneTimeKeyCount to prevent start uploading based on old data.
+        // it will be set again on the next /sync-response
+        crypto._oneTimeKeyCount = undefined;
         crypto._oneTimeKeyCheckInProgress = false;
     }).done();
 }
@@ -393,49 +415,6 @@ Crypto.prototype.getStoredDevicesForUser = function(userId) {
  */
 Crypto.prototype.getStoredDevice = function(userId, deviceId) {
     return this._deviceList.getStoredDevice(userId, deviceId);
-};
-
-/**
- * List the stored device keys for a user id
- *
- * @deprecated prefer {@link module:crypto#getStoredDevicesForUser}
- *
- * @param {string} userId the user to list keys for.
- *
- * @return {object[]} list of devices with "id", "verified", "blocked",
- *    "key", and "display_name" parameters.
- */
-Crypto.prototype.listDeviceKeys = function(userId) {
-    const devices = this.getStoredDevicesForUser(userId) || [];
-
-    const result = [];
-
-    for (let i = 0; i < devices.length; ++i) {
-        const device = devices[i];
-        const ed25519Key = device.getFingerprint();
-        if (ed25519Key) {
-            result.push({
-                id: device.deviceId,
-                key: ed25519Key,
-                verified: Boolean(device.isVerified()),
-                blocked: Boolean(device.isBlocked()),
-                display_name: device.getDisplayName(),
-            });
-        }
-    }
-
-    // sort by deviceid
-    result.sort(function(a, b) {
-        if (a.deviceId < b.deviceId) {
-            return -1;
-        }
-        if (a.deviceId > b.deviceId) {
-            return 1;
-        }
-        return 0;
-    });
-
-    return result;
 };
 
 /**
@@ -789,12 +768,13 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
  *
  * @param {MatrixEvent} event
  *
- * @raises {algorithms.DecryptionError} if there is a problem decrypting the event
+ * @return {Promise} resolves once we have finished decrypting. Rejects with an
+ * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
 Crypto.prototype.decryptEvent = function(event) {
     const content = event.getWireContent();
     const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
-    alg.decryptEvent(event);
+    return alg.decryptEvent(event);
 };
 
 /**
@@ -842,10 +822,9 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
 /**
  * handle an m.room.encryption event
  *
- * @private
  * @param {module:models/event.MatrixEvent} event encryption event
  */
-Crypto.prototype._onCryptoEvent = function(event) {
+Crypto.prototype.onCryptoEvent = async function(event) {
     const roomId = event.getRoomId();
     const content = event.getContent();
 
@@ -972,6 +951,25 @@ Crypto.prototype._getE2eRooms = function() {
 
         return true;
     });
+};
+
+
+Crypto.prototype._onToDeviceEvent = function(event) {
+    try {
+        if (event.getType() == "m.room_key"
+            || event.getType() == "m.forwarded_room_key") {
+            this._onRoomKeyEvent(event);
+        } else if (event.getType() == "m.room_key_request") {
+            this._onRoomKeyRequestEvent(event);
+        } else if (event.isBeingDecrypted()) {
+            // once the event has been decrypted, try again
+            event.once('Event.decrypted', (ev) => {
+                this._onToDeviceEvent(ev);
+            });
+        }
+    } catch (e) {
+        console.error("Error handling toDeviceEvent:", e);
+    }
 };
 
 /**

@@ -280,12 +280,13 @@ describe("megolm", function() {
         return claimResponse;
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs",
         );
+        await aliceTestClient.client.initCrypto();
 
         testOlmAccount = new Olm.Account();
         testOlmAccount.create();
@@ -1079,10 +1080,10 @@ describe("megolm", function() {
             aliceTestClient = new TestClient(
                 "@alice:localhost", "device2", "access_token2",
             );
-
-            aliceTestClient.client.importRoomKeys(exported);
-
-            return aliceTestClient.start();
+            return aliceTestClient.client.initCrypto().then(() => {
+                aliceTestClient.client.importRoomKeys(exported);
+                return aliceTestClient.start();
+            });
         }).then(function() {
             const syncResponse = {
                 next_batch: 1,

@@ -52,11 +52,11 @@ function getFilterName(userId, suffix) {
     return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
 }
 
-function debuglog() {
+function debuglog(...params) {
     if (!DEBUG) {
         return;
     }
-    console.log(...arguments);
+    console.log(...params);
 }
 
 
@@ -603,39 +603,36 @@ SyncApi.prototype._sync = function(syncOptions) {
             return Promise.resolve(data);
         }
     }).done((data) => {
-        try {
-            self._processSyncResponse(syncToken, data);
-        } catch (e) {
+        self._processSyncResponse(syncToken, data).catch((e) => {
             // log the exception with stack if we have it, else fall back
             // to the plain description
             console.error("Caught /sync error", e.stack || e);
-        }
+        }).then(() => {
+            // emit synced events
+            const syncEventData = {
+                oldSyncToken: syncToken,
+                nextSyncToken: data.next_batch,
+                catchingUp: self._catchingUp,
+            };
 
-        // emit synced events
-        const syncEventData = {
-            oldSyncToken: syncToken,
-            nextSyncToken: data.next_batch,
-            catchingUp: self._catchingUp,
-        };
+            if (!syncOptions.hasSyncedBefore) {
+                self._updateSyncState("PREPARED", syncEventData);
+                syncOptions.hasSyncedBefore = true;
+            }
 
-        if (!syncOptions.hasSyncedBefore) {
-            self._updateSyncState("PREPARED", syncEventData);
-            syncOptions.hasSyncedBefore = true;
-        }
+            // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+            if (!isCachedResponse) {
+                self._updateSyncState("SYNCING", syncEventData);
 
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        if (!isCachedResponse) {
-            self._updateSyncState("SYNCING", syncEventData);
+                // tell databases that everything is now in a consistent state and can be
+                // saved (no point doing so if we only have the data we just got out of the
+                // store).
+                client.store.save();
+            }
 
-            // tell databases that everything is now in a consistent state and can be
-            // saved (no point doing so if we only have the data we just got out of the
-            // store).
-            client.store.save();
-        }
-
-
-        // Begin next sync
-        self._sync(syncOptions);
+            // Begin next sync
+            self._sync(syncOptions);
+        });
     }, function(err) {
         if (!self._running) {
             debuglog("Sync no longer running: exiting");
@@ -680,7 +677,7 @@ SyncApi.prototype._sync = function(syncOptions) {
  *    sync request.
  * @param {Object} data The response from /sync
  */
-SyncApi.prototype._processSyncResponse = function(syncToken, data) {
+SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     const client = this.client;
     const self = this;
 
@@ -691,6 +688,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     //    account_data: { events: [] },
     //    device_lists: { changed: ["@user:server", ... ]},
     //    to_device: { events: [] },
+    //    device_one_time_keys_count: { signed_curve25519: 42 },
     //    rooms: {
     //      invite: {
     //        $roomid: {
@@ -821,7 +819,7 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
     });
 
     // Handle joins
-    joinRooms.forEach(function(joinObj) {
+    await Promise.mapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
@@ -884,14 +882,10 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             }
 
             if (limited) {
-                // save the old 'next_batch' token as the
-                // forward-pagination token for the previously-active
-                // timeline.
-                room.currentState.paginationToken = syncToken;
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId),
+                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -918,12 +912,16 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
             client.store.storeRoom(room);
             client.emit("Room", room);
         }
-        stateEvents.forEach(function(e) {
+
+        async function processRoomEvent(e) {
             client.emit("event", e);
-        });
-        timelineEvents.forEach(function(e) {
-            client.emit("event", e);
-        });
+            if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
+                await self.opts.crypto.onCryptoEvent(e);
+            }
+        }
+
+        await Promise.mapSeries(stateEvents, processRoomEvent);
+        await Promise.mapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
@@ -981,6 +979,12 @@ SyncApi.prototype._processSyncResponse = function(syncToken, data) {
         data.device_lists.changed.forEach((u) => {
             this.opts.crypto.userDeviceListChanged(u);
         });
+    }
+
+    // Handle one_time_keys_count
+    if (this.opts.crypto && data.device_one_time_keys_count) {
+        const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
+        this.opts.crypto.updateOneTimeKeyCount(currentCount);
     }
 };
 

@@ -5,6 +5,7 @@ const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
 import expect from 'expect';
+import Promise from 'bluebird';
 
 describe("MatrixClient events", function() {
     const baseUrl = "http://localhost.or.something";
@@ -101,7 +102,7 @@ describe("MatrixClient events", function() {
         };
 
         it("should emit events from both the first and subsequent /sync calls",
-        function(done) {
+        function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
@@ -130,11 +131,16 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            return Promise.all([
+                // wait for two SYNCING events
+                utils.syncPromise(client).then(() => {
+                    return utils.syncPromise(client);
+                }),
+                httpBackend.flushAllExpected(),
+            ]).then(() => {
                 expect(expectedEvents.length).toEqual(
                     0, "Failed to see all events from /sync calls",
                 );
-                done();
             });
         });
 

@@ -93,7 +93,14 @@ describe("MatrixClient retrying", function() {
             }).toThrow();
         }).respond(400); // fail the first message
 
-        const p3 = httpBackend.flush().then(function() {
+        // wait for the localecho of ev1 to be updated
+        const p3 = new Promise((resolve, reject) => {
+            room.on("Room.localEchoUpdated", (ev0) => {
+                if(ev0 === ev1) {
+                    resolve();
+                }
+            });
+        }).then(function() {
             expect(ev1.status).toEqual(EventStatus.NOT_SENT);
             expect(tl.length).toEqual(1);
 
@@ -103,7 +110,11 @@ describe("MatrixClient retrying", function() {
             expect(tl.length).toEqual(0);
         });
 
-        return Promise.all([p1, p3]);
+        return Promise.all([
+            p1,
+            p3,
+            httpBackend.flushAllExpected(),
+        ]);
     });
 
     describe("resending", function() {

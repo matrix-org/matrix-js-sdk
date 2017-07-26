@@ -1,6 +1,13 @@
 {
     "presets": ["es2015"],
     "plugins": [
-        "transform-async-to-generator",
+        // this transforms async functions into generator functions, which
+        // are then made to use the regenerator module by babel's
+        // transform-regnerator plugin (which is enabled by es2015).
+        "transform-async-to-bluebird",
+
+        // This makes sure that the regenerator runtime is available to
+        // the transpiled code.
+        "transform-runtime",
     ],
 }

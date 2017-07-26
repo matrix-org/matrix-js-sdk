@@ -173,21 +173,9 @@ function MatrixClient(opts) {
 
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
-    if (CRYPTO_ENABLED && Boolean(opts.sessionStore) &&
-            Boolean(this._cryptoStore) &&
-            userId !== null && this.deviceId !== null) {
-        this._crypto = new Crypto(
-            this, this,
-            opts.sessionStore,
-            userId, this.deviceId,
-            this.store,
-            opts.cryptoStore,
-        );
-        reEmit(this, this._crypto, [
-            "crypto.roomKeyRequest",
-            "crypto.roomKeyRequestCancellation",
-        ]);
+    this._sessionStore = opts.sessionStore;
 
+    if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
 }
@@ -342,6 +330,73 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
 // ===========
 
 /**
+ * Initialise support for end-to-end encryption in this client
+ *
+ * You should call this method after creating the matrixclient, but *before*
+ * calling `startClient`, if you want to support end-to-end encryption.
+ *
+ * It will return a Promise which will resolve when the crypto layer has been
+ * successfully initialised.
+ */
+MatrixClient.prototype.initCrypto = async function() {
+    if (this._crypto) {
+        console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
+        return;
+    }
+
+    if (!CRYPTO_ENABLED) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
+    if (!this._sessionStore) {
+        // this is temporary, the sessionstore is supposed to be going away
+        throw new Error(`Cannot enable encryption: no sessionStore provided`);
+    }
+    if (!this._cryptoStore) {
+        // the cryptostore is provided by sdk.createClient, so this shouldn't happen
+        throw new Error(`Cannot enable encryption: no cryptoStore provided`);
+    }
+
+    const userId = this.getUserId();
+    if (userId === null) {
+        throw new Error(
+            `Cannot enable encryption on MatrixClient with unknown userId: ` +
+                `ensure userId is passed in createClient().`,
+        );
+    }
+    if (this.deviceId === null) {
+        throw new Error(
+            `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
+                `ensure deviceId is passed in createClient().`,
+        );
+    }
+
+    const crypto = new Crypto(
+        this,
+        this._sessionStore,
+        userId, this.deviceId,
+        this.store,
+        this._cryptoStore,
+    );
+
+    reEmit(this, crypto, [
+        "crypto.roomKeyRequest",
+        "crypto.roomKeyRequestCancellation",
+    ]);
+
+    await crypto.init();
+
+    // if crypto initialisation was successful, tell it to attach its event
+    // handlers.
+    crypto.registerEventHandlers(this);
+    this._crypto = crypto;
+};
+
+
+/**
  * Is end-to-end crypto enabled for this client.
  * @return {boolean} True if end-to-end is enabled.
  */
@@ -392,30 +447,13 @@ MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
 };
 
 /**
- * List the stored device keys for a user id
- *
- * @deprecated prefer {@link module:client#getStoredDevicesForUser}
- *
- * @param {string} userId the user to list keys for.
- *
- * @return {object[]} list of devices with "id", "verified", "blocked",
- *    "key", and "display_name" parameters.
- */
-MatrixClient.prototype.listDeviceKeys = function(userId) {
-    if (this._crypto === null) {
-        throw new Error("End-to-end encryption disabled");
-    }
-    return this._crypto.listDeviceKeys(userId);
-};
-
-/**
  * Get the stored device keys for a user id
  *
  * @param {string} userId the user to list keys for.
  *
- * @return {module:crypto-deviceinfo[]} list of devices
+ * @return {Promise<module:crypto-deviceinfo[]>} list of devices
  */
-MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
+MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -428,9 +466,9 @@ MatrixClient.prototype.getStoredDevicesForUser = function(userId) {
  * @param {string} userId the user to list keys for.
  * @param {string} deviceId unique identifier for the device
  *
- * @return {?module:crypto-deviceinfo} device or null
+ * @return {Promise<?module:crypto-deviceinfo>} device or null
  */
-MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
+MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -446,13 +484,15 @@ MatrixClient.prototype.getStoredDevice = function(userId, deviceId) {
  * @param {boolean=} verified whether to mark the device as verified. defaults
  *   to 'true'.
  *
+ * @returns {Promise}
+ *
  * @fires module:client~event:MatrixClient"deviceVerificationChanged"
  */
 MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) {
     if (verified === undefined) {
         verified = true;
     }
-    _setDeviceVerification(this, userId, deviceId, verified, null);
+    return _setDeviceVerification(this, userId, deviceId, verified, null);
 };
 
 /**
@@ -464,13 +504,15 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
  * @param {boolean=} blocked whether to mark the device as blocked. defaults
  *   to 'true'.
  *
+ * @returns {Promise}
+ *
  * @fires module:client~event:MatrixClient"deviceVerificationChanged"
  */
 MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
     if (blocked === undefined) {
         blocked = true;
     }
-    _setDeviceVerification(this, userId, deviceId, null, blocked);
+    return _setDeviceVerification(this, userId, deviceId, null, blocked);
 };
 
 /**
@@ -482,16 +524,20 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
  * @param {boolean=} known whether to mark the device as known. defaults
  *   to 'true'.
  *
+ * @returns {Promise}
+ *
  * @fires module:client~event:MatrixClient"deviceVerificationChanged"
  */
 MatrixClient.prototype.setDeviceKnown = function(userId, deviceId, known) {
     if (known === undefined) {
         known = true;
     }
-    _setDeviceVerification(this, userId, deviceId, null, null, known);
+    return _setDeviceVerification(this, userId, deviceId, null, null, known);
 };
 
-function _setDeviceVerification(client, userId, deviceId, verified, blocked, known) {
+async function _setDeviceVerification(
+    client, userId, deviceId, verified, blocked, known,
+) {
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
@@ -532,9 +578,9 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
  *
  * @param {MatrixEvent} event event to be checked
  *
- * @return {module:crypto/deviceinfo?}
+ * @return {Promise<module:crypto/deviceinfo?>}
  */
-MatrixClient.prototype.getEventSenderDeviceInfo = function(event) {
+MatrixClient.prototype.getEventSenderDeviceInfo = async function(event) {
     if (!this._crypto) {
         return null;
     }
@@ -550,8 +596,8 @@ MatrixClient.prototype.getEventSenderDeviceInfo = function(event) {
  * @return {boolean} true if the sender of this event has been verified using
  * {@link module:client~MatrixClient#setDeviceVerified|setDeviceVerified}.
  */
-MatrixClient.prototype.isEventSenderVerified = function(event) {
-    const device = this.getEventSenderDeviceInfo(event);
+MatrixClient.prototype.isEventSenderVerified = async function(event) {
+    const device = await this.getEventSenderDeviceInfo(event);
     if (!device) {
         return false;
     }
@@ -605,48 +651,12 @@ MatrixClient.prototype.exportRoomKeys = function() {
  *
  * @param {Object[]} keys a list of session export objects
  */
-MatrixClient.prototype.importRoomKeys = function(keys) {
+MatrixClient.prototype.importRoomKeys = async function(keys) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
     this._crypto.importRoomKeys(keys);
 };
-
-/**
- * Decrypt a received event according to the algorithm specified in the event.
- *
- * @param {MatrixClient} client
- * @param {MatrixEvent} event
- */
-function _decryptEvent(client, event) {
-    if (!client._crypto) {
-        _badEncryptedMessage(event, "Encryption not enabled");
-        return;
-    }
-
-    try {
-        client._crypto.decryptEvent(event);
-    } catch (e) {
-        console.warn(
-            `Error decrypting event (id=${event.getId()}): ${e}`,
-        );
-        if (e.name !== "DecryptionError") {
-            throw e;
-        }
-        _badEncryptedMessage(event, e.message);
-        return;
-    }
-}
-
-function _badEncryptedMessage(event, reason) {
-    event.setClearData({
-        type: "m.room.message",
-        content: {
-            msgtype: "m.bad.encrypted",
-            body: "** Unable to decrypt: " + reason + " **",
-        },
-    });
-}
 
 // Room ops
 // ========
@@ -2120,7 +2130,7 @@ MatrixClient.prototype.resetNotifTimelineSet = function() {
     // know about /notifications, so we have no choice but to start paginating
     // from the current point in time.  This may well overlap with historical
     // notifs which are then inserted into the timeline by /sync responses.
-    this._notifTimelineSet.resetLiveTimeline('end', true);
+    this._notifTimelineSet.resetLiveTimeline('end', null);
 
     // we could try to paginate a single event at this point in order to get
     // a more valid pagination token, but it just ends up with an out of order
@@ -3271,7 +3281,7 @@ function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
-            _decryptEvent(client, event);
+            event.attemptDecryption(client._crypto);
         }
         return event;
     }

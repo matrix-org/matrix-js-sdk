@@ -145,13 +145,10 @@ function aliDownloadsKeys() {
     expect(bobTestClient.getSigningKey()).toBeTruthy();
 
     const p1 = aliTestClient.client.downloadKeys([bobUserId]).then(function() {
-        expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([{
-            id: "bvcxz",
-            key: bobTestClient.getSigningKey(),
-            verified: false,
-            blocked: false,
-            display_name: null,
-        }]);
+        return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+    }).then((devices) => {
+        expect(devices.length).toEqual(1);
+        expect(devices[0].deviceId).toEqual("bvcxz");
     });
     const p2 = expectAliQueryKeys();
 
@@ -277,8 +274,8 @@ function expectSendMessageRequest(httpBackend) {
         };
     });
 
-    // it can take a while to process the key query, so give it 20ms
-    return httpBackend.flush(path, 1, 20).then(() => deferred.promise);
+    // it can take a while to process the key query
+    return httpBackend.flush(path, 1).then(() => deferred.promise);
 }
 
 function aliRecvMessage() {
@@ -388,11 +385,14 @@ describe("MatrixClient crypto", function() {
         return;
     }
 
-    beforeEach(function() {
+    beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
+        await aliTestClient.client.initCrypto();
+
         bobTestClient = new TestClient(bobUserId, bobDeviceId, bobAccessToken);
+        await bobTestClient.client.initCrypto();
 
         aliMessages = [];
         bobMessages = [];
@@ -430,10 +430,11 @@ describe("MatrixClient crypto", function() {
                     aliTestClient.client.downloadKeys([bobUserId]),
                     expectAliQueryKeys(),
                 ]);
-            })
-            .then(function() {
+            }).then(function() {
+                return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+            }).then((devices) => {
                 // should get an empty list
-                expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
+                expect(devices).toEqual([]);
             })
             .nodeify(done);
     });
@@ -471,9 +472,14 @@ describe("MatrixClient crypto", function() {
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
+            return Promise.all([
+                aliTestClient.client.getStoredDevicesForUser(bobUserId),
+                aliTestClient.client.getStoredDevicesForUser(eveUserId),
+            ]);
+        }).spread((bobDevices, eveDevices) => {
             // should get an empty list
-            expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
-            expect(aliTestClient.client.listDeviceKeys(eveUserId)).toEqual([]);
+            expect(bobDevices).toEqual([]);
+            expect(eveDevices).toEqual([]);
         }).nodeify(done);
     });
 
@@ -508,8 +514,10 @@ describe("MatrixClient crypto", function() {
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
+            return aliTestClient.client.getStoredDevicesForUser(bobUserId);
+        }).then((devices) => {
             // should get an empty list
-            expect(aliTestClient.client.listDeviceKeys(bobUserId)).toEqual([]);
+            expect(devices).toEqual([]);
         }).nodeify(done);
     });
 
@@ -534,19 +542,18 @@ describe("MatrixClient crypto", function() {
             .nodeify(done);
     });
 
-    it("Bob receives a message", function(done) {
-        Promise.resolve()
+    it("Bob receives a message", function() {
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(aliEnablesEncryption)
             .then(aliSendsFirstMessage)
-            .then(bobRecvMessage)
-            .nodeify(done);
+            .then(bobRecvMessage);
     });
 
-    it("Bob receives a message with a bogus sender", function(done) {
-        Promise.resolve()
+    it("Bob receives a message with a bogus sender", function() {
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -586,20 +593,18 @@ describe("MatrixClient crypto", function() {
                         return;
                     }
 
-                    expect(event.getType()).toEqual("m.room.message");
-                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
                     expect(event.isEncrypted()).toBeTruthy();
 
-                    bobTestClient.client.removeListener("event", onEvent);
+                    expect(event.getType()).toEqual("m.room.message");
+                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
                     deferred.resolve();
                 };
 
-                bobTestClient.client.on("event", onEvent);
+                bobTestClient.client.once("event", onEvent);
 
                 bobTestClient.httpBackend.flush();
                 return deferred.promise;
-            })
-            .nodeify(done);
+            });
     });
 
     it("Ali blocks Bob's device", function(done) {
@@ -688,5 +693,54 @@ describe("MatrixClient crypto", function() {
                 });
                 return aliTestClient.httpBackend.flush('/keys/query', 1);
             });
+    });
+
+    it("Upload new oneTimeKeys based on a /sync request - no count-asking", function() {
+        // Send a response which causes a key upload
+        const httpBackend = aliTestClient.httpBackend;
+        const syncDataEmpty = {
+            next_batch: "a",
+            device_one_time_keys_count: {
+                signed_curve25519: 0,
+            },
+        };
+
+        // enqueue expectations:
+        // * Sync with empty one_time_keys => upload keys
+
+        return Promise.resolve()
+            .then(() => {
+                console.log(aliTestClient + ': starting');
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+                aliTestClient.expectDeviceKeyUpload();
+
+                // we let the client do a very basic initial sync, which it needs before
+                // it will upload one-time keys.
+                httpBackend.when("GET", "/sync").respond(200, syncDataEmpty);
+
+                aliTestClient.client.startClient({});
+
+                return httpBackend.flushAllExpected().then(() => {
+                    console.log(aliTestClient + ': started');
+                });
+            })
+            .then(() => httpBackend.when("POST", "/keys/upload")
+                .respond(200, (path, content) => {
+                    expect(content.one_time_keys).toBeTruthy();
+                    expect(content.one_time_keys).toNotEqual({});
+                    expect(Object.keys(content.one_time_keys).length)
+                        .toBeGreaterThanOrEqualTo(1);
+                    console.log('received %i one-time keys',
+                                Object.keys(content.one_time_keys).length);
+                    // cancel futher calls by telling the client
+                    // we have more than we need
+                    return {
+                       one_time_key_counts: {
+                           signed_curve25519: 70,
+                       },
+                    };
+                }))
+            .then(() => httpBackend.flushAllExpected());
     });
 });

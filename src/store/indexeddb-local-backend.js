@@ -113,19 +113,41 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     connect: function() {
         if (this.db) {
+            console.log(
+                `LocalIndexedDBStoreBackend.connect: already connected`,
+            );
             return Promise.resolve();
         }
+
+        console.log(
+            `LocalIndexedDBStoreBackend.connect: connecting`,
+        );
         const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
             const db = ev.target.result;
             const oldVersion = ev.oldVersion;
+            console.log(
+                `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
+            );
             if (oldVersion < 1) { // The database did not previously exist.
                 createDatabase(db);
             }
             // Expand as needed.
         };
 
+        req.onblocked = () => {
+            console.log(
+                `can't yet open LocalIndexedDBStoreBackend because it is open elsewhere`,
+            );
+        };
+
+        console.log(
+            `LocalIndexedDBStoreBackend.connect: awaiting connection`,
+        );
         return promiseifyRequest(req).then((ev) => {
+            console.log(
+                `LocalIndexedDBStoreBackend.connect: connected`,
+            );
             this.db = ev.target.result;
 
             // add a poorly-named listener for when deleteDatabase is called
@@ -147,6 +169,9 @@ LocalIndexedDBStoreBackend.prototype = {
             this._loadAccountData(),
             this._loadSyncData(),
         ]).then(([accountData, syncData]) => {
+            console.log(
+                `LocalIndexedDBStoreBackend: loaded initial data`,
+            );
             this._syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
@@ -310,7 +335,13 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of raw global account events.
      */
     _loadAccountData: function() {
+        console.log(
+            `LocalIndexedDBStoreBackend: loading account data`,
+        );
         return Promise.try(() => {
+            console.log(
+                `LocalIndexedDBStoreBackend: loaded account data`,
+            );
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
@@ -324,7 +355,13 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
     _loadSyncData: function() {
+        console.log(
+            `LocalIndexedDBStoreBackend: loaded sync data`,
+        );
         return Promise.try(() => {
+            console.log(
+                `LocalIndexedDBStoreBackend: loaded sync data`,
+            );
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
