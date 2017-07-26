@@ -164,16 +164,7 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
     });
 
     eventEmitter.on("toDeviceEvent", function(event) {
-        try {
-            if (event.getType() == "m.room_key"
-                    || event.getType() == "m.forwarded_room_key") {
-                crypto._onRoomKeyEvent(event);
-            } else if (event.getType() == "m.room_key_request") {
-                crypto._onRoomKeyRequestEvent(event);
-            }
-        } catch (e) {
-            console.error("Error handling toDeviceEvent:", e);
-        }
+        crypto._onToDeviceEvent(event);
     });
 };
 
@@ -777,12 +768,13 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
  *
  * @param {MatrixEvent} event
  *
- * @raises {algorithms.DecryptionError} if there is a problem decrypting the event
+ * @return {Promise} resolves once we have finished decrypting. Rejects with an
+ * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
 Crypto.prototype.decryptEvent = function(event) {
     const content = event.getWireContent();
     const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
-    alg.decryptEvent(event);
+    return alg.decryptEvent(event);
 };
 
 /**
@@ -959,6 +951,25 @@ Crypto.prototype._getE2eRooms = function() {
 
         return true;
     });
+};
+
+
+Crypto.prototype._onToDeviceEvent = function(event) {
+    try {
+        if (event.getType() == "m.room_key"
+            || event.getType() == "m.forwarded_room_key") {
+            this._onRoomKeyEvent(event);
+        } else if (event.getType() == "m.room_key_request") {
+            this._onRoomKeyRequestEvent(event);
+        } else if (event.isBeingDecrypted()) {
+            // once the event has been decrypted, try again
+            event.once('Event.decrypted', (ev) => {
+                this._onToDeviceEvent(ev);
+            });
+        }
+    } catch (e) {
+        console.error("Error handling toDeviceEvent:", e);
+    }
 };
 
 /**

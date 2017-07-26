@@ -640,42 +640,6 @@ MatrixClient.prototype.importRoomKeys = async function(keys) {
     this._crypto.importRoomKeys(keys);
 };
 
-/**
- * Decrypt a received event according to the algorithm specified in the event.
- *
- * @param {MatrixClient} client
- * @param {MatrixEvent} event
- */
-function _decryptEvent(client, event) {
-    if (!client._crypto) {
-        _badEncryptedMessage(event, "Encryption not enabled");
-        return;
-    }
-
-    try {
-        client._crypto.decryptEvent(event);
-    } catch (e) {
-        console.warn(
-            `Error decrypting event (id=${event.getId()}): ${e}`,
-        );
-        if (e.name !== "DecryptionError") {
-            throw e;
-        }
-        _badEncryptedMessage(event, e.message);
-        return;
-    }
-}
-
-function _badEncryptedMessage(event, reason) {
-    event.setClearData({
-        type: "m.room.message",
-        content: {
-            msgtype: "m.bad.encrypted",
-            body: "** Unable to decrypt: " + reason + " **",
-        },
-    });
-}
-
 // Room ops
 // ========
 
@@ -3223,7 +3187,7 @@ function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
-            _decryptEvent(client, event);
+            event.attemptDecryption(client._crypto);
         }
         return event;
     }

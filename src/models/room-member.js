@@ -33,7 +33,10 @@ const utils = require("../utils");
  * @prop {string} roomId The room ID for this member.
  * @prop {string} userId The user ID of this member.
  * @prop {boolean} typing True if the room member is currently typing.
- * @prop {string} name The human-readable name for this room member.
+ * @prop {string} name The human-readable name for this room member. This will be
+ * disambiguated with a suffix of " (@user_id:matrix.org)" if another member shares the
+ * same displayname.
+ * @prop {string} rawDisplayName The ambiguous displayname of this room member.
  * @prop {Number} powerLevel The power level for this room member.
  * @prop {Number} powerLevelNorm The normalised power level (0-100) for this
  * room member.
@@ -47,6 +50,7 @@ function RoomMember(roomId, userId) {
     this.userId = userId;
     this.typing = false;
     this.name = userId;
+    this.rawDisplayName = userId;
     this.powerLevel = 0;
     this.powerLevelNorm = 0;
     this.user = null;
@@ -78,6 +82,7 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
 
     const oldName = this.name;
     this.name = calculateDisplayName(this, event, roomState);
+    this.rawDisplayName = event.getDirectionalContent().displayname;
     if (oldMembership !== this.membership) {
         this._updateModifiedTime();
         this.emit("RoomMember.membership", event, this, oldMembership);

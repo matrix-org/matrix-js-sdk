@@ -113,13 +113,10 @@ class DecryptionAlgorithm {
      * @method module:crypto/algorithms/base.DecryptionAlgorithm#decryptEvent
      * @abstract
      *
-     * @param {object} event raw event
+     * @param {MatrixEvent} event undecrypted event
      *
-     * @return {null} if the event referred to an unknown megolm session
-     * @return {module:crypto.DecryptionResult} decryption result
-     *
-     * @throws {module:crypto/algorithms/base.DecryptionError} if there is a
-     *   problem decrypting the event
+     * @return {Promise} resolves once we have finished decrypting. Rejects with an
+     * `algorithms.DecryptionError` if there is a problem decrypting the event.
      */
 
     /**
