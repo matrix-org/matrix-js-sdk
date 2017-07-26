@@ -132,7 +132,10 @@ describe("MatrixClient events", function() {
             client.startClient();
 
             return Promise.all([
-                utils.syncPromise(client),
+                // wait for two SYNCING events
+                utils.syncPromise(client).then(() => {
+                    return utils.syncPromise(client);
+                }),
                 httpBackend.flushAllExpected(),
             ]).then(() => {
                 expect(expectedEvents.length).toEqual(
