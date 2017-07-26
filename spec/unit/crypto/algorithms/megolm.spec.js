@@ -103,8 +103,9 @@ describe("MegolmDecryption", function() {
                 },
             });
 
-            megolmDecryption.decryptEvent(event);
-            expect(event.getContent()).toEqual('testytest');
+            return megolmDecryption.decryptEvent(event).then(() => {
+                expect(event.getContent()).toEqual('testytest');
+            });
         });
 
         it('can respond to a key request event', function() {

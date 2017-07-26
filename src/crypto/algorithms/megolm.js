@@ -531,11 +531,13 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * @throws {module:crypto/algorithms/base.DecryptionError} if there is a
- *   problem decrypting the event
+ * @return {Promise} resolves once we have finished decrypting. Rejects with an
+ * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
 MegolmDecryption.prototype.decryptEvent = function(event) {
-    this._decryptEvent(event, true);
+    return Promise.try(() => {
+        this._decryptEvent(event, true);
+    });
 };
 
 
@@ -842,13 +844,7 @@ MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
     delete this._pendingEvents[k];
 
     for (let i = 0; i < pending.length; i++) {
-        try {
-            // no point sending another m.room_key_request here.
-            this._decryptEvent(pending[i], false);
-            console.log("successful re-decryption of", pending[i]);
-        } catch (e) {
-            console.log("Still can't decrypt", pending[i], e.stack || e);
-        }
+        pending[i].attemptDecryption(this._crypto);
     }
 };
 

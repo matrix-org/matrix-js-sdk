@@ -153,10 +153,10 @@ utils.inherits(OlmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * @throws {module:crypto/algorithms/base.DecryptionError} if there is a
- *   problem decrypting the event
+ * returns a promise which resolves once we have finished decrypting. Rejects with an
+ * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
-OlmDecryption.prototype.decryptEvent = function(event) {
+OlmDecryption.prototype.decryptEvent = async function(event) {
     const content = event.getWireContent();
     const deviceKey = content.sender_key;
     const ciphertext = content.ciphertext;
