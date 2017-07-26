@@ -165,6 +165,7 @@ module.exports.ensureOlmSessionsForDevices = function(
         devicesWithoutSession, oneTimeKeyAlgorithm,
     ).then(function(res) {
         const otk_res = res.one_time_keys || {};
+        const promises = [];
         for (const userId in devicesByUser) {
             if (!devicesByUser.hasOwnProperty(userId)) {
                 continue;
@@ -195,21 +196,23 @@ module.exports.ensureOlmSessionsForDevices = function(
                     continue;
                 }
 
-                const sid = _verifyKeyAndStartSession(
-                    olmDevice, oneTimeKey, userId, deviceInfo,
+                promises.push(
+                    _verifyKeyAndStartSession(
+                        olmDevice, oneTimeKey, userId, deviceInfo,
+                    ).then((sid) => {
+                        result[userId][deviceId].sessionId = sid;
+                    }),
                 );
-                result[userId][deviceId].sessionId = sid;
             }
         }
-        return result;
+        return Promise.all(promises).return(result);
     });
 };
 
-
-function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
+async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     const deviceId = deviceInfo.deviceId;
     try {
-        _verifySignature(
+        await _verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
             deviceInfo.getFingerprint(),
         );
@@ -252,8 +255,11 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
  * @param {string} signingDeviceId  ID of the device whose signature should be checked
  *
  * @param {string} signingKey   base64-ed ed25519 public key
+ *
+ * Returns a promise which resolves (to undefined) if the the signature is good,
+ * or rejects with an Error if it is bad.
  */
-const _verifySignature = module.exports.verifySignature = function(
+const _verifySignature = module.exports.verifySignature = async function(
     olmDevice, obj, signingUserId, signingDeviceId, signingKey,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;

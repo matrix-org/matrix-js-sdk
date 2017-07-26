@@ -587,7 +587,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     const unsigned = deviceResult.unsigned || {};
 
     try {
-        olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
+        await olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
     } catch (e) {
         console.warn("Unable to verify signature on device " +
             userId + ":" + deviceId + ":" + e);
