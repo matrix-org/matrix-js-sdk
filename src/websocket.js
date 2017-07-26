@@ -484,15 +484,13 @@ WebSocketApi.prototype.handleSync = function(data) {
     // Reset after a successful sync
     self._failedSyncCount = 0;
 
-    client.store.setSyncData(data).then(() => {
-        try {
-            client._syncApi._processSyncResponse(self.ws_syncToken, data);
-        } catch (e) {
-            // log the exception with stack if we have it, else fall back
-            // to the plain description
-            console.error("Caught /sync error (via WebSocket)", e.stack || e);
-        }
-
+    client.store.setSyncData(data)
+    .then(() => client._syncApi._processSyncResponse(self.ws_syncToken, data)
+    .catch((e) => {
+        // log the exception with stack if we have it, else fall back
+        // to the plain description
+        console.error("Caught /sync error (via WebSocket)", e.stack || e);
+    }).then(() => {
         // emit synced events
         const syncEventData = {
             oldSyncToken: self.ws_syncToken,
@@ -506,7 +504,7 @@ WebSocketApi.prototype.handleSync = function(data) {
         // store).
         client.store.save();
         self.ws_syncToken = data.next_batch;
-    });
+    }));
 };
 
 WebSocketApi.prototype.sendObject = function(message) {
