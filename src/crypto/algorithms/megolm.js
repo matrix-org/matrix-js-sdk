@@ -719,7 +719,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 /**
  * @inheritdoc
  */
-MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
+MegolmDecryption.prototype.hasKeysForKeyRequest = async function(keyRequest) {
     const body = keyRequest.requestBody;
 
     return this._olmDevice.hasInboundSessionKeys(

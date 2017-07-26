@@ -1131,7 +1131,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
         return;
     }
 
-    if (!decryptor.hasKeysForKeyRequest(req)) {
+    if (!await decryptor.hasKeysForKeyRequest(req)) {
         console.log(
             `room key request for unknown session ${roomId} / ` +
                 body.session_id,
