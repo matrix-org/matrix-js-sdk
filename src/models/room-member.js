@@ -82,7 +82,7 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
 
     const oldName = this.name;
     this.name = calculateDisplayName(this, event, roomState);
-    this.rawDisplayName = event.getDirectionalContent().displayname;
+    this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
     if (oldMembership !== this.membership) {
         this._updateModifiedTime();
         this.emit("RoomMember.membership", event, this, oldMembership);
