@@ -143,7 +143,8 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
               }};
           });
 
-    return this.httpBackend.flush('/keys/upload', 2).then((flushed) => {
+    // this can take ages
+    return this.httpBackend.flush('/keys/upload', 2, 1000).then((flushed) => {
         expect(flushed).toEqual(2);
         return this.oneTimeKeys;
     });

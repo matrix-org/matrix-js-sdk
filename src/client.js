@@ -523,7 +523,7 @@ async function _setDeviceVerification(
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    const dev = client._crypto.setDeviceVerification(
+    const dev = await client._crypto.setDeviceVerification(
         userId, deviceId, verified, blocked, known,
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
@@ -590,14 +590,13 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
  * Enable end-to-end encryption for a room.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
- * @return {Object} A promise that will resolve when encryption is setup.
+ * @return {Promise} A promise that will resolve when encryption is set up.
  */
 MatrixClient.prototype.setRoomEncryption = function(roomId, config) {
     if (!this._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    this._crypto.setRoomEncryption(roomId, config);
-    return Promise.resolve();
+    return this._crypto.setRoomEncryption(roomId, config);
 };
 
 /**
@@ -632,12 +631,15 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ *
+ * @return {module:client.Promise} a promise which resolves when the keys
+ *    have been imported
  */
-MatrixClient.prototype.importRoomKeys = async function(keys) {
+MatrixClient.prototype.importRoomKeys = function(keys) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
-    this._crypto.importRoomKeys(keys);
+    return this._crypto.importRoomKeys(keys);
 };
 
 // Room ops
