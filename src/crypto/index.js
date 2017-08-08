@@ -727,24 +727,16 @@ Crypto.prototype.importRoomKeys = function(keys) {
 };
 
 /**
- * Encrypt an event according to the configuration of the room, if necessary.
+ * Encrypt an event according to the configuration of the room.
  *
  * @param {module:models/event.MatrixEvent} event  event to be sent
  *
- * @param {module:models/room?} room destination room. Null if the destination
- *     is not a room we have seen over the sync pipe.
+ * @param {module:models/room} room destination room.
  *
  * @return {module:client.Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
-Crypto.prototype.encryptEventIfNeeded = function(event, room) {
-    if (event.isEncrypted()) {
-        // this event has already been encrypted; this happens if the
-        // encryption step succeeded, but the send step failed on the first
-        // attempt.
-        return null;
-    }
-
+Crypto.prototype.encryptEvent = function(event, room) {
     if (!room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
     }
@@ -753,17 +745,13 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
 
     const alg = this._roomEncryptors[roomId];
     if (!alg) {
-        // not encrypting messages in this room
-
-        // check that the HS hasn't hidden the crypto event
-        if (this._sessionStore.getEndToEndRoom(roomId)) {
-            throw new Error(
-                "Room was previously configured to use encryption, but is " +
-                "no longer. Perhaps the homeserver is hiding the " +
-                "configuration event.",
-            );
-        }
-        return null;
+        // MatrixClient has already checked that this room should be encrypted,
+        // so this is an unexpected situation.
+        throw new Error(
+            "Room was previously configured to use encryption, but is " +
+            "no longer. Perhaps the homeserver is hiding the " +
+            "configuration event.",
+        );
     }
 
     return alg.encryptMessage(
