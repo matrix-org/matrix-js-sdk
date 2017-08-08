@@ -691,7 +691,7 @@ describe("MatrixClient crypto", function() {
                         [bobUserId]: {},
                     },
                 });
-                return aliTestClient.httpBackend.flush('/keys/query', 1);
+                return aliTestClient.httpBackend.flushAllExpected();
             });
     });
 
