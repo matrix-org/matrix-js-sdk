@@ -77,7 +77,10 @@ TestClient.prototype.start = function() {
         pendingEventOrdering: 'detached',
     });
 
-    return this.httpBackend.flushAllExpected().then(() => {
+    return Promise.all([
+        this.httpBackend.flushAllExpected(),
+        testUtils.syncPromise(this.client),
+    ]).then(() => {
         console.log(this + ': started');
     });
 };
@@ -199,5 +202,7 @@ TestClient.prototype.flushSync = function() {
     return Promise.all([
         this.httpBackend.flush('/sync', 1),
         testUtils.syncPromise(this.client),
-    ]);
+    ]).then(() => {
+        console.log(`${this}: flushSync completed`);
+    });
 };

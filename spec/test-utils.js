@@ -12,19 +12,32 @@ const MatrixEvent = sdk.MatrixEvent;
  * Return a promise that is resolved when the client next emits a
  * SYNCING event.
  * @param {Object} client The client
+ * @param {Number=} count Number of syncs to wait for (default 1)
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
-module.exports.syncPromise = function(client) {
-    const def = Promise.defer();
-    const cb = (state) => {
-        if (state == 'SYNCING') {
-            def.resolve();
-        } else {
-            client.once('sync', cb);
-        }
-    };
-    client.once('sync', cb);
-    return def.promise;
+module.exports.syncPromise = function(client, count) {
+    if (count === undefined) {
+        count = 1;
+    }
+    if (count <= 0) {
+        return Promise.resolve();
+    }
+
+    const p = new Promise((resolve, reject) => {
+        const cb = (state) => {
+            console.log(`${Date.now()} syncPromise(${count}): ${state}`);
+            if (state == 'SYNCING') {
+                resolve();
+            } else {
+                client.once('sync', cb);
+            }
+        };
+        client.once('sync', cb);
+    });
+
+    return p.then(() => {
+        return module.exports.syncPromise(client, count-1);
+    });
 };
 
 /**

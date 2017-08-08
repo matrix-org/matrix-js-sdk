@@ -169,7 +169,7 @@ describe("MatrixClient events", function() {
             });
         });
 
-        it("should emit Room events", function(done) {
+        it("should emit Room events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             let roomInvokeCount = 0;
@@ -189,7 +189,10 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 2),
+            ]).then(function() {
                 expect(roomInvokeCount).toEqual(
                     1, "Room fired wrong number of times.",
                 );
@@ -199,11 +202,10 @@ describe("MatrixClient events", function() {
                 expect(timelineFireCount).toEqual(
                     3, "Room.timeline fired the wrong number of times",
                 );
-                done();
             });
         });
 
-        it("should emit RoomState events", function(done) {
+        it("should emit RoomState events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
@@ -238,7 +240,10 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 2),
+            ]).then(function() {
                 expect(membersInvokeCount).toEqual(
                     1, "RoomState.members fired wrong number of times",
                 );
@@ -248,11 +253,10 @@ describe("MatrixClient events", function() {
                 expect(eventsInvokeCount).toEqual(
                     2, "RoomState.events fired wrong number of times",
                 );
-                done();
             });
         });
 
-        it("should emit RoomMember events", function(done) {
+        it("should emit RoomMember events", function() {
             httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
             httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
@@ -277,7 +281,10 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 2),
+            ]).then(function() {
                 expect(typingInvokeCount).toEqual(
                     1, "RoomMember.typing fired wrong number of times",
                 );
@@ -290,11 +297,10 @@ describe("MatrixClient events", function() {
                 expect(membershipInvokeCount).toEqual(
                     1, "RoomMember.membership fired wrong number of times",
                 );
-                done();
             });
         });
 
-        it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function(done) {
+        it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function() {
             httpBackend.when("GET", "/sync").respond(401, { errcode: 'M_UNKNOWN_TOKEN' });
 
             let sessionLoggedOutCount = 0;
@@ -304,11 +310,10 @@ describe("MatrixClient events", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            return httpBackend.flushAllExpected().then(function() {
                 expect(sessionLoggedOutCount).toEqual(
                     1, "Session.logged_out fired wrong number of times",
                 );
-                done();
             });
         });
     });

@@ -468,7 +468,10 @@ describe("MatrixClient syncing", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
 
             client.startClient();
-            return httpBackend.flushAllExpected();
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(),
+            ]);
         });
 
         it("should set the back-pagination token on new rooms", function() {
@@ -496,6 +499,7 @@ describe("MatrixClient syncing", function() {
                 awaitSyncEvent(),
             ]).then(function() {
                 const room = client.getRoom(roomTwo);
+                expect(room).toExist();
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
@@ -727,15 +731,9 @@ describe("MatrixClient syncing", function() {
      * waits for the MatrixClient to emit one or more 'sync' events.
      *
      * @param {Number?} numSyncs number of syncs to wait for
+     * @returns {Promise} promise which resolves after the sync events have happened
      */
-    async function awaitSyncEvent(numSyncs) {
-        if (numSyncs === undefined) {
-            numSyncs = 1;
-        }
-
-        while (numSyncs > 0) {
-            await utils.syncPromise(client);
-            numSyncs--;
-        }
+    function awaitSyncEvent(numSyncs) {
+        return utils.syncPromise(client, numSyncs);
     }
 });
