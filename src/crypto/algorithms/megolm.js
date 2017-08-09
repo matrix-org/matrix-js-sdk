@@ -166,7 +166,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
     // Updates `session` to hold the final OutboundSessionInfo.
     //
     // returns a promise which resolves once the keyshare is successful.
-    function prepareSession(oldSession) {
+    async function prepareSession(oldSession) {
         session = oldSession;
 
         // need to make a brand new session?
@@ -184,7 +184,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
 
         if (!session) {
             console.log(`Starting new megolm session for room ${self._roomId}`);
-            session = self._prepareNewSession();
+            session = await self._prepareNewSession();
         }
 
         // now check if we need to share with any devices
@@ -245,7 +245,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
  *
  * @return {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  */
-MegolmEncryption.prototype._prepareNewSession = function() {
+MegolmEncryption.prototype._prepareNewSession = async function() {
     const sessionId = this._olmDevice.createOutboundGroupSession();
     const key = this._olmDevice.getOutboundGroupSessionKey(sessionId);
 
@@ -535,16 +535,14 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  * `algorithms.DecryptionError` if there is a problem decrypting the event.
  */
 MegolmDecryption.prototype.decryptEvent = function(event) {
-    return Promise.try(() => {
-        this._decryptEvent(event, true);
-    });
+    return this._decryptEvent(event, true);
 };
 
 
 // helper for the real decryptEvent and for _retryDecryption. If
 // requestKeysOnFail is true, we'll send an m.room_key_request when we fail
 // to decrypt the event due to missing megolm keys.
-MegolmDecryption.prototype._decryptEvent = function(event, requestKeysOnFail) {
+MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFail) {
     const content = event.getWireContent();
 
     if (!content.sender_key || !content.session_id ||
@@ -721,7 +719,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 /**
  * @inheritdoc
  */
-MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
+MegolmDecryption.prototype.hasKeysForKeyRequest = async function(keyRequest) {
     const body = keyRequest.requestBody;
 
     return this._olmDevice.hasInboundSessionKeys(
