@@ -535,9 +535,10 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * returns a promise which resolves once we have finished decrypting, or
- * rejects with an `algorithms.DecryptionError` if there is a problem
- * decrypting the event.
+ * returns a promise which resolves to a
+ * {@link module:crypto~EventDecryptionResult} once we have finished
+ * decrypting, or rejects with an `algorithms.DecryptionError` if there is a
+ * problem decrypting the event.
  */
 MegolmDecryption.prototype.decryptEvent = async function(event) {
     const content = event.getWireContent();
@@ -588,8 +589,12 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         );
     }
 
-    event.setClearData(payload, res.senderKey, res.keysClaimed.ed25519,
-        res.forwardingCurve25519KeyChain);
+    return {
+        clearEvent: payload,
+        senderCurve25519Key: res.senderKey,
+        claimedEd25519Key: res.keysClaimed.ed25519,
+        forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+    };
 };
 
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {
