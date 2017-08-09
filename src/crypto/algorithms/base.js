@@ -20,6 +20,8 @@ limitations under the License.
  * @module
  */
 
+import Promise from 'bluebird';
+
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
  * module:crypto/algorithms/base.EncryptionAlgorithm|EncryptionAlgorithm} class
@@ -143,11 +145,11 @@ class DecryptionAlgorithm {
      * Determine if we have the keys necessary to respond to a room key request
      *
      * @param {module:crypto~IncomingRoomKeyRequest} keyRequest
-     * @return {boolean} true if we have the keys and could (theoretically) share
+     * @return {Promise<boolean>} true if we have the keys and could (theoretically) share
      *  them; else false.
      */
     hasKeysForKeyRequest(keyRequest) {
-        return false;
+        return Promise.resolve(false);
     }
 
     /**

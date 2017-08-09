@@ -176,7 +176,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     let payloadString;
 
     try {
-        payloadString = this._decryptMessage(deviceKey, message);
+        payloadString = await this._decryptMessage(deviceKey, message);
     } catch (e) {
         throw new base.DecryptionError(
             "Bad Encrypted Message", {
@@ -239,7 +239,9 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
  *
  * @return {string} payload, if decrypted successfully.
  */
-OlmDecryption.prototype._decryptMessage = function(theirDeviceIdentityKey, message) {
+OlmDecryption.prototype._decryptMessage = async function(
+    theirDeviceIdentityKey, message,
+) {
     const sessionIds = this._olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
 
     // try each session in turn.
