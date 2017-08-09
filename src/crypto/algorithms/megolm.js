@@ -270,6 +270,7 @@ MegolmEncryption.prototype._prepareNewSession = function() {
  */
 MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUser) {
     const self = this;
+    const maxToDeviceMessagesPerRequest = 20;
 
     const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
     const payload = {
@@ -283,7 +284,9 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         },
     };
 
-    const contentMap = {};
+    const contentMaps = [];
+    let maxContentMapId = 0;
+    let currentToDeviceId = 0;
 
     return olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
@@ -338,11 +341,20 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                     payload,
                 );
 
-                if (!contentMap[userId]) {
-                    contentMap[userId] = {};
+                if (currentToDeviceId > maxToDeviceMessagesPerRequest) {
+                    currentToDeviceId = 0;
+                    maxContentMapId++;
+                }
+                if (!contentMaps[maxContentMapId]) {
+                    contentMaps[maxContentMapId] = {};
                 }
 
-                contentMap[userId][deviceId] = encryptedContent;
+                if (!contentMaps[maxContentMapId][userId]) {
+                    contentMaps[maxContentMapId][userId] = {};
+                }
+
+                contentMaps[maxContentMapId][userId][deviceId] = encryptedContent;
+                currentToDeviceId++;
                 haveTargets = true;
             }
         }
@@ -350,10 +362,31 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         if (!haveTargets) {
             return Promise.resolve();
         }
-
         // TODO: retries
-        return self._baseApis.sendToDevice("m.room.encrypted", contentMap);
-    }).then(function() {
+        function sendToDeviceLoop(slice) {
+            if (slice > maxContentMapId) {
+                return Promise.resolve();
+            }
+            const contentMap = contentMaps[slice];
+            return self._baseApis.sendToDevice("m.room.encrypted", contentMap)
+                .then(() => {
+                    // store that we successfully uploaded the keys of the current slice
+                    for (const userId in contentMap) {
+                        if (!contentMap.hasOwnProperty(userId)) {
+                            continue;
+                        }
+                        for (const deviceId in contentMap[userId]) {
+                            if (!session.sharedWithDevices[userId]) {
+                                session.sharedWithDevices[userId] = {};
+                            }
+                            session.sharedWithDevices[userId][deviceId] = key.chain_index;
+                        }
+                    }
+                    return sendToDeviceLoop(slice + 1);
+                });
+        }
+        return sendToDeviceLoop(0);
+    }).then(() => {
         console.log(`Completed megolm keyshare in ${self._roomId}`);
 
         // Add the devices we have shared with to session.sharedWithDevices.
