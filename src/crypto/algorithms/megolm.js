@@ -370,6 +370,9 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
             const contentMap = contentMaps[slice];
             return self._baseApis.sendToDevice("m.room.encrypted", contentMap)
                 .then(() => {
+                    console.log(`Uploaded megolm keys in ${self._roomId} `
+                        + `(slice ${slice}/${maxContentMapId})`);
+
                     // store that we successfully uploaded the keys of the current slice
                     for (const userId in contentMap) {
                         if (!contentMap.hasOwnProperty(userId)) {
