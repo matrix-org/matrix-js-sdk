@@ -1240,7 +1240,7 @@ Crypto.prototype._signObject = async function(obj) {
     const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
-        this._olmDevice.sign(anotherjson.stringify(obj));
+        await this._olmDevice.sign(anotherjson.stringify(obj));
     obj.signatures = sigs;
 };
 

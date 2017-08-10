@@ -238,9 +238,9 @@ OlmDevice.prototype._getUtility = function(func) {
  * Signs a message with the ed25519 key for this account.
  *
  * @param {string} message  message to be signed
- * @return {string} base64-encoded signature
+ * @return {Promise<string>} base64-encoded signature
  */
-OlmDevice.prototype.sign = function(message) {
+OlmDevice.prototype.sign = async function(message) {
     return this._getAccount(function(account) {
         return account.sign(message);
     });
