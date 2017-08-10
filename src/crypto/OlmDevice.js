@@ -305,7 +305,7 @@ OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
  * @param {string} theirOneTimeKey  remote user's one-time Curve25519 key
  * @return {string} sessionId for the outbound session.
  */
-OlmDevice.prototype.createOutboundSession = function(
+OlmDevice.prototype.createOutboundSession = async function(
     theirIdentityKey, theirOneTimeKey,
 ) {
     const self = this;
@@ -335,7 +335,7 @@ OlmDevice.prototype.createOutboundSession = function(
  * @raises {Error} if the received message was not valid (for instance, it
  *     didn't use a valid one-time key).
  */
-OlmDevice.prototype.createInboundSession = function(
+OlmDevice.prototype.createInboundSession = async function(
     theirDeviceIdentityKey, message_type, ciphertext,
 ) {
     if (message_type !== 0) {

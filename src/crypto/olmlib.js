@@ -228,7 +228,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
 
     let sid;
     try {
-        sid = olmDevice.createOutboundSession(
+        sid = await olmDevice.createOutboundSession(
             deviceInfo.getIdentityKey(), oneTimeKey.key,
         );
     } catch (e) {

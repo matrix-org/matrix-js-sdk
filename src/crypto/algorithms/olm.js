@@ -298,7 +298,7 @@ OlmDecryption.prototype._decryptMessage = async function(
 
     let res;
     try {
-        res = this._olmDevice.createInboundSession(
+        res = await this._olmDevice.createInboundSession(
             theirDeviceIdentityKey, message.type, message.body,
         );
     } catch (e) {
