@@ -725,7 +725,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 /**
  * @inheritdoc
  */
-MegolmDecryption.prototype.hasKeysForKeyRequest = async function(keyRequest) {
+MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
     const body = keyRequest.requestBody;
 
     return this._olmDevice.hasInboundSessionKeys(
@@ -766,10 +766,10 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             + userId + ":" + deviceId,
         );
 
-        const payload = this._buildKeyForwardingMessage(
+        return this._buildKeyForwardingMessage(
             body.room_id, body.sender_key, body.session_id,
         );
-
+    }).then((payload) => {
         const encryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
             sender_key: this._olmDevice.deviceCurve25519Key,
@@ -797,10 +797,10 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
     }).done();
 };
 
-MegolmDecryption.prototype._buildKeyForwardingMessage = function(
+MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
     roomId, senderKey, sessionId,
 ) {
-    const key = this._olmDevice.getInboundGroupSessionKey(
+    const key = await this._olmDevice.getInboundGroupSessionKey(
         roomId, senderKey, sessionId,
     );
 

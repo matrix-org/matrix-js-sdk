@@ -849,9 +849,9 @@ OlmDevice.prototype.decryptGroupMessage = async function(
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {sring} sessionId session identifier
  *
- * @returns {boolean} true if we have the keys to this session
+ * @returns {Promise<boolean>} true if we have the keys to this session
  */
-OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionId) {
+OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(
         senderKey, sessionId,
     );
@@ -880,14 +880,16 @@ OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionI
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
  *
- * @returns {{chain_index: number, key: string,
+ * @returns {Promise<{chain_index: number, key: string,
  *        forwarding_curve25519_key_chain: Array<string>,
  *        sender_claimed_ed25519_key: string
- *    }}
+ *    }>}
  *    details of the session key. The key is a base64-encoded megolm key in
  *    export format.
  */
-OlmDevice.prototype.getInboundGroupSessionKey = function(roomId, senderKey, sessionId) {
+OlmDevice.prototype.getInboundGroupSessionKey = async function(
+    roomId, senderKey, sessionId,
+) {
     function getKey(session, sessionData) {
         const messageIndex = session.first_known_index();
 
