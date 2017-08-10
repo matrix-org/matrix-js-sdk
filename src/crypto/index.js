@@ -499,7 +499,7 @@ Crypto.prototype.getOlmSessionsForUser = async function(userId) {
     for (let j = 0; j < devices.length; ++j) {
         const device = devices[j];
         const deviceKey = device.getIdentityKey();
-        const sessions = this._olmDevice.getSessionInfoForDevice(deviceKey);
+        const sessions = await this._olmDevice.getSessionInfoForDevice(deviceKey);
 
         result[device.deviceId] = {
             deviceIdKey: deviceKey,

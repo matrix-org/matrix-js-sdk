@@ -369,9 +369,9 @@ OlmDevice.prototype.createInboundSession = function(
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
- * @return {string[]}  a list of known session ids for the device
+ * @return {Promise<string[]>}  a list of known session ids for the device
  */
-OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
+OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
     const sessions = this._sessionStore.getEndToEndSessions(
         theirDeviceIdentityKey,
     );
@@ -383,10 +383,10 @@ OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
- * @return {string?}  session id, or null if no established session
+ * @return {Promise<string?>}  session id, or null if no established session
  */
-OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
-    const sessionIds = this.getSessionIdsForDevice(theirDeviceIdentityKey);
+OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
+    const sessionIds = await this.getSessionIdsForDevice(theirDeviceIdentityKey);
     if (sessionIds.length === 0) {
         return null;
     }
@@ -406,8 +406,8 @@ OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
  * @param {string} deviceIdentityKey Curve25519 identity key for the device
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
-    const sessionIds = this.getSessionIdsForDevice(deviceIdentityKey);
+OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) {
+    const sessionIds = await this.getSessionIdsForDevice(deviceIdentityKey);
     sessionIds.sort();
 
     const info = [];

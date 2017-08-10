@@ -242,7 +242,9 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
 OlmDecryption.prototype._decryptMessage = async function(
     theirDeviceIdentityKey, message,
 ) {
-    const sessionIds = this._olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
+    const sessionIds = await this._olmDevice.getSessionIdsForDevice(
+        theirDeviceIdentityKey,
+    );
 
     // try each session in turn.
     const decryptionErrors = {};
