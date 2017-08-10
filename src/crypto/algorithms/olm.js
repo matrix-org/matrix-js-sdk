@@ -107,6 +107,8 @@ OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
             ciphertext: {},
         };
 
+        const promises = [];
+
         for (let i = 0; i < users.length; ++i) {
             const userId = users[i];
             const devices = self._crypto.getStoredDevicesForUser(userId);
@@ -123,15 +125,17 @@ OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
                     continue;
                 }
 
-                olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    self._userId, self._deviceId, self._olmDevice,
-                    userId, deviceInfo, payloadFields,
+                promises.push(
+                    olmlib.encryptMessageForDevice(
+                        encryptedContent.ciphertext,
+                        self._userId, self._deviceId, self._olmDevice,
+                        userId, deviceInfo, payloadFields,
+                    ),
                 );
             }
         }
 
-        return encryptedContent;
+        return Promise.all(promises).return(encryptedContent);
     });
 };
 
