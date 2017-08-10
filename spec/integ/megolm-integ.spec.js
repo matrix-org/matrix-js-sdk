@@ -119,6 +119,7 @@ function encryptMegolmEvent(opts) {
     }
 
     return {
+        event_id: 'test_megolm_event',
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
             ciphertext: opts.groupSession.encrypt(JSON.stringify(plaintext)),
@@ -342,6 +343,9 @@ describe("megolm", function() {
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isEncrypted()).toBe(true);
+            return testUtils.awaitDecryption(event);
+        }).then((event) => {
             expect(event.getContent().body).toEqual('42');
         });
     });
