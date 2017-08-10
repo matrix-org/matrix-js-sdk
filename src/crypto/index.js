@@ -1303,15 +1303,17 @@ class IncomingRoomKeyRequestCancellation {
  * @property {Object} clearEvent The plaintext payload for the event
  *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
  *
- * @property {string?} senderCurve25519Key Key owned by the sender of this event.
- *    See {@link module:models/event.MatrixEvent#getSenderKey}.
+ * @property {?string} senderCurve25519Key Key owned by the sender of this
+ *    event.  See {@link module:models/event.MatrixEvent#getSenderKey}.
  *
- * @property {string?} claimedEd25519Key ed25519 key claimed by the sender of
- *    this event. See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
+ * @property {?string} claimedEd25519Key ed25519 key claimed by the sender of
+ *    this event. See
+ *    {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
  *
- * @property {Array<string>?} forwardingCurve25519KeyChain list of curve25519 keys
- *     involved in telling us about the senderCurve25519Key and claimedEd25519Key.
- *     See {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
+ * @property {?Array<string>} forwardingCurve25519KeyChain list of curve25519
+ *     keys involved in telling us about the senderCurve25519Key and
+ *     claimedEd25519Key. See
+ *     {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
  */
 
 /**
