@@ -686,7 +686,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {boolean} exportFormat true if the megolm keys are in export format
  *    (ie, they lack an ed25519 signature)
  */
-OlmDevice.prototype.addInboundGroupSession = function(
+OlmDevice.prototype.addInboundGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
     sessionId, sessionKey, keysClaimed,
     exportFormat,
