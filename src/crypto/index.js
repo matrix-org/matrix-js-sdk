@@ -694,17 +694,16 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
  *    session export objects
  */
 Crypto.prototype.exportRoomKeys = function() {
-    return Promise.resolve(
-        this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
-            (s) => {
-                const sess = this._olmDevice.exportInboundGroupSession(
-                    s.senderKey, s.sessionId,
-                );
-
+    return Promise.map(
+        this._sessionStore.getAllEndToEndInboundGroupSessionKeys(),
+        (s) => {
+            return this._olmDevice.exportInboundGroupSession(
+                s.senderKey, s.sessionId,
+            ).then((sess) => {
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 return sess;
-            },
-        ),
+            });
+        },
     );
 };
 

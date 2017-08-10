@@ -915,9 +915,9 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
- * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
+ * @return {Promise<module:crypto/OlmDevice.MegolmSessionData>} exported session data
  */
-OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
+OlmDevice.prototype.exportInboundGroupSession = async function(senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(
         senderKey, sessionId,
     );
