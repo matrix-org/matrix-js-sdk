@@ -74,6 +74,14 @@ OutboundSessionInfo.prototype.needsRotation = function(
     return false;
 };
 
+OutboundSessionInfo.prototype.markSharedWithDevice = function(
+    userId, deviceId, chainIndex,
+) {
+    if (!this.sharedWithDevices[userId]) {
+        this.sharedWithDevices[userId] = {};
+    }
+    this.sharedWithDevices[userId][deviceId] = chainIndex;
+};
 
 /**
  * Determine if this session has been shared with devices which it shouldn't
@@ -284,8 +292,9 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         },
     };
 
+    // use an array where the slices of a content map gets stored
     const contentMaps = [];
-    let maxContentMapId = 0;
+    let maxContentMapId = 0; // start inserting in the first contentMap
     let currentToDeviceId = 0;
 
     return olmlib.ensureOlmSessionsForDevices(
@@ -297,7 +306,6 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
             if (!devicesByUser.hasOwnProperty(userId)) {
                 continue;
             }
-
             const devicesToShareWith = devicesByUser[userId];
             const sessionResults = devicemap[userId];
 
@@ -315,7 +323,11 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                     // message because of the lack of keys, but there's not
                     // much point in that really; it will mostly serve to clog
                     // up to_device inboxes.
-                    //
+
+                    // mark this device as "handled" because we don't want to try
+                    // to claim a one-time-key for dead devices on every message.
+                    session.markSharedWithDevice(userId, deviceId, key.chain_index);
+
                     // ensureOlmSessionsForUsers has already done the logging,
                     // so just skip it.
                     continue;
@@ -332,6 +344,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                 };
 
                 if (currentToDeviceId > maxToDeviceMessagesPerRequest) {
+                    // the first slice is filled up. Start inserting into the next slice
                     currentToDeviceId = 0;
                     maxContentMapId++;
                 }
@@ -363,8 +376,11 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
             // no devices to send to
             return Promise.resolve();
         }
+
+        // This loop iterates through all slices and sends them slice by slice
         function sendToDeviceLoop(slice) {
             if (slice > maxContentMapId) {
+                // root of recursion. All slices got send => return success
                 return Promise.resolve();
             }
             const contentMap = contentMaps[slice];
@@ -379,12 +395,15 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
                             continue;
                         }
                         for (const deviceId in contentMap[userId]) {
-                            if (!session.sharedWithDevices[userId]) {
-                                session.sharedWithDevices[userId] = {};
+                            if (!contentMap[userId].hasOwnProperty(deviceId)) {
+                                continue;
                             }
-                            session.sharedWithDevices[userId][deviceId] = key.chain_index;
+                            session.markSharedWithDevice(
+                                userId, deviceId, key.chain_index,
+                            );
                         }
                     }
+                    // send the next slice
                     return sendToDeviceLoop(slice + 1);
                 });
         }
@@ -394,27 +413,6 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         });
     }).then(() => {
         console.log(`Completed megolm keyshare in ${self._roomId}`);
-
-        // Add the devices we have shared with to session.sharedWithDevices.
-        //
-        // we deliberately iterate over devicesByUser (ie, the devices we
-        // attempted to share with) rather than the contentMap (those we did
-        // share with), because we don't want to try to claim a one-time-key
-        // for dead devices on every message.
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
-                continue;
-            }
-            if (!session.sharedWithDevices[userId]) {
-                session.sharedWithDevices[userId] = {};
-            }
-            const devicesToShareWith = devicesByUser[userId];
-            for (let i = 0; i < devicesToShareWith.length; i++) {
-                const deviceInfo = devicesToShareWith[i];
-                session.sharedWithDevices[userId][deviceInfo.deviceId] =
-                    key.chain_index;
-            }
-        }
     });
 };
 
