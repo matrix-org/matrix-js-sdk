@@ -251,7 +251,7 @@ OlmDecryption.prototype._decryptMessage = async function(
     for (let i = 0; i < sessionIds.length; i++) {
         const sessionId = sessionIds[i];
         try {
-            const payload = this._olmDevice.decryptMessage(
+            const payload = await this._olmDevice.decryptMessage(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
             console.log(
@@ -260,7 +260,7 @@ OlmDecryption.prototype._decryptMessage = async function(
             );
             return payload;
         } catch (e) {
-            const foundSession = this._olmDevice.matchesSession(
+            const foundSession = await this._olmDevice.matchesSession(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
 

@@ -435,9 +435,9 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) 
  * @param {string} sessionId  the id of the active session
  * @param {string} payloadString  payload to be encrypted and sent
  *
- * @return {string} ciphertext
+ * @return {Promise<string>} ciphertext
  */
-OlmDevice.prototype.encryptMessage = function(
+OlmDevice.prototype.encryptMessage = async function(
     theirDeviceIdentityKey, sessionId, payloadString,
 ) {
     const self = this;
@@ -460,9 +460,9 @@ OlmDevice.prototype.encryptMessage = function(
  * @param {number} message_type  message_type field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
- * @return {string} decrypted payload.
+ * @return {Promise<string>} decrypted payload.
  */
-OlmDevice.prototype.decryptMessage = function(
+OlmDevice.prototype.decryptMessage = async function(
     theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     const self = this;
@@ -484,10 +484,10 @@ OlmDevice.prototype.decryptMessage = function(
  * @param {number} message_type  message_type field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
- * @return {boolean} true if the received message is a prekey message which matches
+ * @return {Promise<boolean>} true if the received message is a prekey message which matches
  *    the given session.
  */
-OlmDevice.prototype.matchesSession = function(
+OlmDevice.prototype.matchesSession = async function(
     theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     if (message_type !== 0) {

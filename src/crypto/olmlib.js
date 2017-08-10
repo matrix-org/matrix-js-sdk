@@ -102,7 +102,7 @@ module.exports.encryptMessageForDevice = async function(
 
     utils.extend(payload, payloadFields);
 
-    resultsObject[deviceKey] = olmDevice.encryptMessage(
+    resultsObject[deviceKey] = await olmDevice.encryptMessage(
         deviceKey, sessionId, JSON.stringify(payload),
     );
 };
