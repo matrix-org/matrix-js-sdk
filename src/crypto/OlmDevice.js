@@ -253,7 +253,7 @@ OlmDevice.prototype.sign = async function(message) {
  * <tt>curve25519</tt>, which is itself an object mapping key id to Curve25519
  * key.
  */
-OlmDevice.prototype.getOneTimeKeys = function() {
+OlmDevice.prototype.getOneTimeKeys = async function() {
     return this._getAccount(function(account) {
         return JSON.parse(account.one_time_keys());
     });
@@ -274,7 +274,7 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
 /**
  * Marks all of the one-time keys as published.
  */
-OlmDevice.prototype.markKeysAsPublished = function() {
+OlmDevice.prototype.markKeysAsPublished = async function() {
     const self = this;
     this._getAccount(function(account) {
         account.mark_keys_as_published();

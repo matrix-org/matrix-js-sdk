@@ -358,7 +358,7 @@ function _maybeUploadOneTimeKeys(crypto) {
 
 // returns a promise which resolves to the response
 async function _uploadOneTimeKeys(crypto) {
-    const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
+    const oneTimeKeys = await crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
 
     const promises = [];
@@ -383,7 +383,7 @@ async function _uploadOneTimeKeys(crypto) {
         device_id: crypto._deviceId,
     });
 
-    crypto._olmDevice.markKeysAsPublished();
+    await crypto._olmDevice.markKeysAsPublished();
     return res;
 }
 
