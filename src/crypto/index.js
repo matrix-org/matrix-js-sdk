@@ -308,14 +308,15 @@ function _maybeUploadOneTimeKeys(crypto) {
     function uploadLoop(keyCount) {
         if (keyLimit <= keyCount) {
             // If we don't need to generate any more keys then we are done.
-            return;
+            return Promise.resolve();
         }
 
         const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
 
         // Ask olm to generate new one time keys, then upload them to synapse.
-        crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
-        return _uploadOneTimeKeys(crypto).then((res) => {
+        return crypto._olmDevice.generateOneTimeKeys(keysThisLoop).then(() => {
+            return _uploadOneTimeKeys(crypto);
+        }).then((res) => {
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                 // if the response contains a more up to date value use this
                 // for the next loop

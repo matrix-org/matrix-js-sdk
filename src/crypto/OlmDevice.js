@@ -86,6 +86,7 @@ function OlmDevice(sessionStore) {
     // don't know these until we load the account from storage in init()
     this.deviceCurve25519Key = null;
     this.deviceEd25519Key = null;
+    this._maxOneTimeKeys = null;
 
     // we don't bother stashing outboundgroupsessions in the sessionstore -
     // instead we keep them here.
@@ -119,6 +120,8 @@ OlmDevice.prototype.init = async function() {
     try {
         _initialise_account(this._sessionStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
+
+        this._maxOneTimeKeys = account.max_number_of_one_time_keys();
     } finally {
         account.free();
     }
@@ -266,9 +269,7 @@ OlmDevice.prototype.getOneTimeKeys = async function() {
  * @return {number} number of keys
  */
 OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
-    return this._getAccount(function(account) {
-        return account.max_number_of_one_time_keys();
-    });
+    return this._maxOneTimeKeys;
 };
 
 /**
@@ -287,7 +288,7 @@ OlmDevice.prototype.markKeysAsPublished = async function() {
  *
  * @param {number} numKeys number of keys to generate
  */
-OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
+OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
     const self = this;
     this._getAccount(function(account) {
         account.generate_one_time_keys(numKeys);
