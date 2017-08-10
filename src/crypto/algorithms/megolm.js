@@ -557,7 +557,7 @@ MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFa
 
     let res;
     try {
-        res = this._olmDevice.decryptGroupMessage(
+        res = await this._olmDevice.decryptGroupMessage(
             event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
         );
     } catch (e) {

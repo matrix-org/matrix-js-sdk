@@ -797,11 +797,11 @@ OlmDevice.prototype.importInboundGroupSession = async function(data) {
  *
  * @return {null} the sessionId is unknown
  *
- * @return {{result: string, senderKey: string,
+ * @return {Promise<{result: string, senderKey: string,
  *    forwardingCurve25519KeyChain: Array<string>,
- *    keysClaimed: Object<string, string>}}
+ *    keysClaimed: Object<string, string>}>}
  */
-OlmDevice.prototype.decryptGroupMessage = function(
+OlmDevice.prototype.decryptGroupMessage = async function(
     roomId, senderKey, sessionId, body,
 ) {
     const self = this;
