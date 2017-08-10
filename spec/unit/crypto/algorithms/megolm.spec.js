@@ -60,7 +60,8 @@ describe("MegolmDecryption", function() {
         // we stub out the olm encryption bits
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = expect.createSpy();
-        mockOlmLib.encryptMessageForDevice = expect.createSpy();
+        mockOlmLib.encryptMessageForDevice =
+            expect.createSpy().andReturn(Promise.resolve());
         megolmDecryption.olmlib = mockOlmLib;
     });
 
@@ -119,29 +120,32 @@ describe("MegolmDecryption", function() {
                 },
             };
 
-            expect(megolmDecryption.hasKeysForKeyRequest(keyRequest))
-                .toBe(true);
+            return megolmDecryption.hasKeysForKeyRequest(
+                keyRequest,
+            ).then((hasKeys) => {
+                expect(hasKeys).toBe(true);
 
-            // set up some pre-conditions for the share call
-            const deviceInfo = {};
-            mockCrypto.getStoredDevice.andReturn(deviceInfo);
+                // set up some pre-conditions for the share call
+                const deviceInfo = {};
+                mockCrypto.getStoredDevice.andReturn(deviceInfo);
 
-            const awaitEnsureSessions = new Promise((res, rej) => {
-                mockOlmLib.ensureOlmSessionsForDevices.andCall(() => {
-                    res();
-                    return Promise.resolve({'@alice:foo': {'alidevice': {
-                        sessionId: 'alisession',
-                    }}});
+                const awaitEnsureSessions = new Promise((res, rej) => {
+                    mockOlmLib.ensureOlmSessionsForDevices.andCall(() => {
+                        res();
+                        return Promise.resolve({'@alice:foo': {'alidevice': {
+                            sessionId: 'alisession',
+                        }}});
+                    });
                 });
-            });
 
-            mockBaseApis.sendToDevice = expect.createSpy();
+                mockBaseApis.sendToDevice = expect.createSpy();
 
-            // do the share
-            megolmDecryption.shareKeysWithDevice(keyRequest);
+                // do the share
+                megolmDecryption.shareKeysWithDevice(keyRequest);
 
-            // it's asynchronous, so we have to wait a bit
-            return awaitEnsureSessions.then(() => {
+                // it's asynchronous, so we have to wait a bit
+                return awaitEnsureSessions;
+            }).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.
                 expect(mockOlmLib.encryptMessageForDevice.calls.length)

@@ -48,8 +48,11 @@ module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
  * @param {string} recipientUserId
  * @param {module:crypto/deviceinfo} recipientDevice
  * @param {object} payloadFields fields to include in the encrypted payload
+ *
+ * Returns a promise which resolves (to undefined) when the payload
+ *    has been encrypted into `resultsObject`
  */
-module.exports.encryptMessageForDevice = function(
+module.exports.encryptMessageForDevice = async function(
     resultsObject,
     ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
     payloadFields,
@@ -118,7 +121,7 @@ module.exports.encryptMessageForDevice = function(
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
-module.exports.ensureOlmSessionsForDevices = function(
+module.exports.ensureOlmSessionsForDevices = async function(
     olmDevice, baseApis, devicesByUser,
 ) {
     const devicesWithoutSession = [
@@ -148,7 +151,7 @@ module.exports.ensureOlmSessionsForDevices = function(
     }
 
     if (devicesWithoutSession.length === 0) {
-        return Promise.resolve(result);
+        return result;
     }
 
     // TODO: this has a race condition - if we try to send another message
@@ -158,55 +161,60 @@ module.exports.ensureOlmSessionsForDevices = function(
     // That should eventually resolve itself, but it's poor form.
 
     const oneTimeKeyAlgorithm = "signed_curve25519";
-    return baseApis.claimOneTimeKeys(
+    const res = await baseApis.claimOneTimeKeys(
         devicesWithoutSession, oneTimeKeyAlgorithm,
-    ).then(function(res) {
-        const otk_res = res.one_time_keys || {};
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
+    );
+
+    const otk_res = res.one_time_keys || {};
+    const promises = [];
+    for (const userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
+        const userRes = otk_res[userId] || {};
+        const devices = devicesByUser[userId];
+        for (let j = 0; j < devices.length; j++) {
+            const deviceInfo = devices[j];
+            const deviceId = deviceInfo.deviceId;
+            if (result[userId][deviceId].sessionId) {
+                // we already have a result for this device
                 continue;
             }
-            const userRes = otk_res[userId] || {};
-            const devices = devicesByUser[userId];
-            for (let j = 0; j < devices.length; j++) {
-                const deviceInfo = devices[j];
-                const deviceId = deviceInfo.deviceId;
-                if (result[userId][deviceId].sessionId) {
-                    // we already have a result for this device
-                    continue;
-                }
 
-                const deviceRes = userRes[deviceId] || {};
-                let oneTimeKey = null;
-                for (const keyId in deviceRes) {
-                    if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
-                        oneTimeKey = deviceRes[keyId];
-                    }
+            const deviceRes = userRes[deviceId] || {};
+            let oneTimeKey = null;
+            for (const keyId in deviceRes) {
+                if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
+                    oneTimeKey = deviceRes[keyId];
                 }
-
-                if (!oneTimeKey) {
-                    console.warn(
-                        "No one-time keys (alg=" + oneTimeKeyAlgorithm +
-                            ") for device " + userId + ":" + deviceId,
-                    );
-                    continue;
-                }
-
-                const sid = _verifyKeyAndStartSession(
-                    olmDevice, oneTimeKey, userId, deviceInfo,
-                );
-                result[userId][deviceId].sessionId = sid;
             }
+
+            if (!oneTimeKey) {
+                console.warn(
+                    "No one-time keys (alg=" + oneTimeKeyAlgorithm +
+                        ") for device " + userId + ":" + deviceId,
+                );
+                continue;
+            }
+
+            promises.push(
+                _verifyKeyAndStartSession(
+                    olmDevice, oneTimeKey, userId, deviceInfo,
+                ).then((sid) => {
+                    result[userId][deviceId].sessionId = sid;
+                }),
+            );
         }
-        return result;
-    });
+    }
+
+    await Promise.all(promises);
+    return result;
 };
 
-
-function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
+async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     const deviceId = deviceInfo.deviceId;
     try {
-        _verifySignature(
+        await _verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
             deviceInfo.getFingerprint(),
         );
@@ -249,8 +257,11 @@ function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
  * @param {string} signingDeviceId  ID of the device whose signature should be checked
  *
  * @param {string} signingKey   base64-ed ed25519 public key
+ *
+ * Returns a promise which resolves (to undefined) if the the signature is good,
+ * or rejects with an Error if it is bad.
  */
-const _verifySignature = module.exports.verifySignature = function(
+const _verifySignature = module.exports.verifySignature = async function(
     olmDevice, obj, signingUserId, signingDeviceId, signingKey,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;

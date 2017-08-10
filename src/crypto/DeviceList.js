@@ -462,7 +462,7 @@ class DeviceListUpdateSerialiser {
             let prom = Promise.resolve();
             for (const userId of downloadUsers) {
                 prom = prom.delay(5).then(() => {
-                    this._processQueryResponseForUser(userId, dk[userId]);
+                    return this._processQueryResponseForUser(userId, dk[userId]);
                 });
             }
 
@@ -486,7 +486,7 @@ class DeviceListUpdateSerialiser {
         return deferred.promise;
     }
 
-    _processQueryResponseForUser(userId, response) {
+    async _processQueryResponseForUser(userId, response) {
         console.log('got keys for ' + userId + ':', response);
 
         // map from deviceid -> deviceinfo for this user
@@ -499,7 +499,7 @@ class DeviceListUpdateSerialiser {
             });
         }
 
-        _updateStoredDeviceKeysForUser(
+        await _updateStoredDeviceKeysForUser(
             this._olmDevice, userId, userStore, response || {},
         );
 
@@ -516,7 +516,7 @@ class DeviceListUpdateSerialiser {
 }
 
 
-function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
+async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         userResult) {
     let updated = false;
 
@@ -554,7 +554,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
             continue;
         }
 
-        if (_storeDeviceKeys(_olmDevice, userStore, deviceResult)) {
+        if (await _storeDeviceKeys(_olmDevice, userStore, deviceResult)) {
             updated = true;
         }
     }
@@ -565,9 +565,9 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
 /*
  * Process a device in a /query response, and add it to the userStore
  *
- * returns true if a change was made, else false
+ * returns (a promise for) true if a change was made, else false
  */
- function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
+async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     if (!deviceResult.keys) {
         // no keys?
         return false;
@@ -587,7 +587,7 @@ function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     const unsigned = deviceResult.unsigned || {};
 
     try {
-        olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
+        await olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
     } catch (e) {
         console.warn("Unable to verify signature on device " +
             userId + ":" + deviceId + ":" + e);
