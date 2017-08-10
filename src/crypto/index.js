@@ -88,12 +88,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._deviceKeys = {};
 
-    // build our device keys: these will later be uploaded
-    this._deviceKeys["ed25519:" + this._deviceId] =
-        this._olmDevice.deviceEd25519Key;
-    this._deviceKeys["curve25519:" + this._deviceId] =
-        this._olmDevice.deviceCurve25519Key;
-
     this._globalBlacklistUnverifiedDevices = false;
 
     this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
@@ -106,6 +100,20 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+}
+utils.inherits(Crypto, EventEmitter);
+
+/**
+ * Initialise the crypto module so that it is ready for use
+ */
+Crypto.prototype.init = async function() {
+    await this._olmDevice.init();
+
+    // build our device keys: these will later be uploaded
+    this._deviceKeys["ed25519:" + this._deviceId] =
+        this._olmDevice.deviceEd25519Key;
+    this._deviceKeys["curve25519:" + this._deviceId] =
+        this._olmDevice.deviceCurve25519Key;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -129,13 +137,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
             this._userId, myDevices,
         );
     }
-}
-utils.inherits(Crypto, EventEmitter);
-
-/**
- * Initialise the crypto module so that it is ready for use
- */
-Crypto.prototype.init = async function() {
 };
 
 /**

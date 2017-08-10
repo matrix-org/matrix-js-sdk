@@ -83,17 +83,9 @@ function OlmDevice(sessionStore) {
     this._sessionStore = sessionStore;
     this._pickleKey = "DEFAULT_KEY";
 
-    let e2eKeys;
-    const account = new Olm.Account();
-    try {
-        _initialise_account(this._sessionStore, this._pickleKey, account);
-        e2eKeys = JSON.parse(account.identity_keys());
-    } finally {
-        account.free();
-    }
-
-    this.deviceCurve25519Key = e2eKeys.curve25519;
-    this.deviceEd25519Key = e2eKeys.ed25519;
+    // don't know these until we load the account from storage in init()
+    this.deviceCurve25519Key = null;
+    this.deviceEd25519Key = null;
 
     // we don't bother stashing outboundgroupsessions in the sessionstore -
     // instead we keep them here.
@@ -111,6 +103,30 @@ function OlmDevice(sessionStore) {
     // Values are true.
     this._inboundGroupSessionMessageIndexes = {};
 }
+
+/**
+ * Initialise the OlmAccount. This must be called before any other operations
+ * on the OlmDevice.
+ *
+ * Attempts to load the OlmAccount from localStorage, or creates one if none is
+ * found.
+ *
+ * Reads the device keys from the OlmAccount object.
+ */
+OlmDevice.prototype.init = async function() {
+    let e2eKeys;
+    const account = new Olm.Account();
+    try {
+        _initialise_account(this._sessionStore, this._pickleKey, account);
+        e2eKeys = JSON.parse(account.identity_keys());
+    } finally {
+        account.free();
+    }
+
+    this.deviceCurve25519Key = e2eKeys.curve25519;
+    this.deviceEd25519Key = e2eKeys.ed25519;
+};
+
 
 function _initialise_account(sessionStore, pickleKey, account) {
     const e2eAccount = sessionStore.getEndToEndAccount();
