@@ -719,11 +719,11 @@ Crypto.prototype.importRoomKeys = function(keys) {
         keys, (key) => {
             if (!key.room_id || !key.algorithm) {
                 console.warn("ignoring room key entry with missing fields", key);
-                return;
+                return null;
             }
 
             const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            alg.importRoomKey(key);
+            return alg.importRoomKey(key);
         },
     );
 };

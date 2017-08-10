@@ -744,7 +744,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
  *
  * @param {module:crypto/OlmDevice.MegolmSessionData} data  session data
  */
-OlmDevice.prototype.importInboundGroupSession = function(data) {
+OlmDevice.prototype.importInboundGroupSession = async function(data) {
     /* if we already have this session, consider updating it */
     function updateSession(session, sessionData) {
         console.log("Update for megolm session " + data.sender_key + "|" +
