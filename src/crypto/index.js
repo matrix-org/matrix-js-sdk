@@ -104,6 +104,8 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     // we received in the current sync.
     this._receivedRoomKeyRequests = [];
     this._receivedRoomKeyRequestCancellations = [];
+    // true if we are currently processing received room key requests
+    this._processingRoomKeyRequests = false;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -229,14 +231,15 @@ Crypto.prototype.uploadDeviceKeys = function() {
         keys: crypto._deviceKeys,
         user_id: userId,
     };
-    crypto._signObject(deviceKeys);
 
-    return crypto._baseApis.uploadKeysRequest({
-        device_keys: deviceKeys,
-    }, {
-        // for now, we set the device id explicitly, as we may not be using the
-        // same one as used in login.
-        device_id: deviceId,
+    return crypto._signObject(deviceKeys).then(() => {
+        crypto._baseApis.uploadKeysRequest({
+            device_keys: deviceKeys,
+        }, {
+            // for now, we set the device id explicitly, as we may not be using the
+            // same one as used in login.
+            device_id: deviceId,
+        });
     });
 };
 
@@ -353,30 +356,34 @@ function _maybeUploadOneTimeKeys(crypto) {
 }
 
 // returns a promise which resolves to the response
-function _uploadOneTimeKeys(crypto) {
+async function _uploadOneTimeKeys(crypto) {
     const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
+
+    const promises = [];
 
     for (const keyId in oneTimeKeys.curve25519) {
         if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
             const k = {
                 key: oneTimeKeys.curve25519[keyId],
             };
-            crypto._signObject(k);
             oneTimeJson["signed_curve25519:" + keyId] = k;
+            promises.push(crypto._signObject(k));
         }
     }
 
-    return crypto._baseApis.uploadKeysRequest({
+    await Promise.all(promises);
+
+    const res = await crypto._baseApis.uploadKeysRequest({
         one_time_keys: oneTimeJson,
     }, {
         // for now, we set the device id explicitly, as we may not be using the
         // same one as used in login.
         device_id: crypto._deviceId,
-    }).then(function(res) {
-        crypto._olmDevice.markKeysAsPublished();
-        return res;
     });
+
+    crypto._olmDevice.markKeysAsPublished();
+    return res;
 }
 
 /**
@@ -432,10 +439,11 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
  * @param {?boolean} known whether to mark that the user has been made aware of
  *      the existence of this device. Null to leave unchanged
  *
- * @return {module:crypto/deviceinfo} updated DeviceInfo
+ * @return {Promise<module:crypto/deviceinfo>} updated DeviceInfo
  */
-Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
-                                                  blocked, known) {
+Crypto.prototype.setDeviceVerification = async function(
+    userId, deviceId, verified, blocked, known,
+) {
     const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
@@ -482,9 +490,9 @@ Crypto.prototype.setDeviceVerification = function(userId, deviceId, verified,
  *
  * @param {string} userId id of user to inspect
  *
- * @return {Object.<string, {deviceIdKey: string, sessions: object[]}>}
+ * @return {Promise<Object.<string, {deviceIdKey: string, sessions: object[]}>>}
  */
-Crypto.prototype.getOlmSessionsForUser = function(userId) {
+Crypto.prototype.getOlmSessionsForUser = async function(userId) {
     const devices = this.getStoredDevicesForUser(userId) || [];
     const result = {};
     for (let j = 0; j < devices.length; ++j) {
@@ -572,7 +580,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
  *   users in the room (for now)
  */
-Crypto.prototype.setRoomEncryption = function(roomId, config, inhibitDeviceQuery) {
+Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
     const existingConfig = this._sessionStore.getEndToEndRoom(roomId);
@@ -606,6 +614,10 @@ Crypto.prototype.setRoomEncryption = function(roomId, config, inhibitDeviceQuery
     console.log("Enabling encryption in " + roomId + "; " +
                 "starting to track device lists for all users therein");
     const room = this._clientStore.getRoom(roomId);
+    if (!room) {
+        throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
+    }
+
     const members = room.getJoinedMembers();
     members.forEach((m) => {
         this._deviceList.startTrackingDeviceList(m.userId);
@@ -698,38 +710,33 @@ Crypto.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ * @return {module:client.Promise} a promise which resolves once the keys have been imported
  */
 Crypto.prototype.importRoomKeys = function(keys) {
-    keys.map((session) => {
-        if (!session.room_id || !session.algorithm) {
-            console.warn("ignoring session entry with missing fields", session);
-            return;
-        }
+    return Promise.map(
+        keys, (key) => {
+            if (!key.room_id || !key.algorithm) {
+                console.warn("ignoring room key entry with missing fields", key);
+                return;
+            }
 
-        const alg = this._getRoomDecryptor(session.room_id, session.algorithm);
-        alg.importRoomKey(session);
-    });
+            const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
+            alg.importRoomKey(key);
+        },
+    );
 };
 
 /**
- * Encrypt an event according to the configuration of the room, if necessary.
+ * Encrypt an event according to the configuration of the room.
  *
  * @param {module:models/event.MatrixEvent} event  event to be sent
  *
- * @param {module:models/room?} room destination room. Null if the destination
- *     is not a room we have seen over the sync pipe.
+ * @param {module:models/room} room destination room.
  *
  * @return {module:client.Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
-Crypto.prototype.encryptEventIfNeeded = function(event, room) {
-    if (event.isEncrypted()) {
-        // this event has already been encrypted; this happens if the
-        // encryption step succeeded, but the send step failed on the first
-        // attempt.
-        return null;
-    }
-
+Crypto.prototype.encryptEvent = function(event, room) {
     if (!room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
     }
@@ -738,17 +745,13 @@ Crypto.prototype.encryptEventIfNeeded = function(event, room) {
 
     const alg = this._roomEncryptors[roomId];
     if (!alg) {
-        // not encrypting messages in this room
-
-        // check that the HS hasn't hidden the crypto event
-        if (this._sessionStore.getEndToEndRoom(roomId)) {
-            throw new Error(
-                "Room was previously configured to use encryption, but is " +
-                "no longer. Perhaps the homeserver is hiding the " +
-                "configuration event.",
-            );
-        }
-        return null;
+        // MatrixClient has already checked that this room should be encrypted,
+        // so this is an unexpected situation.
+        throw new Error(
+            "Room was previously configured to use encryption, but is " +
+            "no longer. Perhaps the homeserver is hiding the " +
+            "configuration event.",
+        );
     }
 
     return alg.encryptMessage(
@@ -831,7 +834,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
     try {
         // inhibit the device list refresh for now - it will happen once we've
         // finished processing the sync, in _onSyncCompleted.
-        this.setRoomEncryption(roomId, content, true);
+        await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
                       ":", e);
@@ -1051,79 +1054,124 @@ Crypto.prototype._onRoomKeyRequestEvent = function(event) {
  *
  * @private
  */
-Crypto.prototype._processReceivedRoomKeyRequests = function() {
-    const requests = this._receivedRoomKeyRequests;
-    this._receivedRoomKeyRequests = [];
-    for (const req of requests) {
-        const userId = req.userId;
-        const deviceId = req.deviceId;
+Crypto.prototype._processReceivedRoomKeyRequests = async function() {
+    if (this._processingRoomKeyRequests) {
+        // we're still processing last time's requests; keep queuing new ones
+        // up for now.
+        return;
+    }
+    this._processingRoomKeyRequests = true;
 
-        const body = req.requestBody;
-        const roomId = body.room_id;
-        const alg = body.algorithm;
+    try {
+        // we need to grab and clear the queues in the synchronous bit of this method,
+        // so that we don't end up racing with the next /sync.
+        const requests = this._receivedRoomKeyRequests;
+        this._receivedRoomKeyRequests = [];
+        const cancellations = this._receivedRoomKeyRequestCancellations;
+        this._receivedRoomKeyRequestCancellations = [];
 
-        console.log(`m.room_key_request from ${userId}:${deviceId}` +
+        // Process all of the requests, *then* all of the cancellations.
+        //
+        // This makes sure that if we get a request and its cancellation in the
+        // same /sync result, then we process the request before the
+        // cancellation (and end up with a cancelled request), rather than the
+        // cancellation before the request (and end up with an outstanding
+        // request which should have been cancelled.)
+        await Promise.map(
+            requests, (req) =>
+                this._processReceivedRoomKeyRequest(req),
+        );
+        await Promise.map(
+            cancellations, (cancellation) =>
+                this._processReceivedRoomKeyRequestCancellation(cancellation),
+        );
+    } catch (e) {
+        console.error(`Error processing room key requsts: ${e}`);
+    } finally {
+        this._processingRoomKeyRequests = false;
+    }
+};
+
+/**
+ * Helper for processReceivedRoomKeyRequests
+ *
+ * @param {IncomingRoomKeyRequest} req
+ */
+Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
+    const userId = req.userId;
+    const deviceId = req.deviceId;
+
+    const body = req.requestBody;
+    const roomId = body.room_id;
+    const alg = body.algorithm;
+
+    console.log(`m.room_key_request from ${userId}:${deviceId}` +
                 ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
-        if (userId !== this._userId) {
-            // TODO: determine if we sent this device the keys already: in
-            // which case we can do so again.
-            console.log("Ignoring room key request from other user for now");
-            return;
-        }
-
-        // todo: should we queue up requests we don't yet have keys for,
-        // in case they turn up later?
-
-        // if we don't have a decryptor for this room/alg, we don't have
-        // the keys for the requested events, and can drop the requests.
-        if (!this._roomDecryptors[roomId]) {
-            console.log(`room key request for unencrypted room ${roomId}`);
-            continue;
-        }
-
-        const decryptor = this._roomDecryptors[roomId][alg];
-        if (!decryptor) {
-            console.log(`room key request for unknown alg ${alg} in room ${roomId}`);
-            continue;
-        }
-
-        if (!decryptor.hasKeysForKeyRequest(req)) {
-            console.log(
-                `room key request for unknown session ${roomId} / ` +
-                body.session_id,
-            );
-            continue;
-        }
-
-        req.share = () => {
-            decryptor.shareKeysWithDevice(req);
-        };
-
-        // if the device is is verified already, share the keys
-        const device = this._deviceList.getStoredDevice(userId, deviceId);
-        if (device && device.isVerified()) {
-            console.log('device is already verified: sharing keys');
-            req.share();
-            return;
-        }
-
-        this.emit("crypto.roomKeyRequest", req);
+    if (userId !== this._userId) {
+        // TODO: determine if we sent this device the keys already: in
+        // which case we can do so again.
+        console.log("Ignoring room key request from other user for now");
+        return;
     }
 
-    const cancellations = this._receivedRoomKeyRequestCancellations;
-    this._receivedRoomKeyRequestCancellations = [];
-    for (const cancellation of cancellations) {
+    // todo: should we queue up requests we don't yet have keys for,
+    // in case they turn up later?
+
+    // if we don't have a decryptor for this room/alg, we don't have
+    // the keys for the requested events, and can drop the requests.
+    if (!this._roomDecryptors[roomId]) {
+        console.log(`room key request for unencrypted room ${roomId}`);
+        return;
+    }
+
+    const decryptor = this._roomDecryptors[roomId][alg];
+    if (!decryptor) {
+        console.log(`room key request for unknown alg ${alg} in room ${roomId}`);
+        return;
+    }
+
+    if (!await decryptor.hasKeysForKeyRequest(req)) {
         console.log(
-            `m.room_key_request cancellation for ${cancellation.userId}:` +
-            `${cancellation.deviceId} (id ${cancellation.requestId})`,
+            `room key request for unknown session ${roomId} / ` +
+                body.session_id,
         );
-
-        // we should probably only notify the app of cancellations we told it
-        // about, but we don't currently have a record of that, so we just pass
-        // everything through.
-        this.emit("crypto.roomKeyRequestCancellation", cancellation);
+        return;
     }
+
+    req.share = () => {
+        decryptor.shareKeysWithDevice(req);
+    };
+
+    // if the device is is verified already, share the keys
+    const device = this._deviceList.getStoredDevice(userId, deviceId);
+    if (device && device.isVerified()) {
+        console.log('device is already verified: sharing keys');
+        req.share();
+        return;
+    }
+
+    this.emit("crypto.roomKeyRequest", req);
+};
+
+
+/**
+ * Helper for processReceivedRoomKeyRequests
+ *
+ * @param {IncomingRoomKeyRequestCancellation} cancellation
+ */
+Crypto.prototype._processReceivedRoomKeyRequestCancellation = async function(
+    cancellation,
+) {
+    console.log(
+        `m.room_key_request cancellation for ${cancellation.userId}:` +
+            `${cancellation.deviceId} (id ${cancellation.requestId})`,
+    );
+
+    // we should probably only notify the app of cancellations we told it
+    // about, but we don't currently have a record of that, so we just pass
+    // everything through.
+    this.emit("crypto.roomKeyRequestCancellation", cancellation);
 };
 
 /**
@@ -1187,7 +1235,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
  *
  * @param {Object} obj  Object to which we will add a 'signatures' property
  */
-Crypto.prototype._signObject = function(obj) {
+Crypto.prototype._signObject = async function(obj) {
     const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =

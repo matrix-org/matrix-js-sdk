@@ -538,7 +538,7 @@ async function _setDeviceVerification(
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    const dev = client._crypto.setDeviceVerification(
+    const dev = await client._crypto.setDeviceVerification(
         userId, deviceId, verified, blocked, known,
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
@@ -605,14 +605,13 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
  * Enable end-to-end encryption for a room.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
- * @return {Object} A promise that will resolve when encryption is setup.
+ * @return {Promise} A promise that will resolve when encryption is set up.
  */
 MatrixClient.prototype.setRoomEncryption = function(roomId, config) {
     if (!this._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    this._crypto.setRoomEncryption(roomId, config);
-    return Promise.resolve();
+    return this._crypto.setRoomEncryption(roomId, config);
 };
 
 /**
@@ -621,11 +620,28 @@ MatrixClient.prototype.setRoomEncryption = function(roomId, config) {
  * @return {bool} whether encryption is enabled.
  */
 MatrixClient.prototype.isRoomEncrypted = function(roomId) {
-    if (!this._crypto) {
+    const room = this.getRoom(roomId);
+    if (!room) {
+        // we don't know about this room, so can't determine if it should be
+        // encrypted. Let's assume not.
         return false;
     }
 
-    return this._crypto.isRoomEncrypted(roomId);
+    // if there is an 'm.room.encryption' event in this room, it should be
+    // encrypted (independently of whether we actually support encryption)
+    const ev = room.currentState.getStateEvents("m.room.encryption", "");
+    if (ev) {
+        return true;
+    }
+
+    // we don't have an m.room.encrypted event, but that might be because
+    // the server is hiding it from us. Check the store to see if it was
+    // previously encrypted.
+    if (!this._sessionStore) {
+        return false;
+    }
+
+    return Boolean(this._sessionStore.getEndToEndRoom(roomId));
 };
 
 /**
@@ -647,12 +663,15 @@ MatrixClient.prototype.exportRoomKeys = function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
+ *
+ * @return {module:client.Promise} a promise which resolves when the keys
+ *    have been imported
  */
-MatrixClient.prototype.importRoomKeys = async function(keys) {
+MatrixClient.prototype.importRoomKeys = function(keys) {
     if (!this._crypto) {
         throw new Error("End-to-end encryption disabled");
     }
-    this._crypto.importRoomKeys(keys);
+    return this._crypto.importRoomKeys(keys);
 };
 
 // Room ops
@@ -1010,17 +1029,16 @@ function _sendEvent(client, room, event, callback) {
     // so that we can handle synchronous and asynchronous exceptions with the
     // same code path.
     return Promise.resolve().then(function() {
-        let encryptionPromise = null;
-        if (client._crypto) {
-            encryptionPromise = client._crypto.encryptEventIfNeeded(event, room);
+        const encryptionPromise = _encryptEventIfNeeded(client, event, room);
+
+        if (!encryptionPromise) {
+            return null;
         }
-        if (encryptionPromise) {
-            _updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
-            encryptionPromise = encryptionPromise.then(function() {
-                _updatePendingEventStatus(room, event, EventStatus.SENDING);
-            });
-        }
-        return encryptionPromise;
+
+        _updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        return encryptionPromise.then(() => {
+            _updatePendingEventStatus(room, event, EventStatus.SENDING);
+        });
     }).then(function() {
         let promise;
         // this event may be queued
@@ -1068,6 +1086,43 @@ function _sendEvent(client, room, event, callback) {
         }
         throw err;
     });
+}
+
+/**
+ * Encrypt an event according to the configuration of the room, if necessary.
+ *
+ * @param {MatrixClient} client
+ *
+ * @param {module:models/event.MatrixEvent} event  event to be sent
+ *
+ * @param {module:models/room?} room destination room. Null if the destination
+ *     is not a room we have seen over the sync pipe.
+ *
+ * @return {module:client.Promise?} Promise which resolves when the event has been
+ *     encrypted, or null if nothing was needed
+ */
+
+function _encryptEventIfNeeded(client, event, room) {
+    if (event.isEncrypted()) {
+        // this event has already been encrypted; this happens if the
+        // encryption step succeeded, but the send step failed on the first
+        // attempt.
+        return null;
+    }
+
+    if (!client.isRoomEncrypted(event.getRoomId())) {
+        // looks like this room isn't encrypted.
+        return null;
+    }
+
+    if (!client._crypto) {
+        throw new Error(
+            "This room is configured to use encryption, but your client does " +
+            "not support encryption.",
+        );
+    }
+
+    return client._crypto.encryptEvent(event, room);
 }
 
 function _updatePendingEventStatus(room, event, newStatus) {

@@ -78,7 +78,10 @@ TestClient.prototype.start = function() {
         pendingEventOrdering: 'detached',
     });
 
-    return this.httpBackend.flushAllExpected().then(() => {
+    return Promise.all([
+        this.httpBackend.flushAllExpected(),
+        testUtils.syncPromise(this.client),
+    ]).then(() => {
         console.log(this + ': started');
     });
 };
@@ -144,7 +147,8 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
               }};
           });
 
-    return this.httpBackend.flush('/keys/upload', 2).then((flushed) => {
+    // this can take ages
+    return this.httpBackend.flush('/keys/upload', 2, 1000).then((flushed) => {
         expect(flushed).toEqual(2);
         return this.oneTimeKeys;
     });
@@ -199,5 +203,7 @@ TestClient.prototype.flushSync = function() {
     return Promise.all([
         this.httpBackend.flush('/sync', 1),
         testUtils.syncPromise(this.client),
-    ]);
+    ]).then(() => {
+        console.log(`${this}: flushSync completed`);
+    });
 };

@@ -195,21 +195,19 @@ describe("getEventTimeline support", function() {
                 },
             });
 
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client, 2),
+            ]);
+        }).then(function() {
+            expect(room.timeline.length).toEqual(1);
+            expect(room.timeline[0].event).toEqual(EVENTS[1]);
+
             httpBackend.when("GET", "/messages").respond(200, {
                 chunk: [EVENTS[0]],
                 start: "pagin_start",
                 end: "pagin_end",
             });
-
-            return httpBackend.flush("/sync", 2);
-        }).then(() => {
-            // the sync isn't processed immediately; give the promise chain
-            // a chance to complete.
-            return Promise.delay(0);
-        }).then(function() {
-            expect(room.timeline.length).toEqual(1);
-            expect(room.timeline[0].event).toEqual(EVENTS[1]);
-
             httpBackend.flush("/messages", 1);
             return client.scrollback(room);
         }).then(function() {
@@ -301,7 +299,10 @@ describe("MatrixClient event timelines", function() {
                 },
             });
 
-            return httpBackend.flush("/sync").then(function() {
+            return Promise.all([
+                httpBackend.flush("/sync"),
+                utils.syncPromise(client),
+            ]).then(function() {
                 return client.getEventTimeline(timelineSet, EVENTS[0].event_id);
             }).then(function(tl) {
                 expect(tl.getEvents().length).toEqual(2);
@@ -726,7 +727,10 @@ describe("MatrixClient event timelines", function() {
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        httpBackend.flushAllExpected().then(function() {
+        Promise.all([
+            httpBackend.flushAllExpected(),
+            utils.syncPromise(client),
+        ]).then(function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(3);
@@ -751,7 +755,10 @@ describe("MatrixClient event timelines", function() {
             };
             httpBackend.when("GET", "/sync").respond(200, sync2);
 
-            return httpBackend.flushAllExpected();
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                utils.syncPromise(client),
+            ]);
         }).then(function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
