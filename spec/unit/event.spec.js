@@ -43,6 +43,8 @@ describe("MatrixEvent", () => {
         it('should retry decryption if a retry is queued', () => {
             let callCount = 0;
 
+            let prom2;
+
             const crypto = {
                 decryptEvent: function() {
                     ++callCount;
@@ -50,12 +52,15 @@ describe("MatrixEvent", () => {
                     if (callCount == 1) {
                         // schedule a second decryption attempt while
                         // the first one is still running.
-                        encryptedEvent.attemptDecryption(crypto);
+                        prom2 = encryptedEvent.attemptDecryption(crypto);
 
                         const error = new Error("nope");
                         error.name = 'DecryptionError';
                         return Promise.reject(error);
                     } else {
+                        expect(prom2.isFulfilled()).toBe(
+                            false, 'second attemptDecryption resolved too soon');
+
                         return Promise.resolve({
                             clearEvent: {
                                 type: 'm.room.message',
@@ -68,6 +73,9 @@ describe("MatrixEvent", () => {
             return encryptedEvent.attemptDecryption(crypto).then(() => {
                 expect(callCount).toEqual(2);
                 expect(encryptedEvent.getType()).toEqual('m.room.message');
+
+                // make sure the second attemptDecryption resolves
+                return prom2;
             });
         });
     });
