@@ -384,7 +384,7 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
- * @return {Promise<string?>}  session id, or null if no established session
+ * @return {Promise<?string>}  session id, or null if no established session
  */
 OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
     const sessionIds = await this.getSessionIdsForDevice(theirDeviceIdentityKey);

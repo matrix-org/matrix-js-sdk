@@ -105,6 +105,8 @@ utils.inherits(Crypto, EventEmitter);
 
 /**
  * Initialise the crypto module so that it is ready for use
+ *
+ * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
     await this._olmDevice.init();
