@@ -535,18 +535,12 @@ utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * @return {Promise} resolves once we have finished decrypting. Rejects with an
- * `algorithms.DecryptionError` if there is a problem decrypting the event.
+ * returns a promise which resolves to a
+ * {@link module:crypto~EventDecryptionResult} once we have finished
+ * decrypting, or rejects with an `algorithms.DecryptionError` if there is a
+ * problem decrypting the event.
  */
-MegolmDecryption.prototype.decryptEvent = function(event) {
-    return this._decryptEvent(event, true);
-};
-
-
-// helper for the real decryptEvent and for _retryDecryption. If
-// requestKeysOnFail is true, we'll send an m.room_key_request when we fail
-// to decrypt the event due to missing megolm keys.
-MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFail) {
+MegolmDecryption.prototype.decryptEvent = async function(event) {
     const content = event.getWireContent();
 
     if (!content.sender_key || !content.session_id ||
@@ -563,9 +557,7 @@ MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFa
     } catch (e) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._addEventToPendingList(event);
-            if (requestKeysOnFail) {
-                this._requestKeysForEvent(event);
-            }
+            this._requestKeysForEvent(event);
         }
         throw new base.DecryptionError(
             e.toString(), {
@@ -577,9 +569,7 @@ MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFa
     if (res === null) {
         // We've got a message for a session we don't have.
         this._addEventToPendingList(event);
-        if (requestKeysOnFail) {
-            this._requestKeysForEvent(event);
-        }
+        this._requestKeysForEvent(event);
         throw new base.DecryptionError(
             "The sender's device has not sent us the keys for this message.",
             {
@@ -599,8 +589,12 @@ MegolmDecryption.prototype._decryptEvent = async function(event, requestKeysOnFa
         );
     }
 
-    event.setClearData(payload, res.senderKey, res.keysClaimed.ed25519,
-        res.forwardingCurve25519KeyChain);
+    return {
+        clearEvent: payload,
+        senderCurve25519Key: res.senderKey,
+        claimedEd25519Key: res.keysClaimed.ed25519,
+        forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+    };
 };
 
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {

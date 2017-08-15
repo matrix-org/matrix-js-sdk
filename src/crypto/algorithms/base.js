@@ -117,7 +117,8 @@ class DecryptionAlgorithm {
      *
      * @param {MatrixEvent} event undecrypted event
      *
-     * @return {Promise} resolves once we have finished decrypting. Rejects with an
+     * @return {Promise<module:crypto~EventDecryptionResult>} promise which
+     * resolves once we have finished decrypting. Rejects with an
      * `algorithms.DecryptionError` if there is a problem decrypting the event.
      */
 
