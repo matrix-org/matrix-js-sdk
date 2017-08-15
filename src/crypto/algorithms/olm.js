@@ -157,8 +157,10 @@ utils.inherits(OlmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * returns a promise which resolves once we have finished decrypting. Rejects with an
- * `algorithms.DecryptionError` if there is a problem decrypting the event.
+ * returns a promise which resolves to a
+ * {@link module:crypto~EventDecryptionResult} once we have finished
+ * decrypting. Rejects with an `algorithms.DecryptionError` if there is a
+ * problem decrypting the event.
  */
 OlmDecryption.prototype.decryptEvent = async function(event) {
     const content = event.getWireContent();
@@ -227,9 +229,13 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     }
 
     const claimedKeys = payload.keys || {};
-    event.setClearData(payload, deviceKey, claimedKeys.ed25519 || null);
-};
 
+    return {
+        clearEvent: payload,
+        senderCurve25519Key: deviceKey,
+        claimedEd25519Key: claimedKeys.ed25519 || null,
+    };
+};
 
 /**
  * Attempt to decrypt an Olm message

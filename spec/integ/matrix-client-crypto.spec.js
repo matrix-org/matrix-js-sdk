@@ -314,31 +314,37 @@ function recvMessage(httpBackend, client, sender, message) {
         },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
-    const deferred = Promise.defer();
-    const onEvent = function(event) {
-        console.log(client.credentials.userId + " received event",
-                    event);
 
-        // ignore the m.room.member events
-        if (event.getType() == "m.room.member") {
-            return;
-        }
+    const eventPromise = new Promise((resolve, reject) => {
+        const onEvent = function(event) {
+            // ignore the m.room.member events
+            if (event.getType() == "m.room.member") {
+                return;
+            }
+            console.log(client.credentials.userId + " received event",
+                        event);
 
+            client.removeListener("event", onEvent);
+            resolve(event);
+        };
+        client.on("event", onEvent);
+    });
+
+    httpBackend.flush();
+
+    return eventPromise.then((event) => {
+        expect(event.isEncrypted()).toBeTruthy();
+
+        // it may still be being decrypted
+        return testUtils.awaitDecryption(event);
+    }).then((event) => {
         expect(event.getType()).toEqual("m.room.message");
         expect(event.getContent()).toEqual({
             msgtype: "m.text",
             body: "Hello, World",
         });
         expect(event.isEncrypted()).toBeTruthy();
-
-        client.removeListener("event", onEvent);
-        deferred.resolve();
-    };
-
-    client.on("event", onEvent);
-
-    httpBackend.flush();
-    return deferred.promise;
+    });
 }
 
 
@@ -583,27 +589,25 @@ describe("MatrixClient crypto", function() {
                 };
                 bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncData);
 
-                const deferred = Promise.defer();
-                const onEvent = function(event) {
-                    console.log(bobUserId + " received event",
-                                event);
-
-                    // ignore the m.room.member events
-                    if (event.getType() == "m.room.member") {
-                        return;
-                    }
-
-                    expect(event.isEncrypted()).toBeTruthy();
-
-                    expect(event.getType()).toEqual("m.room.message");
-                    expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
-                    deferred.resolve();
-                };
-
-                bobTestClient.client.once("event", onEvent);
+                const eventPromise = new Promise((resolve, reject) => {
+                    const onEvent = function(event) {
+                        console.log(bobUserId + " received event",
+                                    event);
+                        resolve(event);
+                    };
+                    bobTestClient.client.once("event", onEvent);
+                });
 
                 bobTestClient.httpBackend.flush();
-                return deferred.promise;
+                return eventPromise;
+            }).then((event) => {
+                expect(event.isEncrypted()).toBeTruthy();
+
+                // it may still be being decrypted
+                return testUtils.awaitDecryption(event);
+            }).then((event) => {
+                expect(event.getType()).toEqual("m.room.message");
+                expect(event.getContent().msgtype).toEqual("m.bad.encrypted");
             });
     });
 
