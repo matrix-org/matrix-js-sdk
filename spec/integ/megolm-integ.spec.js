@@ -409,6 +409,8 @@ describe("megolm", function() {
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
+            return testUtils.awaitDecryption(event);
+        }).then((event) => {
             expect(event.getContent().body).toEqual('42');
         });
     });
