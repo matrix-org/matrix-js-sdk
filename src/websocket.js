@@ -207,18 +207,12 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
     debuglog("Run MessageTimeout for message", messageId);
     const curObj = this._awaiting_responses[messageId];
     if (curObj == "ping") {
-        console.error("Timeout for sending ping-request. Try reconnecting");
-        // as reconnection will be handled in _close this is enough for here
-        this._websocket.close();
-        return;
-    }
-    if (curObj.retried > 1) {
-        curObj.defer.reject(new MatrixError({
-            error: "Locally timed out waiting for a response",
-            errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-            timeout: this.ws_timeout * 2,
-        }));
-        delete this._awaiting_responses[messageId];
+        // only try closing the connection when the browser thinks it is not broken
+        if (this._websocket.readyState == WebSocket.OPEN) {
+            console.error("Timeout for sending ping-request. Try reconnecting");
+            // as reconnection will be handled in _close this is enough for here
+            this._websocket.close();
+        }
         return;
     }
     if (this._websocket.readyState != WebSocket.OPEN) {
@@ -227,13 +221,15 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
             this._awaiting_responses[messageId].pending = true;
             this._pendingSend.push(curObj.message);
         }
-    } else {
-        this._websocket.send(JSON.stringify(curObj.message));
+        return;
     }
-    this._awaiting_responses[messageId].retried = curObj.retried + 1 || 1;
 
-    setTimeout(this._handleResponseTimeout.bind(this, messageId),
-        this.ws_timeout * 2/3);
+    curObj.defer.reject(new MatrixError({
+        error: "Locally timed out waiting for a response",
+        errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
+        timeout: this.ws_timeout,
+    }));
+    delete this._awaiting_responses[messageId];
 };
 
 /**
@@ -527,7 +523,7 @@ WebSocketApi.prototype.sendObject = function(message) {
         this._websocket.send(JSON.stringify(message));
     }
 
-    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout * 2/3);
+    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout);
     return defer.promise;
 };
 
