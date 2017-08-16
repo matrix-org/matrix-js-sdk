@@ -446,7 +446,8 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
  */
 MatrixBaseApis.prototype.inviteUserToGroup = function(groupId, userId) {
     const path = utils.encodeUri(
-        "/groups/$groupId/admin/users/invite/$userId", {$groupId: groupId, $userId: userId}
+        "/groups/$groupId/admin/users/invite/$userId",
+        {$groupId: groupId, $userId: userId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
@@ -459,7 +460,8 @@ MatrixBaseApis.prototype.inviteUserToGroup = function(groupId, userId) {
  */
 MatrixBaseApis.prototype.removeUserFromGroup = function(groupId, userId) {
     const path = utils.encodeUri(
-        "/groups/$groupId/admin/users/remove/$userId", {$groupId: groupId, $userId, userId}
+        "/groups/$groupId/admin/users/remove/$userId",
+        {$groupId: groupId, $userId: userId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
