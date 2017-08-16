@@ -409,7 +409,17 @@ describe("megolm", function() {
         }).then(function() {
             const room = aliceTestClient.client.getRoom(ROOM_ID);
             const event = room.getLiveTimeline().getEvents()[0];
-            return testUtils.awaitDecryption(event);
+
+            if (event.getContent().msgtype != 'm.bad.encrypted') {
+                return event;
+            }
+
+            return new Promise((resolve, reject) => {
+                event.once('Event.decrypted', (ev) => {
+                    console.log(`${Date.now()} event ${event.getId()} now decrypted`);
+                    resolve(ev);
+                });
+            });
         }).then((event) => {
             expect(event.getContent().body).toEqual('42');
         });
