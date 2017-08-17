@@ -88,12 +88,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._deviceKeys = {};
 
-    // build our device keys: these will later be uploaded
-    this._deviceKeys["ed25519:" + this._deviceId] =
-        this._olmDevice.deviceEd25519Key;
-    this._deviceKeys["curve25519:" + this._deviceId] =
-        this._olmDevice.deviceCurve25519Key;
-
     this._globalBlacklistUnverifiedDevices = false;
 
     this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
@@ -106,6 +100,22 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+}
+utils.inherits(Crypto, EventEmitter);
+
+/**
+ * Initialise the crypto module so that it is ready for use
+ *
+ * Returns a promise which resolves once the crypto module is ready for use.
+ */
+Crypto.prototype.init = async function() {
+    await this._olmDevice.init();
+
+    // build our device keys: these will later be uploaded
+    this._deviceKeys["ed25519:" + this._deviceId] =
+        this._olmDevice.deviceEd25519Key;
+    this._deviceKeys["curve25519:" + this._deviceId] =
+        this._olmDevice.deviceCurve25519Key;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -129,13 +139,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
             this._userId, myDevices,
         );
     }
-}
-utils.inherits(Crypto, EventEmitter);
-
-/**
- * Initialise the crypto module so that it is ready for use
- */
-Crypto.prototype.init = async function() {
 };
 
 /**
@@ -307,14 +310,15 @@ function _maybeUploadOneTimeKeys(crypto) {
     function uploadLoop(keyCount) {
         if (keyLimit <= keyCount) {
             // If we don't need to generate any more keys then we are done.
-            return;
+            return Promise.resolve();
         }
 
         const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
 
         // Ask olm to generate new one time keys, then upload them to synapse.
-        crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
-        return _uploadOneTimeKeys(crypto).then((res) => {
+        return crypto._olmDevice.generateOneTimeKeys(keysThisLoop).then(() => {
+            return _uploadOneTimeKeys(crypto);
+        }).then((res) => {
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                 // if the response contains a more up to date value use this
                 // for the next loop
@@ -357,7 +361,7 @@ function _maybeUploadOneTimeKeys(crypto) {
 
 // returns a promise which resolves to the response
 async function _uploadOneTimeKeys(crypto) {
-    const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
+    const oneTimeKeys = await crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
 
     const promises = [];
@@ -382,7 +386,7 @@ async function _uploadOneTimeKeys(crypto) {
         device_id: crypto._deviceId,
     });
 
-    crypto._olmDevice.markKeysAsPublished();
+    await crypto._olmDevice.markKeysAsPublished();
     return res;
 }
 
@@ -498,7 +502,7 @@ Crypto.prototype.getOlmSessionsForUser = async function(userId) {
     for (let j = 0; j < devices.length; ++j) {
         const device = devices[j];
         const deviceKey = device.getIdentityKey();
-        const sessions = this._olmDevice.getSessionInfoForDevice(deviceKey);
+        const sessions = await this._olmDevice.getSessionInfoForDevice(deviceKey);
 
         result[device.deviceId] = {
             deviceIdKey: deviceKey,
@@ -692,17 +696,16 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
  *    session export objects
  */
 Crypto.prototype.exportRoomKeys = function() {
-    return Promise.resolve(
-        this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
-            (s) => {
-                const sess = this._olmDevice.exportInboundGroupSession(
-                    s.senderKey, s.sessionId,
-                );
-
+    return Promise.map(
+        this._sessionStore.getAllEndToEndInboundGroupSessionKeys(),
+        (s) => {
+            return this._olmDevice.exportInboundGroupSession(
+                s.senderKey, s.sessionId,
+            ).then((sess) => {
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 return sess;
-            },
-        ),
+            });
+        },
     );
 };
 
@@ -717,11 +720,11 @@ Crypto.prototype.importRoomKeys = function(keys) {
         keys, (key) => {
             if (!key.room_id || !key.algorithm) {
                 console.warn("ignoring room key entry with missing fields", key);
-                return;
+                return null;
             }
 
             const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            alg.importRoomKey(key);
+            return alg.importRoomKey(key);
         },
     );
 };
@@ -1240,7 +1243,7 @@ Crypto.prototype._signObject = async function(obj) {
     const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
-        this._olmDevice.sign(anotherjson.stringify(obj));
+        await this._olmDevice.sign(anotherjson.stringify(obj));
     obj.signatures = sigs;
 };
 

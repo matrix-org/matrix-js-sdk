@@ -141,12 +141,16 @@ describe("MegolmDecryption", function() {
                 const deviceInfo = {};
                 mockCrypto.getStoredDevice.andReturn(deviceInfo);
 
-                const awaitEnsureSessions = new Promise((res, rej) => {
-                    mockOlmLib.ensureOlmSessionsForDevices.andCall(() => {
+                mockOlmLib.ensureOlmSessionsForDevices.andReturn(
+                    Promise.resolve({'@alice:foo': {'alidevice': {
+                        sessionId: 'alisession',
+                    }}}),
+                );
+
+                const awaitEncryptForDevice = new Promise((res, rej) => {
+                    mockOlmLib.encryptMessageForDevice.andCall(() => {
                         res();
-                        return Promise.resolve({'@alice:foo': {'alidevice': {
-                            sessionId: 'alisession',
-                        }}});
+                        return Promise.resolve();
                     });
                 });
 
@@ -156,7 +160,7 @@ describe("MegolmDecryption", function() {
                 megolmDecryption.shareKeysWithDevice(keyRequest);
 
                 // it's asynchronous, so we have to wait a bit
-                return awaitEnsureSessions;
+                return awaitEncryptForDevice;
             }).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.
