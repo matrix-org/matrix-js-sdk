@@ -659,6 +659,30 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+// Group ops
+// =========
+// Operations on groups that come down the sync stream (ie. ones the
+// user is a member of or invited to)
+
+/**
+ * Get the group for the given group ID.
+ * This function will return a valid group for any group for which a Group event
+ * has been emitted.
+ * @param {string} groupId The group ID
+ * @return {Group} The Group or null if the group is not known or there is no data store.
+ */
+MatrixClient.prototype.getGroup = function(groupId) {
+    return this.store.getGroup(groupId);
+};
+
+/**
+ * Retrieve all known groups.
+ * @return {Groups[]} A list of groups, or an empty list if there is no data store.
+ */
+MatrixClient.prototype.getGroups = function() {
+    return this.store.getGroups();
+};
+
 // Room ops
 // ========
 
@@ -3420,6 +3444,17 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *       var rooms = matrixClient.getRooms();
  *       break;
  *   }
+ * });
+ */
+
+ /**
+ * Fires whenever the sdk learns about a new group. <strong>This event
+ * is experimental and may change.</strong>
+ * @event module:client~MatrixClient#"Group"
+ * @param {Group} group The newly created, fully populated group.
+ * @example
+ * matrixClient.on("Group", function(group){
+ *   var groupId = group.groupId;
  * });
  */
 

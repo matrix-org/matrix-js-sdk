@@ -27,6 +27,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const User = require("./models/user");
 const Room = require("./models/room");
+const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
@@ -122,6 +123,17 @@ SyncApi.prototype.createRoom = function(roomId) {
                          ]);
     this._registerStateListeners(room);
     return room;
+};
+
+/**
+ * @param {string} groupId
+ * @return {Group}
+ */
+SyncApi.prototype.createGroup = function(groupId) {
+    const client = this.client;
+    const group = new Group(groupId);
+    reEmit(client, group, ["Group.profile", "Group.myMembership"]);
+    return group;
 };
 
 /**
@@ -568,6 +580,7 @@ SyncApi.prototype._sync = function(syncOptions) {
             return {
                 next_batch: savedSync.nextBatch,
                 rooms: savedSync.roomsData,
+                groups: savedSync.groupsData,
                 account_data: {
                     events: savedSync.accountData,
                 },
@@ -714,6 +727,19 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     //        }
     //      }
     //    },
+    //    groups: {
+    //        invite: {
+    //            $groupId: {
+    //                inviter: $inviter,
+    //                profile: {
+    //                    avatar_url: $avatarUrl,
+    //                    name: $groupName,
+    //                },
+    //            },
+    //        },
+    //        join: {},
+    //        leave: {},
+    //    },
     // }
 
     // TODO-arch:
@@ -779,6 +805,29 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     } else {
         // no more to-device events: we can stop polling with a short timeout.
         this._catchingUp = false;
+    }
+
+    if (data.groups) {
+        if (data.groups.invite) {
+            for (const groupId of Object.keys(data.groups.invite)) {
+                const groupInfo = data.groups.invite[groupId];
+                let group = this.client.store.getGroup(groupId);
+                const isBrandNew = group === null;
+                if (group === null) {
+                    group = this.createGroup(groupId);
+                }
+                if (groupInfo.profile) {
+                    group.setProfile(
+                        groupInfo.profile.name, groupInfo.profile.avatar_url,
+                    );
+                }
+                group.setMyMembership('invite');
+                if (isBrandNew) {
+                    this.client.store.storeGroup(group);
+                    client.emit("Group", group);
+                }
+            }
+        }
     }
 
     // the returned json structure is a bit crap, so make it into a

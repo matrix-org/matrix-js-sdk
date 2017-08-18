@@ -175,6 +175,7 @@ LocalIndexedDBStoreBackend.prototype = {
             this._syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
+                groups: syncData.groupsData,
                 account_data: {
                     events: accountData,
                 },
@@ -251,7 +252,9 @@ LocalIndexedDBStoreBackend.prototype = {
         return Promise.all([
             this._persistUserPresenceEvents(userTuples),
             this._persistAccountData(syncData.accountData),
-            this._persistSyncData(syncData.nextBatch, syncData.roomsData),
+            this._persistSyncData(
+                syncData.nextBatch, syncData.roomsData, syncData.groupsData,
+            ),
         ]);
     },
 
@@ -259,9 +262,10 @@ LocalIndexedDBStoreBackend.prototype = {
      * Persist rooms /sync data along with the next batch token.
      * @param {string} nextBatch The next_batch /sync value.
      * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
+     * @param {Object} groupsData The 'groups' /sync data from a SyncAccumulator
      * @return {Promise} Resolves if the data was persisted.
      */
-    _persistSyncData: function(nextBatch, roomsData) {
+    _persistSyncData: function(nextBatch, roomsData, groupsData) {
         console.log("Persisting sync data up to ", nextBatch);
         return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
@@ -270,6 +274,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 clobber: "-", // constant key so will always clobber
                 nextBatch: nextBatch,
                 roomsData: roomsData,
+                groupsData: groupsData,
             }); // put == UPSERT
             return promiseifyTxn(txn);
         });

@@ -72,10 +72,18 @@ class SyncAccumulator {
         // coherent /sync response and know at what point they should be
         // streaming from without losing events.
         this.nextBatch = null;
+
+        // { ('invite'|'join'|'leave'): $groupId: { ... sync 'group' data } }
+        this.groups = {
+            invite: {},
+            join: {},
+            leave: {},
+        };
     }
 
     accumulate(syncResponse) {
         this._accumulateRooms(syncResponse);
+        this._accumulateGroups(syncResponse);
         this._accumulateAccountData(syncResponse);
         this.nextBatch = syncResponse.next_batch;
     }
@@ -337,6 +345,30 @@ class SyncAccumulator {
     }
 
     /**
+     * Accumulate incremental /sync group data.
+     * @param {Object} syncResponse the complete /sync JSON
+     */
+    _accumulateGroups(syncResponse) {
+        if (!syncResponse.groups) {
+            return;
+        }
+        if (syncResponse.groups.invite) {
+            Object.keys(syncResponse.groups.invite).forEach((groupId) => {
+                this._accumulateGroup(
+                    groupId, "invite", syncResponse.groups.invite[groupId],
+                );
+            });
+        }
+    }
+
+    _accumulateGroup(groupId, category, data) {
+        for (const cat of ['invite', 'join', 'leave']) {
+            delete this.groups[cat][groupId];
+        }
+        this.groups[category][groupId] = data;
+    }
+
+    /**
      * Return everything under the 'rooms' key from a /sync response which
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
@@ -470,6 +502,7 @@ class SyncAccumulator {
         return {
             nextBatch: this.nextBatch,
             roomsData: data,
+            groupsData: this.groups,
             accountData: accData,
         };
     }
