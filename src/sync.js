@@ -809,24 +809,15 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
 
     if (data.groups) {
         if (data.groups.invite) {
-            for (const groupId of Object.keys(data.groups.invite)) {
-                const groupInfo = data.groups.invite[groupId];
-                let group = this.client.store.getGroup(groupId);
-                const isBrandNew = group === null;
-                if (group === null) {
-                    group = this.createGroup(groupId);
-                }
-                if (groupInfo.profile) {
-                    group.setProfile(
-                        groupInfo.profile.name, groupInfo.profile.avatar_url,
-                    );
-                }
-                group.setMyMembership('invite');
-                if (isBrandNew) {
-                    this.client.store.storeGroup(group);
-                    client.emit("Group", group);
-                }
-            }
+            this._processGroupSyncEntry(data.groups.invite, 'invite');
+        }
+
+        if (data.groups.join) {
+            this._processGroupSyncEntry(data.groups.join, 'join');
+        }
+
+        if (data.groups.leave) {
+            this._processGroupSyncEntry(data.groups.leave, 'leave');
         }
     }
 
@@ -1117,6 +1108,35 @@ SyncApi.prototype._pokeKeepAlive = function() {
             self._updateSyncState("ERROR", { error: err });
         }
     });
+};
+
+/**
+ * @param {Object} obj Groups section object, eg. response.groups.invite
+ * @param {string} sectionName Which section this is ('invite', 'join' or 'leave')
+ */
+SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) {
+    // Processes entries from 'groups' section of the sync stream
+    for (const groupId of Object.keys(groupsSection)) {
+        const groupInfo = groupsSection[groupId];
+        let group = this.client.store.getGroup(groupId);
+        const isBrandNew = group === null;
+        if (group === null) {
+            group = this.createGroup(groupId);
+        }
+        if (groupInfo.profile) {
+            group.setProfile(
+                groupInfo.profile.name, groupInfo.profile.avatar_url,
+            );
+        }
+        if (groupInfo.inviter) {
+            group.setInviter({userId: groupInfo.inviter});
+        }
+        group.setMyMembership(sectionName);
+        if (isBrandNew) {
+            this.client.store.storeGroup(group);
+            this.client.emit("Group", group);
+        }
+    }
 };
 
 /**

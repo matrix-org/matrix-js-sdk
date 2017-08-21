@@ -359,6 +359,20 @@ class SyncAccumulator {
                 );
             });
         }
+        if (syncResponse.groups.join) {
+            Object.keys(syncResponse.groups.join).forEach((groupId) => {
+                this._accumulateGroup(
+                    groupId, "join", syncResponse.groups.join[groupId],
+                );
+            });
+        }
+        if (syncResponse.groups.leave) {
+            Object.keys(syncResponse.groups.leave).forEach((groupId) => {
+                this._accumulateGroup(
+                    groupId, "leave", syncResponse.groups.leave[groupId],
+                );
+            });
+        }
     }
 
     _accumulateGroup(groupId, category, data) {

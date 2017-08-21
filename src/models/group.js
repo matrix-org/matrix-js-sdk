@@ -30,12 +30,16 @@ const utils = require("../utils");
  * @prop {string} name The human-readable display name for this group.
  * @prop {string} avatarUrl The mxc URL for this group's avatar.
  * @prop {string} myMembership The logged in user's membership of this group
+ * @prop {Object} inviter Infomation about the user who invited the logged in user
+ *       to the group, if myMembership is 'invite'.
+ * @prop {string} inviter.userId The user ID of the inviter
  */
 function Group(groupId) {
     this.groupId = groupId;
     this.name = null;
     this.avatarUrl = null;
     this.myMembership = null;
+    this.inviter = null;
 }
 utils.inherits(Group, EventEmitter);
 
@@ -54,6 +58,16 @@ Group.prototype.setMyMembership = function(membership) {
     this.myMembership = membership;
 
     this.emit("Group.myMembership", this);
+};
+
+/**
+ * Sets the 'inviter' property. This does not emit an event (the inviter
+ * will only change when the user is revited / reinvited to a room),
+ * so set this before setting myMembership.
+ * @param {Object} inviter Infomation about who invited us to the room
+ */
+Group.prototype.setInviter = function(inviter) {
+    this.inviter = inviter;
 };
 
 module.exports = Group;
