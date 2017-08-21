@@ -1111,7 +1111,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
 };
 
 /**
- * @param {Object} obj Groups section object, eg. response.groups.invite
+ * @param {Object} groupsSection Groups section object, eg. response.groups.invite
  * @param {string} sectionName Which section this is ('invite', 'join' or 'leave')
  */
 SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) {
