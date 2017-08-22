@@ -1,3 +1,14 @@
+Changes in [0.8.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.1-rc.1) (2017-08-22)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.0...v0.8.1-rc.1)
+
+ * Fix error handling in interactive-auth
+   [\#527](https://github.com/matrix-org/matrix-js-sdk/pull/527)
+ * Make lots of OlmDevice asynchronous
+   [\#524](https://github.com/matrix-org/matrix-js-sdk/pull/524)
+ * Make crypto.decryptMessage return decryption results
+   [\#523](https://github.com/matrix-org/matrix-js-sdk/pull/523)
+
 Changes in [0.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.0) (2017-08-15)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.13...v0.8.0)
