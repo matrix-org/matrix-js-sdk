@@ -319,6 +319,19 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Check if this event is an encrypted event which we failed to decrypt
+     *
+     * (This implies that we might retry decryption at some point in the future)
+     *
+     * @return {boolean} True if this event is an encrypted event which we
+     *     couldn't decrypt.
+     */
+    isDecryptionFailure: function() {
+        return this._clearEvent && this._clearEvent.content &&
+            this._clearEvent.content.msgtype === "m.bad.encrypted";
+    },
+
+    /**
      * Start the process of trying to decrypt this event.
      *
      * (This is used within the SDK: it isn't intended for use by applications)
