@@ -3241,6 +3241,9 @@ function _resolve(callback, defer, res) {
 function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
+        reEmit(client, event, [
+            "Event.decrypted",
+        ]);
         if (event.isEncrypted()) {
             event.attemptDecryption(client._crypto);
         }
