@@ -1,3 +1,12 @@
+Changes in [0.8.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.2) (2017-08-24)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.1...v0.8.2)
+
+ * Handle m.call.* events which are decrypted asynchronously
+   [\#530](https://github.com/matrix-org/matrix-js-sdk/pull/530)
+ * Re-emit events from, er, Event objects
+   [\#529](https://github.com/matrix-org/matrix-js-sdk/pull/529)
+
 Changes in [0.8.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.1) (2017-08-23)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.1-rc.1...v0.8.1)
