@@ -49,6 +49,30 @@ StubStore.prototype = {
 
     /**
      * No-op.
+     * @param {Group} group
+     */
+    storeGroup: function(group) {
+    },
+
+    /**
+     * No-op.
+     * @param {string} groupId
+     * @return {null}
+     */
+    getGroup: function(groupId) {
+        return null;
+    },
+
+    /**
+     * No-op.
+     * @return {Array} An empty array.
+     */
+    getGroups: function() {
+        return [];
+    },
+
+    /**
+     * No-op.
      * @param {Room} room
      */
     storeRoom: function(room) {

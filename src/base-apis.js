@@ -467,6 +467,32 @@ MatrixBaseApis.prototype.removeUserFromGroup = function(groupId, userId) {
 };
 
 /**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.acceptGroupInvite = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/accept_invite",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.leaveGroup = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/leave",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
  * @return {module:client.Promise} Resolves: The groups to which the user is joined
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
