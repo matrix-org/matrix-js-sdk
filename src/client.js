@@ -3053,6 +3053,10 @@ function setupCallEventHandler(client) {
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
                 if (ignoreCallIds[e.getContent().call_id]) {
+                    console.log(
+                        'Ignoring previously answered/hungup call ' +
+                            e.getContent().call_id,
+                    );
                     return;
                 }
                 callEventHandler(e);
@@ -3061,20 +3065,25 @@ function setupCallEventHandler(client) {
         }
     });
 
-    client.on("event", function(event) {
-        if (!isClientPrepared) {
-            if (event.getType().indexOf("m.call.") === 0) {
-                callEventBuffer.push(event);
+    client.on("event", onEvent);
+
+    function onEvent(event) {
+        if (event.getType().indexOf("m.call.") !== 0) {
+            // not a call event
+            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+                // not *yet* a call event, but might become one...
+                event.once("Event.decrypted", onEvent);
             }
             return;
         }
+        if (!isClientPrepared) {
+            callEventBuffer.push(event);
+            return;
+        }
         callEventHandler(event);
-    });
+    }
 
     function callEventHandler(event) {
-        if (event.getType().indexOf("m.call.") !== 0) {
-            return; // not a call event
-        }
         const content = event.getContent();
         let call = content.call_id ? client.callList[content.call_id] : undefined;
         let i;
