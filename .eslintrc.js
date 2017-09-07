@@ -9,6 +9,10 @@ module.exports = {
     env: {
         browser: true,
         node: true,
+
+        // babel's transform-runtime converts references to ES6 globals such as
+        // Promise and Map to core-js polyfills, so we can use ES6 globals.
+        es6: true,
     },
     extends: ["eslint:recommended", "google"],
     rules: {
