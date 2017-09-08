@@ -775,12 +775,24 @@ Crypto.prototype.decryptEvent = function(event) {
 };
 
 /**
- * Handle the notification from /sync that a user has updated their device list.
+ * Handle the notification from /sync or /keys/changes that device lists have
+ * been changed.
  *
- * @param {String} userId
+ * @param {Object} deviceLists device_lists field from /sync, or response from
+ * /keys/changes
  */
-Crypto.prototype.userDeviceListChanged = function(userId) {
-    this._deviceList.invalidateUserDeviceList(userId);
+Crypto.prototype.handleDeviceListChanges = async function(deviceLists) {
+    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+        deviceLists.changed.forEach((u) => {
+            this._deviceList.invalidateUserDeviceList(u);
+        });
+    }
+
+    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        deviceLists.left.forEach((u) => {
+            this._deviceList.stopTrackingDeviceList(u);
+        });
+    }
 
     // don't flush the outdated device list yet - we do it once we finish
     // processing the sync.
@@ -899,23 +911,19 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
  * @param {String} oldSyncToken
  * @param {String} lastKnownSyncToken
  *
- * @returns {Promise} resolves once the query is complete. Rejects if the
+ * Returns a Promise which resolves once the query is complete. Rejects if the
  *   keyChange query fails.
  */
-Crypto.prototype._invalidateDeviceListsSince = function(
+Crypto.prototype._invalidateDeviceListsSince = async function(
     oldSyncToken, lastKnownSyncToken,
 ) {
-    return this._baseApis.getKeyChanges(
+    const r = await this._baseApis.getKeyChanges(
         oldSyncToken, lastKnownSyncToken,
-    ).then((r) => {
-        console.log("got key changes since", oldSyncToken, ":", r.changed);
+    );
 
-        if (r.changed && Array.isArray(r.changed)) {
-            r.changed.forEach((u) => {
-                this._deviceList.invalidateUserDeviceList(u);
-            });
-        }
-    });
+    console.log("got key changes since", oldSyncToken, ":", r);
+
+    await this.handleDeviceListChanges(r);
 };
 
 /**
