@@ -500,13 +500,12 @@ SyncApi.prototype.retryImmediately = function() {
  */
 SyncApi.prototype._sync = async function(syncOptions) {
     const client = this.client;
-    const self = this;
 
     if (!this._running) {
         debuglog("Sync no longer running: exiting.");
-        if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.reject();
-            self._connectionReturnedDefer = null;
+        if (this._connectionReturnedDefer) {
+            this._connectionReturnedDefer.reject();
+            this._connectionReturnedDefer = null;
         }
         this._updateSyncState("STOPPED");
         return;
@@ -604,7 +603,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     client.store.setSyncToken(data.next_batch);
 
     // Reset after a successful sync
-    self._failedSyncCount = 0;
+    this._failedSyncCount = 0;
 
     // We need to wait until the sync data has been sent to the backend
     // because it appears that the sync data gets modified somewhere in
@@ -627,17 +626,17 @@ SyncApi.prototype._sync = async function(syncOptions) {
     const syncEventData = {
         oldSyncToken: syncToken,
         nextSyncToken: data.next_batch,
-        catchingUp: self._catchingUp,
+        catchingUp: this._catchingUp,
     };
 
     if (!syncOptions.hasSyncedBefore) {
-        self._updateSyncState("PREPARED", syncEventData);
+        this._updateSyncState("PREPARED", syncEventData);
         syncOptions.hasSyncedBefore = true;
     }
 
     // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     if (!isCachedResponse) {
-        self._updateSyncState("SYNCING", syncEventData);
+        this._updateSyncState("SYNCING", syncEventData);
 
         // tell databases that everything is now in a consistent state and can be
         // saved (no point doing so if we only have the data we just got out of the
@@ -646,26 +645,25 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     // Begin next sync
-    self._sync(syncOptions);
+    this._sync(syncOptions);
 };
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
-    const self = this;
-    if (!self._running) {
+    if (!this._running) {
         debuglog("Sync no longer running: exiting");
-        if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.reject();
-            self._connectionReturnedDefer = null;
+        if (this._connectionReturnedDefer) {
+            this._connectionReturnedDefer.reject();
+            this._connectionReturnedDefer = null;
         }
-        self._updateSyncState("STOPPED");
+        this._updateSyncState("STOPPED");
         return;
     }
 
     console.error("/sync error %s", err);
     console.error(err);
 
-    self._failedSyncCount++;
-    console.log('Number of consecutive failed sync requests:', self._failedSyncCount);
+    this._failedSyncCount++;
+    console.log('Number of consecutive failed sync requests:', this._failedSyncCount);
 
     debuglog("Starting keep-alive");
     // Note that we do *not* mark the sync connection as
@@ -675,14 +673,14 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     // erroneous. We set the state to 'reconnecting'
     // instead, so that clients can onserve this state
     // if they wish.
-    self._startKeepAlives().done(function() {
-        self._sync(syncOptions);
+    this._startKeepAlives().then(() => {
+        this._sync(syncOptions);
     });
 
-    self._currentSyncRequest = null;
+    this._currentSyncRequest = null;
     // Transition from RECONNECTING to ERROR after a given number of failed syncs
-    self._updateSyncState(
-        self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+    this._updateSyncState(
+        this._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
             "ERROR" : "RECONNECTING",
     );
 };
