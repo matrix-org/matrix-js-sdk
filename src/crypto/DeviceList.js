@@ -26,8 +26,30 @@ import Promise from 'bluebird';
 import DeviceInfo from './deviceinfo';
 import olmlib from './olmlib';
 
+
+/* State transition diagram for DeviceList._deviceTrackingStatus
+ *
+ *                                |
+ *     stopTrackingDeviceList     V
+ *   +---------------------> NOT_TRACKED
+ *   |                            |
+ *   +<--------------------+      | startTrackingDeviceList
+ *   |                     |      V
+ *   |   +-------------> PENDING_DOWNLOAD <--------------------+-+
+ *   |   |                      ^ |                            | |
+ *   |   | restart     download | |  start download            | | invalidateUserDeviceList
+ *   |   | client        failed | |                            | |
+ *   |   |                      | V                            | |
+ *   |   +------------ DOWNLOAD_IN_PROGRESS -------------------+ |
+ *   |                    |       |                              |
+ *   +<-------------------+       |  download successful         |
+ *   ^                            V                              |
+ *   +----------------------- UP_TO_DATE ------------------------+
+ */
+
+
 // constants for DeviceList._deviceTrackingStatus
-// const TRACKING_STATUS_NOT_TRACKED = 0;
+const TRACKING_STATUS_NOT_TRACKED = 0;
 const TRACKING_STATUS_PENDING_DOWNLOAD = 1;
 const TRACKING_STATUS_DOWNLOAD_IN_PROGRESS = 2;
 const TRACKING_STATUS_UP_TO_DATE = 3;
@@ -237,6 +259,26 @@ export default class DeviceList {
     }
 
     /**
+     * Mark the given user as no longer being tracked for device-list updates.
+     *
+     * This won't affect any in-progress downloads, which will still go on to
+     * complete; it will just mean that we don't think that we have an up-to-date
+     * list for future calls to downloadKeys.
+     *
+     * @param {String} userId
+     */
+    stopTrackingDeviceList(userId) {
+        if (this._deviceTrackingStatus[userId]) {
+            console.log('No longer tracking device list for ' + userId);
+            this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
+        }
+        // we don't yet persist the tracking status, since there may be a lot
+        // of calls; instead we wait for the forthcoming
+        // refreshOutdatedDeviceLists.
+    }
+
+
+    /**
      * Mark the cached device list for the given user outdated.
      *
      * If we are not tracking this user's devices, we'll do nothing. Otherwise
@@ -282,9 +324,6 @@ export default class DeviceList {
             if (stat == TRACKING_STATUS_PENDING_DOWNLOAD) {
                 usersToDownload.push(userId);
             }
-        }
-        if (usersToDownload.length == 0) {
-            return;
         }
 
         // we didn't persist the tracking status during

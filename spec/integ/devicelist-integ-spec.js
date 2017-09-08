@@ -52,21 +52,31 @@ function getSyncResponse(roomMembers) {
 }
 
 
-describe("DeviceList management", function() {
+describe("DeviceList management:", function() {
     if (!global.Olm) {
         console.warn('not running deviceList tests: Olm not present');
         return;
     }
 
+    let sessionStoreBackend;
     let aliceTestClient;
+
+    async function createTestClient() {
+        const testClient = new TestClient(
+            "@alice:localhost", "xzcvb", "akjgkrgjs", sessionStoreBackend,
+        );
+        await testClient.client.initCrypto();
+        return testClient;
+    }
 
     beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
-        aliceTestClient = new TestClient(
-            "@alice:localhost", "xzcvb", "akjgkrgjs",
-        );
-        await aliceTestClient.client.initCrypto();
+        // we create our own sessionStoreBackend so that we can use it for
+        // another TestClient.
+        sessionStoreBackend = new testUtils.MockStorageApi();
+
+        aliceTestClient = await createTestClient();
     });
 
     afterEach(function() {
@@ -234,4 +244,126 @@ describe("DeviceList management", function() {
                expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(3);
            });
        });
+
+    // https://github.com/vector-im/riot-web/issues/4983
+    describe("Alice should know she has stale device lists", () => {
+        beforeEach(async function() {
+            await aliceTestClient.start();
+
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, getSyncResponse(['@bob:xyz']));
+            await aliceTestClient.flushSync();
+
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, {
+                    device_keys: {
+                        '@bob:xyz': {},
+                    },
+                },
+            );
+            await aliceTestClient.httpBackend.flush('/keys/query', 1);
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+
+            expect(bobStat).toBeGreaterThan(
+                0, "Alice should be tracking bob's device list",
+            );
+        });
+
+        it("when Bob leaves", async function() {
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, {
+                    next_batch: 2,
+                    device_lists: {
+                        left: ['@bob:xyz'],
+                    },
+                    rooms: {
+                        join: {
+                            [ROOM_ID]: {
+                                timeline: {
+                                    events: [
+                                        testUtils.mkMembership({
+                                            mship: 'leave',
+                                            sender: '@bob:xyz',
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            );
+
+
+            await aliceTestClient.flushSync();
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+            expect(bobStat).toEqual(
+                0, "Alice should have marked bob's device list as untracked",
+            );
+        });
+
+        it("when Alice leaves", async function() {
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, {
+                    next_batch: 2,
+                    device_lists: {
+                        left: ['@bob:xyz'],
+                    },
+                    rooms: {
+                        leave: {
+                            [ROOM_ID]: {
+                                timeline: {
+                                    events: [
+                                        testUtils.mkMembership({
+                                            mship: 'leave',
+                                            sender: '@bob:xyz',
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            );
+
+            await aliceTestClient.flushSync();
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+            expect(bobStat).toEqual(
+                0, "Alice should have marked bob's device list as untracked",
+            );
+        });
+
+        it("when Bob leaves whilst Alice is offline", async function() {
+            aliceTestClient.stop();
+
+            const anotherTestClient = await createTestClient();
+
+            try {
+                anotherTestClient.httpBackend.when('GET', '/keys/changes').respond(
+                    200, {
+                        changed: [],
+                        left: ['@bob:xyz'],
+                    },
+                );
+                await anotherTestClient.start();
+                anotherTestClient.httpBackend.when('GET', '/sync').respond(
+                    200, getSyncResponse([]));
+                await anotherTestClient.flushSync();
+
+                const bobStat = anotherTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+
+                expect(bobStat).toEqual(
+                    0, "Alice should have marked bob's device list as untracked",
+                );
+            } finally {
+                anotherTestClient.stop();
+            }
+        });
+    });
 });

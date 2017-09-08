@@ -634,8 +634,14 @@ SyncApi.prototype._sync = async function(syncOptions) {
         syncOptions.hasSyncedBefore = true;
     }
 
-    // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     if (!isCachedResponse) {
+        // tell the crypto module to do its processing. It may block (to do a
+        // /keys/changes request).
+        if (this.opts.crypto) {
+            await this.opts.crypto.onSyncCompleted(syncEventData);
+        }
+
+        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
         this._updateSyncState("SYNCING", syncEventData);
 
         // tell databases that everything is now in a consistent state and can be
@@ -1018,10 +1024,14 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     }
 
     // Handle device list updates
-    if (this.opts.crypto && data.device_lists && data.device_lists.changed) {
-        data.device_lists.changed.forEach((u) => {
-            this.opts.crypto.userDeviceListChanged(u);
-        });
+    if (data.device_lists) {
+        if (this.opts.crypto) {
+            await this.opts.crypto.handleDeviceListChanges(data.device_lists);
+        } else {
+            // FIXME if we *don't* have a crypto module, we still need to
+            // invalidate the device lists. But that would require a
+            // substantial bit of rework :/.
+        }
     }
 
     // Handle one_time_keys_count

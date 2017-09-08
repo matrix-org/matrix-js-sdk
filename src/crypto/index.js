@@ -69,7 +69,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
-    this._initialDeviceListInvalidationPending = false;
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -150,15 +149,6 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype.registerEventHandlers = function(eventEmitter) {
     const crypto = this;
-    eventEmitter.on("sync", function(syncState, oldState, data) {
-        try {
-            if (syncState === "SYNCING") {
-                crypto._onSyncCompleted(data);
-            }
-        } catch (e) {
-            console.error("Error handling sync", e);
-        }
-    });
 
     eventEmitter.on("RoomMember.membership", function(event, member, oldMembership) {
         try {
@@ -248,7 +238,7 @@ Crypto.prototype.uploadDeviceKeys = function() {
 
 /**
  * Stores the current one_time_key count which will be handled later (in a call of
- * _onSyncCompleted). The count is e.g. coming from a /sync response.
+ * onSyncCompleted). The count is e.g. coming from a /sync response.
  *
  * @param {Number} currentCount The current count of one_time_keys to be stored
  */
@@ -785,12 +775,24 @@ Crypto.prototype.decryptEvent = function(event) {
 };
 
 /**
- * Handle the notification from /sync that a user has updated their device list.
+ * Handle the notification from /sync or /keys/changes that device lists have
+ * been changed.
  *
- * @param {String} userId
+ * @param {Object} deviceLists device_lists field from /sync, or response from
+ * /keys/changes
  */
-Crypto.prototype.userDeviceListChanged = function(userId) {
-    this._deviceList.invalidateUserDeviceList(userId);
+Crypto.prototype.handleDeviceListChanges = async function(deviceLists) {
+    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+        deviceLists.changed.forEach((u) => {
+            this._deviceList.invalidateUserDeviceList(u);
+        });
+    }
+
+    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        deviceLists.left.forEach((u) => {
+            this._deviceList.stopTrackingDeviceList(u);
+        });
+    }
 
     // don't flush the outdated device list yet - we do it once we finish
     // processing the sync.
@@ -837,7 +839,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 
     try {
         // inhibit the device list refresh for now - it will happen once we've
-        // finished processing the sync, in _onSyncCompleted.
+        // finished processing the sync, in onSyncCompleted.
         await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
@@ -853,7 +855,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
  *
  * @param {Object} syncData  the data from the 'MatrixClient.sync' event
  */
-Crypto.prototype._onSyncCompleted = function(syncData) {
+Crypto.prototype.onSyncCompleted = async function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
     if (!syncData.oldSyncToken) {
@@ -863,18 +865,15 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         // invalidate devices which have changed since then.
         const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
         if (oldSyncToken !== null) {
-            this._initialDeviceListInvalidationPending = true;
-            this._invalidateDeviceListsSince(
-                oldSyncToken, nextSyncToken,
-            ).catch((e) => {
+            try {
+                await this._invalidateDeviceListsSince(
+                    oldSyncToken, nextSyncToken,
+                );
+            } catch (e) {
                 // if that failed, we fall back to invalidating everyone.
                 console.warn("Error fetching changed device list", e);
                 this._deviceList.invalidateAllDeviceLists();
-            }).done(() => {
-                this._initialDeviceListInvalidationPending = false;
-                this._deviceList.lastKnownSyncToken = nextSyncToken;
-                this._deviceList.refreshOutdatedDeviceLists();
-            });
+            }
         } else {
             // otherwise, we have to invalidate all devices for all users we
             // are tracking.
@@ -884,14 +883,12 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         }
     }
 
-    if (!this._initialDeviceListInvalidationPending) {
-        // we can now store our sync token so that we can get an update on
-        // restart rather than having to invalidate everyone.
-        //
-        // (we don't really need to do this on every sync - we could just
-        // do it periodically)
-        this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
-    }
+    // we can now store our sync token so that we can get an update on
+    // restart rather than having to invalidate everyone.
+    //
+    // (we don't really need to do this on every sync - we could just
+    // do it periodically)
+    this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
 
     // catch up on any new devices we got told about during the sync.
     this._deviceList.lastKnownSyncToken = nextSyncToken;
@@ -914,25 +911,19 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
  * @param {String} oldSyncToken
  * @param {String} lastKnownSyncToken
  *
- * @returns {Promise} resolves once the query is complete. Rejects if the
+ * Returns a Promise which resolves once the query is complete. Rejects if the
  *   keyChange query fails.
  */
-Crypto.prototype._invalidateDeviceListsSince = function(
+Crypto.prototype._invalidateDeviceListsSince = async function(
     oldSyncToken, lastKnownSyncToken,
 ) {
-    return this._baseApis.getKeyChanges(
+    const r = await this._baseApis.getKeyChanges(
         oldSyncToken, lastKnownSyncToken,
-    ).then((r) => {
-        console.log("got key changes since", oldSyncToken, ":", r.changed);
+    );
 
-        if (!r.changed || !Array.isArray(r.changed)) {
-            return;
-        }
+    console.log("got key changes since", oldSyncToken, ":", r);
 
-        r.changed.forEach((u) => {
-            this._deviceList.invalidateUserDeviceList(u);
-        });
-    });
+    await this.handleDeviceListChanges(r);
 };
 
 /**
