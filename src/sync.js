@@ -634,8 +634,14 @@ SyncApi.prototype._sync = async function(syncOptions) {
         syncOptions.hasSyncedBefore = true;
     }
 
-    // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     if (!isCachedResponse) {
+        // tell the crypto module to do its processing. It may block (to do a
+        // /keys/changes request).
+        if (this.opts.crypto) {
+            await this.opts.crypto.onSyncCompleted(syncEventData);
+        }
+
+        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
         this._updateSyncState("SYNCING", syncEventData);
 
         // tell databases that everything is now in a consistent state and can be
