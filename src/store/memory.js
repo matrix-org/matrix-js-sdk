@@ -19,8 +19,8 @@ limitations under the License.
  * This is an internal module. See {@link MatrixInMemoryStore} for the public class.
  * @module store/memory
  */
- const utils = require("../utils");
- const User = require("../models/user");
+const utils = require("../utils");
+const User = require("../models/user");
 import Promise from 'bluebird';
 
 /**
@@ -34,6 +34,9 @@ module.exports.MatrixInMemoryStore = function MatrixInMemoryStore(opts) {
     opts = opts || {};
     this.rooms = {
         // roomId: Room
+    };
+    this.groups = {
+        // groupId: Group
     };
     this.users = {
         // userId: User
@@ -67,6 +70,31 @@ module.exports.MatrixInMemoryStore.prototype = {
      */
     setSyncToken: function(token) {
         this.syncToken = token;
+    },
+
+    /**
+     * Store the given room.
+     * @param {Group} group The group to be stored
+     */
+    storeGroup: function(group) {
+        this.groups[group.groupId] = group;
+    },
+
+    /**
+     * Retrieve a group by its group ID.
+     * @param {string} groupId The group ID.
+     * @return {Group} The group or null.
+     */
+    getGroup: function(groupId) {
+        return this.groups[groupId] || null;
+    },
+
+    /**
+     * Retrieve all known groups.
+     * @return {Group[]} A list of groups, which may be empty.
+     */
+    getGroups: function() {
+        return utils.values(this.groups);
     },
 
     /**

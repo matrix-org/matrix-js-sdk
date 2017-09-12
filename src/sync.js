@@ -27,6 +27,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const User = require("./models/user");
 const Room = require("./models/room");
+const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
@@ -122,6 +123,17 @@ SyncApi.prototype.createRoom = function(roomId) {
                          ]);
     this._registerStateListeners(room);
     return room;
+};
+
+/**
+ * @param {string} groupId
+ * @return {Group}
+ */
+SyncApi.prototype.createGroup = function(groupId) {
+    const client = this.client;
+    const group = new Group(groupId);
+    reEmit(client, group, ["Group.profile", "Group.myMembership"]);
+    return group;
 };
 
 /**
@@ -486,15 +498,14 @@ SyncApi.prototype.retryImmediately = function() {
  * @param {string} syncOptions.filterId
  * @param {boolean} syncOptions.hasSyncedBefore
  */
-SyncApi.prototype._sync = function(syncOptions) {
+SyncApi.prototype._sync = async function(syncOptions) {
     const client = this.client;
-    const self = this;
 
     if (!this._running) {
         debuglog("Sync no longer running: exiting.");
-        if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.reject();
-            self._connectionReturnedDefer = null;
+        if (this._connectionReturnedDefer) {
+            this._connectionReturnedDefer.reject();
+            this._connectionReturnedDefer = null;
         }
         this._updateSyncState("STOPPED");
         return;
@@ -550,123 +561,134 @@ SyncApi.prototype._sync = function(syncOptions) {
         qps.timeout = 0;
     }
 
-    let isCachedResponse = false;
-
-    let syncPromise;
+    let savedSync;
     if (!syncOptions.hasSyncedBefore) {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
-        syncPromise = client.store.getSavedSync();
-    } else {
-        syncPromise = Promise.resolve(null);
+        savedSync = await client.store.getSavedSync();
     }
 
-    syncPromise.then((savedSync) => {
-        if (savedSync) {
-            debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-            isCachedResponse = true;
-            return {
-                next_batch: savedSync.nextBatch,
-                rooms: savedSync.roomsData,
-                account_data: {
-                    events: savedSync.accountData,
-                },
-            };
-        } else {
+    let isCachedResponse = false;
+    let data;
+
+    if (savedSync) {
+        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+        isCachedResponse = true;
+        data = {
+            next_batch: savedSync.nextBatch,
+            rooms: savedSync.roomsData,
+            groups: savedSync.groupsData,
+            account_data: {
+                events: savedSync.accountData,
+            },
+        };
+    } else {
+        try {
             //debuglog('Starting sync since=' + syncToken);
             this._currentSyncRequest = client._http.authedRequest(
                 undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
             );
-            return this._currentSyncRequest;
-        }
-    }).then(function(data) {
-        //debuglog('Completed sync, next_batch=' + data.next_batch);
-
-        // set the sync token NOW *before* processing the events. We do this so
-        // if something barfs on an event we can skip it rather than constantly
-        // polling with the same token.
-        client.store.setSyncToken(data.next_batch);
-
-        // Reset after a successful sync
-        self._failedSyncCount = 0;
-
-        // We need to wait until the sync data has been sent to the backend
-        // because it appears that the sync data gets modified somewhere in
-        // processing it in such a way as to make it no longer cloneable.
-        // XXX: Find out what is modifying it!
-        if (!isCachedResponse) {
-            // Don't give the store back its own cached data
-            return client.store.setSyncData(data).then(() => {
-                return data;
-            });
-        } else {
-            return Promise.resolve(data);
-        }
-    }).done((data) => {
-        self._processSyncResponse(syncToken, data).catch((e) => {
-            // log the exception with stack if we have it, else fall back
-            // to the plain description
-            console.error("Caught /sync error", e.stack || e);
-        }).then(() => {
-            // emit synced events
-            const syncEventData = {
-                oldSyncToken: syncToken,
-                nextSyncToken: data.next_batch,
-                catchingUp: self._catchingUp,
-            };
-
-            if (!syncOptions.hasSyncedBefore) {
-                self._updateSyncState("PREPARED", syncEventData);
-                syncOptions.hasSyncedBefore = true;
-            }
-
-            // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-            if (!isCachedResponse) {
-                self._updateSyncState("SYNCING", syncEventData);
-
-                // tell databases that everything is now in a consistent state and can be
-                // saved (no point doing so if we only have the data we just got out of the
-                // store).
-                client.store.save();
-            }
-
-            // Begin next sync
-            self._sync(syncOptions);
-        });
-    }, function(err) {
-        if (!self._running) {
-            debuglog("Sync no longer running: exiting");
-            if (self._connectionReturnedDefer) {
-                self._connectionReturnedDefer.reject();
-                self._connectionReturnedDefer = null;
-            }
-            self._updateSyncState("STOPPED");
+            data = await this._currentSyncRequest;
+        } catch (e) {
+            this._onSyncError(e, syncOptions);
             return;
         }
-        console.error("/sync error %s", err);
-        console.error(err);
+    }
 
-        self._failedSyncCount++;
-        console.log('Number of consecutive failed sync requests:', self._failedSyncCount);
+    //debuglog('Completed sync, next_batch=' + data.next_batch);
 
-        debuglog("Starting keep-alive");
-        // Note that we do *not* mark the sync connection as
-        // lost yet: we only do this if a keepalive poke
-        // fails, since long lived HTTP connections will
-        // go away sometimes and we shouldn't treat this as
-        // erroneous. We set the state to 'reconnecting'
-        // instead, so that clients can onserve this state
-        // if they wish.
-        self._startKeepAlives().done(function() {
-            self._sync(syncOptions);
-        });
-        self._currentSyncRequest = null;
-        // Transition from RECONNECTING to ERROR after a given number of failed syncs
-        self._updateSyncState(
-            self._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
-                "ERROR" : "RECONNECTING",
-        );
+    // set the sync token NOW *before* processing the events. We do this so
+    // if something barfs on an event we can skip it rather than constantly
+    // polling with the same token.
+    client.store.setSyncToken(data.next_batch);
+
+    // Reset after a successful sync
+    this._failedSyncCount = 0;
+
+    // We need to wait until the sync data has been sent to the backend
+    // because it appears that the sync data gets modified somewhere in
+    // processing it in such a way as to make it no longer cloneable.
+    // XXX: Find out what is modifying it!
+    if (!isCachedResponse) {
+        // Don't give the store back its own cached data
+        await client.store.setSyncData(data);
+    }
+
+    try {
+        await this._processSyncResponse(syncToken, data);
+    } catch(e) {
+        // log the exception with stack if we have it, else fall back
+        // to the plain description
+        console.error("Caught /sync error", e.stack || e);
+    }
+
+    // emit synced events
+    const syncEventData = {
+        oldSyncToken: syncToken,
+        nextSyncToken: data.next_batch,
+        catchingUp: this._catchingUp,
+    };
+
+    if (!syncOptions.hasSyncedBefore) {
+        this._updateSyncState("PREPARED", syncEventData);
+        syncOptions.hasSyncedBefore = true;
+    }
+
+    if (!isCachedResponse) {
+        // tell the crypto module to do its processing. It may block (to do a
+        // /keys/changes request).
+        if (this.opts.crypto) {
+            await this.opts.crypto.onSyncCompleted(syncEventData);
+        }
+
+        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+        this._updateSyncState("SYNCING", syncEventData);
+
+        // tell databases that everything is now in a consistent state and can be
+        // saved (no point doing so if we only have the data we just got out of the
+        // store).
+        client.store.save();
+    }
+
+    // Begin next sync
+    this._sync(syncOptions);
+};
+
+SyncApi.prototype._onSyncError = function(err, syncOptions) {
+    if (!this._running) {
+        debuglog("Sync no longer running: exiting");
+        if (this._connectionReturnedDefer) {
+            this._connectionReturnedDefer.reject();
+            this._connectionReturnedDefer = null;
+        }
+        this._updateSyncState("STOPPED");
+        return;
+    }
+
+    console.error("/sync error %s", err);
+    console.error(err);
+
+    this._failedSyncCount++;
+    console.log('Number of consecutive failed sync requests:', this._failedSyncCount);
+
+    debuglog("Starting keep-alive");
+    // Note that we do *not* mark the sync connection as
+    // lost yet: we only do this if a keepalive poke
+    // fails, since long lived HTTP connections will
+    // go away sometimes and we shouldn't treat this as
+    // erroneous. We set the state to 'reconnecting'
+    // instead, so that clients can onserve this state
+    // if they wish.
+    this._startKeepAlives().then(() => {
+        this._sync(syncOptions);
     });
+
+    this._currentSyncRequest = null;
+    // Transition from RECONNECTING to ERROR after a given number of failed syncs
+    this._updateSyncState(
+        this._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+            "ERROR" : "RECONNECTING",
+    );
 };
 
 /**
@@ -713,6 +735,19 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     //          timeline: { events: [], prev_batch: $token }
     //        }
     //      }
+    //    },
+    //    groups: {
+    //        invite: {
+    //            $groupId: {
+    //                inviter: $inviter,
+    //                profile: {
+    //                    avatar_url: $avatarUrl,
+    //                    name: $groupName,
+    //                },
+    //            },
+    //        },
+    //        join: {},
+    //        leave: {},
     //    },
     // }
 
@@ -779,6 +814,20 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     } else {
         // no more to-device events: we can stop polling with a short timeout.
         this._catchingUp = false;
+    }
+
+    if (data.groups) {
+        if (data.groups.invite) {
+            this._processGroupSyncEntry(data.groups.invite, 'invite');
+        }
+
+        if (data.groups.join) {
+            this._processGroupSyncEntry(data.groups.join, 'join');
+        }
+
+        if (data.groups.leave) {
+            this._processGroupSyncEntry(data.groups.leave, 'leave');
+        }
     }
 
     // the returned json structure is a bit crap, so make it into a
@@ -975,10 +1024,14 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
     }
 
     // Handle device list updates
-    if (this.opts.crypto && data.device_lists && data.device_lists.changed) {
-        data.device_lists.changed.forEach((u) => {
-            this.opts.crypto.userDeviceListChanged(u);
-        });
+    if (data.device_lists) {
+        if (this.opts.crypto) {
+            await this.opts.crypto.handleDeviceListChanges(data.device_lists);
+        } else {
+            // FIXME if we *don't* have a crypto module, we still need to
+            // invalidate the device lists. But that would require a
+            // substantial bit of rework :/.
+        }
     }
 
     // Handle one_time_keys_count
@@ -1068,6 +1121,35 @@ SyncApi.prototype._pokeKeepAlive = function() {
             self._updateSyncState("ERROR", { error: err });
         }
     });
+};
+
+/**
+ * @param {Object} groupsSection Groups section object, eg. response.groups.invite
+ * @param {string} sectionName Which section this is ('invite', 'join' or 'leave')
+ */
+SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) {
+    // Processes entries from 'groups' section of the sync stream
+    for (const groupId of Object.keys(groupsSection)) {
+        const groupInfo = groupsSection[groupId];
+        let group = this.client.store.getGroup(groupId);
+        const isBrandNew = group === null;
+        if (group === null) {
+            group = this.createGroup(groupId);
+        }
+        if (groupInfo.profile) {
+            group.setProfile(
+                groupInfo.profile.name, groupInfo.profile.avatar_url,
+            );
+        }
+        if (groupInfo.inviter) {
+            group.setInviter({userId: groupInfo.inviter});
+        }
+        group.setMyMembership(sectionName);
+        if (isBrandNew) {
+            this.client.store.storeGroup(group);
+            this.client.emit("Group", group);
+        }
+    }
 };
 
 /**

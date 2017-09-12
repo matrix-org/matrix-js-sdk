@@ -21,11 +21,9 @@ limitations under the License.
  * @module models/event
  */
 
-const EventEmitter = require("events").EventEmitter;
-
-const utils = require('../utils.js');
-
 import Promise from 'bluebird';
+import {EventEmitter} from 'events';
+import utils from '../utils.js';
 
 /**
  * Enum for event statuses.
@@ -131,8 +129,10 @@ module.exports.MatrixEvent = function MatrixEvent(
      */
     this._forwardingCurve25519KeyChain = [];
 
-    /* flag to indicate if we have a process decrypting this event */
-    this._decrypting = false;
+    /* if we have a process decrypting this event, a Promise which resolves
+     * when it is finished. Normally null.
+     */
+    this._decryptionPromise = null;
 
     /* flag to indicate if we should retry decrypting this event after the
      * first attempt (eg, we have received new data which means that a second
@@ -315,7 +315,20 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {boolean} True if this event is currently being decrypted, else false.
      */
     isBeingDecrypted: function() {
-        return this._decrypting;
+        return this._decryptionPromise != null;
+    },
+
+    /**
+     * Check if this event is an encrypted event which we failed to decrypt
+     *
+     * (This implies that we might retry decryption at some point in the future)
+     *
+     * @return {boolean} True if this event is an encrypted event which we
+     *     couldn't decrypt.
+     */
+    isDecryptionFailure: function() {
+        return this._clearEvent && this._clearEvent.content &&
+            this._clearEvent.content.msgtype === "m.bad.encrypted";
     },
 
     /**
@@ -326,13 +339,12 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @internal
      *
      * @param {module:crypto} crypto crypto module
+     *
+     * @returns {Promise} promise which resolves (to undefined) when the decryption
+     * attempt is completed.
      */
-    attemptDecryption: function(crypto) {
-        if (!crypto) {
-            this._badEncryptedMessage("Encryption not enabled");
-            return;
-        }
-
+    attemptDecryption: async function(crypto) {
+        // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
@@ -347,60 +359,112 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             );
         }
 
-        if (this._decrypting) {
+        // if we already have a decryption attempt in progress, then it may
+        // fail because it was using outdated info. We now have reason to
+        // succeed where it failed before, but we don't want to have multiple
+        // attempts going at the same time, so just set a flag that says we have
+        // new info.
+        //
+        if (this._decryptionPromise) {
             console.log(
                 `Event ${this.getId()} already being decrypted; queueing a retry`,
             );
             this._retryDecryption = true;
-            return;
+            return this._decryptionPromise;
         }
 
-        this._decrypting = true;
-
-        this._doDecryption(crypto).finally(() => {
-            this._decrypting = false;
-            this._retryDecryption = false;
-        });
+        this._decryptionPromise = this._decryptionLoop(crypto);
+        return this._decryptionPromise;
     },
 
-    _doDecryption: function(crypto) {
-        return Promise.try(() => {
-            return crypto.decryptEvent(this);
-        }).catch((e) => {
-            if (e.name !== "DecryptionError") {
-                // not a decryption error: log the whole exception as an error.
-                console.error(
-                    `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
-                );
-                return null;
-            } else if (this._retryDecryption) {
-                // decryption error, but we have a retry queued.
-                console.log(
-                    `Got error decrypting event (id=${this.getId()}), but retrying`,
-                );
-                this._retryDecryption = false;
-                return this._doDecryption(crypto);
-            } else {
+    _decryptionLoop: async function(crypto) {
+        // make sure that this method never runs completely synchronously.
+        // (doing so would mean that we would clear _decryptionPromise *before*
+        // it is set in attemptDecryption - and hence end up with a stuck
+        // `_decryptionPromise`).
+        await Promise.resolve();
+
+        while (true) {
+            this._retryDecryption = false;
+
+            let res;
+            try {
+                if (!crypto) {
+                    res = this._badEncryptedMessage("Encryption not enabled");
+                } else {
+                    res = await crypto.decryptEvent(this);
+                }
+            } catch (e) {
+                if (e.name !== "DecryptionError") {
+                    // not a decryption error: log the whole exception as an error
+                    // (and don't bother with a retry)
+                    console.error(
+                        `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
+                    );
+                    this._decryptionPromise = null;
+                    this._retryDecryption = false;
+                    return;
+                }
+
+                // see if we have a retry queued.
+                //
+                // NB: make sure to keep this check in the same tick of the
+                //   event loop as `_decryptionPromise = null` below - otherwise we
+                //   risk a race:
+                //
+                //   * A: we check _retryDecryption here and see that it is
+                //        false
+                //   * B: we get a second call to attemptDecryption, which sees
+                //        that _decryptionPromise is set so sets
+                //        _retryDecryption
+                //   * A: we continue below, clear _decryptionPromise, and
+                //        never do the retry.
+                //
+                if (this._retryDecryption) {
+                    // decryption error, but we have a retry queued.
+                    console.log(
+                        `Got error decrypting event (id=${this.getId()}: ` +
+                        `${e.message}), but retrying`,
+                    );
+                    continue;
+                }
+
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
                 console.warn(
                     `Error decrypting event (id=${this.getId()}): ${e}`,
                 );
 
-                this._badEncryptedMessage(e.message);
-                return null;
+                res = this._badEncryptedMessage(e.message);
             }
-        });
+
+            // at this point, we've either successfully decrypted the event, or have given up
+            // (and set res to a 'badEncryptedMessage'). Either way, we can now set the
+            // cleartext of the event and raise Event.decrypted.
+            //
+            // make sure we clear '_decryptionPromise' before sending the 'Event.decrypted' event,
+            // otherwise the app will be confused to see `isBeingDecrypted` still set when
+            // there isn't an `Event.decrypted` on the way.
+            //
+            // see also notes on _retryDecryption above.
+            //
+            this._decryptionPromise = null;
+            this._retryDecryption = false;
+            this._setClearData(res);
+            return;
+        }
     },
 
     _badEncryptedMessage: function(reason) {
-        this.setClearData({
-            type: "m.room.message",
-            content: {
-                msgtype: "m.bad.encrypted",
-                body: "** Unable to decrypt: " + reason + " **",
+        return {
+            clearEvent: {
+                type: "m.room.message",
+                content: {
+                    msgtype: "m.bad.encrypted",
+                    body: "** Unable to decrypt: " + reason + " **",
+                },
             },
-        });
+        };
     },
 
     /**
@@ -412,29 +476,17 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @fires module:models/event.MatrixEvent#"Event.decrypted"
      *
-     * @param {Object} clearEvent The plaintext payload for the event
-     *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
-     *
-     * @param {string=} senderCurve25519Key Key owned by the sender of this event.
-     *    See {@link module:models/event.MatrixEvent#getSenderKey}.
-     *
-     * @param {string=} claimedEd25519Key ed25519 key claimed by the sender of
-     *    this event. See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
-     *
-     * @param {Array<string>=} forwardingCurve25519KeyChain list of curve25519 keys
-     *     involved in telling us about the senderCurve25519Key and claimedEd25519Key.
-     *     See {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
+     * @param {module:crypto~EventDecryptionResult} decryptionResult
+     *     the decryption result, including the plaintext and some key info
      */
-    setClearData: function(
-        clearEvent,
-        senderCurve25519Key,
-        claimedEd25519Key,
-        forwardingCurve25519KeyChain,
-    ) {
-        this._clearEvent = clearEvent;
-        this._senderCurve25519Key = senderCurve25519Key || null;
-        this._claimedEd25519Key = claimedEd25519Key || null;
-        this._forwardingCurve25519KeyChain = forwardingCurve25519KeyChain || [];
+    _setClearData: function(decryptionResult) {
+        this._clearEvent = decryptionResult.clearEvent;
+        this._senderCurve25519Key =
+            decryptionResult.senderCurve25519Key || null;
+        this._claimedEd25519Key =
+            decryptionResult.claimedEd25519Key || null;
+        this._forwardingCurve25519KeyChain =
+            decryptionResult.forwardingCurve25519KeyChain || [];
         this.emit("Event.decrypted", this);
     },
 

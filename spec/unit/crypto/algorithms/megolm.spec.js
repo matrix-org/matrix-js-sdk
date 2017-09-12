@@ -71,9 +71,13 @@ describe("MegolmDecryption", function() {
             groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
 
-            const event = new MatrixEvent({});
-            event.setClearData(
-                {
+            // construct a fake decrypted key event via the use of a mocked
+            // 'crypto' implementation.
+            const event = new MatrixEvent({
+                type: 'm.room.encrypted',
+            });
+            const decryptedData = {
+                clearEvent: {
                     type: 'm.room_key',
                     content: {
                         algorithm: 'm.megolm.v1.aes-sha2',
@@ -82,11 +86,19 @@ describe("MegolmDecryption", function() {
                         session_key: groupSession.session_key(),
                     },
                 },
-                "SENDER_CURVE25519",
-                "SENDER_ED25519",
-            );
+                senderCurve25519Key: "SENDER_CURVE25519",
+                claimedEd25519Key: "SENDER_ED25519",
+            };
 
-            megolmDecryption.onRoomKeyEvent(event);
+            const mockCrypto = {
+                decryptEvent: function() {
+                    return Promise.resolve(decryptedData);
+                },
+            };
+
+            return event.attemptDecryption(mockCrypto).then(() => {
+                megolmDecryption.onRoomKeyEvent(event);
+            });
         });
 
         it('can decrypt an event', function() {
@@ -104,8 +116,8 @@ describe("MegolmDecryption", function() {
                 },
             });
 
-            return megolmDecryption.decryptEvent(event).then(() => {
-                expect(event.getContent()).toEqual('testytest');
+            return megolmDecryption.decryptEvent(event).then((res) => {
+                expect(res.clearEvent.content).toEqual('testytest');
             });
         });
 
@@ -129,12 +141,16 @@ describe("MegolmDecryption", function() {
                 const deviceInfo = {};
                 mockCrypto.getStoredDevice.andReturn(deviceInfo);
 
-                const awaitEnsureSessions = new Promise((res, rej) => {
-                    mockOlmLib.ensureOlmSessionsForDevices.andCall(() => {
+                mockOlmLib.ensureOlmSessionsForDevices.andReturn(
+                    Promise.resolve({'@alice:foo': {'alidevice': {
+                        sessionId: 'alisession',
+                    }}}),
+                );
+
+                const awaitEncryptForDevice = new Promise((res, rej) => {
+                    mockOlmLib.encryptMessageForDevice.andCall(() => {
                         res();
-                        return Promise.resolve({'@alice:foo': {'alidevice': {
-                            sessionId: 'alisession',
-                        }}});
+                        return Promise.resolve();
                     });
                 });
 
@@ -144,7 +160,7 @@ describe("MegolmDecryption", function() {
                 megolmDecryption.shareKeysWithDevice(keyRequest);
 
                 // it's asynchronous, so we have to wait a bit
-                return awaitEnsureSessions;
+                return awaitEncryptForDevice;
             }).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.

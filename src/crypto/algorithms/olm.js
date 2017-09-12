@@ -157,8 +157,10 @@ utils.inherits(OlmDecryption, base.DecryptionAlgorithm);
  *
  * @param {MatrixEvent} event
  *
- * returns a promise which resolves once we have finished decrypting. Rejects with an
- * `algorithms.DecryptionError` if there is a problem decrypting the event.
+ * returns a promise which resolves to a
+ * {@link module:crypto~EventDecryptionResult} once we have finished
+ * decrypting. Rejects with an `algorithms.DecryptionError` if there is a
+ * problem decrypting the event.
  */
 OlmDecryption.prototype.decryptEvent = async function(event) {
     const content = event.getWireContent();
@@ -227,9 +229,13 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     }
 
     const claimedKeys = payload.keys || {};
-    event.setClearData(payload, deviceKey, claimedKeys.ed25519 || null);
-};
 
+    return {
+        clearEvent: payload,
+        senderCurve25519Key: deviceKey,
+        claimedEd25519Key: claimedKeys.ed25519 || null,
+    };
+};
 
 /**
  * Attempt to decrypt an Olm message
@@ -242,14 +248,16 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
 OlmDecryption.prototype._decryptMessage = async function(
     theirDeviceIdentityKey, message,
 ) {
-    const sessionIds = this._olmDevice.getSessionIdsForDevice(theirDeviceIdentityKey);
+    const sessionIds = await this._olmDevice.getSessionIdsForDevice(
+        theirDeviceIdentityKey,
+    );
 
     // try each session in turn.
     const decryptionErrors = {};
     for (let i = 0; i < sessionIds.length; i++) {
         const sessionId = sessionIds[i];
         try {
-            const payload = this._olmDevice.decryptMessage(
+            const payload = await this._olmDevice.decryptMessage(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
             console.log(
@@ -258,7 +266,7 @@ OlmDecryption.prototype._decryptMessage = async function(
             );
             return payload;
         } catch (e) {
-            const foundSession = this._olmDevice.matchesSession(
+            const foundSession = await this._olmDevice.matchesSession(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
 
@@ -296,7 +304,7 @@ OlmDecryption.prototype._decryptMessage = async function(
 
     let res;
     try {
-        res = this._olmDevice.createInboundSession(
+        res = await this._olmDevice.createInboundSession(
             theirDeviceIdentityKey, message.type, message.body,
         );
     } catch (e) {

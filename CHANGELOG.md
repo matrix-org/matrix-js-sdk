@@ -1,5 +1,32 @@
-Unreleased changes
-==================
+Changes in [0.8.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.2) (2017-08-24)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.1...v0.8.2)
+
+ * Handle m.call.* events which are decrypted asynchronously
+   [\#530](https://github.com/matrix-org/matrix-js-sdk/pull/530)
+ * Re-emit events from, er, Event objects
+   [\#529](https://github.com/matrix-org/matrix-js-sdk/pull/529)
+
+Changes in [0.8.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.1) (2017-08-23)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.1-rc.1...v0.8.1)
+
+ * [No changes]
+
+Changes in [0.8.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.1-rc.1) (2017-08-22)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.0...v0.8.1-rc.1)
+
+ * Fix error handling in interactive-auth
+   [\#527](https://github.com/matrix-org/matrix-js-sdk/pull/527)
+ * Make lots of OlmDevice asynchronous
+   [\#524](https://github.com/matrix-org/matrix-js-sdk/pull/524)
+ * Make crypto.decryptMessage return decryption results
+   [\#523](https://github.com/matrix-org/matrix-js-sdk/pull/523)
+
+Changes in [0.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.0) (2017-08-15)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.7.13...v0.8.0)
 
 BREAKING CHANGE
 ---------------
@@ -35,6 +62,91 @@ applications which support end-to-end encryption:
    use `MatrixClient.getStoredDevices`, which is similar but returns its results
    in a slightly different format.
 
+
+ * Make bits of `olmlib` asynchronous
+   [\#521](https://github.com/matrix-org/matrix-js-sdk/pull/521)
+ * Make some of DeviceList asynchronous
+   [\#520](https://github.com/matrix-org/matrix-js-sdk/pull/520)
+ * Make methods in crypto/algorithms async
+   [\#519](https://github.com/matrix-org/matrix-js-sdk/pull/519)
+ * Avoid sending unencrypted messages in e2e room
+   [\#518](https://github.com/matrix-org/matrix-js-sdk/pull/518)
+ * Make tests wait for syncs to happen
+   [\#517](https://github.com/matrix-org/matrix-js-sdk/pull/517)
+ * Make a load of methods in the 'Crypto' module asynchronous
+   [\#510](https://github.com/matrix-org/matrix-js-sdk/pull/510)
+ * Set `rawDisplayName` to `userId` if membership has `displayname=null`
+   [\#515](https://github.com/matrix-org/matrix-js-sdk/pull/515)
+ * Refactor handling of crypto events for async
+   [\#508](https://github.com/matrix-org/matrix-js-sdk/pull/508)
+ * Let event decryption be asynchronous
+   [\#509](https://github.com/matrix-org/matrix-js-sdk/pull/509)
+ * Transform `async` functions to bluebird promises
+   [\#511](https://github.com/matrix-org/matrix-js-sdk/pull/511)
+ * Add more group APIs
+   [\#512](https://github.com/matrix-org/matrix-js-sdk/pull/512)
+ * Retrying test: wait for localEchoUpdated event
+   [\#507](https://github.com/matrix-org/matrix-js-sdk/pull/507)
+ * Fix member events breaking on timeline reset, 2
+   [\#504](https://github.com/matrix-org/matrix-js-sdk/pull/504)
+ * Make bits of the js-sdk api asynchronous
+   [\#503](https://github.com/matrix-org/matrix-js-sdk/pull/503)
+ * Yet more js-sdk test deflakification
+   [\#499](https://github.com/matrix-org/matrix-js-sdk/pull/499)
+ * Fix racy 'matrixclient retrying' test
+   [\#497](https://github.com/matrix-org/matrix-js-sdk/pull/497)
+ * Fix spamming of key-share-requests
+   [\#495](https://github.com/matrix-org/matrix-js-sdk/pull/495)
+ * Add progress handler to `uploadContent`
+   [\#500](https://github.com/matrix-org/matrix-js-sdk/pull/500)
+ * Switch matrix-js-sdk to bluebird
+   [\#490](https://github.com/matrix-org/matrix-js-sdk/pull/490)
+ * Fix some more flakey tests
+   [\#492](https://github.com/matrix-org/matrix-js-sdk/pull/492)
+ * make the npm test script windows-friendly
+   [\#489](https://github.com/matrix-org/matrix-js-sdk/pull/489)
+ * Fix a bunch of races in the tests
+   [\#488](https://github.com/matrix-org/matrix-js-sdk/pull/488)
+ * Fix early return in MatrixClient.setGuestAccess
+   [\#487](https://github.com/matrix-org/matrix-js-sdk/pull/487)
+ * Remove testUtils.failTest
+   [\#486](https://github.com/matrix-org/matrix-js-sdk/pull/486)
+ * Add test:watch script
+   [\#485](https://github.com/matrix-org/matrix-js-sdk/pull/485)
+ * Make it possible to use async/await
+   [\#484](https://github.com/matrix-org/matrix-js-sdk/pull/484)
+ * Remove m.new_device support
+   [\#483](https://github.com/matrix-org/matrix-js-sdk/pull/483)
+ * Use access-token in header
+   [\#478](https://github.com/matrix-org/matrix-js-sdk/pull/478)
+ * Sanity-check response from /thirdparty/protocols
+   [\#482](https://github.com/matrix-org/matrix-js-sdk/pull/482)
+ * Avoid parsing plain-text errors as JSON
+   [\#479](https://github.com/matrix-org/matrix-js-sdk/pull/479)
+ * Use external mock-request
+   [\#481](https://github.com/matrix-org/matrix-js-sdk/pull/481)
+ * Fix some races in the tests
+   [\#480](https://github.com/matrix-org/matrix-js-sdk/pull/480)
+ * Fall back to MemoryCryptoStore if indexeddb fails
+   [\#475](https://github.com/matrix-org/matrix-js-sdk/pull/475)
+ * Fix load failure in firefox when indexedDB is disabled
+   [\#474](https://github.com/matrix-org/matrix-js-sdk/pull/474)
+ * Fix a race in a test
+   [\#471](https://github.com/matrix-org/matrix-js-sdk/pull/471)
+ * Avoid throwing an unhandled error when the indexeddb is deleted
+   [\#470](https://github.com/matrix-org/matrix-js-sdk/pull/470)
+ * fix jsdoc
+   [\#469](https://github.com/matrix-org/matrix-js-sdk/pull/469)
+ * Handle m.forwarded_room_key events
+   [\#468](https://github.com/matrix-org/matrix-js-sdk/pull/468)
+ * Improve error reporting from indexeddbstore.clearDatabase
+   [\#466](https://github.com/matrix-org/matrix-js-sdk/pull/466)
+ * Implement sharing of megolm keys
+   [\#454](https://github.com/matrix-org/matrix-js-sdk/pull/454)
+ * Process received room key requests
+   [\#449](https://github.com/matrix-org/matrix-js-sdk/pull/449)
+ * Send m.room_key_request events when we fail to decrypt an event
+   [\#448](https://github.com/matrix-org/matrix-js-sdk/pull/448)
 
 Changes in [0.7.13](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.7.13) (2017-06-22)
 ==================================================================================================
