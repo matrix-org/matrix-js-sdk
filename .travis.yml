@@ -1,5 +1,5 @@
 language: node_js
 node_js:
-    - node # Latest stable version of nodejs.
+    - 8.4.0 # XXX: Temporarily pin to 8.4.0 because of https://github.com/jsdoc3/jsdoc/issues/1438
 script:
     - ./travis.sh
