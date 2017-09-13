@@ -28,8 +28,6 @@ import Promise from 'bluebird';
 const Filter = require("./filter");
 const MatrixError = require("./http-api").MatrixError;
 
-import reEmit from './reemit';
-
 const DEBUG = true;
 
 function getFilterName(userId, suffix) {
@@ -86,7 +84,7 @@ function WebSocketApi(client, opts) {
     this._pendingSend = [];
 
     if (client.getNotifTimelineSet()) {
-        reEmit(client, client.getNotifTimelineSet(),
+        client.reEmitter.reEmit(client.getNotifTimelineSet(),
                ["Room.timeline", "Room.timelineReset"]);
     }
 }
