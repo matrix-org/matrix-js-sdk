@@ -32,8 +32,6 @@ const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 
-import reEmit from './reemit';
-
 const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
@@ -100,7 +98,7 @@ function SyncApi(client, opts) {
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
 
     if (client.getNotifTimelineSet()) {
-        reEmit(client, client.getNotifTimelineSet(),
+        client.reEmitter.reEmit(client.getNotifTimelineSet(),
                ["Room.timeline", "Room.timelineReset"]);
     }
 }
@@ -115,7 +113,7 @@ SyncApi.prototype.createRoom = function(roomId) {
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
-    reEmit(client, room, ["Room.name", "Room.timeline", "Room.redaction",
+    client.reEmitter.reEmit(room, ["Room.name", "Room.timeline", "Room.redaction",
                           "Room.receipt", "Room.tags",
                           "Room.timelineReset",
                           "Room.localEchoUpdated",
@@ -132,7 +130,7 @@ SyncApi.prototype.createRoom = function(roomId) {
 SyncApi.prototype.createGroup = function(groupId) {
     const client = this.client;
     const group = new Group(groupId);
-    reEmit(client, group, ["Group.profile", "Group.myMembership"]);
+    client.reEmitter.reEmit(group, ["Group.profile", "Group.myMembership"]);
     return group;
 };
 
@@ -145,13 +143,13 @@ SyncApi.prototype._registerStateListeners = function(room) {
     // we need to also re-emit room state and room member events, so hook it up
     // to the client now. We need to add a listener for RoomState.members in
     // order to hook them correctly. (TODO: find a better way?)
-    reEmit(client, room.currentState, [
+    client.reEmitter.reEmit(room.currentState, [
         "RoomState.events", "RoomState.members", "RoomState.newMember",
     ]);
     room.currentState.on("RoomState.newMember", function(event, state, member) {
         member.user = client.getUser(member.userId);
-        reEmit(
-            client, member,
+        client.reEmitter.reEmit(
+            member,
             [
                 "RoomMember.name", "RoomMember.typing", "RoomMember.powerLevel",
                 "RoomMember.membership",
@@ -1337,7 +1335,7 @@ SyncApi.prototype._onOnline = function() {
 
 function createNewUser(client, userId) {
     const user = new User(userId);
-    reEmit(client, user, [
+    client.reEmitter.reEmit(user, [
         "User.avatarUrl", "User.displayName", "User.presence",
         "User.currentlyActive", "User.lastPresenceTs",
     ]);

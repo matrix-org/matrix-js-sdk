@@ -27,7 +27,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
-import reEmit from '../reemit';
+import ReEmitter from '../ReEmitter';
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -106,6 +106,8 @@ function Room(roomId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
+    this.reEmitter = new ReEmitter(this);
+
     if (["chronological", "detached"].indexOf(opts.pendingEventOrdering) === -1) {
         throw new Error(
             "opts.pendingEventOrdering MUST be either 'chronological' or " +
@@ -153,7 +155,7 @@ function Room(roomId, opts) {
     // all our per-room timeline sets. the first one is the unfiltered ones;
     // the subsequent ones are the filtered ones in no particular order.
     this._timelineSets = [new EventTimelineSet(this, opts)];
-    reEmit(this, this.getUnfilteredTimelineSet(),
+    this.reEmitter.reEmit(this.getUnfilteredTimelineSet(),
            ["Room.timeline", "Room.timelineReset"]);
 
     this._fixUpLegacyTimelineFields();
@@ -490,7 +492,7 @@ Room.prototype.getOrCreateFilteredTimelineSet = function(filter) {
     }
     const opts = Object.assign({ filter: filter }, this._opts);
     const timelineSet = new EventTimelineSet(this, opts);
-    reEmit(this, timelineSet, ["Room.timeline", "Room.timelineReset"]);
+    this.reEmitter.reEmit(timelineSet, ["Room.timeline", "Room.timelineReset"]);
     this._filteredTimelineSets[filter.filterId] = timelineSet;
     this._timelineSets.push(timelineSet);
 
