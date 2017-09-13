@@ -41,7 +41,7 @@ const WebSocketApi = require("./websocket");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
-import reEmit from './reemit';
+import ReEmitter from './ReEmitter';
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
@@ -119,6 +119,8 @@ try {
  */
 function MatrixClient(opts) {
     MatrixBaseApis.call(this, opts);
+
+    this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
 
@@ -379,7 +381,7 @@ MatrixClient.prototype.initCrypto = async function() {
         this._cryptoStore,
     );
 
-    reEmit(this, crypto, [
+    this.reEmitter.reEmit(crypto, [
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
     ]);
@@ -3365,10 +3367,10 @@ function _resolve(callback, defer, res) {
 function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
-        reEmit(client, event, [
-            "Event.decrypted",
-        ]);
         if (event.isEncrypted()) {
+            client.reEmitter.reEmit(event, [
+                "Event.decrypted",
+            ]);
             event.attemptDecryption(client._crypto);
         }
         return event;
