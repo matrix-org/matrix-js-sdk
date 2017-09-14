@@ -762,7 +762,7 @@ MatrixClient.prototype.getAccountData = function(eventType) {
  * @returns {string[]} The array of users that are ignored (empty if none)
  */
 MatrixClient.prototype.getIgnoredUsers = function() {
-    var event = this.getAccountData("m.ignored_user_list");
+    const event = this.getAccountData("m.ignored_user_list");
     if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
     return Object.keys(event.getContent()["ignored_users"]);
 };
@@ -770,13 +770,13 @@ MatrixClient.prototype.getIgnoredUsers = function() {
 /**
  * Sets the users that the current user should ignore.
  * @param {string[]} userIds the user IDs to ignore
- * @param {module:client.callback} callback Optional.
+ * @param {module:client.callback} [callback] Optional.
  * @return {module:client.Promise} Resolves: Account data event
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
-    var content = {ignored_users: {}};
-    userIds.map(u => content.ignored_users[u] = {});
+    const content = {ignored_users: {}};
+    userIds.map((u) => content.ignored_users[u] = {});
     return this.setAccountData("m.ignored_user_list", content, callback);
 };
 
