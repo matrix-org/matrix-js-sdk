@@ -757,6 +757,34 @@ MatrixClient.prototype.getAccountData = function(eventType) {
     return this.store.getAccountData(eventType);
 };
 
+/**
+ * Gets the users that are ignored by this client
+ * @returns {string[]} The array of users that are ignored (empty if none)
+ */
+MatrixClient.prototype.getIgnoredUsers = function() {
+    var event = this.getAccountData("m.ignored_user_list");
+    if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
+    return Object.keys(event.getContent()["ignored_users"]);
+};
+
+/**
+ * Sets the users that the current user should ignore.
+ * @param {string[]} userIds the user IDs to ignore
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: Account data event
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
+    var content = {
+        ignored_users: userIds.map(u => {
+            var obj = {};
+            obj[u] = {};
+            return obj;
+        })
+    };
+    return this.setAccountData("m.ignored_user_list", content, callback);
+};
+
 // Room operations
 // ===============
 
