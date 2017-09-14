@@ -775,13 +775,8 @@ MatrixClient.prototype.getIgnoredUsers = function() {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
-    var content = {
-        ignored_users: userIds.map(u => {
-            var obj = {};
-            obj[u] = {};
-            return obj;
-        })
-    };
+    var content = {ignored_users: {}};
+    userIds.map(u => content.ignored_users[u] = {});
     return this.setAccountData("m.ignored_user_list", content, callback);
 };
 
