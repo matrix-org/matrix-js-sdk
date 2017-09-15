@@ -780,6 +780,15 @@ MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
     return this.setAccountData("m.ignored_user_list", content, callback);
 };
 
+/**
+ * Gets whether or not a specific user is being ignored by this client.
+ * @param {string} userId the user ID to check
+ * @returns {boolean} true if the user is ignored, false otherwise
+ */
+MatrixClient.prototype.isUserIgnored = function(userId) {
+    return this.getIgnoredUsers().indexOf(userId) !== -1;
+};
+
 // Room operations
 // ===============
 
