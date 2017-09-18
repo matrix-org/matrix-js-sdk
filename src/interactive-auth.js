@@ -293,7 +293,9 @@ InteractiveAuth.prototype = {
             },
         );
         if (!background) {
-            prom = prom.catch(this._completionDeferred.reject);
+            prom = prom.catch((e) => {
+                this._completionDeferred.reject(e);
+            });
         } else {
             // We ignore all failures here (even non-UI auth related ones)
             // since we don't want to suddenly fail if the internet connection

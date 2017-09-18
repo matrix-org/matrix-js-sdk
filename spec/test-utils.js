@@ -219,3 +219,25 @@ module.exports.MockStorageApi.prototype = {
         delete this.data[k];
     },
 };
+
+
+/**
+ * If an event is being decrypted, wait for it to finish being decrypted.
+ *
+ * @param {MatrixEvent} event
+ * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
+ */
+module.exports.awaitDecryption = function(event) {
+    if (!event.isBeingDecrypted()) {
+        return Promise.resolve(event);
+    }
+
+    console.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
+
+    return new Promise((resolve, reject) => {
+        event.once('Event.decrypted', (ev) => {
+            console.log(`${Date.now()} event ${event.getId()} now decrypted`);
+            resolve(ev);
+        });
+    });
+};

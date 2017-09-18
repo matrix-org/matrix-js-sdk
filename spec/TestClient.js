@@ -33,12 +33,20 @@ import Promise from 'bluebird';
  * @param {string} userId
  * @param {string} deviceId
  * @param {string} accessToken
+ *
+ * @param {WebStorage=} sessionStoreBackend a web storage object to use for the
+ *     session store. If undefined, we will create a MockStorageApi.
  */
-export default function TestClient(userId, deviceId, accessToken) {
+export default function TestClient(
+    userId, deviceId, accessToken, sessionStoreBackend,
+) {
     this.userId = userId;
     this.deviceId = deviceId;
 
-    this.storage = new sdk.WebStorageSessionStore(new testUtils.MockStorageApi());
+    if (sessionStoreBackend === undefined) {
+        sessionStoreBackend = new testUtils.MockStorageApi();
+    }
+    this.storage = new sdk.WebStorageSessionStore(sessionStoreBackend);
     this.httpBackend = new MockHttpBackend();
     this.client = sdk.createClient({
         baseUrl: "http://" + userId + ".test.server",

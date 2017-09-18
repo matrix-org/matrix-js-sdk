@@ -69,7 +69,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._olmDevice = new OlmDevice(sessionStore);
     this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
-    this._initialDeviceListInvalidationPending = false;
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -88,12 +87,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._deviceKeys = {};
 
-    // build our device keys: these will later be uploaded
-    this._deviceKeys["ed25519:" + this._deviceId] =
-        this._olmDevice.deviceEd25519Key;
-    this._deviceKeys["curve25519:" + this._deviceId] =
-        this._olmDevice.deviceCurve25519Key;
-
     this._globalBlacklistUnverifiedDevices = false;
 
     this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
@@ -106,6 +99,22 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+}
+utils.inherits(Crypto, EventEmitter);
+
+/**
+ * Initialise the crypto module so that it is ready for use
+ *
+ * Returns a promise which resolves once the crypto module is ready for use.
+ */
+Crypto.prototype.init = async function() {
+    await this._olmDevice.init();
+
+    // build our device keys: these will later be uploaded
+    this._deviceKeys["ed25519:" + this._deviceId] =
+        this._olmDevice.deviceEd25519Key;
+    this._deviceKeys["curve25519:" + this._deviceId] =
+        this._olmDevice.deviceCurve25519Key;
 
     let myDevices = this._sessionStore.getEndToEndDevicesForUser(
         this._userId,
@@ -129,13 +138,6 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
             this._userId, myDevices,
         );
     }
-}
-utils.inherits(Crypto, EventEmitter);
-
-/**
- * Initialise the crypto module so that it is ready for use
- */
-Crypto.prototype.init = async function() {
 };
 
 /**
@@ -147,15 +149,6 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype.registerEventHandlers = function(eventEmitter) {
     const crypto = this;
-    eventEmitter.on("sync", function(syncState, oldState, data) {
-        try {
-            if (syncState === "SYNCING") {
-                crypto._onSyncCompleted(data);
-            }
-        } catch (e) {
-            console.error("Error handling sync", e);
-        }
-    });
 
     eventEmitter.on("RoomMember.membership", function(event, member, oldMembership) {
         try {
@@ -245,7 +238,7 @@ Crypto.prototype.uploadDeviceKeys = function() {
 
 /**
  * Stores the current one_time_key count which will be handled later (in a call of
- * _onSyncCompleted). The count is e.g. coming from a /sync response.
+ * onSyncCompleted). The count is e.g. coming from a /sync response.
  *
  * @param {Number} currentCount The current count of one_time_keys to be stored
  */
@@ -307,14 +300,15 @@ function _maybeUploadOneTimeKeys(crypto) {
     function uploadLoop(keyCount) {
         if (keyLimit <= keyCount) {
             // If we don't need to generate any more keys then we are done.
-            return;
+            return Promise.resolve();
         }
 
         const keysThisLoop = Math.min(keyLimit - keyCount, maxKeysPerCycle);
 
         // Ask olm to generate new one time keys, then upload them to synapse.
-        crypto._olmDevice.generateOneTimeKeys(keysThisLoop);
-        return _uploadOneTimeKeys(crypto).then((res) => {
+        return crypto._olmDevice.generateOneTimeKeys(keysThisLoop).then(() => {
+            return _uploadOneTimeKeys(crypto);
+        }).then((res) => {
             if (res.one_time_key_counts && res.one_time_key_counts.signed_curve25519) {
                 // if the response contains a more up to date value use this
                 // for the next loop
@@ -357,7 +351,7 @@ function _maybeUploadOneTimeKeys(crypto) {
 
 // returns a promise which resolves to the response
 async function _uploadOneTimeKeys(crypto) {
-    const oneTimeKeys = crypto._olmDevice.getOneTimeKeys();
+    const oneTimeKeys = await crypto._olmDevice.getOneTimeKeys();
     const oneTimeJson = {};
 
     const promises = [];
@@ -382,7 +376,7 @@ async function _uploadOneTimeKeys(crypto) {
         device_id: crypto._deviceId,
     });
 
-    crypto._olmDevice.markKeysAsPublished();
+    await crypto._olmDevice.markKeysAsPublished();
     return res;
 }
 
@@ -498,7 +492,7 @@ Crypto.prototype.getOlmSessionsForUser = async function(userId) {
     for (let j = 0; j < devices.length; ++j) {
         const device = devices[j];
         const deviceKey = device.getIdentityKey();
-        const sessions = this._olmDevice.getSessionInfoForDevice(deviceKey);
+        const sessions = await this._olmDevice.getSessionInfoForDevice(deviceKey);
 
         result[device.deviceId] = {
             deviceIdKey: deviceKey,
@@ -692,17 +686,16 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
  *    session export objects
  */
 Crypto.prototype.exportRoomKeys = function() {
-    return Promise.resolve(
-        this._sessionStore.getAllEndToEndInboundGroupSessionKeys().map(
-            (s) => {
-                const sess = this._olmDevice.exportInboundGroupSession(
-                    s.senderKey, s.sessionId,
-                );
-
+    return Promise.map(
+        this._sessionStore.getAllEndToEndInboundGroupSessionKeys(),
+        (s) => {
+            return this._olmDevice.exportInboundGroupSession(
+                s.senderKey, s.sessionId,
+            ).then((sess) => {
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 return sess;
-            },
-        ),
+            });
+        },
     );
 };
 
@@ -717,11 +710,11 @@ Crypto.prototype.importRoomKeys = function(keys) {
         keys, (key) => {
             if (!key.room_id || !key.algorithm) {
                 console.warn("ignoring room key entry with missing fields", key);
-                return;
+                return null;
             }
 
             const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            alg.importRoomKey(key);
+            return alg.importRoomKey(key);
         },
     );
 };
@@ -771,8 +764,9 @@ Crypto.prototype.encryptEvent = function(event, room) {
  *
  * @param {MatrixEvent} event
  *
- * @return {Promise} resolves once we have finished decrypting. Rejects with an
- * `algorithms.DecryptionError` if there is a problem decrypting the event.
+ * @return {Promise<module:crypto~EventDecryptionResult>} resolves once we have
+ *  finished decrypting. Rejects with an `algorithms.DecryptionError` if there
+ *  is a problem decrypting the event.
  */
 Crypto.prototype.decryptEvent = function(event) {
     const content = event.getWireContent();
@@ -781,12 +775,24 @@ Crypto.prototype.decryptEvent = function(event) {
 };
 
 /**
- * Handle the notification from /sync that a user has updated their device list.
+ * Handle the notification from /sync or /keys/changes that device lists have
+ * been changed.
  *
- * @param {String} userId
+ * @param {Object} deviceLists device_lists field from /sync, or response from
+ * /keys/changes
  */
-Crypto.prototype.userDeviceListChanged = function(userId) {
-    this._deviceList.invalidateUserDeviceList(userId);
+Crypto.prototype.handleDeviceListChanges = async function(deviceLists) {
+    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+        deviceLists.changed.forEach((u) => {
+            this._deviceList.invalidateUserDeviceList(u);
+        });
+    }
+
+    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        deviceLists.left.forEach((u) => {
+            this._deviceList.stopTrackingDeviceList(u);
+        });
+    }
 
     // don't flush the outdated device list yet - we do it once we finish
     // processing the sync.
@@ -833,7 +839,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 
     try {
         // inhibit the device list refresh for now - it will happen once we've
-        // finished processing the sync, in _onSyncCompleted.
+        // finished processing the sync, in onSyncCompleted.
         await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
@@ -849,7 +855,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
  *
  * @param {Object} syncData  the data from the 'MatrixClient.sync' event
  */
-Crypto.prototype._onSyncCompleted = function(syncData) {
+Crypto.prototype.onSyncCompleted = async function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
     if (!syncData.oldSyncToken) {
@@ -859,18 +865,15 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         // invalidate devices which have changed since then.
         const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
         if (oldSyncToken !== null) {
-            this._initialDeviceListInvalidationPending = true;
-            this._invalidateDeviceListsSince(
-                oldSyncToken, nextSyncToken,
-            ).catch((e) => {
+            try {
+                await this._invalidateDeviceListsSince(
+                    oldSyncToken, nextSyncToken,
+                );
+            } catch (e) {
                 // if that failed, we fall back to invalidating everyone.
                 console.warn("Error fetching changed device list", e);
                 this._deviceList.invalidateAllDeviceLists();
-            }).done(() => {
-                this._initialDeviceListInvalidationPending = false;
-                this._deviceList.lastKnownSyncToken = nextSyncToken;
-                this._deviceList.refreshOutdatedDeviceLists();
-            });
+            }
         } else {
             // otherwise, we have to invalidate all devices for all users we
             // are tracking.
@@ -880,14 +883,12 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
         }
     }
 
-    if (!this._initialDeviceListInvalidationPending) {
-        // we can now store our sync token so that we can get an update on
-        // restart rather than having to invalidate everyone.
-        //
-        // (we don't really need to do this on every sync - we could just
-        // do it periodically)
-        this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
-    }
+    // we can now store our sync token so that we can get an update on
+    // restart rather than having to invalidate everyone.
+    //
+    // (we don't really need to do this on every sync - we could just
+    // do it periodically)
+    this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
 
     // catch up on any new devices we got told about during the sync.
     this._deviceList.lastKnownSyncToken = nextSyncToken;
@@ -910,25 +911,19 @@ Crypto.prototype._onSyncCompleted = function(syncData) {
  * @param {String} oldSyncToken
  * @param {String} lastKnownSyncToken
  *
- * @returns {Promise} resolves once the query is complete. Rejects if the
+ * Returns a Promise which resolves once the query is complete. Rejects if the
  *   keyChange query fails.
  */
-Crypto.prototype._invalidateDeviceListsSince = function(
+Crypto.prototype._invalidateDeviceListsSince = async function(
     oldSyncToken, lastKnownSyncToken,
 ) {
-    return this._baseApis.getKeyChanges(
+    const r = await this._baseApis.getKeyChanges(
         oldSyncToken, lastKnownSyncToken,
-    ).then((r) => {
-        console.log("got key changes since", oldSyncToken, ":", r.changed);
+    );
 
-        if (!r.changed || !Array.isArray(r.changed)) {
-            return;
-        }
+    console.log("got key changes since", oldSyncToken, ":", r);
 
-        r.changed.forEach((u) => {
-            this._deviceList.invalidateUserDeviceList(u);
-        });
-    });
+    await this.handleDeviceListChanges(r);
 };
 
 /**
@@ -1239,7 +1234,7 @@ Crypto.prototype._signObject = async function(obj) {
     const sigs = {};
     sigs[this._userId] = {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
-        this._olmDevice.sign(anotherjson.stringify(obj));
+        await this._olmDevice.sign(anotherjson.stringify(obj));
     obj.signatures = sigs;
 };
 
@@ -1293,6 +1288,27 @@ class IncomingRoomKeyRequestCancellation {
         this.requestId = content.request_id;
     }
 }
+
+/**
+ * The result of a (successful) call to decryptEvent.
+ *
+ * @typedef {Object} EventDecryptionResult
+ *
+ * @property {Object} clearEvent The plaintext payload for the event
+ *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
+ *
+ * @property {?string} senderCurve25519Key Key owned by the sender of this
+ *    event.  See {@link module:models/event.MatrixEvent#getSenderKey}.
+ *
+ * @property {?string} claimedEd25519Key ed25519 key claimed by the sender of
+ *    this event. See
+ *    {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
+ *
+ * @property {?Array<string>} forwardingCurve25519KeyChain list of curve25519
+ *     keys involved in telling us about the senderCurve25519Key and
+ *     claimedEd25519Key. See
+ *     {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
+ */
 
 /**
  * Fires when we receive a room key request

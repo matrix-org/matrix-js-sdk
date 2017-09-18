@@ -1,0 +1,369 @@
+import expect from 'expect';
+import Promise from 'bluebird';
+
+import TestClient from '../TestClient';
+import testUtils from '../test-utils';
+
+const ROOM_ID = "!room:id";
+
+/**
+ * get a /sync response which contains a single e2e room (ROOM_ID), with the
+ * members given
+ *
+ * @param {string[]} roomMembers
+ *
+ * @return {object} sync response
+ */
+function getSyncResponse(roomMembers) {
+    const stateEvents = [
+        testUtils.mkEvent({
+            type: 'm.room.encryption',
+            skey: '',
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+            },
+        }),
+    ];
+
+    Array.prototype.push.apply(
+        stateEvents,
+        roomMembers.map(
+            (m) => testUtils.mkMembership({
+                mship: 'join',
+                sender: m,
+            }),
+        ),
+    );
+
+    const syncResponse = {
+        next_batch: 1,
+        rooms: {
+            join: {
+                [ROOM_ID]: {
+                    state: {
+                        events: stateEvents,
+                    },
+                },
+            },
+        },
+    };
+
+    return syncResponse;
+}
+
+
+describe("DeviceList management:", function() {
+    if (!global.Olm) {
+        console.warn('not running deviceList tests: Olm not present');
+        return;
+    }
+
+    let sessionStoreBackend;
+    let aliceTestClient;
+
+    async function createTestClient() {
+        const testClient = new TestClient(
+            "@alice:localhost", "xzcvb", "akjgkrgjs", sessionStoreBackend,
+        );
+        await testClient.client.initCrypto();
+        return testClient;
+    }
+
+    beforeEach(async function() {
+        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+
+        // we create our own sessionStoreBackend so that we can use it for
+        // another TestClient.
+        sessionStoreBackend = new testUtils.MockStorageApi();
+
+        aliceTestClient = await createTestClient();
+    });
+
+    afterEach(function() {
+        aliceTestClient.stop();
+    });
+
+    it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {
+        return aliceTestClient.start().then(function() {
+            const syncResponse = getSyncResponse(['@bob:xyz']);
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+
+            return aliceTestClient.flushSync();
+        }).then(function() {
+            console.log("Forcing alice to download our device keys");
+
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
+                device_keys: {
+                    '@bob:xyz': {},
+                },
+            });
+
+            return Promise.all([
+                aliceTestClient.client.downloadKeys(['@bob:xyz']),
+                aliceTestClient.httpBackend.flush('/keys/query', 1),
+            ]);
+        }).then(function() {
+            console.log("Telling alice to send a megolm message");
+
+            aliceTestClient.httpBackend.when(
+                'PUT', '/send/',
+            ).respond(200, {
+                    event_id: '$event_id',
+            });
+
+            return Promise.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+
+                // the crypto stuff can take a while, so give the requests a whole second.
+                aliceTestClient.httpBackend.flushAllExpected({
+                    timeout: 1000,
+                }),
+            ]);
+        });
+    });
+
+
+    it("We should not get confused by out-of-order device query responses",
+       () => {
+           // https://github.com/vector-im/riot-web/issues/3126
+           return aliceTestClient.start().then(() => {
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                   200, getSyncResponse(['@bob:xyz', '@chris:abc']));
+               return aliceTestClient.flushSync();
+           }).then(() => {
+               // to make sure the initial device queries are flushed out, we
+               // attempt to send a message.
+
+               aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                   200, {
+                       device_keys: {
+                           '@bob:xyz': {},
+                           '@chris:abc': {},
+                       },
+                   },
+               );
+
+               aliceTestClient.httpBackend.when('PUT', '/send/').respond(
+                   200, {event_id: '$event1'});
+
+               return Promise.all([
+                   aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                   aliceTestClient.httpBackend.flush('/keys/query', 1).then(
+                       () => aliceTestClient.httpBackend.flush('/send/', 1),
+                   ),
+               ]);
+           }).then(() => {
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
+
+               // invalidate bob's and chris's device lists in separate syncs
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(200, {
+                   next_batch: '2',
+                   device_lists: {
+                       changed: ['@bob:xyz'],
+                   },
+               });
+               aliceTestClient.httpBackend.when('GET', '/sync').respond(200, {
+                   next_batch: '3',
+                   device_lists: {
+                       changed: ['@chris:abc'],
+                   },
+               });
+               // flush both syncs
+               return aliceTestClient.flushSync().then(() => {
+                   return aliceTestClient.flushSync();
+               });
+           }).then(() => {
+               // check that we don't yet have a request for chris's devices.
+               aliceTestClient.httpBackend.when('POST', '/keys/query', {
+                   device_keys: {
+                       '@chris:abc': {},
+                   },
+                   token: '3',
+               }).respond(200, {
+                   device_keys: {'@chris:abc': {}},
+               });
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(0);
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               if (bobStat != 1 && bobStat != 2) {
+                   throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
+                                   bobStat);
+               }
+
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+               if (chrisStat != 1 && chrisStat != 2) {
+                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
+                                   chrisStat);
+               }
+
+               // now add an expectation for a query for bob's devices, and let
+               // it complete.
+               aliceTestClient.httpBackend.when('POST', '/keys/query', {
+                   device_keys: {
+                       '@bob:xyz': {},
+                   },
+                   token: '2',
+               }).respond(200, {
+                   device_keys: {'@bob:xyz': {}},
+               });
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(1);
+
+               // wait for the client to stop processing the response
+               return aliceTestClient.client.downloadKeys(['@bob:xyz']);
+           }).then(() => {
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               expect(bobStat).toEqual(3);
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+               if (chrisStat != 1 && chrisStat != 2) {
+                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
+                                   bobStat);
+               }
+
+               // now let the query for chris's devices complete.
+               return aliceTestClient.httpBackend.flush('/keys/query', 1);
+           }).then((flushed) => {
+               expect(flushed).toEqual(1);
+
+               // wait for the client to stop processing the response
+               return aliceTestClient.client.downloadKeys(['@chris:abc']);
+           }).then(() => {
+               const bobStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+               const chrisStat = aliceTestClient.storage
+                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+
+               expect(bobStat).toEqual(3);
+               expect(chrisStat).toEqual(3);
+               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(3);
+           });
+       });
+
+    // https://github.com/vector-im/riot-web/issues/4983
+    describe("Alice should know she has stale device lists", () => {
+        beforeEach(async function() {
+            await aliceTestClient.start();
+
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, getSyncResponse(['@bob:xyz']));
+            await aliceTestClient.flushSync();
+
+            aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+                200, {
+                    device_keys: {
+                        '@bob:xyz': {},
+                    },
+                },
+            );
+            await aliceTestClient.httpBackend.flush('/keys/query', 1);
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+
+            expect(bobStat).toBeGreaterThan(
+                0, "Alice should be tracking bob's device list",
+            );
+        });
+
+        it("when Bob leaves", async function() {
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, {
+                    next_batch: 2,
+                    device_lists: {
+                        left: ['@bob:xyz'],
+                    },
+                    rooms: {
+                        join: {
+                            [ROOM_ID]: {
+                                timeline: {
+                                    events: [
+                                        testUtils.mkMembership({
+                                            mship: 'leave',
+                                            sender: '@bob:xyz',
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            );
+
+
+            await aliceTestClient.flushSync();
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+            expect(bobStat).toEqual(
+                0, "Alice should have marked bob's device list as untracked",
+            );
+        });
+
+        it("when Alice leaves", async function() {
+            aliceTestClient.httpBackend.when('GET', '/sync').respond(
+                200, {
+                    next_batch: 2,
+                    device_lists: {
+                        left: ['@bob:xyz'],
+                    },
+                    rooms: {
+                        leave: {
+                            [ROOM_ID]: {
+                                timeline: {
+                                    events: [
+                                        testUtils.mkMembership({
+                                            mship: 'leave',
+                                            sender: '@bob:xyz',
+                                        }),
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            );
+
+            await aliceTestClient.flushSync();
+
+            const bobStat = aliceTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+            expect(bobStat).toEqual(
+                0, "Alice should have marked bob's device list as untracked",
+            );
+        });
+
+        it("when Bob leaves whilst Alice is offline", async function() {
+            aliceTestClient.stop();
+
+            const anotherTestClient = await createTestClient();
+
+            try {
+                anotherTestClient.httpBackend.when('GET', '/keys/changes').respond(
+                    200, {
+                        changed: [],
+                        left: ['@bob:xyz'],
+                    },
+                );
+                await anotherTestClient.start();
+                anotherTestClient.httpBackend.when('GET', '/sync').respond(
+                    200, getSyncResponse([]));
+                await anotherTestClient.flushSync();
+
+                const bobStat = anotherTestClient.storage
+                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+
+                expect(bobStat).toEqual(
+                    0, "Alice should have marked bob's device list as untracked",
+                );
+            } finally {
+                anotherTestClient.stop();
+            }
+        });
+    });
+});

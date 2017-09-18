@@ -40,7 +40,7 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
-import reEmit from './reemit';
+import ReEmitter from './ReEmitter';
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
@@ -113,7 +113,19 @@ try {
  *    crypto store implementation.
  */
 function MatrixClient(opts) {
+    // Allow trailing slash in HS url
+    if (opts.baseUrl && opts.baseUrl.endsWith("/")) {
+        opts.baseUrl = opts.baseUrl.substr(0, opts.baseUrl.length - 1);
+    }
+
+    // Allow trailing slash in IS url
+    if (opts.idBaseUrl && opts.idBaseUrl.endsWith("/")) {
+        opts.idBaseUrl = opts.idBaseUrl.substr(0, opts.idBaseUrl.length - 1);
+    }
+
     MatrixBaseApis.call(this, opts);
+
+    this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
 
@@ -364,7 +376,7 @@ MatrixClient.prototype.initCrypto = async function() {
         this._cryptoStore,
     );
 
-    reEmit(this, crypto, [
+    this.reEmitter.reEmit(crypto, [
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
     ]);
@@ -659,6 +671,30 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+// Group ops
+// =========
+// Operations on groups that come down the sync stream (ie. ones the
+// user is a member of or invited to)
+
+/**
+ * Get the group for the given group ID.
+ * This function will return a valid group for any group for which a Group event
+ * has been emitted.
+ * @param {string} groupId The group ID
+ * @return {Group} The Group or null if the group is not known or there is no data store.
+ */
+MatrixClient.prototype.getGroup = function(groupId) {
+    return this.store.getGroup(groupId);
+};
+
+/**
+ * Retrieve all known groups.
+ * @return {Groups[]} A list of groups, or an empty list if there is no data store.
+ */
+MatrixClient.prototype.getGroups = function() {
+    return this.store.getGroups();
+};
+
 // Room ops
 // ========
 
@@ -729,6 +765,38 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
  */
 MatrixClient.prototype.getAccountData = function(eventType) {
     return this.store.getAccountData(eventType);
+};
+
+/**
+ * Gets the users that are ignored by this client
+ * @returns {string[]} The array of users that are ignored (empty if none)
+ */
+MatrixClient.prototype.getIgnoredUsers = function() {
+    const event = this.getAccountData("m.ignored_user_list");
+    if (!event || !event.getContent() || !event.getContent()["ignored_users"]) return [];
+    return Object.keys(event.getContent()["ignored_users"]);
+};
+
+/**
+ * Sets the users that the current user should ignore.
+ * @param {string[]} userIds the user IDs to ignore
+ * @param {module:client.callback} [callback] Optional.
+ * @return {module:client.Promise} Resolves: Account data event
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.setIgnoredUsers = function(userIds, callback) {
+    const content = {ignored_users: {}};
+    userIds.map((u) => content.ignored_users[u] = {});
+    return this.setAccountData("m.ignored_user_list", content, callback);
+};
+
+/**
+ * Gets whether or not a specific user is being ignored by this client.
+ * @param {string} userId the user ID to check
+ * @returns {boolean} true if the user is ignored, false otherwise
+ */
+MatrixClient.prototype.isUserIgnored = function(userId) {
+    return this.getIgnoredUsers().indexOf(userId) !== -1;
 };
 
 // Room operations
@@ -3029,6 +3097,10 @@ function setupCallEventHandler(client) {
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
                 if (ignoreCallIds[e.getContent().call_id]) {
+                    console.log(
+                        'Ignoring previously answered/hungup call ' +
+                            e.getContent().call_id,
+                    );
                     return;
                 }
                 callEventHandler(e);
@@ -3037,20 +3109,25 @@ function setupCallEventHandler(client) {
         }
     });
 
-    client.on("event", function(event) {
-        if (!isClientPrepared) {
-            if (event.getType().indexOf("m.call.") === 0) {
-                callEventBuffer.push(event);
+    client.on("event", onEvent);
+
+    function onEvent(event) {
+        if (event.getType().indexOf("m.call.") !== 0) {
+            // not a call event
+            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+                // not *yet* a call event, but might become one...
+                event.once("Event.decrypted", onEvent);
             }
             return;
         }
+        if (!isClientPrepared) {
+            callEventBuffer.push(event);
+            return;
+        }
         callEventHandler(event);
-    });
+    }
 
     function callEventHandler(event) {
-        if (event.getType().indexOf("m.call.") !== 0) {
-            return; // not a call event
-        }
         const content = event.getContent();
         let call = content.call_id ? client.callList[content.call_id] : undefined;
         let i;
@@ -3242,6 +3319,9 @@ function _PojoToMatrixEventMapper(client) {
     function mapper(plainOldJsObject) {
         const event = new MatrixEvent(plainOldJsObject);
         if (event.isEncrypted()) {
+            client.reEmitter.reEmit(event, [
+                "Event.decrypted",
+            ]);
             event.attemptDecryption(client._crypto);
         }
         return event;
@@ -3420,6 +3500,17 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *       var rooms = matrixClient.getRooms();
  *       break;
  *   }
+ * });
+ */
+
+ /**
+ * Fires whenever the sdk learns about a new group. <strong>This event
+ * is experimental and may change.</strong>
+ * @event module:client~MatrixClient#"Group"
+ * @param {Group} group The newly created, fully populated group.
+ * @example
+ * matrixClient.on("Group", function(group){
+ *   var groupId = group.groupId;
  * });
  */
 

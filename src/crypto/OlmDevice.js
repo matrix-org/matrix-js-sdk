@@ -83,17 +83,10 @@ function OlmDevice(sessionStore) {
     this._sessionStore = sessionStore;
     this._pickleKey = "DEFAULT_KEY";
 
-    let e2eKeys;
-    const account = new Olm.Account();
-    try {
-        _initialise_account(this._sessionStore, this._pickleKey, account);
-        e2eKeys = JSON.parse(account.identity_keys());
-    } finally {
-        account.free();
-    }
-
-    this.deviceCurve25519Key = e2eKeys.curve25519;
-    this.deviceEd25519Key = e2eKeys.ed25519;
+    // don't know these until we load the account from storage in init()
+    this.deviceCurve25519Key = null;
+    this.deviceEd25519Key = null;
+    this._maxOneTimeKeys = null;
 
     // we don't bother stashing outboundgroupsessions in the sessionstore -
     // instead we keep them here.
@@ -111,6 +104,32 @@ function OlmDevice(sessionStore) {
     // Values are true.
     this._inboundGroupSessionMessageIndexes = {};
 }
+
+/**
+ * Initialise the OlmAccount. This must be called before any other operations
+ * on the OlmDevice.
+ *
+ * Attempts to load the OlmAccount from localStorage, or creates one if none is
+ * found.
+ *
+ * Reads the device keys from the OlmAccount object.
+ */
+OlmDevice.prototype.init = async function() {
+    let e2eKeys;
+    const account = new Olm.Account();
+    try {
+        _initialise_account(this._sessionStore, this._pickleKey, account);
+        e2eKeys = JSON.parse(account.identity_keys());
+
+        this._maxOneTimeKeys = account.max_number_of_one_time_keys();
+    } finally {
+        account.free();
+    }
+
+    this.deviceCurve25519Key = e2eKeys.curve25519;
+    this.deviceEd25519Key = e2eKeys.ed25519;
+};
+
 
 function _initialise_account(sessionStore, pickleKey, account) {
     const e2eAccount = sessionStore.getEndToEndAccount();
@@ -222,9 +241,9 @@ OlmDevice.prototype._getUtility = function(func) {
  * Signs a message with the ed25519 key for this account.
  *
  * @param {string} message  message to be signed
- * @return {string} base64-encoded signature
+ * @return {Promise<string>} base64-encoded signature
  */
-OlmDevice.prototype.sign = function(message) {
+OlmDevice.prototype.sign = async function(message) {
     return this._getAccount(function(account) {
         return account.sign(message);
     });
@@ -237,7 +256,7 @@ OlmDevice.prototype.sign = function(message) {
  * <tt>curve25519</tt>, which is itself an object mapping key id to Curve25519
  * key.
  */
-OlmDevice.prototype.getOneTimeKeys = function() {
+OlmDevice.prototype.getOneTimeKeys = async function() {
     return this._getAccount(function(account) {
         return JSON.parse(account.one_time_keys());
     });
@@ -250,15 +269,13 @@ OlmDevice.prototype.getOneTimeKeys = function() {
  * @return {number} number of keys
  */
 OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
-    return this._getAccount(function(account) {
-        return account.max_number_of_one_time_keys();
-    });
+    return this._maxOneTimeKeys;
 };
 
 /**
  * Marks all of the one-time keys as published.
  */
-OlmDevice.prototype.markKeysAsPublished = function() {
+OlmDevice.prototype.markKeysAsPublished = async function() {
     const self = this;
     this._getAccount(function(account) {
         account.mark_keys_as_published();
@@ -271,7 +288,7 @@ OlmDevice.prototype.markKeysAsPublished = function() {
  *
  * @param {number} numKeys number of keys to generate
  */
-OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
+OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
     const self = this;
     this._getAccount(function(account) {
         account.generate_one_time_keys(numKeys);
@@ -288,7 +305,7 @@ OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
  * @param {string} theirOneTimeKey  remote user's one-time Curve25519 key
  * @return {string} sessionId for the outbound session.
  */
-OlmDevice.prototype.createOutboundSession = function(
+OlmDevice.prototype.createOutboundSession = async function(
     theirIdentityKey, theirOneTimeKey,
 ) {
     const self = this;
@@ -318,7 +335,7 @@ OlmDevice.prototype.createOutboundSession = function(
  * @raises {Error} if the received message was not valid (for instance, it
  *     didn't use a valid one-time key).
  */
-OlmDevice.prototype.createInboundSession = function(
+OlmDevice.prototype.createInboundSession = async function(
     theirDeviceIdentityKey, message_type, ciphertext,
 ) {
     if (message_type !== 0) {
@@ -353,9 +370,9 @@ OlmDevice.prototype.createInboundSession = function(
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
- * @return {string[]}  a list of known session ids for the device
+ * @return {Promise<string[]>}  a list of known session ids for the device
  */
-OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
+OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
     const sessions = this._sessionStore.getEndToEndSessions(
         theirDeviceIdentityKey,
     );
@@ -367,10 +384,10 @@ OlmDevice.prototype.getSessionIdsForDevice = function(theirDeviceIdentityKey) {
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
- * @return {string?}  session id, or null if no established session
+ * @return {Promise<?string>}  session id, or null if no established session
  */
-OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
-    const sessionIds = this.getSessionIdsForDevice(theirDeviceIdentityKey);
+OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
+    const sessionIds = await this.getSessionIdsForDevice(theirDeviceIdentityKey);
     if (sessionIds.length === 0) {
         return null;
     }
@@ -390,8 +407,8 @@ OlmDevice.prototype.getSessionIdForDevice = function(theirDeviceIdentityKey) {
  * @param {string} deviceIdentityKey Curve25519 identity key for the device
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
-    const sessionIds = this.getSessionIdsForDevice(deviceIdentityKey);
+OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) {
+    const sessionIds = await this.getSessionIdsForDevice(deviceIdentityKey);
     sessionIds.sort();
 
     const info = [];
@@ -419,9 +436,9 @@ OlmDevice.prototype.getSessionInfoForDevice = function(deviceIdentityKey) {
  * @param {string} sessionId  the id of the active session
  * @param {string} payloadString  payload to be encrypted and sent
  *
- * @return {string} ciphertext
+ * @return {Promise<string>} ciphertext
  */
-OlmDevice.prototype.encryptMessage = function(
+OlmDevice.prototype.encryptMessage = async function(
     theirDeviceIdentityKey, sessionId, payloadString,
 ) {
     const self = this;
@@ -444,9 +461,9 @@ OlmDevice.prototype.encryptMessage = function(
  * @param {number} message_type  message_type field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
- * @return {string} decrypted payload.
+ * @return {Promise<string>} decrypted payload.
  */
-OlmDevice.prototype.decryptMessage = function(
+OlmDevice.prototype.decryptMessage = async function(
     theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     const self = this;
@@ -468,10 +485,10 @@ OlmDevice.prototype.decryptMessage = function(
  * @param {number} message_type  message_type field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
- * @return {boolean} true if the received message is a prekey message which matches
+ * @return {Promise<boolean>} true if the received message is a prekey message which matches
  *    the given session.
  */
-OlmDevice.prototype.matchesSession = function(
+OlmDevice.prototype.matchesSession = async function(
     theirDeviceIdentityKey, sessionId, message_type, ciphertext,
 ) {
     if (message_type !== 0) {
@@ -669,7 +686,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
  * @param {boolean} exportFormat true if the megolm keys are in export format
  *    (ie, they lack an ed25519 signature)
  */
-OlmDevice.prototype.addInboundGroupSession = function(
+OlmDevice.prototype.addInboundGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
     sessionId, sessionKey, keysClaimed,
     exportFormat,
@@ -727,7 +744,7 @@ OlmDevice.prototype.addInboundGroupSession = function(
  *
  * @param {module:crypto/OlmDevice.MegolmSessionData} data  session data
  */
-OlmDevice.prototype.importInboundGroupSession = function(data) {
+OlmDevice.prototype.importInboundGroupSession = async function(data) {
     /* if we already have this session, consider updating it */
     function updateSession(session, sessionData) {
         console.log("Update for megolm session " + data.sender_key + "|" +
@@ -780,11 +797,11 @@ OlmDevice.prototype.importInboundGroupSession = function(data) {
  *
  * @return {null} the sessionId is unknown
  *
- * @return {{result: string, senderKey: string,
+ * @return {Promise<{result: string, senderKey: string,
  *    forwardingCurve25519KeyChain: Array<string>,
- *    keysClaimed: Object<string, string>}}
+ *    keysClaimed: Object<string, string>}>}
  */
-OlmDevice.prototype.decryptGroupMessage = function(
+OlmDevice.prototype.decryptGroupMessage = async function(
     roomId, senderKey, sessionId, body,
 ) {
     const self = this;
@@ -832,9 +849,9 @@ OlmDevice.prototype.decryptGroupMessage = function(
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {sring} sessionId session identifier
  *
- * @returns {boolean} true if we have the keys to this session
+ * @returns {Promise<boolean>} true if we have the keys to this session
  */
-OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionId) {
+OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(
         senderKey, sessionId,
     );
@@ -863,14 +880,16 @@ OlmDevice.prototype.hasInboundSessionKeys = function(roomId, senderKey, sessionI
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
  *
- * @returns {{chain_index: number, key: string,
+ * @returns {Promise<{chain_index: number, key: string,
  *        forwarding_curve25519_key_chain: Array<string>,
  *        sender_claimed_ed25519_key: string
- *    }}
+ *    }>}
  *    details of the session key. The key is a base64-encoded megolm key in
  *    export format.
  */
-OlmDevice.prototype.getInboundGroupSessionKey = function(roomId, senderKey, sessionId) {
+OlmDevice.prototype.getInboundGroupSessionKey = async function(
+    roomId, senderKey, sessionId,
+) {
     function getKey(session, sessionData) {
         const messageIndex = session.first_known_index();
 
@@ -896,9 +915,9 @@ OlmDevice.prototype.getInboundGroupSessionKey = function(roomId, senderKey, sess
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
- * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
+ * @return {Promise<module:crypto/OlmDevice.MegolmSessionData>} exported session data
  */
-OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId) {
+OlmDevice.prototype.exportInboundGroupSession = async function(senderKey, sessionId) {
     const s = this._sessionStore.getEndToEndInboundGroupSession(
         senderKey, sessionId,
     );

@@ -413,6 +413,16 @@ MatrixBaseApis.prototype.getGroupSummary = function(groupId) {
 
 /**
  * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group profile object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupProfile = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/profile", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {string} groupId
  * @param {Object} profile The group profile object
  * @param {string=} profile.name Name of the group
  * @param {string=} profile.avatar_url MXC avatar URL
@@ -439,6 +449,60 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
 };
 
 /**
+ * @param {string} groupId
+ * @param {string} userId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.inviteUserToGroup = function(groupId, userId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/users/invite/$userId",
+        {$groupId: groupId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} userId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeUserFromGroup = function(groupId, userId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/users/remove/$userId",
+        {$groupId: groupId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.acceptGroupInvite = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/accept_invite",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.leaveGroup = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/leave",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
  * @return {module:client.Promise} Resolves: The groups to which the user is joined
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
@@ -458,6 +522,26 @@ MatrixBaseApis.prototype.createGroup = function(content) {
     const path = utils.encodeUri("/create_group");
     return this._http.authedRequest(
         undefined, "POST", path, undefined, content,
+    );
+};
+
+/**
+ * @param {string[]} userIds List of user IDs
+ * @return {module:client.Promise} Resolves: Object as exmaple below
+ *
+ *     {
+ *         "users": {
+ *             "@bob:example.com": {
+ *                 "+example:example.com"
+ *             }
+ *         }
+ *     }
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
+    const path = utils.encodeUri("/publicised_groups");
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, { user_ids: userIds },
     );
 };
 

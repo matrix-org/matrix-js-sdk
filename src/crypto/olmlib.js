@@ -58,7 +58,7 @@ module.exports.encryptMessageForDevice = async function(
     payloadFields,
 ) {
     const deviceKey = recipientDevice.getIdentityKey();
-    const sessionId = olmDevice.getSessionIdForDevice(deviceKey);
+    const sessionId = await olmDevice.getSessionIdForDevice(deviceKey);
     if (sessionId === null) {
         // If we don't have a session for a device then
         // we can't encrypt a message for it.
@@ -102,7 +102,7 @@ module.exports.encryptMessageForDevice = async function(
 
     utils.extend(payload, payloadFields);
 
-    resultsObject[deviceKey] = olmDevice.encryptMessage(
+    resultsObject[deviceKey] = await olmDevice.encryptMessage(
         deviceKey, sessionId, JSON.stringify(payload),
     );
 };
@@ -139,7 +139,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
-            const sessionId = olmDevice.getSessionIdForDevice(key);
+            const sessionId = await olmDevice.getSessionIdForDevice(key);
             if (sessionId === null) {
                 devicesWithoutSession.push([userId, deviceId]);
             }
@@ -228,7 +228,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
 
     let sid;
     try {
-        sid = olmDevice.createOutboundSession(
+        sid = await olmDevice.createOutboundSession(
             deviceInfo.getIdentityKey(), oneTimeKey.key,
         );
     } catch (e) {
