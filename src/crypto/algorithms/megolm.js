@@ -270,16 +270,165 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
  *
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
+ * @param {object<userId, deviceId>} devicemap
+ *   mapping from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ *
+ * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
+ *    map from userid to list of devices
+ *
+ * @return {array<object<userid, deviceInfo>>}
+ */
+MegolmEncryption.prototype._splitUserDeviceMap = function(
+    session, devicemap, devicesByUser,
+) {
+    const maxToDeviceMessagesPerRequest = 20;
+
+    // use an array where the slices of a content map gets stored
+    const contentMaps = [];
+    let maxContentMapId = 0; // start inserting in the first contentMap
+    let currentToDeviceId = 0;
+
+    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
+
+    for (const userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
+        const devicesToShareWith = devicesByUser[userId];
+        const sessionResults = devicemap[userId];
+
+        for (let i = 0; i < devicesToShareWith.length; i++) {
+            const deviceInfo = devicesToShareWith[i];
+            const deviceId = deviceInfo.deviceId;
+
+            const sessionResult = sessionResults[deviceId];
+            if (!sessionResult.sessionId) {
+                // no session with this device, probably because there
+                // were no one-time keys.
+                //
+                // we could send them a to_device message anyway, as a
+                // signal that they have missed out on the key sharing
+                // message because of the lack of keys, but there's not
+                // much point in that really; it will mostly serve to clog
+                // up to_device inboxes.
+
+                // mark this device as "handled" because we don't want to try
+                // to claim a one-time-key for dead devices on every message.
+                session.markSharedWithDevice(userId, deviceId, key.chain_index);
+
+                // ensureOlmSessionsForUsers has already done the logging,
+                // so just skip it.
+                continue;
+            }
+
+            console.log(
+                "share keys with device " + userId + ":" + deviceId,
+            );
+
+            if (currentToDeviceId > maxToDeviceMessagesPerRequest) {
+                // the first slice is filled up. Start inserting into the next slice
+                currentToDeviceId = 0;
+                maxContentMapId++;
+            }
+            if (!contentMaps[maxContentMapId]) {
+                contentMaps[maxContentMapId] = [{
+                    userId: userId,
+                    deviceInfo: deviceInfo,
+                }];
+            } else {
+                contentMaps[maxContentMapId].push({
+                    userId: userId,
+                    deviceInfo: deviceInfo,
+                });
+            }
+            currentToDeviceId++;
+        }
+    }
+    return contentMaps;
+};
+
+/**
+ * @private
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {object<userId, deviceInfo>} userDeviceMap
+ *   mapping from userId to deviceInfo TODO
+ *
+ * @param {object} payload fields to include in the encrypted payload
+ *
+ * @return {module:client.Promise} Promise which resolves once the key sharing
+ *     for the given userDeviceMap is generated and has been sent.
+ */
+MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
+    session, userDeviceMap, payload,
+) {
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
+
+    const contentMap = {};
+
+    const promises = [];
+    for (let i = 0; i < userDeviceMap.length; i++) {
+        const val = userDeviceMap[i];
+        const userId = val.userId;
+        const deviceInfo = val.deviceInfo;
+        const deviceId = deviceInfo.deviceId;
+
+        if (!contentMap[userId]) {
+            contentMap[userId] = {};
+        }
+        contentMap[userId][deviceId] = encryptedContent;
+
+        promises.push(
+            olmlib.encryptMessageForDevice(
+                encryptedContent.ciphertext,
+                this._userId,
+                this._deviceId,
+                this._olmDevice,
+                userId,
+                deviceInfo,
+                payload,
+            ),
+        );
+    }
+
+    return Promise.all(promises).then(() => {
+        return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
+            // store that we successfully uploaded the keys of the current slice
+            for (const userId in contentMap) {
+                if (!contentMap.hasOwnProperty(userId)) {
+                    continue;
+                }
+                for (const deviceId in contentMap[userId]) {
+                    if (!contentMap[userId].hasOwnProperty(deviceId)) {
+                        continue;
+                    }
+                    session.markSharedWithDevice(
+                        userId, deviceId, key.chain_index,
+                    );
+                }
+            }
+        });
+    });
+};
+
+/**
+ * @private
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices
  *
  * @return {module:client.Promise} Promise which resolves once the key sharing
  *     message has been sent.
  */
-MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUser) {
-    const self = this;
-    const maxToDeviceMessagesPerRequest = 20;
-
+MegolmEncryption.prototype._shareKeyWithDevices = async function(session, devicesByUser) {
     const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
     const payload = {
         type: "m.room_key",
@@ -292,128 +441,34 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         },
     };
 
-    // use an array where the slices of a content map gets stored
-    const contentMaps = [];
-    let maxContentMapId = 0; // start inserting in the first contentMap
-    let currentToDeviceId = 0;
-
-    return olmlib.ensureOlmSessionsForDevices(
+    const devicemap = await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
-    ).then(function(devicemap) {
-        const promises = [];
+    );
 
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
-                continue;
-            }
-            const devicesToShareWith = devicesByUser[userId];
-            const sessionResults = devicemap[userId];
+    const userDeviceMaps = this._splitUserDeviceMap(
+        session, devicemap, devicesByUser,
+    );
 
-            for (let i = 0; i < devicesToShareWith.length; i++) {
-                const deviceInfo = devicesToShareWith[i];
-                const deviceId = deviceInfo.deviceId;
+    if (userDeviceMaps.length == 0) {
+        // no devices to send to
+        return;
+    }
 
-                const sessionResult = sessionResults[deviceId];
-                if (!sessionResult.sessionId) {
-                    // no session with this device, probably because there
-                    // were no one-time keys.
-                    //
-                    // we could send them a to_device message anyway, as a
-                    // signal that they have missed out on the key sharing
-                    // message because of the lack of keys, but there's not
-                    // much point in that really; it will mostly serve to clog
-                    // up to_device inboxes.
+    for (let i = 0; i < userDeviceMaps.length; i++) {
+        await this._encryptAndSendKeysToDevices(
+            session, userDeviceMaps[i], payload,
+        ).then(() => {
+            console.log(`Uploaded megolm keys in ${this._roomId} `
+                + `(slice ${i + 1}/${userDeviceMaps.length})`);
+        }).catch((e) => {
+            console.log(`Upload for megolm keys in ${this._roomId} `
+            + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
-                    // mark this device as "handled" because we don't want to try
-                    // to claim a one-time-key for dead devices on every message.
-                    session.markSharedWithDevice(userId, deviceId, key.chain_index);
-
-                    // ensureOlmSessionsForUsers has already done the logging,
-                    // so just skip it.
-                    continue;
-                }
-
-                console.log(
-                    "sharing keys with device " + userId + ":" + deviceId,
-                );
-
-                const encryptedContent = {
-                    algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: self._olmDevice.deviceCurve25519Key,
-                    ciphertext: {},
-                };
-
-                if (currentToDeviceId > maxToDeviceMessagesPerRequest) {
-                    // the first slice is filled up. Start inserting into the next slice
-                    currentToDeviceId = 0;
-                    maxContentMapId++;
-                }
-                if (!contentMaps[maxContentMapId]) {
-                    contentMaps[maxContentMapId] = {};
-                }
-                if (!contentMaps[maxContentMapId][userId]) {
-                    contentMaps[maxContentMapId][userId] = {};
-                }
-
-                contentMaps[maxContentMapId][userId][deviceId] = encryptedContent;
-                currentToDeviceId++;
-
-                promises.push(
-                    olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        self._userId,
-                        self._deviceId,
-                        self._olmDevice,
-                        userId,
-                        deviceInfo,
-                        payload,
-                    ),
-                );
-            }
-        }
-
-        if (promises.length === 0) {
-            // no devices to send to
-            return Promise.resolve();
-        }
-
-        // This loop iterates through all slices and sends them slice by slice
-        function sendToDeviceLoop(slice) {
-            if (slice > maxContentMapId) {
-                // root of recursion. All slices got send => return success
-                return Promise.resolve();
-            }
-            const contentMap = contentMaps[slice];
-            return self._baseApis.sendToDevice("m.room.encrypted", contentMap)
-                .then(() => {
-                    console.log(`Uploaded megolm keys in ${self._roomId} `
-                        + `(slice ${slice}/${maxContentMapId})`);
-
-                    // store that we successfully uploaded the keys of the current slice
-                    for (const userId in contentMap) {
-                        if (!contentMap.hasOwnProperty(userId)) {
-                            continue;
-                        }
-                        for (const deviceId in contentMap[userId]) {
-                            if (!contentMap[userId].hasOwnProperty(deviceId)) {
-                                continue;
-                            }
-                            session.markSharedWithDevice(
-                                userId, deviceId, key.chain_index,
-                            );
-                        }
-                    }
-                    // send the next slice
-                    return sendToDeviceLoop(slice + 1);
-                });
-        }
-        return Promise.all(promises).then(() => {
-            // TODO: retries
-            return sendToDeviceLoop(0);
+            Promise.reject(e);
         });
-    }).then(() => {
-        console.log(`Completed megolm keyshare in ${self._roomId}`);
-    });
+    }
+
+    console.log(`Completed megolm keyshare in ${this._roomId}`);
 };
 
 /**
