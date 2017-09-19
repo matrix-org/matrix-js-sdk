@@ -424,9 +424,6 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices
- *
- * @return {module:client.Promise} Promise which resolves once the key sharing
- *     message has been sent.
  */
 MegolmEncryption.prototype._shareKeyWithDevices = async function(session, devicesByUser) {
     const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
