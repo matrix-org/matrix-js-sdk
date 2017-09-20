@@ -270,6 +270,8 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
  *
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
+ * @param {number} chainIndex current chain index
+ *
  * @param {object<userId, deviceId>} devicemap
  *   mapping from userId to deviceId to {@link module:crypto~OlmSessionResult}
  *
@@ -279,21 +281,17 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
  * @return {array<object<userid, deviceInfo>>}
  */
 MegolmEncryption.prototype._splitUserDeviceMap = function(
-    session, devicemap, devicesByUser,
+    session, chainIndex, devicemap, devicesByUser,
 ) {
     const maxToDeviceMessagesPerRequest = 20;
 
     // use an array where the slices of a content map gets stored
-    const contentMaps = [];
-    let maxContentMapId = 0; // start inserting in the first contentMap
-    let currentToDeviceId = 0;
+    const mapSlices = [];
+    let currentSliceId = 0; // start inserting in the first slice
+    let entriesInCurrentSlice = 0;
 
-    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
-
-    for (const userId in devicesByUser) {
-        if (!devicesByUser.hasOwnProperty(userId)) {
-            continue;
-        }
+    for (let j = 0, userIds = Object.keys(devicesByUser); j < userIds.length; j++) {
+        const userId = userIds[j];
         const devicesToShareWith = devicesByUser[userId];
         const sessionResults = devicemap[userId];
 
@@ -314,7 +312,7 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
 
                 // mark this device as "handled" because we don't want to try
                 // to claim a one-time-key for dead devices on every message.
-                session.markSharedWithDevice(userId, deviceId, key.chain_index);
+                session.markSharedWithDevice(userId, deviceId, chainIndex);
 
                 // ensureOlmSessionsForUsers has already done the logging,
                 // so just skip it.
@@ -325,26 +323,24 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
                 "share keys with device " + userId + ":" + deviceId,
             );
 
-            if (currentToDeviceId > maxToDeviceMessagesPerRequest) {
-                // the first slice is filled up. Start inserting into the next slice
-                currentToDeviceId = 0;
-                maxContentMapId++;
+            if (entriesInCurrentSlice > maxToDeviceMessagesPerRequest) {
+                // the current slice is filled up. Start inserting into the next slice
+                entriesInCurrentSlice = 0;
+                currentSliceId++;
             }
-            if (!contentMaps[maxContentMapId]) {
-                contentMaps[maxContentMapId] = [{
-                    userId: userId,
-                    deviceInfo: deviceInfo,
-                }];
-            } else {
-                contentMaps[maxContentMapId].push({
-                    userId: userId,
-                    deviceInfo: deviceInfo,
-                });
+            if (!mapSlices[currentSliceId]) {
+                mapSlices[currentSliceId] = [];
             }
-            currentToDeviceId++;
+
+            mapSlices[currentSliceId].push({
+                userId: userId,
+                deviceInfo: deviceInfo,
+            });
+
+            entriesInCurrentSlice++;
         }
     }
-    return contentMaps;
+    return mapSlices;
 };
 
 /**
@@ -352,8 +348,10 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
  *
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
+ * @param {number} chainIndex current chain index
+ *
  * @param {object<userId, deviceInfo>} userDeviceMap
- *   mapping from userId to deviceInfo TODO
+ *   mapping from userId to deviceInfo
  *
  * @param {object} payload fields to include in the encrypted payload
  *
@@ -361,15 +359,13 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
  *     for the given userDeviceMap is generated and has been sent.
  */
 MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
-    session, userDeviceMap, payload,
+    session, chainIndex, userDeviceMap, payload,
 ) {
     const encryptedContent = {
         algorithm: olmlib.OLM_ALGORITHM,
         sender_key: this._olmDevice.deviceCurve25519Key,
         ciphertext: {},
     };
-    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
-
     const contentMap = {};
 
     const promises = [];
@@ -400,16 +396,12 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     return Promise.all(promises).then(() => {
         return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            for (const userId in contentMap) {
-                if (!contentMap.hasOwnProperty(userId)) {
-                    continue;
-                }
-                for (const deviceId in contentMap[userId]) {
-                    if (!contentMap[userId].hasOwnProperty(deviceId)) {
-                        continue;
-                    }
+            const userIds = Object.keys(contentMap);
+            for (let i = 0; i < userIds.length; i++) {
+                const deviceIds = Object.keys(contentMap[userIds[i]]);
+                for (let j = 0; j < deviceIds.length; j++) {
                     session.markSharedWithDevice(
-                        userId, deviceId, key.chain_index,
+                        userIds[i], deviceIds[j], chainIndex,
                     );
                 }
             }
@@ -443,29 +435,23 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
     );
 
     const userDeviceMaps = this._splitUserDeviceMap(
-        session, devicemap, devicesByUser,
+        session, key.chain_index, devicemap, devicesByUser,
     );
 
-    if (userDeviceMaps.length == 0) {
-        // no devices to send to
-        return;
-    }
-
     for (let i = 0; i < userDeviceMaps.length; i++) {
-        await this._encryptAndSendKeysToDevices(
-            session, userDeviceMaps[i], payload,
-        ).then(() => {
-            console.log(`Uploaded megolm keys in ${this._roomId} `
+        try {
+            await this._encryptAndSendKeysToDevices(
+                session, key.chain_index, userDeviceMaps[i], payload,
+            );
+            console.log(`Completed megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length})`);
-        }).catch((e) => {
-            console.log(`Upload for megolm keys in ${this._roomId} `
-            + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
+        } catch (e) {
+            console.log(`Completed megolm keyshare in ${this._roomId} `
+                + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
-            Promise.reject(e);
-        });
+            throw e;
+        }
     }
-
-    console.log(`Completed megolm keyshare in ${this._roomId}`);
 };
 
 /**
