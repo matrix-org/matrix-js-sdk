@@ -446,7 +446,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
             console.log(`Completed megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length})`);
         } catch (e) {
-            console.log(`Completed megolm keyshare in ${this._roomId} `
+            console.log(`megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
             throw e;
