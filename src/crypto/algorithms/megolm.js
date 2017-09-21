@@ -522,7 +522,7 @@ function MegolmDecryption(params) {
     base.DecryptionAlgorithm.call(this, params);
 
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
-    // senderKey|sessionId to list of MatrixEvents
+    // senderKey|sessionId to Set of MatrixEvents
     this._pendingEvents = {};
 
     // this gets stubbed out by the unit tests.
@@ -549,6 +549,13 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         throw new base.DecryptionError("Missing fields in input");
     }
 
+    // we add the event to the pending list *before* we start decryption.
+    //
+    // then, if the key turns up while decryption is in progress (and
+    // decryption fails), we will schedule a retry.
+    // (fixes https://github.com/vector-im/riot-web/issues/5001)
+    this._addEventToPendingList(event);
+
     let res;
     try {
         res = await this._olmDevice.decryptGroupMessage(
@@ -556,7 +563,6 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         );
     } catch (e) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
-            this._addEventToPendingList(event);
             this._requestKeysForEvent(event);
         }
         throw new base.DecryptionError(
@@ -568,7 +574,12 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
 
     if (res === null) {
         // We've got a message for a session we don't have.
-        this._addEventToPendingList(event);
+        //
+        // (XXX: We might actually have received this key since we started
+        // decrypting, in which case we'll have scheduled a retry, and this
+        // request will be redundant. We could probably check to see if the
+        // event is still in the pending list; if not, a retry will have been
+        // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
         throw new base.DecryptionError(
             "The sender's device has not sent us the keys for this message.",
@@ -577,6 +588,10 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             },
         );
     }
+
+    // success. We can remove the event from the pending list, if that hasn't
+    // already happened.
+    this._removeEventFromPendingList(event);
 
     const payload = JSON.parse(res.result);
 
@@ -621,8 +636,7 @@ MegolmDecryption.prototype._requestKeysForEvent = function(event) {
 };
 
 /**
- * Add an event to the list of those we couldn't decrypt the first time we
- * saw them.
+ * Add an event to the list of those awaiting their session keys.
  *
  * @private
  *
@@ -632,10 +646,31 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
     const content = event.getWireContent();
     const k = content.sender_key + "|" + content.session_id;
     if (!this._pendingEvents[k]) {
-        this._pendingEvents[k] = [];
+        this._pendingEvents[k] = new Set();
     }
-    this._pendingEvents[k].push(event);
+    this._pendingEvents[k].add(event);
 };
+
+/**
+ * Remove an event from the list of those awaiting their session keys.
+ *
+ * @private
+ *
+ * @param {module:models/event.MatrixEvent} event
+ */
+MegolmDecryption.prototype._removeEventFromPendingList = function(event) {
+    const content = event.getWireContent();
+    const k = content.sender_key + "|" + content.session_id;
+    if (!this._pendingEvents[k]) {
+        return;
+    }
+
+    this._pendingEvents[k].delete(event);
+    if (this._pendingEvents[k].size === 0) {
+        delete this._pendingEvents[k];
+    }
+};
+
 
 /**
  * @inheritdoc
@@ -841,8 +876,8 @@ MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
 
     delete this._pendingEvents[k];
 
-    for (let i = 0; i < pending.length; i++) {
-        pending[i].attemptDecryption(this._crypto);
+    for (const ev of pending) {
+        ev.attemptDecryption(this._crypto);
     }
 };
 
