@@ -290,8 +290,7 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
     let currentSliceId = 0; // start inserting in the first slice
     let entriesInCurrentSlice = 0;
 
-    for (let j = 0, userIds = Object.keys(devicesByUser); j < userIds.length; j++) {
-        const userId = userIds[j];
+    for (const userId of Object.keys(devicesByUser)) {
         const devicesToShareWith = devicesByUser[userId];
         const sessionResults = devicemap[userId];
 
@@ -396,12 +395,10 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     return Promise.all(promises).then(() => {
         return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            const userIds = Object.keys(contentMap);
-            for (let i = 0; i < userIds.length; i++) {
-                const deviceIds = Object.keys(contentMap[userIds[i]]);
-                for (let j = 0; j < deviceIds.length; j++) {
+            for (const userId in Object.keys(contentMap)) {
+                for (const deviceId of Object.keys(contentMap[userId])) {
                     session.markSharedWithDevice(
-                        userIds[i], deviceIds[j], chainIndex,
+                        userId, deviceId, chainIndex,
                     );
                 }
             }
