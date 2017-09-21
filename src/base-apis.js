@@ -450,6 +450,16 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
 
 /**
  * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group rooms list object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupRooms = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/rooms", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {string} groupId
  * @param {string} userId
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -489,6 +499,23 @@ MatrixBaseApis.prototype.addUserToGroupSummary = function(groupId, userId, roleI
             "/groups/$groupId/summary/$roleId/users/$userId" :
             "/groups/$groupId/summary/users/$userId",
         {$groupId: groupId, $roleId: roleId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @param {string} categoryId Optional.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addRoomToGroupSummary = function(groupId, roomId, categoryId) {
+    const path = utils.encodeUri(
+        categoryId ?
+            "/groups/$groupId/summary/$categoryId/rooms/$roomId" :
+            "/groups/$groupId/summary/rooms/$roomId",
+        {$groupId: groupId, $categoryId: categoryId, $roomId: roomId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
