@@ -395,7 +395,7 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     return Promise.all(promises).then(() => {
         return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            for (const userId in Object.keys(contentMap)) {
+            for (const userId of Object.keys(contentMap)) {
                 for (const deviceId of Object.keys(contentMap[userId])) {
                     session.markSharedWithDevice(
                         userId, deviceId, chainIndex,
