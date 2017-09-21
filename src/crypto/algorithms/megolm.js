@@ -652,7 +652,7 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
 };
 
 /**
- * Remove an event to the list of those awaiting their session keys.
+ * Remove an event from the list of those awaiting their session keys.
  *
  * @private
  *
