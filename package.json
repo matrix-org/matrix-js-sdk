@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -11,11 +11,12 @@
     "check": "npm run test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel --no-babelrc -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
     "start": "babel -s -w -d lib src",
+    "clean": "rimraf lib dist",
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 109 src spec",
-    "prepublish": "npm run build && git rev-parse HEAD > git-revision.txt"
+    "prepublish": "npm run clean && npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
     "url": "https://github.com/matrix-org/matrix-js-sdk"
