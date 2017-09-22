@@ -505,6 +505,20 @@ MatrixBaseApis.prototype.addUserToGroupSummary = function(groupId, userId, roleI
 
 /**
  * @param {string} groupId
+ * @param {string} userId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeUserFromGroupSummary = function(groupId, userId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/summary/users/$userId",
+        {$groupId: groupId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
  * @param {string} roomId
  * @param {string} categoryId Optional.
  * @return {module:client.Promise} Resolves: Empty object
@@ -518,6 +532,20 @@ MatrixBaseApis.prototype.addRoomToGroupSummary = function(groupId, roomId, categ
         {$groupId: groupId, $categoryId: categoryId, $roomId: roomId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/summary/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
 };
 
 /**
