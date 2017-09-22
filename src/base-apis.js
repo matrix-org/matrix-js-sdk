@@ -628,7 +628,9 @@ MatrixBaseApis.prototype.setGroupPublicity = function(groupId, publicity) {
         "/groups/$groupId/self/update_publicity",
         {$groupId: groupId},
     );
-    return this._http.authedRequest(undefined, "PUT", path, undefined, {publicise: publicity});
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {
+        publicise: publicity
+    });
 };
 
 /**
