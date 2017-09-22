@@ -131,6 +131,7 @@ SyncApi.prototype.createGroup = function(groupId) {
     const client = this.client;
     const group = new Group(groupId);
     client.reEmitter.reEmit(group, ["Group.profile", "Group.myMembership"]);
+    client.store.storeGroup(group);
     return group;
 };
 
@@ -1128,6 +1129,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
 SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) {
     // Processes entries from 'groups' section of the sync stream
     for (const groupId of Object.keys(groupsSection)) {
+        console.log("got "+groupId+" in "+sectionName+" section");
         const groupInfo = groupsSection[groupId];
         let group = this.client.store.getGroup(groupId);
         const isBrandNew = group === null;
@@ -1144,7 +1146,7 @@ SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) 
         }
         group.setMyMembership(sectionName);
         if (isBrandNew) {
-            this.client.store.storeGroup(group);
+            // Now we've filled in all the fields, emit the Group event
             this.client.emit("Group", group);
         }
     }
