@@ -623,13 +623,13 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.setGroupPublicity = function(groupId, publicity) {
+MatrixBaseApis.prototype.setGroupPublicity = function(groupId, isPublic) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/update_publicity",
         {$groupId: groupId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {
-        publicise: publicity,
+        publicise: isPublic,
     });
 };
 
