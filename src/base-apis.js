@@ -629,7 +629,7 @@ MatrixBaseApis.prototype.setGroupPublicity = function(groupId, publicity) {
         {$groupId: groupId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {
-        publicise: publicity
+        publicise: publicity,
     });
 };
 
