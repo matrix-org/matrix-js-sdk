@@ -619,7 +619,7 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
 
 /**
  * @param {string} groupId
- * @param {bool} publicity Whether the user's mebership of this group is made public
+ * @param {bool} isPublic Whether the user's mebership of this group is made public
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
