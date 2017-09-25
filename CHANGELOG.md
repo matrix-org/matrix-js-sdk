@@ -1,3 +1,38 @@
+Changes in [0.8.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.4) (2017-09-21)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.3...v0.8.4)
+
+ * Fix build issue
+
+Changes in [0.8.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.3) (2017-09-20)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.3-rc.1...v0.8.3)
+
+ * No changes
+
+Changes in [0.8.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.3-rc.1) (2017-09-19)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.2...v0.8.3-rc.1)
+
+ * consume trailing slash when creating Matrix Client in HS and IS urls
+   [\#526](https://github.com/matrix-org/matrix-js-sdk/pull/526)
+ * Add ignore users API
+   [\#539](https://github.com/matrix-org/matrix-js-sdk/pull/539)
+ * Upgrade to jsdoc 3.5.5
+   [\#540](https://github.com/matrix-org/matrix-js-sdk/pull/540)
+ * Make re-emitting events much more memory efficient
+   [\#538](https://github.com/matrix-org/matrix-js-sdk/pull/538)
+ * Only re-emit events from Event objects if needed
+   [\#536](https://github.com/matrix-org/matrix-js-sdk/pull/536)
+ * Handle 'left' users in the deviceList mananagement
+   [\#535](https://github.com/matrix-org/matrix-js-sdk/pull/535)
+ * Factor out devicelist integration tests to a separate file
+   [\#534](https://github.com/matrix-org/matrix-js-sdk/pull/534)
+ * Refactor sync._sync as an async function
+   [\#533](https://github.com/matrix-org/matrix-js-sdk/pull/533)
+ * Add es6 to eslint environments
+   [\#532](https://github.com/matrix-org/matrix-js-sdk/pull/532)
+
 Changes in [0.8.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.2) (2017-08-24)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.1...v0.8.2)

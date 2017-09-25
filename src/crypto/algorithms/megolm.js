@@ -74,6 +74,14 @@ OutboundSessionInfo.prototype.needsRotation = function(
     return false;
 };
 
+OutboundSessionInfo.prototype.markSharedWithDevice = function(
+    userId, deviceId, chainIndex,
+) {
+    if (!this.sharedWithDevices[userId]) {
+        this.sharedWithDevices[userId] = {};
+    }
+    this.sharedWithDevices[userId][deviceId] = chainIndex;
+};
 
 /**
  * Determine if this session has been shared with devices which it shouldn't
@@ -262,15 +270,151 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
  *
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
+ * @param {number} chainIndex current chain index
+ *
+ * @param {object<userId, deviceId>} devicemap
+ *   mapping from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices
  *
- * @return {module:client.Promise} Promise which resolves once the key sharing
- *     message has been sent.
+ * @return {array<object<userid, deviceInfo>>}
  */
-MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUser) {
-    const self = this;
+MegolmEncryption.prototype._splitUserDeviceMap = function(
+    session, chainIndex, devicemap, devicesByUser,
+) {
+    const maxToDeviceMessagesPerRequest = 20;
 
+    // use an array where the slices of a content map gets stored
+    const mapSlices = [];
+    let currentSliceId = 0; // start inserting in the first slice
+    let entriesInCurrentSlice = 0;
+
+    for (const userId of Object.keys(devicesByUser)) {
+        const devicesToShareWith = devicesByUser[userId];
+        const sessionResults = devicemap[userId];
+
+        for (let i = 0; i < devicesToShareWith.length; i++) {
+            const deviceInfo = devicesToShareWith[i];
+            const deviceId = deviceInfo.deviceId;
+
+            const sessionResult = sessionResults[deviceId];
+            if (!sessionResult.sessionId) {
+                // no session with this device, probably because there
+                // were no one-time keys.
+                //
+                // we could send them a to_device message anyway, as a
+                // signal that they have missed out on the key sharing
+                // message because of the lack of keys, but there's not
+                // much point in that really; it will mostly serve to clog
+                // up to_device inboxes.
+
+                // mark this device as "handled" because we don't want to try
+                // to claim a one-time-key for dead devices on every message.
+                session.markSharedWithDevice(userId, deviceId, chainIndex);
+
+                // ensureOlmSessionsForUsers has already done the logging,
+                // so just skip it.
+                continue;
+            }
+
+            console.log(
+                "share keys with device " + userId + ":" + deviceId,
+            );
+
+            if (entriesInCurrentSlice > maxToDeviceMessagesPerRequest) {
+                // the current slice is filled up. Start inserting into the next slice
+                entriesInCurrentSlice = 0;
+                currentSliceId++;
+            }
+            if (!mapSlices[currentSliceId]) {
+                mapSlices[currentSliceId] = [];
+            }
+
+            mapSlices[currentSliceId].push({
+                userId: userId,
+                deviceInfo: deviceInfo,
+            });
+
+            entriesInCurrentSlice++;
+        }
+    }
+    return mapSlices;
+};
+
+/**
+ * @private
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {number} chainIndex current chain index
+ *
+ * @param {object<userId, deviceInfo>} userDeviceMap
+ *   mapping from userId to deviceInfo
+ *
+ * @param {object} payload fields to include in the encrypted payload
+ *
+ * @return {module:client.Promise} Promise which resolves once the key sharing
+ *     for the given userDeviceMap is generated and has been sent.
+ */
+MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
+    session, chainIndex, userDeviceMap, payload,
+) {
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    const contentMap = {};
+
+    const promises = [];
+    for (let i = 0; i < userDeviceMap.length; i++) {
+        const val = userDeviceMap[i];
+        const userId = val.userId;
+        const deviceInfo = val.deviceInfo;
+        const deviceId = deviceInfo.deviceId;
+
+        if (!contentMap[userId]) {
+            contentMap[userId] = {};
+        }
+        contentMap[userId][deviceId] = encryptedContent;
+
+        promises.push(
+            olmlib.encryptMessageForDevice(
+                encryptedContent.ciphertext,
+                this._userId,
+                this._deviceId,
+                this._olmDevice,
+                userId,
+                deviceInfo,
+                payload,
+            ),
+        );
+    }
+
+    return Promise.all(promises).then(() => {
+        return this._baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
+            // store that we successfully uploaded the keys of the current slice
+            for (const userId of Object.keys(contentMap)) {
+                for (const deviceId of Object.keys(contentMap[userId])) {
+                    session.markSharedWithDevice(
+                        userId, deviceId, chainIndex,
+                    );
+                }
+            }
+        });
+    });
+};
+
+/**
+ * @private
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
+ *    map from userid to list of devices
+ */
+MegolmEncryption.prototype._shareKeyWithDevices = async function(session, devicesByUser) {
     const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
     const payload = {
         type: "m.room_key",
@@ -283,104 +427,28 @@ MegolmEncryption.prototype._shareKeyWithDevices = function(session, devicesByUse
         },
     };
 
-    const contentMap = {};
-
-    return olmlib.ensureOlmSessionsForDevices(
+    const devicemap = await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser,
-    ).then(function(devicemap) {
-        const promises = [];
+    );
 
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
-                continue;
-            }
+    const userDeviceMaps = this._splitUserDeviceMap(
+        session, key.chain_index, devicemap, devicesByUser,
+    );
 
-            const devicesToShareWith = devicesByUser[userId];
-            const sessionResults = devicemap[userId];
+    for (let i = 0; i < userDeviceMaps.length; i++) {
+        try {
+            await this._encryptAndSendKeysToDevices(
+                session, key.chain_index, userDeviceMaps[i], payload,
+            );
+            console.log(`Completed megolm keyshare in ${this._roomId} `
+                + `(slice ${i + 1}/${userDeviceMaps.length})`);
+        } catch (e) {
+            console.log(`megolm keyshare in ${this._roomId} `
+                + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
-            for (let i = 0; i < devicesToShareWith.length; i++) {
-                const deviceInfo = devicesToShareWith[i];
-                const deviceId = deviceInfo.deviceId;
-
-                const sessionResult = sessionResults[deviceId];
-                if (!sessionResult.sessionId) {
-                    // no session with this device, probably because there
-                    // were no one-time keys.
-                    //
-                    // we could send them a to_device message anyway, as a
-                    // signal that they have missed out on the key sharing
-                    // message because of the lack of keys, but there's not
-                    // much point in that really; it will mostly serve to clog
-                    // up to_device inboxes.
-                    //
-                    // ensureOlmSessionsForUsers has already done the logging,
-                    // so just skip it.
-                    continue;
-                }
-
-                console.log(
-                    "sharing keys with device " + userId + ":" + deviceId,
-                );
-
-                const encryptedContent = {
-                    algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: self._olmDevice.deviceCurve25519Key,
-                    ciphertext: {},
-                };
-
-                if (!contentMap[userId]) {
-                    contentMap[userId] = {};
-                }
-
-                contentMap[userId][deviceId] = encryptedContent;
-
-                promises.push(
-                    olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        self._userId,
-                        self._deviceId,
-                        self._olmDevice,
-                        userId,
-                        deviceInfo,
-                        payload,
-                    ),
-                );
-            }
+            throw e;
         }
-
-        if (promises.length === 0) {
-            // no devices to send to
-            return Promise.resolve();
-        }
-
-        return Promise.all(promises).then(() => {
-            // TODO: retries
-            return self._baseApis.sendToDevice("m.room.encrypted", contentMap);
-        });
-    }).then(function() {
-        console.log(`Completed megolm keyshare in ${self._roomId}`);
-
-        // Add the devices we have shared with to session.sharedWithDevices.
-        //
-        // we deliberately iterate over devicesByUser (ie, the devices we
-        // attempted to share with) rather than the contentMap (those we did
-        // share with), because we don't want to try to claim a one-time-key
-        // for dead devices on every message.
-        for (const userId in devicesByUser) {
-            if (!devicesByUser.hasOwnProperty(userId)) {
-                continue;
-            }
-            if (!session.sharedWithDevices[userId]) {
-                session.sharedWithDevices[userId] = {};
-            }
-            const devicesToShareWith = devicesByUser[userId];
-            for (let i = 0; i < devicesToShareWith.length; i++) {
-                const deviceInfo = devicesToShareWith[i];
-                session.sharedWithDevices[userId][deviceInfo.deviceId] =
-                    key.chain_index;
-            }
-        }
-    });
+    }
 };
 
 /**
@@ -522,7 +590,7 @@ function MegolmDecryption(params) {
     base.DecryptionAlgorithm.call(this, params);
 
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
-    // senderKey|sessionId to list of MatrixEvents
+    // senderKey|sessionId to Set of MatrixEvents
     this._pendingEvents = {};
 
     // this gets stubbed out by the unit tests.
@@ -549,6 +617,13 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         throw new base.DecryptionError("Missing fields in input");
     }
 
+    // we add the event to the pending list *before* we start decryption.
+    //
+    // then, if the key turns up while decryption is in progress (and
+    // decryption fails), we will schedule a retry.
+    // (fixes https://github.com/vector-im/riot-web/issues/5001)
+    this._addEventToPendingList(event);
+
     let res;
     try {
         res = await this._olmDevice.decryptGroupMessage(
@@ -556,7 +631,6 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         );
     } catch (e) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
-            this._addEventToPendingList(event);
             this._requestKeysForEvent(event);
         }
         throw new base.DecryptionError(
@@ -568,7 +642,12 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
 
     if (res === null) {
         // We've got a message for a session we don't have.
-        this._addEventToPendingList(event);
+        //
+        // (XXX: We might actually have received this key since we started
+        // decrypting, in which case we'll have scheduled a retry, and this
+        // request will be redundant. We could probably check to see if the
+        // event is still in the pending list; if not, a retry will have been
+        // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
         throw new base.DecryptionError(
             "The sender's device has not sent us the keys for this message.",
@@ -577,6 +656,10 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             },
         );
     }
+
+    // success. We can remove the event from the pending list, if that hasn't
+    // already happened.
+    this._removeEventFromPendingList(event);
 
     const payload = JSON.parse(res.result);
 
@@ -621,8 +704,7 @@ MegolmDecryption.prototype._requestKeysForEvent = function(event) {
 };
 
 /**
- * Add an event to the list of those we couldn't decrypt the first time we
- * saw them.
+ * Add an event to the list of those awaiting their session keys.
  *
  * @private
  *
@@ -632,10 +714,31 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
     const content = event.getWireContent();
     const k = content.sender_key + "|" + content.session_id;
     if (!this._pendingEvents[k]) {
-        this._pendingEvents[k] = [];
+        this._pendingEvents[k] = new Set();
     }
-    this._pendingEvents[k].push(event);
+    this._pendingEvents[k].add(event);
 };
+
+/**
+ * Remove an event from the list of those awaiting their session keys.
+ *
+ * @private
+ *
+ * @param {module:models/event.MatrixEvent} event
+ */
+MegolmDecryption.prototype._removeEventFromPendingList = function(event) {
+    const content = event.getWireContent();
+    const k = content.sender_key + "|" + content.session_id;
+    if (!this._pendingEvents[k]) {
+        return;
+    }
+
+    this._pendingEvents[k].delete(event);
+    if (this._pendingEvents[k].size === 0) {
+        delete this._pendingEvents[k];
+    }
+};
+
 
 /**
  * @inheritdoc
@@ -841,8 +944,8 @@ MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
 
     delete this._pendingEvents[k];
 
-    for (let i = 0; i < pending.length; i++) {
-        pending[i].attemptDecryption(this._crypto);
+    for (const ev of pending) {
+        ev.attemptDecryption(this._crypto);
     }
 };
 
