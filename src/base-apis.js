@@ -618,6 +618,22 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
 };
 
 /**
+ * @param {string} groupId
+ * @param {bool} isPublic Whether the user's mebership of this group is made public
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupPublicity = function(groupId, isPublic) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/update_publicity",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {
+        publicise: isPublic,
+    });
+};
+
+/**
  * Retrieve a state event.
  * @param {string} roomId
  * @param {string} eventType
