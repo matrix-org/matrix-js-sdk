@@ -550,6 +550,20 @@ MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) 
 
 /**
  * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
