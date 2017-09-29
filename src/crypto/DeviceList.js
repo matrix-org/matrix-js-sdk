@@ -518,7 +518,7 @@ class DeviceListUpdateSerialiser {
             }
         }, (e) => {
             console.warn('Error downloading keys for ' + downloadUsers + ':', e);
-            this._downloadInProgressInProgress = false;
+            this._downloadInProgress = false;
             deferred.reject(e);
         });
 
