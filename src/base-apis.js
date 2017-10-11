@@ -450,6 +450,16 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
 
 /**
  * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group rooms list object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupRooms = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/rooms", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {string} groupId
  * @param {string} userId
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -474,6 +484,96 @@ MatrixBaseApis.prototype.removeUserFromGroup = function(groupId, userId) {
         {$groupId: groupId, $userId: userId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} userId
+ * @param {string} roleId Optional.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addUserToGroupSummary = function(groupId, userId, roleId) {
+    const path = utils.encodeUri(
+        roleId ?
+            "/groups/$groupId/summary/$roleId/users/$userId" :
+            "/groups/$groupId/summary/users/$userId",
+        {$groupId: groupId, $roleId: roleId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} userId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeUserFromGroupSummary = function(groupId, userId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/summary/users/$userId",
+        {$groupId: groupId, $userId: userId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @param {string} categoryId Optional.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addRoomToGroupSummary = function(groupId, roomId, categoryId) {
+    const path = utils.encodeUri(
+        categoryId ?
+            "/groups/$groupId/summary/$categoryId/rooms/$roomId" :
+            "/groups/$groupId/summary/rooms/$roomId",
+        {$groupId: groupId, $categoryId: categoryId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/summary/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
 };
 
 /**
@@ -543,6 +643,22 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
     return this._http.authedRequest(
         undefined, "POST", path, undefined, { user_ids: userIds },
     );
+};
+
+/**
+ * @param {string} groupId
+ * @param {bool} isPublic Whether the user's mebership of this group is made public
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupPublicity = function(groupId, isPublic) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/update_publicity",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {
+        publicise: isPublic,
+    });
 };
 
 /**
