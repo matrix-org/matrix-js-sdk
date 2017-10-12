@@ -107,7 +107,7 @@ function OlmDevice(sessionStore) {
     // event and we don't consider it a replay attack.
     //
     // Keys are strings of form "<senderKey>|<session_id>|<message_index>"
-    // Values are objects containing the event ID and timestamp.
+    // Values are objects of the form "{id: <event id>, timestamp: <ts>}"
     this._inboundGroupSessionMessageIndexes = {};
 }
 
@@ -813,7 +813,6 @@ OlmDevice.prototype.decryptGroupMessage = async function(
     roomId, senderKey, sessionId, body, eventId, timestamp,
 ) {
     const self = this;
-    const argumentsLength = arguments.length;
 
     function decrypt(session, sessionData) {
         const res = session.decrypt(body);
@@ -828,14 +827,14 @@ OlmDevice.prototype.decryptGroupMessage = async function(
             // and timestamp from the last time we used this message index, then we
             // don't consider it a replay attack.
             const messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
-            if (messageIndexKey in self._inboundGroupSessionMessageIndexes
-                && (argumentsLength <= 4 // Compatibility for older old versions.
-                    || self._inboundGroupSessionMessageIndexes[messageIndexKey].id !== eventId
-                    || self._inboundGroupSessionMessageIndexes[messageIndexKey].timestamp !== timestamp)) {
-                throw new Error(
-                    "Duplicate message index, possible replay attack: " +
-                    messageIndexKey,
-                );
+            if (messageIndexKey in self._inboundGroupSessionMessageIndexes) {
+                const msgInfo = self._inboundGroupSessionMessageIndexes[messageIndexKey];
+                if (msgInfo.id !== eventId || msgInfo.timestamp !== timestamp) {
+                    throw new Error(
+                        "Duplicate message index, possible replay attack: " +
+                        messageIndexKey,
+                    );
+                }
             }
             self._inboundGroupSessionMessageIndexes[messageIndexKey] = {
                 id: eventId,
