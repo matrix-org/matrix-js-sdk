@@ -550,6 +550,34 @@ MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) 
 
 /**
  * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @param {string} roomId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
@@ -615,6 +643,22 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
     return this._http.authedRequest(
         undefined, "POST", path, undefined, { user_ids: userIds },
     );
+};
+
+/**
+ * @param {string} groupId
+ * @param {bool} isPublic Whether the user's mebership of this group is made public
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupPublicity = function(groupId, isPublic) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/update_publicity",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {
+        publicise: isPublic,
+    });
 };
 
 /**
