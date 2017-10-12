@@ -348,6 +348,11 @@ WebSocketApi.prototype._start = function(syncOptions) {
         this._websocket.onopen = _onopen;
         this._websocket.onclose = _onclose;
         this._websocket.onmessage = _onmessage;
+    }).catch((err) => {
+        client._syncApi._startKeepAlives().done(() => {
+            debuglog("Starting failed (", err, "). Retries");
+            this._start(syncOptions);
+        });
     });
 
     function _onopen(ev) {
