@@ -1129,7 +1129,6 @@ SyncApi.prototype._pokeKeepAlive = function() {
 SyncApi.prototype._processGroupSyncEntry = function(groupsSection, sectionName) {
     // Processes entries from 'groups' section of the sync stream
     for (const groupId of Object.keys(groupsSection)) {
-        console.log("got "+groupId+" in "+sectionName+" section");
         const groupInfo = groupsSection[groupId];
         let group = this.client.store.getGroup(groupId);
         const isBrandNew = group === null;
