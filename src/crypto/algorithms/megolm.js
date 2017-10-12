@@ -628,6 +628,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     try {
         res = await this._olmDevice.decryptGroupMessage(
             event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
+            event.getId(), event.getTs(),
         );
     } catch (e) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {

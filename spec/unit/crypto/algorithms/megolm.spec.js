@@ -181,5 +181,88 @@ describe("MegolmDecryption", function() {
                 expect(payload.content.session_key).toExist();
             });
         });
+
+        it("can detect replay attacks", function() {
+            // trying to decrypt two different messages (marked by different
+            // event IDs or timestamps) using the same (sender key, session id,
+            // message index) triple should result in an exception being thrown
+            // as it should be detected as a replay attack.
+            const sessionId = groupSession.session_id();
+            const cipherText = groupSession.encrypt(JSON.stringify({
+                room_id: ROOM_ID,
+                content: 'testytest',
+            }));
+            const event1 = new MatrixEvent({
+                type: 'm.room.encrypted',
+                room_id: ROOM_ID,
+                content: {
+                    algorithm: 'm.megolm.v1.aes-sha2',
+                    sender_key: "SENDER_CURVE25519",
+                    session_id: sessionId,
+                    ciphertext: cipherText,
+                },
+                event_id: "$event1",
+                origin_server_ts: 1507753886000,
+            });
+
+            const successHandler = expect.createSpy();
+            const failureHandler = expect.createSpy()
+                .andCall((err) => {
+                    expect(err.toString()).toMatch(
+                        /Duplicate message index, possible replay attack/,
+                    );
+                });
+
+            return megolmDecryption.decryptEvent(event1).then((res) => {
+                const event2 = new MatrixEvent({
+                    type: 'm.room.encrypted',
+                    room_id: ROOM_ID,
+                    content: {
+                        algorithm: 'm.megolm.v1.aes-sha2',
+                        sender_key: "SENDER_CURVE25519",
+                        session_id: sessionId,
+                        ciphertext: cipherText,
+                    },
+                    event_id: "$event2",
+                    origin_server_ts: 1507754149000,
+                });
+
+                return megolmDecryption.decryptEvent(event2);
+            }).then(
+                successHandler,
+                failureHandler,
+            ).then(() => {
+                expect(successHandler).toNotHaveBeenCalled();
+                expect(failureHandler).toHaveBeenCalled();
+            });
+        });
+
+        it("allows re-decryption of the same event", function() {
+            // in contrast with the previous test, if the event ID and
+            // timestamp are the same, then it should not be considered a
+            // replay attack
+            const sessionId = groupSession.session_id();
+            const cipherText = groupSession.encrypt(JSON.stringify({
+                room_id: ROOM_ID,
+                content: 'testytest',
+            }));
+            const event = new MatrixEvent({
+                type: 'm.room.encrypted',
+                room_id: ROOM_ID,
+                content: {
+                    algorithm: 'm.megolm.v1.aes-sha2',
+                    sender_key: "SENDER_CURVE25519",
+                    session_id: sessionId,
+                    ciphertext: cipherText,
+                },
+                event_id: "$event1",
+                origin_server_ts: 1507753886000,
+            });
+
+            return megolmDecryption.decryptEvent(event).then((res) => {
+                return megolmDecryption.decryptEvent(event);
+                // test is successful if no exception is thrown
+            });
+        });
     });
 });

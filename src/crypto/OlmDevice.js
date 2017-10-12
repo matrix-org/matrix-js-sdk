@@ -96,12 +96,18 @@ function OlmDevice(sessionStore) {
     // This partially mitigates a replay attack where a MITM resends a group
     // message into the room.
     //
-    // TODO: If we ever remove an event from memory we will also need to remove
-    // it from this map. Otherwise if we download the event from the server we
-    // will think that it is a duplicate.
+    // When we decrypt a message and the message index matches a previously
+    // decrypted message, one possible cause of that is that we are decrypting
+    // the same event, and may not indicate an actual replay attack.  For
+    // example, this could happen if we receive events, forget about them, and
+    // then re-fetch them when we backfill.  So we store the event ID and
+    // timestamp corresponding to each message index when we first decrypt it,
+    // and compare these against the event ID and timestamp every time we use
+    // that same index.  If they match, then we're probably decrypting the same
+    // event and we don't consider it a replay attack.
     //
     // Keys are strings of form "<senderKey>|<session_id>|<message_index>"
-    // Values are true.
+    // Values are objects containing the event ID and timestamp.
     this._inboundGroupSessionMessageIndexes = {};
 }
 
@@ -794,6 +800,8 @@ OlmDevice.prototype.importInboundGroupSession = async function(data) {
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
  * @param {string} body      base64-encoded body of the encrypted message
+ * @param {string} eventId   ID of the event being decrypted
+ * @param {Number} timestamp timestamp of the event being decrypted
  *
  * @return {null} the sessionId is unknown
  *
@@ -802,9 +810,10 @@ OlmDevice.prototype.importInboundGroupSession = async function(data) {
  *    keysClaimed: Object<string, string>}>}
  */
 OlmDevice.prototype.decryptGroupMessage = async function(
-    roomId, senderKey, sessionId, body,
+    roomId, senderKey, sessionId, body, eventId, timestamp,
 ) {
     const self = this;
+    const argumentsLength = arguments.length;
 
     function decrypt(session, sessionData) {
         const res = session.decrypt(body);
@@ -815,14 +824,23 @@ OlmDevice.prototype.decryptGroupMessage = async function(
             plaintext = res;
         } else {
             // Check if we have seen this message index before to detect replay attacks.
+            // If the event ID and timestamp are specified, and the match the event ID
+            // and timestamp from the last time we used this message index, then we
+            // don't consider it a replay attack.
             const messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
-            if (messageIndexKey in self._inboundGroupSessionMessageIndexes) {
+            if (messageIndexKey in self._inboundGroupSessionMessageIndexes
+                && (argumentsLength <= 4 // Compatibility for older old versions.
+                    || self._inboundGroupSessionMessageIndexes[messageIndexKey].id !== eventId
+                    || self._inboundGroupSessionMessageIndexes[messageIndexKey].timestamp !== timestamp)) {
                 throw new Error(
                     "Duplicate message index, possible replay attack: " +
                     messageIndexKey,
                 );
             }
-            self._inboundGroupSessionMessageIndexes[messageIndexKey] = true;
+            self._inboundGroupSessionMessageIndexes[messageIndexKey] = {
+                id: eventId,
+                timestamp: timestamp,
+            };
         }
 
         sessionData.session = session.pickle(self._pickleKey);
