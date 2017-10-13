@@ -1,3 +1,20 @@
+Changes in [0.8.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.5-rc.1) (2017-10-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.4...v0.8.5-rc.1)
+
+ * Implement wrapper API for removing a room from a group
+   [\#553](https://github.com/matrix-org/matrix-js-sdk/pull/553)
+ * Fix typo which resulted in stuck key download requests
+   [\#552](https://github.com/matrix-org/matrix-js-sdk/pull/552)
+ * Store group when it's created
+   [\#549](https://github.com/matrix-org/matrix-js-sdk/pull/549)
+ * Luke/groups remove rooms users from summary
+   [\#548](https://github.com/matrix-org/matrix-js-sdk/pull/548)
+ * Clean on prepublish
+   [\#546](https://github.com/matrix-org/matrix-js-sdk/pull/546)
+ * Implement wrapper APIs for adding rooms to group summary
+   [\#545](https://github.com/matrix-org/matrix-js-sdk/pull/545)
+
 Changes in [0.8.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.4) (2017-09-21)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.3...v0.8.4)
