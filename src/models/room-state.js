@@ -258,7 +258,11 @@ RoomState.prototype.maySendRedactionForEvent = function(mxEvent, userId) {
     if (!member || member.membership === 'leave') return false;
 
     if (mxEvent.status || mxEvent.isRedacted()) return false;
-    if (mxEvent.getSender() === userId) return true;
+
+    // The user may have been the sender, but they can't redact their own message
+    // if redactions are blocked.
+    const canRedact = this.maySendEvent("m.room.redaction", userId);
+    if (mxEvent.getSender() === userId) return canRedact;
 
     return this._hasSufficientPowerLevelFor('redact', member.powerLevel);
 };
