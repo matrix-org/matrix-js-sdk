@@ -2983,6 +2983,9 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Filter=} opts.filter The filter to apply to /sync calls. This will override
  * the opts.initialSyncLimit, which would normally result in a timeline limit filter.
+ *
+ * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
+ * updating presence.
  */
 MatrixClient.prototype.startClient = function(opts) {
     if (this.clientRunning) {
