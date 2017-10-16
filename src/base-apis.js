@@ -450,6 +450,16 @@ MatrixBaseApis.prototype.getGroupUsers = function(groupId) {
 
 /**
  * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Group users list object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getGroupInvitedUsers = function(groupId) {
+    const path = utils.encodeUri("/groups/$groupId/invited_users", {$groupId: groupId});
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * @param {string} groupId
  * @return {module:client.Promise} Resolves: Group rooms list object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
