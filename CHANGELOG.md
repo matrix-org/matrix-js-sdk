@@ -1,3 +1,10 @@
+Changes in [0.8.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.5) (2017-10-16)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.5-rc.1...v0.8.5)
+
+ * Make unknown pushrule conditions not match
+   [\#559](https://github.com/matrix-org/matrix-js-sdk/pull/559)
+
 Changes in [0.8.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.5-rc.1) (2017-10-13)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.4...v0.8.5-rc.1)
