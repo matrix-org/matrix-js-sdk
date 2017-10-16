@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -126,7 +127,10 @@ function PushProcessor(client) {
         if (condition_functions[cond.kind]) {
             return condition_functions[cond.kind](cond, ev);
         }
-        return true;
+        // unknown conditions: we previously matched all unknown conditions,
+        // but given that rules can be added to the base rules on a server,
+        // it's probably better to not match unknown conditions.
+        return false;
     };
 
     const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
@@ -215,9 +219,9 @@ function PushProcessor(client) {
         // Because micromatch is about 130KB with dependencies,
         // and minimatch is not much better.
         let pat = escapeRegExp(glob);
-        pat = pat.replace(/\\\*/, '.*');
-        pat = pat.replace(/\?/, '.');
-        pat = pat.replace(/\\\[(!|)(.*)\\]/, function(match, p1, p2, offset, string) {
+        pat = pat.replace(/\\\*/g, '.*');
+        pat = pat.replace(/\?/g, '.');
+        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
             const first = p1 && '^' || '';
             const second = p2.replace(/\\\-/, '-');
             return '[' + first + second + ']';
