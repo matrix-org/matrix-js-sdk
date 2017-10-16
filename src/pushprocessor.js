@@ -215,9 +215,9 @@ function PushProcessor(client) {
         // Because micromatch is about 130KB with dependencies,
         // and minimatch is not much better.
         let pat = escapeRegExp(glob);
-        pat = pat.replace(/\\\*/, '.*');
-        pat = pat.replace(/\?/, '.');
-        pat = pat.replace(/\\\[(!|)(.*)\\]/, function(match, p1, p2, offset, string) {
+        pat = pat.replace(/\\\*/g, '.*');
+        pat = pat.replace(/\?/g, '.');
+        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
             const first = p1 && '^' || '';
             const second = p2.replace(/\\\-/, '-');
             return '[' + first + second + ']';
