@@ -123,7 +123,7 @@ function PushProcessor(client) {
             "device": eventFulfillsDeviceCondition,
             "contains_display_name": eventFulfillsDisplayNameCondition,
             "room_member_count": eventFulfillsRoomMemberCountCondition,
-            "sender_notification_permission": eventFulfillsSenderNotificationPermCondition,
+            "sender_notification_permission": eventFulfillsSenderNotifPermCondition,
         };
         if (condition_functions[cond.kind]) {
             return condition_functions[cond.kind](cond, ev);
@@ -134,7 +134,7 @@ function PushProcessor(client) {
         return false;
     };
 
-    const eventFulfillsSenderNotificationPermCondition = function(cond, ev) {
+    const eventFulfillsSenderNotifPermCondition = function(cond, ev) {
         const notifLevelKey = cond['key'];
         if (!notifLevelKey) {
             return false;
@@ -159,7 +159,7 @@ function PushProcessor(client) {
         }
 
         return ev.sender.powerLevel >= notifLevel;
-    }
+    };
 
     const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
         if (!cond.is) {
