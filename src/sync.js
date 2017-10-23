@@ -1277,6 +1277,12 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // may make notifications appear which should have the right name.
     room.recalculate(this.client.credentials.userId);
 
+    // execute the timeline events, this will begin to diverge the current state
+    // if the timeline has any state events in it.
+    // This also needs to be done before running push rules on the events as they need
+    // to be decorated with sender etc.
+    room.addLiveEvents(timelineEventList);
+
     // gather our notifications into this._notifEvents
     if (client.getNotifTimelineSet()) {
         for (let i = 0; i < timelineEventList.length; i++) {
@@ -1287,10 +1293,6 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
             }
         }
     }
-
-    // execute the timeline events, this will begin to diverge the current state
-    // if the timeline has any state events in it.
-    room.addLiveEvents(timelineEventList);
 };
 
 /**
