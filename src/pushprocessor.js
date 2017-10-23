@@ -123,6 +123,7 @@ function PushProcessor(client) {
             "device": eventFulfillsDeviceCondition,
             "contains_display_name": eventFulfillsDisplayNameCondition,
             "room_member_count": eventFulfillsRoomMemberCountCondition,
+            "sender_notification_permission": eventFulfillsSenderNotificationPermCondition,
         };
         if (condition_functions[cond.kind]) {
             return condition_functions[cond.kind](cond, ev);
@@ -132,6 +133,33 @@ function PushProcessor(client) {
         // it's probably better to not match unknown conditions.
         return false;
     };
+
+    const eventFulfillsSenderNotificationPermCondition = function(cond, ev) {
+        const notifLevelKey = cond['key'];
+        if (!notifLevelKey) {
+            return false;
+        }
+
+        const room = client.getRoom(ev.getRoomId());
+        if (!room || !room.currentState) {
+            return false;
+        }
+
+        const powerLevels = room.currentState.getStateEvents('m.room.power_levels', '');
+        if (!powerLevels || !powerLevels.getContent()) {
+            return false;
+        }
+
+        let notifLevel = 50;
+        if (
+            powerLevels.getContent().notifications &&
+            powerLevels.getContent().notifications[notifLevelKey]
+        ) {
+            notifLevel = powerLevels.getContent().notifications[notifLevelKey];
+        }
+
+        return ev.sender.powerLevel >= notifLevel;
+    }
 
     const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
         if (!cond.is) {
