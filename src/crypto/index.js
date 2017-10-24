@@ -769,6 +769,15 @@ Crypto.prototype.encryptEvent = function(event, room) {
  *  is a problem decrypting the event.
  */
 Crypto.prototype.decryptEvent = function(event) {
+    if (event.isRedacted()) {
+        return Promise.resolve({
+            clearEvent: {
+                room_id: event.getRoomId(),
+                type: "m.room.message",
+                content: {},
+            },
+        });
+    }
     const content = event.getWireContent();
     const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
     return alg.decryptEvent(event);
