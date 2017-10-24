@@ -770,13 +770,13 @@ Crypto.prototype.encryptEvent = function(event, room) {
  */
 Crypto.prototype.decryptEvent = function(event) {
     if (event.isRedacted()) {
-        return {
+        return Promise.resolve({
             clearEvent: {
                 room_id: event.getRoomId(),
                 type: "m.room.message",
                 content: {},
             },
-        };
+        });
     }
     const content = event.getWireContent();
     const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
