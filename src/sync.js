@@ -232,7 +232,7 @@ SyncApi.prototype.syncLeftRooms = function() {
             client.store.storeRoom(room);
             client.emit("Room", room);
 
-            self._processEventForNotifs(room, timelineEvents);
+            self._processEventsForNotifs(room, timelineEvents);
         });
         return rooms;
     });
@@ -963,7 +963,7 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
             client.emit("Room", room);
         }
 
-        self._processEventForNotifs(room, timelineEvents);
+        self._processEventsForNotifs(room, timelineEvents);
 
         async function processRoomEvent(e) {
             client.emit("event", e);
@@ -1001,7 +1001,7 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
             client.emit("Room", room);
         }
 
-        self._processEventForNotifs(room, timelineEvents);
+        self._processEventsForNotifs(room, timelineEvents);
 
         stateEvents.forEach(function(e) {
             client.emit("event", e);
@@ -1299,7 +1299,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
  * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
  * is earlier in time. Higher index is later.
  */
-SyncApi.prototype._processEventForNotifs = function(room, timelineEventList) {
+SyncApi.prototype._processEventsForNotifs = function(room, timelineEventList) {
     // gather our notifications into this._notifEvents
     if (this.client.getNotifTimelineSet()) {
         for (let i = 0; i < timelineEventList.length; i++) {
