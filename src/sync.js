@@ -1303,7 +1303,7 @@ SyncApi.prototype._processEventForNotifs = function(room, timelineEventList) {
     // gather our notifications into this._notifEvents
     if (this.client.getNotifTimelineSet()) {
         for (let i = 0; i < timelineEventList.length; i++) {
-            const pushActions = client.getPushActionsForEvent(timelineEventList[i]);
+            const pushActions = this.client.getPushActionsForEvent(timelineEventList[i]);
             if (pushActions && pushActions.notify &&
                 pushActions.tweaks && pushActions.tweaks.highlight) {
                 this._notifEvents.push(timelineEventList[i]);
