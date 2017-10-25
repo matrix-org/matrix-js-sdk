@@ -104,17 +104,20 @@ RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
     if (powerLevelEvent.getType() !== "m.room.power_levels") {
         return;
     }
-    let maxLevel = powerLevelEvent.getContent().users_default || 0;
-    utils.forEach(utils.values(powerLevelEvent.getContent().users), function(lvl) {
+
+    const evContent = powerLevelEvent.getDirectionalContent();
+
+    let maxLevel = evContent.users_default || 0;
+    utils.forEach(utils.values(evContent.users), function(lvl) {
         maxLevel = Math.max(maxLevel, lvl);
     });
     const oldPowerLevel = this.powerLevel;
     const oldPowerLevelNorm = this.powerLevelNorm;
 
-    if (powerLevelEvent.getContent().users[this.userId] !== undefined) {
-        this.powerLevel = powerLevelEvent.getContent().users[this.userId];
-    } else if (powerLevelEvent.getContent().users_default !== undefined) {
-        this.powerLevel = powerLevelEvent.getContent().users_default;
+    if (evContent.users && evContent.users[this.userId] !== undefined) {
+        this.powerLevel = evContent.users[this.userId];
+    } else if (evContent.users_default !== undefined) {
+        this.powerLevel = evContent.users_default;
     } else {
         this.powerLevel = 0;
     }

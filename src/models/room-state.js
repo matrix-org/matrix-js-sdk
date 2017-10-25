@@ -197,6 +197,16 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 member.setPowerLevelEvent(event);
                 self.emit("RoomState.members", event, self, member);
             });
+
+            // Go through the sentinel members and see if any of them would be
+            // affected by the new power levels. If so, replace the sentinel.
+            for (const userId of Object.keys(self._sentinels)) {
+                const oldSentinel = self._sentinels[userId];
+                const newSentinel = new RoomMember(event.getRoomId(), userId);
+                newSentinel.setMembershipEvent(oldSentinel.events.member, self);
+                newSentinel.setPowerLevelEvent(event);
+                self._sentinels[userId] = newSentinel;
+            }
         }
     });
 };
