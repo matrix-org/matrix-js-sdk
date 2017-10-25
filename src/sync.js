@@ -231,6 +231,8 @@ SyncApi.prototype.syncLeftRooms = function() {
             room.recalculate(client.credentials.userId);
             client.store.storeRoom(room);
             client.emit("Room", room);
+
+            self._processEventForNotifs(room, timelineEvents);
         });
         return rooms;
     });
@@ -961,6 +963,8 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
             client.emit("Room", room);
         }
 
+        self._processEventForNotifs(room, timelineEvents);
+
         async function processRoomEvent(e) {
             client.emit("event", e);
             if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
@@ -996,6 +1000,8 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
             client.store.storeRoom(room);
             client.emit("Room", room);
         }
+
+        self._processEventForNotifs(room, timelineEvents);
 
         stateEvents.forEach(function(e) {
             client.emit("event", e);
@@ -1282,9 +1288,20 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
     room.addLiveEvents(timelineEventList);
+};
 
+/**
+ * Takes a list of timelineEvents and adds and adds to _notifEvents
+ * as appropriate.
+ * This must be called after the room the events belong to has been stored.
+ *
+ * @param {Room} room
+ * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+ * is earlier in time. Higher index is later.
+ */
+SyncApi.prototype._processEventForNotifs = function(room, timelineEventList) {
     // gather our notifications into this._notifEvents
-    if (client.getNotifTimelineSet()) {
+    if (this.client.getNotifTimelineSet()) {
         for (let i = 0; i < timelineEventList.length; i++) {
             const pushActions = client.getPushActionsForEvent(timelineEventList[i]);
             if (pushActions && pushActions.notify &&
