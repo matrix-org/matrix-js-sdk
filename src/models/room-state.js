@@ -205,12 +205,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 const newSentinel = new RoomMember(event.getRoomId(), userId);
                 newSentinel.setMembershipEvent(oldSentinel.events.member, self);
                 newSentinel.setPowerLevelEvent(event);
-                if (
-                    newSentinel.powerLevel != oldSentinel.powerLevel ||
-                    newSentinel.powerLevelNorm != oldSentinel.powerLevelNorm
-                ) {
-                    self._sentinels[userId] = newSentinel;
-                }
+                self._sentinels[userId] = newSentinel;
             }
         }
     });
