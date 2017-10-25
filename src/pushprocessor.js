@@ -158,6 +158,14 @@ function PushProcessor(client) {
             notifLevel = powerLevels.getContent().notifications[notifLevelKey];
         }
 
+        // This cannot be assumed to always be set for state events
+        // (in particular it is never set for the room creation event
+        // because it preceeds the join event of the sender).
+        // In these cases, this condition cannot match.
+        if (ev.sender === null) {
+            return false;
+        }
+
         return ev.sender.powerLevel >= notifLevel;
     };
 
