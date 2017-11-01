@@ -363,7 +363,7 @@ function PushProcessor(client) {
             }
         }
         return null;
-    }
+    };
 }
 
 /**
