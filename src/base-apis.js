@@ -561,16 +561,29 @@ MatrixBaseApis.prototype.removeRoomFromGroupSummary = function(groupId, roomId) 
 /**
  * @param {string} groupId
  * @param {string} roomId
+ * @param {bool} isPublic Whether the room-group association is visible to non-members
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId) {
+MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId, isPublic) {
+    if (isPublic === undefined) {
+        isPublic = true;
+    }
     const path = utils.encodeUri(
         "/groups/$groupId/admin/rooms/$roomId",
         {$groupId: groupId, $roomId: roomId},
     );
-    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+    return this._http.authedRequest(undefined, "PUT", path, undefined,
+        { visibility: { type: isPublic ? "public" : "private" } },
+    );
 };
+
+/**
+ * Alias for addRoomToGroup.
+ * @see module:base-apis.addRoomToGroup
+ */
+MatrixBaseApis.prototype.updateGroupRoomAssociation =
+MatrixBaseApis.prototype.addRoomToGroup;
 
 /**
  * @param {string} groupId
@@ -657,7 +670,7 @@ MatrixBaseApis.prototype.getPublicisedGroups = function(userIds) {
 
 /**
  * @param {string} groupId
- * @param {bool} isPublic Whether the user's mebership of this group is made public
+ * @param {bool} isPublic Whether the user's membership of this group is made public
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
