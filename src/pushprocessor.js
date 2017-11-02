@@ -145,28 +145,10 @@ function PushProcessor(client) {
             return false;
         }
 
-        const powerLevels = room.currentState.getStateEvents('m.room.power_levels', '');
-        if (!powerLevels || !powerLevels.getContent()) {
-            return false;
-        }
-
-        let notifLevel = 50;
-        if (
-            powerLevels.getContent().notifications &&
-            powerLevels.getContent().notifications[notifLevelKey]
-        ) {
-            notifLevel = powerLevels.getContent().notifications[notifLevelKey];
-        }
-
-        // This cannot be assumed to always be set for state events
-        // (in particular it is never set for the room creation event
-        // because it preceeds the join event of the sender).
-        // In these cases, this condition cannot match.
-        if (ev.sender === null) {
-            return false;
-        }
-
-        return ev.sender.powerLevel >= notifLevel;
+        // Note that this should not be the current state of the room but the state at
+        // the point the event is in the DAG. Unfortunately the js-sdk does not store
+        // this.
+        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender());
     };
 
     const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
