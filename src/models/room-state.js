@@ -409,12 +409,10 @@ RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
 
     const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
 
-    if (!powerLevelsEvent || !powerLevelsEvent.getContent()) {
-        return false;
-    }
-
     let notifLevel = 50;
     if (
+        powerLevelsEvent &&
+        powerLevelsEvent.getContent() &&
         powerLevelsEvent.getContent().notifications &&
         powerLevelsEvent.getContent().notifications[notifLevelKey]
     ) {
