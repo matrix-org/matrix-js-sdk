@@ -403,7 +403,7 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
  */
 RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
     const member = this.getMember(userId);
-    if (!member || member.membership == 'leave') {
+    if (!member) {
         return false;
     }
 
