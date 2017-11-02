@@ -394,6 +394,35 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
 };
 
 /**
+ * Returns true if the given user ID has permission to trigger notification
+ * of type `notifLevelKey`
+ * @param {string} notifLevelKey The level of notification to test (eg. 'room')
+ * @param {string} userId The user ID of the user to test permission for
+ * @return {boolean} true if the given user ID has permission to trigger a
+ *                        notification of this type.
+ */
+RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
+    const member = this.getMember(userId);
+    if (!member) {
+        return false;
+    }
+
+    const powerLevelsEvent = this.getStateEvents('m.room.power_levels', '');
+
+    let notifLevel = 50;
+    if (
+        powerLevelsEvent &&
+        powerLevelsEvent.getContent() &&
+        powerLevelsEvent.getContent().notifications &&
+        powerLevelsEvent.getContent().notifications[notifLevelKey]
+    ) {
+        notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
+    }
+
+    return member.powerLevel >= notifLevel;
+};
+
+/**
  * The RoomState class.
  */
 module.exports = RoomState;
