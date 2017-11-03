@@ -18,6 +18,8 @@ limitations under the License.
  * @module pushprocessor
  */
 
+const RULEKINDS_IN_ORDER = ['override', 'content', 'room', 'sender', 'underride'];
+
 /**
  * Construct a Push Processor.
  * @constructor
@@ -28,12 +30,11 @@ function PushProcessor(client) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     };
 
-    const matchingRuleFromKindSet = function(ev, kindset, device) {
-        const rulekinds_in_order = ['override', 'content', 'room', 'sender', 'underride'];
+    const matchingRuleFromKindSet = (ev, kindset, device) => {
         for (let ruleKindIndex = 0;
-                ruleKindIndex < rulekinds_in_order.length;
+                ruleKindIndex < RULEKINDS_IN_ORDER.length;
                 ++ruleKindIndex) {
-            const kind = rulekinds_in_order[ruleKindIndex];
+            const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
 
             for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
@@ -47,7 +48,7 @@ function PushProcessor(client) {
                     continue;
                 }
 
-                if (ruleMatchesEvent(rawrule, ev)) {
+                if (this.ruleMatchesEvent(rawrule, ev)) {
                     rule.kind = kind;
                     return rule;
                 }
@@ -107,16 +108,6 @@ function PushProcessor(client) {
         return rawrule;
     };
 
-    const ruleMatchesEvent = function(rule, ev) {
-        let ret = true;
-        for (let i = 0; i < rule.conditions.length; ++i) {
-            const cond = rule.conditions[i];
-            ret &= eventFulfillsCondition(cond, ev);
-        }
-        //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
-        return ret;
-    };
-
     const eventFulfillsCondition = function(cond, ev) {
         const condition_functions = {
             "event_match": eventFulfillsEventMatchCondition,
@@ -145,28 +136,10 @@ function PushProcessor(client) {
             return false;
         }
 
-        const powerLevels = room.currentState.getStateEvents('m.room.power_levels', '');
-        if (!powerLevels || !powerLevels.getContent()) {
-            return false;
-        }
-
-        let notifLevel = 50;
-        if (
-            powerLevels.getContent().notifications &&
-            powerLevels.getContent().notifications[notifLevelKey]
-        ) {
-            notifLevel = powerLevels.getContent().notifications[notifLevelKey];
-        }
-
-        // This cannot be assumed to always be set for state events
-        // (in particular it is never set for the room creation event
-        // because it preceeds the join event of the sender).
-        // In these cases, this condition cannot match.
-        if (ev.sender === null) {
-            return false;
-        }
-
-        return ev.sender.powerLevel >= notifLevel;
+        // Note that this should not be the current state of the room but the state at
+        // the point the event is in the DAG. Unfortunately the js-sdk does not store
+        // this.
+        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender());
     };
 
     const eventFulfillsRoomMemberCountCondition = function(cond, ev) {
@@ -331,6 +304,17 @@ function PushProcessor(client) {
         return actionObj;
     };
 
+    this.ruleMatchesEvent = function(rule, ev) {
+        let ret = true;
+        for (let i = 0; i < rule.conditions.length; ++i) {
+            const cond = rule.conditions[i];
+            ret &= eventFulfillsCondition(cond, ev);
+        }
+        //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
+        return ret;
+    };
+
+
     /**
      * Get the user's push actions for the given event
      *
@@ -340,6 +324,27 @@ function PushProcessor(client) {
      */
     this.actionsForEvent = function(ev) {
         return pushActionsForEventAndRulesets(ev, client.pushRules);
+    };
+
+    /**
+     * Get one of the users push rules by its ID
+     *
+     * @param {string} ruleId The ID of the rule to search for
+     * @return {object} The push rule, or null if no such rule was found
+     */
+    this.getPushRuleById = function(ruleId) {
+        for (const scope of ['device', 'global']) {
+            if (client.pushRules[scope] === undefined) continue;
+
+            for (const kind of RULEKINDS_IN_ORDER) {
+                if (client.pushRules[scope][kind] === undefined) continue;
+
+                for (const rule of client.pushRules[scope][kind]) {
+                    if (rule.rule_id === ruleId) return rule;
+                }
+            }
+        }
+        return null;
     };
 }
 
