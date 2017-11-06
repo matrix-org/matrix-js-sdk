@@ -886,7 +886,7 @@ describe("Room", function() {
                 expect(name).toEqual("Empty room");
             });
 
-            it("should return 'Invite from [inviter display name] if state event " +
+            it("should return '[inviter display name] if state event " +
                "available",
             function() {
                 setJoinRule("invite");
@@ -894,7 +894,7 @@ describe("Room", function() {
                 addMember(userB, "invite", {user: userA});
                 room.recalculate(userB);
                 const name = room.name;
-                expect(name).toEqual("Invite from Alice");
+                expect(name).toEqual("Alice");
             });
 
             it("should return inviter mxid if display name not available",
@@ -904,7 +904,7 @@ describe("Room", function() {
                 addMember(userB, "invite", {user: userA});
                 room.recalculate(userB);
                 const name = room.name;
-                expect(name).toEqual("Invite from " + userA);
+                expect(name).toEqual(userA);
             });
         });
     });
