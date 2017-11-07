@@ -1205,13 +1205,13 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     if (myMemberEvent && myMemberEvent.content.membership == "invite") {
         if (room.currentState.getMember(myMemberEvent.sender)) {
             // extract who invited us to the room
-            return "Invite from " + room.currentState.getMember(
+            return room.currentState.getMember(
                 myMemberEvent.sender,
             ).name;
         } else if (allMembers[0].events.member) {
             // use the sender field from the invite event, although this only
             // gets us the mxid
-            return "Invite from " + myMemberEvent.sender;
+            return myMemberEvent.sender;
         } else {
             return "Room Invite";
         }
