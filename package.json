@@ -50,6 +50,7 @@
   ],
   "dependencies": {
     "another-json": "^0.2.0",
+    "babel-runtime": "^6.26.0",
     "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
     "content-type": "^1.0.2",
