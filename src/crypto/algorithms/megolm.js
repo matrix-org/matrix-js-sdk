@@ -541,6 +541,12 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
         return u.userId;
     });
 
+    // The global value is treated as a default for when rooms don't specify a value.
+    let isBlacklisting = this._crypto.getBlacklistUnverifiedDevices();
+    if (room.getBlacklistUnverifiedDevices() !== null) {
+        isBlacklisting = room.getBlacklistUnverifiedDevices();
+    }
+
     // We are happy to use a cached version here: we assume that if we already
     // have a list of the user's devices, then we already share an e2e room
     // with them, which means that they will have announced any new devices via
@@ -564,9 +570,7 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
                 }
 
                 if (userDevices[deviceId].isBlocked() ||
-                    (userDevices[deviceId].isUnverified() &&
-                     (room.getBlacklistUnverifiedDevices() ||
-                      this._crypto.getGlobalBlacklistUnverifiedDevices()))
+                    (userDevices[deviceId].isUnverified() && isBlacklisting)
                    ) {
                     delete userDevices[deviceId];
                 }
