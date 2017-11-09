@@ -616,15 +616,16 @@ MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
 
 /**
  * @param {string} groupId
+ * @param {Object} opts Additional options to send alongside the acceptance.
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.acceptGroupInvite = function(groupId) {
+MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/accept_invite",
         {$groupId: groupId},
     );
-    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+    return this._http.authedRequest(undefined, "PUT", path, undefined, opts || {});
 };
 
 /**
