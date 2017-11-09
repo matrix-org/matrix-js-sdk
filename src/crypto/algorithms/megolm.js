@@ -542,7 +542,7 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     });
 
     // The global value is treated as a default for when rooms don't specify a value.
-    let isBlacklisting = this._crypto.getBlacklistUnverifiedDevices();
+    let isBlacklisting = this._crypto.getGlobalBlacklistUnverifiedDevices();
     if (room.getBlacklistUnverifiedDevices() !== null) {
         isBlacklisting = room.getBlacklistUnverifiedDevices();
     }
