@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -101,7 +102,7 @@ function MatrixCall(opts) {
     // We try to amalgamate candidates into a single candidate message where
     // possible
     this.candidateSendQueue = [];
-    this.candidateSendTries = 0;
+    this.sendingCandidates = false;
 
     // Lookup from opaque queue ID to a promise for media element operations that
     // need to be serialised into a given queue.  Store this per-MatrixCall on the
@@ -972,6 +973,11 @@ const setState = function(self, state) {
  * @return {Promise}
  */
 const sendEvent = function(self, eventType, content) {
+    // XXX: This makes this promise always succeed (ie. swallows the error)
+    // but only one of our sendEvent calls catches the rejection (the
+    // candidate sending one, for good hygiene). In practice what this means
+    // is that the events go into the room's pending events, but this is
+    // definitely not the most graceful way to handle failures.
     return self.client.sendEvent(self.roomId, eventType, content).catch(
         (err) => {
             self.emit('send_event_error', err);
@@ -980,10 +986,10 @@ const sendEvent = function(self, eventType, content) {
 };
 
 const sendCandidate = function(self, content) {
-    // Sends candidates with are sent in a special way because we try to amalgamate
+    // candidates are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
-    if (self.candidateSendTries === 0) {
+    if (!self.sendingCandidates) {
         setTimeout(function() {
             _sendCandidateQueue(self);
         }, 100);
@@ -1124,7 +1130,7 @@ const _sendCandidateQueue = function(self) {
 
     const cands = self.candidateSendQueue;
     self.candidateSendQueue = [];
-    ++self.candidateSendTries;
+    self.sendingCandidates = true;
     const content = {
         version: 0,
         call_id: self.callId,
@@ -1132,28 +1138,10 @@ const _sendCandidateQueue = function(self) {
     };
     debuglog("Attempting to send " + cands.length + " candidates");
     sendEvent(self, 'm.call.candidates', content).then(function() {
-        self.candidateSendTries = 0;
+        self.sendingCandidates = false;
         _sendCandidateQueue(self);
-    }, function(error) {
-        for (let i = 0; i < cands.length; i++) {
-            self.candidateSendQueue.push(cands[i]);
-        }
-
-        if (self.candidateSendTries > 5) {
-            debuglog(
-                "Failed to send candidates on attempt %s. Giving up for now.",
-                self.candidateSendTries,
-            );
-            self.candidateSendTries = 0;
-            return;
-        }
-
-        const delayMs = 500 * Math.pow(2, self.candidateSendTries);
-        ++self.candidateSendTries;
-        debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
-        setTimeout(function() {
-            _sendCandidateQueue(self);
-        }, delayMs);
+    }).catch(() => {
+        self.sendingCandidates = false;
     });
 };
 
