@@ -699,8 +699,11 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * @param {string} syncToken the old next_batch token sent to this
  *    sync request.
  * @param {Object} data The response from /sync
+ * @param {bool} isCachedResponse True if this response is from our local cache
  */
-SyncApi.prototype._processSyncResponse = async function(syncToken, data, isCachedResponse) {
+SyncApi.prototype._processSyncResponse = async function(
+    syncToken, data, isCachedResponse,
+) {
     const client = this.client;
     const self = this;
 
