@@ -1,3 +1,27 @@
+Changes in [0.9.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.0-rc.1) (2017-11-10)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.5...v0.9.0-rc.1)
+
+ * Modify addRoomToGroup to allow setting isPublic, create alias
+   updateGroupRoomAssociation
+   [\#567](https://github.com/matrix-org/matrix-js-sdk/pull/567)
+ * Expose more functionality of pushprocessor
+   [\#565](https://github.com/matrix-org/matrix-js-sdk/pull/565)
+ * Function for working out notif trigger permission
+   [\#566](https://github.com/matrix-org/matrix-js-sdk/pull/566)
+ * keep track of event ID and timestamp of decrypted messages
+   [\#555](https://github.com/matrix-org/matrix-js-sdk/pull/555)
+ * Fix notifEvent computation
+   [\#564](https://github.com/matrix-org/matrix-js-sdk/pull/564)
+ * Fix power level of sentinel members
+   [\#563](https://github.com/matrix-org/matrix-js-sdk/pull/563)
+ * don't try to decrypt a redacted message (fixes vector-im/riot-web#3744)
+   [\#554](https://github.com/matrix-org/matrix-js-sdk/pull/554)
+ * Support room notifs
+   [\#562](https://github.com/matrix-org/matrix-js-sdk/pull/562)
+ * Fix the glob-to-regex code
+   [\#558](https://github.com/matrix-org/matrix-js-sdk/pull/558)
+
 Changes in [0.8.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.8.5) (2017-10-16)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.8.5-rc.1...v0.8.5)
