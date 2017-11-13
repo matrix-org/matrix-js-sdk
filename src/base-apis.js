@@ -579,11 +579,26 @@ MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId, isPublic) {
 };
 
 /**
- * Alias for addRoomToGroup.
- * @see module:base-apis.addRoomToGroup
+ * Configure the visibility of a room-group association.
+ * @param {string} groupId
+ * @param {string} roomId
+ * @param {bool} isPublic Whether the room-group association is visible to non-members
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.updateGroupRoomAssociation =
-MatrixBaseApis.prototype.addRoomToGroup;
+MatrixBaseApis.prototype.updateGroupRoomVisibility = function(groupId, roomId, isPublic) {
+    // NB: The /config API is generic but there's not much point in exposing this yet as synapse
+    //     is the only server to implement this. In future we should consider an API that allows
+    //     arbitrary configuration, i.e. "config/$configKey".
+
+    const path = utils.encodeUri(
+        "/groups/$groupId/admin/rooms/$roomId/config/m.visibility",
+        {$groupId: groupId, $roomId: roomId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined,
+        { type: isPublic ? "public" : "private" },
+    );
+};
 
 /**
  * @param {string} groupId
@@ -601,15 +616,16 @@ MatrixBaseApis.prototype.removeRoomFromGroup = function(groupId, roomId) {
 
 /**
  * @param {string} groupId
+ * @param {Object} opts Additional options to send alongside the acceptance.
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.acceptGroupInvite = function(groupId) {
+MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/accept_invite",
         {$groupId: groupId},
     );
-    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+    return this._http.authedRequest(undefined, "PUT", path, undefined, opts || {});
 };
 
 /**
