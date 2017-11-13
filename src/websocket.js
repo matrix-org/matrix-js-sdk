@@ -300,7 +300,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
                     account_data: {
                         events: cachedSync.accountData,
                     },
-                });
+                }, true);
                 client.store.setSyncToken(cachedSync.nextBatch);
                 return cachedSync.nextBatch;
             } else {
@@ -314,7 +314,7 @@ WebSocketApi.prototype._start = function(syncOptions) {
                     });
                 }).then((data) => {
                     try {
-                        client._syncApi._processSyncResponse(null, data);
+                        client._syncApi._processSyncResponse(null, data, false);
                     } catch (e) {
                         console.error("Caught /sync error", e.stack || e);
                     }
@@ -484,7 +484,7 @@ WebSocketApi.prototype.handleSync = function(data) {
     self._failedSyncCount = 0;
 
     client.store.setSyncData(data)
-    .then(() => client._syncApi._processSyncResponse(self.ws_syncToken, data)
+    .then(() => client._syncApi._processSyncResponse(self.ws_syncToken, data, false)
     .catch((e) => {
         // log the exception with stack if we have it, else fall back
         // to the plain description
