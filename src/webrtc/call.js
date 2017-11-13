@@ -974,10 +974,10 @@ const setState = function(self, state) {
  */
 const sendEvent = function(self, eventType, content) {
     // XXX: This makes this promise always succeed (ie. swallows the error)
-    // but only one of our sendEvent calls catches the rejection (the
-    // candidate sending one, for good hygiene). In practice what this means
-    // is that the events go into the room's pending events, but this is
-    // definitely not the most graceful way to handle failures.
+    // (although the candidate sending one sendEvent call still catches it
+    // for good hygiene). In practice what this means is that the events
+    // go into the room's pending events, but this is definitely not the
+    // most graceful way to handle failures.
     return self.client.sendEvent(self.roomId, eventType, content).catch(
         (err) => {
             self.emit('send_event_error', err);
