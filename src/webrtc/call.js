@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,6 +82,12 @@ MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
  * the hardware isn't plugged in, or the user has explicitly denied access.
  */
 MatrixCall.ERR_NO_USER_MEDIA = "no_user_media";
+
+/*
+ * Error code used when a call event failed to send
+ * because unknown devices were present in the room
+ */
+MatrixCall.ERR_UNKNOWN_DEVICES = "unknown_devices";
 
 utils.inherits(MatrixCall, EventEmitter);
 
@@ -416,6 +423,8 @@ MatrixCall.prototype._replacedBy = function(newCall) {
  * @param {boolean} suppressEvent True to suppress emitting an event.
  */
 MatrixCall.prototype.hangup = function(reason, suppressEvent) {
+    if (this.state == 'ended') return;
+
     debuglog("Ending call " + this.callId);
     terminate(this, "local", reason, !suppressEvent);
     const content = {
@@ -630,6 +639,9 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
             "Got local ICE " + event.candidate.sdpMid + " candidate: " +
             event.candidate.candidate,
         );
+
+        if (this.state == 'ended') return;
+
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
         const c = {
@@ -712,14 +724,26 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             },
             lifetime: MatrixCall.CALL_TIMEOUT_MS,
         };
-        sendEvent(self, 'm.call.invite', content);
+        sendEvent(self, 'm.call.invite', content).then(() => {
+            setState(self, 'invite_sent');
+            setTimeout(function() {
+                if (self.state == 'invite_sent') {
+                    self.hangup('invite_timeout');
+                }
+            }, MatrixCall.CALL_TIMEOUT_MS);
+        }).catch((error) => {
+            self.client.cancelPendingEvent(error.event);
+            terminate(self, "local", "unknown_devices", false);
+            self.emit(
+                "error",
+                callError(
+                    MatrixCall.ERR_UNKNOWN_DEVICES,
+                    "Unknown devices present in the room",
+                ),
+            );
+            throw error;
+        });
 
-        setTimeout(function() {
-            if (self.state == 'invite_sent') {
-                self.hangup('invite_timeout');
-            }
-        }, MatrixCall.CALL_TIMEOUT_MS);
-        setState(self, 'invite_sent');
     }, function() {
         debuglog("Error setting local description!");
     });
