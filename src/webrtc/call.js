@@ -767,6 +767,7 @@ MatrixCall.prototype._getLocalOfferFailed = function(error) {
  * @param {Object} error
  */
 MatrixCall.prototype._getUserMediaFailed = function(error) {
+    terminate(this, "local", 'user_media_failed', false);
     this.emit(
         "error",
         callError(
@@ -775,7 +776,6 @@ MatrixCall.prototype._getUserMediaFailed = function(error) {
             "does this app have permission?",
         ),
     );
-    this.hangup("user_media_failed");
 };
 
 /**
