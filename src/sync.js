@@ -71,6 +71,8 @@ function debuglog(...params) {
  * SAFELY remove events from this room. It may not be safe to remove events if
  * there are other references to the timelines for this room.
  * Default: returns false.
+ * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
+ * updating presence.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -545,6 +547,10 @@ SyncApi.prototype._sync = async function(syncOptions) {
         timeout: pollTimeout,
     };
 
+    if (this.opts.disablePresence) {
+        qps.set_presence = "offline";
+    }
+
     if (syncToken) {
         qps.since = syncToken;
     } else {
@@ -616,7 +622,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     try {
-        await this._processSyncResponse(syncToken, data);
+        await this._processSyncResponse(syncToken, data, isCachedResponse);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -699,8 +705,11 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * @param {string} syncToken the old next_batch token sent to this
  *    sync request.
  * @param {Object} data The response from /sync
+ * @param {bool} isCachedResponse True if this response is from our local cache
  */
-SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
+SyncApi.prototype._processSyncResponse = async function(
+    syncToken, data, isCachedResponse,
+) {
     const client = this.client;
     const self = this;
 
@@ -779,7 +788,13 @@ SyncApi.prototype._processSyncResponse = async function(syncToken, data) {
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
-                if (accountDataEvent.getType() == 'm.push_rules') {
+                // XXX: This is awful: ignore push rules from our cached sync. We fetch the
+                // push rules before syncing so we actually have up-to-date ones. We do want
+                // to honour new push rules that come down the sync but synapse doesn't
+                // put new push rules in the sync stream when the base rules change, so
+                // if the base rules change, we do need to refresh. We therefore ignore
+                // the push rules in our cached sync response.
+                if (accountDataEvent.getType() == 'm.push_rules' && !isCachedResponse) {
                     client.pushRules = accountDataEvent.getContent();
                 }
                 client.emit("accountData", accountDataEvent);
