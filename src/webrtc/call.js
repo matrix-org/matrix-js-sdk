@@ -70,6 +70,8 @@ function MatrixCall(opts) {
     this.mediaPromises = Object.create(null);
 
     this.screenSharingStream = null;
+
+    this._answerContent = null;
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
@@ -375,6 +377,11 @@ MatrixCall.prototype.answer = function() {
     debuglog("Answering call %s of type %s", this.callId, this.type);
     const self = this;
 
+    if (self._answerContent) {
+        self._sendAnswer();
+        return;
+    }
+
     if (!this.localAVStream && !this.waitForLocalAVStream) {
         this.webRtc.getUserMedia(
             _getUserMediaVideoContraints(this.type),
@@ -561,6 +568,27 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
     setState(self, 'create_offer');
 };
 
+MatrixCall.prototype._sendAnswer = function(stream) {
+    sendEvent(this, 'm.call.answer', this._answerContent).then(() => {
+        setState(this, 'connecting');
+        // If this isn't the first time we've tried to send the answer,
+        // we may have candidates queued up, so send them now.
+        _sendCandidateQueue(this);
+    }).catch((error) => {
+        // We've failed to answer: back to the ringing state
+        setState(this, 'ringing');
+        this.client.cancelPendingEvent(error.event);
+        this.emit(
+            "error",
+            callError(
+                MatrixCall.ERR_UNKNOWN_DEVICES,
+                "Unknown devices present in the room",
+            ),
+        );
+        throw error;
+    });
+};
+
 /**
  * Internal
  * @private
@@ -609,7 +637,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     self.peerConn.createAnswer(function(description) {
         debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
-            const content = {
+            self._answerContent = {
                 version: 0,
                 call_id: self.callId,
                 answer: {
@@ -617,8 +645,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
                     type: self.peerConn.localDescription.type,
                 },
             };
-            sendEvent(self, 'm.call.answer', content);
-            setState(self, 'connecting');
+            self._sendAnswer();
         }, function() {
             debuglog("Error setting local description!");
         }, constraints);
@@ -962,6 +989,13 @@ const sendCandidate = function(self, content) {
     // Sends candidates with are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
+
+    // Don't send the ICE candidates yet if the call is in the ringing state: this
+    // means we tried to pick (ie. started generating candidates) and then failed to
+    // send the answer and went back to the ringing state. Queue up the candidates
+    // to send if we sucessfully send the answer.
+    if (self.state == 'ringing') return;
+
     if (self.candidateSendTries === 0) {
         setTimeout(function() {
             _sendCandidateQueue(self);
