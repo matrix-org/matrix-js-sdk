@@ -1296,11 +1296,11 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * Create a new Matrix call for the browser.
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
- * @param {Object?} options optional options map.
- * @param {boolean} options.forceTURN whether relay through TURN should be forced.
+ * @param {Object?} options DEPRECATED optional options map.
+ * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be forced. This option is deprecated - use opts.forceTURN when creating the matrix client since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-module.exports.createNewMatrixCall = function(client, roomId) {
+module.exports.createNewMatrixCall = function(client, roomId, options) {
     const w = global.window;
     const doc = global.document;
     if (!w || !doc) {
@@ -1350,6 +1350,9 @@ module.exports.createNewMatrixCall = function(client, roomId) {
             !webRtc.RtcPeerConnection || !webRtc.getUserMedia) {
         return null; // WebRTC is not supported.
     }
+
+    const optionsForceTURN = options ? options.forceTURN : false;
+
     const opts = {
         webRtc: webRtc,
         client: client,
@@ -1357,7 +1360,7 @@ module.exports.createNewMatrixCall = function(client, roomId) {
         roomId: roomId,
         turnServers: client.getTurnServers(),
         // call level options
-        forceTURN: client._forceTURN,
+        forceTURN: client._forceTURN || optionsForceTURN,
     };
     return new MatrixCall(opts);
 };
