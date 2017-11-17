@@ -1,3 +1,10 @@
+Changes in [0.9.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.1) (2017-11-17)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.0...v0.9.1)
+
+ * Fix the force TURN option
+   [\#577](https://github.com/matrix-org/matrix-js-sdk/pull/577)
+
 Changes in [0.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.0) (2017-11-15)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.0-rc.1...v0.9.0)
