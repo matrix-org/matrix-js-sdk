@@ -258,9 +258,10 @@ MatrixClient.prototype.supportsVoip = function() {
  * Set whether VoIP calls are forced to use only TURN
  * candidates. This is the same as the forceTURN option
  * when creating the client.
+ * @param {bool} forceTURN True to force use of TURN servers
  */
 MatrixClient.prototype.setForceTURN = function(forceTURN) {
-    return this._forceTURN = forceTURN;
+    this._forceTURN = forceTURN;
 };
 
 /**
