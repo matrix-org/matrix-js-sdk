@@ -1300,7 +1300,7 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * @param {boolean} options.forceTURN whether relay through TURN should be forced.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-module.exports.createNewMatrixCall = function(client, roomId, options) {
+module.exports.createNewMatrixCall = function(client, roomId) {
     const w = global.window;
     const doc = global.document;
     if (!w || !doc) {
@@ -1357,7 +1357,7 @@ module.exports.createNewMatrixCall = function(client, roomId, options) {
         roomId: roomId,
         turnServers: client.getTurnServers(),
         // call level options
-        forceTURN: options ? options.forceTURN : false,
+        forceTURN: client._forceTURN,
     };
     return new MatrixCall(opts);
 };

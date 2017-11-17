@@ -175,6 +175,8 @@ function MatrixClient(opts) {
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
 
+    this._forceTURN = opts.forceTURN || false;
+
     if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
@@ -250,6 +252,15 @@ MatrixClient.prototype.getDeviceId = function() {
  */
 MatrixClient.prototype.supportsVoip = function() {
     return this._supportsVoip;
+};
+
+/**
+ * Set whether VoIP calls are forced to use only TURN
+ * candidates. This is the same as the forceTURN option
+ * when creating the client.
+ */
+MatrixClient.prototype.setForceTURN = function(forceTURN) {
+    return this._forceTURN = forceTURN;
 };
 
 /**
@@ -3153,7 +3164,9 @@ function setupCallEventHandler(client) {
                 );
             }
 
-            call = webRtcCall.createNewMatrixCall(client, event.getRoomId());
+            call = webRtcCall.createNewMatrixCall(client, event.getRoomId(), {
+                forceTURN: client._forceTURN,
+            });
             if (!call) {
                 console.log(
                     "Incoming call ID " + content.call_id + " but this client " +
