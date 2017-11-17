@@ -107,6 +107,18 @@ MatrixCall.ERR_NO_USER_MEDIA = "no_user_media";
  */
 MatrixCall.ERR_UNKNOWN_DEVICES = "unknown_devices";
 
+/*
+ * Error code usewd when we fail to send the invite
+ * for some reason other than there being unknown devices
+ */
+MatrixCall.ERR_SEND_INVITE = "send_invite";
+
+/*
+ * Error code usewd when we fail to send the answer
+ * for some reason other than there being unknown devices
+ */
+MatrixCall.ERR_SEND_ANSWER = "send_answer";
+
 utils.inherits(MatrixCall, EventEmitter);
 
 /**
@@ -594,13 +606,14 @@ MatrixCall.prototype._sendAnswer = function(stream) {
         // We've failed to answer: back to the ringing state
         setState(this, 'ringing');
         this.client.cancelPendingEvent(error.event);
-        this.emit(
-            "error",
-            callError(
-                MatrixCall.ERR_UNKNOWN_DEVICES,
-                "Unknown devices present in the room",
-            ),
-        );
+
+        let code = MatrixCall.ERR_SEND_ANSWER;
+        let message = "Failed to send answer";
+        if (error.name == 'UnknownDeviceError') {
+            code = MatrixCall.ERR_UNKNOWN_DEVICES;
+            message = "Unknown devices present in the room";
+        }
+        this.emit("error", callError(code, message));
         throw error;
     });
 };
@@ -775,15 +788,16 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
                 }
             }, MatrixCall.CALL_TIMEOUT_MS);
         }).catch((error) => {
+            let code = MatrixCall.ERR_SEND_INVITE;
+            let message = "Failed to send invite";
+            if (error.name == 'UnknownDeviceError') {
+                code = MatrixCall.ERR_UNKNOWN_DEVICES;
+                message = "Unknown devices present in the room";
+            }
+
             self.client.cancelPendingEvent(error.event);
-            terminate(self, "local", "unknown_devices", false);
-            self.emit(
-                "error",
-                callError(
-                    MatrixCall.ERR_UNKNOWN_DEVICES,
-                    "Unknown devices present in the room",
-                ),
-            );
+            terminate(self, "local", code, false);
+            self.emit("error", callError(code, message));
             throw error;
         });
 
