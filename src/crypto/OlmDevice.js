@@ -79,8 +79,9 @@ function checkPayloadLength(payloadString) {
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
  */
-function OlmDevice(sessionStore) {
+function OlmDevice(sessionStore, cryptoStore) {
     this._sessionStore = sessionStore;
+    this._cryptoStore = cryptoStore;
     this._pickleKey = "DEFAULT_KEY";
 
     // don't know these until we load the account from storage in init()
@@ -124,7 +125,7 @@ OlmDevice.prototype.init = async function() {
     let e2eKeys;
     const account = new Olm.Account();
     try {
-        _initialise_account(this._sessionStore, this._pickleKey, account);
+        await _initialise_account(this._cryptoStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -137,16 +138,16 @@ OlmDevice.prototype.init = async function() {
 };
 
 
-function _initialise_account(sessionStore, pickleKey, account) {
-    const e2eAccount = sessionStore.getEndToEndAccount();
-    if (e2eAccount !== null) {
-        account.unpickle(pickleKey, e2eAccount);
+async function _initialise_account(cryptoStore, pickleKey, account) {
+    const accountTxn = await cryptoStore.endToEndAccountTransaction();
+    if (accountTxn.account !== null) {
+        account.unpickle(pickleKey, accountTxn.account);
         return;
     }
 
     account.create();
     const pickled = account.pickle(pickleKey);
-    sessionStore.storeEndToEndAccount(pickled);
+    await accountTxn.save(pickled);
 }
 
 /**
@@ -158,21 +159,36 @@ OlmDevice.getOlmVersion = function() {
 
 
 /**
- * extract our OlmAccount from the session store and call the given function
+ * extract our OlmAccount from the crypto store and call the given function
+ * with the account object and a 'save' function which returns a promise.
+ * The function will not be awaited upon and the save function must be
+ * called before the function returns, or not at all.
  *
  * @param {function} func
  * @return {object} result of func
  * @private
  */
-OlmDevice.prototype._getAccount = function(func) {
-    const account = new Olm.Account();
+OlmDevice.prototype._getAccount = async function(func) {
+    let result;
+
+    let account = null;
     try {
-        const pickledAccount = this._sessionStore.getEndToEndAccount();
-        account.unpickle(this._pickleKey, pickledAccount);
-        return func(account);
+        const accountTxn = await this._cryptoStore.endToEndAccountTransaction();
+        // Olm has a limited stack size so we must tightly control the number of
+        // Olm account objects in existence at any given time: once created, it
+        // must be destroyed again before we await.
+        account = new Olm.Account();
+        account.unpickle(this._pickleKey, accountTxn.account);
+
+        result = func(account, () => {
+                const pickledAccount = account.pickle(this._pickleKey);
+                return accountTxn.save(pickledAccount);
+            }
+        );
     } finally {
-        account.free();
+        if (account !== null) account.free();
     }
+    return result;
 };
 
 
@@ -182,9 +198,9 @@ OlmDevice.prototype._getAccount = function(func) {
  * @param {OlmAccount} account
  * @private
  */
-OlmDevice.prototype._saveAccount = function(account) {
+OlmDevice.prototype._saveAccount = async function(account) {
     const pickledAccount = account.pickle(this._pickleKey);
-    this._sessionStore.storeEndToEndAccount(pickledAccount);
+    await this._cryptoStore.storeEndToEndAccount(pickledAccount);
 };
 
 
@@ -250,7 +266,7 @@ OlmDevice.prototype._getUtility = function(func) {
  * @return {Promise<string>} base64-encoded signature
  */
 OlmDevice.prototype.sign = async function(message) {
-    return this._getAccount(function(account) {
+    return await this._getAccount(function(account) {
         return account.sign(message);
     });
 };
@@ -263,7 +279,7 @@ OlmDevice.prototype.sign = async function(message) {
  * key.
  */
 OlmDevice.prototype.getOneTimeKeys = async function() {
-    return this._getAccount(function(account) {
+    return await this._getAccount(function(account) {
         return JSON.parse(account.one_time_keys());
     });
 };
@@ -283,9 +299,9 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
  */
 OlmDevice.prototype.markKeysAsPublished = async function() {
     const self = this;
-    this._getAccount(function(account) {
+    await this._getAccount(function(account, save) {
         account.mark_keys_as_published();
-        self._saveAccount(account);
+        return save();
     });
 };
 
@@ -296,9 +312,9 @@ OlmDevice.prototype.markKeysAsPublished = async function() {
  */
 OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
     const self = this;
-    this._getAccount(function(account) {
+    return this._getAccount(function(account, save) {
         account.generate_one_time_keys(numKeys);
-        self._saveAccount(account);
+        return save();
     });
 };
 
@@ -315,11 +331,12 @@ OlmDevice.prototype.createOutboundSession = async function(
     theirIdentityKey, theirOneTimeKey,
 ) {
     const self = this;
-    return this._getAccount(function(account) {
+    return await this._getAccount(async function(account, save) {
         const session = new Olm.Session();
         try {
             session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
-            self._saveSession(theirIdentityKey, session);
+            await save();
+            await self._saveSession(theirIdentityKey, session);
             return session.session_id();
         } finally {
             session.free();
@@ -349,12 +366,12 @@ OlmDevice.prototype.createInboundSession = async function(
     }
 
     const self = this;
-    return this._getAccount(function(account) {
+    return await this._getAccount(async function(account, save) {
         const session = new Olm.Session();
         try {
             session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
             account.remove_one_time_keys(session);
-            self._saveAccount(account);
+            await save();
 
             const payloadString = session.decrypt(message_type, ciphertext);
 

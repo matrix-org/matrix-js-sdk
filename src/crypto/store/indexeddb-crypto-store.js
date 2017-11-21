@@ -220,4 +220,20 @@ export default class IndexedDBCryptoStore {
             return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
         });
     }
+
+    /**
+     * Load the end to end account for the logged-in user, giving an object
+     * that has the base64 encoded account string and a method for saving
+     * the account string back to the database. This allows the account
+     * to be read and writen atomically.
+     * @return {Promise<Object>} Object
+     * @return {Promise<Object>.account} Base64 encoded account.
+     * @return {Promise<Object>.save} Function to save account data back.
+     *     Takes base64 encoded account data, returns a promise.
+     */
+    endToEndAccountTransaction() {
+        return this._connect().then((backend) => {
+            return backend.endToEndAccountTransaction();
+        });
+    }
 }

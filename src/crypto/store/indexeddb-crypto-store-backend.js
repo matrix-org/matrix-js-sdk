@@ -1,7 +1,7 @@
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 1;
+export const VERSION = 2;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -257,6 +257,38 @@ export class Backend {
         };
         return promiseifyTxn(txn);
     }
+
+    /**
+     * Load the end to end account for the logged-in user, giving an object
+     * that has the base64 encoded account string and a method for saving
+     * the account string back to the database. This allows the account
+     * to be read and writen atomically.
+     * @return {Promise<Object>} Object
+     * @return {Promise<Object>.account} Base64 encoded account.
+     * @return {Promise<Object>.save} Function to save account data back.
+     *     Takes base64 encoded account data, returns a promise.
+     */
+    endToEndAccountTransaction() {
+        const txn = this._db.transaction("account", "readwrite");
+        const objectStore = txn.objectStore("account");
+
+
+        return new Promise((resolve, reject) => {
+            const getReq = objectStore.get("-");
+            getReq.onsuccess = function() {
+                resolve({
+                    account: getReq.result || null,
+                    save: (newData) => {
+                        const saveReq = objectStore.put(newData, "-");
+                        return promiseifyTxn(txn);
+                    },
+                });
+            };
+            getReq.onerror = reject;
+        });
+
+        return promiseifyTxn(txn).then(() => returnObj);
+    }
 }
 
 export function upgradeDatabase(db, oldVersion) {
@@ -266,6 +298,9 @@ export function upgradeDatabase(db, oldVersion) {
     );
     if (oldVersion < 1) { // The database did not previously exist.
         createDatabase(db);
+    }
+    if (oldVersion < 2) {
+        createV2Tables(db);
     }
     // Expand as needed.
 }
@@ -281,6 +316,10 @@ function createDatabase(db) {
     );
 
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
+}
+
+function createV2Tables(db) {
+    db.createObjectStore("account");
 }
 
 function promiseifyTxn(txn) {
