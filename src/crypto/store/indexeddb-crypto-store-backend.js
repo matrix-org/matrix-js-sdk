@@ -275,6 +275,10 @@ export class Backend {
 
         return new Promise((resolve, reject) => {
             const getReq = objectStore.get("-");
+            // We resolve on success here rather than on complete:
+            // the caller may wish to save the account back, which needs
+            // to be done while the transaction is still open (ie. before
+            // oncomplete)
             getReq.onsuccess = function() {
                 resolve({
                     account: getReq.result || null,
