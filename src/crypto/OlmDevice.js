@@ -126,7 +126,7 @@ OlmDevice.prototype.init = async function() {
     let e2eKeys;
     const account = new Olm.Account();
     try {
-        await _initialise_account(this._cryptoStore, this._pickleKey, account);
+        await _initialise_account(this._sessionStore, this._cryptoStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -139,16 +139,29 @@ OlmDevice.prototype.init = async function() {
 };
 
 
-async function _initialise_account(cryptoStore, pickleKey, account) {
+async function _initialise_account(sessionStore, cryptoStore, pickleKey, account) {
+    let removeFromSessionStore = false;
     await cryptoStore.endToEndAccountTransaction((accountData, save) => {
         if (accountData !== null) {
             account.unpickle(pickleKey, accountData);
         } else {
-            account.create();
-            const pickled = account.pickle(pickleKey);
-            save(pickled);
+            // Migrate from sessionStore
+            accountData = sessionStore.getEndToEndAccount();
+            if (accountData !== null) {
+                removeFromSessionStore = true;
+                account.unpickle(pickleKey, accountData);
+            } else {
+                account.create();
+                accountData = account.pickle(pickleKey);
+            }
+            save(accountData);
         }
     });
+
+    // only remove this once it's safely saved to the crypto store
+    if (removeFromSessionStore) {
+        sessionStore.removeEndToEndAccount();
+    }
 }
 
 /**
