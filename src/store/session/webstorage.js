@@ -57,6 +57,9 @@ WebStorageSessionStore.prototype = {
 
     /**
      * Load the end to end account for the logged-in user.
+     * Note that the end-to-end account is now stored in the
+     * crypto store rather than here: this remains here so
+     * old sessions can be migrated out of the session store.
      * @return {?string} Base64 encoded account.
      */
     getEndToEndAccount: function() {
