@@ -282,7 +282,6 @@ export class Backend {
                 getReq.result || null,
                 (newData) => {
                     objectStore.put(newData, "-");
-                    return txnPromise;
                 },
             );
         };

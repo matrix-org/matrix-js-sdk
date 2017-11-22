@@ -197,7 +197,7 @@ OlmDevice.prototype._getAccount = async function(func) {
 
             result = func(account, () => {
                 const pickledAccount = account.pickle(this._pickleKey);
-                return save(pickledAccount);
+                save(pickledAccount);
             });
         } finally {
             account.free();
@@ -315,7 +315,7 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
 OlmDevice.prototype.markKeysAsPublished = async function() {
     await this._getAccount(function(account, save) {
         account.mark_keys_as_published();
-        return save();
+        save();
     });
 };
 
@@ -328,7 +328,7 @@ OlmDevice.prototype.markKeysAsPublished = async function() {
 OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
     return this._getAccount(function(account, save) {
         account.generate_one_time_keys(numKeys);
-        return save();
+        save();
     });
 };
 
@@ -345,12 +345,12 @@ OlmDevice.prototype.createOutboundSession = async function(
     theirIdentityKey, theirOneTimeKey,
 ) {
     const self = this;
-    return await this._getAccount(async function(account, save) {
+    return await this._getAccount(function(account, save) {
         const session = new Olm.Session();
         try {
             session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
-            await save();
-            await self._saveSession(theirIdentityKey, session);
+            save();
+            self._saveSession(theirIdentityKey, session);
             return session.session_id();
         } finally {
             session.free();
@@ -380,12 +380,12 @@ OlmDevice.prototype.createInboundSession = async function(
     }
 
     const self = this;
-    return await this._getAccount(async function(account, save) {
+    return await this._getAccount(function(account, save) {
         const session = new Olm.Session();
         try {
             session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
             account.remove_one_time_keys(session);
-            await save();
+            save();
 
             const payloadString = session.decrypt(message_type, ciphertext);
 
