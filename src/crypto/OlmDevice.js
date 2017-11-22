@@ -173,7 +173,7 @@ OlmDevice.prototype._getAccount = async function(func) {
     let result;
 
     await this._cryptoStore.endToEndAccountTransaction((accountData, save) => {
-        // Olm has a limited stack size so we must tightly control the number of
+        // Olm has a limited heap size so we must tightly control the number of
         // Olm account objects in existence at any given time: once created, it
         // must be destroyed again before we await.
         const account = new Olm.Account();
