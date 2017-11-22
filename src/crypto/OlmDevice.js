@@ -208,18 +208,6 @@ OlmDevice.prototype._getAccount = async function(func) {
 
 
 /**
- * store our OlmAccount in the session store
- *
- * @param {OlmAccount} account
- * @private
- */
-OlmDevice.prototype._saveAccount = async function(account) {
-    const pickledAccount = account.pickle(this._pickleKey);
-    await this._cryptoStore.storeEndToEndAccount(pickledAccount);
-};
-
-
-/**
  * extract an OlmSession from the session store and call the given function
  *
  * @param {string} deviceKey
