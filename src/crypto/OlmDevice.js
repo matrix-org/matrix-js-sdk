@@ -74,7 +74,8 @@ function checkPayloadLength(payloadString) {
  * @alias module:crypto/OlmDevice
  *
  * @param {Object} sessionStore A store to be used for data in end-to-end
- *    crypto
+ *    crypto. This is deprecated and being replaced by cryptoStore.
+ * @param {Object} cryptoStore A store for crypto data
  *
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
@@ -297,7 +298,6 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
  * Marks all of the one-time keys as published.
  */
 OlmDevice.prototype.markKeysAsPublished = async function() {
-    const self = this;
     await this._getAccount(function(account, save) {
         account.mark_keys_as_published();
         return save();
@@ -308,9 +308,9 @@ OlmDevice.prototype.markKeysAsPublished = async function() {
  * Generate some new one-time keys
  *
  * @param {number} numKeys number of keys to generate
+ * @return {Promise} Resolved once the account is saved back having generated the keys
  */
 OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
-    const self = this;
     return this._getAccount(function(account, save) {
         account.generate_one_time_keys(numKeys);
         return save();
