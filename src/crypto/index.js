@@ -192,18 +192,17 @@ Crypto.prototype.getDeviceEd25519Key = function() {
 
 /**
  * Set the global override for whether the client should ever send encrypted
- * messages to unverified devices.  If false, it can still be overridden
- * per-room.  If true, it overrides the per-room settings.
+ * messages to unverified devices.  This provides the default for rooms which
+ * do not specify a value.
  *
- * @param {boolean} value whether to unilaterally blacklist all
- * unverified devices
+ * @param {boolean} value whether to blacklist all unverified devices by default
  */
 Crypto.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
     this._globalBlacklistUnverifiedDevices = value;
 };
 
 /**
- * @return {boolean} whether to unilaterally blacklist all unverified devices
+ * @return {boolean} whether to blacklist all unverified devices by default
  */
 Crypto.prototype.getGlobalBlacklistUnverifiedDevices = function() {
     return this._globalBlacklistUnverifiedDevices;

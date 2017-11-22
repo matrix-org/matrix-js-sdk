@@ -169,7 +169,8 @@ function Room(roomId, opts) {
         this._pendingEventList = [];
     }
 
-    this._blacklistUnverifiedDevices = false; // read by megolm
+    // read by megolm; boolean value - null indicates "use global value"
+    this._blacklistUnverifiedDevices = null;
 }
 utils.inherits(Room, EventEmitter);
 
@@ -307,8 +308,8 @@ Room.prototype.setUnreadNotificationCount = function(type, count) {
 
 /**
  * Whether to send encrypted messages to devices within this room.
- * Will be ignored if MatrixClient's blacklistUnverifiedDevices setting is true.
- * @param {boolean} value if true, blacklist unverified devices.
+ * @param {Boolean} value true to blacklist unverified devices, null
+ * to use the global value for this room.
  */
 Room.prototype.setBlacklistUnverifiedDevices = function(value) {
     this._blacklistUnverifiedDevices = value;
@@ -316,8 +317,8 @@ Room.prototype.setBlacklistUnverifiedDevices = function(value) {
 
 /**
  * Whether to send encrypted messages to devices within this room.
- * Will be ignored if MatrixClient's blacklistUnverifiedDevices setting is true.
- * @return {boolean} true if blacklisting unverified devices.
+ * @return {Boolean} true if blacklisting unverified devices, null
+ * if the global value should be used for this room.
  */
 Room.prototype.getBlacklistUnverifiedDevices = function() {
     return this._blacklistUnverifiedDevices;
