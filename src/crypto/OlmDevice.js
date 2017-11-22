@@ -198,7 +198,7 @@ OlmDevice.prototype._getAccount = async function(func) {
                 return save(pickledAccount);
             });
         } finally {
-            if (account !== null) account.free();
+            account.free();
         }
     });
     return result;
