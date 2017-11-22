@@ -424,7 +424,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                     // decryption error, but we have a retry queued.
                     console.log(
                         `Got error decrypting event (id=${this.getId()}: ` +
-                        `${e.message}), but retrying`,
+                        `${e}), but retrying`,
                     );
                     continue;
                 }
@@ -432,7 +432,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
                 console.warn(
-                    `Error decrypting event (id=${this.getId()}): ${e}`,
+                    `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
                 );
 
                 res = this._badEncryptedMessage(e.message);

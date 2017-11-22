@@ -179,30 +179,25 @@ class DecryptionError extends Error {
     constructor(msg, details) {
         super(msg);
         this.name = 'DecryptionError';
-        this.details = details;
-    }
-
-    /**
-     * override the string used when logging
-     *
-     * @returns {String}
-     */
-    toString() {
-        let result = this.name + '[msg: ' + this.message;
-
-        if (this.details) {
-            result += ', ' +
-                Object.keys(this.details).map(
-                    (k) => k + ': ' + this.details[k],
-                ).join(', ');
-        }
-
-        result += ']';
-
-        return result;
+        this.detailedString = _detailedStringForDecryptionError(this, details);
     }
 }
 export {DecryptionError}; // https://github.com/jsdoc3/jsdoc/issues/1272
+
+function _detailedStringForDecryptionError(err, details) {
+    let result = err.name + '[msg: ' + err.message;
+
+    if (details) {
+        result += ', ' +
+            Object.keys(details).map(
+                (k) => k + ': ' + details[k],
+            ).join(', ');
+    }
+
+    result += ']';
+
+    return result;
+}
 
 /**
  * Exception thrown specifically when we want to warn the user to consider
