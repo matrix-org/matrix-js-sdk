@@ -177,8 +177,8 @@ OlmDevice.getOlmVersion = function() {
 /**
  * extract our OlmAccount from the crypto store and call the given function
  * with the account object and a 'save' function which returns a promise.
- * The function will not be awaited upon and the save function must be
- * called before the function returns, or not at all.
+ * The `account` will be freed as soon as `func` returns - even if func returns
+ * a promise
  *
  * @param {function} func
  * @return {object} result of func
