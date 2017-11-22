@@ -143,20 +143,20 @@ OlmDevice.prototype.init = async function() {
 
 async function _initialise_account(sessionStore, cryptoStore, pickleKey, account) {
     let removeFromSessionStore = false;
-    await cryptoStore.endToEndAccountTransaction((accountData, save) => {
-        if (accountData !== null) {
-            account.unpickle(pickleKey, accountData);
+    await cryptoStore.endToEndAccountTransaction((pickledAccount, save) => {
+        if (pickledAccount !== null) {
+            account.unpickle(pickleKey, pickledAccount);
         } else {
             // Migrate from sessionStore
-            accountData = sessionStore.getEndToEndAccount();
-            if (accountData !== null) {
+            pickledAccount = sessionStore.getEndToEndAccount();
+            if (pickledAccount !== null) {
                 removeFromSessionStore = true;
-                account.unpickle(pickleKey, accountData);
+                account.unpickle(pickleKey, pickledAccount);
             } else {
                 account.create();
-                accountData = account.pickle(pickleKey);
+                pickledAccount = account.pickle(pickleKey);
             }
-            save(accountData);
+            save(pickledAccount);
         }
     });
 
@@ -187,13 +187,13 @@ OlmDevice.getOlmVersion = function() {
 OlmDevice.prototype._getAccount = async function(func) {
     let result;
 
-    await this._cryptoStore.endToEndAccountTransaction((accountData, save) => {
+    await this._cryptoStore.endToEndAccountTransaction((pickledAccount, save) => {
         // Olm has a limited heap size so we must tightly control the number of
         // Olm account objects in existence at any given time: once created, it
         // must be destroyed again before we await.
         const account = new Olm.Account();
         try {
-            account.unpickle(this._pickleKey, accountData);
+            account.unpickle(this._pickleKey, pickledAccount);
 
             result = func(account, () => {
                 const pickledAccount = account.pickle(this._pickleKey);
