@@ -16,6 +16,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 
@@ -93,7 +94,12 @@ export default class IndexedDBCryptoStore {
         }).catch((e) => {
             console.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
-                    `: falling back to in-memory store: ${e}`,
+                    `: falling back to localStorage store: ${e}`,
+            );
+            return new LocalStorageCryptoStore();
+        }).catch((e) => {
+            console.warn(
+                `unable to open localStorage: falling back to in-memory store: ${e}`,
             );
             return new MemoryCryptoStore();
         });
