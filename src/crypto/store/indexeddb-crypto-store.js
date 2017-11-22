@@ -229,14 +229,15 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Load the end to end account for the logged-in user. Once the account
-     * is retrieved, the given function is executed and passed the base64
-     * encoded account string and a method for saving the account string
+     * is retrieved, the given function is executed and passed the pickled
+     * account string and a method for saving the pickle
      * back to the database. This allows the account to be read and writen
      * atomically.
-     * @param {func} func Function called with the account data and a save function
-     * @return {Promise} Resolves with the return value of the function once
+     * @param {function(string, function())} func Function called with the
+     *     account data and a save function
+     * @return {Promise} Resolves with the return value of `func` once
      *     the transaction is complete (ie. once data is written back if the
-     *     save function is called.
+     *     save function is called.)
      */
     endToEndAccountTransaction(func) {
         return this._connect().then((backend) => {
