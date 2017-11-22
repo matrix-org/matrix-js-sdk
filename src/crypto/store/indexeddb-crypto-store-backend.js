@@ -259,39 +259,33 @@ export class Backend {
     }
 
     /**
-     * Load the end to end account for the logged-in user, giving an object
-     * that has the base64 encoded account string and a method for saving
-     * the account string back to the database. This allows the account
-     * to be read and writen atomically.
-     * @return {Promise<Object>} Object
-     * @return {Promise<Object>.account} Base64 encoded account.
-     * @return {Promise<Object>.save} Function to save account data back.
-     *     Takes base64 encoded account data, returns a promise.
+     * Load the end to end account for the logged-in user. Once the account
+     * is retrieved, the given function is executed and passed the base64
+     * encoded account string and a method for saving the account string
+     * back to the database. This allows the account to be read and writen
+     * atomically.
+     * @return {Promise} * Resolves with the return value of the function once
+     *     the transaction is complete (ie. once data is written back if the
+     *     save function is called.
      */
-    endToEndAccountTransaction() {
+    endToEndAccountTransaction(func) {
         const txn = this._db.transaction("account", "readwrite");
         const objectStore = txn.objectStore("account");
 
+        const txnPromise = promiseifyTxn(txn);
 
-        return new Promise((resolve, reject) => {
-            const getReq = objectStore.get("-");
-            // We resolve on success here rather than on complete:
-            // the caller may wish to save the account back, which needs
-            // to be done while the transaction is still open (ie. before
-            // oncomplete)
-            getReq.onsuccess = function() {
-                resolve({
-                    account: getReq.result || null,
-                    save: (newData) => {
-                        const saveReq = objectStore.put(newData, "-");
-                        return promiseifyTxn(txn);
-                    },
-                });
-            };
-            getReq.onerror = reject;
-        });
-
-        return promiseifyTxn(txn).then(() => returnObj);
+        const getReq = objectStore.get("-");
+        let result;
+        getReq.onsuccess = function() {
+            result = func(
+                getReq.result || null,
+                (newData) => {
+                    const saveReq = objectStore.put(newData, "-");
+                    return txnPromise;
+                },
+            );
+        };
+        return txnPromise;
     }
 }
 

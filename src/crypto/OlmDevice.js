@@ -139,15 +139,15 @@ OlmDevice.prototype.init = async function() {
 
 
 async function _initialise_account(cryptoStore, pickleKey, account) {
-    const accountTxn = await cryptoStore.endToEndAccountTransaction();
-    if (accountTxn.account !== null) {
-        account.unpickle(pickleKey, accountTxn.account);
-        return;
-    }
-
-    account.create();
-    const pickled = account.pickle(pickleKey);
-    await accountTxn.save(pickled);
+    await cryptoStore.endToEndAccountTransaction((accountData, save) => {
+        if (accountData !== null) {
+            account.unpickle(pickleKey, accountData);
+        } else {
+            account.create();
+            const pickled = account.pickle(pickleKey);
+            save(pickled);
+        }
+    });
 }
 
 /**
@@ -171,23 +171,22 @@ OlmDevice.getOlmVersion = function() {
 OlmDevice.prototype._getAccount = async function(func) {
     let result;
 
-    let account = null;
-    try {
-        const accountTxn = await this._cryptoStore.endToEndAccountTransaction();
+    await this._cryptoStore.endToEndAccountTransaction((accountData, save) => {
         // Olm has a limited stack size so we must tightly control the number of
         // Olm account objects in existence at any given time: once created, it
         // must be destroyed again before we await.
-        account = new Olm.Account();
-        account.unpickle(this._pickleKey, accountTxn.account);
+        const account = new Olm.Account();
+        try {
+            account.unpickle(this._pickleKey, accountData);
 
-        result = func(account, () => {
+            result = func(account, () => {
                 const pickledAccount = account.pickle(this._pickleKey);
-                return accountTxn.save(pickledAccount);
-            }
-        );
-    } finally {
-        if (account !== null) account.free();
-    }
+                return save(pickledAccount);
+            });
+        } finally {
+            if (account !== null) account.free();
+        }
+    });
     return result;
 };
 

@@ -199,21 +199,18 @@ export default class MemoryCryptoStore {
     }
 
     /**
-     * Load the end to end account for the logged-in user, giving an object
-     * that has the base64 encoded account string and a method for saving
-     * the account string back to the database. This allows the account
-     * to be read and writen atomically.
-     * @return {Promise<Object>} Object
-     * @return {Promise<Object>.account} Base64 encoded account.
-     * @return {Promise<Object>.save} Function to save account data back.
-     *     Takes base64 encoded account data, returns a promise.
+     * Load the end to end account for the logged-in user. Once the account
+     * is retrieved, the given function is executed and passed the base64
+     * encoded account string and a method for saving the account string
+     * back to the database. This allows the account to be read and writen
+     * atomically.
+     * @return {Promise} * Resolves with the return value of the function once
+     *     the transaction is complete (ie. once data is written back if the
+     *     save function is called.
      */
-    endToEndAccountTransaction() {
-        return Promise.resolve({
-            account: this._account,
-            save: (newData) => {
-                this._account = newData;
-            },
-        });
+    endToEndAccountTransaction(func) {
+        return Promise.resolve(func(this._account, (newData) => {
+            this._account = newData;
+        }));
     }
 }
