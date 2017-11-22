@@ -23,7 +23,6 @@ import MemoryCryptoStore from './memory-crypto-store.js';
  * some things backed by localStorage. It exists because indexedDB
  * is broken in Firefox private mode or set to, "will not remember
  * history".
- * 
  *
  * @module
  */

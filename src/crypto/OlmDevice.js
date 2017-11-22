@@ -126,7 +126,9 @@ OlmDevice.prototype.init = async function() {
     let e2eKeys;
     const account = new Olm.Account();
     try {
-        await _initialise_account(this._sessionStore, this._cryptoStore, this._pickleKey, account);
+        await _initialise_account(
+            this._sessionStore, this._cryptoStore, this._pickleKey, account,
+        );
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
