@@ -48,17 +48,18 @@ function WebStorageSessionStore(webStore) {
 }
 
 WebStorageSessionStore.prototype = {
-
     /**
-     * Store the end to end account for the logged-in user.
-     * @param {string} account Base64 encoded account.
+     * Remove the stored end to end account for the logged-in user.
      */
-    storeEndToEndAccount: function(account) {
-        this.store.setItem(KEY_END_TO_END_ACCOUNT, account);
+    removeEndToEndAccount: function() {
+        this.store.removeItem(KEY_END_TO_END_ACCOUNT);
     },
 
     /**
      * Load the end to end account for the logged-in user.
+     * Note that the end-to-end account is now stored in the
+     * crypto store rather than here: this remains here so
+     * old sessions can be migrated out of the session store.
      * @return {?string} Base64 encoded account.
      */
     getEndToEndAccount: function() {

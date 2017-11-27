@@ -16,6 +16,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 
@@ -93,7 +94,12 @@ export default class IndexedDBCryptoStore {
         }).catch((e) => {
             console.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
-                    `: falling back to in-memory store: ${e}`,
+                    `: falling back to localStorage store: ${e}`,
+            );
+            return new LocalStorageCryptoStore();
+        }).catch((e) => {
+            console.warn(
+                `unable to open localStorage: falling back to in-memory store: ${e}`,
             );
             return new MemoryCryptoStore();
         });
@@ -218,6 +224,24 @@ export default class IndexedDBCryptoStore {
     deleteOutgoingRoomKeyRequest(requestId, expectedState) {
         return this._connect().then((backend) => {
             return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
+        });
+    }
+
+    /**
+     * Load the end to end account for the logged-in user. Once the account
+     * is retrieved, the given function is executed and passed the pickled
+     * account string and a method for saving the pickle
+     * back to the database. This allows the account to be read and writen
+     * atomically.
+     * @param {function(string, function())} func Function called with the
+     *     account data and a save function
+     * @return {Promise} Resolves with the return value of `func` once
+     *     the transaction is complete (ie. once data is written back if the
+     *     save function is called.)
+     */
+    endToEndAccountTransaction(func) {
+        return this._connect().then((backend) => {
+            return backend.endToEndAccountTransaction(func);
         });
     }
 }
