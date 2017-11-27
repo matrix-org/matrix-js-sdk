@@ -265,7 +265,7 @@ export class Backend {
      * back to the database. This allows the account to be read and writen
      * atomically.
      * @param {function(string, function())} func Function called with the
-     *     account data and a save function
+     *     picked account and a save function
      * @return {Promise} Resolves with the return value of `func` once
      *     the transaction is complete (ie. once data is written back if the
      *     save function is called.)
