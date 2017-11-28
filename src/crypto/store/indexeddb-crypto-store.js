@@ -47,7 +47,7 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Ensure the database exists and is up-to-date, or fall back to
-     * an in-memory store.
+     * a local storage or in-memory store.
      *
      * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
      * or a MemoryCryptoStore
