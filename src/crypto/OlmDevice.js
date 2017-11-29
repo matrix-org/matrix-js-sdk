@@ -128,7 +128,7 @@ OlmDevice.prototype.init = async function() {
     let e2eKeys;
     const account = new Olm.Account();
     try {
-        await _initialise_account(
+        await _initialiseAccount(
             this._sessionStore, this._cryptoStore, this._pickleKey, account,
         );
         e2eKeys = JSON.parse(account.identity_keys());
@@ -143,7 +143,7 @@ OlmDevice.prototype.init = async function() {
 };
 
 
-async function _initialise_account(sessionStore, cryptoStore, pickleKey, account) {
+async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account) {
     let removeFromSessionStore = false;
 
     await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
@@ -269,10 +269,13 @@ OlmDevice.prototype._getUtility = function(func) {
  */
 OlmDevice.prototype.sign = async function(message) {
     let result;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            result = account.sign(message);
-        });
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = account.sign(message);
+            },
+        );
     });
     return result;
 };
@@ -286,11 +289,14 @@ OlmDevice.prototype.sign = async function(message) {
  */
 OlmDevice.prototype.getOneTimeKeys = async function() {
     let result;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            result = JSON.parse(account.one_time_keys())
-        });
-    });
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                result = JSON.parse(account.one_time_keys());
+            });
+        },
+    );
 
     return result;
 };
@@ -309,12 +315,15 @@ OlmDevice.prototype.maxNumberOfOneTimeKeys = function() {
  * Marks all of the one-time keys as published.
  */
 OlmDevice.prototype.markKeysAsPublished = async function() {
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            account.mark_keys_as_published();
-            this._storeAccount(txn, account);
-        });
-    });
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.mark_keys_as_published();
+                this._storeAccount(txn, account);
+            });
+        },
+    );
 };
 
 /**
@@ -323,13 +332,16 @@ OlmDevice.prototype.markKeysAsPublished = async function() {
  * @param {number} numKeys number of keys to generate
  * @return {Promise} Resolved once the account is saved back having generated the keys
  */
-OlmDevice.prototype.generateOneTimeKeys = async function(numKeys) {
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            account.generate_one_time_keys(numKeys);
-            this._storeAccount(txn, account);
-        });
-    });
+OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
+    return this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                account.generate_one_time_keys(numKeys);
+                this._storeAccount(txn, account);
+            });
+        },
+    );
 };
 
 /**
@@ -345,20 +357,23 @@ OlmDevice.prototype.createOutboundSession = async function(
     theirIdentityKey, theirOneTimeKey,
 ) {
     let newSessionId;
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            const session = new Olm.Session();
-            try {
-                session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
-                newSessionId = session.session_id();
-                this._storeAccount(txn, account);
-                this._saveSession(theirIdentityKey, session);
-                return session.session_id();
-            } finally {
-                session.free();
-            }
-        });
-    });
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                const session = new Olm.Session();
+                try {
+                    session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
+                    newSessionId = session.session_id();
+                    this._storeAccount(txn, account);
+                    this._saveSession(theirIdentityKey, session);
+                    return session.session_id();
+                } finally {
+                    session.free();
+                }
+            });
+        },
+    );
     return newSessionId;
 };
 
@@ -367,7 +382,7 @@ OlmDevice.prototype.createOutboundSession = async function(
  * Generate a new inbound session, given an incoming message
  *
  * @param {string} theirDeviceIdentityKey remote user's Curve25519 identity key
- * @param {number} message_type  message_type field from the received message (must be 0)
+ * @param {number} messageType  messageType field from the received message (must be 0)
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {{payload: string, session_id: string}} decrypted payload, and
@@ -377,34 +392,39 @@ OlmDevice.prototype.createOutboundSession = async function(
  *     didn't use a valid one-time key).
  */
 OlmDevice.prototype.createInboundSession = async function(
-    theirDeviceIdentityKey, message_type, ciphertext,
+    theirDeviceIdentityKey, messageType, ciphertext,
 ) {
-    if (message_type !== 0) {
-        throw new Error("Need message_type == 0 to create inbound session");
+    if (messageType !== 0) {
+        throw new Error("Need messageType == 0 to create inbound session");
     }
 
     let result;
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._getAccount(txn, (account) => {
-            const session = new Olm.Session();
-            try {
-                session.create_inbound_from(account, theirDeviceIdentityKey, ciphertext);
-                account.remove_one_time_keys(session);
-                this._storeAccount(txn, account);
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._getAccount(txn, (account) => {
+                const session = new Olm.Session();
+                try {
+                    session.create_inbound_from(
+                        account, theirDeviceIdentityKey, ciphertext,
+                    );
+                    account.remove_one_time_keys(session);
+                    this._storeAccount(txn, account);
 
-                const payloadString = session.decrypt(message_type, ciphertext);
+                    const payloadString = session.decrypt(messageType, ciphertext);
 
-                this._saveSession(theirDeviceIdentityKey, session);
+                    this._saveSession(theirDeviceIdentityKey, session);
 
-                result = {
-                    payload: payloadString,
-                    session_id: session.session_id(),
-                };
-            } finally {
-                session.free();
-            }
-        });
-    });
+                    result = {
+                        payload: payloadString,
+                        session_id: session.session_id(),
+                    };
+                } finally {
+                    session.free();
+                }
+            });
+        },
+    );
 
     return result;
 };
@@ -503,18 +523,18 @@ OlmDevice.prototype.encryptMessage = async function(
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
  * @param {string} sessionId  the id of the active session
- * @param {number} message_type  message_type field from the received message
+ * @param {number} messageType  messageType field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {Promise<string>} decrypted payload.
  */
 OlmDevice.prototype.decryptMessage = async function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
 ) {
     const self = this;
 
     return this._getSession(theirDeviceIdentityKey, sessionId, function(session) {
-        const payloadString = session.decrypt(message_type, ciphertext);
+        const payloadString = session.decrypt(messageType, ciphertext);
         self._saveSession(theirDeviceIdentityKey, session);
 
         return payloadString;
@@ -527,16 +547,16 @@ OlmDevice.prototype.decryptMessage = async function(
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
  * @param {string} sessionId  the id of the active session
- * @param {number} message_type  message_type field from the received message
+ * @param {number} messageType  messageType field from the received message
  * @param {string} ciphertext base64-encoded body from the received message
  *
  * @return {Promise<boolean>} true if the received message is a prekey message which matches
  *    the given session.
  */
 OlmDevice.prototype.matchesSession = async function(
-    theirDeviceIdentityKey, sessionId, message_type, ciphertext,
+    theirDeviceIdentityKey, sessionId, messageType, ciphertext,
 ) {
-    if (message_type !== 0) {
+    if (messageType !== 0) {
         return false;
     }
 
