@@ -227,21 +227,50 @@ export default class IndexedDBCryptoStore {
         });
     }
 
-    /**
-     * Load the end to end account for the logged-in user. Once the account
-     * is retrieved, the given function is executed and passed the pickled
-     * account string and a method for saving the pickle
-     * back to the database. This allows the account to be read and writen
-     * atomically.
-     * @param {function(string, function())} func Function called with the
-     *     account data and a save function
-     * @return {Promise} Resolves with the return value of `func` once
-     *     the transaction is complete (ie. once data is written back if the
-     *     save function is called.)
+    /*
+     * Get the account pickle from the store.
+     * This requires an active transaction. See doTxn().
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(string)} func Called with the account pickle
      */
-    endToEndAccountTransaction(func) {
+    getAccount(txn, func) {
+        this._backendPromise.value().getAccount(txn, func);
+    }
+
+    /*
+     * Write the account pickle to the store.
+     * This requires an active transaction. See doTxn().
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {string} newData The new account pickle to store.
+     */
+    storeAccount(txn, newData) {
+        this._backendPromise.value().storeAccount(txn, newData);
+    }
+
+    /**
+     * Perform a transaction on the crypto store. Any store methods
+     * that require a transaction (txn) object to be passed in may
+     * only be called within a callback of either this function or
+     * one of the store functions operating on the same transaction.
+     *
+     * @param {string} mode 'readwrite' if you need to call setter
+     *     functions with this transaction. Otherwise, 'readonly'.
+     * @param {string[]} stores List IndexedDBCryptoStore.STORE_*
+     *     options representing all types of object that will be
+     *     accessed or written to with this transaction.
+     * @param {function(*)} func Function called with the
+     *     transaction object: an opaque object that should be passed
+     *     to store functions.
+     * @return {Promise} Promise that resolves with the result of the `func`
+     *     when the transaction is complete
+     */
+    doTxn(mode, stores, func) {
         return this._connect().then((backend) => {
-            return backend.endToEndAccountTransaction(func);
+            return backend.doTxn(mode, stores, func);
         });
     }
 }
+
+IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
