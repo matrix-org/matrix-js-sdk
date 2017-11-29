@@ -185,8 +185,10 @@ OlmDevice.getOlmVersion = function() {
  * The `account` object is useable only within the callback passed to this
  * function and will be freed as soon the callback returns. It is *not*
  * useable for the rest of the lifetime of the transaction.
+ * This function requires a live transaction object from cryptoStore.doTxn()
+ * and therefore may only be called in a doTxn() callback.
  *
- * @param {*} txn
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
  * @param {function} func
  * @private
  */
@@ -202,6 +204,15 @@ OlmDevice.prototype._getAccount = function(txn, func) {
     });
 };
 
+/*
+ * Saves an account to the crypto store.
+ * This function requires a live transaction object from cryptoStore.doTxn()
+ * and therefore may only be called in a doTxn() callback.
+ *
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
+ * @param {object} Olm.Account object
+ * @private
+ */
 OlmDevice.prototype._storeAccount = function(txn, account) {
     this._cryptoStore.storeAccount(txn, account.pickle(this._pickleKey));
 };
