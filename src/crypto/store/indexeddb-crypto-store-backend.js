@@ -258,35 +258,23 @@ export class Backend {
         return promiseifyTxn(txn);
     }
 
-    /**
-     * Load the end to end account for the logged-in user. Once the account
-     * is retrieved, the given function is executed and passed the pickled
-     * account string and a method for saving the pickle
-     * back to the database. This allows the account to be read and writen
-     * atomically.
-     * @param {function(string, function())} func Function called with the
-     *     picked account and a save function
-     * @return {Promise} Resolves with the return value of `func` once
-     *     the transaction is complete (ie. once data is written back if the
-     *     save function is called.)
-     */
-    endToEndAccountTransaction(func) {
-        const txn = this._db.transaction("account", "readwrite");
+    getAccount(txn, func) {
         const objectStore = txn.objectStore("account");
-
-        const txnPromise = promiseifyTxn(txn);
-
         const getReq = objectStore.get("-");
-        let result;
         getReq.onsuccess = function() {
-            result = func(
-                getReq.result || null,
-                (newData) => {
-                    objectStore.put(newData, "-");
-                },
-            );
+            func(getReq.result || null);
         };
-        return txnPromise.then(() => {
+    }
+
+    storeAccount(txn, newData) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(newData, "-");
+    }
+
+    doTxn(mode, stores, func) {
+        const txn = this._db.transaction(stores, mode);
+        const result = func(txn);
+        return promiseifyTxn(txn).then(() => {
             return result;
         });
     }

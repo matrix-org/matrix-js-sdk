@@ -49,10 +49,16 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         return Promise.resolve();
     }
 
-    endToEndAccountTransaction(func) {
+    getAccount(txn, func) {
         const account = this.store.getItem(KEY_END_TO_END_ACCOUNT);
-        return Promise.resolve(func(account, (newData) => {
-            this.store.setItem(KEY_END_TO_END_ACCOUNT, newData);
-        }));
+        func(account);
+    }
+
+    storeAccount(txn, newData) {
+        this.store.setItem(KEY_END_TO_END_ACCOUNT, newData);
+    }
+
+    doTxn(mode, stores, func) {
+        return Promise.resolve(func(null));
     }
 }
