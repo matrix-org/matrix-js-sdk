@@ -574,7 +574,7 @@ MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId, isPublic) {
         {$groupId: groupId, $roomId: roomId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined,
-        { visibility: { type: isPublic ? "public" : "private" } },
+        { "m.visibility": { type: isPublic ? "public" : "private" } },
     );
 };
 
