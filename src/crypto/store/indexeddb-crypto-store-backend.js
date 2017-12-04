@@ -1,7 +1,7 @@
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 2;
+export const VERSION = 3;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -271,10 +271,44 @@ export class Backend {
         objectStore.put(newData, "-");
     }
 
+    getEndToEndSessions(deviceKey, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const idx = objectStore.index("deviceKey");
+        const getReq = idx.openCursor(deviceKey);
+        const results = {};
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                results[cursor.value.sessionId] = cursor.value.session;
+                cursor.continue();
+            } else {
+                func(results);
+            }
+        };
+    }
+
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const getReq = objectStore.get([deviceKey, sessionId]);
+        getReq.onsuccess = function() {
+            if (getReq.result) {
+                func(getReq.result.session);
+            } else {
+                func(null);
+            }
+        };
+    }
+
+    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+        const objectStore = txn.objectStore("sessions");
+        objectStore.put({deviceKey, sessionId, session});
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
+        const promise = promiseifyTxn(txn);
         const result = func(txn);
-        return promiseifyTxn(txn).then(() => {
+        return promise.then(() => {
             return result;
         });
     }
@@ -289,7 +323,13 @@ export function upgradeDatabase(db, oldVersion) {
         createDatabase(db);
     }
     if (oldVersion < 2) {
-        createV2Tables(db);
+        db.createObjectStore("account");
+    }
+    if (oldVersion < 3) {
+        const sessionsStore = db.createObjectStore("sessions", {
+            keyPath: ["deviceKey", "sessionId"],
+        });
+        sessionsStore.createIndex("deviceKey", "deviceKey");
     }
     // Expand as needed.
 }
@@ -305,10 +345,6 @@ function createDatabase(db) {
     );
 
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
-}
-
-function createV2Tables(db) {
-    db.createObjectStore("account");
 }
 
 function promiseifyTxn(txn) {

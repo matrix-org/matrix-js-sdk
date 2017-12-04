@@ -250,6 +250,42 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
+     * Retrieve a specific end-to-end session between the logged-in user
+     * and another device.
+     * @param {string} deviceKey The public key of the other device.
+     * @param {string} sessionId The ID of the session to retrieve
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called with A map from sessionId
+     *     to Base64 end-to-end session.
+     */
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        this._backendPromise.value().getEndToEndSession(deviceKey, sessionId, txn, func);
+    }
+
+    /**
+     * Retrieve the end-to-end sessions between the logged-in user and another
+     * device.
+     * @param {string} deviceKey The public key of the other device.
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called with A map from sessionId
+     *     to Base64 end-to-end session.
+     */
+    getEndToEndSessions(deviceKey, txn, func) {
+        this._backendPromise.value().getEndToEndSessions(deviceKey, txn, func);
+    }
+
+    /**
+     * Store a session between the logged-in user and another device
+     * @param {string} deviceKey The public key of the other device.
+     * @param {string} sessionId The ID for this end-to-end session.
+     * @param {string} session Base64 encoded end-to-end session.
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+        this._backendPromise.value().storeEndToEndSession(deviceKey, sessionId, session, txn);
+    }
+
+    /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
      * only be called within a callback of either this function or
@@ -274,3 +310,4 @@ export default class IndexedDBCryptoStore {
 }
 
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
+IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
