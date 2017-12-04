@@ -115,20 +115,6 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
-     * Store a session between the logged-in user and another device
-     * @param {string} deviceKey The public key of the other device.
-     * @param {string} sessionId The ID for this end-to-end session.
-     * @param {string} session Base64 encoded end-to-end session.
-     */
-    storeEndToEndSession: function(deviceKey, sessionId, session) {
-        const sessions = this.getEndToEndSessions(deviceKey) || {};
-        sessions[sessionId] = session;
-        setJsonItem(
-            this.store, keyEndToEndSessions(deviceKey), sessions,
-        );
-    },
-
-    /**
      * Retrieve the end-to-end sessions between the logged-in user and another
      * device.
      * @param {string} deviceKey The public key of the other device.
