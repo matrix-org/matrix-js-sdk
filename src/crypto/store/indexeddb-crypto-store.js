@@ -282,7 +282,9 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndSession(deviceKey, sessionId, session, txn) {
-        this._backendPromise.value().storeEndToEndSession(deviceKey, sessionId, session, txn);
+        this._backendPromise.value().storeEndToEndSession(
+            deviceKey, sessionId, session, txn,
+        );
     }
 
     /**

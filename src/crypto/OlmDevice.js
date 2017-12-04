@@ -26,7 +26,6 @@ const Olm = global.Olm;
 if (!Olm) {
     throw new Error("global.Olm is not defined");
 }
-const utils = require("../utils");
 
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
@@ -230,15 +229,17 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
  * @private
  */
 OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
-    const sessions = this._cryptoStore.getEndToEndSession(deviceKey, sessionId, txn, (pickledSession) => {
-        const session = new Olm.Session();
-        try {
-            session.unpickle(this._pickleKey, pickledSession);
-            func(session);
-        } finally {
-            session.free();
-        }
-    });
+    this._cryptoStore.getEndToEndSession(
+        deviceKey, sessionId, txn, (pickledSession) => {
+            const session = new Olm.Session();
+            try {
+                session.unpickle(this._pickleKey, pickledSession);
+                func(session);
+            } finally {
+                session.free();
+            }
+        },
+    );
 };
 
 /**
@@ -265,6 +266,7 @@ OlmDevice.prototype._unpickleSession = function(pickledSession, func) {
  *
  * @param {string} deviceKey
  * @param {OlmSession} session
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
  * @private
  */
 OlmDevice.prototype._saveSession = function(deviceKey, session, txn) {
@@ -478,9 +480,11 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
         (txn) => {
-            this._cryptoStore.getEndToEndSessions(theirDeviceIdentityKey, txn, (sessions) => {
-                sessionIds = Object.keys(sessions);
-            });
+            this._cryptoStore.getEndToEndSessions(
+                theirDeviceIdentityKey, txn, (sessions) => {
+                    sessionIds = Object.keys(sessions);
+                },
+            );
         },
     );
 
