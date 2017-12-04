@@ -616,15 +616,21 @@ OlmDevice.prototype.decryptMessage = async function(
     theirDeviceIdentityKey, sessionId, messageType, ciphertext,
 ) {
     let payloadString;
+    let exception;
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (session) => {
-                payloadString = session.decrypt(messageType, ciphertext);
+                try {
+                    payloadString = session.decrypt(messageType, ciphertext);
+                } catch (e) {
+                    exception = e;
+                }
                 this._saveSession(theirDeviceIdentityKey, session, txn);
             });
         },
     );
+    if (exception) throw exception;
     return payloadString;
 };
 
