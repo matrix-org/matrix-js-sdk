@@ -124,6 +124,8 @@ function OlmDevice(sessionStore, cryptoStore) {
  * Reads the device keys from the OlmAccount object.
  */
 OlmDevice.prototype.init = async function() {
+    await this._migrateFromSessionStore();
+
     let e2eKeys;
     const account = new Olm.Account();
     try {
@@ -141,32 +143,39 @@ OlmDevice.prototype.init = async function() {
     this.deviceEd25519Key = e2eKeys.ed25519;
 };
 
-
 async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account) {
-    let removeFromSessionStore = false;
-
     await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
         cryptoStore.getAccount(txn, (pickledAccount) => {
             if (pickledAccount !== null) {
                 account.unpickle(pickleKey, pickledAccount);
             } else {
-                // Migrate from sessionStore
-                pickledAccount = sessionStore.getEndToEndAccount();
-                if (pickledAccount !== null) {
-                    removeFromSessionStore = true;
-                    account.unpickle(pickleKey, pickledAccount);
-                } else {
-                    account.create();
-                    pickledAccount = account.pickle(pickleKey);
-                }
+                account.create();
+                pickledAccount = account.pickle(pickleKey);
                 cryptoStore.storeAccount(txn, pickledAccount);
+            }
+        });
+    });
+}
+
+OlmDevice._migrateFromSessionStore = async function() {
+    let migratedAccount = false;
+    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        this._cryptoStore.getAccount(txn, (pickledAccount) => {
+            if (pickledAccount === null) {
+                // Migrate from sessionStore
+                pickledAccount = this._sessionStore.getEndToEndAccount();
+                if (pickledAccount !== null) {
+                    console.log("Migrating account from session store");
+                    migratedAccount = true;
+                    this._cryptoStore.storeAccount(txn, pickledAccount);
+                }
             }
         });
     });
 
     // only remove this once it's safely saved to the crypto store
-    if (removeFromSessionStore) {
-        sessionStore.removeEndToEndAccount();
+    if (migratedAccount) {
+        this._sessionStore.removeEndToEndAccount();
     }
 }
 
