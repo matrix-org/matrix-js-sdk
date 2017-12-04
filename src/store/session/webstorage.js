@@ -147,7 +147,8 @@ WebStorageSessionStore.prototype = {
         const deviceKeys = getKeysWithPrefix(this.store, keyEndToEndSessions(''));
         const results = {};
         for (const k of deviceKeys) {
-            results[k] = getJsonItem(this.store, k);
+            const unprefixedKey = k.substr(keyEndToEndSessions('').length);
+            results[unprefixedKey] = getJsonItem(this.store, k);
         }
         return results;
     },
