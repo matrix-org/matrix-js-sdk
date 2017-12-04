@@ -167,18 +167,20 @@ OlmDevice.getOlmVersion = function() {
 OlmDevice.prototype._migrateFromSessionStore = async function() {
     // account
     let migratedAccount = false;
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._cryptoStore.getAccount(txn, (pickledAccount) => {
-            if (pickledAccount === null) {
-                // Migrate from sessionStore
-                pickledAccount = this._sessionStore.getEndToEndAccount();
-                if (pickledAccount !== null) {
-                    console.log("Migrating account from session store");
-                    migratedAccount = true;
-                    this._cryptoStore.storeAccount(txn, pickledAccount);
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                if (pickledAccount === null) {
+                    // Migrate from sessionStore
+                    pickledAccount = this._sessionStore.getEndToEndAccount();
+                    if (pickledAccount !== null) {
+                        console.log("Migrating account from session store");
+                        migratedAccount = true;
+                        this._cryptoStore.storeAccount(txn, pickledAccount);
+                    }
                 }
-            }
-        });
+            },
+        );
     });
 
     // only remove this once it's safely saved to the crypto store
@@ -206,7 +208,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
 
         this._sessionStore.removeAllEndToEndSessions();
     }
-}
+};
 
 /**
  * extract our OlmAccount from the crypto store and call the given function
