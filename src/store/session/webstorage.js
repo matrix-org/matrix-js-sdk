@@ -139,6 +139,24 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
+     * Retrieve all end-to-end sessions between the logged-in user and other
+     * devices.
+     * @return {object} A map of {deviceKey -> {sessionId -> session pickle}}
+     */
+    getAllEndToEndSessions: function() {
+        const deviceKeys = getKeysWithPrefix(this.store, keyEndToEndSessions(''));
+        const results = {};
+        for (const k of deviceKeys) {
+            results[k] = getJsonItem(this.store, k);
+        }
+        return results;
+    },
+
+    removeAllEndToEndSessions: function() {
+        removeByPrefix(this.store, keyEndToEndSessions(''));
+    },
+
+    /**
      * Retrieve a list of all known inbound group sessions
      *
      * @return {{senderKey: string, sessionId: string}}
@@ -227,6 +245,26 @@ function getJsonItem(store, key) {
 
 function setJsonItem(store, key, val) {
     store.setItem(key, JSON.stringify(val));
+}
+
+function getKeysWithPrefix(store, prefix) {
+    const results = [];
+    for (let i = 0; i < store.length; ++i) {
+        const key = store.key(i);
+        if (key.startsWith(prefix)) results.push(key);
+    }
+    return results;
+}
+
+function removeByPrefix(store, prefix) {
+    const toRemove = [];
+    for (let i = 0; i < store.length; ++i) {
+        const key = store.key(i);
+        if (key.startsWith(prefix)) toRemove.push(key);
+    }
+    for (const key of toRemove) {
+        store.removeItem(key);
+    }
 }
 
 function debuglog() {

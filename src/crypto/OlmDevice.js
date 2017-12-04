@@ -118,7 +118,7 @@ function OlmDevice(sessionStore, cryptoStore) {
  * Initialise the OlmAccount. This must be called before any other operations
  * on the OlmDevice.
  *
- * Attempts to load the OlmAccount from localStorage, or creates one if none is
+ * Attempts to load the OlmAccount from the crypto store, or creates one if none is
  * found.
  *
  * Reads the device keys from the OlmAccount object.
@@ -157,7 +157,15 @@ async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account)
     });
 }
 
-OlmDevice._migrateFromSessionStore = async function() {
+/**
+ * @return {array} The version of Olm.
+ */
+OlmDevice.getOlmVersion = function() {
+    return Olm.get_library_version();
+};
+
+OlmDevice.prototype._migrateFromSessionStore = async function() {
+    // account
     let migratedAccount = false;
     await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
         this._cryptoStore.getAccount(txn, (pickledAccount) => {
@@ -177,15 +185,28 @@ OlmDevice._migrateFromSessionStore = async function() {
     if (migratedAccount) {
         this._sessionStore.removeEndToEndAccount();
     }
+
+    // sessions
+    const sessions = this._sessionStore.getAllEndToEndSessions();
+    if (Object.keys(sessions).length > 0) {
+        await this._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
+                let numSessions = 0;
+                for (const deviceKey of Object.keys(sessions)) {
+                    for (const sessionId of Object.keys(sessions[deviceKey])) {
+                        numSessions++;
+                        this._cryptoStore.storeEndToEndSession(
+                            deviceKey, sessionId, sessions[deviceKey][sessionId], txn,
+                        );
+                    }
+                }
+                console.log("Migrating " + numSessions + " sessions from session store");
+            },
+        );
+
+        this._sessionStore.removeAllEndToEndSessions();
+    }
 }
-
-/**
- * @return {array} The version of Olm.
- */
-OlmDevice.getOlmVersion = function() {
-    return Olm.get_library_version();
-};
-
 
 /**
  * extract our OlmAccount from the crypto store and call the given function
