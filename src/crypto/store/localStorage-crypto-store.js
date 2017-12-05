@@ -94,7 +94,7 @@ function getJsonItem(store, key) {
         // JSON.parse(null) === null, so this returns null.
         return JSON.parse(store.getItem(key));
     } catch (e) {
-        console.log("Failed to get key %s: %s", key, e);
+        console.log("Error: Failed to get key %s: %s", key, e.stack || e);
         console.log(e.stack);
     }
     return null;

@@ -553,8 +553,7 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) 
         (txn) => {
             this._cryptoStore.getEndToEndSessions(deviceIdentityKey, txn, (sessions) => {
                 const sessionIds = Object.keys(sessions).sort();
-                for (let i = 0; i < sessionIds.length; i++) {
-                    const sessionId = sessionIds[i];
+                for (const sessionId of sessionIds) {
                     this._unpickleSession(sessions[sessionId], (session) => {
                         info.push({
                             hasReceivedMessage: session.has_received_message(),
