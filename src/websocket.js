@@ -210,10 +210,11 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
             console.error("Timeout for sending ping-request. Try reconnecting");
             // as reconnection will be handled in _close this is enough for here
             this._websocket.close();
+            this._websocket = null;
         }
         return;
     }
-    if (this._websocket.readyState != WebSocket.OPEN) {
+    if (this._websocket == null || this._websocket.readyState != WebSocket.OPEN) {
         debuglog("WebSocket is not ready. Postponing", curObj.message);
         if (!curObj.pending) {
             this._awaiting_responses[messageId].pending = true;
@@ -316,7 +317,7 @@ WebSocketApi.prototype._start = async function(syncOptions) {
         try {
             //debuglog('Starting sync since=' + syncToken);
             this._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+                undefined, "GET", "/sync", qps, undefined, this.opts.pollTimeout,
             );
             data = await this._currentSyncRequest;
         } catch (e) {
@@ -348,7 +349,9 @@ WebSocketApi.prototype._start = async function(syncOptions) {
     }
 
     try {
-        await client._syncApi._processSyncResponse(self.ws_syncToken, data, isCachedResponse);
+        await client._syncApi._processSyncResponse(
+            self.ws_syncToken, data, isCachedResponse,
+        );
     } catch (e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -357,7 +360,7 @@ WebSocketApi.prototype._start = async function(syncOptions) {
 
     // emit synced events
     const syncEventData = {
-        oldSyncToken: syncToken,
+        oldSyncToken: this.ws_syncToken,
         nextSyncToken: data.next_batch,
         catchingUp: this._catchingUp,
     };
@@ -367,7 +370,7 @@ WebSocketApi.prototype._start = async function(syncOptions) {
         this.ws_syncOptions.hasSyncedBefore = true;
     }
 
-    this.ws_syncToken = syncToken;
+    this.ws_syncToken = data.next_batch;
 
     if (!isCachedResponse) {
         // tell the crypto module to do its processing. It may block (to do a
@@ -498,7 +501,7 @@ WebSocketApi.prototype.handleResponse = function(response) {
         this._awaiting_responses[txnId].defer.reject(response.error);
         return delete this._awaiting_responses[txnId];
     } else {
-        console.error("response does not contain result or error", response);
+        console.error("response does not contain result nor error", response);
         return false;
     }
 };
@@ -556,7 +559,7 @@ WebSocketApi.prototype.sendObject = function(message) {
         defer: defer,
     };
 
-    if (this._websocket.readyState != WebSocket.OPEN) {
+    if (this._websocket == null || this._websocket.readyState != WebSocket.OPEN) {
         debuglog("WebSocket is not ready. Postponing", message);
         this._pendingSend.push(message);
         this._awaiting_responses[message.id].pending = true;
