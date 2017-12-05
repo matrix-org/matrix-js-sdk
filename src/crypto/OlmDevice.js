@@ -263,13 +263,7 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
 OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
     this._cryptoStore.getEndToEndSession(
         deviceKey, sessionId, txn, (pickledSession) => {
-            const session = new Olm.Session();
-            try {
-                session.unpickle(this._pickleKey, pickledSession);
-                func(session);
-            } finally {
-                session.free();
-            }
+            this._unpickleSession(pickledSession, func);
         },
     );
 };
