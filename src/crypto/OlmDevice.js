@@ -256,7 +256,7 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
  *
  * @param {string} deviceKey
  * @param {string} sessionId
- * @param {*} txn
+ * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
  * @param {function} func
  * @private
  */

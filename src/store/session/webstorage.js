@@ -139,6 +139,10 @@ WebStorageSessionStore.prototype = {
         return results;
     },
 
+    /**
+     * Remove all end-to-end sessions from the store
+     * This is used after migrating sessions awat from the sessions store.
+     */
     removeAllEndToEndSessions: function() {
         removeByPrefix(this.store, keyEndToEndSessions(''));
     },
