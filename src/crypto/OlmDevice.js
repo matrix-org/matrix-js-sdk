@@ -406,7 +406,7 @@ OlmDevice.prototype.generateOneTimeKeys = function(numKeys) {
 /**
  * Generate a new outbound session
  *
- * The new session will be stored in the sessionStore.
+ * The new session will be stored in the cryptoStore.
  *
  * @param {string} theirIdentityKey remote user's Curve25519 identity key
  * @param {string} theirOneTimeKey  remote user's one-time Curve25519 key
