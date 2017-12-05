@@ -31,6 +31,8 @@ export default class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
+
+        // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
     }
 
