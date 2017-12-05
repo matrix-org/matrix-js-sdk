@@ -206,19 +206,35 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
     const curObj = this._awaiting_responses[messageId];
     if (curObj == "ping") {
         // only try closing the connection when the browser thinks it is not broken
-        if (this._websocket.readyState == WebSocket.OPEN) {
+        if (this._ping_failed_already && this._websocket.readyState == WebSocket.OPEN) {
             console.error("Timeout for sending ping-request. Try reconnecting");
             // as reconnection will be handled in _close this is enough for here
             this._websocket.close();
+            this._websocket = null;
+        } else {
+            // ignore one failed ping but issue a new ping with a short delay
+            this._ping_failed_already = true;
+            delete this._awaiting_responses[messageId];
+            setTimeout(this.sendPing.bind(this), 5);
         }
         return;
     }
-    if (this._websocket.readyState != WebSocket.OPEN) {
+    if (this._websocket == null || this._websocket.readyState != WebSocket.OPEN) {
         debuglog("WebSocket is not ready. Postponing", curObj.message);
         if (!curObj.pending) {
             this._awaiting_responses[messageId].pending = true;
             this._pendingSend.push(curObj.message);
         }
+        return;
+    }
+    if (!curObj.retried) {
+        // only retry once
+        this._websocket.send(JSON.stringyfy(curObj.message));
+        this._awaiting_responses[messageId].retried = true;
+        setTimeout(
+            this._handleResponseTimeout.bind(this, messageId),
+            this._ws_timeout / 2,
+        );
         return;
     }
 
@@ -266,7 +282,7 @@ WebSocketApi.prototype.stop = function() {
  * @param {string} syncOptions.filterId
  * @param {boolean} syncOptions.hasSyncedBefore
  */
-WebSocketApi.prototype._start = function(syncOptions) {
+WebSocketApi.prototype._start = async function(syncOptions) {
     const client = this.client;
     const self = this;
 
@@ -287,73 +303,111 @@ WebSocketApi.prototype._start = function(syncOptions) {
         filter: filterId,
     };
 
-    let syncPromise;
+    if (this.opts.disablePresence) {
+        qps.set_presence = "offline";
+    }
+
+    let savedSync;
     if (!syncOptions.hasSyncedBefore) {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
-        syncPromise = client.store.getSavedSync().then((cachedSync) => {
-            if (cachedSync) {
-                debuglog("Use cached Sync", cachedSync);
-                client._syncApi._processSyncResponse(null, {
-                    next_batch: cachedSync.nextBatch,
-                    rooms: cachedSync.roomsData,
-                    account_data: {
-                        events: cachedSync.accountData,
-                    },
-                }, true);
-                client.store.setSyncToken(cachedSync.nextBatch);
-                return cachedSync.nextBatch;
-            } else {
-                debuglog("No cached Sync");
-                return client._http.authedRequest(
-                    undefined, "GET", "/sync", qps, undefined, {},
-                ).then((data) => {
-                    client.store.setSyncToken(data.next_batch);
-                    return client.store.setSyncData(data).then(() => {
-                        return data;
-                    });
-                }).then((data) => {
-                    try {
-                        client._syncApi._processSyncResponse(null, data, false);
-                    } catch (e) {
-                        console.error("Caught /sync error", e.stack || e);
-                    }
-                    return data.next_batch;
-                });
-            }
-        });
-    } else {
-        syncPromise = Promise.resolve(null);
+        savedSync = await client.store.getSavedSync();
     }
 
-    syncPromise.then((syncToken) => {
-        if (syncToken) {
-            // last data got fetched via cache or /sync;
-            // So this is a client boot-up
-            const syncEventData = {
-                oldSyncToken: null,
-                nextSyncToken: syncToken,
-            };
-            self._updateSyncState("PREPARED", syncEventData);
+    let isCachedResponse = false;
+    let data;
 
-            self.ws_syncToken = syncToken;
-            self.ws_syncOptions.hasSyncedBefore = true;
-        } else {
-            // we are reconnecting right now
-            // So nothing to do right here
-            debuglog("Reconnect of WebSocket initiated.");
+    if (savedSync) {
+        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+        isCachedResponse = true;
+        data = {
+            next_batch: savedSync.nextBatch,
+            rooms: savedSync.roomsData,
+            groups: savedSync.groupsData,
+            account_data: {
+                events: savedSync.accountData,
+            },
+        };
+    } else {
+        try {
+            //debuglog('Starting sync since=' + syncToken);
+            this._currentSyncRequest = client._http.authedRequest(
+                undefined, "GET", "/sync", qps, undefined, this.opts.pollTimeout,
+            );
+            data = await this._currentSyncRequest;
+        } catch (e) {
+            client._syncApi._startKeepAlives().done(() => {
+                debuglog("Starting failed (", e, "). Retries");
+                this._start(syncOptions);
+            });
+            return;
         }
-        qps.since = self.ws_syncToken;
-        this._websocket = client._http.generateWebSocket(qps);
-        this._websocket.onopen = _onopen;
-        this._websocket.onclose = _onclose;
-        this._websocket.onmessage = _onmessage;
-    }).catch((err) => {
-        client._syncApi._startKeepAlives().done(() => {
-            debuglog("Starting failed (", err, "). Retries");
-            this._start(syncOptions);
-        });
-    });
+    }
+
+    //debuglog('Completed sync, next_batch=' + data.next_batch);
+
+    // set the sync token NOW *before* processing the events. We do this so
+    // if something barfs on an event we can skip it rather than constantly
+    // polling with the same token.
+    client.store.setSyncToken(data.next_batch);
+
+    // Reset after a successful sync
+    this._failedSyncCount = 0;
+
+    // We need to wait until the sync data has been sent to the backend
+    // because it appears that the sync data gets modified somewhere in
+    // processing it in such a way as to make it no longer cloneable.
+    // XXX: Find out what is modifying it!
+    if (!isCachedResponse) {
+        // Don't give the store back its own cached data
+        await client.store.setSyncData(data);
+    }
+
+    try {
+        await client._syncApi._processSyncResponse(
+            self.ws_syncToken, data, isCachedResponse,
+        );
+    } catch (e) {
+        // log the exception with stack if we have it, else fall back
+        // to the plain description
+        console.error("Caught /sync error", e.stack || e);
+    }
+
+    // emit synced events
+    const syncEventData = {
+        oldSyncToken: this.ws_syncToken,
+        nextSyncToken: data.next_batch,
+        catchingUp: this._catchingUp,
+    };
+
+    if (!this.ws_syncOptions.hasSyncedBefore) {
+        this._updateSyncState("PREPARED", syncEventData);
+        this.ws_syncOptions.hasSyncedBefore = true;
+    }
+
+    this.ws_syncToken = data.next_batch;
+
+    if (!isCachedResponse) {
+        // tell the crypto module to do its processing. It may block (to do a
+        // /keys/changes request).
+        if (this.opts.crypto) {
+            await this.opts.crypto.onSyncCompleted(syncEventData);
+        }
+
+        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+        this._updateSyncState("SYNCING", syncEventData);
+
+        // tell databases that everything is now in a consistent state and can be
+        // saved (no point doing so if we only have the data we just got out of the
+        // store).
+        client.store.save();
+    }
+
+    qps.since = this.ws_syncToken;
+    this._websocket = client._http.generateWebSocket(qps);
+    this._websocket.onopen = _onopen;
+    this._websocket.onclose = _onclose;
+    this._websocket.onmessage = _onmessage;
 
     function _onopen(ev) {
         debuglog("Connected to WebSocket: ", ev);
@@ -380,6 +434,9 @@ WebSocketApi.prototype._start = function(syncOptions) {
             debuglog("Unclean close. Code: "+ev.code+" reason: "+ev.reason,
                 "error");
         }
+
+        // reset var to not kill the socket after the first ping timeout
+        self._ping_failed_already = false;
 
         if (self.ws_possible) {
             // assume connection to websocket lost by mistake
@@ -449,6 +506,7 @@ WebSocketApi.prototype.handleResponse = function(response) {
         return false;
     }
     if (this._awaiting_responses[txnId] == "ping") {
+        self._ping_failed_already = false;
         return delete this._awaiting_responses[txnId];
     }
 
@@ -461,7 +519,7 @@ WebSocketApi.prototype.handleResponse = function(response) {
         this._awaiting_responses[txnId].defer.reject(response.error);
         return delete this._awaiting_responses[txnId];
     } else {
-        console.error("response does not contain result or error", response);
+        console.error("response does not contain result nor error", response);
         return false;
     }
 };
@@ -470,7 +528,7 @@ WebSocketApi.prototype.handleResponse = function(response) {
  * handle message from server which was identified to be a /sync-response
  * @param {Object} data Object that contains the /sync-response
  */
-WebSocketApi.prototype.handleSync = function(data) {
+WebSocketApi.prototype.handleSync = async function(data) {
     const client = this.client;
     const self = this;
     //debuglog('Got new data from socket, next_batch=' + data.next_batch);
@@ -483,27 +541,28 @@ WebSocketApi.prototype.handleSync = function(data) {
     // Reset after a successful sync
     self._failedSyncCount = 0;
 
-    client.store.setSyncData(data)
-    .then(() => client._syncApi._processSyncResponse(self.ws_syncToken, data, false)
-    .catch((e) => {
+    await client.store.setSyncData(data);
+    try {
+        client._syncApi._processSyncResponse(self.ws_syncToken, data, false);
+    } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
         console.error("Caught /sync error (via WebSocket)", e.stack || e);
-    }).then(() => {
-        // emit synced events
-        const syncEventData = {
-            oldSyncToken: self.ws_syncToken,
-            nextSyncToken: data.next_batch,
-        };
+    }
 
-        self._updateSyncState("SYNCING", syncEventData);
+    // emit synced events
+    const syncEventData = {
+        oldSyncToken: self.ws_syncToken,
+        nextSyncToken: data.next_batch,
+    };
 
-        // tell databases that everything is now in a consistent state and can be
-        // saved (no point doing so if we only have the data we just got out of the
-        // store).
-        client.store.save();
-        self.ws_syncToken = data.next_batch;
-    }));
+    self._updateSyncState("SYNCING", syncEventData);
+
+    // tell databases that everything is now in a consistent state and can be
+    // saved (no point doing so if we only have the data we just got out of the
+    // store).
+    client.store.save();
+    self.ws_syncToken = data.next_batch;
 };
 
 WebSocketApi.prototype.sendObject = function(message) {
@@ -518,7 +577,7 @@ WebSocketApi.prototype.sendObject = function(message) {
         defer: defer,
     };
 
-    if (this._websocket.readyState != WebSocket.OPEN) {
+    if (this._websocket == null || this._websocket.readyState != WebSocket.OPEN) {
         debuglog("WebSocket is not ready. Postponing", message);
         this._pendingSend.push(message);
         this._awaiting_responses[message.id].pending = true;
@@ -526,7 +585,7 @@ WebSocketApi.prototype.sendObject = function(message) {
         this._websocket.send(JSON.stringify(message));
     }
 
-    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout);
+    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout/2);
     return defer.promise;
 };
 

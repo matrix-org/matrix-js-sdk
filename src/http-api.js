@@ -378,6 +378,7 @@ module.exports.MatrixHttpApi.prototype = {
         if (!queryParams) {
             queryParams = {};
         }
+        // currently is is not possible to set the accessToken as Authorization Header
         if (!queryParams.access_token) {
             queryParams.access_token = this.opts.accessToken;
         }
