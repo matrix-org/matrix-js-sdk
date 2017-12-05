@@ -302,7 +302,11 @@ export default class IndexedDBCryptoStore {
      *     transaction object: an opaque object that should be passed
      *     to store functions.
      * @return {Promise} Promise that resolves with the result of the `func`
-     *     when the transaction is complete
+     *     when the transaction is complete. If the backend is
+     *     async (ie. the indexeddb backend) any of the callback
+     *     functions throwing an exception will cause this promise to
+     *     reject with that exception. On synchronous backends, the
+     *     exception will propagate to the caller of the getFoo method.
      */
     doTxn(mode, stores, func) {
         return this._connect().then((backend) => {

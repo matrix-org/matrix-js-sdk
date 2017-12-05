@@ -359,7 +359,14 @@ function createDatabase(db) {
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
 }
 
+/*
+ * Aborts a transaction with a given exception
+ * The transaction promise will be rejected with this exception.
+ */
 function abortWithException(txn, e) {
+    // We cheekily stick our exception onto the transaction object here
+    // We could alternatively make the thing we pass back to the app
+    // an object containing the transaction and exception.
     txn._mx_abortexception = e;
     txn.abort();
 }
