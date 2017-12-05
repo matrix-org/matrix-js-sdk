@@ -1,7 +1,7 @@
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 1;
+export const VERSION = 2;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -257,6 +257,27 @@ export class Backend {
         };
         return promiseifyTxn(txn);
     }
+
+    getAccount(txn, func) {
+        const objectStore = txn.objectStore("account");
+        const getReq = objectStore.get("-");
+        getReq.onsuccess = function() {
+            func(getReq.result || null);
+        };
+    }
+
+    storeAccount(txn, newData) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(newData, "-");
+    }
+
+    doTxn(mode, stores, func) {
+        const txn = this._db.transaction(stores, mode);
+        const result = func(txn);
+        return promiseifyTxn(txn).then(() => {
+            return result;
+        });
+    }
 }
 
 export function upgradeDatabase(db, oldVersion) {
@@ -266,6 +287,9 @@ export function upgradeDatabase(db, oldVersion) {
     );
     if (oldVersion < 1) { // The database did not previously exist.
         createDatabase(db);
+    }
+    if (oldVersion < 2) {
+        createV2Tables(db);
     }
     // Expand as needed.
 }
@@ -281,6 +305,10 @@ function createDatabase(db) {
     );
 
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
+}
+
+function createV2Tables(db) {
+    db.createObjectStore("account");
 }
 
 function promiseifyTxn(txn) {

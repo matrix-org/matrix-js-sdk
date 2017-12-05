@@ -184,6 +184,8 @@ function MatrixClient(opts) {
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
 
+    this._forceTURN = opts.forceTURN || false;
+
     if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
@@ -259,6 +261,16 @@ MatrixClient.prototype.getDeviceId = function() {
  */
 MatrixClient.prototype.supportsVoip = function() {
     return this._supportsVoip;
+};
+
+/**
+ * Set whether VoIP calls are forced to use only TURN
+ * candidates. This is the same as the forceTURN option
+ * when creating the client.
+ * @param {bool} forceTURN True to force use of TURN servers
+ */
+MatrixClient.prototype.setForceTURN = function(forceTURN) {
+    this._forceTURN = forceTURN;
 };
 
 /**
@@ -558,11 +570,10 @@ async function _setDeviceVerification(
 
 /**
  * Set the global override for whether the client should ever send encrypted
- * messages to unverified devices.  If false, it can still be overridden
- * per-room.  If true, it overrides the per-room settings.
+ * messages to unverified devices.  This provides the default for rooms which
+ * do not specify a value.
  *
- * @param {boolean} value whether to unilaterally blacklist all
- * unverified devices
+ * @param {boolean} value whether to blacklist all unverified devices by default
  */
 MatrixClient.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
     if (this._crypto === null) {
@@ -572,8 +583,7 @@ MatrixClient.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
 };
 
 /**
- * @return {boolean} whether to unilaterally blacklist all
- * unverified devices
+ * @return {boolean} whether to blacklist all unverified devices by default
  */
 MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
     if (this._crypto === null) {
@@ -3013,6 +3023,9 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Filter=} opts.filter The filter to apply to /sync calls. This will override
  * the opts.initialSyncLimit, which would normally result in a timeline limit filter.
+ *
+ * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
+ * updating presence.
  */
 MatrixClient.prototype.startClient = function(opts) {
     if (this.clientRunning) {
@@ -3244,7 +3257,9 @@ function setupCallEventHandler(client) {
                 );
             }
 
-            call = webRtcCall.createNewMatrixCall(client, event.getRoomId());
+            call = webRtcCall.createNewMatrixCall(client, event.getRoomId(), {
+                forceTURN: client._forceTURN,
+            });
             if (!call) {
                 console.log(
                     "Incoming call ID " + content.call_id + " but this client " +

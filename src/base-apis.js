@@ -574,7 +574,7 @@ MatrixBaseApis.prototype.addRoomToGroup = function(groupId, roomId, isPublic) {
         {$groupId: groupId, $roomId: roomId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined,
-        { visibility: { type: isPublic ? "public" : "private" } },
+        { "m.visibility": { type: isPublic ? "public" : "private" } },
     );
 };
 
@@ -1226,6 +1226,27 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
 
     return this._http.authedRequestWithPrefix(
         undefined, "DELETE", path, undefined, body,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
+
+/**
+ * Delete multiple device
+ *
+ * @param {string[]} devices IDs of the devices to delete
+ * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
+ * @return {module:client.Promise} Resolves: result object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.deleteMultipleDevices = function(devices, auth) {
+    const body = {devices};
+
+    if (auth) {
+        body.auth = auth;
+    }
+
+    return this._http.authedRequestWithPrefix(
+        undefined, "POST", "/delete_devices", undefined, body,
         httpApi.PREFIX_UNSTABLE,
     );
 };

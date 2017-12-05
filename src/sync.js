@@ -71,6 +71,8 @@ function debuglog(...params) {
  * SAFELY remove events from this room. It may not be safe to remove events if
  * there are other references to the timelines for this room.
  * Default: returns false.
+ * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
+ * updating presence.
  */
 function SyncApi(client, opts) {
     this.client = client;
@@ -544,6 +546,10 @@ SyncApi.prototype._sync = async function(syncOptions) {
         filter: filterId,
         timeout: pollTimeout,
     };
+
+    if (this.opts.disablePresence) {
+        qps.set_presence = "offline";
+    }
 
     if (syncToken) {
         qps.since = syncToken;

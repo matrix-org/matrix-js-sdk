@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,17 +49,18 @@ function WebStorageSessionStore(webStore) {
 }
 
 WebStorageSessionStore.prototype = {
-
     /**
-     * Store the end to end account for the logged-in user.
-     * @param {string} account Base64 encoded account.
+     * Remove the stored end to end account for the logged-in user.
      */
-    storeEndToEndAccount: function(account) {
-        this.store.setItem(KEY_END_TO_END_ACCOUNT, account);
+    removeEndToEndAccount: function() {
+        this.store.removeItem(KEY_END_TO_END_ACCOUNT);
     },
 
     /**
      * Load the end to end account for the logged-in user.
+     * Note that the end-to-end account is now stored in the
+     * crypto store rather than here: this remains here so
+     * old sessions can be migrated out of the session store.
      * @return {?string} Base64 encoded account.
      */
     getEndToEndAccount: function() {

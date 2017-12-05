@@ -16,6 +16,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 
@@ -46,7 +47,7 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Ensure the database exists and is up-to-date, or fall back to
-     * an in-memory store.
+     * a local storage or in-memory store.
      *
      * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
      * or a MemoryCryptoStore
@@ -93,7 +94,12 @@ export default class IndexedDBCryptoStore {
         }).catch((e) => {
             console.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
-                    `: falling back to in-memory store: ${e}`,
+                    `: falling back to localStorage store: ${e}`,
+            );
+            return new LocalStorageCryptoStore();
+        }).catch((e) => {
+            console.warn(
+                `unable to open localStorage: falling back to in-memory store: ${e}`,
             );
             return new MemoryCryptoStore();
         });
@@ -220,4 +226,51 @@ export default class IndexedDBCryptoStore {
             return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
         });
     }
+
+    /*
+     * Get the account pickle from the store.
+     * This requires an active transaction. See doTxn().
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(string)} func Called with the account pickle
+     */
+    getAccount(txn, func) {
+        this._backendPromise.value().getAccount(txn, func);
+    }
+
+    /*
+     * Write the account pickle to the store.
+     * This requires an active transaction. See doTxn().
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {string} newData The new account pickle to store.
+     */
+    storeAccount(txn, newData) {
+        this._backendPromise.value().storeAccount(txn, newData);
+    }
+
+    /**
+     * Perform a transaction on the crypto store. Any store methods
+     * that require a transaction (txn) object to be passed in may
+     * only be called within a callback of either this function or
+     * one of the store functions operating on the same transaction.
+     *
+     * @param {string} mode 'readwrite' if you need to call setter
+     *     functions with this transaction. Otherwise, 'readonly'.
+     * @param {string[]} stores List IndexedDBCryptoStore.STORE_*
+     *     options representing all types of object that will be
+     *     accessed or written to with this transaction.
+     * @param {function(*)} func Function called with the
+     *     transaction object: an opaque object that should be passed
+     *     to store functions.
+     * @return {Promise} Promise that resolves with the result of the `func`
+     *     when the transaction is complete
+     */
+    doTxn(mode, stores, func) {
+        return this._connect().then((backend) => {
+            return backend.doTxn(mode, stores, func);
+        });
+    }
 }
+
+IndexedDBCryptoStore.STORE_ACCOUNT = 'account';

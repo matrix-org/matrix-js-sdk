@@ -30,6 +30,7 @@ import utils from '../../utils';
 export default class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
+        this._account = null;
     }
 
     /**
@@ -195,5 +196,17 @@ export default class MemoryCryptoStore {
         }
 
         return Promise.resolve(null);
+    }
+
+    getAccount(txn, func) {
+        func(this._account);
+    }
+
+    storeAccount(txn, newData) {
+        this._account = newData;
+    }
+
+    doTxn(mode, stores, func) {
+        return Promise.resolve(func(null));
     }
 }
