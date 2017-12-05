@@ -262,7 +262,11 @@ export class Backend {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
         getReq.onsuccess = function() {
-            func(getReq.result || null);
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
         };
     }
 
@@ -282,7 +286,11 @@ export class Backend {
                 results[cursor.value.sessionId] = cursor.value.session;
                 cursor.continue();
             } else {
-                func(results);
+                try {
+                    func(results);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
             }
         };
     }
@@ -291,10 +299,14 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.get([deviceKey, sessionId]);
         getReq.onsuccess = function() {
-            if (getReq.result) {
-                func(getReq.result.session);
-            } else {
-                func(null);
+            try {
+                if (getReq.result) {
+                    func(getReq.result.session);
+                } else {
+                    func(null);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
             }
         };
     }
@@ -347,9 +359,15 @@ function createDatabase(db) {
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
 }
 
+function abortWithException(txn, e) {
+    txn._mx_abortexception = e;
+    txn.abort();
+}
+
 function promiseifyTxn(txn) {
     return new Promise((resolve, reject) => {
         txn.oncomplete = resolve;
         txn.onerror = reject;
+        txn.onabort = () => reject(txn._mx_abortexception);
     });
 }
