@@ -206,11 +206,16 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
     const curObj = this._awaiting_responses[messageId];
     if (curObj == "ping") {
         // only try closing the connection when the browser thinks it is not broken
-        if (this._websocket.readyState == WebSocket.OPEN) {
+        if (this._ping_failed_already && this._websocket.readyState == WebSocket.OPEN) {
             console.error("Timeout for sending ping-request. Try reconnecting");
             // as reconnection will be handled in _close this is enough for here
             this._websocket.close();
             this._websocket = null;
+        } else {
+            // ignore one failed ping but issue a new ping with a short delay
+            this._ping_failed_already = true;
+            delete this._awaiting_responses[messageId];
+            setTimeout(this.sendPing.bind(this), 5);
         }
         return;
     }
@@ -421,6 +426,9 @@ WebSocketApi.prototype._start = async function(syncOptions) {
                 "error");
         }
 
+        // reset var to not kill the socket after the first ping timeout
+        self._ping_failed_already = false;
+
         if (self.ws_possible) {
             // assume connection to websocket lost by mistake
             debuglog("Reinit Connection via WebSocket");
@@ -489,6 +497,7 @@ WebSocketApi.prototype.handleResponse = function(response) {
         return false;
     }
     if (this._awaiting_responses[txnId] == "ping") {
+        self._ping_failed_already = false;
         return delete this._awaiting_responses[txnId];
     }
 
