@@ -227,6 +227,16 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
         }
         return;
     }
+    if (!curObj.retried) {
+        // only retry once
+        this._websocket.send(JSON.stringyfy(curObj.message));
+        this._awaiting_responses[messageId].retried = true;
+        setTimeout(
+            this._handleResponseTimeout.bind(this, messageId),
+            this._ws_timeout / 2,
+        );
+        return;
+    }
 
     curObj.defer.reject(new MatrixError({
         error: "Locally timed out waiting for a response",
@@ -392,7 +402,6 @@ WebSocketApi.prototype._start = async function(syncOptions) {
         // store).
         client.store.save();
     }
-
 
     qps.since = this.ws_syncToken;
     this._websocket = client._http.generateWebSocket(qps);
@@ -576,7 +585,7 @@ WebSocketApi.prototype.sendObject = function(message) {
         this._websocket.send(JSON.stringify(message));
     }
 
-    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout);
+    setTimeout(this._handleResponseTimeout.bind(this, message.id), this.ws_timeout/2);
     return defer.promise;
 };
 
