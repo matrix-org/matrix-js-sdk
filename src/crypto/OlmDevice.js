@@ -179,9 +179,9 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                         this._cryptoStore.storeAccount(txn, pickledAccount);
                     }
                 }
-            },
-        );
-    });
+            });
+        },
+    );
 
     // only remove this once it's safely saved to the crypto store
     if (migratedAccount) {
@@ -193,16 +193,27 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
     if (Object.keys(sessions).length > 0) {
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
-                let numSessions = 0;
-                for (const deviceKey of Object.keys(sessions)) {
-                    for (const sessionId of Object.keys(sessions[deviceKey])) {
-                        numSessions++;
-                        this._cryptoStore.storeEndToEndSession(
-                            deviceKey, sessionId, sessions[deviceKey][sessionId], txn,
-                        );
+                // Don't migrate sessions from localstorage if we already have sessions
+                // in indexeddb, since this means we've already migrated and an old version
+                // has run against the same localstorage and created some spurious sessions.
+                this._cryptoStore.countEndToEndSessions(txn, (count) => {
+                    if (count) {
+                        console.log("Crypto store already has sessions: not migrating");
+                        return;
                     }
-                }
-                console.log("Migrating " + numSessions + " sessions from session store");
+                    let numSessions = 0;
+                    for (const deviceKey of Object.keys(sessions)) {
+                        for (const sessionId of Object.keys(sessions[deviceKey])) {
+                            numSessions++;
+                            this._cryptoStore.storeEndToEndSession(
+                                deviceKey, sessionId, sessions[deviceKey][sessionId], txn,
+                            );
+                        }
+                    }
+                    console.log(
+                        "Migrating " + numSessions + " sessions from session store",
+                    );
+                });
             },
         );
 
