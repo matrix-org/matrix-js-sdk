@@ -85,7 +85,9 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
         );
         if (!existing) {
-            this.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
+            this.storeEndToEndInboundGroupSession(
+                senderCurve25519Key, sessionId, sessionData, txn,
+            );
         }
     }
 
