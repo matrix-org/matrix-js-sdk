@@ -927,7 +927,7 @@ MegolmDecryption.prototype._buildKeyForwardingMessage = async function(
  * @param {module:crypto/OlmDevice.MegolmSessionData} session
  */
 MegolmDecryption.prototype.importRoomKey = function(session) {
-    return this._olmDevice.addInboundGroupSession({
+    return this._olmDevice.addInboundGroupSession(
         session.room_id,
         session.sender_key,
         session.forwarding_curve25519_key_chain,
@@ -935,7 +935,7 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         session.session_key,
         session.sender_claimed_keys,
         true,
-    }).then(() => {
+    ).then(() => {
         // have another go at decrypting events sent with this session.
         this._retryDecryption(session.sender_key, session.session_id);
     });
