@@ -774,39 +774,37 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  * @param {function(Olm.InboundGroupSession, InboundGroupSessionData): T} func
  *   function to call.
  *
- * @return {null} the sessionId is unknown
- *
- * @return {T} result of func
- *
  * @private
  * @template {T}
  */
 OlmDevice.prototype._getInboundGroupSession = function(
     roomId, senderKey, sessionId, txn, func,
 ) {
-    this._cryptoStore.getEndToEndInboundGroupSession(senderKey, sessionId, txn, (sessionData) => {
-        if (sessionData === null) {
-            func(null);
-            return;
-        }
+    this._cryptoStore.getEndToEndInboundGroupSession(
+        senderKey, sessionId, txn, (sessionData) => {
+            if (sessionData === null) {
+                func(null);
+                return;
+            }
 
-        // check that the room id matches the original one for the session. This stops
-        // the HS pretending a message was targeting a different room.
-        if (roomId !== sessionData.room_id) {
-            throw new Error(
-                "Mismatched room_id for inbound group session (expected " + sessionData.room_id +
-                    ", was " + roomId + ")",
-            );
-        }
+            // check that the room id matches the original one for the session. This stops
+            // the HS pretending a message was targeting a different room.
+            if (roomId !== sessionData.room_id) {
+                throw new Error(
+                    "Mismatched room_id for inbound group session (expected " +
+                    sessionData.room_id + ", was " + roomId + ")",
+                );
+            }
 
-        const session = new Olm.InboundGroupSession();
-        try {
-            session.unpickle(this._pickleKey, sessionData.session);
-            return func(session, sessionData);
-        } finally {
-            session.free();
-        }
-    });
+            const session = new Olm.InboundGroupSession();
+            try {
+                session.unpickle(this._pickleKey, sessionData.session);
+                return func(session, sessionData);
+            } finally {
+                session.free();
+            }
+        },
+    );
 };
 
 /**
@@ -827,46 +825,52 @@ OlmDevice.prototype.addInboundGroupSession = async function(
     sessionId, sessionKey, keysClaimed,
     exportFormat,
 ) {
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-        /* if we already have this session, consider updating it */
-        this._getInboundGroupSession(
-            roomId, senderKey, sessionId, txn, (existingSession, existingSessionData) => {
-                if (existingSession) {
-                    console.log("Update for megolm session " + senderKey + "/" + sessionId);
-                    // for now we just ignore updates. TODO: implement something here
-                    return;
-                }
-
-                // new session.
-                const session = new Olm.InboundGroupSession();
-                try {
-                    if (exportFormat) {
-                        session.import_session(sessionKey);
-                    } else {
-                        session.create(sessionKey);
-                    }
-                    if (sessionId != session.session_id()) {
-                        throw new Error(
-                            "Mismatched group session ID from senderKey: " + senderKey,
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            /* if we already have this session, consider updating it */
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn,
+                (existingSession, existingSessionData) => {
+                    if (existingSession) {
+                        console.log(
+                            "Update for megolm session " + senderKey + "/" + sessionId,
                         );
+                        // for now we just ignore updates. TODO: implement something here
+                        return;
                     }
 
-                    const sessionData = {
-                        room_id: roomId,
-                        session: session.pickle(this._pickleKey),
-                        keysClaimed: keysClaimed,
-                        forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
-                    };
+                    // new session.
+                    const session = new Olm.InboundGroupSession();
+                    try {
+                        if (exportFormat) {
+                            session.import_session(sessionKey);
+                        } else {
+                            session.create(sessionKey);
+                        }
+                        if (sessionId != session.session_id()) {
+                            throw new Error(
+                                "Mismatched group session ID from senderKey: " +
+                                senderKey,
+                            );
+                        }
 
-                    this._cryptoStore.addEndToEndInboundGroupSession(
-                        senderKey, sessionId, sessionData, txn,
-                    );
-                } finally {
-                    session.free();
-                }
-            },
-        );
-    });
+                        const sessionData = {
+                            room_id: roomId,
+                            session: session.pickle(this._pickleKey),
+                            keysClaimed: keysClaimed,
+                            forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
+                        };
+
+                        this._cryptoStore.addEndToEndInboundGroupSession(
+                            senderKey, sessionId, sessionData, txn,
+                        );
+                    } finally {
+                        session.free();
+                    }
+                },
+            );
+        },
+    );
 };
 
 /**
@@ -890,51 +894,64 @@ OlmDevice.prototype.decryptGroupMessage = async function(
 ) {
     let result;
 
-    await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-        this._getInboundGroupSession(roomId, senderKey, sessionId, txn, (session, sessionData) => {
-            if (session === null) {
-                result = null;
-                return;
-            }
-            const res = session.decrypt(body);
-
-            let plaintext = res.plaintext;
-            if (plaintext === undefined) {
-                // Compatibility for older olm versions.
-                plaintext = res;
-            } else {
-                // Check if we have seen this message index before to detect replay attacks.
-                // If the event ID and timestamp are specified, and the match the event ID
-                // and timestamp from the last time we used this message index, then we
-                // don't consider it a replay attack.
-                const messageIndexKey = senderKey + "|" + sessionId + "|" + res.message_index;
-                if (messageIndexKey in this._inboundGroupSessionMessageIndexes) {
-                    const msgInfo = this._inboundGroupSessionMessageIndexes[messageIndexKey];
-                    if (msgInfo.id !== eventId || msgInfo.timestamp !== timestamp) {
-                        throw new Error(
-                            "Duplicate message index, possible replay attack: " +
-                            messageIndexKey,
-                        );
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                    if (session === null) {
+                        result = null;
+                        return;
                     }
-                }
-                this._inboundGroupSessionMessageIndexes[messageIndexKey] = {
-                    id: eventId,
-                    timestamp: timestamp,
-                };
-            }
+                    const res = session.decrypt(body);
 
-            sessionData.session = session.pickle(this._pickleKey);
-            this._cryptoStore.storeEndToEndInboundGroupSession(
-                senderKey, sessionId, sessionData, txn,
+                    let plaintext = res.plaintext;
+                    if (plaintext === undefined) {
+                        // Compatibility for older olm versions.
+                        plaintext = res;
+                    } else {
+                        // Check if we have seen this message index before to detect replay attacks.
+                        // If the event ID and timestamp are specified, and the match the event ID
+                        // and timestamp from the last time we used this message index, then we
+                        // don't consider it a replay attack.
+                        const messageIndexKey = (
+                            senderKey + "|" + sessionId + "|" + res.message_index
+                        );
+                        if (messageIndexKey in this._inboundGroupSessionMessageIndexes) {
+                            const msgInfo = (
+                                this._inboundGroupSessionMessageIndexes[messageIndexKey]
+                            );
+                            if (
+                                msgInfo.id !== eventId ||
+                                msgInfo.timestamp !== timestamp
+                            ) {
+                                throw new Error(
+                                    "Duplicate message index, possible replay attack: " +
+                                    messageIndexKey,
+                                );
+                            }
+                        }
+                        this._inboundGroupSessionMessageIndexes[messageIndexKey] = {
+                            id: eventId,
+                            timestamp: timestamp,
+                        };
+                    }
+
+                    sessionData.session = session.pickle(this._pickleKey);
+                    this._cryptoStore.storeEndToEndInboundGroupSession(
+                        senderKey, sessionId, sessionData, txn,
+                    );
+                    result = {
+                        result: plaintext,
+                        keysClaimed: sessionData.keysClaimed || {},
+                        senderKey: senderKey,
+                        forwardingCurve25519KeyChain: (
+                            sessionData.forwardingCurve25519KeyChain || []
+                        ),
+                    };
+                },
             );
-            result = {
-                result: plaintext,
-                keysClaimed: sessionData.keysClaimed || {},
-                senderKey: senderKey,
-                forwardingCurve25519KeyChain: sessionData.forwardingCurve25519KeyChain || [],
-            };
-        });
-    });
+        },
+    );
 
     return result;
 };
@@ -950,27 +967,30 @@ OlmDevice.prototype.decryptGroupMessage = async function(
  */
 OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
     let result;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-        this._cryptoStore.getEndToEndInboundGroupSession(
-            senderKey, sessionId, txn, (sessionData) => {
-                if (sessionData === null) {
-                    result = false;
-                    return;
-                }
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            this._cryptoStore.getEndToEndInboundGroupSession(
+                senderKey, sessionId, txn, (sessionData) => {
+                    if (sessionData === null) {
+                        result = false;
+                        return;
+                    }
 
-                if (roomId !== sessionData.room_id) {
-                    console.warn(
-                        `requested keys for inbound group session ${senderKey}|` +
-                        `${sessionId}, with incorrect room_id (expected ${sessionData.room_id}, ` +
-                        `was ${roomId})`,
-                    );
-                    result = false;
-                } else {
-                    result = true;
-                }
-            },
-        );
-    });
+                    if (roomId !== sessionData.room_id) {
+                        console.warn(
+                            `requested keys for inbound group session ${senderKey}|` +
+                            `${sessionId}, with incorrect room_id ` +
+                            `(expected ${sessionData.room_id}, ` +
+                            `was ${roomId})`,
+                        );
+                        result = false;
+                    } else {
+                        result = true;
+                    }
+                },
+            );
+        },
+    );
 
     return result;
 };
@@ -993,28 +1013,30 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
     roomId, senderKey, sessionId,
 ) {
     let result;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-        this._getInboundGroupSession(
-            roomId, senderKey, sessionId, txn, (session, sessionData) => {
-                if (session === null) {
-                    result = null;
-                    return;
-                }
-                const messageIndex = session.first_known_index();
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                    if (session === null) {
+                        result = null;
+                        return;
+                    }
+                    const messageIndex = session.first_known_index();
 
-                const claimedKeys = sessionData.keysClaimed || {};
-                const senderEd25519Key = claimedKeys.ed25519 || null;
+                    const claimedKeys = sessionData.keysClaimed || {};
+                    const senderEd25519Key = claimedKeys.ed25519 || null;
 
-                result = {
-                    "chain_index": messageIndex,
-                    "key": session.export_session(messageIndex),
-                    "forwarding_curve25519_key_chain":
-                        sessionData.forwardingCurve25519KeyChain || [],
-                    "sender_claimed_ed25519_key": senderEd25519Key,
-                };
-            },
-        );
-    });
+                    result = {
+                        "chain_index": messageIndex,
+                        "key": session.export_session(messageIndex),
+                        "forwarding_curve25519_key_chain":
+                            sessionData.forwardingCurve25519KeyChain || [],
+                        "sender_claimed_ed25519_key": senderEd25519Key,
+                    };
+                },
+            );
+        },
+    );
 
     return result;
 };
@@ -1028,29 +1050,32 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
  */
 OlmDevice.prototype.exportInboundGroupSession = async function(senderKey, sessionId) {
     let result;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-        this._getInboundGroupSession(
-            roomId, senderKey, sessionId, txn, (session, sessionData) => {
-                if (session === null) {
-                    throw new Error(
-                        "Unknown inbound group session [" + senderKey + "," + sessionId + "]"
-                    );
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            this._getInboundGroupSession(
+                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                    if (session === null) {
+                        throw new Error(
+                            "Unknown inbound group session [" +
+                            senderKey + "," + sessionId + "]",
+                        );
 
-                    const messageIndex = session.first_known_index();
+                        const messageIndex = session.first_known_index();
 
-                    result = {
-                        "sender_key": senderKey,
-                        "sender_claimed_keys": r.keysClaimed,
-                        "room_id": r.room_id,
-                        "session_id": sessionId,
-                        "session_key": session.export_session(messageIndex),
-                        "forwarding_curve25519_key_chain":
-                            session.forwardingCurve25519KeyChain || [],
-                    };
-                }
-            },
-        );
-    });
+                        result = {
+                            "sender_key": senderKey,
+                            "sender_claimed_keys": r.keysClaimed,
+                            "room_id": r.room_id,
+                            "session_id": sessionId,
+                            "session_key": session.export_session(messageIndex),
+                            "forwarding_curve25519_key_chain":
+                                session.forwardingCurve25519KeyChain || [],
+                        };
+                    }
+                },
+            );
+        },
+    );
 
     return result;
 };
