@@ -787,9 +787,9 @@ OlmDevice.prototype._getInboundGroupSession = function(
                 return;
             }
 
-            // check that the room id matches the original one for the session. This stops
+            // if we were given a room ID, check that the it matches the original one for the session. This stops
             // the HS pretending a message was targeting a different room.
-            if (roomId !== sessionData.room_id) {
+            if (roomId !== null && roomId !== sessionData.room_id) {
                 throw new Error(
                     "Mismatched room_id for inbound group session (expected " +
                     sessionData.room_id + ", was " + roomId + ")",
@@ -1053,25 +1053,25 @@ OlmDevice.prototype.exportInboundGroupSession = async function(senderKey, sessio
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
             this._getInboundGroupSession(
-                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                null, senderKey, sessionId, txn, (session, sessionData) => {
                     if (session === null) {
                         throw new Error(
                             "Unknown inbound group session [" +
                             senderKey + "," + sessionId + "]",
                         );
-
-                        const messageIndex = session.first_known_index();
-
-                        result = {
-                            "sender_key": senderKey,
-                            "sender_claimed_keys": r.keysClaimed,
-                            "room_id": r.room_id,
-                            "session_id": sessionId,
-                            "session_key": session.export_session(messageIndex),
-                            "forwarding_curve25519_key_chain":
-                                session.forwardingCurve25519KeyChain || [],
-                        };
                     }
+
+                    const messageIndex = session.first_known_index();
+
+                    result = {
+                        "sender_key": senderKey,
+                        "sender_claimed_keys": sessionData.keysClaimed,
+                        "room_id": sessionData.room_id,
+                        "session_id": sessionId,
+                        "session_key": session.export_session(messageIndex),
+                        "forwarding_curve25519_key_chain":
+                            session.forwardingCurve25519KeyChain || [],
+                    };
                 },
             );
         },
