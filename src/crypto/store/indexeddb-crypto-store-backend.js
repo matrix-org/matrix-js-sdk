@@ -350,7 +350,7 @@ export class Backend {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         const objectStore = txn.objectStore("inbound_group_sessions");
-        const addReq = objectStore.put({
+        objectStore.put({
             senderCurve25519Key, sessionId, session: sessionData,
         });
     }
