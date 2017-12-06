@@ -34,6 +34,10 @@ function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
 }
 
+function keyEndToEndInboundGroupSession(senderKey, sessionId) {
+    return E2E_PREFIX + "inboundgroupsessions/" + senderKey + "/" + sessionId;
+}
+
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
@@ -42,6 +46,8 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         super();
         this.store = global.localStorage;
     }
+
+    // Olm Sessions
 
     _getEndToEndSessions(deviceKey, txn, func) {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
@@ -64,6 +70,32 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
+    // Inbound Group Sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        func(getJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+        ));
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const existing = getJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+        );
+        if (!existing) {
+            this.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
+        }
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this.store.setItem(
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+            sessionData,
+        );
+    }
+
     /**
      * Delete all data from this store.
      *
@@ -73,6 +105,8 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         this.store.removeItem(KEY_END_TO_END_ACCOUNT);
         return Promise.resolve();
     }
+
+    // Olm account
 
     getAccount(txn, func) {
         const account = this.store.getItem(KEY_END_TO_END_ACCOUNT);

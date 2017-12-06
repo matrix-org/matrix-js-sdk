@@ -227,6 +227,8 @@ export default class IndexedDBCryptoStore {
         });
     }
 
+    // Olm Account
+
     /*
      * Get the account pickle from the store.
      * This requires an active transaction. See doTxn().
@@ -248,6 +250,8 @@ export default class IndexedDBCryptoStore {
     storeAccount(txn, newData) {
         this._backendPromise.value().storeAccount(txn, newData);
     }
+
+    // Olm sessions
 
     /**
      * Retrieve a specific end-to-end session between the logged-in user
@@ -286,6 +290,8 @@ export default class IndexedDBCryptoStore {
             deviceKey, sessionId, session, txn,
         );
     }
+
+    // Inbound group saessions
 
     /**
      * Retrieve the end-to-end inbound group session for a given

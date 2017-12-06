@@ -258,6 +258,8 @@ export class Backend {
         return promiseifyTxn(txn);
     }
 
+    // Olm Account
+
     getAccount(txn, func) {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
@@ -274,6 +276,8 @@ export class Backend {
         const objectStore = txn.objectStore("account");
         objectStore.put(newData, "-");
     }
+
+    // Olm Sessions
 
     getEndToEndSessions(deviceKey, txn, func) {
         const objectStore = txn.objectStore("sessions");
@@ -315,6 +319,8 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         objectStore.put({deviceKey, sessionId, session});
     }
+
+    // Inbound group sessions
 
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
         const objectStore = txn.objectStore("inbound_group_sessions");

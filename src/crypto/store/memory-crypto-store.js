@@ -34,6 +34,8 @@ export default class MemoryCryptoStore {
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
+        // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
+        this._inboundGroupSessions = {};
     }
 
     /**
@@ -201,6 +203,8 @@ export default class MemoryCryptoStore {
         return Promise.resolve(null);
     }
 
+    // Olm Account
+
     getAccount(txn, func) {
         func(this._account);
     }
@@ -208,6 +212,8 @@ export default class MemoryCryptoStore {
     storeAccount(txn, newData) {
         this._account = newData;
     }
+
+    // Olm Sessions
 
     getEndToEndSession(deviceKey, sessionId, txn, func) {
         const deviceSessions = this._sessions[deviceKey] || {};
@@ -226,6 +232,24 @@ export default class MemoryCryptoStore {
         }
         deviceSessions[sessionId] = session;
     }
+
+    // Inbound Group Sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const k = senderCurve25519Key+'/'+sessionId;
+        if (this._inboundGroupSessions[k] === undefined) {
+            this._inboundGroupSessions[k] = sessionData;
+        }
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
 
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));
