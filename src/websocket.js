@@ -229,7 +229,7 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
     }
     if (!curObj.retried) {
         // only retry once
-        this._websocket.send(JSON.stringyfy(curObj.message));
+        this._websocket.send(JSON.stringify(curObj.message));
         this._awaiting_responses[messageId].retried = true;
         setTimeout(
             this._handleResponseTimeout.bind(this, messageId),
