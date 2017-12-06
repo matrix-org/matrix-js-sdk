@@ -111,11 +111,13 @@ utils.inherits(Crypto, EventEmitter);
 Crypto.prototype.init = async function() {
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._cryptoStore.getAccount(txn, (pickledAccount) => {
-            cryptoStoreHasAccount = Boolean(pickledAccount);
-        });
-    });
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                cryptoStoreHasAccount = Boolean(pickledAccount);
+            });
+        },
+    );
     if (sessionStoreHasAccount && !cryptoStoreHasAccount) {
         // we're about to migrate to the crypto store
         this.emit("crypto.warning", 'CRYPTO_WARNING_ACCOUNT_MIGRATED');
