@@ -30,6 +30,10 @@ import MemoryCryptoStore from './memory-crypto-store.js';
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 
+function keyEndToEndSessions(deviceKey) {
+    return E2E_PREFIX + "sessions/" + deviceKey;
+}
+
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
@@ -37,6 +41,27 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     constructor() {
         super();
         this.store = global.localStorage;
+    }
+
+    _getEndToEndSessions(deviceKey, txn, func) {
+        return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+    }
+
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        const sessions = this._getEndToEndSessions(deviceKey);
+        func(sessions[sessionId] || {});
+    }
+
+    getEndToEndSessions(deviceKey, txn, func) {
+        func(this._getEndToEndSessions(deviceKey) || {});
+    }
+
+    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+        const sessions = this._getEndToEndSessions(deviceKey) || {};
+        sessions[sessionId] = session;
+        setJsonItem(
+            this.store, keyEndToEndSessions(deviceKey), sessions,
+        );
     }
 
     /**
@@ -61,4 +86,20 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));
     }
+}
+
+function getJsonItem(store, key) {
+    try {
+        // if the key is absent, store.getItem() returns null, and
+        // JSON.parse(null) === null, so this returns null.
+        return JSON.parse(store.getItem(key));
+    } catch (e) {
+        console.log("Error: Failed to get key %s: %s", key, e.stack || e);
+        console.log(e.stack);
+    }
+    return null;
+}
+
+function setJsonItem(store, key, val) {
+    store.setItem(key, JSON.stringify(val));
 }

@@ -31,6 +31,9 @@ export default class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
+
+        // Map of {devicekey -> {sessionId -> session pickle}}
+        this._sessions = {};
     }
 
     /**
@@ -204,6 +207,24 @@ export default class MemoryCryptoStore {
 
     storeAccount(txn, newData) {
         this._account = newData;
+    }
+
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        const deviceSessions = this._sessions[deviceKey] || {};
+        func(deviceSessions[sessionId] || null);
+    }
+
+    getEndToEndSessions(deviceKey, txn, func) {
+        func(this._sessions[deviceKey] || {});
+    }
+
+    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+        let deviceSessions = this._sessions[deviceKey];
+        if (deviceSessions === undefined) {
+            deviceSessions = {};
+            this._sessions[deviceKey] = deviceSessions;
+        }
+        deviceSessions[sessionId] = session;
     }
 
     doTxn(mode, stores, func) {
