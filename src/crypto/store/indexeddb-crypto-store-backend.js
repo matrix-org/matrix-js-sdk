@@ -1,7 +1,7 @@
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 2;
+export const VERSION = 3;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -262,7 +262,11 @@ export class Backend {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
         getReq.onsuccess = function() {
-            func(getReq.result || null);
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
         };
     }
 
@@ -271,10 +275,52 @@ export class Backend {
         objectStore.put(newData, "-");
     }
 
+    getEndToEndSessions(deviceKey, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const idx = objectStore.index("deviceKey");
+        const getReq = idx.openCursor(deviceKey);
+        const results = {};
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                results[cursor.value.sessionId] = cursor.value.session;
+                cursor.continue();
+            } else {
+                try {
+                    func(results);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const getReq = objectStore.get([deviceKey, sessionId]);
+        getReq.onsuccess = function() {
+            try {
+                if (getReq.result) {
+                    func(getReq.result.session);
+                } else {
+                    func(null);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+        const objectStore = txn.objectStore("sessions");
+        objectStore.put({deviceKey, sessionId, session});
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
+        const promise = promiseifyTxn(txn);
         const result = func(txn);
-        return promiseifyTxn(txn).then(() => {
+        return promise.then(() => {
             return result;
         });
     }
@@ -289,7 +335,13 @@ export function upgradeDatabase(db, oldVersion) {
         createDatabase(db);
     }
     if (oldVersion < 2) {
-        createV2Tables(db);
+        db.createObjectStore("account");
+    }
+    if (oldVersion < 3) {
+        const sessionsStore = db.createObjectStore("sessions", {
+            keyPath: ["deviceKey", "sessionId"],
+        });
+        sessionsStore.createIndex("deviceKey", "deviceKey");
     }
     // Expand as needed.
 }
@@ -307,13 +359,22 @@ function createDatabase(db) {
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
 }
 
-function createV2Tables(db) {
-    db.createObjectStore("account");
+/*
+ * Aborts a transaction with a given exception
+ * The transaction promise will be rejected with this exception.
+ */
+function abortWithException(txn, e) {
+    // We cheekily stick our exception onto the transaction object here
+    // We could alternatively make the thing we pass back to the app
+    // an object containing the transaction and exception.
+    txn._mx_abortexception = e;
+    txn.abort();
 }
 
 function promiseifyTxn(txn) {
     return new Promise((resolve, reject) => {
         txn.oncomplete = resolve;
         txn.onerror = reject;
+        txn.onabort = () => reject(txn._mx_abortexception);
     });
 }

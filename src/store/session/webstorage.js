@@ -115,20 +115,6 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
-     * Store a session between the logged-in user and another device
-     * @param {string} deviceKey The public key of the other device.
-     * @param {string} sessionId The ID for this end-to-end session.
-     * @param {string} session Base64 encoded end-to-end session.
-     */
-    storeEndToEndSession: function(deviceKey, sessionId, session) {
-        const sessions = this.getEndToEndSessions(deviceKey) || {};
-        sessions[sessionId] = session;
-        setJsonItem(
-            this.store, keyEndToEndSessions(deviceKey), sessions,
-        );
-    },
-
-    /**
      * Retrieve the end-to-end sessions between the logged-in user and another
      * device.
      * @param {string} deviceKey The public key of the other device.
@@ -136,6 +122,29 @@ WebStorageSessionStore.prototype = {
      */
     getEndToEndSessions: function(deviceKey) {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+    },
+
+    /**
+     * Retrieve all end-to-end sessions between the logged-in user and other
+     * devices.
+     * @return {object} A map of {deviceKey -> {sessionId -> session pickle}}
+     */
+    getAllEndToEndSessions: function() {
+        const deviceKeys = getKeysWithPrefix(this.store, keyEndToEndSessions(''));
+        const results = {};
+        for (const k of deviceKeys) {
+            const unprefixedKey = k.substr(keyEndToEndSessions('').length);
+            results[unprefixedKey] = getJsonItem(this.store, k);
+        }
+        return results;
+    },
+
+    /**
+     * Remove all end-to-end sessions from the store
+     * This is used after migrating sessions awat from the sessions store.
+     */
+    removeAllEndToEndSessions: function() {
+        removeByPrefix(this.store, keyEndToEndSessions(''));
     },
 
     /**
@@ -227,6 +236,26 @@ function getJsonItem(store, key) {
 
 function setJsonItem(store, key, val) {
     store.setItem(key, JSON.stringify(val));
+}
+
+function getKeysWithPrefix(store, prefix) {
+    const results = [];
+    for (let i = 0; i < store.length; ++i) {
+        const key = store.key(i);
+        if (key.startsWith(prefix)) results.push(key);
+    }
+    return results;
+}
+
+function removeByPrefix(store, prefix) {
+    const toRemove = [];
+    for (let i = 0; i < store.length; ++i) {
+        const key = store.key(i);
+        if (key.startsWith(prefix)) toRemove.push(key);
+    }
+    for (const key of toRemove) {
+        store.removeItem(key);
+    }
 }
 
 function debuglog() {
