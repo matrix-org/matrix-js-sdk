@@ -391,6 +391,7 @@ MatrixClient.prototype.initCrypto = async function() {
     this.reEmitter.reEmit(crypto, [
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
+        "crypto.warning",
     ]);
 
     await crypto.init();
