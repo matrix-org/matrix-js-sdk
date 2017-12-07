@@ -208,6 +208,39 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
 
         this._sessionStore.removeAllEndToEndSessions();
     }
+
+    // inbound group sessions
+    const ibGroupSessions = this._sessionStore.getAllEndToEndInboundGroupSessionKeys();
+    if (Object.keys(ibGroupSessions).length > 0) {
+        let numIbSessions = 0;
+        await this._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+                this._cryptoStore.countEndToEndInboundGroupSessions(txn, (count) => {
+                    if (count) {
+                        console.log(
+                            "Cryto store already has inbound group sessions: "+
+                            "not migrating",
+                        );
+                        return;
+                    }
+                    for (const s of ibGroupSessions) {
+                        this._cryptoStore.addEndToEndInboundGroupSession(
+                            s.senderKey, s.sessionId,
+                            this._sessionStore.getEndToEndInboundGroupSession(
+                                s.senderKey, s.sessionId,
+                            ),
+                        );
+                        ++numIbSessions;
+                    }
+                    console.log(
+                        "Migrating " + numIbSessions +
+                        " inbound group sessions from session store",
+                    );
+                });
+            },
+        );
+        this._sessionStore.removeAllEndToEndInboundGroupSessions();
+    }
 };
 
 /**

@@ -294,6 +294,15 @@ export default class IndexedDBCryptoStore {
     // Inbound group saessions
 
     /**
+     * Gets the number of inbound group sessions in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called witht he count of inbound group sessions
+     */
+    countEndToEndInboundGroupSessions(txn, func) {
+        this._backendPromise.value().countEndToEndInboundGroupSessions(txn, func);
+    }
+
+    /**
      * Retrieve the end-to-end inbound group session for a given
      * server key and session ID
      * @param {string} senderCurve25519Key The sender's curve 25519 key

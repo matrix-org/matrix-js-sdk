@@ -73,6 +73,18 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     // Inbound Group Sessions
 
+    countEndToEndInboundGroupSessions(txn, func) {
+        let count = 0;
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                ++count;
+            }
+        }
+
+        func(count);
+    }
+
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
         func(getJsonItem(
             this.store,

@@ -178,9 +178,8 @@ WebStorageSessionStore.prototype = {
         return this.store.getItem(key);
     },
 
-    storeEndToEndInboundGroupSession: function(senderKey, sessionId, pickledSession) {
-        const key = keyEndToEndInboundGroupSession(senderKey, sessionId);
-        return this.store.setItem(key, pickledSession);
+    removeAllEndToEndInboundGroupSessions: function() {
+        removeByPrefix(this.store, E2E_PREFIX + 'inboundgroupsessions/');
     },
 
     /**

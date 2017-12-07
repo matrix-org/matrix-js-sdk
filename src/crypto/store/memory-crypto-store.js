@@ -235,6 +235,10 @@ export default class MemoryCryptoStore {
 
     // Inbound Group Sessions
 
+    countEndToEndInboundGroupSessions(txn, func) {
+        func(this._inboundGroupSessions.length);
+    }
+
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
         func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
     }
