@@ -1052,10 +1052,12 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
- * @param {string} sessiondata The session object from the store
+ * @param {string} sessionData The session object from the store
  * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
  */
-OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId, sessionData) {
+OlmDevice.prototype.exportInboundGroupSession = function(
+    senderKey, sessionId, sessionData,
+) {
     return this._unpickleInboundGroupSession(sessionData, (session) => {
         const messageIndex = session.first_known_index();
 

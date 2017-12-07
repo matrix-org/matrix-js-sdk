@@ -311,7 +311,7 @@ export default class IndexedDBCryptoStore {
     /**
      * Fetches all inbound group sessions in the store
      * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object|null)} func Called once for each group session
+     * @param {function(object)} func Called once for each group session
      *     in the store with an object having keys {senderKey, sessionId,
      *     sessionData}, then once with null to indicate the end of the list.
      */
