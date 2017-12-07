@@ -227,14 +227,16 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                         try {
                             this._cryptoStore.addEndToEndInboundGroupSession(
                                 s.senderKey, s.sessionId,
-                                JSON.parse(this._sessionStore.getEndToEndInboundGroupSession(
-                                    s.senderKey, s.sessionId,
-                                )), txn,
+                                JSON.parse(
+                                    this._sessionStore.getEndToEndInboundGroupSession(
+                                        s.senderKey, s.sessionId,
+                                    ),
+                                ), txn,
                             );
                         } catch (e) {
                             console.warn(
                                 "Failed to import session " + s.senderKey + "/" +
-                                s.sessionId + ": " + e.stack || e
+                                s.sessionId + ": " + e.stack || e,
                             );
                         }
                         ++numIbSessions;
