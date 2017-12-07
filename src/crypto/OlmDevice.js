@@ -228,7 +228,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                             s.senderKey, s.sessionId,
                             this._sessionStore.getEndToEndInboundGroupSession(
                                 s.senderKey, s.sessionId,
-                            ),
+                            ), txn,
                         );
                         ++numIbSessions;
                     }
