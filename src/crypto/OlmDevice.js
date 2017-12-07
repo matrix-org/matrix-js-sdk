@@ -224,12 +224,19 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                         return;
                     }
                     for (const s of ibGroupSessions) {
-                        this._cryptoStore.addEndToEndInboundGroupSession(
-                            s.senderKey, s.sessionId,
-                            this._sessionStore.getEndToEndInboundGroupSession(
+                        try {
+                            this._cryptoStore.addEndToEndInboundGroupSession(
                                 s.senderKey, s.sessionId,
-                            ), txn,
-                        );
+                                JSON.parse(this._sessionStore.getEndToEndInboundGroupSession(
+                                    s.senderKey, s.sessionId,
+                                )), txn,
+                            );
+                        } catch (e) {
+                            console.warn(
+                                "Failed to import session " + s.senderKey + "/" +
+                                s.sessionId + ": " + e.stack || e
+                            );
+                        }
                         ++numIbSessions;
                     }
                     console.log(
