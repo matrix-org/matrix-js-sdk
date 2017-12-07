@@ -124,7 +124,8 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
-        this.store.setItem(
+        setJsonItem(
+            this.store,
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
             sessionData,
         );
