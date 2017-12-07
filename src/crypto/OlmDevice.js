@@ -764,6 +764,16 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  *     this session to us (normally empty).
  */
 
+OlmDevice.prototype._unpickleInboundGroupSession = function(sessionData, func) {
+    const session = new Olm.InboundGroupSession();
+    try {
+        session.unpickle(this._pickleKey, sessionData.session);
+        return func(session);
+    } finally {
+        session.free();
+    }
+};
+
 /**
  * extract an InboundGroupSession from the crypto store and call the given function
  *
@@ -796,13 +806,9 @@ OlmDevice.prototype._getInboundGroupSession = function(
                 );
             }
 
-            const session = new Olm.InboundGroupSession();
-            try {
-                session.unpickle(this._pickleKey, sessionData.session);
-                return func(session, sessionData);
-            } finally {
-                session.free();
-            }
+            this._unpickleInboundGroupSession(sessionData, (session) => {
+                func(session, sessionData);
+            });
         },
     );
 };
@@ -1046,38 +1052,22 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
  *
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
- * @return {Promise<module:crypto/OlmDevice.MegolmSessionData>} exported session data
+ * @param {string} sessiondata The session object from the store
+ * @return {module:crypto/OlmDevice.MegolmSessionData} exported session data
  */
-OlmDevice.prototype.exportInboundGroupSession = async function(senderKey, sessionId) {
-    let result;
-    await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-            this._getInboundGroupSession(
-                null, senderKey, sessionId, txn, (session, sessionData) => {
-                    if (session === null) {
-                        throw new Error(
-                            "Unknown inbound group session [" +
-                            senderKey + "," + sessionId + "]",
-                        );
-                    }
+OlmDevice.prototype.exportInboundGroupSession = function(senderKey, sessionId, sessionData) {
+    return this._unpickleInboundGroupSession(sessionData, (session) => {
+        const messageIndex = session.first_known_index();
 
-                    const messageIndex = session.first_known_index();
-
-                    result = {
-                        "sender_key": senderKey,
-                        "sender_claimed_keys": sessionData.keysClaimed,
-                        "room_id": sessionData.room_id,
-                        "session_id": sessionId,
-                        "session_key": session.export_session(messageIndex),
-                        "forwarding_curve25519_key_chain":
-                            session.forwardingCurve25519KeyChain || [],
-                    };
-                },
-            );
-        },
-    );
-
-    return result;
+        return {
+            "sender_key": senderKey,
+            "sender_claimed_keys": sessionData.keysClaimed,
+            "room_id": sessionData.room_id,
+            "session_id": sessionId,
+            "session_key": session.export_session(messageIndex),
+            "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
+        };
+    });
 };
 
 // Utilities

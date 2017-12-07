@@ -309,6 +309,17 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
+     * Fetches all inbound group sessions in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object|null)} func Called once for each group session
+     *     in the store with an object having keys {senderKey, sessionId,
+     *     sessionData}, then once with null to indicate the end of the list.
+     */
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        this._backendPromise.value().getAllEndToEndInboundGroupSessions(txn, func);
+    }
+
+    /**
      * Adds an end-to-end inbound group session to the store.
      * If there already exists an inbound group session with the same
      * senderCurve25519Key and sessionID, the session will not be added.

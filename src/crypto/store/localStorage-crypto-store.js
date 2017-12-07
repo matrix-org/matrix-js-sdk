@@ -29,13 +29,14 @@ import MemoryCryptoStore from './memory-crypto-store.js';
 
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 
 function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
 }
 
 function keyEndToEndInboundGroupSession(senderKey, sessionId) {
-    return E2E_PREFIX + "inboundgroupsessions/" + senderKey + "/" + sessionId;
+    return KEY_INBOUND_SESSION_PREFIX + senderKey + "/" + sessionId;
 }
 
 /**
@@ -77,6 +78,25 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
             this.store,
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
         ));
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                // we can't use split, as the components we are trying to split out
+                // might themselves contain '/' characters. We rely on the
+                // senderKey being a (32-byte) curve25519 key, base64-encoded
+                // (hence 43 characters long).
+
+                func({
+                    senderKey: key.substr(KEY_INBOUND_SESSION_PREFIX.length, 43),
+                    sessionId: key.substr(KEY_INBOUND_SESSION_PREFIX.length + 44),
+                    sessionData: getJsonItem(this.store, key),
+                });
+            }
+        }
+        func(null);
     }
 
     addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {

@@ -239,6 +239,22 @@ export default class MemoryCryptoStore {
         func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
     }
 
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        for (const key of Object.keys(this._inboundGroupSessions)) {
+            // we can't use split, as the components we are trying to split out
+            // might themselves contain '/' characters. We rely on the
+            // senderKey being a (32-byte) curve25519 key, base64-encoded
+            // (hence 43 characters long).
+
+            func({
+                senderKey: key.substr(0, 43),
+                sessionId: key.substr(44),
+                sessionData: this._inboundGroupSessions[key],
+            });
+        }
+        func(null);
+    }
+
     addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         const k = senderCurve25519Key+'/'+sessionId;
         if (this._inboundGroupSessions[k] === undefined) {

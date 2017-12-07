@@ -338,6 +338,32 @@ export class Backend {
         };
     }
 
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                try {
+                    func({
+                        senderKey: cursor.value.senderCurve25519Key,
+                        sessionId: cursor.value.sessionId,
+                        sessionData: cursor.value.session,
+                    });
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+                cursor.continue();
+            } else {
+                try {
+                    func(null);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
     addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         const objectStore = txn.objectStore("inbound_group_sessions");
         const addReq = objectStore.add({
