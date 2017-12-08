@@ -215,6 +215,10 @@ export default class MemoryCryptoStore {
 
     // Olm Sessions
 
+    countEndToEndSessions(txn, func) {
+        return Object.keys(this._sessions).length;
+    }
+
     getEndToEndSession(deviceKey, sessionId, txn, func) {
         const deviceSessions = this._sessions[deviceKey] || {};
         func(deviceSessions[sessionId] || null);

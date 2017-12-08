@@ -109,6 +109,24 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
+    let cryptoStoreHasAccount;
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                cryptoStoreHasAccount = Boolean(pickledAccount);
+            });
+        },
+    );
+    if (sessionStoreHasAccount && !cryptoStoreHasAccount) {
+        // we're about to migrate to the crypto store
+        this.emit("crypto.warning", 'CRYPTO_WARNING_ACCOUNT_MIGRATED');
+    } else if (sessionStoreHasAccount && cryptoStoreHasAccount) {
+        // There's an account in both stores: an old version of
+        // the code has been run against this store.
+        this.emit("crypto.warning", 'CRYPTO_WARNING_OLD_VERSION_DETECTED');
+    }
+
     await this._olmDevice.init();
 
     // build our device keys: these will later be uploaded
@@ -1335,6 +1353,25 @@ class IncomingRoomKeyRequestCancellation {
  *
  * @event module:client~MatrixClient#"crypto.roomKeyRequestCancellation"
  * @param {module:crypto~IncomingRoomKeyRequestCancellation} req
+ */
+
+/**
+ * Fires when the app may wish to warn the user about something related
+ * the end-to-end crypto.
+ *
+ * Comes with a type which is one of:
+ * * CRYPTO_WARNING_ACCOUNT_MIGRATED: Account data has been migrated from an older
+ *       version of the store in such a way that older clients will no longer be
+ *       able to read it. The app may wish to warn the user against going back to
+ *       an older version of the app.
+ * * CRYPTO_WARNING_OLD_VERSION_DETECTED: js-sdk has detected that an older version
+ *       of js-sdk has been run against the same store after a migration has been
+ *       performed. This is likely have caused unexpected behaviour in the old
+ *       version. For example, the old version and the new version may have two
+ *       different identity keys.
+ *
+ * @event module:client~MatrixClient#"crypto.warning"
+ * @param {string} type One of the strings listed above
  */
 
 /** */

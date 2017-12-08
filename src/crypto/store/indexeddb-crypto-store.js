@@ -254,6 +254,15 @@ export default class IndexedDBCryptoStore {
     // Olm sessions
 
     /**
+     * Returns the number of end-to-end sessions in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(int)} func Called with the count of sessions
+     */
+    countEndToEndSessions(txn, func) {
+        this._backendPromise.value().countEndToEndSessions(txn, func);
+    }
+
+    /**
      * Retrieve a specific end-to-end session between the logged-in user
      * and another device.
      * @param {string} deviceKey The public key of the other device.

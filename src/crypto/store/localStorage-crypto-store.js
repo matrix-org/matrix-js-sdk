@@ -50,6 +50,14 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     // Olm Sessions
 
+    countEndToEndSessions(txn, func) {
+        let count = 0;
+        for (let i = 0; i < this.store.length; ++i) {
+            if (this.store.key(i).startsWith(keyEndToEndSessions(''))) ++count;
+        }
+        func(count);
+    }
+
     _getEndToEndSessions(deviceKey, txn, func) {
         return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
     }
