@@ -275,6 +275,14 @@ export class Backend {
         objectStore.put(newData, "-");
     }
 
+    countEndToEndSessions(txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const countReq = objectStore.count();
+        countReq.onsuccess = function() {
+            func(countReq.result);
+        };
+    }
+
     getEndToEndSessions(deviceKey, txn, func) {
         const objectStore = txn.objectStore("sessions");
         const idx = objectStore.index("deviceKey");
