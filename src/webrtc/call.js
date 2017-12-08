@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2017 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,31 +24,6 @@ const EventEmitter = require("events").EventEmitter;
 const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
-
-/**
- * Fires when the MatrixCall encounters an error when sending a Matrix event.
- * <p>
- * This is required to allow errors, which occur during sending of events, to bubble up.
- * (This is because call.js does a hangup when it encounters a normal `error`, which in
- * turn could lead to an UnknownDeviceError.)
- * <p>
- * To deal with an UnknownDeviceError when trying to send events, the application should let
- * users know that there are new devices in the encrypted room (into which the event was
- * sent) and give the user the options to resend unsent events or cancel them. Resending
- * is done using {@link module:client~MatrixClient#resendEvent} and cancelling can be done by using
- * {@link module:client~MatrixClient#cancelPendingEvent}.
- * <p>
- * MatrixCall will not do anything in response to an error that causes `send_event_error`
- * to be emitted with the exception of sending `m.call.candidates`, which is retried upon
- * failure when ICE candidates are being sent. This happens during call setup.
- *
- * @event module:webrtc/call~MatrixCall#"send_event_error"
- * @param {Error} err The error caught from calling client.sendEvent in call.js.
- * @example
- * matrixCall.on("send_event_error", function(err){
- *   console.error(err);
- * });
- */
 
 /**
  * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
@@ -110,6 +86,8 @@ function MatrixCall(opts) {
     this.mediaPromises = Object.create(null);
 
     this.screenSharingStream = null;
+
+    this._answerContent = null;
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
@@ -122,6 +100,24 @@ MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
  * the hardware isn't plugged in, or the user has explicitly denied access.
  */
 MatrixCall.ERR_NO_USER_MEDIA = "no_user_media";
+
+/*
+ * Error code used when a call event failed to send
+ * because unknown devices were present in the room
+ */
+MatrixCall.ERR_UNKNOWN_DEVICES = "unknown_devices";
+
+/*
+ * Error code usewd when we fail to send the invite
+ * for some reason other than there being unknown devices
+ */
+MatrixCall.ERR_SEND_INVITE = "send_invite";
+
+/*
+ * Error code usewd when we fail to send the answer
+ * for some reason other than there being unknown devices
+ */
+MatrixCall.ERR_SEND_ANSWER = "send_answer";
 
 utils.inherits(MatrixCall, EventEmitter);
 
@@ -409,6 +405,11 @@ MatrixCall.prototype.answer = function() {
     debuglog("Answering call %s of type %s", this.callId, this.type);
     const self = this;
 
+    if (self._answerContent) {
+        self._sendAnswer();
+        return;
+    }
+
     if (!this.localAVStream && !this.waitForLocalAVStream) {
         this.webRtc.getUserMedia(
             _getUserMediaVideoContraints(this.type),
@@ -457,6 +458,8 @@ MatrixCall.prototype._replacedBy = function(newCall) {
  * @param {boolean} suppressEvent True to suppress emitting an event.
  */
 MatrixCall.prototype.hangup = function(reason, suppressEvent) {
+    if (this.state == 'ended') return;
+
     debuglog("Ending call " + this.callId);
     terminate(this, "local", reason, !suppressEvent);
     const content = {
@@ -593,6 +596,28 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
     setState(self, 'create_offer');
 };
 
+MatrixCall.prototype._sendAnswer = function(stream) {
+    sendEvent(this, 'm.call.answer', this._answerContent).then(() => {
+        setState(this, 'connecting');
+        // If this isn't the first time we've tried to send the answer,
+        // we may have candidates queued up, so send them now.
+        _sendCandidateQueue(this);
+    }).catch((error) => {
+        // We've failed to answer: back to the ringing state
+        setState(this, 'ringing');
+        this.client.cancelPendingEvent(error.event);
+
+        let code = MatrixCall.ERR_SEND_ANSWER;
+        let message = "Failed to send answer";
+        if (error.name == 'UnknownDeviceError') {
+            code = MatrixCall.ERR_UNKNOWN_DEVICES;
+            message = "Unknown devices present in the room";
+        }
+        this.emit("error", callError(code, message));
+        throw error;
+    });
+};
+
 /**
  * Internal
  * @private
@@ -641,7 +666,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
     self.peerConn.createAnswer(function(description) {
         debuglog("Created answer: " + description);
         self.peerConn.setLocalDescription(description, function() {
-            const content = {
+            self._answerContent = {
                 version: 0,
                 call_id: self.callId,
                 answer: {
@@ -649,8 +674,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
                     type: self.peerConn.localDescription.type,
                 },
             };
-            sendEvent(self, 'm.call.answer', content);
-            setState(self, 'connecting');
+            self._sendAnswer();
         }, function() {
             debuglog("Error setting local description!");
         }, constraints);
@@ -671,6 +695,9 @@ MatrixCall.prototype._gotLocalIceCandidate = function(event) {
             "Got local ICE " + event.candidate.sdpMid + " candidate: " +
             event.candidate.candidate,
         );
+
+        if (this.state == 'ended') return;
+
         // As with the offer, note we need to make a copy of this object, not
         // pass the original: that broke in Chrome ~m43.
         const c = {
@@ -753,14 +780,27 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             },
             lifetime: MatrixCall.CALL_TIMEOUT_MS,
         };
-        sendEvent(self, 'm.call.invite', content);
-
-        setTimeout(function() {
-            if (self.state == 'invite_sent') {
-                self.hangup('invite_timeout');
+        sendEvent(self, 'm.call.invite', content).then(() => {
+            setState(self, 'invite_sent');
+            setTimeout(function() {
+                if (self.state == 'invite_sent') {
+                    self.hangup('invite_timeout');
+                }
+            }, MatrixCall.CALL_TIMEOUT_MS);
+        }).catch((error) => {
+            let code = MatrixCall.ERR_SEND_INVITE;
+            let message = "Failed to send invite";
+            if (error.name == 'UnknownDeviceError') {
+                code = MatrixCall.ERR_UNKNOWN_DEVICES;
+                message = "Unknown devices present in the room";
             }
-        }, MatrixCall.CALL_TIMEOUT_MS);
-        setState(self, 'invite_sent');
+
+            self.client.cancelPendingEvent(error.event);
+            terminate(self, "local", code, false);
+            self.emit("error", callError(code, message));
+            throw error;
+        });
+
     }, function() {
         debuglog("Error setting local description!");
     });
@@ -784,6 +824,7 @@ MatrixCall.prototype._getLocalOfferFailed = function(error) {
  * @param {Object} error
  */
 MatrixCall.prototype._getUserMediaFailed = function(error) {
+    terminate(this, "local", 'user_media_failed', false);
     this.emit(
         "error",
         callError(
@@ -792,7 +833,6 @@ MatrixCall.prototype._getUserMediaFailed = function(error) {
             "does this app have permission?",
         ),
     );
-    this.hangup("user_media_failed");
 };
 
 /**
@@ -972,17 +1012,20 @@ const setState = function(self, state) {
  * @return {Promise}
  */
 const sendEvent = function(self, eventType, content) {
-    return self.client.sendEvent(self.roomId, eventType, content).catch(
-        (err) => {
-            self.emit('send_event_error', err);
-        },
-    );
+    return self.client.sendEvent(self.roomId, eventType, content);
 };
 
 const sendCandidate = function(self, content) {
     // Sends candidates with are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
+
+    // Don't send the ICE candidates yet if the call is in the ringing state: this
+    // means we tried to pick (ie. started generating candidates) and then failed to
+    // send the answer and went back to the ringing state. Queue up the candidates
+    // to send if we sucessfully send the answer.
+    if (self.state == 'ringing') return;
+
     if (self.candidateSendTries === 0) {
         setTimeout(function() {
             _sendCandidateQueue(self);
