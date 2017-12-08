@@ -166,7 +166,6 @@ OlmDevice.getOlmVersion = function() {
 
 OlmDevice.prototype._migrateFromSessionStore = async function() {
     // account
-    let migratedAccount = false;
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this._cryptoStore.getAccount(txn, (pickledAccount) => {
@@ -175,7 +174,6 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                     pickledAccount = this._sessionStore.getEndToEndAccount();
                     if (pickledAccount !== null) {
                         console.log("Migrating account from session store");
-                        migratedAccount = true;
                         this._cryptoStore.storeAccount(txn, pickledAccount);
                     }
                 }
@@ -183,10 +181,9 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
         );
     });
 
-    // only remove this once it's safely saved to the crypto store
-    if (migratedAccount) {
-        this._sessionStore.removeEndToEndAccount();
-    }
+    // remove the old account now the transaction has completed. Either we've
+    // migrated it or decided not to, either way we want to blow away the old data.
+    this._sessionStore.removeEndToEndAccount();
 
     // sessions
     const sessions = this._sessionStore.getAllEndToEndSessions();
