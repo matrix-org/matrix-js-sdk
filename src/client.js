@@ -406,6 +406,7 @@ MatrixClient.prototype.initCrypto = async function() {
     this.reEmitter.reEmit(crypto, [
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
+        "crypto.warning",
     ]);
 
     await crypto.init();
@@ -1155,6 +1156,9 @@ function _sendEvent(client, room, event, callback) {
         try {
             _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             event.error = err;
+            // also put the event object on the error: the caller will need this
+            // to resend or cancel the event
+            err.event = event;
 
             if (callback) {
                 callback(err);
