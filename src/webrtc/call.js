@@ -800,7 +800,6 @@ MatrixCall.prototype._gotLocalOffer = function(description) {
             self.emit("error", callError(code, message));
             throw error;
         });
-
     }, function() {
         debuglog("Error setting local description!");
     });
