@@ -1668,7 +1668,7 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
  * Get information on how a specific place on a third party protocol
  * may be reached.
  * @param {string} protocol The protocol given in getThirdpartyProtocols()
- * @param {object} params Protocol-specific parameters, as given in th
+ * @param {object} params Protocol-specific parameters, as given in the
  *                        response to getThirdpartyProtocols()
  * @return {module:client.Promise} Resolves to the result object
  */
