@@ -386,7 +386,9 @@ export class Backend {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = () => {
-            abortWithException(txn, new Error("Inbound Session already exists"));
+            abortWithException(txn, new Error(
+                "Failed to add inbound group session - session may already exist",
+            ));
         };
     }
 
