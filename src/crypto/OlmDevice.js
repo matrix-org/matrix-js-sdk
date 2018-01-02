@@ -223,37 +223,30 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
         let numIbSessions = 0;
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-                this._cryptoStore.countEndToEndInboundGroupSessions(txn, (count) => {
-                    if (count) {
-                        console.log(
-                            "Cryto store already has inbound group sessions: "+
-                            "not migrating",
+                // We always migrate inbound group sessions, even if we already have some
+                // in the new store. They should be be safe to migrate.
+                for (const s of ibGroupSessions) {
+                    try {
+                        this._cryptoStore.addEndToEndInboundGroupSession(
+                            s.senderKey, s.sessionId,
+                            JSON.parse(
+                                this._sessionStore.getEndToEndInboundGroupSession(
+                                    s.senderKey, s.sessionId,
+                                ),
+                            ), txn,
                         );
-                        return;
+                    } catch (e) {
+                        console.warn(
+                            "Failed to import session " + s.senderKey + "/" +
+                            s.sessionId + ": " + e.stack || e,
+                        );
                     }
-                    for (const s of ibGroupSessions) {
-                        try {
-                            this._cryptoStore.addEndToEndInboundGroupSession(
-                                s.senderKey, s.sessionId,
-                                JSON.parse(
-                                    this._sessionStore.getEndToEndInboundGroupSession(
-                                        s.senderKey, s.sessionId,
-                                    ),
-                                ), txn,
-                            );
-                        } catch (e) {
-                            console.warn(
-                                "Failed to import session " + s.senderKey + "/" +
-                                s.sessionId + ": " + e.stack || e,
-                            );
-                        }
-                        ++numIbSessions;
-                    }
-                    console.log(
-                        "Migrating " + numIbSessions +
-                        " inbound group sessions from session store",
-                    );
-                });
+                    ++numIbSessions;
+                }
+                console.log(
+                    "Migrating " + numIbSessions +
+                    " inbound group sessions from session store",
+                );
             },
         );
         this._sessionStore.removeAllEndToEndInboundGroupSessions();
