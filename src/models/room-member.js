@@ -229,11 +229,21 @@ function calculateDisplayName(member, event, roomState) {
         return displayName;
     }
 
-    const userIds = roomState.getUserIdsWithDisplayName(displayName);
-    const otherUsers = userIds.filter(function(u) {
-        return u !== selfUserId;
-    });
-    if (otherUsers.length > 0) {
+
+    // Check if the name contains something that look like a mxid
+    // If it does, it may be someone trying to impersonate someone else
+    // Show full mxid in this case
+    // Also show mxid if there are other people with the same displayname
+    let disambiguate = /@.+:.+/.test(displayName);
+    if (!disambiguate) {
+        const userIds = roomState.getUserIdsWithDisplayName(displayName);
+        const otherUsers = userIds.filter(function(u) {
+            return u !== selfUserId;
+        });
+        disambiguate = otherUsers.length > 0;
+    }
+
+    if (disambiguate) {
         return displayName + " (" + selfUserId + ")";
     }
     return displayName;
