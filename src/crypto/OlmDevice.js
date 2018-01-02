@@ -813,6 +813,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  *
  * @param {Object} sessionData Object describing the session.
  * @param {function(Olm.InboundGroupSession)} func Invoked with the unpickled session
+ * @return {*} result of func
  */
 OlmDevice.prototype._unpickleInboundGroupSession = function(sessionData, func) {
     const session = new Olm.InboundGroupSession();
