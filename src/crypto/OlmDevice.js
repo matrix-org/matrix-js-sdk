@@ -244,7 +244,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                     ++numIbSessions;
                 }
                 console.log(
-                    "Migrating " + numIbSessions +
+                    "Migrated " + numIbSessions +
                     " inbound group sessions from session store",
                 );
             },
