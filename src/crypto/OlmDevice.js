@@ -237,7 +237,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                         );
                     } catch (e) {
                         console.warn(
-                            "Failed to import session " + s.senderKey + "/" +
+                            "Failed to migrate session " + s.senderKey + "/" +
                             s.sessionId + ": " + e.stack || e,
                         );
                     }
