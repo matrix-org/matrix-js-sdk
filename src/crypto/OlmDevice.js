@@ -827,7 +827,8 @@ OlmDevice.prototype._unpickleInboundGroupSession = function(sessionData, func) {
 /**
  * extract an InboundGroupSession from the crypto store and call the given function
  *
- * @param {string} roomId
+ * @param {string} roomId The room ID to extract the session for, or null to fetch
+ *     sessions for any room.
  * @param {string} senderKey
  * @param {string} sessionId
  * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
