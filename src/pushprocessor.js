@@ -75,7 +75,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'room_id',
-                    'pattern': tprule.rule_id,
+                    'value': tprule.rule_id,
                 });
                 break;
             case 'sender':
@@ -85,7 +85,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'user_id',
-                    'pattern': tprule.rule_id,
+                    'value': tprule.rule_id,
                 });
                 break;
             case 'content':
@@ -95,7 +95,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'content.body',
-                    'pattern': tprule.pattern,
+                    'regex': new RegExp('(^|\\W)' + globToRegexp(tprule.pattern) + '(\\W|$)'),
                 });
                 break;
         }
@@ -212,14 +212,11 @@ function PushProcessor(client) {
             return false;
         }
 
-        let pat;
-        if (cond.key == 'content.body') {
-            pat = '(^|\\W)' + globToRegexp(cond.pattern) + '(\\W|$)';
-        } else {
-            pat = '^' + globToRegexp(cond.pattern) + '$';
+        if (cond.value) {
+            return cond.value === val;
         }
-        const regex = new RegExp(pat, 'i');
-        return !!val.match(regex);
+
+        return !!val.match(cond.regex);
     };
 
     const globToRegexp = function(glob) {
