@@ -328,6 +328,10 @@ WebSocketApi.prototype._start = async function(syncOptions) {
                 events: savedSync.accountData,
             },
         };
+    } else if (syncOptions.hasSyncedBefore) {
+	    // we are currently reconnecting
+            this._start_websocket(qps);
+            return;
     } else {
         try {
             //debuglog('Starting sync since=' + syncToken);
@@ -402,9 +406,13 @@ WebSocketApi.prototype._start = async function(syncOptions) {
         // store).
         client.store.save();
     }
+    this._start_websocket(qps);
+};
 
+WebSocketApi.prototype._start_websocket = function(qps) {
+    const self = this;
     qps.since = this.ws_syncToken;
-    this._websocket = client._http.generateWebSocket(qps);
+    this._websocket = this.client._http.generateWebSocket(qps);
     this._websocket.onopen = _onopen;
     this._websocket.onclose = _onclose;
     this._websocket.onmessage = _onmessage;
