@@ -95,7 +95,9 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'content.body',
-                    'regex': new RegExp('(^|\\W)' + globToRegexp(tprule.pattern) + '(\\W|$)'),
+                    'regex': new RegExp(
+                        '(^|\\W)' + globToRegexp(tprule.pattern) + '(\\W|$)',
+                    ),
                 });
                 break;
         }
