@@ -329,9 +329,9 @@ WebSocketApi.prototype._start = async function(syncOptions) {
             },
         };
     } else if (syncOptions.hasSyncedBefore) {
-	    // we are currently reconnecting
-            this._start_websocket(qps);
-            return;
+        // we are currently reconnecting
+        this._start_websocket(qps);
+        return;
     } else {
         try {
             //debuglog('Starting sync since=' + syncToken);
@@ -450,7 +450,7 @@ WebSocketApi.prototype._start_websocket = function(qps) {
             // assume connection to websocket lost by mistake
             debuglog("Reinit Connection via WebSocket");
             self._updateSyncState("RECONNECTING");
-            client._syncApi._startKeepAlives().done(function() {
+            self.client._syncApi._startKeepAlives().done(function() {
                 debuglog("Restart Websocket");
                 self._start(self.ws_syncOptions);
             });
@@ -458,7 +458,7 @@ WebSocketApi.prototype._start_websocket = function(qps) {
             debuglog("Connection via WebSocket seems to be not available. "
                 + "Fallback to Long-Polling");
             // Fallback /sync Long Polling
-            client.connectionFallback(self.opts, self.ws_syncOptions);
+            self.client.connectionFallback(self.opts, self.ws_syncOptions);
             // remove variables used by WebSockets
             self.ws_syncOptions = null;
             self.ws_syncToken = null;
