@@ -1334,12 +1334,13 @@ MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, ca
         text = "Sticker";
     }
     const content = {
-         msgtype: "m.sticker",
          url: url,
          info: info,
          body: text,
     };
-    return this.sendMessage(roomId, content, callback);
+    return this.sendEvent(
+        roomId, "m.room.sticker", content, callback, undefined,
+    );
 };
 
 /**
