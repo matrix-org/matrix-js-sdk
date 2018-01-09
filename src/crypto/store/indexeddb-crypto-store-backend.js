@@ -330,14 +330,6 @@ export class Backend {
 
     // Inbound group sessions
 
-    countEndToEndInboundGroupSessions(txn, func) {
-        const objectStore = txn.objectStore("inbound_group_sessions");
-        const countReq = objectStore.count();
-        countReq.onsuccess = function() {
-            func(countReq.result);
-        };
-    }
-
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
