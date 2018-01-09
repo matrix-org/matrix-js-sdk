@@ -1136,8 +1136,11 @@ function _sendEvent(client, room, event, callback) {
         console.error("Error sending event", err.stack || err);
 
         try {
-            _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            // set the error on the event before we update the status:
+            // updating the status emits the event, so the state should be
+            // consistent at that point.
             event.error = err;
+            _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             // also put the event object on the error: the caller will need this
             // to resend or cancel the event
             err.event = event;
