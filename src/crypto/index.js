@@ -700,21 +700,25 @@ Crypto.prototype.isRoomEncrypted = function(roomId) {
 /**
  * Get a list containing all of the room keys
  *
- * @return {module:client.Promise} a promise which resolves to a list of
- *    session export objects
+ * @return {module:crypto/OlmDevice.MegolmSessionData[]} a list of session export objects
  */
-Crypto.prototype.exportRoomKeys = function() {
-    return Promise.map(
-        this._sessionStore.getAllEndToEndInboundGroupSessionKeys(),
-        (s) => {
-            return this._olmDevice.exportInboundGroupSession(
-                s.senderKey, s.sessionId,
-            ).then((sess) => {
+Crypto.prototype.exportRoomKeys = async function() {
+    const exportedSessions = [];
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
+                if (s === null) return;
+
+                const sess = this._olmDevice.exportInboundGroupSession(
+                    s.senderKey, s.sessionId, s.sessionData,
+                );
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
-                return sess;
+                exportedSessions.push(sess);
             });
         },
     );
+
+    return exportedSessions;
 };
 
 /**

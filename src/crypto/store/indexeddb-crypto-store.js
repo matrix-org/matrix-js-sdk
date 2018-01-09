@@ -227,6 +227,8 @@ export default class IndexedDBCryptoStore {
         });
     }
 
+    // Olm Account
+
     /*
      * Get the account pickle from the store.
      * This requires an active transaction. See doTxn().
@@ -248,6 +250,8 @@ export default class IndexedDBCryptoStore {
     storeAccount(txn, newData) {
         this._backendPromise.value().storeAccount(txn, newData);
     }
+
+    // Olm sessions
 
     /**
      * Returns the number of end-to-end sessions in the store
@@ -296,6 +300,64 @@ export default class IndexedDBCryptoStore {
         );
     }
 
+    // Inbound group saessions
+
+    /**
+     * Retrieve the end-to-end inbound group session for a given
+     * server key and session ID
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called with A map from sessionId
+     *     to Base64 end-to-end session.
+     */
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        this._backendPromise.value().getEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, txn, func,
+        );
+    }
+
+    /**
+     * Fetches all inbound group sessions in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called once for each group session
+     *     in the store with an object having keys {senderKey, sessionId,
+     *     sessionData}, then once with null to indicate the end of the list.
+     */
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        this._backendPromise.value().getAllEndToEndInboundGroupSessions(txn, func);
+    }
+
+    /**
+     * Adds an end-to-end inbound group session to the store.
+     * If there already exists an inbound group session with the same
+     * senderCurve25519Key and sessionID, the session will not be added.
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {object} sessionData The session data structure
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._backendPromise.value().addEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
+    }
+
+    /**
+     * Writes an end-to-end inbound group session to the store.
+     * If there already exists an inbound group session with the same
+     * senderCurve25519Key and sessionID, it will be overwritten.
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {object} sessionData The session data structure
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._backendPromise.value().storeEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -326,3 +388,4 @@ export default class IndexedDBCryptoStore {
 
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
+IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
