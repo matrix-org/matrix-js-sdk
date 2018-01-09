@@ -1323,6 +1323,32 @@ MatrixClient.prototype.sendImageMessage = function(roomId, url, info, text, call
 
 /**
  * @param {string} roomId
+ * @param {string} url
+ * @param {Object} info
+ * @param {string} text
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, callback) {
+    if (utils.isFunction(text)) {
+        callback = text; text = undefined;
+    }
+    if (!text) {
+        text = "Sticker";
+    }
+    const content = {
+         url: url,
+         info: info,
+         body: text,
+    };
+    return this.sendEvent(
+        roomId, "m.room.sticker", content, callback, undefined,
+    );
+};
+
+/**
+ * @param {string} roomId
  * @param {string} body
  * @param {string} htmlBody
  * @param {module:client.callback} callback Optional.

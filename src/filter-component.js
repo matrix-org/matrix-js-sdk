@@ -97,11 +97,12 @@ FilterComponent.prototype._checkFields =
     };
 
     const self = this;
-    Object.keys(literal_keys).forEach(function(name) {
+    for (let n=0; n < Object.keys(literal_keys).length; n++) {
+        const name = Object.keys(literal_keys)[n];
         const match_func = literal_keys[name];
         const not_name = "not_" + name;
         const disallowed_values = self[not_name];
-        if (disallowed_values.map(match_func)) {
+        if (disallowed_values.filter(match_func).length > 0) {
             return false;
         }
 
@@ -111,7 +112,7 @@ FilterComponent.prototype._checkFields =
                 return false;
             }
         }
-    });
+    }
 
     const contains_url_filter = this.filter_json.contains_url;
     if (contains_url_filter !== undefined) {
