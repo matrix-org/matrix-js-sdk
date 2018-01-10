@@ -107,6 +107,155 @@ module.exports.MatrixHttpApi.prototype = {
     },
 
     /**
+     * Resolve url to the Home Server
+     *
+     * @param {string=} url The url to resolve.
+     *
+     * @param {object} opts  options object
+     *
+     * @param {boolean=} opts.rawResponse Return the raw body, rather than
+     *   parsing the JSON. Defaults to false (except on node.js, where it
+     *   defaults to true for backwards compatibility).
+     *
+     * @param {boolean=} opts.onlyContentUri Just return the content URI,
+     *   rather than the whole body. Defaults to false (except on browsers,
+     *   where it defaults to true for backwards compatibility). Ignored if
+     *   opts.rawResponse is true.
+     *
+     * @param {Function=} opts.callback Deprecated. Optional. The callback to
+     *    invoke on success/failure. See the promise return values for more
+     *    information.
+     *
+     * @return {module:client.Promise} Resolves to response object, as
+     *    determined by this.opts.onlyData, opts.rawResponse, and
+     *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
+     */
+    resolveUrl: function(url, opts) {
+        if (utils.isFunction(opts)) {
+            // opts used to be callback
+            opts = {
+                callback: opts,
+            };
+        } else if (opts === undefined) {
+            opts = {};
+        }
+
+        // if the file doesn't have a mime type, use a default since
+        // the HS errors if we don't supply one.
+        const contentType = 'application/json';
+        const body = JSON.stringify({ url: url });
+
+        // backwards-compatibility hacks where we used to do different things
+        // between browser and node.
+        let rawResponse = opts.rawResponse;
+        if (rawResponse === undefined) {
+            if (global.XMLHttpRequest) {
+                rawResponse = false;
+            } else {
+                console.warn(
+                    "Returning the raw JSON from uploadContent(). Future " +
+                    "versions of the js-sdk will change this default, to " +
+                    "return the parsed object. Set opts.rawResponse=false " +
+                    "to change this behaviour now.");
+                rawResponse = true;
+            }
+        }
+
+        let onlyContentUri = opts.onlyContentUri;
+        if (!rawResponse && onlyContentUri === undefined) {
+            if (global.XMLHttpRequest) {
+                console.warn(
+                    "Returning only the content-uri from uploadContent(). " +
+                    "Future versions of the js-sdk will change this " +
+                    "default, to return the whole response object. Set " +
+                    "opts.onlyContentUri=false to change this behaviour now.");
+                onlyContentUri = true;
+            } else {
+                onlyContentUri = false;
+            }
+        }
+
+        let promise;
+
+        // XMLHttpRequest doesn't parse JSON for us. request normally does, but
+        // we're setting opts.json=false so that it doesn't JSON-encode the
+        // request, which also means it doesn't JSON-decode the response. Either
+        // way, we have to JSON-parse the response ourselves.
+        let bodyParser = null;
+        if (!rawResponse) {
+            bodyParser = function(rawBody) {
+                let body = JSON.parse(rawBody);
+                if (onlyContentUri) {
+                    body = body.content_uri;
+                    if (body === undefined) {
+                        throw Error('Bad response');
+                    }
+                }
+                return body;
+            };
+        }
+
+        if (global.XMLHttpRequest) {
+            const defer = Promise.defer();
+            const xhr = new global.XMLHttpRequest();
+            const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
+
+            const timeout_fn = function() {
+                xhr.abort();
+                cb(new Error('Timeout'));
+            };
+
+            // set an initial timeout of 30s; we'll advance it each time we get
+            // a progress notification
+            xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
+
+            xhr.onreadystatechange = function() {
+                switch (xhr.readyState) {
+                    case global.XMLHttpRequest.DONE:
+                        callbacks.clearTimeout(xhr.timeout_timer);
+                        let resp;
+                        try {
+                            if (!xhr.responseText) {
+                                throw new Error('No response body.');
+                            }
+                            resp = xhr.responseText;
+                            if (bodyParser) {
+                                resp = bodyParser(resp);
+                            }
+                        } catch (err) {
+                            err.http_status = xhr.status;
+                            cb(err);
+                            return;
+                        }
+                        cb(undefined, xhr, resp);
+                        break;
+                }
+            };
+            let url = this.opts.baseUrl + "/_matrix/media/v1/resolve";
+            url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
+
+            xhr.open("POST", url);
+            xhr.setRequestHeader("Content-Type", contentType);
+            xhr.send(body);
+            promise = defer.promise;
+
+            // dirty hack (as per _request) to allow the upload to be cancelled.
+            promise.abort = xhr.abort.bind(xhr);
+        } else {
+            promise = this.authedRequest(
+                opts.callback, "POST", "/resolve", {}, body, {
+                    prefix: "/_matrix/media/v1",
+                    headers: {"Content-Type": contentType},
+                    json: false,
+                    bodyParser: bodyParser,
+                },
+            );
+        }
+
+        return promise;
+    },
+
+    /**
      * Upload content to the Home Server
      *
      * @param {object} file The object to upload. On a browser, something that
