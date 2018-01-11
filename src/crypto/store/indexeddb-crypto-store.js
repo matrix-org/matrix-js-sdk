@@ -358,6 +358,30 @@ export default class IndexedDBCryptoStore {
         );
     }
 
+    // End-to-end device tracking
+
+    /**
+     * Store the state of all tracked devices
+     * This contains devices for each user, a tracking state for each user
+     * and a sync token matching the point in time the snapshot represents.
+     * These all need to be written out in full each time such that the snapshot
+     * is always consistent, so they are stored in one object.
+     *
+     * @param {Object} deviceData
+     */
+    storeEndToEndDeviceData(deviceData, txn) {
+        this._backendPromise.value().storeEndToEndDeviceData(deviceData, txn);
+    }
+
+    /**
+     * Get the state of all tracked devices
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    getEndToEndDeviceData(txn, func) {
+        return this._backendPromise.value().getEndToEndDeviceData(txn, func);
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -389,3 +413,4 @@ export default class IndexedDBCryptoStore {
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
+IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';

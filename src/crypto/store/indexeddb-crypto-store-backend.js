@@ -1,7 +1,7 @@
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 4;
+export const VERSION = 5;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -391,6 +391,23 @@ export class Backend {
         });
     }
 
+    getEndToEndDeviceData(txn, func) {
+        const objectStore = txn.objectStore("device_data");
+        const getReq = objectStore.get("-");
+        getReq.onsuccess = function() {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        const objectStore = txn.objectStore("device_data");
+        objectStore.put(deviceData, "-");
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
@@ -422,6 +439,9 @@ export function upgradeDatabase(db, oldVersion) {
         db.createObjectStore("inbound_group_sessions", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
+    }
+    if (oldVersion < 5) {
+        db.createObjectStore("device_data");
     }
     // Expand as needed.
 }

@@ -69,7 +69,7 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._cryptoStore = cryptoStore;
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
-    this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
+    this._deviceList = new DeviceList(baseApis, cryptoStore, this._olmDevice);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -128,6 +128,7 @@ Crypto.prototype.init = async function() {
     }
 
     await this._olmDevice.init();
+    await this._deviceList.load();
 
     // build our device keys: these will later be uploaded
     this._deviceKeys["ed25519:" + this._deviceId] =
@@ -135,7 +136,7 @@ Crypto.prototype.init = async function() {
     this._deviceKeys["curve25519:" + this._deviceId] =
         this._olmDevice.deviceCurve25519Key;
 
-    let myDevices = this._sessionStore.getEndToEndDevicesForUser(
+    let myDevices = this._deviceList.getRawStoredDevicesForUser(
         this._userId,
     );
 
@@ -153,9 +154,10 @@ Crypto.prototype.init = async function() {
         };
 
         myDevices[this._deviceId] = deviceInfo;
-        this._sessionStore.storeEndToEndDevicesForUser(
+        this._deviceList.storeDevicesForUser(
             this._userId, myDevices,
         );
+        this._deviceList.saveIfDirty();
     }
 };
 
@@ -456,7 +458,7 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
 Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
-    const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devices = this._deviceList.getRawStoredDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
     }
@@ -484,7 +486,8 @@ Crypto.prototype.setDeviceVerification = async function(
     if (dev.verified !== verificationStatus || dev.known !== knownStatus) {
         dev.verified = verificationStatus;
         dev.known = knownStatus;
-        this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
+        this._deviceList.storeDevicesForUser(userId, devices);
+        this._deviceList.saveIfDirty();
     }
     return DeviceInfo.fromStorage(dev, deviceId);
 };
@@ -812,21 +815,31 @@ Crypto.prototype.decryptEvent = function(event) {
  * @param {Object} deviceLists device_lists field from /sync, or response from
  * /keys/changes
  */
-Crypto.prototype.handleDeviceListChanges = async function(deviceLists) {
-    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
-        deviceLists.changed.forEach((u) => {
-            this._deviceList.invalidateUserDeviceList(u);
-        });
-    }
+Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLists) {
+    // No point processing device list changes for initial syncs: they'd be meaningless
+    // since the server doesn't know what point we were were at previously. We'll either
+    // get the complete list of changes for the interval or invalidate everything in
+    // onSyncComplete
+    if (!syncData.oldSyncToken) return;
 
-    if (deviceLists.left && Array.isArray(deviceLists.left)) {
-        deviceLists.left.forEach((u) => {
-            this._deviceList.stopTrackingDeviceList(u);
-        });
+    if (syncData.oldSyncToken === this._deviceList.getSyncToken()) {
+        // the point the db is at matches where the sync started from, so
+        // we can safely write the changes
+        this._evalDeviceListChanges(syncDeviceLists);
+    } else {
+        // the db is at a different point to where this sync started from, so
+        // additionally fetch the changes between where the db is and where the
+        // sync started
+        console.log(
+            "Device list sync gap detected - fetching key changes between " +
+            this._deviceList.getSyncToken() + " and " + syncData.oldSyncToken,
+        );
+        const gapDeviceLists = await this._baseApis.getKeyChanges(
+            this._deviceList.getSyncToken(), syncData.oldSyncToken,
+        );
+        this._evalDeviceListChanges(gapDeviceLists);
+        this._evalDeviceListChanges(syncDeviceLists);
     }
-
-    // don't flush the outdated device list yet - we do it once we finish
-    // processing the sync.
 };
 
 /**
@@ -890,36 +903,15 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
     if (!syncData.oldSyncToken) {
-        console.log("Completed initial sync");
-
-        // if we have a deviceSyncToken, we can tell the deviceList to
-        // invalidate devices which have changed since then.
-        const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
-        if (oldSyncToken !== null) {
-            try {
-                await this._invalidateDeviceListsSince(
-                    oldSyncToken, nextSyncToken,
-                );
-            } catch (e) {
-                // if that failed, we fall back to invalidating everyone.
-                console.warn("Error fetching changed device list", e);
-                this._deviceList.invalidateAllDeviceLists();
-            }
-        } else {
-            // otherwise, we have to invalidate all devices for all users we
-            // are tracking.
-            console.log("Completed first initialsync; invalidating all " +
-                        "device list caches");
-            this._deviceList.invalidateAllDeviceLists();
-        }
+        // If we have a stored device sync token, we could request the complete
+        // list of device changes from the server here to get our device list up
+        // to date. This case should be relatively rare though (only when you hit
+        // 'clear cache and reload' in practice) so we just invalidate everything.
+        console.log("invalidating all device list caches after inital sync");
+        this._deviceList.invalidateAllDeviceLists();
     }
-
-    // we can now store our sync token so that we can get an update on
-    // restart rather than having to invalidate everyone.
-    //
-    // (we don't really need to do this on every sync - we could just
-    // do it periodically)
-    this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
+    this._deviceList.setSyncToken(syncData.nextSyncToken);
+    this._deviceList.saveIfDirty();
 
     // catch up on any new devices we got told about during the sync.
     this._deviceList.lastKnownSyncToken = nextSyncToken;
@@ -936,25 +928,24 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
 };
 
 /**
- * Ask the server which users have new devices since a given token,
- * and invalidate them
+ * Trigger the appropriate invalidations and removes for a given
+ * device list
  *
- * @param {String} oldSyncToken
- * @param {String} lastKnownSyncToken
- *
- * Returns a Promise which resolves once the query is complete. Rejects if the
- *   keyChange query fails.
+ * @param {Object} deviceLists device_lists field from /sync, or response from
+ * /keys/changes
  */
-Crypto.prototype._invalidateDeviceListsSince = async function(
-    oldSyncToken, lastKnownSyncToken,
-) {
-    const r = await this._baseApis.getKeyChanges(
-        oldSyncToken, lastKnownSyncToken,
-    );
+Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
+    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+        deviceLists.changed.forEach((u) => {
+            this._deviceList.invalidateUserDeviceList(u);
+        });
+    }
 
-    console.log("got key changes since", oldSyncToken, ":", r);
-
-    await this.handleDeviceListChanges(r);
+    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        deviceLists.left.forEach((u) => {
+            this._deviceList.stopTrackingDeviceList(u);
+        });
+    }
 };
 
 /**

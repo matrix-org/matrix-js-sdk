@@ -621,8 +621,14 @@ SyncApi.prototype._sync = async function(syncOptions) {
         await client.store.setSyncData(data);
     }
 
+    const syncEventData = {
+        oldSyncToken: syncToken,
+        nextSyncToken: data.next_batch,
+        catchingUp: this._catchingUp,
+    };
+
     try {
-        await this._processSyncResponse(syncToken, data, isCachedResponse);
+        await this._processSyncResponse(syncEventData, data, isCachedResponse);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -630,12 +636,6 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     // emit synced events
-    const syncEventData = {
-        oldSyncToken: syncToken,
-        nextSyncToken: data.next_batch,
-        catchingUp: this._catchingUp,
-    };
-
     if (!syncOptions.hasSyncedBefore) {
         this._updateSyncState("PREPARED", syncEventData);
         syncOptions.hasSyncedBefore = true;
@@ -708,7 +708,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * @param {bool} isCachedResponse True if this response is from our local cache
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncToken, data, isCachedResponse,
+    syncEventData, data, isCachedResponse,
 ) {
     const client = this.client;
     const self = this;
@@ -950,7 +950,7 @@ SyncApi.prototype._processSyncResponse = async function(
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncToken,
+                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -1034,7 +1034,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // in the timeline relative to ones paginated in by /notifications.
     // XXX: we could fix this by making EventTimeline support chronological
     // ordering... but it doesn't, right now.
-    if (syncToken && this._notifEvents.length) {
+    if (syncEventData.oldSyncToken && this._notifEvents.length) {
         this._notifEvents.sort(function(a, b) {
             return a.getTs() - b.getTs();
         });
@@ -1046,7 +1046,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle device list updates
     if (data.device_lists) {
         if (this.opts.crypto) {
-            await this.opts.crypto.handleDeviceListChanges(data.device_lists);
+            await this.opts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
         } else {
             // FIXME if we *don't* have a crypto module, we still need to
             // invalidate the device lists. But that would require a
