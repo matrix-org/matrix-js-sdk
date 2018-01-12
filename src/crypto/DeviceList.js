@@ -59,8 +59,9 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
  * @alias module:crypto/DeviceList
  */
 export default class DeviceList {
-    constructor(baseApis, cryptoStore, olmDevice) {
+    constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
         this._cryptoStore = cryptoStore;
+        this._sessionStore = sessionStore;
 
         // userId -> {
         //     deviceId -> {
@@ -96,16 +97,37 @@ export default class DeviceList {
      * Load the device tracking state from storage
      */
     async load() {
+        let shouldDeleteSessionStore = false;
         await this._cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
+            // migrate from session store if there's data there and not here
+            'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
-                    this._devices = deviceData ? deviceData.devices : {},
-                    this._deviceTrackingStatus = deviceData ?
-                        deviceData.trackingStatus : {};
-                    this._syncToken = deviceData ? deviceData.syncToken : null;
+                    if (deviceData === null) {
+                        console.log("Migrating e2e device data...");
+                        this._devices = this._sessionStore.getAllEndToEndDevices();
+                        this._deviceTrackingStatus = this._sessionStore.getEndToEndDeviceTrackingStatus();
+                        this._syncToken = this._sessionStore.getEndToEndDeviceSyncToken();
+                        this._cryptoStore.storeEndToEndDeviceData({
+                            devices: this._devices,
+                            trackingStatus: this._deviceTrackingStatus,
+                            syncToken: this._syncToken,
+                        }, txn);
+                        shouldDeleteSessionStore = true;
+                    } else {
+                        this._devices = deviceData ? deviceData.devices : {},
+                        this._deviceTrackingStatus = deviceData ?
+                            deviceData.trackingStatus : {};
+                        this._syncToken = deviceData ? deviceData.syncToken : null;
+                    }
                 });
             },
         );
+
+        if (shouldDeleteSessionStore) {
+            // migrated data is now safely persisted: remove from old store
+            this._sessionStore.removeEndToEndDeviceData();
+        }
+
         for (const u of Object.keys(this._deviceTrackingStatus)) {
             // if a download was in progress when we got shut down, it isn't any more.
             if (this._deviceTrackingStatus[u] == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {

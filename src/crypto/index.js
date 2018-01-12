@@ -69,7 +69,7 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._cryptoStore = cryptoStore;
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
-    this._deviceList = new DeviceList(baseApis, cryptoStore, this._olmDevice);
+    this._deviceList = new DeviceList(baseApis, cryptoStore, sessionStore, this._olmDevice);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
