@@ -68,11 +68,11 @@ export default class DeviceList {
         //         [device info]
         //     }
         // }
-        this._devices = null;
+        this._devices = {};
 
         // which users we are tracking device status for.
         // userId -> TRACKING_STATUS_*
-        this._deviceTrackingStatus = null; // loaded from storage in load()
+        this._deviceTrackingStatus = {}; // loaded from storage in load()
 
         // The 'next_batch' sync token at the point the data was writen,
         // ie. a token represtenting the point immediately after the
@@ -104,8 +104,10 @@ export default class DeviceList {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
                     if (deviceData === null) {
                         console.log("Migrating e2e device data...");
-                        this._devices = this._sessionStore.getAllEndToEndDevices();
-                        this._deviceTrackingStatus = this._sessionStore.getEndToEndDeviceTrackingStatus();
+                        this._devices = this._sessionStore.getAllEndToEndDevices() || {};
+                        this._deviceTrackingStatus = (
+                            this._sessionStore.getEndToEndDeviceTrackingStatus() || {}
+                        );
                         this._syncToken = this._sessionStore.getEndToEndDeviceSyncToken();
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
