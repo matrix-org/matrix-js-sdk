@@ -368,6 +368,7 @@ export default class IndexedDBCryptoStore {
      * is always consistent, so they are stored in one object.
      *
      * @param {Object} deviceData
+     * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndDeviceData(deviceData, txn) {
         this._backendPromise.value().storeEndToEndDeviceData(deviceData, txn);
@@ -377,9 +378,11 @@ export default class IndexedDBCryptoStore {
      * Get the state of all tracked devices
      *
      * @param {*} txn An active transaction. See doTxn().
+     * @param {function(Object)} func Function called with the
+     *     device data
      */
     getEndToEndDeviceData(txn, func) {
-        return this._backendPromise.value().getEndToEndDeviceData(txn, func);
+        this._backendPromise.value().getEndToEndDeviceData(txn, func);
     }
 
     /**

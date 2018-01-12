@@ -100,7 +100,8 @@ export default class DeviceList {
             'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
                     this._devices = deviceData ? deviceData.devices : {},
-                    this._deviceTrackingStatus = deviceData ? deviceData.trackingStatus : {};
+                    this._deviceTrackingStatus = deviceData ?
+                        deviceData.trackingStatus : {};
                     this._syncToken = deviceData ? deviceData.syncToken : null;
                 });
             },
@@ -327,6 +328,9 @@ export default class DeviceList {
 
     /**
      * Replaces the list of devices for a user with the given device list
+     *
+     * @param {string} u The user ID
+     * @param {Object} devs New device info for user
      */
     storeDevicesForUser(u, devs) {
         this._devices[u] = devs;

@@ -812,7 +812,8 @@ Crypto.prototype.decryptEvent = function(event) {
  * Handle the notification from /sync or /keys/changes that device lists have
  * been changed.
  *
- * @param {Object} deviceLists device_lists field from /sync, or response from
+ * @param {Object} syncData Object containing sync tokens associated with this sync
+ * @param {Object} syncDeviceLists device_lists field from /sync, or response from
  * /keys/changes
  */
 Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLists) {

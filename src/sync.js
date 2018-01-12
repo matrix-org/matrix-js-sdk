@@ -702,8 +702,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * Process data returned from a sync response and propagate it
  * into the model objects
  *
- * @param {string} syncToken the old next_batch token sent to this
- *    sync request.
+ * @param {Object} syncEventData Object containing sync tokens associated with this sync
  * @param {Object} data The response from /sync
  * @param {bool} isCachedResponse True if this response is from our local cache
  */
@@ -950,7 +949,8 @@ SyncApi.prototype._processSyncResponse = async function(
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
+                    self.opts.canResetEntireTimeline(room.roomId) ?
+                        null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -1046,7 +1046,9 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle device list updates
     if (data.device_lists) {
         if (this.opts.crypto) {
-            await this.opts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
+            await this.opts.crypto.handleDeviceListChanges(
+                syncEventData, data.device_lists,
+            );
         } else {
             // FIXME if we *don't* have a crypto module, we still need to
             // invalidate the device lists. But that would require a
