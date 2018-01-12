@@ -87,6 +87,9 @@ export default class DeviceList {
 
         // Set whenever changes are made other than setting the sync token
         this._dirty = false;
+
+        // Timeout for a scheduled save
+        this._saveTimer = null;
     }
 
     /**
@@ -113,23 +116,26 @@ export default class DeviceList {
     /**
      * Save the device tracking state to storage, if any changes are
      * pending other than updating the sync token
-     * Before calling this, the caller must ensure that the state it
-     * has set this object to is consistent, ie. the appropriate sync
-     * token has been set with setSyncToken for any device updates that
-     * have occurred.
      */
     async saveIfDirty() {
         if (!this._dirty) return;
-        await this._cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
-                this._cryptoStore.storeEndToEndDeviceData({
-                    devices: this._devices,
-                    trackingStatus: this._deviceTrackingStatus,
-                    syncToken: this._syncToken,
-                }, txn);
-            },
-        );
-        this._dirty = false;
+
+        if (this._saveTimer === null) {
+            this._saveTimer = setTimeout(() => {
+                this._saveTimer = null;
+                this._cryptoStore.doTxn(
+                    'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
+                        this._cryptoStore.storeEndToEndDeviceData({
+                            devices: this._devices,
+                            trackingStatus: this._deviceTrackingStatus,
+                            syncToken: this._syncToken,
+                        }, txn);
+                    },
+                ).then(() => {
+                    this._dirty = false;
+                });
+            }, 500);
+        }
     }
 
     /**
@@ -143,6 +149,10 @@ export default class DeviceList {
 
     /**
      * Sets the current sync token
+     * The sync token must always be set after any changes made as a result of
+     * data in that sync since setting the sync token to a newer one will mean
+     * those changed will not be synced from the server if a new client starts
+     * up with that data.
      *
      * @param {string} st The sync token
      */
