@@ -29,6 +29,7 @@ import MemoryCryptoStore from './memory-crypto-store.js';
 
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 
 function keyEndToEndSessions(deviceKey) {
@@ -125,6 +126,16 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
             sessionData,
         );
+    }
+
+    getEndToEndDeviceData(txn, func) {
+        func(getJsonItem(
+            this.store, KEY_DEVICE_DATA,
+        ));
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        this.store.setItem(KEY_DEVICE_DATA, deviceData);
     }
 
     /**

@@ -36,6 +36,8 @@ export default class MemoryCryptoStore {
         this._sessions = {};
         // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
         this._inboundGroupSessions = {};
+        // Opaque device data object
+        this._deviceData = {};
     }
 
     /**
@@ -268,6 +270,16 @@ export default class MemoryCryptoStore {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
+    // Device Data
+
+    getEndToEndDeviceData(txn, func) {
+        func(this._deviceData);
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        this._deviceData = deviceData;
     }
 
 
