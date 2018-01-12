@@ -74,8 +74,8 @@ WebStorageSessionStore.prototype = {
     getAllEndToEndDevices: function() {
         const prefix = keyEndToEndDevicesForUser('');
         const devices = {};
-        for (let i = 0; i < store.length; ++i) {
-            const key = store.key(i);
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
             const userId = key.substr(prefix.length);
             if (key.startsWith(prefix)) devices[userId] = getJsonItem(this.store, key);
         }
