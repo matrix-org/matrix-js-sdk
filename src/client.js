@@ -393,6 +393,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
+        "crypto.suggestKeyRestore",
     ]);
 
     await crypto.init();

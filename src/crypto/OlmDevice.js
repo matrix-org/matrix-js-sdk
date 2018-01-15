@@ -91,6 +91,21 @@ function OlmDevice(sessionStore, cryptoStore) {
     this.deviceEd25519Key = null;
     this._maxOneTimeKeys = null;
 
+    // track whether this device's megolm keys are being backed up incrementally
+    // to the server or not.
+    // XXX: this should probably have a single source of truth from OlmAccount
+    this.backupKey = null;
+
+    // track which of our other devices (if any) have cross-signed this device
+    // XXX: this should probably have a single source of truth in the /devices
+    // API store or whatever we use to track our self-signed devices.
+    this.crossSelfSigs = [];
+
+    // track whether we have already suggested to the user that they should
+    // restore their keys from backup or by cross-signing the device.
+    // We use this to avoid repeatedly emitting the suggestion event.
+    this.suggestedKeyRestore = false;
+
     // we don't bother stashing outboundgroupsessions in the sessionstore -
     // instead we keep them here.
     this._outboundGroupSessionStore = {};
@@ -921,6 +936,11 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                         this._cryptoStore.addEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
                         );
+
+                        if (this.backupKey) {
+                            // get olm::Account::generate_backup_encryption_secret
+                            // save sessionData (pickled with this secret) to the server
+                        }
                     } finally {
                         session.free();
                     }
