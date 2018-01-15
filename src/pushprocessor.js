@@ -97,6 +97,7 @@ function PushProcessor(client) {
                     'key': 'content.body',
                     'regex': new RegExp(
                         '(^|\\W)' + globToRegexp(tprule.pattern) + '(\\W|$)',
+                        'i', // Case insensitive
                     ),
                 });
                 break;
