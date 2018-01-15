@@ -96,7 +96,7 @@ export default class IndexedDBCryptoStore {
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to localStorage store: ${e}`,
             );
-            return new LocalStorageCryptoStore();
+            return new LocalStorageCryptoStore(global.localStorage);
         }).catch((e) => {
             console.warn(
                 `unable to open localStorage: falling back to in-memory store: ${e}`,

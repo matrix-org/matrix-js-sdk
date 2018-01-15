@@ -49,7 +49,7 @@ describe('DeviceList', function() {
         downloadSpy = expect.createSpy();
         const mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
-        cryptoStore = new MemoryCryptoStore(mockStorage);
+        cryptoStore = new MemoryCryptoStore();
     });
 
     function createTestDeviceList() {

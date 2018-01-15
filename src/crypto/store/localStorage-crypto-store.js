@@ -44,9 +44,9 @@ function keyEndToEndInboundGroupSession(senderKey, sessionId) {
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export default class LocalStorageCryptoStore extends MemoryCryptoStore {
-    constructor() {
+    constructor(webStore) {
         super();
-        this.store = global.localStorage;
+        this.store = webStore;
     }
 
     // Olm Sessions

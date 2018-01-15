@@ -25,6 +25,7 @@ import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
 import Promise from 'bluebird';
+import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -47,6 +48,9 @@ export default function TestClient(
         sessionStoreBackend = new testUtils.MockStorageApi();
     }
     this.storage = new sdk.WebStorageSessionStore(sessionStoreBackend);
+
+    const cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
+
     this.httpBackend = new MockHttpBackend();
     this.client = sdk.createClient({
         baseUrl: "http://" + userId + ".test.server",
@@ -54,6 +58,7 @@ export default function TestClient(
         accessToken: accessToken,
         deviceId: deviceId,
         sessionStore: this.storage,
+        cryptoStore: cryptoStore,
         request: this.httpBackend.requestFn,
     });
 

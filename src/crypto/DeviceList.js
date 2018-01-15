@@ -144,11 +144,11 @@ export default class DeviceList {
      * Save the device tracking state to storage, if any changes are
      * pending other than updating the sync token
      *
-     * @return {Promise<bool>} True is the data was saved, false if
+     * @return {Promise<bool>} true is the data was saved, false if
      *     it was not (eg. because no changes were pending)
      */
     async saveIfDirty() {
-        if (!this._dirty) return Promise.resolve(False);
+        if (!this._dirty) return Promise.resolve(false);
 
         if (this._saveTimer === null) {
             this._saveTimer = setTimeout(() => {
@@ -164,7 +164,7 @@ export default class DeviceList {
                     },
                 ).then(() => {
                     this._dirty = false;
-                    return True;
+                    return true;
                 });
             }, 500);
         } else {
