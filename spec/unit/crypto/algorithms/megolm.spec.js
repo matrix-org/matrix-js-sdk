@@ -10,6 +10,7 @@ import Promise from 'bluebird';
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
 import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
+import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
 
@@ -45,8 +46,9 @@ describe("MegolmDecryption", function() {
 
         const mockStorage = new MockStorageApi();
         const sessionStore = new WebStorageSessionStore(mockStorage);
+        const cryptoStore = new MemoryCryptoStore(mockStorage);
 
-        const olmDevice = new OlmDevice(sessionStore);
+        const olmDevice = new OlmDevice(sessionStore, cryptoStore);
 
         megolmDecryption = new MegolmDecryption({
             userId: '@user:id',

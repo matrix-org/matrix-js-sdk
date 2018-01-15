@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1154,8 +1155,11 @@ function _sendEvent(client, room, event, callback) {
         console.error("Error sending event", err.stack || err);
 
         try {
-            _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            // set the error on the event before we update the status:
+            // updating the status emits the event, so the state should be
+            // consistent at that point.
             event.error = err;
+            _updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
             // also put the event object on the error: the caller will need this
             // to resend or cancel the event
             err.event = event;
@@ -1337,6 +1341,32 @@ MatrixClient.prototype.sendImageMessage = function(roomId, url, info, text, call
          body: text,
     };
     return this.sendMessage(roomId, content, callback);
+};
+
+/**
+ * @param {string} roomId
+ * @param {string} url
+ * @param {Object} info
+ * @param {string} text
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, callback) {
+    if (utils.isFunction(text)) {
+        callback = text; text = undefined;
+    }
+    if (!text) {
+        text = "Sticker";
+    }
+    const content = {
+         url: url,
+         info: info,
+         body: text,
+    };
+    return this.sendEvent(
+        roomId, "m.room.sticker", content, callback, undefined,
+    );
 };
 
 /**

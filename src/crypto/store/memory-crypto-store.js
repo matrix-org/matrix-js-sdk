@@ -34,6 +34,8 @@ export default class MemoryCryptoStore {
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
+        // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
+        this._inboundGroupSessions = {};
     }
 
     /**
@@ -201,6 +203,8 @@ export default class MemoryCryptoStore {
         return Promise.resolve(null);
     }
 
+    // Olm Account
+
     getAccount(txn, func) {
         func(this._account);
     }
@@ -208,6 +212,8 @@ export default class MemoryCryptoStore {
     storeAccount(txn, newData) {
         this._account = newData;
     }
+
+    // Olm Sessions
 
     countEndToEndSessions(txn, func) {
         return Object.keys(this._sessions).length;
@@ -230,6 +236,40 @@ export default class MemoryCryptoStore {
         }
         deviceSessions[sessionId] = session;
     }
+
+    // Inbound Group Sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        for (const key of Object.keys(this._inboundGroupSessions)) {
+            // we can't use split, as the components we are trying to split out
+            // might themselves contain '/' characters. We rely on the
+            // senderKey being a (32-byte) curve25519 key, base64-encoded
+            // (hence 43 characters long).
+
+            func({
+                senderKey: key.substr(0, 43),
+                sessionId: key.substr(44),
+                sessionData: this._inboundGroupSessions[key],
+            });
+        }
+        func(null);
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const k = senderCurve25519Key+'/'+sessionId;
+        if (this._inboundGroupSessions[k] === undefined) {
+            this._inboundGroupSessions[k] = sessionData;
+        }
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
 
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));
