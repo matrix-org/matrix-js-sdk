@@ -30,6 +30,10 @@ function PushProcessor(client) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     };
 
+    const cachedGlobToRegex = {
+        // $glob: RegExp,
+    };
+
     const matchingRuleFromKindSet = (ev, kindset, device) => {
         for (let ruleKindIndex = 0;
                 ruleKindIndex < RULEKINDS_IN_ORDER.length;
@@ -95,10 +99,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'content.body',
-                    'regex': new RegExp(
-                        '(^|\\W)' + globToRegexp(tprule.pattern) + '(\\W|$)',
-                        'i', // Case insensitive
-                    ),
+                    'pattern': tprule.pattern,
                 });
                 break;
         }
@@ -219,7 +220,23 @@ function PushProcessor(client) {
             return cond.value === val;
         }
 
-        return !!val.match(cond.regex);
+        let regex;
+
+        if (cond.key == 'content.body') {
+            regex = createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)');
+        } else {
+            regex = createCachedRegex('^', cond.pattern, '$');
+        }
+
+        return !!val.match(regex);
+    };
+
+    const createCachedRegex = function(prefix, glob, suffix) {
+        cachedGlobToRegex[glob] = new RegExp(
+            prefix + globToRegexp(glob) + suffix,
+            'i', // Case insensitive
+        );
+        return cachedGlobToRegex[glob];
     };
 
     const globToRegexp = function(glob) {
