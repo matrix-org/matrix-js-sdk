@@ -1,6 +1,7 @@
 import DeviceList from '../../../lib/crypto/DeviceList';
 import MockStorageApi from '../../MockStorageApi';
 import WebStorageSessionStore from '../../../lib/store/session/webstorage';
+import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
 import testUtils from '../../test-utils';
 import utils from '../../../lib/utils';
 
@@ -40,6 +41,7 @@ const signedDeviceList = {
 describe('DeviceList', function() {
     let downloadSpy;
     let sessionStore;
+    let cryptoStore;
 
     beforeEach(function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
@@ -47,6 +49,7 @@ describe('DeviceList', function() {
         downloadSpy = expect.createSpy();
         const mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
+        cryptoStore = new MemoryCryptoStore(mockStorage);
     });
 
     function createTestDeviceList() {
@@ -56,7 +59,7 @@ describe('DeviceList', function() {
         const mockOlm = {
             verifySignature: function(key, message, signature) {},
         };
-        return new DeviceList(baseApis, sessionStore, mockOlm);
+        return new DeviceList(baseApis, cryptoStore, sessionStore, mockOlm);
     }
 
     it("should successfully download and store device keys", function() {
@@ -72,7 +75,7 @@ describe('DeviceList', function() {
         queryDefer1.resolve(utils.deepCopy(signedDeviceList));
 
         return prom1.then(() => {
-            const storedKeys = sessionStore.getEndToEndDevicesForUser('@test1:sw1v.org');
+            const storedKeys = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
             expect(Object.keys(storedKeys)).toEqual(['HGKAWHRVJQ']);
         });
     });
@@ -97,14 +100,15 @@ describe('DeviceList', function() {
         dl.invalidateUserDeviceList('@test1:sw1v.org');
         dl.refreshOutdatedDeviceLists();
 
-        // the first request completes
-        queryDefer1.resolve({
-            device_keys: {
-                '@test1:sw1v.org': {},
-            },
-        });
-
-        return prom1.then(() => {
+        dl.saveIfDirty().then(() => {
+            // the first request completes
+            queryDefer1.resolve({
+                device_keys: {
+                    '@test1:sw1v.org': {},
+                },
+            });
+            return prom1;
+        }).then(() => {
             // uh-oh; user restarts before second request completes. The new instance
             // should know we never got a complete device list.
             console.log("Creating new devicelist to simulate app reload");
@@ -121,7 +125,7 @@ describe('DeviceList', function() {
             // allow promise chain to complete
             return prom3;
         }).then(() => {
-            const storedKeys = sessionStore.getEndToEndDevicesForUser('@test1:sw1v.org');
+            const storedKeys = dl.getRawStoredDevicesForUser('@test1:sw1v.org');
             expect(Object.keys(storedKeys)).toEqual(['HGKAWHRVJQ']);
         });
     });

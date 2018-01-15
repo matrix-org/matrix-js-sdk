@@ -91,6 +91,8 @@ export default class DeviceList {
 
         // Timeout for a scheduled save
         this._saveTimer = null;
+        // Promise resolved when device data is saved
+        this._savePromise = null;
     }
 
     /**
@@ -141,14 +143,18 @@ export default class DeviceList {
     /**
      * Save the device tracking state to storage, if any changes are
      * pending other than updating the sync token
+     *
+     * @return {Promise<bool>} True is the data was saved, false if
+     *     it was not (eg. because no changes were pending)
      */
     async saveIfDirty() {
-        if (!this._dirty) return;
+        if (!this._dirty) return Promise.resolve(False);
 
         if (this._saveTimer === null) {
             this._saveTimer = setTimeout(() => {
+                console.log('Saving device tracking data...');
                 this._saveTimer = null;
-                this._cryptoStore.doTxn(
+                this._savePromise = this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
@@ -158,8 +164,11 @@ export default class DeviceList {
                     },
                 ).then(() => {
                     this._dirty = false;
+                    return True;
                 });
             }, 500);
+        } else {
+            return this._savePromise;
         }
     }
 
