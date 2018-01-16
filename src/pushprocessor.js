@@ -232,6 +232,9 @@ function PushProcessor(client) {
     };
 
     const createCachedRegex = function(prefix, glob, suffix) {
+        if (cachedGlobToRegex[glob]) {
+            return cachedGlobToRegex[glob];
+        }
         cachedGlobToRegex[glob] = new RegExp(
             prefix + globToRegexp(glob) + suffix,
             'i', // Case insensitive
