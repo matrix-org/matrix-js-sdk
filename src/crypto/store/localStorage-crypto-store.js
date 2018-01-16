@@ -135,7 +135,9 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     storeEndToEndDeviceData(deviceData, txn) {
-        this.store.setItem(KEY_DEVICE_DATA, deviceData);
+        setJsonItem(
+            this.store, KEY_DEVICE_DATA, deviceData,
+        );
     }
 
     /**
@@ -151,12 +153,14 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     // Olm account
 
     getAccount(txn, func) {
-        const account = this.store.getItem(KEY_END_TO_END_ACCOUNT);
+        const account = getJsonItem(this.store, KEY_END_TO_END_ACCOUNT);
         func(account);
     }
 
     storeAccount(txn, newData) {
-        this.store.setItem(KEY_END_TO_END_ACCOUNT, newData);
+        setJsonItem(
+            this.store, KEY_END_TO_END_ACCOUNT, newData,
+        );
     }
 
     doTxn(mode, stores, func) {

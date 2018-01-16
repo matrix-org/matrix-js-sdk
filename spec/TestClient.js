@@ -47,9 +47,10 @@ export default function TestClient(
     if (sessionStoreBackend === undefined) {
         sessionStoreBackend = new testUtils.MockStorageApi();
     }
-    this.storage = new sdk.WebStorageSessionStore(sessionStoreBackend);
+    const sessionStore = new sdk.WebStorageSessionStore(sessionStoreBackend);
 
-    const cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
+    // expose this so the tests can get to it
+    this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
 
     this.httpBackend = new MockHttpBackend();
     this.client = sdk.createClient({
@@ -57,8 +58,8 @@ export default function TestClient(
         userId: userId,
         accessToken: accessToken,
         deviceId: deviceId,
-        sessionStore: this.storage,
-        cryptoStore: cryptoStore,
+        sessionStore: sessionStore,
+        cryptoStore: this.cryptoStore,
         request: this.httpBackend.requestFn,
     });
 

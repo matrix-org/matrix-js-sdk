@@ -89,8 +89,6 @@ export default class DeviceList {
         // Set whenever changes are made other than setting the sync token
         this._dirty = false;
 
-        // Timeout for a scheduled save
-        this._saveTimer = null;
         // Promise resolved when device data is saved
         this._savePromise = null;
     }
@@ -150,11 +148,10 @@ export default class DeviceList {
     async saveIfDirty() {
         if (!this._dirty) return Promise.resolve(false);
 
-        if (this._saveTimer === null) {
-            this._saveTimer = setTimeout(() => {
-                console.log('Saving device tracking data...');
-                this._saveTimer = null;
-                this._savePromise = this._cryptoStore.doTxn(
+        if (this._savePromise === null) {
+            this._savePromise = Promise.delay(500).then(() => {
+                console.log('Saving device tracking data at token ' + this._syncToken);
+                return this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
@@ -162,11 +159,12 @@ export default class DeviceList {
                             syncToken: this._syncToken,
                         }, txn);
                     },
-                ).then(() => {
-                    this._dirty = false;
-                    return true;
-                });
-            }, 500);
+                );
+            }).then(() => {
+                this._dirty = false;
+                this._savePromise = null;
+                return true;
+            });
         } else {
             return this._savePromise;
         }
@@ -571,6 +569,7 @@ class DeviceListUpdateSerialiser {
 
         this._devices = null; // the complete device list
         this._updatedDevices = null; // device list updates we've fetched
+        this._syncToken = null; // The sync token we send with the requests
     }
 
     /**
@@ -596,6 +595,11 @@ class DeviceListUpdateSerialiser {
             this._queuedQueryDeferred = Promise.defer();
         }
 
+        // We always take the new sync token and just use the latest one we've
+        // been given, since it just needs to be at least as recent as the
+        // sync response the device invalidation message arrived in
+        this._syncToken = syncToken;
+
         if (this._downloadInProgress) {
             // just queue up these users
             console.log('Queued key download for', users);
@@ -605,10 +609,10 @@ class DeviceListUpdateSerialiser {
         this._devices = devices;
         this._updatedDevices = {};
         // start a new download.
-        return this._doQueuedQueries(syncToken);
+        return this._doQueuedQueries();
     }
 
-    _doQueuedQueries(syncToken) {
+    _doQueuedQueries() {
         if (this._downloadInProgress) {
             throw new Error(
                 "DeviceListUpdateSerialiser._doQueuedQueries called with request active",
@@ -624,8 +628,8 @@ class DeviceListUpdateSerialiser {
         this._downloadInProgress = true;
 
         const opts = {};
-        if (syncToken) {
-            opts.token = syncToken;
+        if (this._syncToken) {
+            opts.token = this._syncToken;
         }
 
         this._baseApis.downloadKeysForUsers(
@@ -654,7 +658,7 @@ class DeviceListUpdateSerialiser {
 
             // if we have queued users, fire off another request.
             if (this._queuedQueryDeferred) {
-                this._doQueuedQueries(syncToken);
+                this._doQueuedQueries();
             }
         }, (e) => {
             console.warn('Error downloading keys for ' + downloadUsers + ':', e);
