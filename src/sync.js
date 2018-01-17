@@ -641,6 +641,9 @@ SyncApi.prototype._sync = async function(syncOptions) {
         console.error("Caught /sync error", e.stack || e);
     }
 
+    // update this as it may have changed
+    syncEventData.catchingUp = this._catchingUp;
+
     // emit synced events
     if (!syncOptions.hasSyncedBefore) {
         this._updateSyncState("PREPARED", syncEventData);
