@@ -895,6 +895,22 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 };
 
 /**
+ * Called before the result of a sync is procesed
+ *
+ * @param {Object} syncData  the data from the 'MatrixClient.sync' event
+ */
+Crypto.prototype.onSyncWillProcess = async function(syncData) {
+    if (!syncData.oldSyncToken) {
+        // If there is no old sync token, we start all our tracking from
+        // scratch, so mark everything as untracked. onCryptoEvent will
+        // be called for all e2e rooms during the processing of the sync,
+        // at which point we'll start tracking all the users of that room.
+        console.log("Initial sync performed - resetting device tracking state");
+        this._deviceList.stopTrackingAllDeviceLists();
+    }
+};
+
+/**
  * handle the completion of a /sync
  *
  * This is called after the processing of each successful /sync response.
@@ -905,14 +921,6 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 Crypto.prototype.onSyncCompleted = async function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
-    if (!syncData.oldSyncToken) {
-        // If we have a stored device sync token, we could request the complete
-        // list of device changes from the server here to get our device list up
-        // to date. This case should be relatively rare though (only when you hit
-        // 'clear cache and reload' in practice) so we just invalidate everything.
-        console.log("invalidating all device list caches after inital sync");
-        this._deviceList.invalidateAllDeviceLists();
-    }
     this._deviceList.setSyncToken(syncData.nextSyncToken);
     this._deviceList.saveIfDirty();
 
@@ -945,10 +953,30 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
     }
 
     if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        const e2eUserIds = new Set(this._getE2eUsers());
+
         deviceLists.left.forEach((u) => {
-            this._deviceList.stopTrackingDeviceList(u);
+            if (!e2eUserIds.has(u)) {
+                this._deviceList.stopTrackingDeviceList(u);
+            }
         });
     }
+};
+
+/**
+ * Get a list of all the IDs of users we share an e2e room with
+ *
+ * @returns {string[]} List of user IDs
+ */
+Crypto.prototype._getE2eUsers = function() {
+    const e2eUserIds = [];
+    for (const room of this._getE2eRooms()) {
+        const members = room.getJoinedMembers();
+        for (const member of members) {
+            e2eUserIds.push(member.userId);
+        }
+    }
+    return e2eUserIds;
 };
 
 /**

@@ -627,6 +627,12 @@ SyncApi.prototype._sync = async function(syncOptions) {
         catchingUp: this._catchingUp,
     };
 
+    if (this.opts.crypto && !isCachedResponse) {
+        // tell the crypto module we're about to process a sync
+        // response
+        await this.opts.crypto.onSyncWillProcess(syncEventData);
+    }
+
     try {
         await this._processSyncResponse(syncEventData, data, isCachedResponse);
     } catch(e) {

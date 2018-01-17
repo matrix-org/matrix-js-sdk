@@ -417,6 +417,19 @@ export default class DeviceList {
         this._dirty = true;
     }
 
+    /**
+     * Set all users we're currently tracking to untracked
+     *
+     * This will flag each user whose devices we are tracking as in need of an
+     * update.
+     */
+    stopTrackingAllDeviceLists() {
+        for (const userId of Object.keys(this._deviceTrackingStatus)) {
+            this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
+        }
+        console.log("stopped tracking all: "+JSON.stringify(this._deviceTrackingStatus));
+        this._dirty = true;
+    }
 
     /**
      * Mark the cached device list for the given user outdated.
@@ -438,18 +451,6 @@ export default class DeviceList {
         // of calls; we save all data together once the sync is done
 
         this._dirty = true;
-    }
-
-    /**
-     * Mark all tracked device lists as outdated.
-     *
-     * This will flag each user whose devices we are tracking as in need of an
-     * update.
-     */
-    invalidateAllDeviceLists() {
-        for (const userId of Object.keys(this._deviceTrackingStatus)) {
-            this.invalidateUserDeviceList(userId);
-        }
     }
 
     /**

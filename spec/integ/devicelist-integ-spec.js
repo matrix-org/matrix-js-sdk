@@ -366,9 +366,9 @@ describe("DeviceList management:", function() {
                 anotherTestClient.httpBackend.when('GET', '/sync').respond(
                     200, getSyncResponse([]));
                 await anotherTestClient.flushSync();
-                await aliceTestClient.client._crypto._deviceList.saveIfDirty();
+                await anotherTestClient.client._crypto._deviceList.saveIfDirty();
 
-                aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                anotherTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                     const bobStat = data.trackingStatus['@bob:xyz'];
 
                     expect(bobStat).toEqual(
