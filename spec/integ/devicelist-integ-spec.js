@@ -281,7 +281,6 @@ describe("DeviceList management:", function() {
                     0, "Alice should be tracking bob's device list",
                 );
             });
-
         });
 
         it("when Bob leaves", async function() {
