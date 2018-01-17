@@ -154,11 +154,15 @@ function aliDownloadsKeys() {
 
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
-    return Promise.all([p1, p2]).then(function() {
-        const devices = aliTestClient.storage.getEndToEndDevicesForUser(bobUserId);
-        expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
-        expect(devices[bobDeviceId].verified).
-            toBe(0); // DeviceVerification.UNVERIFIED
+    return Promise.all([p1, p2]).then(() => {
+        return aliTestClient.client._crypto._deviceList.saveIfDirty();
+    }).then(() => {
+        aliTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            const devices = data.devices[bobUserId];
+            expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
+            expect(devices[bobDeviceId].verified).
+                toBe(0); // DeviceVerification.UNVERIFIED
+        });
     });
 }
 

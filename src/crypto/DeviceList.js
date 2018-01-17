@@ -193,8 +193,9 @@ export default class DeviceList {
     }
 
     /**
-     * Download the keys for a list of users and stores the keys in the session
-     * store.
+     * Ensures up to date keys for a list of users are stored in the session store,
+     * downloading and storing them if they're not (or if forceDownload is
+     * true).
      * @param {Array} userIds The users to fetch.
      * @param {bool} forceDownload Always download the keys even if cached.
      *
@@ -427,7 +428,6 @@ export default class DeviceList {
         for (const userId of Object.keys(this._deviceTrackingStatus)) {
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
         }
-        console.log("stopped tracking all: "+JSON.stringify(this._deviceTrackingStatus));
         this._dirty = true;
     }
 
@@ -513,6 +513,9 @@ export default class DeviceList {
 
         const finished = (newDevices) => {
             users.forEach((u) => {
+                this._devices[u] = newDevices[u];
+                this._dirty = true;
+
                 // we may have queued up another download request for this user
                 // since we started this request. If that happens, we should
                 // ignore the completion of the first one.
@@ -528,8 +531,6 @@ export default class DeviceList {
                         // we didn't get any new invalidations since this download started:
                         // this user's device list is now up to date.
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_UP_TO_DATE;
-                        this._devices[u] = newDevices[u];
-                        this._dirty = true;
                         console.log("Device list for", u, "now up to date");
                     } else {
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
