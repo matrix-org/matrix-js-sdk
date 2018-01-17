@@ -37,7 +37,7 @@ export default class MemoryCryptoStore {
         // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
         this._inboundGroupSessions = {};
         // Opaque device data object
-        this._deviceData = {};
+        this._deviceData = null;
     }
 
     /**
