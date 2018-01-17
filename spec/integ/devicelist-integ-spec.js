@@ -198,8 +198,9 @@ describe("DeviceList management:", function() {
                    }
                    const chrisStat = data.trackingStatus['@chris:abc'];
                    if (chrisStat != 1 && chrisStat != 2) {
-                       throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
-                                       chrisStat);
+                       throw new Error(
+                           'Unexpected status for chris: wanted 1 or 2, got ' + chrisStat,
+                       );
                    }
                });
 
@@ -227,8 +228,9 @@ describe("DeviceList management:", function() {
                    expect(bobStat).toEqual(3);
                    const chrisStat = data.trackingStatus['@chris:abc'];
                    if (chrisStat != 1 && chrisStat != 2) {
-                       throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
-                                       bobStat);
+                       throw new Error(
+                           'Unexpected status for chris: wanted 1 or 2, got ' + bobStat,
+                       );
                    }
                });
 
