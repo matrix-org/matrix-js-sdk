@@ -150,6 +150,8 @@ export default class DeviceList {
         if (!this._dirty) return Promise.resolve(false);
 
         if (this._savePromise === null) {
+            // Delay saves for a bit so we can aggregate multiple saves that happen
+            // in quick succession (eg. when a whole room's devices are marked as known)
             this._savePromise = Promise.delay(500).then(() => {
                 console.log('Saving device tracking data at token ' + this._syncToken);
                 return this._cryptoStore.doTxn(
@@ -172,7 +174,7 @@ export default class DeviceList {
     }
 
     /**
-     * Gets the current sync token
+     * Gets the sync token last set with setSyncToken
      *
      * @return {string} The sync token
      */
@@ -181,7 +183,8 @@ export default class DeviceList {
     }
 
     /**
-     * Sets the current sync token
+     * Sets the sync token that the app will pass as the 'since' to the /sync
+     * endpoint next time it syncs.
      * The sync token must always be set after any changes made as a result of
      * data in that sync since setting the sync token to a newer one will mean
      * those changed will not be synced from the server if a new client starts

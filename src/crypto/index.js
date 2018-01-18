@@ -954,6 +954,9 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
     }
 
     if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        // Check we really don't share any rooms with these users
+        // any more: the server isn't required to give us the
+        // exact correct set.
         const e2eUserIds = new Set(this._getE2eUsers());
 
         deviceLists.left.forEach((u) => {
