@@ -393,7 +393,6 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
-        "crypto.suggestKeyRestore",
     ]);
 
     await crypto.init();
@@ -3630,6 +3629,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * });
  */
 
+/**
+ * Fires when we want to suggest to the user that they restore their megolm keys
+ * from backup or by cross-signing the device.
+ *
+ * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
 
 // EventEmitter JSDocs
 

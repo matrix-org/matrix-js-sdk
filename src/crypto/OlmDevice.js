@@ -104,6 +104,7 @@ function OlmDevice(sessionStore, cryptoStore) {
     // track whether we have already suggested to the user that they should
     // restore their keys from backup or by cross-signing the device.
     // We use this to avoid repeatedly emitting the suggestion event.
+    // XXX: persist this somewhere!
     this.suggestedKeyRestore = false;
 
     // we don't bother stashing outboundgroupsessions in the sessionstore -

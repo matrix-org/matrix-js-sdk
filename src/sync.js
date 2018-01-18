@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -983,6 +984,15 @@ SyncApi.prototype._processSyncResponse = async function(
         async function processRoomEvent(e) {
             client.emit("event", e);
             if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
+
+                // XXX: get device
+                if (!device.getSuggestedKeyRestore() && 
+                    !device.backupKey && !device.selfCrossSigs.length)
+                {
+                    client.emit("crypto.suggestKeyRestore");
+                    device.setSuggestedKeyRestore(true);
+                }
+
                 await self.opts.crypto.onCryptoEvent(e);
             }
         }

@@ -1015,13 +1015,6 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
         return;
     }
 
-    if (!device.suggestedKeyRestore && 
-        !device.backupKey && !device.selfCrossSigs.length)
-    {
-        this.emit("crypto.suggestKeyRestore");
-        device.suggestKeyRestore = true;
-    }
-
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
 };
@@ -1360,13 +1353,6 @@ class IncomingRoomKeyRequestCancellation {
  *
  * @event module:client~MatrixClient#"crypto.roomKeyRequestCancellation"
  * @param {module:crypto~IncomingRoomKeyRequestCancellation} req
- */
-
-/**
- * Fires when we want to suggest to the user that they restore their megolm keys
- * from backup or by cross-signing the device.
- *
- * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
  */
 
 /**
