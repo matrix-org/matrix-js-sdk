@@ -30,6 +30,10 @@ function PushProcessor(client) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     };
 
+    const cachedGlobToRegex = {
+        // $glob: RegExp,
+    };
+
     const matchingRuleFromKindSet = (ev, kindset, device) => {
         for (let ruleKindIndex = 0;
                 ruleKindIndex < RULEKINDS_IN_ORDER.length;
@@ -75,7 +79,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'room_id',
-                    'pattern': tprule.rule_id,
+                    'value': tprule.rule_id,
                 });
                 break;
             case 'sender':
@@ -85,7 +89,7 @@ function PushProcessor(client) {
                 rawrule.conditions.push({
                     'kind': 'event_match',
                     'key': 'user_id',
-                    'pattern': tprule.rule_id,
+                    'value': tprule.rule_id,
                 });
                 break;
             case 'content':
@@ -212,14 +216,30 @@ function PushProcessor(client) {
             return false;
         }
 
-        let pat;
-        if (cond.key == 'content.body') {
-            pat = '(^|\\W)' + globToRegexp(cond.pattern) + '(\\W|$)';
-        } else {
-            pat = '^' + globToRegexp(cond.pattern) + '$';
+        if (cond.value) {
+            return cond.value === val;
         }
-        const regex = new RegExp(pat, 'i');
+
+        let regex;
+
+        if (cond.key == 'content.body') {
+            regex = createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)');
+        } else {
+            regex = createCachedRegex('^', cond.pattern, '$');
+        }
+
         return !!val.match(regex);
+    };
+
+    const createCachedRegex = function(prefix, glob, suffix) {
+        if (cachedGlobToRegex[glob]) {
+            return cachedGlobToRegex[glob];
+        }
+        cachedGlobToRegex[glob] = new RegExp(
+            prefix + globToRegexp(glob) + suffix,
+            'i', // Case insensitive
+        );
+        return cachedGlobToRegex[glob];
     };
 
     const globToRegexp = function(glob) {
