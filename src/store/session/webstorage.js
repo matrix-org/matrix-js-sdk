@@ -174,21 +174,24 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
-     * Store the end-to-end state for a room.
-     * @param {string} roomId The room's ID.
-     * @param {object} roomInfo The end-to-end info for the room.
+     * Get the end-to-end state for all rooms
+     * @return {object} roomId -> object with the end-to-end info for the room.
      */
-    storeEndToEndRoom: function(roomId, roomInfo) {
-        setJsonItem(this.store, keyEndToEndRoom(roomId), roomInfo);
+    getAllEndToEndRooms: function() {
+        return getJsonItem(this.store, keyEndToEndRoom(roomId));
+
+
+        const roomKeys = getKeysWithPrefix(this.store, keyEndToEndRoom(''));
+        const results = {};
+        for (const k of roomKeys) {
+            const unprefixedKey = k.substr(keyEndToEndSessions('').length);
+            results[unprefixedKey] = getJsonItem(this.store, k);
+        }
+        return results;
     },
 
-    /**
-     * Get the end-to-end state for a room
-     * @param {string} roomId The room's ID.
-     * @return {object} The end-to-end info for the room.
-     */
-    getEndToEndRoom: function(roomId) {
-        return getJsonItem(this.store, keyEndToEndRoom(roomId));
+    removeAllEndToEndRooms: function() {
+        removeByPrefix(this.store, keyEndToEndRoom(''));
     },
 };
 

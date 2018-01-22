@@ -29,17 +29,33 @@ export default class RoomList {
     constructor(cryptoStore, sessionStore) {
         this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
+
+        // Object of roomId -> room e2e info object
         this._roomEncryption = {};
     }
 
     async init() {
+        let removeSessionStoreRooms = false;
         await this._cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
+            'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
                 this._cryptoStore.getEndToEndRooms(txn, (result) => {
-                    this._roomEncryption = result;
+                    if (result === null) {
+                        // migrate rom session store, if there's data there
+                        const sessionStoreRooms = this._sessionStore.getAllEndToEndRooms();
+                        if (sessionStoreRooms !== null) {
+                            this._cryptoStore.storeEndToEndRooms(sessionStoreRooms, txn);
+                        }
+                        this._roomEncryption = sessionStoreRooms;
+                        removeSessionStoreRooms = true;
+                    } else {
+                        this._roomEncryption = result;
+                    }
                 });
             },
         );
+        if (removeSessionStoreRooms) {
+            this._sessionStore.removeAllEndToEndRooms();
+        }
     }
 
     getRoomEncryption(roomId) {
