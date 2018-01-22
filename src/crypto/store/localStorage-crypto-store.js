@@ -31,6 +31,7 @@ const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
+const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
 
 function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
@@ -38,6 +39,10 @@ function keyEndToEndSessions(deviceKey) {
 
 function keyEndToEndInboundGroupSession(senderKey, sessionId) {
     return KEY_INBOUND_SESSION_PREFIX + senderKey + "/" + sessionId;
+}
+
+function keyEndToEndRoomsPrefix(roomId) {
+    return KEY_ROOMS_PREFIX + roomId;
 }
 
 /**
@@ -138,6 +143,18 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(
             this.store, KEY_DEVICE_DATA, deviceData,
         );
+    }
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        setJsonItem(
+            this.store, keyEndToEndRoomsPrefix(roomId), roomInfo,
+        );
+    }
+
+    getEndToEndRoom(roomId, txn, func) {
+        func(getJsonItem(
+            this.store, keyEndToEndRoomsPrefix(roomId),
+        ));
     }
 
     /**

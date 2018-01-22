@@ -59,15 +59,18 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  *
  * @param {module:crypto/store/base~CryptoStore} cryptoStore
  *    storage for the crypto layer.
+ *
+ * @param {RoomList} roomList An initialised RoomList object
  */
 function Crypto(baseApis, sessionStore, userId, deviceId,
-                clientStore, cryptoStore) {
+                clientStore, cryptoStore, roomList) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
     this._deviceId = deviceId;
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
+    this._roomList = roomList;
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -587,6 +590,15 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     return device;
 };
 
+/**
+ * Get the current end-to-end encryption config for a room
+ *
+ * @return {object} The current end-to-end encyption status, or null if
+ *     the room is not stored as using end-to-end encryption.
+ */
+Crypto.prototype.getRoomEncryption = async function(roomId) {
+    return this._roomList.getRoomEncryption(roomId);
+};
 
 /**
  * Configure a room to use encryption (ie, save a flag in the sessionstore).
@@ -601,13 +613,12 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
-    const existingConfig = this._sessionStore.getEndToEndRoom(roomId);
-    if (existingConfig) {
-        if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
-            console.error("Ignoring m.room.encryption event which requests " +
-                          "a change of config in " + roomId);
-            return;
-        }
+    console.log("arese");
+    const existingConfig = await this.getRoomEncryption(roomId);
+    if (existingConfig && JSON.stringify(existingConfig) != JSON.stringify(config)) {
+        console.error("Ignoring m.room.encryption event which requests " +
+                      "a change of config in " + roomId);
+        return;
     }
 
     const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
@@ -615,7 +626,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
 
-    this._sessionStore.storeEndToEndRoom(roomId, config);
+    await this._roomList.setRoomEncryption(roomId);
 
     const alg = new AlgClass({
         userId: this._userId,
@@ -692,16 +703,6 @@ Crypto.prototype.ensureOlmSessionsForUsers = function(users) {
         this._olmDevice, this._baseApis, devicesByUser,
     );
 };
-
-/**
- * Whether encryption is enabled for a room.
- * @param {string} roomId the room id to query.
- * @return {bool} whether encryption is enabled.
- */
-Crypto.prototype.isRoomEncrypted = function(roomId) {
-    return Boolean(this._roomEncryptors[roomId]);
-};
-
 
 /**
  * Get a list containing all of the room keys

@@ -42,6 +42,7 @@ const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 
 import ReEmitter from './ReEmitter';
+import RoomList from './crypto/RoomList';
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
@@ -181,6 +182,11 @@ function MatrixClient(opts) {
     if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
+
+    // List of what rooms have encryption enabled: separate from crypto because
+    // we still want to know what rooms are encrypted even if crypto is disabled:
+    // we don't want to start sening unencrypted events to them.
+    this._roomList = new RoomList(this._cryptoStore);
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -351,13 +357,6 @@ MatrixClient.prototype.initCrypto = async function() {
         return;
     }
 
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
-
     if (!this._sessionStore) {
         // this is temporary, the sessionstore is supposed to be going away
         throw new Error(`Cannot enable encryption: no sessionStore provided`);
@@ -365,6 +364,16 @@ MatrixClient.prototype.initCrypto = async function() {
     if (!this._cryptoStore) {
         // the cryptostore is provided by sdk.createClient, so this shouldn't happen
         throw new Error(`Cannot enable encryption: no cryptoStore provided`);
+    }
+
+    // initialise the list of encrypted rooms (whether or not crypto is enabled)
+    await this._roomList.init();
+
+    if (!CRYPTO_ENABLED) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
     }
 
     const userId = this.getUserId();
@@ -387,6 +396,7 @@ MatrixClient.prototype.initCrypto = async function() {
         userId, this.deviceId,
         this.store,
         this._cryptoStore,
+        this._roomList,
     );
 
     this.reEmitter.reEmit(crypto, [
@@ -646,11 +656,7 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
     // we don't have an m.room.encrypted event, but that might be because
     // the server is hiding it from us. Check the store to see if it was
     // previously encrypted.
-    if (!this._sessionStore) {
-        return false;
-    }
-
-    return Boolean(this._sessionStore.getEndToEndRoom(roomId));
+    return this._roomList.isRoomEncrypted(roomId);
 };
 
 /**
