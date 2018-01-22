@@ -625,7 +625,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
 
-    await this._roomList.setRoomEncryption(roomId);
+    await this._roomList.setRoomEncryption(roomId, config);
 
     const alg = new AlgClass({
         userId: this._userId,
