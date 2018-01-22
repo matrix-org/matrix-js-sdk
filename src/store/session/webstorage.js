@@ -224,10 +224,6 @@ function getJsonItem(store, key) {
     return null;
 }
 
-function setJsonItem(store, key, val) {
-    store.setItem(key, JSON.stringify(val));
-}
-
 function getKeysWithPrefix(store, prefix) {
     const results = [];
     for (let i = 0; i < store.length; ++i) {
