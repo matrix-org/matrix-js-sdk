@@ -593,6 +593,8 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 /**
  * Get the current end-to-end encryption config for a room
  *
+ * @param {string} roomId The room ID to query
+ *
  * @return {object} The current end-to-end encyption status, or null if
  *     the room is not stored as using end-to-end encryption.
  */
