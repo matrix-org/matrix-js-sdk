@@ -151,10 +151,18 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    getEndToEndRoom(roomId, txn, func) {
-        func(getJsonItem(
-            this.store, keyEndToEndRoomsPrefix(roomId),
-        ));
+    getEndToEndRooms(txn, func) {
+        const result = {};
+        const prefix = keyEndToEndRoomsPrefix('');
+
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key.startsWith(prefix)) {
+                const roomId = key.substr(prefix.length);
+                result[roomId] = getJsonItem(this.store, key);
+            }
+        }
+        func(result);
     }
 
     /**

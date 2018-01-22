@@ -291,8 +291,8 @@ export default class MemoryCryptoStore {
         this._rooms[roomId] = roomInfo;
     }
 
-    getEndToEndRoom(roomId, txn, func) {
-        func(this._rooms[roomId]);
+    getEndToEndRooms(txn, func) {
+        func(this._rooms);
     }
 
     doTxn(mode, stores, func) {

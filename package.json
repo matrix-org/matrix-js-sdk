@@ -54,6 +54,7 @@
     "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
     "content-type": "^1.0.2",
+    "olm": "https://matrix.org/packages/npm/olm/olm-2.2.2.tgz",
     "request": "^2.53.0"
   },
   "devDependencies": {
