@@ -40,7 +40,7 @@ export default class RoomList {
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
                 this._cryptoStore.getEndToEndRooms(txn, (result) => {
                     if (result === null || Object.keys(result).length === 0) {
-                        // migrate rom session store, if there's data there
+                        // migrate from session store, if there's data there
                         const sessionStoreRooms = this._sessionStore.getAllEndToEndRooms();
                         if (sessionStoreRooms !== null) {
                             for (const roomId of Object.keys(sessionStoreRooms)) {
