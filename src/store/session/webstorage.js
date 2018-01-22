@@ -178,9 +178,6 @@ WebStorageSessionStore.prototype = {
      * @return {object} roomId -> object with the end-to-end info for the room.
      */
     getAllEndToEndRooms: function() {
-        return getJsonItem(this.store, keyEndToEndRoom(roomId));
-
-
         const roomKeys = getKeysWithPrefix(this.store, keyEndToEndRoom(''));
         const results = {};
         for (const k of roomKeys) {

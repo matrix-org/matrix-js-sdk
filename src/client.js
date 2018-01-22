@@ -186,7 +186,7 @@ function MatrixClient(opts) {
     // List of what rooms have encryption enabled: separate from crypto because
     // we still want to know what rooms are encrypted even if crypto is disabled:
     // we don't want to start sening unencrypted events to them.
-    this._roomList = new RoomList(this._cryptoStore);
+    this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);

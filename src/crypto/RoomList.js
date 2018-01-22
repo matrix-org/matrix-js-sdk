@@ -39,11 +39,13 @@ export default class RoomList {
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
                 this._cryptoStore.getEndToEndRooms(txn, (result) => {
-                    if (result === null) {
+                    if (result === null || Object.keys(result).length === 0) {
                         // migrate rom session store, if there's data there
                         const sessionStoreRooms = this._sessionStore.getAllEndToEndRooms();
                         if (sessionStoreRooms !== null) {
-                            this._cryptoStore.storeEndToEndRooms(sessionStoreRooms, txn);
+                            for (const roomId of Object.keys(sessionStoreRooms)) {
+                                this._cryptoStore.storeEndToEndRoom(roomId, sessionStoreRooms[roomId], txn);
+                            }
                         }
                         this._roomEncryption = sessionStoreRooms;
                         removeSessionStoreRooms = true;
