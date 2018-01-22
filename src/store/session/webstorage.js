@@ -181,7 +181,7 @@ WebStorageSessionStore.prototype = {
         const roomKeys = getKeysWithPrefix(this.store, keyEndToEndRoom(''));
         const results = {};
         for (const k of roomKeys) {
-            const unprefixedKey = k.substr(keyEndToEndSessions('').length);
+            const unprefixedKey = k.substr(keyEndToEndRoom('').length);
             results[unprefixedKey] = getJsonItem(this.store, k);
         }
         return results;
