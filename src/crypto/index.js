@@ -613,7 +613,6 @@ Crypto.prototype.getRoomEncryption = async function(roomId) {
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
-    console.log("arese");
     const existingConfig = await this.getRoomEncryption(roomId);
     if (existingConfig && JSON.stringify(existingConfig) != JSON.stringify(config)) {
         console.error("Ignoring m.room.encryption event which requests " +
