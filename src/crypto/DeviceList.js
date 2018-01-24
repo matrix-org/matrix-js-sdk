@@ -161,7 +161,7 @@ export default class DeviceList {
                 console.log('Saving device tracking data at token ' + this._syncToken);
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
-                // actually already happened. Likewsie for the dirty flag.
+                // actually already happened. Likewise for the dirty flag.
                 this._savePromise = null;
                 this._dirty = false;
                 return this._cryptoStore.doTxn(
