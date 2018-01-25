@@ -81,7 +81,7 @@ export default class DeviceList {
         this._syncToken = null;
 
         this._serialiser = new DeviceListUpdateSerialiser(
-            baseApis, olmDevice, this._devices,
+            baseApis, olmDevice, this,
         );
 
         // userId -> promise
@@ -480,6 +480,17 @@ export default class DeviceList {
         return this._doKeyDownload(usersToDownload);
     }
 
+    /**
+     * Set the stored device data for a user, in raw object form
+     * Used only by internal class DeviceListUpdateSerialiser
+     *
+     * @param {string} userId the user to get data for
+     *
+     * @param {Object} devices deviceId->{object} the new devices
+     */
+    _setRawStoredDevicesForUser(userId, devices) {
+        this._devices[userId] = devices;
+    }
 
     /**
      * Fire off download update requests for the given users, and update the
@@ -500,13 +511,13 @@ export default class DeviceList {
 
         const prom = this._serialiser.updateDevicesForUsers(
             users, this._syncToken,
-        ).then((newDevices) => {
-            finished(newDevices);
+        ).then(() => {
+            finished(true);
         }, (e) => {
             console.error(
                 'Error downloading keys for ' + users + ":", e,
             );
-            finished(null);
+            finished(false);
             throw e;
         });
 
@@ -518,9 +529,8 @@ export default class DeviceList {
             }
         });
 
-        const finished = (newDevices) => {
+        const finished = (success) => {
             users.forEach((u) => {
-                this._devices[u] = newDevices[u];
                 this._dirty = true;
 
                 // we may have queued up another download request for this user
@@ -534,7 +544,7 @@ export default class DeviceList {
                 delete this._keyDownloadsInProgressByUser[u];
                 const stat = this._deviceTrackingStatus[u];
                 if (stat == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
-                    if (newDevices) {
+                    if (success) {
                         // we didn't get any new invalidations since this download started:
                         // this user's device list is now up to date.
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_UP_TO_DATE;
@@ -564,12 +574,12 @@ class DeviceListUpdateSerialiser {
     /*
      * @param {object} baseApis Base API object
      * @param {object} olmDevice The Olm Device
-     * @param {object} devices The current device list
+     * @param {object} deviceList The device list object
      */
-    constructor(baseApis, olmDevice, devices) {
+    constructor(baseApis, olmDevice, deviceList) {
         this._baseApis = baseApis;
         this._olmDevice = olmDevice;
-        this._devices = devices; // the complete device list
+        this._deviceList = deviceList; // the device list to be updated
 
         this._downloadInProgress = false;
 
@@ -582,7 +592,6 @@ class DeviceListUpdateSerialiser {
         // non-null indicates that we have users queued for download.
         this._queuedQueryDeferred = null;
 
-        this._updatedDevices = null; // device list updates we've fetched
         this._syncToken = null; // The sync token we send with the requests
     }
 
@@ -618,7 +627,6 @@ class DeviceListUpdateSerialiser {
             return this._queuedQueryDeferred.promise;
         }
 
-        this._updatedDevices = {};
         // start a new download.
         return this._doQueuedQueries();
     }
@@ -665,7 +673,7 @@ class DeviceListUpdateSerialiser {
             console.log('Completed key download for ' + downloadUsers);
 
             this._downloadInProgress = false;
-            deferred.resolve(this._updatedDevices);
+            deferred.resolve();
 
             // if we have queued users, fire off another request.
             if (this._queuedQueryDeferred) {
@@ -685,7 +693,7 @@ class DeviceListUpdateSerialiser {
 
         // map from deviceid -> deviceinfo for this user
         const userStore = {};
-        const devs = this._devices[userId];
+        const devs = this._deviceList.getRawStoredDevicesForUser(userId);
         if (devs) {
             Object.keys(devs).forEach((deviceId) => {
                 const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
@@ -703,7 +711,7 @@ class DeviceListUpdateSerialiser {
             storage[deviceId] = userStore[deviceId].toStorage();
         });
 
-        this._updatedDevices[userId] = storage;
+        this._deviceList._setRawStoredDevicesForUser(userId, storage);
     }
 }
 
