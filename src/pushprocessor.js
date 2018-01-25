@@ -211,6 +211,10 @@ function PushProcessor(client) {
     };
 
     const eventFulfillsEventMatchCondition = function(cond, ev) {
+        if (!cond.key) {
+            return false;
+        }
+
         const val = valueForDottedKey(cond.key, ev);
         if (!val || typeof val != 'string') {
             return false;
