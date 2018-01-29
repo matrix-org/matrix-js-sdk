@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +37,8 @@ export default class MemoryCryptoStore {
         this._sessions = {};
         // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
         this._inboundGroupSessions = {};
+        // Opaque device data object
+        this._deviceData = null;
     }
 
     /**
@@ -268,6 +271,16 @@ export default class MemoryCryptoStore {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
+    // Device Data
+
+    getEndToEndDeviceData(txn, func) {
+        func(this._deviceData);
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        this._deviceData = deviceData;
     }
 
 

@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ import Promise from 'bluebird';
 
 import DeviceInfo from './deviceinfo';
 import olmlib from './olmlib';
+import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
 
 /* State transition diagram for DeviceList._deviceTrackingStatus
@@ -58,31 +60,153 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
  * @alias module:crypto/DeviceList
  */
 export default class DeviceList {
-    constructor(baseApis, sessionStore, olmDevice) {
+    constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
+        this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
-        this._serialiser = new DeviceListUpdateSerialiser(
-            baseApis, sessionStore, olmDevice,
-        );
+
+        // userId -> {
+        //     deviceId -> {
+        //         [device info]
+        //     }
+        // }
+        this._devices = {};
 
         // which users we are tracking device status for.
         // userId -> TRACKING_STATUS_*
-        this._deviceTrackingStatus = sessionStore.getEndToEndDeviceTrackingStatus() || {};
+        this._deviceTrackingStatus = {}; // loaded from storage in load()
+
+        // The 'next_batch' sync token at the point the data was writen,
+        // ie. a token representing the point immediately after the
+        // moment represented by the snapshot in the db.
+        this._syncToken = null;
+
+        this._serialiser = new DeviceListUpdateSerialiser(
+            baseApis, olmDevice, this,
+        );
+
+        // userId -> promise
+        this._keyDownloadsInProgressByUser = {};
+
+        // Set whenever changes are made other than setting the sync token
+        this._dirty = false;
+
+        // Promise resolved when device data is saved
+        this._savePromise = null;
+    }
+
+    /**
+     * Load the device tracking state from storage
+     */
+    async load() {
+        let shouldDeleteSessionStore = false;
+        await this._cryptoStore.doTxn(
+            // migrate from session store if there's data there and not here
+            'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
+                this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
+                    if (deviceData === null) {
+                        console.log("Migrating e2e device data...");
+                        this._devices = this._sessionStore.getAllEndToEndDevices() || {};
+                        this._deviceTrackingStatus = (
+                            this._sessionStore.getEndToEndDeviceTrackingStatus() || {}
+                        );
+                        this._syncToken = this._sessionStore.getEndToEndDeviceSyncToken();
+                        this._cryptoStore.storeEndToEndDeviceData({
+                            devices: this._devices,
+                            trackingStatus: this._deviceTrackingStatus,
+                            syncToken: this._syncToken,
+                        }, txn);
+                        shouldDeleteSessionStore = true;
+                    } else {
+                        this._devices = deviceData ? deviceData.devices : {},
+                        this._deviceTrackingStatus = deviceData ?
+                            deviceData.trackingStatus : {};
+                        this._syncToken = deviceData ? deviceData.syncToken : null;
+                    }
+                });
+            },
+        );
+
+        if (shouldDeleteSessionStore) {
+            // migrated data is now safely persisted: remove from old store
+            this._sessionStore.removeEndToEndDeviceData();
+        }
+
         for (const u of Object.keys(this._deviceTrackingStatus)) {
             // if a download was in progress when we got shut down, it isn't any more.
             if (this._deviceTrackingStatus[u] == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
                 this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
             }
         }
-
-        // userId -> promise
-        this._keyDownloadsInProgressByUser = {};
-
-        this.lastKnownSyncToken = null;
     }
 
     /**
-     * Download the keys for a list of users and stores the keys in the session
-     * store.
+     * Save the device tracking state to storage, if any changes are
+     * pending other than updating the sync token
+     *
+     * The actual save will be delayed by a short amount of time to
+     * aggregate multiple writes to the database.
+     *
+     * @return {Promise<bool>} true if the data was saved, false if
+     *     it was not (eg. because no changes were pending). The promise
+     *     will only resolve once the data is saved, so may take some time
+     *     to resolve.
+     */
+    async saveIfDirty() {
+        if (!this._dirty) return Promise.resolve(false);
+
+        if (this._savePromise === null) {
+            // Delay saves for a bit so we can aggregate multiple saves that happen
+            // in quick succession (eg. when a whole room's devices are marked as known)
+            this._savePromise = Promise.delay(500).then(() => {
+                console.log('Saving device tracking data at token ' + this._syncToken);
+                // null out savePromise now (after the delay but before the write),
+                // otherwise we could return the existing promise when the save has
+                // actually already happened. Likewise for the dirty flag.
+                this._savePromise = null;
+                this._dirty = false;
+                return this._cryptoStore.doTxn(
+                    'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
+                        this._cryptoStore.storeEndToEndDeviceData({
+                            devices: this._devices,
+                            trackingStatus: this._deviceTrackingStatus,
+                            syncToken: this._syncToken,
+                        }, txn);
+                    },
+                );
+            }).then(() => {
+                return true;
+            });
+        }
+        return this._savePromise;
+    }
+
+    /**
+     * Gets the sync token last set with setSyncToken
+     *
+     * @return {string} The sync token
+     */
+    getSyncToken() {
+        return this._syncToken;
+    }
+
+    /**
+     * Sets the sync token that the app will pass as the 'since' to the /sync
+     * endpoint next time it syncs.
+     * The sync token must always be set after any changes made as a result of
+     * data in that sync since setting the sync token to a newer one will mean
+     * those changed will not be synced from the server if a new client starts
+     * up with that data.
+     *
+     * @param {string} st The sync token
+     */
+    setSyncToken(st) {
+        this._syncToken = st;
+    }
+
+    /**
+     * Ensures up to date keys for a list of users are stored in the session store,
+     * downloading and storing them if they're not (or if forceDownload is
+     * true).
      * @param {Array} userIds The users to fetch.
      * @param {bool} forceDownload Always download the keys even if cached.
      *
@@ -152,7 +276,7 @@ export default class DeviceList {
      * managed to get a list of devices for this user yet.
      */
     getStoredDevicesForUser(userId) {
-        const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+        const devs = this._devices[userId];
         if (!devs) {
             return null;
         }
@@ -166,6 +290,18 @@ export default class DeviceList {
     }
 
     /**
+     * Get the stored device data for a user, in raw object form
+     *
+     * @param {string} userId the user to get data for
+     *
+     * @return {Object} deviceId->{object} devices, or undefined if
+     * there is no data for this user.
+     */
+    getRawStoredDevicesForUser(userId) {
+        return this._devices[userId];
+    }
+
+    /**
      * Get the stored keys for a single device
      *
      * @param {string} userId
@@ -175,7 +311,7 @@ export default class DeviceList {
      * if we don't know about this device
      */
     getStoredDevice(userId, deviceId) {
-        const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+        const devs = this._devices[userId];
         if (!devs || !devs[deviceId]) {
             return undefined;
         }
@@ -200,7 +336,7 @@ export default class DeviceList {
             return null;
         }
 
-        const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
+        const devices = this._devices[userId];
         if (!devices) {
             return null;
         }
@@ -230,6 +366,17 @@ export default class DeviceList {
     }
 
     /**
+     * Replaces the list of devices for a user with the given device list
+     *
+     * @param {string} u The user ID
+     * @param {Object} devs New device info for user
+     */
+    storeDevicesForUser(u, devs) {
+        this._devices[u] = devs;
+        this._dirty = true;
+    }
+
+    /**
      * flag the given user for device-list tracking, if they are not already.
      *
      * This will mean that a subsequent call to refreshOutdatedDeviceLists()
@@ -254,8 +401,8 @@ export default class DeviceList {
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
         }
         // we don't yet persist the tracking status, since there may be a lot
-        // of calls; instead we wait for the forthcoming
-        // refreshOutdatedDeviceLists.
+        // of calls; we save all data together once the sync is done
+        this._dirty = true;
     }
 
     /**
@@ -273,10 +420,23 @@ export default class DeviceList {
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
         }
         // we don't yet persist the tracking status, since there may be a lot
-        // of calls; instead we wait for the forthcoming
-        // refreshOutdatedDeviceLists.
+        // of calls; we save all data together once the sync is done
+
+        this._dirty = true;
     }
 
+    /**
+     * Set all users we're currently tracking to untracked
+     *
+     * This will flag each user whose devices we are tracking as in need of an
+     * update.
+     */
+    stopTrackingAllDeviceLists() {
+        for (const userId of Object.keys(this._deviceTrackingStatus)) {
+            this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
+        }
+        this._dirty = true;
+    }
 
     /**
      * Mark the cached device list for the given user outdated.
@@ -295,20 +455,9 @@ export default class DeviceList {
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
         }
         // we don't yet persist the tracking status, since there may be a lot
-        // of calls; instead we wait for the forthcoming
-        // refreshOutdatedDeviceLists.
-    }
+        // of calls; we save all data together once the sync is done
 
-    /**
-     * Mark all tracked device lists as outdated.
-     *
-     * This will flag each user whose devices we are tracking as in need of an
-     * update.
-     */
-    invalidateAllDeviceLists() {
-        for (const userId of Object.keys(this._deviceTrackingStatus)) {
-            this.invalidateUserDeviceList(userId);
-        }
+        this._dirty = true;
     }
 
     /**
@@ -318,6 +467,8 @@ export default class DeviceList {
      *    is no need to wait for this (it's mostly for the unit tests).
      */
     refreshOutdatedDeviceLists() {
+        this.saveIfDirty();
+
         const usersToDownload = [];
         for (const userId of Object.keys(this._deviceTrackingStatus)) {
             const stat = this._deviceTrackingStatus[userId];
@@ -326,13 +477,20 @@ export default class DeviceList {
             }
         }
 
-        // we didn't persist the tracking status during
-        // invalidateUserDeviceList, so do it now.
-        this._persistDeviceTrackingStatus();
-
         return this._doKeyDownload(usersToDownload);
     }
 
+    /**
+     * Set the stored device data for a user, in raw object form
+     * Used only by internal class DeviceListUpdateSerialiser
+     *
+     * @param {string} userId the user to get data for
+     *
+     * @param {Object} devices deviceId->{object} the new devices
+     */
+    _setRawStoredDevicesForUser(userId, devices) {
+        this._devices[userId] = devices;
+    }
 
     /**
      * Fire off download update requests for the given users, and update the
@@ -352,7 +510,7 @@ export default class DeviceList {
         }
 
         const prom = this._serialiser.updateDevicesForUsers(
-            users, this.lastKnownSyncToken,
+            users, this._syncToken,
         ).then(() => {
             finished(true);
         }, (e) => {
@@ -373,6 +531,8 @@ export default class DeviceList {
 
         const finished = (success) => {
             users.forEach((u) => {
+                this._dirty = true;
+
                 // we may have queued up another download request for this user
                 // since we started this request. If that happens, we should
                 // ignore the completion of the first one.
@@ -394,14 +554,10 @@ export default class DeviceList {
                     }
                 }
             });
-            this._persistDeviceTrackingStatus();
+            this.saveIfDirty();
         };
 
         return prom;
-    }
-
-    _persistDeviceTrackingStatus() {
-        this._sessionStore.storeEndToEndDeviceTrackingStatus(this._deviceTrackingStatus);
     }
 }
 
@@ -415,10 +571,15 @@ export default class DeviceList {
  * time (and queuing other requests up).
  */
 class DeviceListUpdateSerialiser {
-    constructor(baseApis, sessionStore, olmDevice) {
+    /*
+     * @param {object} baseApis Base API object
+     * @param {object} olmDevice The Olm Device
+     * @param {object} deviceList The device list object
+     */
+    constructor(baseApis, olmDevice, deviceList) {
         this._baseApis = baseApis;
-        this._sessionStore = sessionStore;
         this._olmDevice = olmDevice;
+        this._deviceList = deviceList; // the device list to be updated
 
         this._downloadInProgress = false;
 
@@ -431,9 +592,7 @@ class DeviceListUpdateSerialiser {
         // non-null indicates that we have users queued for download.
         this._queuedQueryDeferred = null;
 
-        // sync token to be used for the next query: essentially the
-        // most recent one we know about
-        this._nextSyncToken = null;
+        this._syncToken = null; // The sync token we send with the requests
     }
 
     /**
@@ -452,11 +611,15 @@ class DeviceListUpdateSerialiser {
         users.forEach((u) => {
             this._keyDownloadsQueuedByUser[u] = true;
         });
-        this._nextSyncToken = syncToken;
 
         if (!this._queuedQueryDeferred) {
             this._queuedQueryDeferred = Promise.defer();
         }
+
+        // We always take the new sync token and just use the latest one we've
+        // been given, since it just needs to be at least as recent as the
+        // sync response the device invalidation message arrived in
+        this._syncToken = syncToken;
 
         if (this._downloadInProgress) {
             // just queue up these users
@@ -484,8 +647,8 @@ class DeviceListUpdateSerialiser {
         this._downloadInProgress = true;
 
         const opts = {};
-        if (this._nextSyncToken) {
-            opts.token = this._nextSyncToken;
+        if (this._syncToken) {
+            opts.token = this._syncToken;
         }
 
         this._baseApis.downloadKeysForUsers(
@@ -530,7 +693,7 @@ class DeviceListUpdateSerialiser {
 
         // map from deviceid -> deviceinfo for this user
         const userStore = {};
-        const devs = this._sessionStore.getEndToEndDevicesForUser(userId);
+        const devs = this._deviceList.getRawStoredDevicesForUser(userId);
         if (devs) {
             Object.keys(devs).forEach((deviceId) => {
                 const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
@@ -542,15 +705,13 @@ class DeviceListUpdateSerialiser {
             this._olmDevice, userId, userStore, response || {},
         );
 
-        // update the session store
+        // put the updates into thr object that will be returned as our results
         const storage = {};
         Object.keys(userStore).forEach((deviceId) => {
             storage[deviceId] = userStore[deviceId].toStorage();
         });
 
-        this._sessionStore.storeEndToEndDevicesForUser(
-            userId, storage,
-        );
+        this._deviceList._setRawStoredDevicesForUser(userId, storage);
     }
 }
 
