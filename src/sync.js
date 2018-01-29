@@ -416,12 +416,14 @@ SyncApi.prototype.sync = function() {
     //   2) We need to get/create a filter which we can use for /sync.
 
     function getPushRules() {
-        client.getPushRules().done(function(result) {
+        client.getPushRules().done((result) => {
             debuglog("Got push rules");
+
             client.pushRules = result;
-            getFilter(); // Now get the filter
-        }, function(err) {
-            self._startKeepAlives().done(function() {
+
+            getFilter(); // Now get the filter and start syncing
+        }, (err) => {
+            self._startKeepAlives().done(() => {
                 getPushRules();
             });
             self._updateSyncState("ERROR", { error: err });
@@ -439,15 +441,15 @@ SyncApi.prototype.sync = function() {
 
         client.getOrCreateFilter(
             getFilterName(client.credentials.userId), filter,
-        ).done(function(filterId) {
+        ).done((filterId) => {
             // reset the notifications timeline to prepare it to paginate from
             // the current point in time.
             // The right solution would be to tie /sync pagination tokens into
             // /notifications API somehow.
             client.resetNotifTimelineSet();
 
-            self._sync({ filterId: filterId });
-        }, function(err) {
+            self._sync({ filterId });
+        }, (err) => {
             self._startKeepAlives().done(function() {
                 getFilter();
             });
@@ -459,7 +461,18 @@ SyncApi.prototype.sync = function() {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
-        getPushRules();
+        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
+        // if there is data there.
+        client.store.getSavedSync().then((savedSync) => {
+            // Indicate whether we should sync after getting push rules,
+            // this should only be done if aren't about to start syncing
+            // with the savedSync as a first sync.
+            getPushRules();
+
+            if (savedSync) {
+                self._sync({ savedSync });
+            }
+        });
     }
 };
 
@@ -568,16 +581,9 @@ SyncApi.prototype._sync = async function(syncOptions) {
         qps.timeout = 0;
     }
 
-    let savedSync;
-    if (!syncOptions.hasSyncedBefore) {
-        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
-        // if there is data there.
-        savedSync = await client.store.getSavedSync();
-    }
-
     let isCachedResponse = false;
     let data;
-
+    const savedSync = syncOptions.savedSync;
     if (savedSync) {
         debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
         isCachedResponse = true;
@@ -658,7 +664,9 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     // Begin next sync
-    this._sync(syncOptions);
+    if (!savedSync) {
+        this._sync(syncOptions);
+    }
 };
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
