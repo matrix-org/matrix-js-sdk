@@ -510,6 +510,9 @@ SyncApi.prototype.retryImmediately = function() {
  * @param {Object} syncOptions
  * @param {string} syncOptions.filterId
  * @param {boolean} syncOptions.hasSyncedBefore
+ * @param {Object} syncOptions.savedSync a saved sync that was persisted by a
+ *                                       store. Should have been acquired via
+ *                                       client.store.getSavedSync().
  */
 SyncApi.prototype._sync = async function(syncOptions) {
     const client = this.client;
