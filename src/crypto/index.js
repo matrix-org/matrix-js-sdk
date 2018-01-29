@@ -822,10 +822,8 @@ Crypto.prototype.decryptEvent = function(event) {
  * /keys/changes
  */
 Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLists) {
-    // No point processing device list changes for initial syncs: they'd be meaningless
-    // since the server doesn't know what point we were were at previously. We'll either
-    // get the complete list of changes for the interval or invalidate everything in
-    // onSyncComplete
+    // Initial syncs don't have device change lists. We'll either get the complete list
+    // of changes for the interval or invalidate everything in onSyncComplete
     if (!syncData.oldSyncToken) return;
 
     if (syncData.oldSyncToken === this._deviceList.getSyncToken()) {

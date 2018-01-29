@@ -76,12 +76,12 @@ export default class DeviceList {
         this._deviceTrackingStatus = {}; // loaded from storage in load()
 
         // The 'next_batch' sync token at the point the data was writen,
-        // ie. a token represtenting the point immediately after the
+        // ie. a token representing the point immediately after the
         // moment represented by the snapshot in the db.
         this._syncToken = null;
 
         this._serialiser = new DeviceListUpdateSerialiser(
-            baseApis, olmDevice,
+            baseApis, olmDevice, this,
         );
 
         // userId -> promise
@@ -143,8 +143,13 @@ export default class DeviceList {
      * Save the device tracking state to storage, if any changes are
      * pending other than updating the sync token
      *
-     * @return {Promise<bool>} true is the data was saved, false if
-     *     it was not (eg. because no changes were pending)
+     * The actual save will be delayed by a short amount of time to
+     * aggregate multiple writes to the database.
+     *
+     * @return {Promise<bool>} true if the data was saved, false if
+     *     it was not (eg. because no changes were pending). The promise
+     *     will only resolve once the data is saved, so may take some time
+     *     to resolve.
      */
     async saveIfDirty() {
         if (!this._dirty) return Promise.resolve(false);
@@ -154,6 +159,11 @@ export default class DeviceList {
             // in quick succession (eg. when a whole room's devices are marked as known)
             this._savePromise = Promise.delay(500).then(() => {
                 console.log('Saving device tracking data at token ' + this._syncToken);
+                // null out savePromise now (after the delay but before the write),
+                // otherwise we could return the existing promise when the save has
+                // actually already happened. Likewise for the dirty flag.
+                this._savePromise = null;
+                this._dirty = false;
                 return this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
@@ -164,13 +174,10 @@ export default class DeviceList {
                     },
                 );
             }).then(() => {
-                this._dirty = false;
-                this._savePromise = null;
                 return true;
             });
-        } else {
-            return this._savePromise;
         }
+        return this._savePromise;
     }
 
     /**
@@ -287,15 +294,11 @@ export default class DeviceList {
      *
      * @param {string} userId the user to get data for
      *
-     * @return {Object} userId->deviceId->{object} devices, or null if
+     * @return {Object} deviceId->{object} devices, or undefined if
      * there is no data for this user.
      */
     getRawStoredDevicesForUser(userId) {
-        const devs = this._devices[userId];
-        if (!devs) {
-            return null;
-        }
-        return devs;
+        return this._devices[userId];
     }
 
     /**
@@ -477,6 +480,17 @@ export default class DeviceList {
         return this._doKeyDownload(usersToDownload);
     }
 
+    /**
+     * Set the stored device data for a user, in raw object form
+     * Used only by internal class DeviceListUpdateSerialiser
+     *
+     * @param {string} userId the user to get data for
+     *
+     * @param {Object} devices deviceId->{object} the new devices
+     */
+    _setRawStoredDevicesForUser(userId, devices) {
+        this._devices[userId] = devices;
+    }
 
     /**
      * Fire off download update requests for the given users, and update the
@@ -496,14 +510,14 @@ export default class DeviceList {
         }
 
         const prom = this._serialiser.updateDevicesForUsers(
-            this._devices, users, this._syncToken,
-        ).then((newDevices) => {
-            finished(newDevices);
+            users, this._syncToken,
+        ).then(() => {
+            finished(true);
         }, (e) => {
             console.error(
                 'Error downloading keys for ' + users + ":", e,
             );
-            finished(null);
+            finished(false);
             throw e;
         });
 
@@ -515,9 +529,8 @@ export default class DeviceList {
             }
         });
 
-        const finished = (newDevices) => {
+        const finished = (success) => {
             users.forEach((u) => {
-                this._devices[u] = newDevices[u];
                 this._dirty = true;
 
                 // we may have queued up another download request for this user
@@ -531,7 +544,7 @@ export default class DeviceList {
                 delete this._keyDownloadsInProgressByUser[u];
                 const stat = this._deviceTrackingStatus[u];
                 if (stat == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
-                    if (newDevices) {
+                    if (success) {
                         // we didn't get any new invalidations since this download started:
                         // this user's device list is now up to date.
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_UP_TO_DATE;
@@ -558,9 +571,15 @@ export default class DeviceList {
  * time (and queuing other requests up).
  */
 class DeviceListUpdateSerialiser {
-    constructor(baseApis, olmDevice) {
+    /*
+     * @param {object} baseApis Base API object
+     * @param {object} olmDevice The Olm Device
+     * @param {object} deviceList The device list object
+     */
+    constructor(baseApis, olmDevice, deviceList) {
         this._baseApis = baseApis;
         this._olmDevice = olmDevice;
+        this._deviceList = deviceList; // the device list to be updated
 
         this._downloadInProgress = false;
 
@@ -573,15 +592,11 @@ class DeviceListUpdateSerialiser {
         // non-null indicates that we have users queued for download.
         this._queuedQueryDeferred = null;
 
-        this._devices = null; // the complete device list
-        this._updatedDevices = null; // device list updates we've fetched
         this._syncToken = null; // The sync token we send with the requests
     }
 
     /**
      * Make a key query request for the given users
-     *
-     * @param {object} devices The current device list
      *
      * @param {String[]} users list of user ids
      *
@@ -590,9 +605,9 @@ class DeviceListUpdateSerialiser {
      *
      * @return {module:client.Promise} resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
-     *     users. Returns a fresh device list object for the users queried.
+     *     users.
      */
-    updateDevicesForUsers(devices, users, syncToken) {
+    updateDevicesForUsers(users, syncToken) {
         users.forEach((u) => {
             this._keyDownloadsQueuedByUser[u] = true;
         });
@@ -612,8 +627,6 @@ class DeviceListUpdateSerialiser {
             return this._queuedQueryDeferred.promise;
         }
 
-        this._devices = devices;
-        this._updatedDevices = {};
         // start a new download.
         return this._doQueuedQueries();
     }
@@ -660,7 +673,7 @@ class DeviceListUpdateSerialiser {
             console.log('Completed key download for ' + downloadUsers);
 
             this._downloadInProgress = false;
-            deferred.resolve(this._updatedDevices);
+            deferred.resolve();
 
             // if we have queued users, fire off another request.
             if (this._queuedQueryDeferred) {
@@ -680,7 +693,7 @@ class DeviceListUpdateSerialiser {
 
         // map from deviceid -> deviceinfo for this user
         const userStore = {};
-        const devs = this._devices[userId];
+        const devs = this._deviceList.getRawStoredDevicesForUser(userId);
         if (devs) {
             Object.keys(devs).forEach((deviceId) => {
                 const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
@@ -692,13 +705,13 @@ class DeviceListUpdateSerialiser {
             this._olmDevice, userId, userStore, response || {},
         );
 
-        // update the session store
+        // put the updates into thr object that will be returned as our results
         const storage = {};
         Object.keys(userStore).forEach((deviceId) => {
             storage[deviceId] = userStore[deviceId].toStorage();
         });
 
-        this._updatedDevices[userId] = storage;
+        this._deviceList._setRawStoredDevicesForUser(userId, storage);
     }
 }
 
