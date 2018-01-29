@@ -605,7 +605,7 @@ class DeviceListUpdateSerialiser {
      *
      * @return {module:client.Promise} resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
-     *     users. Returns a fresh device list object for the users queried.
+     *     users.
      */
     updateDevicesForUsers(users, syncToken) {
         users.forEach((u) => {
