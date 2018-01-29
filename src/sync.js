@@ -464,9 +464,6 @@ SyncApi.prototype.sync = function() {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
         client.store.getSavedSync().then((savedSync) => {
-            // Indicate whether we should sync after getting push rules,
-            // this should only be done if aren't about to start syncing
-            // with the savedSync as a first sync.
             getPushRules();
 
             if (savedSync) {
