@@ -650,7 +650,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     try {
-        await this._processSyncResponse(syncToken, data, false);
+        await this._processSyncResponse(syncEventData, data, false);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
