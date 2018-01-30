@@ -465,7 +465,7 @@ SyncApi.prototype.sync = function() {
         // if there is data there.
         client.store.getSavedSync().then((savedSync) => {
             if (savedSync) {
-                self._sync({ savedSync });
+                self._syncFromCache(savedSync);
             }
         });
         getPushRules();
@@ -502,6 +502,38 @@ SyncApi.prototype.retryImmediately = function() {
     }
     this._startKeepAlives(0);
     return true;
+};
+
+SyncApi.prototype._syncFromCache = async function(savedSync) {
+    debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+
+    const oldSyncToken = this.client.store.getSyncToken();
+    const nextSyncToken = savedSync.nextBatch;
+
+    this.client.store.setSyncToken(nextSyncToken);
+
+    const data = {
+        next_batch: nextSyncToken,
+        rooms: savedSync.roomsData,
+        groups: savedSync.groupsData,
+        account_data: {
+            events: savedSync.accountData,
+        },
+    };
+
+    try {
+        await this._processSyncResponse(oldSyncToken, data, true);
+    } catch(e) {
+        console.error("Error processing cached sync", e.stack || e);
+    }
+
+    const syncEventData = {
+        oldSyncToken,
+        nextSyncToken,
+        catchingUp: false,
+    };
+
+    this._updateSyncState("PREPARED", syncEventData);
 };
 
 /**
@@ -580,31 +612,16 @@ SyncApi.prototype._sync = async function(syncOptions) {
         qps.timeout = 0;
     }
 
-    let isCachedResponse = false;
     let data;
-    const savedSync = syncOptions.savedSync;
-    if (savedSync) {
-        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-        isCachedResponse = true;
-        data = {
-            next_batch: savedSync.nextBatch,
-            rooms: savedSync.roomsData,
-            groups: savedSync.groupsData,
-            account_data: {
-                events: savedSync.accountData,
-            },
-        };
-    } else {
-        try {
-            //debuglog('Starting sync since=' + syncToken);
-            this._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-            );
-            data = await this._currentSyncRequest;
-        } catch (e) {
-            this._onSyncError(e, syncOptions);
-            return;
-        }
+    try {
+        //debuglog('Starting sync since=' + syncToken);
+        this._currentSyncRequest = client._http.authedRequest(
+            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+        );
+        data = await this._currentSyncRequest;
+    } catch (e) {
+        this._onSyncError(e, syncOptions);
+        return;
     }
 
     //debuglog('Completed sync, next_batch=' + data.next_batch);
@@ -617,17 +634,10 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // Reset after a successful sync
     this._failedSyncCount = 0;
 
-    // We need to wait until the sync data has been sent to the backend
-    // because it appears that the sync data gets modified somewhere in
-    // processing it in such a way as to make it no longer cloneable.
-    // XXX: Find out what is modifying it!
-    if (!isCachedResponse) {
-        // Don't give the store back its own cached data
-        await client.store.setSyncData(data);
-    }
+    await client.store.setSyncData(data);
 
     try {
-        await this._processSyncResponse(syncToken, data, isCachedResponse);
+        await this._processSyncResponse(syncToken, data, false);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -646,26 +656,22 @@ SyncApi.prototype._sync = async function(syncOptions) {
         syncOptions.hasSyncedBefore = true;
     }
 
-    if (!isCachedResponse) {
-        // tell the crypto module to do its processing. It may block (to do a
-        // /keys/changes request).
-        if (this.opts.crypto) {
-            await this.opts.crypto.onSyncCompleted(syncEventData);
-        }
-
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        this._updateSyncState("SYNCING", syncEventData);
-
-        // tell databases that everything is now in a consistent state and can be
-        // saved (no point doing so if we only have the data we just got out of the
-        // store).
-        client.store.save();
+    // tell the crypto module to do its processing. It may block (to do a
+    // /keys/changes request).
+    if (this.opts.crypto) {
+        await this.opts.crypto.onSyncCompleted(syncEventData);
     }
+
+    // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+    this._updateSyncState("SYNCING", syncEventData);
+
+    // tell databases that everything is now in a consistent state and can be
+    // saved (no point doing so if we only have the data we just got out of the
+    // store).
+    client.store.save();
 
     // Begin next sync
-    if (!savedSync) {
-        this._sync(syncOptions);
-    }
+    this._sync(syncOptions);
 };
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
