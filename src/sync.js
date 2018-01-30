@@ -464,12 +464,11 @@ SyncApi.prototype.sync = function() {
         // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
         // if there is data there.
         client.store.getSavedSync().then((savedSync) => {
-            getPushRules();
-
             if (savedSync) {
                 self._sync({ savedSync });
             }
         });
+        getPushRules();
     }
 };
 
