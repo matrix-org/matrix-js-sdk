@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@ import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
 import Promise from 'bluebird';
+import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -46,14 +48,19 @@ export default function TestClient(
     if (sessionStoreBackend === undefined) {
         sessionStoreBackend = new testUtils.MockStorageApi();
     }
-    this.storage = new sdk.WebStorageSessionStore(sessionStoreBackend);
+    const sessionStore = new sdk.WebStorageSessionStore(sessionStoreBackend);
+
+    // expose this so the tests can get to it
+    this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
+
     this.httpBackend = new MockHttpBackend();
     this.client = sdk.createClient({
         baseUrl: "http://" + userId + ".test.server",
         userId: userId,
         accessToken: accessToken,
         deviceId: deviceId,
-        sessionStore: this.storage,
+        sessionStore: sessionStore,
+        cryptoStore: this.cryptoStore,
         request: this.httpBackend.requestFn,
     });
 

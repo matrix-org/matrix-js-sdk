@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -636,6 +637,18 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
     await client.store.setSyncData(data);
 
+    const syncEventData = {
+        oldSyncToken: syncToken,
+        nextSyncToken: data.next_batch,
+        catchingUp: this._catchingUp,
+    };
+
+    if (this.opts.crypto) {
+        // tell the crypto module we're about to process a sync
+        // response
+        await this.opts.crypto.onSyncWillProcess(syncEventData);
+    }
+
     try {
         await this._processSyncResponse(syncToken, data, false);
     } catch(e) {
@@ -644,13 +657,10 @@ SyncApi.prototype._sync = async function(syncOptions) {
         console.error("Caught /sync error", e.stack || e);
     }
 
-    // emit synced events
-    const syncEventData = {
-        oldSyncToken: syncToken,
-        nextSyncToken: data.next_batch,
-        catchingUp: this._catchingUp,
-    };
+    // update this as it may have changed
+    syncEventData.catchingUp = this._catchingUp;
 
+    // emit synced events
     if (!syncOptions.hasSyncedBefore) {
         this._updateSyncState("PREPARED", syncEventData);
         syncOptions.hasSyncedBefore = true;
@@ -715,13 +725,12 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * Process data returned from a sync response and propagate it
  * into the model objects
  *
- * @param {string} syncToken the old next_batch token sent to this
- *    sync request.
+ * @param {Object} syncEventData Object containing sync tokens associated with this sync
  * @param {Object} data The response from /sync
  * @param {bool} isCachedResponse True if this response is from our local cache
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncToken, data, isCachedResponse,
+    syncEventData, data, isCachedResponse,
 ) {
     const client = this.client;
     const self = this;
@@ -963,7 +972,8 @@ SyncApi.prototype._processSyncResponse = async function(
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncToken,
+                    self.opts.canResetEntireTimeline(room.roomId) ?
+                        null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -1047,7 +1057,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // in the timeline relative to ones paginated in by /notifications.
     // XXX: we could fix this by making EventTimeline support chronological
     // ordering... but it doesn't, right now.
-    if (syncToken && this._notifEvents.length) {
+    if (syncEventData.oldSyncToken && this._notifEvents.length) {
         this._notifEvents.sort(function(a, b) {
             return a.getTs() - b.getTs();
         });
@@ -1059,7 +1069,9 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle device list updates
     if (data.device_lists) {
         if (this.opts.crypto) {
-            await this.opts.crypto.handleDeviceListChanges(data.device_lists);
+            await this.opts.crypto.handleDeviceListChanges(
+                syncEventData, data.device_lists,
+            );
         } else {
             // FIXME if we *don't* have a crypto module, we still need to
             // invalidate the device lists. But that would require a
