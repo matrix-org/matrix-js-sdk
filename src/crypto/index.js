@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,7 +70,9 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._cryptoStore = cryptoStore;
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
-    this._deviceList = new DeviceList(baseApis, sessionStore, this._olmDevice);
+    this._deviceList = new DeviceList(
+        baseApis, cryptoStore, sessionStore, this._olmDevice,
+    );
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -128,6 +131,7 @@ Crypto.prototype.init = async function() {
     }
 
     await this._olmDevice.init();
+    await this._deviceList.load();
 
     // build our device keys: these will later be uploaded
     this._deviceKeys["ed25519:" + this._deviceId] =
@@ -135,7 +139,7 @@ Crypto.prototype.init = async function() {
     this._deviceKeys["curve25519:" + this._deviceId] =
         this._olmDevice.deviceCurve25519Key;
 
-    let myDevices = this._sessionStore.getEndToEndDevicesForUser(
+    let myDevices = this._deviceList.getRawStoredDevicesForUser(
         this._userId,
     );
 
@@ -153,9 +157,10 @@ Crypto.prototype.init = async function() {
         };
 
         myDevices[this._deviceId] = deviceInfo;
-        this._sessionStore.storeEndToEndDevicesForUser(
+        this._deviceList.storeDevicesForUser(
             this._userId, myDevices,
         );
+        this._deviceList.saveIfDirty();
     }
 };
 
@@ -456,7 +461,7 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
 Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
-    const devices = this._sessionStore.getEndToEndDevicesForUser(userId);
+    const devices = this._deviceList.getRawStoredDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
     }
@@ -484,7 +489,8 @@ Crypto.prototype.setDeviceVerification = async function(
     if (dev.verified !== verificationStatus || dev.known !== knownStatus) {
         dev.verified = verificationStatus;
         dev.known = knownStatus;
-        this._sessionStore.storeEndToEndDevicesForUser(userId, devices);
+        this._deviceList.storeDevicesForUser(userId, devices);
+        this._deviceList.saveIfDirty();
     }
     return DeviceInfo.fromStorage(dev, deviceId);
 };
@@ -809,24 +815,33 @@ Crypto.prototype.decryptEvent = function(event) {
  * Handle the notification from /sync or /keys/changes that device lists have
  * been changed.
  *
- * @param {Object} deviceLists device_lists field from /sync, or response from
+ * @param {Object} syncData Object containing sync tokens associated with this sync
+ * @param {Object} syncDeviceLists device_lists field from /sync, or response from
  * /keys/changes
  */
-Crypto.prototype.handleDeviceListChanges = async function(deviceLists) {
-    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
-        deviceLists.changed.forEach((u) => {
-            this._deviceList.invalidateUserDeviceList(u);
-        });
-    }
+Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLists) {
+    // Initial syncs don't have device change lists. We'll either get the complete list
+    // of changes for the interval or invalidate everything in onSyncComplete
+    if (!syncData.oldSyncToken) return;
 
-    if (deviceLists.left && Array.isArray(deviceLists.left)) {
-        deviceLists.left.forEach((u) => {
-            this._deviceList.stopTrackingDeviceList(u);
-        });
+    if (syncData.oldSyncToken === this._deviceList.getSyncToken()) {
+        // the point the db is at matches where the sync started from, so
+        // we can safely write the changes
+        this._evalDeviceListChanges(syncDeviceLists);
+    } else {
+        // the db is at a different point to where this sync started from, so
+        // additionally fetch the changes between where the db is and where the
+        // sync started
+        console.log(
+            "Device list sync gap detected - fetching key changes between " +
+            this._deviceList.getSyncToken() + " and " + syncData.oldSyncToken,
+        );
+        const gapDeviceLists = await this._baseApis.getKeyChanges(
+            this._deviceList.getSyncToken(), syncData.oldSyncToken,
+        );
+        this._evalDeviceListChanges(gapDeviceLists);
+        this._evalDeviceListChanges(syncDeviceLists);
     }
-
-    // don't flush the outdated device list yet - we do it once we finish
-    // processing the sync.
 };
 
 /**
@@ -879,6 +894,22 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 };
 
 /**
+ * Called before the result of a sync is procesed
+ *
+ * @param {Object} syncData  the data from the 'MatrixClient.sync' event
+ */
+Crypto.prototype.onSyncWillProcess = async function(syncData) {
+    if (!syncData.oldSyncToken) {
+        // If there is no old sync token, we start all our tracking from
+        // scratch, so mark everything as untracked. onCryptoEvent will
+        // be called for all e2e rooms during the processing of the sync,
+        // at which point we'll start tracking all the users of that room.
+        console.log("Initial sync performed - resetting device tracking state");
+        this._deviceList.stopTrackingAllDeviceLists();
+    }
+};
+
+/**
  * handle the completion of a /sync
  *
  * This is called after the processing of each successful /sync response.
@@ -889,37 +920,8 @@ Crypto.prototype.onCryptoEvent = async function(event) {
 Crypto.prototype.onSyncCompleted = async function(syncData) {
     const nextSyncToken = syncData.nextSyncToken;
 
-    if (!syncData.oldSyncToken) {
-        console.log("Completed initial sync");
-
-        // if we have a deviceSyncToken, we can tell the deviceList to
-        // invalidate devices which have changed since then.
-        const oldSyncToken = this._sessionStore.getEndToEndDeviceSyncToken();
-        if (oldSyncToken !== null) {
-            try {
-                await this._invalidateDeviceListsSince(
-                    oldSyncToken, nextSyncToken,
-                );
-            } catch (e) {
-                // if that failed, we fall back to invalidating everyone.
-                console.warn("Error fetching changed device list", e);
-                this._deviceList.invalidateAllDeviceLists();
-            }
-        } else {
-            // otherwise, we have to invalidate all devices for all users we
-            // are tracking.
-            console.log("Completed first initialsync; invalidating all " +
-                        "device list caches");
-            this._deviceList.invalidateAllDeviceLists();
-        }
-    }
-
-    // we can now store our sync token so that we can get an update on
-    // restart rather than having to invalidate everyone.
-    //
-    // (we don't really need to do this on every sync - we could just
-    // do it periodically)
-    this._sessionStore.storeEndToEndDeviceSyncToken(nextSyncToken);
+    this._deviceList.setSyncToken(syncData.nextSyncToken);
+    this._deviceList.saveIfDirty();
 
     // catch up on any new devices we got told about during the sync.
     this._deviceList.lastKnownSyncToken = nextSyncToken;
@@ -936,25 +938,47 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
 };
 
 /**
- * Ask the server which users have new devices since a given token,
- * and invalidate them
+ * Trigger the appropriate invalidations and removes for a given
+ * device list
  *
- * @param {String} oldSyncToken
- * @param {String} lastKnownSyncToken
- *
- * Returns a Promise which resolves once the query is complete. Rejects if the
- *   keyChange query fails.
+ * @param {Object} deviceLists device_lists field from /sync, or response from
+ * /keys/changes
  */
-Crypto.prototype._invalidateDeviceListsSince = async function(
-    oldSyncToken, lastKnownSyncToken,
-) {
-    const r = await this._baseApis.getKeyChanges(
-        oldSyncToken, lastKnownSyncToken,
-    );
+Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
+    if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+        deviceLists.changed.forEach((u) => {
+            this._deviceList.invalidateUserDeviceList(u);
+        });
+    }
 
-    console.log("got key changes since", oldSyncToken, ":", r);
+    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+        // Check we really don't share any rooms with these users
+        // any more: the server isn't required to give us the
+        // exact correct set.
+        const e2eUserIds = new Set(this._getE2eUsers());
 
-    await this.handleDeviceListChanges(r);
+        deviceLists.left.forEach((u) => {
+            if (!e2eUserIds.has(u)) {
+                this._deviceList.stopTrackingDeviceList(u);
+            }
+        });
+    }
+};
+
+/**
+ * Get a list of all the IDs of users we share an e2e room with
+ *
+ * @returns {string[]} List of user IDs
+ */
+Crypto.prototype._getE2eUsers = function() {
+    const e2eUserIds = [];
+    for (const room of this._getE2eRooms()) {
+        const members = room.getJoinedMembers();
+        for (const member of members) {
+            e2eUserIds.push(member.userId);
+        }
+    }
+    return e2eUserIds;
 };
 
 /**

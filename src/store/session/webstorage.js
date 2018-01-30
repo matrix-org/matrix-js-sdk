@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,41 +69,22 @@ WebStorageSessionStore.prototype = {
     },
 
     /**
-     * Stores the known devices for a user.
-     * @param {string} userId The user's ID.
-     * @param {object} devices A map from device ID to keys for the device.
+     * Retrieves the known devices for all users.
+     * @return {object} A map from user ID to map of device ID to keys for the device.
      */
-    storeEndToEndDevicesForUser: function(userId, devices) {
-        setJsonItem(this.store, keyEndToEndDevicesForUser(userId), devices);
-    },
-
-    /**
-     * Retrieves the known devices for a user.
-     * @param {string} userId The user's ID.
-     * @return {object} A map from device ID to keys for the device.
-     */
-    getEndToEndDevicesForUser: function(userId) {
-        return getJsonItem(this.store, keyEndToEndDevicesForUser(userId));
-    },
-
-    storeEndToEndDeviceTrackingStatus: function(statusMap) {
-        setJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS, statusMap);
+    getAllEndToEndDevices: function() {
+        const prefix = keyEndToEndDevicesForUser('');
+        const devices = {};
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            const userId = key.substr(prefix.length);
+            if (key.startsWith(prefix)) devices[userId] = getJsonItem(this.store, key);
+        }
+        return devices;
     },
 
     getEndToEndDeviceTrackingStatus: function() {
         return getJsonItem(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
-    },
-
-    /**
-     * Store the sync token corresponding to the device list.
-     *
-     * This is used when starting the client, to get a list of the users who
-     * have changed their device list since the list time we were running.
-     *
-     * @param {String?} token
-     */
-    storeEndToEndDeviceSyncToken: function(token) {
-        setJsonItem(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN, token);
     },
 
     /**
@@ -112,6 +94,15 @@ WebStorageSessionStore.prototype = {
      */
     getEndToEndDeviceSyncToken: function() {
         return getJsonItem(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
+    },
+
+    /**
+     * Removes all end to end device data from the store
+     */
+    removeEndToEndDeviceData: function() {
+        removeByPrefix(this.store, keyEndToEndDevicesForUser(''));
+        removeByPrefix(this.store, KEY_END_TO_END_DEVICE_LIST_TRACKING_STATUS);
+        removeByPrefix(this.store, KEY_END_TO_END_DEVICE_SYNC_TOKEN);
     },
 
     /**
