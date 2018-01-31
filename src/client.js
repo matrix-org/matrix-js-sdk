@@ -183,7 +183,7 @@ function MatrixClient(opts) {
         this.olmVersion = Crypto.getOlmVersion();
     }
 
-    // List of what rooms have encryption enabled: separate from crypto because
+    // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know what rooms are encrypted even if crypto is disabled:
     // we don't want to start sening unencrypted events to them.
     this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
