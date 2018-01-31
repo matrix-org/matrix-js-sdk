@@ -30,7 +30,7 @@ export default class RoomList {
         this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
 
-        // Object of roomId -> room e2e info object
+        // Object of roomId -> room e2e info object (body of the m.room.encryption event)
         this._roomEncryption = {};
     }
 
