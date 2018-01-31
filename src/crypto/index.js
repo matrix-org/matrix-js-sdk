@@ -591,18 +591,6 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 };
 
 /**
- * Get the current end-to-end encryption config for a room
- *
- * @param {string} roomId The room ID to query
- *
- * @return {Promise<object>} The current end-to-end encyption status, or null if
- *     the room is not stored as using end-to-end encryption.
- */
-Crypto.prototype.getRoomEncryption = async function(roomId) {
-    return this._roomList.getRoomEncryption(roomId);
-};
-
-/**
  * Configure a room to use encryption (ie, save a flag in the sessionstore).
  *
  * @param {string} roomId The room ID to enable encryption in.
@@ -615,7 +603,7 @@ Crypto.prototype.getRoomEncryption = async function(roomId) {
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
-    const existingConfig = await this.getRoomEncryption(roomId);
+    const existingConfig = this._roomList.getRoomEncryption(roomId);
     if (existingConfig && JSON.stringify(existingConfig) != JSON.stringify(config)) {
         console.error("Ignoring m.room.encryption event which requests " +
                       "a change of config in " + roomId);
