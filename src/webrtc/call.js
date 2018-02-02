@@ -145,11 +145,13 @@ MatrixCall.prototype.placeVoiceCall = function() {
  * to render the local camera preview.
  * @throws If you have not specified a listener for 'error' events.
  */
-MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoElement) {
+MatrixCall.prototype.placeVideoCall = function(remoteVideoElement, localVideoElement, remoteDepthElement) {
     this._debuglog("placeVideoCall");
     checkForErrorListener(this);
     this.localVideoElement = localVideoElement;
     this.remoteVideoElement = remoteVideoElement;
+    this.remoteDepthElement = remoteDepthElement;
+
     _placeCallWithConstraints(this, _getUserMediaVideoContraints('video'));
     this.type = 'video';
     _tryPlayRemoteStream(this);
@@ -292,6 +294,15 @@ MatrixCall.prototype.getRemoteVideoElement = function() {
 };
 
 /**
+ * Retrieve the remote <code>&lt;video&gt;</code> DOM element
+ * used for playing back depth capable streams.
+ * @return {Element} The dom element
+ */
+MatrixCall.prototype.getRemoteDepthElement = function() {
+    return this.remoteDepthElement;
+};
+
+/**
  * Retrieve the remote <code>&lt;audio&gt;</code> DOM element
  * used for playing back audio only streams.
  * @return {Element} The dom element
@@ -329,6 +340,17 @@ MatrixCall.prototype.setLocalVideoElement = function(element) {
  */
 MatrixCall.prototype.setRemoteVideoElement = function(element) {
     this.remoteVideoElement = element;
+    _tryPlayRemoteStream(this);
+};
+
+/**
+ * Set the remote <code>&lt;video&gt;</code> DOM element used for depth streams.
+ * If this call is active, the first received depth-capable video stream will be
+ * rendered to it immediately.
+ * @param {Element} element The <code>&lt;video&gt;</code> DOM element for depth.
+ */
+MatrixCall.prototype.setRemoteDepthElement = function(element) {
+    this.remoteDepthElement = element;
     _tryPlayRemoteStream(this);
 };
 
@@ -914,10 +936,34 @@ MatrixCall.prototype._onAddStream = function(event) {
 
     const s = event.stream;
 
-    if (s.getVideoTracks().length > 0) {
+    const videoTracks = s.getVideoTracks();
+    if (videoTracks.length > 0) {
         this.type = 'video';
         this.remoteAVStream = s;
+        this.remoteDepthStream = undefined;
         this.remoteAStream = s;
+
+        let depthIndex;
+        for (let i = 0; i < videoTracks.length; i++) {
+            let t = videoTracks[i];
+            if (t.label == 'MATRIXd0') {
+                depthIndex = i;
+            }
+        }
+
+        if (depthIndex != undefined) {
+            this.remoteDepthStream = s.clone();
+            for (let i = 0; i < videoTracks.length; i++) {
+                if (i == depthIndex) {
+                    // remove the depth track from the video stream...
+                    this.remoteAVStream.removeTrack(this.remoteAVStream.getVideoTracks()[i]);
+                }
+                else {
+                    // ...and the video track from the depth stream.
+                    this.remoteDepthStream.removeTrack(this.remoteDepthStream.getVideoTracks()[i]);
+                }
+            }            
+        }
     } else {
         this.type = 'voice';
         this.remoteAStream = s;
@@ -1056,6 +1102,12 @@ const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
         }
         self.assignElement(self.getRemoteVideoElement(), null, "remoteVideo");
     }
+    if (self.getRemoteDepthElement()) {
+        if (self.getRemoteDepthElement().pause) {
+            self.pauseElement(self.getRemoteDepthElement(), "remoteDepth");
+        }
+        self.assignElement(self.getRemoteDepthElement(), null, "remoteDepth");
+    }
     if (self.getRemoteAudioElement()) {
         if (self.getRemoteAudioElement().pause) {
             self.pauseElement(self.getRemoteAudioElement(), "remoteAudio");
@@ -1111,6 +1163,13 @@ const stopAllMedia = function(self) {
             }
         });
     }
+    if (self.remoteDepthStream) {
+        forAllTracksOnStream(self.remoteDepthStream, function(t) {
+            if (t.stop) {
+                t.stop();
+            }
+        });
+    }
     if (self.remoteAStream) {
         forAllTracksOnStream(self.remoteAStream, function(t) {
             if (t.stop) {
@@ -1133,6 +1192,19 @@ const _tryPlayRemoteStream = function(self) {
             // OpenWebRTC does not support oniceconnectionstatechange yet
             if (self.webRtc.isOpenWebRTC()) {
                 setState(self, 'connected');
+            }
+        }, 0);
+    }
+
+    // try to play the depth too.
+    if (self.getRemoteDepthElement() && self.remoteDepthStream) {
+        const player = self.getRemoteDepthElement();
+        player.autoplay = true;
+        self.assignElement(player, self.remoteDepthStream, "remoteDepth");
+        setTimeout(function() {
+            const vel = self.getRemoteDepthElement();
+            if (vel.play) {
+                self.playElement(vel, "remoteDepth");
             }
         }, 0);
     }
