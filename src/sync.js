@@ -462,8 +462,8 @@ SyncApi.prototype.sync = function() {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
-        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
-        // if there is data there.
+        // Before fetching push rules, fetching the filter and syncing, check
+        // for persisted /sync data and use that if present.
         client.store.getSavedSync().then((savedSync) => {
             if (savedSync) {
                 self._syncFromCache(savedSync);
@@ -676,9 +676,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     this._updateSyncState("SYNCING", syncEventData);
 
-    // tell databases that everything is now in a consistent state and can be
-    // saved (no point doing so if we only have the data we just got out of the
-    // store).
+    // tell databases that everything is now in a consistent state and can be saved.
     client.store.save();
 
     // Begin next sync
