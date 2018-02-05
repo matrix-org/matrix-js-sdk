@@ -512,7 +512,8 @@ SyncApi.prototype.retryImmediately = function() {
 SyncApi.prototype._syncFromCache = async function(savedSync) {
     debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
 
-    const oldSyncToken = this.client.store.getSyncToken();
+    // No previous sync, set old token to null
+    const oldSyncToken = null;
     const nextSyncToken = savedSync.nextBatch;
 
     this.client.store.setSyncToken(nextSyncToken);
