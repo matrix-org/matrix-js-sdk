@@ -504,7 +504,11 @@ SyncApi.prototype.retryImmediately = function() {
     this._startKeepAlives(0);
     return true;
 };
-
+/**
+ * Process a single set of cached sync data.
+ * @param {Object} savedSync a saved sync that was persisted by a store. This
+ * should have been acquired via client.store.getSavedSync().
+ */
 SyncApi.prototype._syncFromCache = async function(savedSync) {
     debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
 
@@ -542,9 +546,6 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
  * @param {Object} syncOptions
  * @param {string} syncOptions.filterId
  * @param {boolean} syncOptions.hasSyncedBefore
- * @param {Object} syncOptions.savedSync a saved sync that was persisted by a
- *                                       store. Should have been acquired via
- *                                       client.store.getSavedSync().
  */
 SyncApi.prototype._sync = async function(syncOptions) {
     const client = this.client;
