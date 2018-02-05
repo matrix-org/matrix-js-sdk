@@ -1577,17 +1577,12 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
         { $roomId: roomId },
     );
 
-    let identityServerUrl = this.getIdentityServerUrl();
+    const identityServerUrl = this.getIdentityServerUrl(true);
     if (!identityServerUrl) {
         return Promise.reject(new MatrixError({
             error: "No supplied identity server URL",
             errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
         }));
-    }
-    if (identityServerUrl.indexOf("http://") === 0 ||
-            identityServerUrl.indexOf("https://") === 0) {
-        // this request must not have the protocol part because reasons
-        identityServerUrl = identityServerUrl.split("://")[1];
     }
 
     return this._http.authedRequest(callback, "POST", path, undefined, {
