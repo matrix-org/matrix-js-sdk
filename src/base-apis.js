@@ -89,9 +89,14 @@ MatrixBaseApis.prototype.getHomeserverUrl = function() {
 
 /**
  * Get the Identity Server URL of this client
+ * @param {boolean} stripProto whether or not to strip the protocol from the URL
  * @return {string} Identity Server URL of this client
  */
-MatrixBaseApis.prototype.getIdentityServerUrl = function() {
+MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
+    if (stripProto && (this.idBaseUrl.startsWith("http://") ||
+            this.idBaseUrl.startsWith("https://"))) {
+        return this.idBaseUrl.split("://")[1];
+    }
     return this.idBaseUrl;
 };
 
