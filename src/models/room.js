@@ -1220,6 +1220,9 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
 
     if (otherMembers.length === 0) {
+        const leftMembers = utils.filter(room.currentState.getMembers(), function(m) {
+            return m.userId !== userId && m.membership === "leave";
+        });
         if (allMembers.length === 1) {
             // self-chat, peeked room with 1 participant,
             // or inbound invite, or outbound 3PID invite.
@@ -1239,6 +1242,10 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
                         }
                     }
                     return name;
+                } else if (leftMembers.length === 1) {
+                    // if it was a chat with one person who's now left, it's still
+                    // notionally a chat with them
+                    return leftMembers[0].name;
                 } else {
                     return "Empty room";
                 }
