@@ -39,6 +39,8 @@ export default class MemoryCryptoStore {
         this._inboundGroupSessions = {};
         // Opaque device data object
         this._deviceData = null;
+        // roomId -> Opaque roomInfo object
+        this._rooms = {};
     }
 
     /**
@@ -283,6 +285,15 @@ export default class MemoryCryptoStore {
         this._deviceData = deviceData;
     }
 
+    // E2E rooms
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        this._rooms[roomId] = roomInfo;
+    }
+
+    getEndToEndRooms(txn, func) {
+        func(this._rooms);
+    }
 
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));

@@ -386,6 +386,27 @@ export default class IndexedDBCryptoStore {
         this._backendPromise.value().getEndToEndDeviceData(txn, func);
     }
 
+    // End to End Rooms
+
+    /**
+     * Store the end-to-end state for a room.
+     * @param {string} roomId The room's ID.
+     * @param {object} roomInfo The end-to-end info for the room.
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        this._backendPromise.value().storeEndToEndRoom(roomId, roomInfo, txn);
+    }
+
+    /**
+     * Get an object of roomId->roomInfo for all e2e rooms in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(Object)} func Function called with the end to end encrypted rooms
+     */
+    getEndToEndRooms(txn, func) {
+        this._backendPromise.value().getEndToEndRooms(txn, func);
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -418,3 +439,4 @@ IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
+IndexedDBCryptoStore.STORE_ROOMS = 'rooms';

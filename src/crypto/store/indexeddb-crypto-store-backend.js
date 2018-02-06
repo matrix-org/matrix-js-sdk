@@ -18,7 +18,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 5;
+export const VERSION = 6;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -425,6 +425,30 @@ export class Backend {
         objectStore.put(deviceData, "-");
     }
 
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        const objectStore = txn.objectStore("rooms");
+        objectStore.put(roomInfo, roomId);
+    }
+
+    getEndToEndRooms(txn, func) {
+        const rooms = {};
+        const objectStore = txn.objectStore("rooms");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                rooms[cursor.key] = cursor.value;
+                cursor.continue();
+            } else {
+                try {
+                    func(rooms);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
@@ -459,6 +483,9 @@ export function upgradeDatabase(db, oldVersion) {
     }
     if (oldVersion < 5) {
         db.createObjectStore("device_data");
+    }
+    if (oldVersion < 6) {
+        db.createObjectStore("rooms");
     }
     // Expand as needed.
 }
