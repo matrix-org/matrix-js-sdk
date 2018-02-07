@@ -466,11 +466,6 @@ SyncApi.prototype.sync = function() {
         // for persisted /sync data and use that if present.
         client.store.getSavedSync().then((savedSync) => {
             if (savedSync) {
-                // Do this before incrementally syncing otherwise we risk doing
-                // full sync
-                self.client.store.setSyncToken(savedSync.nextBatch);
-
-                // Sync from cache (asynchronously)
                 return self._syncFromCache(savedSync);
             }
         }).then(() => {
@@ -522,6 +517,9 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
 
     const nextSyncToken = savedSync.nextBatch;
+
+    // Set sync token for future incremental syncing
+    self.client.store.setSyncToken(nextSyncToken);
 
     // No previous sync, set old token to null
     const syncEventData = {
