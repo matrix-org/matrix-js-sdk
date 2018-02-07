@@ -357,6 +357,7 @@ function PushProcessor(client) {
      * @return {object} The push rule, or null if no such rule was found
      */
     this.getPushRuleById = function(ruleId) {
+        if (!client.pushRules) return null;
         for (const scope of ['device', 'global']) {
             if (client.pushRules[scope] === undefined) continue;
 
