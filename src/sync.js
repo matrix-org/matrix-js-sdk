@@ -519,7 +519,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     const nextSyncToken = savedSync.nextBatch;
 
     // Set sync token for future incremental syncing
-    self.client.store.setSyncToken(nextSyncToken);
+    this.client.store.setSyncToken(nextSyncToken);
 
     // No previous sync, set old token to null
     const syncEventData = {
