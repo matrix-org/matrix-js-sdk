@@ -512,9 +512,14 @@ SyncApi.prototype.retryImmediately = function() {
 SyncApi.prototype._syncFromCache = async function(savedSync) {
     debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
 
-    // No previous sync, set old token to null
-    const oldSyncToken = null;
     const nextSyncToken = savedSync.nextBatch;
+
+    // No previous sync, set old token to null
+    const syncEventData = {
+        oldSyncToken: null,
+        nextSyncToken,
+        catchingUp: false,
+    };
 
     this.client.store.setSyncToken(nextSyncToken);
 
@@ -528,16 +533,10 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     };
 
     try {
-        await this._processSyncResponse(oldSyncToken, data, true);
+        await this._processSyncResponse(syncEventData, data, true);
     } catch(e) {
         console.error("Error processing cached sync", e.stack || e);
     }
-
-    const syncEventData = {
-        oldSyncToken,
-        nextSyncToken,
-        catchingUp: false,
-    };
 
     this._updateSyncState("PREPARED", syncEventData);
 };
