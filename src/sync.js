@@ -471,9 +471,9 @@ SyncApi.prototype.sync = function() {
                 self.client.store.setSyncToken(savedSync.nextBatch);
 
                 // Sync from cache (asynchronously)
-                self._syncFromCache(savedSync);
+                return self._syncFromCache(savedSync);
             }
-
+        }).then(() => {
             // Get push rules and start syncing after getting the saved sync
             // to handle the case where we needed the `nextBatch` token to
             // start syncing from.
