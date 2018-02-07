@@ -466,10 +466,14 @@ SyncApi.prototype.sync = function() {
         // for persisted /sync data and use that if present.
         client.store.getSavedSync().then((savedSync) => {
             if (savedSync) {
-                self._syncFromCache(savedSync);
+                return self._syncFromCache(savedSync);
             }
+        }).then(() => {
+            // Get push rules and start syncing after getting the saved sync
+            // to handle the case where we needed the `nextBatch` token to
+            // start syncing from.
+            getPushRules();
         });
-        getPushRules();
     }
 };
 
@@ -514,14 +518,15 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
 
     const nextSyncToken = savedSync.nextBatch;
 
+    // Set sync token for future incremental syncing
+    self.client.store.setSyncToken(nextSyncToken);
+
     // No previous sync, set old token to null
     const syncEventData = {
         oldSyncToken: null,
         nextSyncToken,
         catchingUp: false,
     };
-
-    this.client.store.setSyncToken(nextSyncToken);
 
     const data = {
         next_batch: nextSyncToken,
