@@ -813,6 +813,10 @@ SyncApi.prototype._processSyncResponse = async function(
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
+                // Honour push rules that come down the sync stream but also
+                // honour push rules that were previously cached. Base rules
+                // will be updated when we recieve push rules via getPushRules
+                // (see SyncApi.prototype.sync) before syncing over the network.
                 if (accountDataEvent.getType() == 'm.push_rules') {
                     client.pushRules = accountDataEvent.getContent();
                 }
