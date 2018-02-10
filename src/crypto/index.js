@@ -769,9 +769,21 @@ Crypto.prototype.encryptEvent = function(event, room) {
         );
     }
 
+    const content = event.getContent();
+    // If event has an m.relates_to then we need
+    // to put this on the wrapping event instead
+    const mRelatesTo = content['m.relates_to'];
+    if (mRelatesTo) {
+        delete content['m.relates_to'];
+    }
+
     return alg.encryptMessage(
-        room, event.getType(), event.getContent(),
+        room, event.getType(), content,
     ).then((encryptedContent) => {
+        if (mRelatesTo) {
+            encryptedContent['m.relates_to'] = mRelatesTo;
+        }
+
         event.makeEncrypted(
             "m.room.encrypted",
             encryptedContent,
