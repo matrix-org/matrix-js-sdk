@@ -1294,29 +1294,9 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
-    timelineEventList = timelineEventList || [];
-    const client = this.client;
-    // "old" and "current" state are the same initially; they
-    // start diverging if the user paginates.
-    // We must deep copy otherwise membership changes in old state
-    // will leak through to current state!
-    const oldStateEvents = utils.map(
-        utils.deepCopy(
-            stateEventList.map(function(mxEvent) {
-                return mxEvent.event;
-            }),
-        ), client.getEventMapper(),
-    );
-    const stateEvents = stateEventList;
-
-    // set the state of the room to as it was before the timeline executes
-    //
-    // XXX: what if we've already seen (some of) the events in the timeline,
-    // and they modify some of the state set in stateEvents? In that case we'll
-    // end up with the state from stateEvents, instead of the more recent state
-    // from the timeline.
-    room.oldState.setStateEvents(oldStateEvents);
-    room.currentState.setStateEvents(stateEvents);
+    if (stateEventList.length > 0) {
+        room.getLiveTimeline().initialiseState(stateEventList);
+    }
 
     this._resolveInvites(room);
 
@@ -1328,7 +1308,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
-    room.addLiveEvents(timelineEventList);
+    room.addLiveEvents(timelineEventList || []);
 };
 
 /**
