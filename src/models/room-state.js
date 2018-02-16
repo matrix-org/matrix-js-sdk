@@ -16,6 +16,14 @@ limitations under the License.
 "use strict";
 /**
  * @module models/room-state
+ */
+const EventEmitter = require("events").EventEmitter;
+
+const utils = require("../utils");
+const RoomMember = require("./room-member");
+
+/**
+ * Construct room state.
  *
  * Room State represents the state of the room at a given point.
  * It can be mutated by adding state events to it.
@@ -34,14 +42,7 @@ limitations under the License.
  * will still have his old display name. Calling getSentinelMember again
  * after the display name change will return a new RoomMember object
  * with Bob's new display name.
- */
-const EventEmitter = require("events").EventEmitter;
-
-const utils = require("../utils");
-const RoomMember = require("./room-member");
-
-/**
- * Construct room state.
+ *
  * @constructor
  * @param {?string} roomId Optional. The ID of the room which has this state.
  * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
