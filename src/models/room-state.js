@@ -24,6 +24,25 @@ const RoomMember = require("./room-member");
 
 /**
  * Construct room state.
+ *
+ * Room State represents the state of the room at a given point.
+ * It can be mutated by adding state events to it.
+ * There are two types of room member associated with a state event:
+ * normal member objects (accessed via getMember/getMembers) which mutate
+ * with the state to represent the current state of that room/user, eg.
+ * the object returned by getMember('@bob:example.com') will mutate to
+ * get a different display name if Bob later changes his display name
+ * in the room.
+ * There are also 'sentinel' members (accessed via getSentinelMember).
+ * These also represent the state of room members at the point in time
+ * represented by the RoomState object, but unlike objects from getMember,
+ * sentinel objects will always represent the room state as at the time
+ * getSentinelMember was called, so if Bob subsequently changes his display
+ * name, a room member object previously acquired with getSentinelMember
+ * will still have his old display name. Calling getSentinelMember again
+ * after the display name change will return a new RoomMember object
+ * with Bob's new display name.
+ *
  * @constructor
  * @param {?string} roomId Optional. The ID of the room which has this state.
  * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
