@@ -80,7 +80,20 @@ RoomState.prototype.getMember = function(userId) {
  * @return {RoomMember} The member or null if they do not exist.
  */
 RoomState.prototype.getSentinelMember = function(userId) {
-    return this._sentinels[userId] || null;
+    let sentinel = this._sentinels[userId];
+
+    if (sentinel === undefined) {
+        sentinel = new RoomMember(this.roomId, userId);
+        const membershipEvent = this.getStateEvents("m.room.member", userId);
+        if (!membershipEvent) return null;
+        sentinel.setMembershipEvent(membershipEvent, this);
+        const pwrLvlEvent = this.getStateEvents("m.room.power_levels", "");
+        if (pwrLvlEvent) {
+            sentinel.setPowerLevelEvent(pwrLvlEvent);
+        }
+        this._sentinels[userId] = sentinel;
+    }
+    return sentinel;
 };
 
 /**
@@ -173,13 +186,8 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 member = new RoomMember(event.getRoomId(), userId);
                 self.emit("RoomState.newMember", event, self, member);
             }
-            // Add a new sentinel for this change. We apply the same
-            // operations to both sentinel and member rather than deep copying
-            // so we don't make assumptions about the properties of RoomMember
-            // (e.g. and manage to break it because deep copying doesn't do
-            // everything).
-            const sentinel = new RoomMember(event.getRoomId(), userId);
-            utils.forEach([member, sentinel], function(roomMember) {
+
+            utils.forEach([member], function(roomMember) {
                 roomMember.setMembershipEvent(event, self);
                 // this member may have a power level already, so set it.
                 const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
@@ -188,7 +196,9 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 }
             });
 
-            self._sentinels[userId] = sentinel;
+            // blow away the sentinel which is now outdated
+            delete self._sentinels[userId];
+
             self.members[userId] = member;
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
@@ -198,15 +208,8 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 self.emit("RoomState.members", event, self, member);
             });
 
-            // Go through the sentinel members and see if any of them would be
-            // affected by the new power levels. If so, replace the sentinel.
-            for (const userId of Object.keys(self._sentinels)) {
-                const oldSentinel = self._sentinels[userId];
-                const newSentinel = new RoomMember(event.getRoomId(), userId);
-                newSentinel.setMembershipEvent(oldSentinel.events.member, self);
-                newSentinel.setPowerLevelEvent(event);
-                self._sentinels[userId] = newSentinel;
-            }
+            // assume all our sentinels are now out-of-date
+            self._sentinels = {};
         }
     });
 };
