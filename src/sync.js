@@ -1294,6 +1294,9 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
+    // We'll only get state events in stateEventList if this is a limited
+    // sync, in which case this should be a fresh timeline, and this is us
+    // initialising it.
     if (stateEventList.length > 0) {
         room.getLiveTimeline().initialiseState(stateEventList);
     }
