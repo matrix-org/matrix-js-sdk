@@ -80,6 +80,7 @@ RoomState.prototype.getMember = function(userId) {
  * @return {RoomMember} The member or null if they do not exist.
  */
 RoomState.prototype.getSentinelMember = function(userId) {
+    if (!userId) return null;
     let sentinel = this._sentinels[userId];
 
     if (sentinel === undefined) {
