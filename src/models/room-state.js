@@ -28,7 +28,7 @@ const RoomMember = require("./room-member");
  * Room State represents the state of the room at a given point.
  * It can be mutated by adding state events to it.
  * There are two types of room member associated with a state event:
- * normal member objects (accessed via getMember/getMembers) mutate
+ * normal member objects (accessed via getMember/getMembers) which mutate
  * with the state to represent the current state of that room/user, eg.
  * the object returned by getMember('@bob:example.com') will mutate to
  * get a different display name if Bob later changes his display name
