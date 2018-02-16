@@ -1297,7 +1297,12 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // We'll only get state events in stateEventList if this is a limited
     // sync, in which case this should be a fresh timeline, and this is us
     // initialising it.
-    if (stateEventList.length > 0) {
+
+
+    // If there are no events in the timeline yet, initialise it with
+    // the given state events
+    const timelinewasEmpty = room.getLiveTimeline().getEvents().length == 0;
+    if (timelinewasEmpty) {
         room.getLiveTimeline().initialiseState(stateEventList);
     }
 
@@ -1307,7 +1312,13 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // may make notifications appear which should have the right name.
     room.recalculate(this.client.credentials.userId);
 
-    // execute the timeline events, this will begin to diverge the current state
+    // If the timeline wasn't empty, we process the state events here: they're
+    // defined as updates to the state before the start of the timeline, so this
+    // starts to roll the state forward.
+    if (!timelinewasEmpty) {
+        room.addLiveEvents(stateEventList || []);
+    }
+    // execute the timeline events, this will continue to diverge the current state
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
