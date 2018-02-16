@@ -187,14 +187,12 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                 self.emit("RoomState.newMember", event, self, member);
             }
 
-            utils.forEach([member], function(roomMember) {
-                roomMember.setMembershipEvent(event, self);
-                // this member may have a power level already, so set it.
-                const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
-                if (pwrLvlEvent) {
-                    roomMember.setPowerLevelEvent(pwrLvlEvent);
-                }
-            });
+            member.setMembershipEvent(event, self);
+            // this member may have a power level already, so set it.
+            const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
+            if (pwrLvlEvent) {
+                member.setPowerLevelEvent(pwrLvlEvent);
+            }
 
             // blow away the sentinel which is now outdated
             delete self._sentinels[userId];
