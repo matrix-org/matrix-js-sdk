@@ -1296,8 +1296,8 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
     // If there are no events in the timeline yet, initialise it with
     // the given state events
-    const timelinewasEmpty = room.getLiveTimeline().getEvents().length == 0;
-    if (timelinewasEmpty) {
+    const timelineWasEmpty = room.getLiveTimeline().getEvents().length == 0;
+    if (timelineWasEmpty) {
         room.getLiveTimeline().initialiseState(stateEventList);
     }
 
@@ -1310,7 +1310,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // If the timeline wasn't empty, we process the state events here: they're
     // defined as updates to the state before the start of the timeline, so this
     // starts to roll the state forward.
-    if (!timelinewasEmpty) {
+    if (!timelineWasEmpty) {
         room.addLiveEvents(stateEventList || []);
     }
     // execute the timeline events. This will continue to diverge the current state
