@@ -1294,11 +1294,6 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
-    // We'll only get state events in stateEventList if this is a limited
-    // sync, in which case this should be a fresh timeline, and this is us
-    // initialising it.
-
-
     // If there are no events in the timeline yet, initialise it with
     // the given state events
     const timelinewasEmpty = room.getLiveTimeline().getEvents().length == 0;
@@ -1318,7 +1313,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     if (!timelinewasEmpty) {
         room.addLiveEvents(stateEventList || []);
     }
-    // execute the timeline events, this will continue to diverge the current state
+    // execute the timeline events. This will continue to diverge the current state
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
