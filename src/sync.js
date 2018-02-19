@@ -1296,9 +1296,10 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
     // If there are no events in the timeline yet, initialise it with
     // the given state events
-    const timelineWasEmpty = room.getLiveTimeline().getEvents().length == 0;
+    const liveTimeline = room.getLiveTimeline();
+    const timelineWasEmpty = liveTimeline.getEvents().length == 0;
     if (timelineWasEmpty) {
-        room.getLiveTimeline().initialiseState(stateEventList);
+        liveTimeline.initialiseState(stateEventList);
     }
 
     this._resolveInvites(room);
