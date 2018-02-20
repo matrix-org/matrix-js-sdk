@@ -88,19 +88,19 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
         throw new Error("Cannot initialise state after events are added");
     }
 
-    // we deep-copy the events here, in case they get changed later - we don't
-    // want changes to the start state leaking through to the end state.
-    const oldStateEvents = utils.map(
-        utils.deepCopy(
-            stateEvents.map(function(mxEvent) {
-                return mxEvent.event;
-            }),
-        ),
-    function(ev) {
-        return new MatrixEvent(ev);
-    });
+    // We previously deep copied events here and used different copies in
+    // the oldState and state events: this decision seems to date back
+    // quite a way and was apparently made to fix a bug where modifications
+    // made to the start state leaked through to the end state.
+    // This really shouldn't be possible though: the events themselves should
+    // not change. Duplicating the events uses a lot of extra memory,
+    // so we now no longer do it. To assert that they really do never change,
+    // freeze them! Note that we can't do this for events in general:
+    for (const e of stateEvents) {
+        Object.freeze(e);
+    }
 
-    this._startState.setStateEvents(oldStateEvents);
+    this._startState.setStateEvents(stateEvents);
     this._endState.setStateEvents(stateEvents);
 };
 
