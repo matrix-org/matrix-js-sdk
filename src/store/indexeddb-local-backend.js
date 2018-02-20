@@ -219,7 +219,7 @@ LocalIndexedDBStoreBackend.prototype = {
 
     /**
      * @param {boolean=} copy If false, the data returned is from internal
-     * buffers and must not be muated. Otherwise, a copy is made before
+     * buffers and must not be mutated. Otherwise, a copy is made before
      * returning such that the data can be safely mutated. Default: true.
      *
      * @return {Promise} Resolves with a sync response to restore the
