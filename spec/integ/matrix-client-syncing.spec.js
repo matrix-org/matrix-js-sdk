@@ -437,6 +437,26 @@ describe("MatrixClient syncing", function() {
             });
         });
 
+        it("should correctly interpret state in incremental sync.", function() {
+            httpBackend.when("GET", "/sync").respond(200, syncData);
+            httpBackend.when("GET", "/sync").respond(200, nextSyncData);
+
+            client.startClient();
+            return Promise.all([
+                httpBackend.flushAllExpected(),
+                awaitSyncEvent(2),
+            ]).then(function() {
+                const room = client.getRoom(roomOne);
+                const stateAtStart = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
+                const startRoomNameEvent = stateAtStart.getStateEvents('m.room.name', '');
+                expect(startRoomNameEvent.getContent().name).toEqual('Old room name');
+
+                const stateAtEnd = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+                const endRoomNameEvent = stateAtEnd.getStateEvents('m.room.name', '');
+                expect(endRoomNameEvent.getContent().name).toEqual('A new room name');
+            });
+        });
+
         xit("should update power levels for users in a room", function() {
 
         });
