@@ -1306,6 +1306,13 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
 
     // recalculate the room name at this point as adding events to the timeline
     // may make notifications appear which should have the right name.
+    // XXX: This looks suspect: we'll end up recalculating the room once here
+    // and then again after adding events (_processSyncResponse calls it after
+    // calling us) even if no state events were added. It also means that if
+    // one of the room events in timelineEventList is something that needs
+    // a recalculation (like m.room.name) we won't recalculate until we've
+    // finished adding all the events, which will cause the notification to have
+    // the old room name rather than the new one.
     room.recalculate(this.client.credentials.userId);
 
     // If the timeline wasn't empty, we process the state events here: they're
