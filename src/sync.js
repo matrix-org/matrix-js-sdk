@@ -417,12 +417,14 @@ SyncApi.prototype.sync = function() {
     //   2) We need to get/create a filter which we can use for /sync.
 
     function getPushRules() {
-        client.getPushRules().done(function(result) {
+        client.getPushRules().done((result) => {
             debuglog("Got push rules");
+
             client.pushRules = result;
-            getFilter(); // Now get the filter
-        }, function(err) {
-            self._startKeepAlives().done(function() {
+
+            getFilter(); // Now get the filter and start syncing
+        }, (err) => {
+            self._startKeepAlives().done(() => {
                 getPushRules();
             });
             self._updateSyncState("ERROR", { error: err });
@@ -440,15 +442,15 @@ SyncApi.prototype.sync = function() {
 
         client.getOrCreateFilter(
             getFilterName(client.credentials.userId), filter,
-        ).done(function(filterId) {
+        ).done((filterId) => {
             // reset the notifications timeline to prepare it to paginate from
             // the current point in time.
             // The right solution would be to tie /sync pagination tokens into
             // /notifications API somehow.
             client.resetNotifTimelineSet();
 
-            self._sync({ filterId: filterId });
-        }, function(err) {
+            self._sync({ filterId });
+        }, (err) => {
             self._startKeepAlives().done(function() {
                 getFilter();
             });
@@ -460,7 +462,18 @@ SyncApi.prototype.sync = function() {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
-        getPushRules();
+        // Before fetching push rules, fetching the filter and syncing, check
+        // for persisted /sync data and use that if present.
+        client.store.getSavedSync().then((savedSync) => {
+            if (savedSync) {
+                return self._syncFromCache(savedSync);
+            }
+        }).then(() => {
+            // Get push rules and start syncing after getting the saved sync
+            // to handle the case where we needed the `nextBatch` token to
+            // start syncing from.
+            getPushRules();
+        });
     }
 };
 
@@ -494,6 +507,43 @@ SyncApi.prototype.retryImmediately = function() {
     }
     this._startKeepAlives(0);
     return true;
+};
+/**
+ * Process a single set of cached sync data.
+ * @param {Object} savedSync a saved sync that was persisted by a store. This
+ * should have been acquired via client.store.getSavedSync().
+ */
+SyncApi.prototype._syncFromCache = async function(savedSync) {
+    debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+
+    const nextSyncToken = savedSync.nextBatch;
+
+    // Set sync token for future incremental syncing
+    this.client.store.setSyncToken(nextSyncToken);
+
+    // No previous sync, set old token to null
+    const syncEventData = {
+        oldSyncToken: null,
+        nextSyncToken,
+        catchingUp: false,
+    };
+
+    const data = {
+        next_batch: nextSyncToken,
+        rooms: savedSync.roomsData,
+        groups: savedSync.groupsData,
+        account_data: {
+            events: savedSync.accountData,
+        },
+    };
+
+    try {
+        await this._processSyncResponse(syncEventData, data);
+    } catch(e) {
+        console.error("Error processing cached sync", e.stack || e);
+    }
+
+    this._updateSyncState("PREPARED", syncEventData);
 };
 
 /**
@@ -569,38 +619,16 @@ SyncApi.prototype._sync = async function(syncOptions) {
         qps.timeout = 0;
     }
 
-    let savedSync;
-    if (!syncOptions.hasSyncedBefore) {
-        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
-        // if there is data there.
-        savedSync = await client.store.getSavedSync();
-    }
-
-    let isCachedResponse = false;
     let data;
-
-    if (savedSync) {
-        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-        isCachedResponse = true;
-        data = {
-            next_batch: savedSync.nextBatch,
-            rooms: savedSync.roomsData,
-            groups: savedSync.groupsData,
-            account_data: {
-                events: savedSync.accountData,
-            },
-        };
-    } else {
-        try {
-            //debuglog('Starting sync since=' + syncToken);
-            this._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-            );
-            data = await this._currentSyncRequest;
-        } catch (e) {
-            this._onSyncError(e, syncOptions);
-            return;
-        }
+    try {
+        //debuglog('Starting sync since=' + syncToken);
+        this._currentSyncRequest = client._http.authedRequest(
+            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
+        );
+        data = await this._currentSyncRequest;
+    } catch (e) {
+        this._onSyncError(e, syncOptions);
+        return;
     }
 
     //debuglog('Completed sync, next_batch=' + data.next_batch);
@@ -613,14 +641,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // Reset after a successful sync
     this._failedSyncCount = 0;
 
-    // We need to wait until the sync data has been sent to the backend
-    // because it appears that the sync data gets modified somewhere in
-    // processing it in such a way as to make it no longer cloneable.
-    // XXX: Find out what is modifying it!
-    if (!isCachedResponse) {
-        // Don't give the store back its own cached data
-        await client.store.setSyncData(data);
-    }
+    await client.store.setSyncData(data);
 
     const syncEventData = {
         oldSyncToken: syncToken,
@@ -628,14 +649,14 @@ SyncApi.prototype._sync = async function(syncOptions) {
         catchingUp: this._catchingUp,
     };
 
-    if (this.opts.crypto && !isCachedResponse) {
+    if (this.opts.crypto) {
         // tell the crypto module we're about to process a sync
         // response
         await this.opts.crypto.onSyncWillProcess(syncEventData);
     }
 
     try {
-        await this._processSyncResponse(syncEventData, data, isCachedResponse);
+        await this._processSyncResponse(syncEventData, data);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -651,21 +672,17 @@ SyncApi.prototype._sync = async function(syncOptions) {
         syncOptions.hasSyncedBefore = true;
     }
 
-    if (!isCachedResponse) {
-        // tell the crypto module to do its processing. It may block (to do a
-        // /keys/changes request).
-        if (this.opts.crypto) {
-            await this.opts.crypto.onSyncCompleted(syncEventData);
-        }
-
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        this._updateSyncState("SYNCING", syncEventData);
-
-        // tell databases that everything is now in a consistent state and can be
-        // saved (no point doing so if we only have the data we just got out of the
-        // store).
-        client.store.save();
+    // tell the crypto module to do its processing. It may block (to do a
+    // /keys/changes request).
+    if (this.opts.crypto) {
+        await this.opts.crypto.onSyncCompleted(syncEventData);
     }
+
+    // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+    this._updateSyncState("SYNCING", syncEventData);
+
+    // tell databases that everything is now in a consistent state and can be saved.
+    client.store.save();
 
     // Begin next sync
     this._sync(syncOptions);
@@ -714,10 +731,9 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  *
  * @param {Object} syncEventData Object containing sync tokens associated with this sync
  * @param {Object} data The response from /sync
- * @param {bool} isCachedResponse True if this response is from our local cache
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncEventData, data, isCachedResponse,
+    syncEventData, data,
 ) {
     const client = this.client;
     const self = this;
@@ -797,13 +813,11 @@ SyncApi.prototype._processSyncResponse = async function(
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
-                // XXX: This is awful: ignore push rules from our cached sync. We fetch the
-                // push rules before syncing so we actually have up-to-date ones. We do want
-                // to honour new push rules that come down the sync but synapse doesn't
-                // put new push rules in the sync stream when the base rules change, so
-                // if the base rules change, we do need to refresh. We therefore ignore
-                // the push rules in our cached sync response.
-                if (accountDataEvent.getType() == 'm.push_rules' && !isCachedResponse) {
+                // Honour push rules that come down the sync stream but also
+                // honour push rules that were previously cached. Base rules
+                // will be updated when we recieve push rules via getPushRules
+                // (see SyncApi.prototype.sync) before syncing over the network.
+                if (accountDataEvent.getType() == 'm.push_rules') {
                     client.pushRules = accountDataEvent.getContent();
                 }
                 client.emit("accountData", accountDataEvent);
