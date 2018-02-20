@@ -3147,7 +3147,7 @@ function setupCallEventHandler(client) {
                 if (ignoreCallIds[e.getContent().call_id]) {
                     console.log(
                         'Ignoring previously answered/hungup call ' +
-                            e.getContent().call_id,
+                            e.getContent().call_id + ' (' + e.getId() + ')',
                     );
                     return;
                 }
