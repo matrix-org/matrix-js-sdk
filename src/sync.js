@@ -1294,41 +1294,38 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
-    timelineEventList = timelineEventList || [];
-    const client = this.client;
-    // "old" and "current" state are the same initially; they
-    // start diverging if the user paginates.
-    // We must deep copy otherwise membership changes in old state
-    // will leak through to current state!
-    const oldStateEvents = utils.map(
-        utils.deepCopy(
-            stateEventList.map(function(mxEvent) {
-                return mxEvent.event;
-            }),
-        ), client.getEventMapper(),
-    );
-    const stateEvents = stateEventList;
-
-    // set the state of the room to as it was before the timeline executes
-    //
-    // XXX: what if we've already seen (some of) the events in the timeline,
-    // and they modify some of the state set in stateEvents? In that case we'll
-    // end up with the state from stateEvents, instead of the more recent state
-    // from the timeline.
-    room.oldState.setStateEvents(oldStateEvents);
-    room.currentState.setStateEvents(stateEvents);
+    // If there are no events in the timeline yet, initialise it with
+    // the given state events
+    const liveTimeline = room.getLiveTimeline();
+    const timelineWasEmpty = liveTimeline.getEvents().length == 0;
+    if (timelineWasEmpty) {
+        liveTimeline.initialiseState(stateEventList);
+    }
 
     this._resolveInvites(room);
 
     // recalculate the room name at this point as adding events to the timeline
     // may make notifications appear which should have the right name.
+    // XXX: This looks suspect: we'll end up recalculating the room once here
+    // and then again after adding events (_processSyncResponse calls it after
+    // calling us) even if no state events were added. It also means that if
+    // one of the room events in timelineEventList is something that needs
+    // a recalculation (like m.room.name) we won't recalculate until we've
+    // finished adding all the events, which will cause the notification to have
+    // the old room name rather than the new one.
     room.recalculate(this.client.credentials.userId);
 
-    // execute the timeline events, this will begin to diverge the current state
+    // If the timeline wasn't empty, we process the state events here: they're
+    // defined as updates to the state before the start of the timeline, so this
+    // starts to roll the state forward.
+    if (!timelineWasEmpty) {
+        room.addLiveEvents(stateEventList || []);
+    }
+    // execute the timeline events. This will continue to diverge the current state
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
-    room.addLiveEvents(timelineEventList);
+    room.addLiveEvents(timelineEventList || []);
 };
 
 /**
