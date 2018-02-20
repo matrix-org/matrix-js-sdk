@@ -597,7 +597,8 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     // synthesize and inject implicit read receipts
     // Done after adding the event because otherwise the app would get a read receipt
     // pointing to an event that wasn't yet in the timeline
-    if (event.sender) {
+    // Don't synthesize RR for m.room.redaction as this causes the RR to go missing.
+    if (event.sender && event.getType() !== "m.room.redaction") {
         this.addReceipt(synthesizeReceipt(
             event.sender.userId, event, "m.read",
         ), true);
