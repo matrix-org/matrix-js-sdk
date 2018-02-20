@@ -20,8 +20,6 @@ limitations under the License.
  */
 
 const RoomState = require("./room-state");
-const utils = require("../utils");
-const MatrixEvent = require("./event").MatrixEvent;
 
 /**
  * Construct a new EventTimeline
