@@ -1023,7 +1023,7 @@ SyncApi.prototype._processSyncResponse = async function(
         // try to release the bits of the sync structure we just
         // converted into events, so that they can be GC'd
         // https://github.com/vector-im/riot-web/issues/6212
-        delete joinRooms(joinRooms.indexOf(joinObj));
+        delete joinRooms[joinRooms.indexOf(joinObj)];
         delete data.rooms.join[room.roomId];
         // hopefully there is nothing else dangling around...
     });
