@@ -361,7 +361,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _loadSyncData: function() {
         console.log(
-            `LocalIndexedDBStoreBackend: loaded sync data`,
+            `LocalIndexedDBStoreBackend: loading sync data`,
         );
         return Promise.try(() => {
             console.log(
