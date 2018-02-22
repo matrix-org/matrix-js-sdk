@@ -80,7 +80,10 @@ module.exports.MatrixEvent = function MatrixEvent(
     // intern the values of matrix events to force share strings and reduce the
     // amount of needless string duplication. This can save moderate amounts of
     // memory (~10% on a 350MB heap).
-    ["state_key", "type", "sender", "room_id"].forEach((prop) => {
+    // 'membership' at the event level (rather than the content level) is a legacy
+    // field that Riot never otherwise looks at, but it will still take up a lot
+    // of space if we don't intern it.
+    ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
         if (!event[prop]) {
             return;
         }
