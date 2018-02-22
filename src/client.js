@@ -411,6 +411,8 @@ MatrixClient.prototype.initCrypto = async function() {
     // handlers.
     crypto.registerEventHandlers(this);
     this._crypto = crypto;
+
+    this.emit("crypto.initComplete");
 };
 
 
