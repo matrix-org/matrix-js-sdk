@@ -1299,6 +1299,17 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     const liveTimeline = room.getLiveTimeline();
     const timelineWasEmpty = liveTimeline.getEvents().length == 0;
     if (timelineWasEmpty) {
+        // Passing these events into initialiseState will freeze them, so we need
+        // to compute and cache the push actions for them now, otherwise sync dies
+        // with an attempt to assign to read only property.
+        // XXX: This is pretty horrible and is assuming all sorts of behaviour from
+        // these functions that it shouldn't be. We should probably either store the
+        // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
+        // find some solution where MatrixEvents are immutable but allow for a cache
+        // field.
+        for (const ev of stateEventList) {
+            this.client.getPushActionsForEvent(ev);
+        }
         liveTimeline.initialiseState(stateEventList);
     }
 
