@@ -69,8 +69,23 @@ function RoomState(roomId) {
     this._displayNameToUserIds = {};
     this._userIdsToDisplayNames = {};
     this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
+    this._joinedMemberCount = null; // cache of the number of joined members
 }
 utils.inherits(RoomState, EventEmitter);
+
+/**
+ * Returns the number of joined members in this room
+ * This method caches the result.
+ * @return {integer} The number of members in this room whose membership is 'join'
+ */
+RoomState.prototype.getJoinedMemberCount = function() {
+    if (this._joinedMemberCount === null) {
+        this._joinedMemberCount = this.getMembers().filter((m) => {
+            return m.membership === 'join';
+        }).length;
+    }
+    return this._joinedMemberCount;
+};
 
 /**
  * Get all RoomMembers in this room.
@@ -218,6 +233,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             delete self._sentinels[userId];
 
             self.members[userId] = member;
+            self._joinedMemberCount = null;
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
             const members = utils.values(self.members);
