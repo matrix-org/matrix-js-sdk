@@ -793,7 +793,6 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
 /**
  * Get account data event of given type for the current user.
  * @param {string} eventType The event type
- * @param {module:client.callback} callback Optional.
  * @return {?object} The contents of the given account data event
  */
 MatrixClient.prototype.getAccountData = function(eventType) {
@@ -3238,7 +3237,7 @@ function setupCallEventHandler(client) {
                 if (ignoreCallIds[e.getContent().call_id]) {
                     console.log(
                         'Ignoring previously answered/hungup call ' +
-                            e.getContent().call_id,
+                            e.getContent().call_id + ' (' + e.getId() + ')',
                     );
                     return;
                 }
