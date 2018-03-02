@@ -79,9 +79,9 @@ export class Backend {
                 `enqueueing key request for ${requestBody.room_id} / ` +
                     requestBody.session_id,
             );
+            txn.oncomplete = () => { deferred.resolve(request); };
             const store = txn.objectStore("outgoingRoomKeyRequests");
             store.add(request);
-            txn.onsuccess = () => { deferred.resolve(request); };
         });
 
         return deferred.promise;
