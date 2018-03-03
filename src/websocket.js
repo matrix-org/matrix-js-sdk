@@ -319,6 +319,9 @@ WebSocketApi.prototype._start = async function(syncOptions) {
         qps.set_presence = "offline";
     }
 
+    // store syncOptions to be there for restart
+    self.ws_syncOptions = syncOptions;
+
     if (self.ws_syncToken) {
         // we are currently reconnecting
         this._start_websocket(qps);
@@ -397,8 +400,6 @@ WebSocketApi.prototype._start = async function(syncOptions) {
 
     // tell databases that everything is now in a consistent state and can be saved.
     client.store.save();
-
-    self.ws_syncOptions = syncOptions;
 
     // the initial sync now went through. Now start using the websocket
     this._start_websocket(qps);
