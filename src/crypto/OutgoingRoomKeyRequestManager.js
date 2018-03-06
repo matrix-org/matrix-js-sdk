@@ -198,7 +198,7 @@ export default class OutgoingRoomKeyRequestManager {
                         // (We also don't want to wait for the response from the server
                         // here, as it will slow down processing of received keys if we
                         // do.)
-                        this._sendOutgoingRoomKeyRequestCancellation(
+                        return this._sendOutgoingRoomKeyRequestCancellation(
                             updatedReq,
                         ).catch((e) => {
                             console.error(
@@ -206,7 +206,7 @@ export default class OutgoingRoomKeyRequestManager {
                                 + " will retry later.", e,
                             );
                             this._startTimer();
-                        }).done();
+                        });
                     });
 
                 default:
