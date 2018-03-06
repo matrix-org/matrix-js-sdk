@@ -187,6 +187,9 @@ function MatrixClient(opts) {
     // we still want to know which rooms are encrypted even if crypto is disabled:
     // we don't want to start sending unencrypted events to them.
     this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
+
+    // The pushprocessor caches useful things, so keep one and re-use it
+    this._pushProcessor = new PushProcessor(this);
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -1748,8 +1751,7 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
  */
 MatrixClient.prototype.getPushActionsForEvent = function(event) {
     if (!event.getPushActions()) {
-        const pushProcessor = new PushProcessor(this);
-        event.setPushActions(pushProcessor.actionsForEvent(event));
+        event.setPushActions(this._pushProcessor.actionsForEvent(event));
     }
     return event.getPushActions();
 };
