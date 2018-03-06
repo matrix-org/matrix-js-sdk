@@ -856,7 +856,8 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
  *
  * @param {module:crypto~RoomKeyRequestBody} requestBody
  *    parameters to match for cancellation
- * @returns {Promise}
+ * @returns {Promise} Promise which resolves when the room key request has been
+ *                    cancelled.
  */
 Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
     return this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
