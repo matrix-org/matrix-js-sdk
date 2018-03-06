@@ -349,7 +349,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * attempt is completed.
      */
     attemptDecryption: async function(crypto, cancelAndRetry=false) {
-        // start with a couple of sanity checks.
+        // If this event isn't encrypted, decryption will fail so throw early
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
@@ -364,6 +364,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             });
         }
 
+        // Don't attempt to decrypt an event which has already been encrypted,
+        // unless cancelAndRetry is true, in which case we allow a retry
+        // because we've just cancelled the room key request and can expect a
+        // new request to be started when we fail to decrypt again.
         if (!cancelAndRetry && (
                 this._clearEvent && this._clearEvent.content &&
                 this._clearEvent.content.msgtype !== "m.bad.encrypted"
