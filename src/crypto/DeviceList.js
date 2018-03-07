@@ -418,11 +418,11 @@ export default class DeviceList {
         if (this._deviceTrackingStatus[userId]) {
             console.log('No longer tracking device list for ' + userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
-        }
-        // we don't yet persist the tracking status, since there may be a lot
-        // of calls; we save all data together once the sync is done
 
-        this._dirty = true;
+            // we don't yet persist the tracking status, since there may be a lot
+            // of calls; we save all data together once the sync is done
+            this._dirty = true;
+        }
     }
 
     /**
@@ -453,11 +453,11 @@ export default class DeviceList {
         if (this._deviceTrackingStatus[userId]) {
             console.log("Marking device list outdated for", userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
-        }
-        // we don't yet persist the tracking status, since there may be a lot
-        // of calls; we save all data together once the sync is done
 
-        this._dirty = true;
+            // we don't yet persist the tracking status, since there may be a lot
+            // of calls; we save all data together once the sync is done
+            this._dirty = true;
+        }
     }
 
     /**
