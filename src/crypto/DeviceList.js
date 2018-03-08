@@ -92,6 +92,12 @@ export default class DeviceList {
 
         // Promise resolved when device data is saved
         this._savePromise = null;
+        // Function that resolves the save promise
+        this._resolveSavePromise = null;
+        // The time the save is scheduled for
+        this._savePromiseTime = null;
+        // The timer used to delay the save
+        this._saveTimer = null;
     }
 
     /**
@@ -159,17 +165,42 @@ export default class DeviceList {
         if (!this._dirty) return Promise.resolve(false);
         if (delay === undefined) delay = 500;
 
-        if (this._savePromise === null) {
+        const targetTime = Date.now + delay;
+        if (this._savePromiseTime && targetTime < this._savePromiseTime) {
+            // There's a save scheduled but for after we would like: cancel
+            // it & schedule one for the time we want
+            clearTimeout(this._saveTimer);
+            this._saveTimer = null;
+            this._savePromiseTime = null;
+            // (but keep the save promise since whatever called save before
+            // will still want to know when the save is done)
+        }
+
+        let savePromise = this._savePromise;
+        if (savePromise === null) {
+            savePromise = new Promise((resolve, reject) => {
+                this._resolveSavePromise = resolve;
+            });
+            this._savePromise = savePromise;
+        }
+
+        if (this._saveTimer === null) {
             // Delay saves for a bit so we can aggregate multiple saves that happen
             // in quick succession (eg. when a whole room's devices are marked as known)
-            this._savePromise = Promise.delay(delay).then(() => {
+            const resolveSavePromise = this._resolveSavePromise;
+            this._savePromiseTime = targetTime;
+            this._saveTimer = setTimeout(() => {
                 console.log('Saving device tracking data at token ' + this._syncToken);
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
                 // actually already happened. Likewise for the dirty flag.
+                this._savePromiseTime = null;
+                this._saveTimer = null;
                 this._savePromise = null;
+                this._resolveSavePromise = null;
+
                 this._dirty = false;
-                return this._cryptoStore.doTxn(
+                this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
@@ -177,12 +208,12 @@ export default class DeviceList {
                             syncToken: this._syncToken,
                         }, txn);
                     },
-                );
-            }).then(() => {
-                return true;
-            });
+                ).then(() => {
+                    resolveSavePromise();
+                });
+            }, delay);
         }
-        return this._savePromise;
+        return savePromise;
     }
 
     /**
