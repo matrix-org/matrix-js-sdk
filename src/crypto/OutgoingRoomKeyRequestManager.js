@@ -35,7 +35,7 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  *
  * The state machine looks like:
  *
- *     |
+ *     |         (cancellation sent)
  *     | .-------------------------------------------------.
  *     | |                                                 |
  *     V V       (cancellation requested)                  |
