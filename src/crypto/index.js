@@ -831,7 +831,7 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
     if (!syncData.oldSyncToken) return;
 
     // Here, we're relying on the fact that we only ever save the sync data after
-    // sucessfully saving the device list data, so we're guarenteed that the device
+    // sucessfully saving the device list data, so we're guaranteed that the device
     // list store is at least as fresh as the sync token from the sync store, ie.
     // any device changes received in sync tokens prior to the 'next' token here
     // have been processed and are reflected in the current device list.
