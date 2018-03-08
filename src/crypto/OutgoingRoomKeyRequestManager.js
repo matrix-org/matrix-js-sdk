@@ -228,6 +228,7 @@ export default class OutgoingRoomKeyRequestManager {
                             );
                             this._startTimer();
                         }).then(() => {
+                            if (!andResend) return;
                             // The request has transitioned from
                             // CANCELLATION_PENDING_AND_WILL_RESEND to UNSENT. We
                             // still need to resend the request which is now UNSENT, so
