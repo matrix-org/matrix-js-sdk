@@ -36,12 +36,18 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  * The state machine looks like:
  *
  *     |
- *     V         (cancellation requested)
- *   UNSENT  -----------------------------+
- *     |                                  |
- *     | (send successful)                |
- *     V                                  |
- *    SENT                                |
+ *     | .-------------------------------------------------.
+ *     | |                                                 |
+ *     V V       (cancellation requested)                  |
+ *   UNSENT  -----------------------------+                |
+ *     |                                  |                |
+ *     |                                  |                |
+ *     | (send successful)                |  CANCELLATION_PENDING_AND_WILL_RESEND
+ *     V                                  |                Λ
+ *    SENT                                |                |
+ *     |--------------------------------  |  --------------'
+ *     |                                  |  (cancellation requested with intent
+ *     |                                  |   to resend the original request)
  *     |                                  |
  *     | (cancellation requested)         |
  *     V                                  |
@@ -62,6 +68,12 @@ const ROOM_KEY_REQUEST_STATES = {
 
     /** reply received, cancellation not yet sent */
     CANCELLATION_PENDING: 2,
+
+    /**
+     * Cancellation not yet sent and will transition to UNSENT instead of
+     * being deleted once the cancellation has been sent.
+     */
+    CANCELLATION_PENDING_AND_WILL_RESEND: 3,
 };
 
 export default class OutgoingRoomKeyRequestManager {
@@ -130,14 +142,16 @@ export default class OutgoingRoomKeyRequestManager {
     }
 
     /**
-     * Cancel room key requests, if any match the given details
+     * Cancel room key requests, if any match the given requestBody
      *
      * @param {module:crypto~RoomKeyRequestBody} requestBody
+     * @param {boolean} andResend if true, transition to UNSENT instead of
+     *                            deleting after sending cancellation.
      *
      * @returns {Promise} resolves when the request has been updated in our
      *    pending list.
      */
-    cancelRoomKeyRequest(requestBody) {
+    cancelRoomKeyRequest(requestBody, andResend=false) {
         return this._cryptoStore.getOutgoingRoomKeyRequest(
             requestBody,
         ).then((req) => {
@@ -147,6 +161,7 @@ export default class OutgoingRoomKeyRequestManager {
             }
             switch (req.state) {
                 case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING:
+                case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND:
                     // nothing to do here
                     return;
 
@@ -166,11 +181,16 @@ export default class OutgoingRoomKeyRequestManager {
                         req.requestId, ROOM_KEY_REQUEST_STATES.UNSENT,
                     );
 
-                case ROOM_KEY_REQUEST_STATES.SENT:
+                case ROOM_KEY_REQUEST_STATES.SENT: {
+                    // If `andResend` is set, transition to UNSENT once the
+                    // cancellation has successfully been sent.
+                    const state = andResend ?
+                        ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND :
+                        ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING;
                     // send a cancellation.
                     return this._cryptoStore.updateOutgoingRoomKeyRequest(
                         req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
-                            state: ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
+                            state,
                             cancellationTxnId: this._baseApis.makeTxnId(),
                         },
                     ).then((updatedReq) => {
@@ -200,15 +220,22 @@ export default class OutgoingRoomKeyRequestManager {
                         // do.)
                         this._sendOutgoingRoomKeyRequestCancellation(
                             updatedReq,
+                            andResend,
                         ).catch((e) => {
                             console.error(
                                 "Error sending room key request cancellation;"
                                 + " will retry later.", e,
                             );
                             this._startTimer();
-                        }).done();
+                        }).then(() => {
+                            // The request has transitioned from
+                            // CANCELLATION_PENDING_AND_WILL_RESEND to UNSENT. We
+                            // still need to resend the request which is now UNSENT, so
+                            // start the timer if it isn't already started.
+                            this._startTimer();
+                        });
                     });
-
+                }
                 default:
                     throw new Error('unhandled state: ' + req.state);
             }
@@ -258,6 +285,7 @@ export default class OutgoingRoomKeyRequestManager {
 
         return this._cryptoStore.getOutgoingRoomKeyRequestByState([
             ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
+            ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND,
             ROOM_KEY_REQUEST_STATES.UNSENT,
         ]).then((req) => {
             if (!req) {
@@ -267,10 +295,16 @@ export default class OutgoingRoomKeyRequestManager {
             }
 
             let prom;
-            if (req.state === ROOM_KEY_REQUEST_STATES.UNSENT) {
-                prom = this._sendOutgoingRoomKeyRequest(req);
-            } else { // must be a cancellation
-                prom = this._sendOutgoingRoomKeyRequestCancellation(req);
+            switch (req.state) {
+                case ROOM_KEY_REQUEST_STATES.UNSENT:
+                    prom = this._sendOutgoingRoomKeyRequest(req);
+                    break;
+                case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING:
+                    prom = this._sendOutgoingRoomKeyRequestCancellation(req);
+                    break;
+                case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND:
+                    prom = this._sendOutgoingRoomKeyRequestCancellation(req, true);
+                    break;
             }
 
             return prom.then(() => {
@@ -309,8 +343,9 @@ export default class OutgoingRoomKeyRequestManager {
         });
     }
 
-    // given a RoomKeyRequest, cancel it and delete the request record
-    _sendOutgoingRoomKeyRequestCancellation(req) {
+    // Given a RoomKeyRequest, cancel it and delete the request record unless
+    // andResend is set, in which case transition to UNSENT.
+    _sendOutgoingRoomKeyRequestCancellation(req, andResend) {
         console.log(
             `Sending cancellation for key request for ` +
             `${stringifyRequestBody(req.requestBody)} to ` +
@@ -327,6 +362,14 @@ export default class OutgoingRoomKeyRequestManager {
         return this._sendMessageToDevices(
             requestMessage, req.recipients, req.cancellationTxnId,
         ).then(() => {
+            if (andResend) {
+                // We want to resend, so transition to UNSENT
+                return this._cryptoStore.updateOutgoingRoomKeyRequest(
+                    req.requestId,
+                    ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND,
+                    { state: ROOM_KEY_REQUEST_STATES.UNSENT },
+                );
+            }
             return this._cryptoStore.deleteOutgoingRoomKeyRequest(
                 req.requestId, ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
             );

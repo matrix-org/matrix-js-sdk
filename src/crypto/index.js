@@ -856,9 +856,11 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
  *
  * @param {module:crypto~RoomKeyRequestBody} requestBody
  *    parameters to match for cancellation
+ * @param {boolean} andResend
+ *    if true, resend the key request after cancelling.
  */
-Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
-    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
+Crypto.prototype.cancelRoomKeyRequest = function(requestBody, andResend) {
+    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody, andResend)
     .catch((e) => {
         console.warn("Error clearing pending room key requests", e);
     }).done();
