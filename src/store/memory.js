@@ -317,6 +317,8 @@ module.exports.MatrixInMemoryStore.prototype = {
 
     /**
      * We never want to save becase we have nothing to save to.
+     *
+     * @return {boolean} If the store wants to save
      */
     wantsSave: function() {
         return false;
