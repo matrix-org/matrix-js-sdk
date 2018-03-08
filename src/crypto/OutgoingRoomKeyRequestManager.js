@@ -135,7 +135,7 @@ export default class OutgoingRoomKeyRequestManager {
      * @param {module:crypto~RoomKeyRequestBody} requestBody
      *
      * @returns {Promise} resolves when the request has been updated in our
-     *    pending list.
+     *    pending list and we have sent the cancellation.
      */
     cancelRoomKeyRequest(requestBody) {
         return this._cryptoStore.getOutgoingRoomKeyRequest(
@@ -195,10 +195,11 @@ export default class OutgoingRoomKeyRequestManager {
                         // with the same transaction_id, so only one message will get
                         // sent).
                         //
-                        // (We also don't want to wait for the response from the server
-                        // here, as it will slow down processing of received keys if we
-                        // do.)
-                        this._sendOutgoingRoomKeyRequestCancellation(
+                        // (We want to wait for the response from the server here, so that
+                        // we can be sure that the request has been cancelled before
+                        // resolving, despite the fact that it will slow down processing
+                        // of received keys)
+                        return this._sendOutgoingRoomKeyRequestCancellation(
                             updatedReq,
                         ).catch((e) => {
                             console.error(
@@ -206,7 +207,7 @@ export default class OutgoingRoomKeyRequestManager {
                                 + " will retry later.", e,
                             );
                             this._startTimer();
-                        }).done();
+                        });
                     });
 
                 default:

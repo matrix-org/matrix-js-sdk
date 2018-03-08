@@ -340,19 +340,38 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @internal
      *
      * @param {module:crypto} crypto crypto module
+     * @param {boolean} cancelAndRetry retry the attempt, even if we tried to decrypt
+     *                                 this event before. If there's an existing
+     *                                 pending key request for this event, cancel it
+     *                                 before retrying.
      *
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    attemptDecryption: async function(crypto) {
-        // start with a couple of sanity checks.
+    attemptDecryption: async function(crypto, cancelAndRetry=false) {
+        // If this event isn't encrypted, decryption will fail so throw early
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
 
-        if (
-            this._clearEvent && this._clearEvent.content &&
+        if (cancelAndRetry) {
+            const wireContent = this.getWireContent();
+            await crypto.cancelRoomKeyRequest({
+                algorithm: wireContent.algorithm,
+                room_id: this.getRoomId(),
+                session_id: wireContent.session_id,
+                sender_key: wireContent.sender_key,
+            });
+        }
+
+        // Don't attempt to decrypt an event which has already been encrypted,
+        // unless cancelAndRetry is true, in which case we allow a retry
+        // because we've just cancelled the room key request and can expect a
+        // new request to be started when we fail to decrypt again.
+        if (!cancelAndRetry && (
+                this._clearEvent && this._clearEvent.content &&
                 this._clearEvent.content.msgtype !== "m.bad.encrypted"
+            )
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
