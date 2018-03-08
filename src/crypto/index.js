@@ -445,6 +445,22 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
 };
 
 /**
+ * Save the device list, if necessary
+ *
+ * @param {integer} delay Time in ms before which the save actually happens.
+ *     By default, the save is delayed for a short period in order to batch
+ *     multiple writes, but this behaviour can be disabled by passing 0.
+ *
+ * @return {Promise<bool>} true if the data was saved, false if
+ *     it was not (eg. because no changes were pending). The promise
+ *     will only resolve once the data is saved, so may take some time
+ *     to resolve.
+ */
+Crypto.prototype.saveDeviceList = function(delay) {
+    return this._deviceList.saveIfDirty(delay);
+};
+
+/**
  * Update the blocked/verified state of the given device
  *
  * @param {string} userId owner of the device
@@ -811,27 +827,18 @@ Crypto.prototype.decryptEvent = function(event) {
  */
 Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLists) {
     // Initial syncs don't have device change lists. We'll either get the complete list
-    // of changes for the interval or invalidate everything in onSyncComplete
+    // of changes for the interval or will have invalidated everything in willProcessSync
     if (!syncData.oldSyncToken) return;
 
-    if (syncData.oldSyncToken === this._deviceList.getSyncToken()) {
-        // the point the db is at matches where the sync started from, so
-        // we can safely write the changes
-        this._evalDeviceListChanges(syncDeviceLists);
-    } else {
-        // the db is at a different point to where this sync started from, so
-        // additionally fetch the changes between where the db is and where the
-        // sync started
-        console.log(
-            "Device list sync gap detected - fetching key changes between " +
-            this._deviceList.getSyncToken() + " and " + syncData.oldSyncToken,
-        );
-        const gapDeviceLists = await this._baseApis.getKeyChanges(
-            this._deviceList.getSyncToken(), syncData.oldSyncToken,
-        );
-        this._evalDeviceListChanges(gapDeviceLists);
-        this._evalDeviceListChanges(syncDeviceLists);
-    }
+    // Here, we're relying on the fact that we only ever save the sync data after
+    // sucessfully saving the device list data, so we're guarenteed that the device
+    // list store is at least as fresh as the sync token from the sync store, ie.
+    // any device changes received in sync tokens prior to the 'next' token here
+    // have been processed and are reflected in the current device list.
+    // If we didn't make this assumption, we'd have to use the /keys/changes API
+    // to get key changes between the sync token in the device list and the 'old'
+    // sync token used here to make sure we didn't miss any.
+    this._evalDeviceListChanges(syncDeviceLists);
 };
 
 /**

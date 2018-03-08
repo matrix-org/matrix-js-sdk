@@ -146,18 +146,23 @@ export default class DeviceList {
      * The actual save will be delayed by a short amount of time to
      * aggregate multiple writes to the database.
      *
+     * @param {integer} delay Time in ms before which the save actually happens.
+     *     By default, the save is delayed for a short period in order to batch
+     *     multiple writes, but this behaviour can be disabled by passing 0.
+     *
      * @return {Promise<bool>} true if the data was saved, false if
      *     it was not (eg. because no changes were pending). The promise
      *     will only resolve once the data is saved, so may take some time
      *     to resolve.
      */
-    async saveIfDirty() {
+    async saveIfDirty(delay) {
         if (!this._dirty) return Promise.resolve(false);
+        if (delay === undefined) delay = 500;
 
         if (this._savePromise === null) {
             // Delay saves for a bit so we can aggregate multiple saves that happen
             // in quick succession (eg. when a whole room's devices are marked as known)
-            this._savePromise = Promise.delay(500).then(() => {
+            this._savePromise = Promise.delay(delay).then(() => {
                 console.log('Saving device tracking data at token ' + this._syncToken);
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has

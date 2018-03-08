@@ -681,8 +681,19 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     this._updateSyncState("SYNCING", syncEventData);
 
-    // tell databases that everything is now in a consistent state and can be saved.
-    client.store.save();
+    if (client.store.wantsSave()) {
+        // We always save the device list (if it's dirty) before saving the sync data:
+        // this means we know the saved device list data is at least as fresh as the
+        // stored sync data which means we don't have to worry that we may have missed
+        // device changes. We can also skip the delay since we're not calling this very
+        // frequently (and we don't really want to delay the sync for it).
+        if (this.opts.crypto) {
+            await this.opts.crypto.saveDeviceList(0);
+        }
+
+        // tell databases that everything is now in a consistent state and can be saved.
+        client.store.save();
+    }
 
     // Begin next sync
     this._sync(syncOptions);
