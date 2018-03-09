@@ -40,6 +40,8 @@ const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     this._inFlight = {
         // seq: promise,
     };
+    // Once we start connecting, we keep the promise and re-use it
+    // if we try to connect again
     this._startPromise = null;
 };
 
