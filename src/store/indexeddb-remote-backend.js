@@ -26,7 +26,7 @@ import Promise from 'bluebird';
  * @param {string} workerScript URL to the worker script
  * @param {string=} dbName Optional database name. The same name must be used
  * to open the same database.
- * @param {Object} WorkerApi The web worker compatible interface object
+ * @param {Object} workerApi The web worker compatible interface object
  */
 const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     workerScript, dbName, workerApi,
