@@ -29,11 +29,11 @@ import Promise from 'bluebird';
  * @param {Object} WorkerApi The web worker compatible interface object
  */
 const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
-    workerScript, dbName, WorkerApi,
+    workerScript, dbName, workerApi,
 ) {
     this._workerScript = workerScript;
     this._dbName = dbName;
-    this._workerApi = WorkerApi;
+    this._workerApi = workerApi;
     this._worker = null;
     this._nextSeq = 0;
     // The currently in-flight requests to the actual backend
