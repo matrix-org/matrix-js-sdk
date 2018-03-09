@@ -624,6 +624,16 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
 };
 
 /**
+ * Cancel a room key request for this event if one is ongoing and resend the
+ * request.
+ * @param  {MatrxEvent} event event of which to cancel and resend the room
+ *                            key request.
+ */
+MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
+    event.cancelAndResendKeyRequest(this._crypto);
+};
+
+/**
  * Enable end-to-end encryption for a room.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.

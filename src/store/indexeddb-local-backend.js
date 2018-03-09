@@ -101,6 +101,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this.indexedDB = indexedDBInterface;
     this._dbName = "matrix-js-sdk:" + (dbName || "default");
     this.db = null;
+    this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
 };
 
@@ -112,12 +113,14 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        if (this.db) {
+        if (!this._disconnected) {
             console.log(
-                `LocalIndexedDBStoreBackend.connect: already connected`,
+                `LocalIndexedDBStoreBackend.connect: already connected or connecting`,
             );
             return Promise.resolve();
         }
+
+        this._disconnected = false;
 
         console.log(
             `LocalIndexedDBStoreBackend.connect: connecting...`,

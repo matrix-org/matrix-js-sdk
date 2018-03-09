@@ -132,7 +132,7 @@ describe("MatrixClient", function() {
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         store = [
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-            "save", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
+            "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
             "getSyncAccumulator", "startup", "deleteAllData",
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
