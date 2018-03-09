@@ -31,20 +31,16 @@ import Promise from 'bluebird';
 const RemoteIndexedDBStoreBackend = function RemoteIndexedDBStoreBackend(
     workerScript, dbName, WorkerApi,
 ) {
+    this._workerScript = workerScript;
     this._dbName = dbName;
-    this._worker = new WorkerApi(workerScript);
+    this._workerApi = WorkerApi;
+    this._worker = null;
     this._nextSeq = 0;
     // The currently in-flight requests to the actual backend
     this._inFlight = {
         // seq: promise,
     };
-
-    this._worker.onmessage = this._onWorkerMessage.bind(this);
-
-    // tell the worker the db name.
-    this._startPromise = this._doCmd('_setupWorker', [this._dbName]).then(() => {
-        console.log("IndexedDB worker is ready");
-    });
+    this._startPromise = null;
 };
 
 
@@ -55,7 +51,7 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        return this._startPromise.then(() => this._doCmd('connect'));
+        return this._ensureStarted().then(() => this._doCmd('connect'));
     },
 
     /**
@@ -64,7 +60,7 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolved when the database is cleared.
      */
     clearDatabase: function() {
-        return this._startPromise.then(() => this._doCmd('clearDatabase'));
+        return this._ensureStarted().then(() => this._doCmd('clearDatabase'));
     },
 
     /**
@@ -91,6 +87,19 @@ RemoteIndexedDBStoreBackend.prototype = {
      */
     getUserPresenceEvents: function() {
         return this._doCmd('getUserPresenceEvents');
+    },
+
+    _ensureStarted: function() {
+        if (this._startPromise === null) {
+            this._worker = new this._workerApi(this._workerScript);
+            this._worker.onmessage = this._onWorkerMessage.bind(this);
+
+            // tell the worker the db name.
+            this._startPromise = this._doCmd('_setupWorker', [this._dbName]).then(() => {
+                console.log("IndexedDB worker is ready");
+            });
+        }
+        return this._startPromise;
     },
 
     _doCmd: function(cmd, args) {
