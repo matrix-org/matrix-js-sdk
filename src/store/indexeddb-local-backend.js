@@ -120,7 +120,7 @@ LocalIndexedDBStoreBackend.prototype = {
         }
 
         console.log(
-            `LocalIndexedDBStoreBackend.connect: connecting`,
+            `LocalIndexedDBStoreBackend.connect: connecting...`,
         );
         const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
@@ -142,7 +142,7 @@ LocalIndexedDBStoreBackend.prototype = {
         };
 
         console.log(
-            `LocalIndexedDBStoreBackend.connect: awaiting connection`,
+            `LocalIndexedDBStoreBackend.connect: awaiting connection...`,
         );
         return promiseifyRequest(req).then((ev) => {
             console.log(
@@ -341,16 +341,18 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _loadAccountData: function() {
         console.log(
-            `LocalIndexedDBStoreBackend: loading account data`,
+            `LocalIndexedDBStoreBackend: loading account data...`,
         );
         return Promise.try(() => {
-            console.log(
-                `LocalIndexedDBStoreBackend: loaded account data`,
-            );
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
+            }).then((result) => {
+                console.log(
+                    `LocalIndexedDBStoreBackend: loaded account data`,
+                );
+                return result;
             });
         });
     },
@@ -361,17 +363,17 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _loadSyncData: function() {
         console.log(
-            `LocalIndexedDBStoreBackend: loaded sync data`,
+            `LocalIndexedDBStoreBackend: loading sync data...`,
         );
         return Promise.try(() => {
-            console.log(
-                `LocalIndexedDBStoreBackend: loaded sync data`,
-            );
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
             }).then((results) => {
+                console.log(
+                    `LocalIndexedDBStoreBackend: loaded sync data`,
+                );
                 if (results.length > 1) {
                     console.warn("loadSyncData: More than 1 sync row found.");
                 }
