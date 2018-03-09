@@ -163,6 +163,8 @@ export default class DeviceList {
      */
     async saveIfDirty(delay) {
         if (!this._dirty) return Promise.resolve(false);
+        // Delay saves for a bit so we can aggregate multiple saves that happen
+        // in quick succession (eg. when a whole room's devices are marked as known)
         if (delay === undefined) delay = 500;
 
         const targetTime = Date.now + delay;
@@ -185,8 +187,6 @@ export default class DeviceList {
         }
 
         if (this._saveTimer === null) {
-            // Delay saves for a bit so we can aggregate multiple saves that happen
-            // in quick succession (eg. when a whole room's devices are marked as known)
             const resolveSavePromise = this._resolveSavePromise;
             this._savePromiseTime = targetTime;
             this._saveTimer = setTimeout(() => {
