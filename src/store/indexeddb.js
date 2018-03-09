@@ -160,12 +160,26 @@ IndexedDBStore.prototype.deleteAllData = function() {
 };
 
 /**
+ * Whether this store would like to save its data
+ * Note that obviously whether the store wants to save or
+ * not could change between calling this function and calling
+ * save().
+ *
+ * @return {boolean} True if calling save() will actually save
+ *     (at the time this function is called).
+ */
+IndexedDBStore.prototype.wantsSave = function() {
+    const now = Date.now();
+    return now - this._syncTs > WRITE_DELAY_MS;
+};
+
+/**
  * Possibly write data to the database.
- * @return {Promise} Promise resolves after the write completes.
+ * @return {Promise} Promise resolves after the write completes
+ *     (or immediately if no write is performed)
  */
 IndexedDBStore.prototype.save = function() {
-    const now = Date.now();
-    if (now - this._syncTs > WRITE_DELAY_MS) {
+    if (this.wantsSave()) {
         return this._reallySave();
     }
     return Promise.resolve();

@@ -316,6 +316,15 @@ module.exports.MatrixInMemoryStore.prototype = {
     },
 
     /**
+     * We never want to save becase we have nothing to save to.
+     *
+     * @return {boolean} If the store wants to save
+     */
+    wantsSave: function() {
+        return false;
+    },
+
+    /**
      * Save does nothing as there is no backing data store.
      */
     save: function() {},
