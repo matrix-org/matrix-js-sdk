@@ -464,7 +464,8 @@ SyncApi.prototype.sync = function() {
                 const qps = self._getSyncParams({ filterId }, savedSyncToken);
                 console.log("Sending first sync request...");
                 self._currentSyncRequest = client._http.authedRequest(
-                    undefined, "GET", "/sync", qps, undefined, qps.timeout + BUFFER_PERIOD_MS,
+                    undefined, "GET", "/sync", qps, undefined,
+                    qps.timeout + BUFFER_PERIOD_MS,
                 );
             }
 
