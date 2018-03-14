@@ -430,8 +430,9 @@ SyncApi.prototype.sync = function() {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             savedSyncPromise.then(() => {
+                const keepaliveProm = self._startKeepAlives();
                 self._updateSyncState("ERROR", { error: err });
-                return self._startKeepAlives();
+                return keepaliveProm;
             }).then(() => {
                 getPushRules();
             });
@@ -475,8 +476,9 @@ SyncApi.prototype.sync = function() {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             savedSyncPromise.then(() => {
+                const keepaliveProm = self._startKeepAlives();
                 self._updateSyncState("ERROR", { error: err });
-                return self._startKeepAlives();
+                return keepaliveProm;
             }).then(function() {
                 getFilter();
             });
