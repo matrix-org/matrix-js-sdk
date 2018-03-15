@@ -434,7 +434,7 @@ SyncApi.prototype.sync = function() {
             await keepaliveProm;
             getPushRules();
             return;
-        });
+        }
         getFilter(); // Now get the filter and start syncing
     }
 
