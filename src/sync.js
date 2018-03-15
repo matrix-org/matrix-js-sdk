@@ -419,27 +419,26 @@ SyncApi.prototype.sync = function() {
     //      them from /sync.
     //   2) We need to get/create a filter which we can use for /sync.
 
-    function getPushRules() {
-        client.getPushRules().done((result) => {
+    async function getPushRules() {
+        try {
+            const result = await client.getPushRules();
             debuglog("Got push rules");
 
             client.pushRules = result;
-
-            getFilter(); // Now get the filter and start syncing
-        }, (err) => {
+        } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            savedSyncPromise.then(() => {
-                const keepaliveProm = self._startKeepAlives();
-                self._updateSyncState("ERROR", { error: err });
-                return keepaliveProm;
-            }).then(() => {
-                getPushRules();
-            });
+            await savedSyncPromise;
+            const keepaliveProm = self._startKeepAlives();
+            self._updateSyncState("ERROR", { error: err });
+            await keepaliveProm;
+            getPushRules();
+            return;
         });
+        getFilter(); // Now get the filter and start syncing
     }
 
-    function getFilter() {
+    async function getFilter() {
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -449,42 +448,40 @@ SyncApi.prototype.sync = function() {
         }
 
         let filterId;
-        client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter,
-        ).then((fid) => {
-            filterId = fid;
-            // reset the notifications timeline to prepare it to paginate from
-            // the current point in time.
-            // The right solution would be to tie /sync pagination tokens into
-            // /notifications API somehow.
-            client.resetNotifTimelineSet();
-
-            if (self._currentSyncRequest === null) {
-                // Send this first sync request here so we can then wait for the saved
-                // sync data to finish processing before we process the results of this one.
-                const qps = self._getSyncParams({ filterId }, savedSyncToken);
-                console.log("Sending first sync request...");
-                self._currentSyncRequest = client._http.authedRequest(
-                    undefined, "GET", "/sync", qps, undefined,
-                    qps.timeout + BUFFER_PERIOD_MS,
-                );
-            }
-
-            // Now wait for the saved sync to finish...
-            return savedSyncPromise;
-        }, (err) => {
+        try {
+            filterId = await client.getOrCreateFilter(
+                getFilterName(client.credentials.userId), filter,
+            );
+        } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            savedSyncPromise.then(() => {
-                const keepaliveProm = self._startKeepAlives();
-                self._updateSyncState("ERROR", { error: err });
-                return keepaliveProm;
-            }).then(function() {
-                getFilter();
-            });
-        }).then(() => {
-            self._sync({ filterId });
-        });
+            await savedSyncPromise;
+            const keepaliveProm = self._startKeepAlives();
+            self._updateSyncState("ERROR", { error: err });
+            await keepaliveProm;
+            getFilter();
+            return;
+        }
+        // reset the notifications timeline to prepare it to paginate from
+        // the current point in time.
+        // The right solution would be to tie /sync pagination tokens into
+        // /notifications API somehow.
+        client.resetNotifTimelineSet();
+
+        if (self._currentSyncRequest === null) {
+            // Send this first sync request here so we can then wait for the saved
+            // sync data to finish processing before we process the results of this one.
+            const qps = self._getSyncParams({ filterId }, savedSyncToken);
+            console.log("Sending first sync request...");
+            self._currentSyncRequest = client._http.authedRequest(
+                undefined, "GET", "/sync", qps, undefined,
+                qps.timeout + BUFFER_PERIOD_MS,
+            );
+        }
+
+        // Now wait for the saved sync to finish...
+        await savedSyncPromise;
+        self._sync({ filterId });
     }
 
     if (client.isGuest()) {
