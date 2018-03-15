@@ -1340,8 +1340,19 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // If the timeline wasn't empty, we process the state events here: they're
     // defined as updates to the state before the start of the timeline, so this
     // starts to roll the state forward.
+    // XXX: That's what we *should* do, but this can happen if we were previously
+    // peeking in a room, in which case we obviously do *not* want to add the
+    // state events here onto the end of the timeline. Historically, the js-sdk
+    // has just set these new state events on the old and new state. This seems
+    // very wrong because there could be events in the timeline that diverge the
+    // state, in which case this is going to leave things out of sync. However,
+    // for now I think it;s best to behave the same as the code has done previously.
     if (!timelineWasEmpty) {
-        room.addLiveEvents(stateEventList || []);
+        // XXX: As above, don't do this...
+        //room.addLiveEvents(stateEventList || []);
+        // Do this instead...
+        room.oldState.setStateEvents(stateEventList || []);
+        room.currentState.setStateEvents(stateEventList || []);
     }
     // execute the timeline events. This will continue to diverge the current state
     // if the timeline has any state events in it.
