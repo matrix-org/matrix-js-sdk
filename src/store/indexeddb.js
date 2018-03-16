@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -144,6 +145,14 @@ IndexedDBStore.prototype.startup = function() {
 IndexedDBStore.prototype.getSavedSync = function() {
     return this.backend.getSavedSync();
 };
+
+/**
+ * @return {Promise} If there is a saved sync, the nextBatch token
+ * for this sync, otherwise null.
+ */
+IndexedDBStore.prototype.getSavedSyncToken = function() {
+    return this.backend.getNextBatchToken();
+},
 
 /**
  * Delete all data from this store.
