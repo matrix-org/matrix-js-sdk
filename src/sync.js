@@ -396,7 +396,11 @@ SyncApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
-SyncApi.prototype.waitForKeepaliveAndSavedSync = async function(savedSyncPromise, err) {
+SyncApi.prototype.recoverFromSyncStartupError = async function(savedSyncPromise, err) {
+    // Wait for the saved sync to complete - we send the pushrules and filter requests
+    // before the saved sync has finished so they can run in parallel, but only process
+    // the results after the saved sync is done. Equivalently, we wait for it to finish
+    // before reporting failures from these functions.
     await savedSyncPromise;
     const keepaliveProm = this._startKeepAlives();
     this._updateSyncState("ERROR", { error: err });
@@ -435,7 +439,7 @@ SyncApi.prototype.sync = function() {
         } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            await self.waitForKeepaliveAndSavedSync(savedSyncPromise, err);
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getPushRules();
             return;
         }
@@ -459,7 +463,7 @@ SyncApi.prototype.sync = function() {
         } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            await self.waitForKeepaliveAndSavedSync(savedSyncPromise, err);
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getFilter();
             return;
         }
