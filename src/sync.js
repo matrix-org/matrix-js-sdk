@@ -472,12 +472,8 @@ SyncApi.prototype.sync = function() {
         if (self._currentSyncRequest === null) {
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
-            const qps = self._getSyncParams({ filterId }, savedSyncToken);
             console.log("Sending first sync request...");
-            self._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined,
-                qps.timeout + BUFFER_PERIOD_MS,
-            );
+            self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
         }
 
         // Now wait for the saved sync to finish...
@@ -601,10 +597,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     try {
         //debuglog('Starting sync since=' + syncToken);
         if (this._currentSyncRequest === null) {
-            const qps = this._getSyncParams(syncOptions, syncToken);
-            this._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, qps.timeout + BUFFER_PERIOD_MS,
-            );
+            this._currentSyncRequest = this._doSyncRequest(syncOptions, syncToken);
         }
         data = await this._currentSyncRequest;
     } catch (e) {
@@ -680,6 +673,14 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
     // Begin next sync
     this._sync(syncOptions);
+};
+
+SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
+    const qps = this._getSyncParams(syncOptions, syncToken);
+    return this.client._http.authedRequest(
+        undefined, "GET", "/sync", qps, undefined,
+        qps.timeout + BUFFER_PERIOD_MS,
+    );
 };
 
 SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
