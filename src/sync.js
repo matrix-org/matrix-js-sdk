@@ -396,6 +396,13 @@ SyncApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
+SyncApi.prototype.waitForKeepaliveAndSavedSync = async function (savedSyncPromise, err) {
+    await savedSyncPromise;
+    const keepaliveProm = this._startKeepAlives();
+    this._updateSyncState("ERROR", { error: err });
+    await keepaliveProm;
+};
+
 /**
  * Main entry point
  */
@@ -428,10 +435,7 @@ SyncApi.prototype.sync = function() {
         } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            await savedSyncPromise;
-            const keepaliveProm = self._startKeepAlives();
-            self._updateSyncState("ERROR", { error: err });
-            await keepaliveProm;
+            await self.waitForKeepaliveAndSavedSync(savedSyncPromise, err);
             getPushRules();
             return;
         }
@@ -455,10 +459,7 @@ SyncApi.prototype.sync = function() {
         } catch (err) {
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
-            await savedSyncPromise;
-            const keepaliveProm = self._startKeepAlives();
-            self._updateSyncState("ERROR", { error: err });
-            await keepaliveProm;
+            await self.waitForKeepaliveAndSavedSync(savedSyncPromise, err);
             getFilter();
             return;
         }
