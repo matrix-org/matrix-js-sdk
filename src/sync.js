@@ -396,7 +396,7 @@ SyncApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
-SyncApi.prototype.waitForKeepaliveAndSavedSync = async function (savedSyncPromise, err) {
+SyncApi.prototype.waitForKeepaliveAndSavedSync = async function(savedSyncPromise, err) {
     await savedSyncPromise;
     const keepaliveProm = this._startKeepAlives();
     this._updateSyncState("ERROR", { error: err });
