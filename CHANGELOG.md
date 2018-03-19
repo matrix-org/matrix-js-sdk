@@ -1,3 +1,78 @@
+Changes in [0.10.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.0-rc.1) (2018-03-19)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.2...v0.10.0-rc.1)
+
+ * Fix duplicated state events in timeline from peek
+   [\#630](https://github.com/matrix-org/matrix-js-sdk/pull/630)
+ * Create indexeddb worker when starting the store
+   [\#627](https://github.com/matrix-org/matrix-js-sdk/pull/627)
+ * Fix indexeddb logging
+   [\#626](https://github.com/matrix-org/matrix-js-sdk/pull/626)
+ * Don't do /keys/changes on incremental sync
+   [\#625](https://github.com/matrix-org/matrix-js-sdk/pull/625)
+ * Don't mark devicelist dirty unnecessarily
+   [\#623](https://github.com/matrix-org/matrix-js-sdk/pull/623)
+ * Cache the joined member count for a room state
+   [\#619](https://github.com/matrix-org/matrix-js-sdk/pull/619)
+ * Fix JS doc
+   [\#618](https://github.com/matrix-org/matrix-js-sdk/pull/618)
+ * Precompute push actions for state events
+   [\#617](https://github.com/matrix-org/matrix-js-sdk/pull/617)
+ * Fix bug where global "Never send to unverified..." is ignored
+   [\#616](https://github.com/matrix-org/matrix-js-sdk/pull/616)
+ * Intern legacy top-level 'membership' field
+   [\#615](https://github.com/matrix-org/matrix-js-sdk/pull/615)
+ * Don't synthesize RR for m.room.redaction as causes the RR to go missing.
+   [\#598](https://github.com/matrix-org/matrix-js-sdk/pull/598)
+ * Make Events create Dates on demand
+   [\#613](https://github.com/matrix-org/matrix-js-sdk/pull/613)
+ * Stop cloning events when adding to state
+   [\#612](https://github.com/matrix-org/matrix-js-sdk/pull/612)
+ * De-dup code: use the initialiseState function
+   [\#611](https://github.com/matrix-org/matrix-js-sdk/pull/611)
+ * Create sentinel members on-demand
+   [\#610](https://github.com/matrix-org/matrix-js-sdk/pull/610)
+ * Some more doc on how sentinels work
+   [\#609](https://github.com/matrix-org/matrix-js-sdk/pull/609)
+ * Migrate room encryption store to crypto store
+   [\#597](https://github.com/matrix-org/matrix-js-sdk/pull/597)
+ * add parameter to getIdentityServerUrl to strip the protocol for invites
+   [\#600](https://github.com/matrix-org/matrix-js-sdk/pull/600)
+ * Move Device Tracking Data to Crypto Store
+   [\#594](https://github.com/matrix-org/matrix-js-sdk/pull/594)
+ * Optimise pushprocessor
+   [\#591](https://github.com/matrix-org/matrix-js-sdk/pull/591)
+ * Set event error before emitting
+   [\#592](https://github.com/matrix-org/matrix-js-sdk/pull/592)
+ * Add event type for stickers [WIP]
+   [\#590](https://github.com/matrix-org/matrix-js-sdk/pull/590)
+ * Migrate inbound sessions to cryptostore
+   [\#587](https://github.com/matrix-org/matrix-js-sdk/pull/587)
+ * Disambiguate names if they contain an mxid
+   [\#588](https://github.com/matrix-org/matrix-js-sdk/pull/588)
+ * Check for sessions in indexeddb before migrating
+   [\#585](https://github.com/matrix-org/matrix-js-sdk/pull/585)
+ * Emit an event for crypto store migration
+   [\#586](https://github.com/matrix-org/matrix-js-sdk/pull/586)
+ * Supporting fixes For making UnknownDeviceDialog not pop up automatically
+   [\#575](https://github.com/matrix-org/matrix-js-sdk/pull/575)
+ * Move sessions to the crypto store
+   [\#584](https://github.com/matrix-org/matrix-js-sdk/pull/584)
+ * Change crypto store transaction API
+   [\#582](https://github.com/matrix-org/matrix-js-sdk/pull/582)
+ * Add some missed copyright notices
+   [\#581](https://github.com/matrix-org/matrix-js-sdk/pull/581)
+ * Move Olm account to IndexedDB
+   [\#579](https://github.com/matrix-org/matrix-js-sdk/pull/579)
+ * Fix logging of DecryptionErrors to be more useful
+   [\#580](https://github.com/matrix-org/matrix-js-sdk/pull/580)
+ * [BREAKING] Change the behaviour of the unverfied devices blacklist flag
+   [\#568](https://github.com/matrix-org/matrix-js-sdk/pull/568)
+ * Support set_presence=offline for syncing
+   [\#557](https://github.com/matrix-org/matrix-js-sdk/pull/557)
+ * Consider cases where the sender may not redact their own event
+   [\#556](https://github.com/matrix-org/matrix-js-sdk/pull/556)
+
 Changes in [0.9.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.2) (2017-12-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.1...v0.9.2)
