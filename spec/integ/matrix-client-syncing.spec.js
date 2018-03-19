@@ -437,7 +437,11 @@ describe("MatrixClient syncing", function() {
             });
         });
 
-        it("should correctly interpret state in incremental sync.", function() {
+        // XXX: This test asserts that the js-sdk obeys the spec and treats state
+        // events that arrive in the incremental sync as if they preceeded the
+        // timeline events, however this breaks peeking, so it's disabled
+        // (see sync.js)
+        xit("should correctly interpret state in incremental sync.", function() {
             httpBackend.when("GET", "/sync").respond(200, syncData);
             httpBackend.when("GET", "/sync").respond(200, nextSyncData);
 

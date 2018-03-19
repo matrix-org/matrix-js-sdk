@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -101,6 +102,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this.indexedDB = indexedDBInterface;
     this._dbName = "matrix-js-sdk:" + (dbName || "default");
     this.db = null;
+    this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
 };
 
@@ -112,15 +114,17 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if successfully connected.
      */
     connect: function() {
-        if (this.db) {
+        if (!this._disconnected) {
             console.log(
-                `LocalIndexedDBStoreBackend.connect: already connected`,
+                `LocalIndexedDBStoreBackend.connect: already connected or connecting`,
             );
             return Promise.resolve();
         }
 
+        this._disconnected = false;
+
         console.log(
-            `LocalIndexedDBStoreBackend.connect: connecting`,
+            `LocalIndexedDBStoreBackend.connect: connecting...`,
         );
         const req = this.indexedDB.open(this._dbName, VERSION);
         req.onupgradeneeded = (ev) => {
@@ -142,7 +146,7 @@ LocalIndexedDBStoreBackend.prototype = {
         };
 
         console.log(
-            `LocalIndexedDBStoreBackend.connect: awaiting connection`,
+            `LocalIndexedDBStoreBackend.connect: awaiting connection...`,
         );
         return promiseifyRequest(req).then((ev) => {
             console.log(
@@ -238,6 +242,10 @@ LocalIndexedDBStoreBackend.prototype = {
         } else {
             return Promise.resolve(data);
         }
+    },
+
+    getNextBatchToken: function() {
+        return Promise.resolve(this._syncAccumulator.getNextBatchToken());
     },
 
     setSyncData: function(syncData) {
@@ -341,16 +349,18 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _loadAccountData: function() {
         console.log(
-            `LocalIndexedDBStoreBackend: loading account data`,
+            `LocalIndexedDBStoreBackend: loading account data...`,
         );
         return Promise.try(() => {
-            console.log(
-                `LocalIndexedDBStoreBackend: loaded account data`,
-            );
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
+            }).then((result) => {
+                console.log(
+                    `LocalIndexedDBStoreBackend: loaded account data`,
+                );
+                return result;
             });
         });
     },
@@ -361,17 +371,17 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _loadSyncData: function() {
         console.log(
-            `LocalIndexedDBStoreBackend: loaded sync data`,
+            `LocalIndexedDBStoreBackend: loading sync data...`,
         );
         return Promise.try(() => {
-            console.log(
-                `LocalIndexedDBStoreBackend: loaded sync data`,
-            );
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
             }).then((results) => {
+                console.log(
+                    `LocalIndexedDBStoreBackend: loaded sync data`,
+                );
                 if (results.length > 1) {
                     console.warn("loadSyncData: More than 1 sync row found.");
                 }
