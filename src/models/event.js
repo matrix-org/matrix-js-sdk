@@ -378,6 +378,21 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         return this._decryptionPromise;
     },
 
+    /**
+     * Cancel any room key request for this event and resend another.
+     *
+     * @param {module:crypto} crypto crypto module
+     */
+    cancelAndResendKeyRequest: function(crypto) {
+        const wireContent = this.getWireContent();
+        crypto.cancelRoomKeyRequest({
+            algorithm: wireContent.algorithm,
+            room_id: this.getRoomId(),
+            session_id: wireContent.session_id,
+            sender_key: wireContent.sender_key,
+        }, true);
+    },
+
     _decryptionLoop: async function(crypto) {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear _decryptionPromise *before*

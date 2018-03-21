@@ -396,6 +396,17 @@ SyncApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
+SyncApi.prototype.recoverFromSyncStartupError = async function(savedSyncPromise, err) {
+    // Wait for the saved sync to complete - we send the pushrules and filter requests
+    // before the saved sync has finished so they can run in parallel, but only process
+    // the results after the saved sync is done. Equivalently, we wait for it to finish
+    // before reporting failures from these functions.
+    await savedSyncPromise;
+    const keepaliveProm = this._startKeepAlives();
+    this._updateSyncState("ERROR", { error: err });
+    await keepaliveProm;
+};
+
 /**
  * Main entry point
  */
@@ -410,28 +421,32 @@ SyncApi.prototype.sync = function() {
         global.document.addEventListener("online", this._onOnlineBound, false);
     }
 
+    let savedSyncPromise = Promise.resolve();
+    let savedSyncToken = null;
+
     // We need to do one-off checks before we can begin the /sync loop.
     // These are:
     //   1) We need to get push rules so we can check if events should bing as we get
     //      them from /sync.
     //   2) We need to get/create a filter which we can use for /sync.
 
-    function getPushRules() {
-        client.getPushRules().done((result) => {
+    async function getPushRules() {
+        try {
+            const result = await client.getPushRules();
             debuglog("Got push rules");
 
             client.pushRules = result;
-
-            getFilter(); // Now get the filter and start syncing
-        }, (err) => {
-            self._startKeepAlives().done(() => {
-                getPushRules();
-            });
-            self._updateSyncState("ERROR", { error: err });
-        });
+        } catch (err) {
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
+            getPushRules();
+            return;
+        }
+        getFilter(); // Now get the filter and start syncing
     }
 
-    function getFilter() {
+    async function getFilter() {
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -440,40 +455,55 @@ SyncApi.prototype.sync = function() {
             filter.setTimelineLimit(self.opts.initialSyncLimit);
         }
 
-        client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter,
-        ).done((filterId) => {
-            // reset the notifications timeline to prepare it to paginate from
-            // the current point in time.
-            // The right solution would be to tie /sync pagination tokens into
-            // /notifications API somehow.
-            client.resetNotifTimelineSet();
+        let filterId;
+        try {
+            filterId = await client.getOrCreateFilter(
+                getFilterName(client.credentials.userId), filter,
+            );
+        } catch (err) {
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
+            getFilter();
+            return;
+        }
+        // reset the notifications timeline to prepare it to paginate from
+        // the current point in time.
+        // The right solution would be to tie /sync pagination tokens into
+        // /notifications API somehow.
+        client.resetNotifTimelineSet();
 
-            self._sync({ filterId });
-        }, (err) => {
-            self._startKeepAlives().done(function() {
-                getFilter();
-            });
-            self._updateSyncState("ERROR", { error: err });
-        });
+        if (self._currentSyncRequest === null) {
+            // Send this first sync request here so we can then wait for the saved
+            // sync data to finish processing before we process the results of this one.
+            console.log("Sending first sync request...");
+            self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
+        }
+
+        // Now wait for the saved sync to finish...
+        await savedSyncPromise;
+        self._sync({ filterId });
     }
 
     if (client.isGuest()) {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
-        // Before fetching push rules, fetching the filter and syncing, check
-        // for persisted /sync data and use that if present.
-        client.store.getSavedSync().then((savedSync) => {
+        // Pull the saved sync token out first, before the worker starts sending
+        // all the sync data which could take a while. This will let us send our
+        // first incremental sync request before we've processed our saved data.
+        savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
+            savedSyncToken = tok;
+            return client.store.getSavedSync();
+        }).then((savedSync) => {
             if (savedSync) {
                 return self._syncFromCache(savedSync);
             }
-        }).then(() => {
-            // Get push rules and start syncing after getting the saved sync
-            // to handle the case where we needed the `nextBatch` token to
-            // start syncing from.
-            getPushRules();
         });
+        // Now start the first incremental sync request: this can also
+        // take a while so if we set it going now, we can wait for it
+        // to finish while we process our saved sync data.
+        getPushRules();
     }
 };
 
@@ -565,70 +595,20 @@ SyncApi.prototype._sync = async function(syncOptions) {
         return;
     }
 
-    let filterId = syncOptions.filterId;
-    if (client.isGuest() && !filterId) {
-        filterId = this._getGuestFilter();
-    }
-
     const syncToken = client.store.getSyncToken();
-
-    let pollTimeout = this.opts.pollTimeout;
-
-    if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
-        // unless we are happily syncing already, we want the server to return
-        // as quickly as possible, even if there are no events queued. This
-        // serves two purposes:
-        //
-        // * When the connection dies, we want to know asap when it comes back,
-        //   so that we can hide the error from the user. (We don't want to
-        //   have to wait for an event or a timeout).
-        //
-        // * We want to know if the server has any to_device messages queued up
-        //   for us. We do that by calling it with a zero timeout until it
-        //   doesn't give us any more to_device messages.
-        this._catchingUp = true;
-        pollTimeout = 0;
-    }
-
-    // normal timeout= plus buffer time
-    const clientSideTimeoutMs = pollTimeout + BUFFER_PERIOD_MS;
-
-    const qps = {
-        filter: filterId,
-        timeout: pollTimeout,
-    };
-
-    if (this.opts.disablePresence) {
-        qps.set_presence = "offline";
-    }
-
-    if (syncToken) {
-        qps.since = syncToken;
-    } else {
-        // use a cachebuster for initialsyncs, to make sure that
-        // we don't get a stale sync
-        // (https://github.com/vector-im/vector-web/issues/1354)
-        qps._cacheBuster = Date.now();
-    }
-
-    if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
-        // we think the connection is dead. If it comes back up, we won't know
-        // about it till /sync returns. If the timeout= is high, this could
-        // be a long time. Set it to 0 when doing retries so we don't have to wait
-        // for an event or a timeout before emiting the SYNCING event.
-        qps.timeout = 0;
-    }
 
     let data;
     try {
         //debuglog('Starting sync since=' + syncToken);
-        this._currentSyncRequest = client._http.authedRequest(
-            undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-        );
+        if (this._currentSyncRequest === null) {
+            this._currentSyncRequest = this._doSyncRequest(syncOptions, syncToken);
+        }
         data = await this._currentSyncRequest;
     } catch (e) {
         this._onSyncError(e, syncOptions);
         return;
+    } finally {
+        this._currentSyncRequest = null;
     }
 
     //debuglog('Completed sync, next_batch=' + data.next_batch);
@@ -681,11 +661,83 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
     this._updateSyncState("SYNCING", syncEventData);
 
-    // tell databases that everything is now in a consistent state and can be saved.
-    client.store.save();
+    if (client.store.wantsSave()) {
+        // We always save the device list (if it's dirty) before saving the sync data:
+        // this means we know the saved device list data is at least as fresh as the
+        // stored sync data which means we don't have to worry that we may have missed
+        // device changes. We can also skip the delay since we're not calling this very
+        // frequently (and we don't really want to delay the sync for it).
+        if (this.opts.crypto) {
+            await this.opts.crypto.saveDeviceList(0);
+        }
+
+        // tell databases that everything is now in a consistent state and can be saved.
+        client.store.save();
+    }
 
     // Begin next sync
     this._sync(syncOptions);
+};
+
+SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
+    const qps = this._getSyncParams(syncOptions, syncToken);
+    return this.client._http.authedRequest(
+        undefined, "GET", "/sync", qps, undefined,
+        qps.timeout + BUFFER_PERIOD_MS,
+    );
+};
+
+SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
+    let pollTimeout = this.opts.pollTimeout;
+
+    if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
+        // unless we are happily syncing already, we want the server to return
+        // as quickly as possible, even if there are no events queued. This
+        // serves two purposes:
+        //
+        // * When the connection dies, we want to know asap when it comes back,
+        //   so that we can hide the error from the user. (We don't want to
+        //   have to wait for an event or a timeout).
+        //
+        // * We want to know if the server has any to_device messages queued up
+        //   for us. We do that by calling it with a zero timeout until it
+        //   doesn't give us any more to_device messages.
+        this._catchingUp = true;
+        pollTimeout = 0;
+    }
+
+    let filterId = syncOptions.filterId;
+    if (this.client.isGuest() && !filterId) {
+        filterId = this._getGuestFilter();
+    }
+
+    const qps = {
+        filter: filterId,
+        timeout: pollTimeout,
+    };
+
+    if (this.opts.disablePresence) {
+        qps.set_presence = "offline";
+    }
+
+    if (syncToken) {
+        qps.since = syncToken;
+    } else {
+        // use a cachebuster for initialsyncs, to make sure that
+        // we don't get a stale sync
+        // (https://github.com/vector-im/vector-web/issues/1354)
+        qps._cacheBuster = Date.now();
+    }
+
+    if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
+        // we think the connection is dead. If it comes back up, we won't know
+        // about it till /sync returns. If the timeout= is high, this could
+        // be a long time. Set it to 0 when doing retries so we don't have to wait
+        // for an event or a timeout before emiting the SYNCING event.
+        qps.timeout = 0;
+    }
+
+    return qps;
 };
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
@@ -1329,8 +1381,19 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // If the timeline wasn't empty, we process the state events here: they're
     // defined as updates to the state before the start of the timeline, so this
     // starts to roll the state forward.
+    // XXX: That's what we *should* do, but this can happen if we were previously
+    // peeking in a room, in which case we obviously do *not* want to add the
+    // state events here onto the end of the timeline. Historically, the js-sdk
+    // has just set these new state events on the old and new state. This seems
+    // very wrong because there could be events in the timeline that diverge the
+    // state, in which case this is going to leave things out of sync. However,
+    // for now I think it;s best to behave the same as the code has done previously.
     if (!timelineWasEmpty) {
-        room.addLiveEvents(stateEventList || []);
+        // XXX: As above, don't do this...
+        //room.addLiveEvents(stateEventList || []);
+        // Do this instead...
+        room.oldState.setStateEvents(stateEventList || []);
+        room.currentState.setStateEvents(stateEventList || []);
     }
     // execute the timeline events. This will continue to diverge the current state
     // if the timeline has any state events in it.

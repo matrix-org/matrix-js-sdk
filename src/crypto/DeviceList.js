@@ -92,6 +92,12 @@ export default class DeviceList {
 
         // Promise resolved when device data is saved
         this._savePromise = null;
+        // Function that resolves the save promise
+        this._resolveSavePromise = null;
+        // The time the save is scheduled for
+        this._savePromiseTime = null;
+        // The timer used to delay the save
+        this._saveTimer = null;
     }
 
     /**
@@ -146,25 +152,55 @@ export default class DeviceList {
      * The actual save will be delayed by a short amount of time to
      * aggregate multiple writes to the database.
      *
+     * @param {integer} delay Time in ms before which the save actually happens.
+     *     By default, the save is delayed for a short period in order to batch
+     *     multiple writes, but this behaviour can be disabled by passing 0.
+     *
      * @return {Promise<bool>} true if the data was saved, false if
      *     it was not (eg. because no changes were pending). The promise
      *     will only resolve once the data is saved, so may take some time
      *     to resolve.
      */
-    async saveIfDirty() {
+    async saveIfDirty(delay) {
         if (!this._dirty) return Promise.resolve(false);
+        // Delay saves for a bit so we can aggregate multiple saves that happen
+        // in quick succession (eg. when a whole room's devices are marked as known)
+        if (delay === undefined) delay = 500;
 
-        if (this._savePromise === null) {
-            // Delay saves for a bit so we can aggregate multiple saves that happen
-            // in quick succession (eg. when a whole room's devices are marked as known)
-            this._savePromise = Promise.delay(500).then(() => {
+        const targetTime = Date.now + delay;
+        if (this._savePromiseTime && targetTime < this._savePromiseTime) {
+            // There's a save scheduled but for after we would like: cancel
+            // it & schedule one for the time we want
+            clearTimeout(this._saveTimer);
+            this._saveTimer = null;
+            this._savePromiseTime = null;
+            // (but keep the save promise since whatever called save before
+            // will still want to know when the save is done)
+        }
+
+        let savePromise = this._savePromise;
+        if (savePromise === null) {
+            savePromise = new Promise((resolve, reject) => {
+                this._resolveSavePromise = resolve;
+            });
+            this._savePromise = savePromise;
+        }
+
+        if (this._saveTimer === null) {
+            const resolveSavePromise = this._resolveSavePromise;
+            this._savePromiseTime = targetTime;
+            this._saveTimer = setTimeout(() => {
                 console.log('Saving device tracking data at token ' + this._syncToken);
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
                 // actually already happened. Likewise for the dirty flag.
+                this._savePromiseTime = null;
+                this._saveTimer = null;
                 this._savePromise = null;
+                this._resolveSavePromise = null;
+
                 this._dirty = false;
-                return this._cryptoStore.doTxn(
+                this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
@@ -172,12 +208,12 @@ export default class DeviceList {
                             syncToken: this._syncToken,
                         }, txn);
                     },
-                );
-            }).then(() => {
-                return true;
-            });
+                ).then(() => {
+                    resolveSavePromise();
+                });
+            }, delay);
         }
-        return this._savePromise;
+        return savePromise;
     }
 
     /**
@@ -418,11 +454,11 @@ export default class DeviceList {
         if (this._deviceTrackingStatus[userId]) {
             console.log('No longer tracking device list for ' + userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
-        }
-        // we don't yet persist the tracking status, since there may be a lot
-        // of calls; we save all data together once the sync is done
 
-        this._dirty = true;
+            // we don't yet persist the tracking status, since there may be a lot
+            // of calls; we save all data together once the sync is done
+            this._dirty = true;
+        }
     }
 
     /**
@@ -453,11 +489,11 @@ export default class DeviceList {
         if (this._deviceTrackingStatus[userId]) {
             console.log("Marking device list outdated for", userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
-        }
-        // we don't yet persist the tracking status, since there may be a lot
-        // of calls; we save all data together once the sync is done
 
-        this._dirty = true;
+            // we don't yet persist the tracking status, since there may be a lot
+            // of calls; we save all data together once the sync is done
+            this._dirty = true;
+        }
     }
 
     /**
