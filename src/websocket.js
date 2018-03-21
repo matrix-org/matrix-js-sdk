@@ -201,7 +201,7 @@ WebSocketApi.prototype.ws_keepAlive = function() {
         console.error("this._websocket does not exist", this);
         return;
     }
-    if (this._websocket.readyState == this._websocket.OPEN) {
+    if (this._websocket && this._websocket.readyState == this._websocket.OPEN) {
         //TODO find function to generate id
         this.sendPing();
     }
@@ -216,7 +216,8 @@ WebSocketApi.prototype._handleResponseTimeout = function(messageId) {
     const curObj = this._awaiting_responses[messageId];
     if (curObj == "ping") {
         // only try closing the connection when the browser thinks it is not broken
-        if (this._ping_failed_already && this._websocket.readyState == WebSocket.OPEN) {
+        if (this._ping_failed_already && this._websocket &&
+                this._websocket.readyState == WebSocket.OPEN) {
             console.error("Timeout for sending ping-request. Try reconnecting");
             // as reconnection will be handled in _close this is enough for here
             this._websocket.close();
