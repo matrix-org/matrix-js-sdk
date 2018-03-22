@@ -1365,7 +1365,7 @@ MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, ca
          body: text,
     };
     return this.sendEvent(
-        roomId, "m.room.sticker", content, callback, undefined,
+        roomId, "m.sticker", content, callback, undefined,
     );
 };
 
