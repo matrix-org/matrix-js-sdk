@@ -1,3 +1,10 @@
+Changes in [0.9.2-cryptowraning.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.2-cryptowraning.1) (2018-03-26)
+================================================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.2...v0.9.2-cryptowraning.1)
+
+ * Disable crypto if indexeddb version too new
+   [\#631](https://github.com/matrix-org/matrix-js-sdk/pull/631)
+
 Changes in [0.9.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.9.2) (2017-12-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.9.1...v0.9.2)
