@@ -91,6 +91,12 @@ export default class IndexedDBCryptoStore {
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
         }).catch((e) => {
+            // Don't fall back to memory in this case: we'd end up recreating
+            // a new Olm account in memory and advertising new keys for the
+            // same device.
+            if (e.name == 'VersionError') {
+                throw e;
+            }
             console.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to in-memory store: ${e}`,

@@ -108,6 +108,12 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    // XXX: Connect to the backend now so we can fail faster if the
+    // version is wrong
+    if (this._cryptoStore._connect) {
+        await this._cryptoStore._connect();
+    }
+
     await this._olmDevice.init();
 
     // build our device keys: these will later be uploaded
