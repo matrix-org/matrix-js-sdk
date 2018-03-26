@@ -88,7 +88,6 @@ export default class IndexedDBCryptoStore {
                 const db = r.target.result;
 
                 console.log(`connected to indexeddb ${this._dbName}`);
-
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
         }).catch((e) => {
