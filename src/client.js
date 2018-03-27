@@ -3156,10 +3156,7 @@ function setupCallEventHandler(client) {
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
                 if (ignoreCallIds[e.getContent().call_id]) {
-                    console.log(
-                        'Ignoring previously answered/hungup call ' +
-                            e.getContent().call_id + ' (' + e.getId() + ')',
-                    );
+                    // This call has previously been ansered or hung up: ignore it
                     return;
                 }
                 callEventHandler(e);
