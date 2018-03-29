@@ -638,6 +638,19 @@ MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
+MatrixBaseApis.prototype.joinGroup = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/join",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
 MatrixBaseApis.prototype.leaveGroup = function(groupId) {
     const path = utils.encodeUri(
         "/groups/$groupId/self/leave",
