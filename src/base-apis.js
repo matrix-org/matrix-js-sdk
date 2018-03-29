@@ -445,6 +445,20 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
 
 /**
  * @param {string} groupId
+ * @param {boolean} isJoinable whether anyone can join the group or only those who
+ *                             are invited.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupJoinable = function(groupId, isJoinable) {
+    const path = utils.encodeUri("/groups/$groupId/joinable", {$groupId: groupId});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, { joinable: isJoinable },
+    );
+};
+
+/**
+ * @param {string} groupId
  * @return {module:client.Promise} Resolves: Group users list object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
