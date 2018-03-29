@@ -453,7 +453,7 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
 MatrixBaseApis.prototype.setGroupJoinable = function(groupId, isJoinable) {
     const path = utils.encodeUri("/groups/$groupId/joinable", {$groupId: groupId});
     return this._http.authedRequest(
-        undefined, "POST", path, undefined, { joinable: isJoinable },
+        undefined, "PUT", path, undefined, { joinable: isJoinable },
     );
 };
 
