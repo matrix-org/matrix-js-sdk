@@ -453,7 +453,10 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
-    const path = utils.encodeUri("/groups/$groupId/settings/m.join_policy", {$groupId: groupId});
+    const path = utils.encodeUri(
+        "/groups/$groupId/settings/m.join_policy",
+        {$groupId: groupId},
+    );
     return this._http.authedRequest(
         undefined, "PUT", path, undefined, {
             'm.join_policy': policy,
