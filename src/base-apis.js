@@ -445,15 +445,19 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
 
 /**
  * @param {string} groupId
- * @param {boolean} isJoinable whether anyone can join the group or only those who
- *                             are invited.
+ * @param {object} policy The join policy for the group. Must include at
+ *     least a 'type' field which is 'open' if anyone can join the group
+ *     the group without prior approval, or 'invite' if an invite is
+ *     required to join.
  * @return {module:client.Promise} Resolves: Empty object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.setGroupJoinable = function(groupId, isJoinable) {
-    const path = utils.encodeUri("/groups/$groupId/joinable", {$groupId: groupId});
+MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
+    const path = utils.encodeUri("/groups/$groupId/settings/m.join_policy", {$groupId: groupId});
     return this._http.authedRequest(
-        undefined, "PUT", path, undefined, { joinable: isJoinable },
+        undefined, "PUT", path, undefined, {
+            'm.join_policy': policy,
+        },
     );
 };
 
