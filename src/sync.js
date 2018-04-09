@@ -1294,6 +1294,12 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
+    // TODO: if we are lazyloading members, then we simply never add member events from
+    // the state block into the timeline with addLiveEvents(); instead we just
+    // update the state.
+    // (Ftr, we hide state changes which happen during a gappy sync because
+    // we empty the timeline each time and re-initialise the state)
+
     // If there are no events in the timeline yet, initialise it with
     // the given state events
     const liveTimeline = room.getLiveTimeline();
