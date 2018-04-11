@@ -396,7 +396,8 @@ export class Backend {
         });
         addReq.onerror = () => {
             abortWithException(txn, new Error(
-                "Failed to add inbound group session - session may already exist: " + addReq.error,
+                "Failed to add inbound group session - session may already exist: " +
+                addReq.error,
             ));
         };
     }
