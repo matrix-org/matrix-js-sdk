@@ -394,9 +394,9 @@ export class Backend {
         const addReq = objectStore.add({
             senderCurve25519Key, sessionId, session: sessionData,
         });
-        addReq.onerror = (e) => {
+        addReq.onerror = () => {
             abortWithException(txn, new Error(
-                "Failed to add inbound group session - session may already exist: " + e,
+                "Failed to add inbound group session - session may already exist: " + addReq.error,
             ));
         };
     }
