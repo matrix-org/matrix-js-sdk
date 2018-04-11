@@ -395,7 +395,7 @@ export class Backend {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = () => {
-            if (addReq.name === 'ConstraintError') {
+            if (addReq.error.name === 'ConstraintError') {
                 console.log(
                     "Ignoring duplicate inbound group session: " +
                     senderCurve25519Key + " / " + sessionId,
