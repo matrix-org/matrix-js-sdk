@@ -445,6 +445,27 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
 
 /**
  * @param {string} groupId
+ * @param {object} policy The join policy for the group. Must include at
+ *     least a 'type' field which is 'open' if anyone can join the group
+ *     the group without prior approval, or 'invite' if an invite is
+ *     required to join.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/settings/m.join_policy",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(
+        undefined, "PUT", path, undefined, {
+            'm.join_policy': policy,
+        },
+    );
+};
+
+/**
+ * @param {string} groupId
  * @return {module:client.Promise} Resolves: Group users list object
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
@@ -631,6 +652,19 @@ MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
         {$groupId: groupId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, opts || {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.joinGroup = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/join",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
 
 /**
