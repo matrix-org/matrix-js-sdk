@@ -402,7 +402,7 @@ export class Backend {
                 );
             } else {
                 abortWithException(txn, new Error(
-                    "Failed to add inbound group session" + addReq.error,
+                    "Failed to add inbound group session: " + addReq.error,
                 ));
             }
         };
