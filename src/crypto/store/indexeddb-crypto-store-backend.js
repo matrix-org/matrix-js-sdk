@@ -395,10 +395,16 @@ export class Backend {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = () => {
-            abortWithException(txn, new Error(
-                "Failed to add inbound group session - session may already exist: " +
-                addReq.error,
-            ));
+            if (addReq.name === 'ConstraintError') {
+                console.log(
+                    "Ignoring duplicate inbound group session: " +
+                    senderCurve25519Key + " / " + sessionId,
+                );
+            } else {
+                abortWithException(txn, new Error(
+                    "Failed to add inbound group session" + addReq.error,
+                ));
+            }
         };
     }
 
