@@ -394,12 +394,12 @@ export class Backend {
         const addReq = objectStore.add({
             senderCurve25519Key, sessionId, session: sessionData,
         });
-        addReq.onerror = (e) => {
+        addReq.onerror = (ev) => {
             if (addReq.error.name === 'ConstraintError') {
                 // This stops the error from triggering the txn's onerror
-                e.stopPropagation();
+                ev.stopPropagation();
                 // ...and this stops it from aborting the transaction
-                e.preventDefault();
+                ev.preventDefault();
                 console.log(
                     "Ignoring duplicate inbound group session: " +
                     senderCurve25519Key + " / " + sessionId,
