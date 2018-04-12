@@ -383,22 +383,25 @@ describe("Room", function() {
     });
 
     const resetTimelineTests = function(timelineSupport) {
-        const events = [
-            utils.mkMessage({
-                room: roomId, user: userA, msg: "A message", event: true,
-            }),
-            utils.mkEvent({
-                type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "New Room Name" },
-            }),
-            utils.mkEvent({
-                type: "m.room.name", room: roomId, user: userA, event: true,
-                content: { name: "Another New Name" },
-            }),
-        ];
+        let events = null;
 
         beforeEach(function() {
             room = new Room(roomId, {timelineSupport: timelineSupport});
+            // set events each time to avoid resusing Event objects (which
+            // doesn't work because they get frozen)
+            events = [
+                utils.mkMessage({
+                    room: roomId, user: userA, msg: "A message", event: true,
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userA, event: true,
+                    content: { name: "New Room Name" },
+                }),
+                utils.mkEvent({
+                    type: "m.room.name", room: roomId, user: userA, event: true,
+                    content: { name: "Another New Name" },
+                }),
+            ];
         });
 
         it("should copy state from previous timeline", function() {

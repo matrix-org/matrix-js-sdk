@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -87,6 +88,9 @@ class IndexedDBStoreWorker {
                 break;
             case 'getUserPresenceEvents':
                 prom = this.backend.getUserPresenceEvents();
+                break;
+            case 'getNextBatchToken':
+                prom = this.backend.getNextBatchToken();
                 break;
         }
 

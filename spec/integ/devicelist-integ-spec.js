@@ -1,3 +1,20 @@
+/*
+Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import expect from 'expect';
 import Promise from 'bluebird';
 
@@ -151,9 +168,12 @@ describe("DeviceList management:", function() {
                    aliceTestClient.httpBackend.flush('/keys/query', 1).then(
                        () => aliceTestClient.httpBackend.flush('/send/', 1),
                    ),
+                   aliceTestClient.client._crypto._deviceList.saveIfDirty(),
                ]);
            }).then(() => {
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(1);
+               aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                   expect(data.syncToken).toEqual(1);
+               });
 
                // invalidate bob's and chris's device lists in separate syncs
                aliceTestClient.httpBackend.when('GET', '/sync').respond(200, {
@@ -185,19 +205,21 @@ describe("DeviceList management:", function() {
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
            }).then((flushed) => {
                expect(flushed).toEqual(0);
-               const bobStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
-               if (bobStat != 1 && bobStat != 2) {
-                   throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
-                                   bobStat);
-               }
-
-               const chrisStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
-               if (chrisStat != 1 && chrisStat != 2) {
-                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
-                                   chrisStat);
-               }
+               return aliceTestClient.client._crypto._deviceList.saveIfDirty();
+           }).then(() => {
+               aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                   const bobStat = data.trackingStatus['@bob:xyz'];
+                   if (bobStat != 1 && bobStat != 2) {
+                       throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
+                                       bobStat);
+                   }
+                   const chrisStat = data.trackingStatus['@chris:abc'];
+                   if (chrisStat != 1 && chrisStat != 2) {
+                       throw new Error(
+                           'Unexpected status for chris: wanted 1 or 2, got ' + chrisStat,
+                       );
+                   }
+               });
 
                // now add an expectation for a query for bob's devices, and let
                // it complete.
@@ -216,15 +238,18 @@ describe("DeviceList management:", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@bob:xyz']);
            }).then(() => {
-               const bobStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
-               expect(bobStat).toEqual(3);
-               const chrisStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
-               if (chrisStat != 1 && chrisStat != 2) {
-                   throw new Error('Unexpected status for chris: wanted 1 or 2, got ' +
-                                   bobStat);
-               }
+               return aliceTestClient.client._crypto._deviceList.saveIfDirty();
+           }).then(() => {
+               aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                   const bobStat = data.trackingStatus['@bob:xyz'];
+                   expect(bobStat).toEqual(3);
+                   const chrisStat = data.trackingStatus['@chris:abc'];
+                   if (chrisStat != 1 && chrisStat != 2) {
+                       throw new Error(
+                           'Unexpected status for chris: wanted 1 or 2, got ' + bobStat,
+                       );
+                   }
+               });
 
                // now let the query for chris's devices complete.
                return aliceTestClient.httpBackend.flush('/keys/query', 1);
@@ -234,16 +259,18 @@ describe("DeviceList management:", function() {
                // wait for the client to stop processing the response
                return aliceTestClient.client.downloadKeys(['@chris:abc']);
            }).then(() => {
-               const bobStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
-               const chrisStat = aliceTestClient.storage
-                     .getEndToEndDeviceTrackingStatus()['@chris:abc'];
+               return aliceTestClient.client._crypto._deviceList.saveIfDirty();
+           }).then(() => {
+               aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                   const bobStat = data.trackingStatus['@bob:xyz'];
+                   const chrisStat = data.trackingStatus['@bob:xyz'];
 
-               expect(bobStat).toEqual(3);
-               expect(chrisStat).toEqual(3);
-               expect(aliceTestClient.storage.getEndToEndDeviceSyncToken()).toEqual(3);
+                   expect(bobStat).toEqual(3);
+                   expect(chrisStat).toEqual(3);
+                   expect(data.syncToken).toEqual(3);
+               });
            });
-       });
+       }).timeout(3000);
 
     // https://github.com/vector-im/riot-web/issues/4983
     describe("Alice should know she has stale device lists", () => {
@@ -262,13 +289,15 @@ describe("DeviceList management:", function() {
                 },
             );
             await aliceTestClient.httpBackend.flush('/keys/query', 1);
+            await aliceTestClient.client._crypto._deviceList.saveIfDirty();
 
-            const bobStat = aliceTestClient.storage
-                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data.trackingStatus['@bob:xyz'];
 
-            expect(bobStat).toBeGreaterThan(
-                0, "Alice should be tracking bob's device list",
-            );
+                expect(bobStat).toBeGreaterThan(
+                    0, "Alice should be tracking bob's device list",
+                );
+            });
         });
 
         it("when Bob leaves", async function() {
@@ -297,12 +326,15 @@ describe("DeviceList management:", function() {
 
 
             await aliceTestClient.flushSync();
+            await aliceTestClient.client._crypto._deviceList.saveIfDirty();
 
-            const bobStat = aliceTestClient.storage
-                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
-            expect(bobStat).toEqual(
-                0, "Alice should have marked bob's device list as untracked",
-            );
+            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data.trackingStatus['@bob:xyz'];
+
+                expect(bobStat).toEqual(
+                    0, "Alice should have marked bob's device list as untracked",
+                );
+            });
         });
 
         it("when Alice leaves", async function() {
@@ -330,12 +362,15 @@ describe("DeviceList management:", function() {
             );
 
             await aliceTestClient.flushSync();
+            await aliceTestClient.client._crypto._deviceList.saveIfDirty();
 
-            const bobStat = aliceTestClient.storage
-                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
-            expect(bobStat).toEqual(
-                0, "Alice should have marked bob's device list as untracked",
-            );
+            aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data.trackingStatus['@bob:xyz'];
+
+                expect(bobStat).toEqual(
+                    0, "Alice should have marked bob's device list as untracked",
+                );
+            });
         });
 
         it("when Bob leaves whilst Alice is offline", async function() {
@@ -344,23 +379,19 @@ describe("DeviceList management:", function() {
             const anotherTestClient = await createTestClient();
 
             try {
-                anotherTestClient.httpBackend.when('GET', '/keys/changes').respond(
-                    200, {
-                        changed: [],
-                        left: ['@bob:xyz'],
-                    },
-                );
                 await anotherTestClient.start();
                 anotherTestClient.httpBackend.when('GET', '/sync').respond(
                     200, getSyncResponse([]));
                 await anotherTestClient.flushSync();
+                await anotherTestClient.client._crypto._deviceList.saveIfDirty();
 
-                const bobStat = anotherTestClient.storage
-                      .getEndToEndDeviceTrackingStatus()['@bob:xyz'];
+                anotherTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+                    const bobStat = data.trackingStatus['@bob:xyz'];
 
-                expect(bobStat).toEqual(
-                    0, "Alice should have marked bob's device list as untracked",
-                );
+                    expect(bobStat).toEqual(
+                        0, "Alice should have marked bob's device list as untracked",
+                    );
+                });
             } finally {
                 anotherTestClient.stop();
             }

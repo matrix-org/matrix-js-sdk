@@ -156,9 +156,7 @@ function PushProcessor(client) {
             return false;
         }
 
-        const memberCount = Object.keys(room.currentState.members).filter(function(m) {
-            return room.currentState.members[m].membership == 'join';
-        }).length;
+        const memberCount = room.currentState.getJoinedMemberCount();
 
         const m = cond.is.match(/^([=<>]*)([0-9]*)$/);
         if (!m) {
