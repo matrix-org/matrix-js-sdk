@@ -1,11 +1,24 @@
+Changes in [0.10.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.1) (2018-04-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.0...v0.10.1)
+
+ * Log IDB errors
+   [\#638](https://github.com/matrix-org/matrix-js-sdk/pull/638)
+ * Ignore inserts of duplicate inbound group sessions
+   [\#639](https://github.com/matrix-org/matrix-js-sdk/pull/639)
+ * Ignore inserts of dup inbound group sessions, pt 2
+   [\#641](https://github.com/matrix-org/matrix-js-sdk/pull/641)
+
 Changes in [0.10.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.0) (2018-04-11)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.0-rc.2...v0.10.0)
 
+ * No changes
 
 Changes in [0.10.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.0-rc.2) (2018-04-09)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.0-rc.1...v0.10.0-rc.2)
+
  * Add wrapper for group join API
  * Add wrapped API to set group join\_policy
 
