@@ -394,10 +394,21 @@ export class Backend {
         const addReq = objectStore.add({
             senderCurve25519Key, sessionId, session: sessionData,
         });
-        addReq.onerror = () => {
-            abortWithException(txn, new Error(
-                "Failed to add inbound group session - session may already exist",
-            ));
+        addReq.onerror = (ev) => {
+            if (addReq.error.name === 'ConstraintError') {
+                // This stops the error from triggering the txn's onerror
+                ev.stopPropagation();
+                // ...and this stops it from aborting the transaction
+                ev.preventDefault();
+                console.log(
+                    "Ignoring duplicate inbound group session: " +
+                    senderCurve25519Key + " / " + sessionId,
+                );
+            } else {
+                abortWithException(txn, new Error(
+                    "Failed to add inbound group session: " + addReq.error,
+                ));
+            }
         };
     }
 
