@@ -626,7 +626,7 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
 /**
  * Cancel a room key request for this event if one is ongoing and resend the
  * request.
- * @param  {MatrxEvent} event event of which to cancel and resend the room
+ * @param  {MatrixEvent} event event of which to cancel and resend the room
  *                            key request.
  */
 MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
@@ -720,7 +720,7 @@ MatrixClient.prototype.getGroup = function(groupId) {
 
 /**
  * Retrieve all known groups.
- * @return {Groups[]} A list of groups, or an empty list if there is no data store.
+ * @return {Group[]} A list of groups, or an empty list if there is no data store.
  */
 MatrixClient.prototype.getGroups = function() {
     return this.store.getGroups();
