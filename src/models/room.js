@@ -94,10 +94,10 @@ function synthesizeReceipt(userId, event, receiptType) {
  * event type and the values are the events.
  * @prop {RoomState} oldState The state of the room at the time of the oldest
  * event in the live timeline. Present for backwards compatibility -
- * prefer getLiveTimeline().getState("b").
+ * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
  * @prop {RoomState} currentState The state of the room at the time of the
  * newest event in the timeline. Present for backwards compatibility -
- * prefer getLiveTimeline().getState("f").
+ * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
  * @prop {RoomSummary} summary The room summary.
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
