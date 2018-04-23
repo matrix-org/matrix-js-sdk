@@ -16,6 +16,8 @@ limitations under the License.
 */
 "use strict";
 
+/** The {@link module:ContentHelpers} object */
+module.exports.ContentHelpers = require("./content-helpers");
 /** The {@link module:models/event.MatrixEvent|MatrixEvent} class. */
 module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 /** The {@link module:models/event.EventStatus|EventStatus} enum. */

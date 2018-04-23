@@ -40,6 +40,7 @@ const Filter = require("./filter");
 const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
+const ContentHelpers = require("./content-helpers");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
@@ -1279,10 +1280,7 @@ MatrixClient.prototype.sendMessage = function(roomId, content, txnId, callback) 
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.text",
-         body: body,
-    };
+    const content = ContentHelpers.makeTextMessage(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1295,10 +1293,7 @@ MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.notice",
-         body: body,
-    };
+    const content = ContentHelpers.makeNotice(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1311,10 +1306,7 @@ MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendEmoteMessage = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.emote",
-         body: body,
-    };
+    const content = ContentHelpers.makeEmoteMessage(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1378,12 +1370,7 @@ MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, ca
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.text",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlMessage(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
@@ -1396,12 +1383,7 @@ MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callba
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.notice",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlNotice(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
@@ -1414,12 +1396,7 @@ MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callbac
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlEmote = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.emote",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlEmote(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
