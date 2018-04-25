@@ -1,3 +1,18 @@
+Changes in [0.10.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.2-rc.1) (2018-04-25)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.1...v0.10.2-rc.1)
+
+ * Ignore inserts of dup inbound group sessions, pt 2
+   [\#641](https://github.com/matrix-org/matrix-js-sdk/pull/641)
+ * Ignore inserts of duplicate inbound group sessions
+   [\#639](https://github.com/matrix-org/matrix-js-sdk/pull/639)
+ * Log IDB errors
+   [\#638](https://github.com/matrix-org/matrix-js-sdk/pull/638)
+ * Remove not very useful but veryv spammy log line
+   [\#632](https://github.com/matrix-org/matrix-js-sdk/pull/632)
+ * Switch event type to m.sticker.
+   [\#628](https://github.com/matrix-org/matrix-js-sdk/pull/628)
+
 Changes in [0.10.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.1) (2018-04-12)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.0...v0.10.1)
