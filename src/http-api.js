@@ -724,7 +724,7 @@ module.exports.MatrixHttpApi.prototype = {
                     body: data,
                     json: false,
                     timeout: localTimeoutMs,
-                    headers: opts.headers || {},
+                    headers: headers || {},
                     _matrix_opts: this.opts,
                 },
                 function(err, response, body) {
