@@ -727,6 +727,20 @@ MatrixClient.prototype.getGroups = function() {
     return this.store.getGroups();
 };
 
+/**
+ * Get the room for the given room ID.
+ * This function will return a valid room for any room for which a Room event
+ * has been emitted. Note in particular that other events, eg. RoomState.members
+ * will be emitted for a room before this function will return the given room.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves with an object containing the limits.
+ */
+MatrixClient.prototype.getMediaLimits = function(callback) {
+    return return this._http.requestWithPrefix(
+        callback, "GET", "/limits", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
+    )
+};
+
 // Room ops
 // ========
 
