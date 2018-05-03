@@ -736,9 +736,9 @@ MatrixClient.prototype.getGroups = function() {
  * @return {module:client.Promise} Resolves with an object containing the limits.
  */
 MatrixClient.prototype.getMediaLimits = function(callback) {
-    return return this._http.requestWithPrefix(
+    return this._http.requestWithPrefix(
         callback, "GET", "/limits", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
-    )
+    );
 };
 
 // Room ops
