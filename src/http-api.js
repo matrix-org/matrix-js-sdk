@@ -434,7 +434,11 @@ module.exports.MatrixHttpApi.prototype = {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out");
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
-                self.event_emitter.emit("Session.no_consent", err.message, err.data.consent_uri);
+                self.event_emitter.emit(
+                    "Session.no_consent",
+                    err.message,
+                    err.data.consent_uri,
+                );
             }
         });
 
