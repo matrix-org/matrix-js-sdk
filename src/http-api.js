@@ -435,7 +435,7 @@ module.exports.MatrixHttpApi.prototype = {
                 self.event_emitter.emit("Session.logged_out");
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
                 self.event_emitter.emit(
-                    "Session.no_consent",
+                    "no_consent",
                     err.message,
                     err.data.consent_uri,
                 );
