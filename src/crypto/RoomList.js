@@ -54,7 +54,6 @@ export default class RoomList {
                     } else {
                         this._roomEncryption = result;
                     }
-                    console.info('room encryption received');
                 });
             },
         );
