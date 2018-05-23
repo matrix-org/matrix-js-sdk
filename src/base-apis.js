@@ -338,10 +338,11 @@ MatrixBaseApis.prototype.logout = function(callback) {
  * it is up to the caller to either reset or destroy the MatrixClient after
  * this method succeeds.
  * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
- * @param {module:client.callback} callback Optional.
+ * @param {boolean} erase Optional. If true, send erase=true query parameter which
+ * indicates that the account should be erased.
  * @return {module:client.Promise} Resolves: On success, the empty object
  */
-MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
+MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
     let body = {};
     if (auth) {
         body = {
@@ -349,7 +350,12 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
         };
     }
     return this._http.authedRequestWithPrefix(
-        callback, "POST", '/account/deactivate', undefined, body, httpApi.PREFIX_UNSTABLE,
+        undefined,
+        "POST",
+        '/account/deactivate',
+        erase ? { erase: true } : undefined,
+        body,
+        httpApi.PREFIX_UNSTABLE,
     );
 };
 
