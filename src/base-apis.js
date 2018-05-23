@@ -339,7 +339,7 @@ MatrixBaseApis.prototype.logout = function(callback) {
  * this method succeeds.
  * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
  * @param {boolean} erase Optional. If true, send `erase: true` in the JSON request
- * body, indicating that the account should be erased.
+ * body, indicating that the account should be erased. Defaults to false.
  * @return {module:client.Promise} Resolves: On success, the empty object
  */
 MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
