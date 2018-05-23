@@ -350,7 +350,7 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
         );
     }
 
-    const body = { auth, erase };
+    const body = {} ;
     if (auth) {
         body.auth = auth;
     }
