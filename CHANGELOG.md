@@ -1,3 +1,17 @@
+Changes in [0.10.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.3-rc.1) (2018-05-24)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.2...v0.10.3-rc.1)
+
+BREAKING CHANGE
+---------------
+
+The deprecated 'callback' parameter has been removed from MatrixBaseApis.deactivateAccount
+
+ * Add `erase` option to deactivateAccount
+   [\#649](https://github.com/matrix-org/matrix-js-sdk/pull/649)
+ * Emit Session.no_consent when M_CONSENT_NOT_GIVEN received
+   [\#647](https://github.com/matrix-org/matrix-js-sdk/pull/647)
+
 Changes in [0.10.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.2) (2018-04-30)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.2-rc.1...v0.10.2)
