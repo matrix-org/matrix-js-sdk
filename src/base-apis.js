@@ -360,7 +360,7 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
 
     return this._http.authedRequestWithPrefix(
         undefined, "POST", '/account/deactivate', undefined, body,
-        httpApi.PREFIX_UNSTABLE,
+        httpApi.PREFIX_R0,
     );
 };
 
