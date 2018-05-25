@@ -1,3 +1,9 @@
+Changes in [0.10.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.3) (2018-05-25)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.3-rc.1...v0.10.3)
+
+ * No changes since v0.10.3-rc.1
+
 Changes in [0.10.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.3-rc.1) (2018-05-24)
 ============================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.2...v0.10.3-rc.1)
