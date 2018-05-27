@@ -455,7 +455,7 @@ RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
         powerLevelsEvent &&
         powerLevelsEvent.getContent() &&
         powerLevelsEvent.getContent().notifications &&
-        powerLevelsEvent.getContent().notifications[notifLevelKey]
+        powerLevelsEvent.getContent().notifications[notifLevelKey] !== undefined
     ) {
         notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
     }
