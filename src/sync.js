@@ -396,6 +396,17 @@ SyncApi.prototype.getSyncState = function() {
     return this._syncState;
 };
 
+SyncApi.prototype.recoverFromSyncStartupError = async function(savedSyncPromise, err) {
+    // Wait for the saved sync to complete - we send the pushrules and filter requests
+    // before the saved sync has finished so they can run in parallel, but only process
+    // the results after the saved sync is done. Equivalently, we wait for it to finish
+    // before reporting failures from these functions.
+    await savedSyncPromise;
+    const keepaliveProm = this._startKeepAlives();
+    this._updateSyncState("ERROR", { error: err });
+    await keepaliveProm;
+};
+
 /**
  * Main entry point
  */
@@ -410,26 +421,32 @@ SyncApi.prototype.sync = function() {
         global.document.addEventListener("online", this._onOnlineBound, false);
     }
 
+    let savedSyncPromise = Promise.resolve();
+    let savedSyncToken = null;
+
     // We need to do one-off checks before we can begin the /sync loop.
     // These are:
     //   1) We need to get push rules so we can check if events should bing as we get
     //      them from /sync.
     //   2) We need to get/create a filter which we can use for /sync.
 
-    function getPushRules() {
-        client.getPushRules().done(function(result) {
+    async function getPushRules() {
+        try {
+            const result = await client.getPushRules();
             debuglog("Got push rules");
+
             client.pushRules = result;
-            getFilter(); // Now get the filter
-        }, function(err) {
-            self._startKeepAlives().done(function() {
-                getPushRules();
-            });
-            self._updateSyncState("ERROR", { error: err });
-        });
+        } catch (err) {
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
+            getPushRules();
+            return;
+        }
+        getFilter(); // Now get the filter and start syncing
     }
 
-    function getFilter() {
+    async function getFilter() {
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -438,28 +455,54 @@ SyncApi.prototype.sync = function() {
             filter.setTimelineLimit(self.opts.initialSyncLimit);
         }
 
-        client.getOrCreateFilter(
-            getFilterName(client.credentials.userId), filter,
-        ).done(function(filterId) {
-            // reset the notifications timeline to prepare it to paginate from
-            // the current point in time.
-            // The right solution would be to tie /sync pagination tokens into
-            // /notifications API somehow.
-            client.resetNotifTimelineSet();
+        let filterId;
+        try {
+            filterId = await client.getOrCreateFilter(
+                getFilterName(client.credentials.userId), filter,
+            );
+        } catch (err) {
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            await self.recoverFromSyncStartupError(savedSyncPromise, err);
+            getFilter();
+            return;
+        }
+        // reset the notifications timeline to prepare it to paginate from
+        // the current point in time.
+        // The right solution would be to tie /sync pagination tokens into
+        // /notifications API somehow.
+        client.resetNotifTimelineSet();
 
-            self._sync({ filterId: filterId });
-        }, function(err) {
-            self._startKeepAlives().done(function() {
-                getFilter();
-            });
-            self._updateSyncState("ERROR", { error: err });
-        });
+        if (self._currentSyncRequest === null) {
+            // Send this first sync request here so we can then wait for the saved
+            // sync data to finish processing before we process the results of this one.
+            console.log("Sending first sync request...");
+            self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
+        }
+
+        // Now wait for the saved sync to finish...
+        await savedSyncPromise;
+        self._sync({ filterId });
     }
 
     if (client.isGuest()) {
         // no push rules for guests, no access to POST filter for guests.
         self._sync({});
     } else {
+        // Pull the saved sync token out first, before the worker starts sending
+        // all the sync data which could take a while. This will let us send our
+        // first incremental sync request before we've processed our saved data.
+        savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
+            savedSyncToken = tok;
+            return client.store.getSavedSync();
+        }).then((savedSync) => {
+            if (savedSync) {
+                return self._syncFromCache(savedSync);
+            }
+        });
+        // Now start the first incremental sync request: this can also
+        // take a while so if we set it going now, we can wait for it
+        // to finish while we process our saved sync data.
         getPushRules();
     }
 };
@@ -495,6 +538,43 @@ SyncApi.prototype.retryImmediately = function() {
     this._startKeepAlives(0);
     return true;
 };
+/**
+ * Process a single set of cached sync data.
+ * @param {Object} savedSync a saved sync that was persisted by a store. This
+ * should have been acquired via client.store.getSavedSync().
+ */
+SyncApi.prototype._syncFromCache = async function(savedSync) {
+    debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
+
+    const nextSyncToken = savedSync.nextBatch;
+
+    // Set sync token for future incremental syncing
+    this.client.store.setSyncToken(nextSyncToken);
+
+    // No previous sync, set old token to null
+    const syncEventData = {
+        oldSyncToken: null,
+        nextSyncToken,
+        catchingUp: false,
+    };
+
+    const data = {
+        next_batch: nextSyncToken,
+        rooms: savedSync.roomsData,
+        groups: savedSync.groupsData,
+        account_data: {
+            events: savedSync.accountData,
+        },
+    };
+
+    try {
+        await this._processSyncResponse(syncEventData, data);
+    } catch(e) {
+        console.error("Error processing cached sync", e.stack || e);
+    }
+
+    this._updateSyncState("PREPARED", syncEventData);
+};
 
 /**
  * Invoke me to do /sync calls
@@ -515,13 +595,99 @@ SyncApi.prototype._sync = async function(syncOptions) {
         return;
     }
 
-    let filterId = syncOptions.filterId;
-    if (client.isGuest() && !filterId) {
-        filterId = this._getGuestFilter();
-    }
-
     const syncToken = client.store.getSyncToken();
 
+    let data;
+    try {
+        //debuglog('Starting sync since=' + syncToken);
+        if (this._currentSyncRequest === null) {
+            this._currentSyncRequest = this._doSyncRequest(syncOptions, syncToken);
+        }
+        data = await this._currentSyncRequest;
+    } catch (e) {
+        this._onSyncError(e, syncOptions);
+        return;
+    } finally {
+        this._currentSyncRequest = null;
+    }
+
+    //debuglog('Completed sync, next_batch=' + data.next_batch);
+
+    // set the sync token NOW *before* processing the events. We do this so
+    // if something barfs on an event we can skip it rather than constantly
+    // polling with the same token.
+    client.store.setSyncToken(data.next_batch);
+
+    // Reset after a successful sync
+    this._failedSyncCount = 0;
+
+    await client.store.setSyncData(data);
+
+    const syncEventData = {
+        oldSyncToken: syncToken,
+        nextSyncToken: data.next_batch,
+        catchingUp: this._catchingUp,
+    };
+
+    if (this.opts.crypto) {
+        // tell the crypto module we're about to process a sync
+        // response
+        await this.opts.crypto.onSyncWillProcess(syncEventData);
+    }
+
+    try {
+        await this._processSyncResponse(syncEventData, data);
+    } catch(e) {
+        // log the exception with stack if we have it, else fall back
+        // to the plain description
+        console.error("Caught /sync error", e.stack || e);
+    }
+
+    // update this as it may have changed
+    syncEventData.catchingUp = this._catchingUp;
+
+    // emit synced events
+    if (!syncOptions.hasSyncedBefore) {
+        this._updateSyncState("PREPARED", syncEventData);
+        syncOptions.hasSyncedBefore = true;
+    }
+
+    // tell the crypto module to do its processing. It may block (to do a
+    // /keys/changes request).
+    if (this.opts.crypto) {
+        await this.opts.crypto.onSyncCompleted(syncEventData);
+    }
+
+    // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+    this._updateSyncState("SYNCING", syncEventData);
+
+    if (client.store.wantsSave()) {
+        // We always save the device list (if it's dirty) before saving the sync data:
+        // this means we know the saved device list data is at least as fresh as the
+        // stored sync data which means we don't have to worry that we may have missed
+        // device changes. We can also skip the delay since we're not calling this very
+        // frequently (and we don't really want to delay the sync for it).
+        if (this.opts.crypto) {
+            await this.opts.crypto.saveDeviceList(0);
+        }
+
+        // tell databases that everything is now in a consistent state and can be saved.
+        client.store.save();
+    }
+
+    // Begin next sync
+    this._sync(syncOptions);
+};
+
+SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
+    const qps = this._getSyncParams(syncOptions, syncToken);
+    return this.client._http.authedRequest(
+        undefined, "GET", "/sync", qps, undefined,
+        qps.timeout + BUFFER_PERIOD_MS,
+    );
+};
+
+SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
     let pollTimeout = this.opts.pollTimeout;
 
     if (this.getSyncState() !== 'SYNCING' || this._catchingUp) {
@@ -540,8 +706,10 @@ SyncApi.prototype._sync = async function(syncOptions) {
         pollTimeout = 0;
     }
 
-    // normal timeout= plus buffer time
-    const clientSideTimeoutMs = pollTimeout + BUFFER_PERIOD_MS;
+    let filterId = syncOptions.filterId;
+    if (this.client.isGuest() && !filterId) {
+        filterId = this._getGuestFilter();
+    }
 
     const qps = {
         filter: filterId,
@@ -569,97 +737,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
         qps.timeout = 0;
     }
 
-    let savedSync;
-    if (!syncOptions.hasSyncedBefore) {
-        // Don't do an HTTP hit to /sync. Instead, load up the persisted /sync data,
-        // if there is data there.
-        savedSync = await client.store.getSavedSync();
-    }
-
-    let isCachedResponse = false;
-    let data;
-
-    if (savedSync) {
-        debuglog("sync(): not doing HTTP hit, instead returning stored /sync data");
-        isCachedResponse = true;
-        data = {
-            next_batch: savedSync.nextBatch,
-            rooms: savedSync.roomsData,
-            groups: savedSync.groupsData,
-            account_data: {
-                events: savedSync.accountData,
-            },
-        };
-    } else {
-        try {
-            //debuglog('Starting sync since=' + syncToken);
-            this._currentSyncRequest = client._http.authedRequest(
-                undefined, "GET", "/sync", qps, undefined, clientSideTimeoutMs,
-            );
-            data = await this._currentSyncRequest;
-        } catch (e) {
-            this._onSyncError(e, syncOptions);
-            return;
-        }
-    }
-
-    //debuglog('Completed sync, next_batch=' + data.next_batch);
-
-    // set the sync token NOW *before* processing the events. We do this so
-    // if something barfs on an event we can skip it rather than constantly
-    // polling with the same token.
-    client.store.setSyncToken(data.next_batch);
-
-    // Reset after a successful sync
-    this._failedSyncCount = 0;
-
-    // We need to wait until the sync data has been sent to the backend
-    // because it appears that the sync data gets modified somewhere in
-    // processing it in such a way as to make it no longer cloneable.
-    // XXX: Find out what is modifying it!
-    if (!isCachedResponse) {
-        // Don't give the store back its own cached data
-        await client.store.setSyncData(data);
-    }
-
-    try {
-        await this._processSyncResponse(syncToken, data, isCachedResponse);
-    } catch(e) {
-        // log the exception with stack if we have it, else fall back
-        // to the plain description
-        console.error("Caught /sync error", e.stack || e);
-    }
-
-    // emit synced events
-    const syncEventData = {
-        oldSyncToken: syncToken,
-        nextSyncToken: data.next_batch,
-        catchingUp: this._catchingUp,
-    };
-
-    if (!syncOptions.hasSyncedBefore) {
-        this._updateSyncState("PREPARED", syncEventData);
-        syncOptions.hasSyncedBefore = true;
-    }
-
-    if (!isCachedResponse) {
-        // tell the crypto module to do its processing. It may block (to do a
-        // /keys/changes request).
-        if (this.opts.crypto) {
-            await this.opts.crypto.onSyncCompleted(syncEventData);
-        }
-
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        this._updateSyncState("SYNCING", syncEventData);
-
-        // tell databases that everything is now in a consistent state and can be
-        // saved (no point doing so if we only have the data we just got out of the
-        // store).
-        client.store.save();
-    }
-
-    // Begin next sync
-    this._sync(syncOptions);
+    return qps;
 };
 
 SyncApi.prototype._onSyncError = function(err, syncOptions) {
@@ -703,13 +781,11 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
  * Process data returned from a sync response and propagate it
  * into the model objects
  *
- * @param {string} syncToken the old next_batch token sent to this
- *    sync request.
+ * @param {Object} syncEventData Object containing sync tokens associated with this sync
  * @param {Object} data The response from /sync
- * @param {bool} isCachedResponse True if this response is from our local cache
  */
 SyncApi.prototype._processSyncResponse = async function(
-    syncToken, data, isCachedResponse,
+    syncEventData, data,
 ) {
     const client = this.client;
     const self = this;
@@ -789,13 +865,11 @@ SyncApi.prototype._processSyncResponse = async function(
         client.store.storeAccountDataEvents(events);
         events.forEach(
             function(accountDataEvent) {
-                // XXX: This is awful: ignore push rules from our cached sync. We fetch the
-                // push rules before syncing so we actually have up-to-date ones. We do want
-                // to honour new push rules that come down the sync but synapse doesn't
-                // put new push rules in the sync stream when the base rules change, so
-                // if the base rules change, we do need to refresh. We therefore ignore
-                // the push rules in our cached sync response.
-                if (accountDataEvent.getType() == 'm.push_rules' && !isCachedResponse) {
+                // Honour push rules that come down the sync stream but also
+                // honour push rules that were previously cached. Base rules
+                // will be updated when we recieve push rules via getPushRules
+                // (see SyncApi.prototype.sync) before syncing over the network.
+                if (accountDataEvent.getType() == 'm.push_rules') {
                     client.pushRules = accountDataEvent.getContent();
                 }
                 client.emit("accountData", accountDataEvent);
@@ -951,7 +1025,8 @@ SyncApi.prototype._processSyncResponse = async function(
                 self._deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     joinObj.timeline.prev_batch,
-                    self.opts.canResetEntireTimeline(room.roomId) ? null : syncToken,
+                    self.opts.canResetEntireTimeline(room.roomId) ?
+                        null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -1044,7 +1119,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // in the timeline relative to ones paginated in by /notifications.
     // XXX: we could fix this by making EventTimeline support chronological
     // ordering... but it doesn't, right now.
-    if (syncToken && this._notifEvents.length) {
+    if (syncEventData.oldSyncToken && this._notifEvents.length) {
         this._notifEvents.sort(function(a, b) {
             return a.getTs() - b.getTs();
         });
@@ -1056,7 +1131,9 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle device list updates
     if (data.device_lists) {
         if (this.opts.crypto) {
-            await this.opts.crypto.handleDeviceListChanges(data.device_lists);
+            await this.opts.crypto.handleDeviceListChanges(
+                syncEventData, data.device_lists,
+            );
         } else {
             // FIXME if we *don't* have a crypto module, we still need to
             // invalidate the device lists. But that would require a
@@ -1278,41 +1355,60 @@ SyncApi.prototype._resolveInvites = function(room) {
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
                                                 timelineEventList) {
-    timelineEventList = timelineEventList || [];
-    const client = this.client;
-    // "old" and "current" state are the same initially; they
-    // start diverging if the user paginates.
-    // We must deep copy otherwise membership changes in old state
-    // will leak through to current state!
-    const oldStateEvents = utils.map(
-        utils.deepCopy(
-            stateEventList.map(function(mxEvent) {
-                return mxEvent.event;
-            }),
-        ), client.getEventMapper(),
-    );
-    const stateEvents = stateEventList;
-
-    // set the state of the room to as it was before the timeline executes
-    //
-    // XXX: what if we've already seen (some of) the events in the timeline,
-    // and they modify some of the state set in stateEvents? In that case we'll
-    // end up with the state from stateEvents, instead of the more recent state
-    // from the timeline.
-    room.oldState.setStateEvents(oldStateEvents);
-    room.currentState.setStateEvents(stateEvents);
+    // If there are no events in the timeline yet, initialise it with
+    // the given state events
+    const liveTimeline = room.getLiveTimeline();
+    const timelineWasEmpty = liveTimeline.getEvents().length == 0;
+    if (timelineWasEmpty) {
+        // Passing these events into initialiseState will freeze them, so we need
+        // to compute and cache the push actions for them now, otherwise sync dies
+        // with an attempt to assign to read only property.
+        // XXX: This is pretty horrible and is assuming all sorts of behaviour from
+        // these functions that it shouldn't be. We should probably either store the
+        // push actions cache elsewhere so we can freeze MatrixEvents, or otherwise
+        // find some solution where MatrixEvents are immutable but allow for a cache
+        // field.
+        for (const ev of stateEventList) {
+            this.client.getPushActionsForEvent(ev);
+        }
+        liveTimeline.initialiseState(stateEventList);
+    }
 
     this._resolveInvites(room);
 
     // recalculate the room name at this point as adding events to the timeline
     // may make notifications appear which should have the right name.
+    // XXX: This looks suspect: we'll end up recalculating the room once here
+    // and then again after adding events (_processSyncResponse calls it after
+    // calling us) even if no state events were added. It also means that if
+    // one of the room events in timelineEventList is something that needs
+    // a recalculation (like m.room.name) we won't recalculate until we've
+    // finished adding all the events, which will cause the notification to have
+    // the old room name rather than the new one.
     room.recalculate(this.client.credentials.userId);
 
-    // execute the timeline events, this will begin to diverge the current state
+    // If the timeline wasn't empty, we process the state events here: they're
+    // defined as updates to the state before the start of the timeline, so this
+    // starts to roll the state forward.
+    // XXX: That's what we *should* do, but this can happen if we were previously
+    // peeking in a room, in which case we obviously do *not* want to add the
+    // state events here onto the end of the timeline. Historically, the js-sdk
+    // has just set these new state events on the old and new state. This seems
+    // very wrong because there could be events in the timeline that diverge the
+    // state, in which case this is going to leave things out of sync. However,
+    // for now I think it;s best to behave the same as the code has done previously.
+    if (!timelineWasEmpty) {
+        // XXX: As above, don't do this...
+        //room.addLiveEvents(stateEventList || []);
+        // Do this instead...
+        room.oldState.setStateEvents(stateEventList || []);
+        room.currentState.setStateEvents(stateEventList || []);
+    }
+    // execute the timeline events. This will continue to diverge the current state
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
-    room.addLiveEvents(timelineEventList);
+    room.addLiveEvents(timelineEventList || []);
 };
 
 /**

@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -217,6 +218,15 @@ StubStore.prototype = {
     },
 
     /**
+     * We never want to save becase we have nothing to save to.
+     *
+     * @return {boolean} If the store wants to save
+     */
+    wantsSave: function() {
+        return false;
+    },
+
+    /**
      * Save does nothing as there is no backing data store.
      */
     save: function() {},
@@ -235,6 +245,14 @@ StubStore.prototype = {
      * is no saved sync data.
      */
     getSavedSync: function() {
+        return Promise.resolve(null);
+    },
+
+    /**
+     * @return {Promise} If there is a saved sync, the nextBatch token
+     * for this sync, otherwise null.
+     */
+    getSavedSyncToken: function() {
         return Promise.resolve(null);
     },
 

@@ -40,8 +40,10 @@ const Filter = require("./filter");
 const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
+const ContentHelpers = require("./content-helpers");
 
 import ReEmitter from './ReEmitter';
+import RoomList from './crypto/RoomList';
 
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
@@ -181,6 +183,14 @@ function MatrixClient(opts) {
     if (CRYPTO_ENABLED) {
         this.olmVersion = Crypto.getOlmVersion();
     }
+
+    // List of which rooms have encryption enabled: separate from crypto because
+    // we still want to know which rooms are encrypted even if crypto is disabled:
+    // we don't want to start sending unencrypted events to them.
+    this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
+
+    // The pushprocessor caches useful things, so keep one and re-use it
+    this._pushProcessor = new PushProcessor(this);
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -351,13 +361,6 @@ MatrixClient.prototype.initCrypto = async function() {
         return;
     }
 
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
-
     if (!this._sessionStore) {
         // this is temporary, the sessionstore is supposed to be going away
         throw new Error(`Cannot enable encryption: no sessionStore provided`);
@@ -365,6 +368,16 @@ MatrixClient.prototype.initCrypto = async function() {
     if (!this._cryptoStore) {
         // the cryptostore is provided by sdk.createClient, so this shouldn't happen
         throw new Error(`Cannot enable encryption: no cryptoStore provided`);
+    }
+
+    // initialise the list of encrypted rooms (whether or not crypto is enabled)
+    await this._roomList.init();
+
+    if (!CRYPTO_ENABLED) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
     }
 
     const userId = this.getUserId();
@@ -387,6 +400,7 @@ MatrixClient.prototype.initCrypto = async function() {
         userId, this.deviceId,
         this.store,
         this._cryptoStore,
+        this._roomList,
     );
 
     this.reEmitter.reEmit(crypto, [
@@ -611,6 +625,16 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
 };
 
 /**
+ * Cancel a room key request for this event if one is ongoing and resend the
+ * request.
+ * @param  {MatrxEvent} event event of which to cancel and resend the room
+ *                            key request.
+ */
+MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
+    event.cancelAndResendKeyRequest(this._crypto);
+};
+
+/**
  * Enable end-to-end encryption for a room.
  * @param {string} roomId The room ID to enable encryption in.
  * @param {object} config The encryption config for the room.
@@ -646,11 +670,7 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
     // we don't have an m.room.encrypted event, but that might be because
     // the server is hiding it from us. Check the store to see if it was
     // previously encrypted.
-    if (!this._sessionStore) {
-        return false;
-    }
-
-    return Boolean(this._sessionStore.getEndToEndRoom(roomId));
+    return this._roomList.isRoomEncrypted(roomId);
 };
 
 /**
@@ -772,7 +792,6 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
 /**
  * Get account data event of given type for the current user.
  * @param {string} eventType The event type
- * @param {module:client.callback} callback Optional.
  * @return {?object} The contents of the given account data event
  */
 MatrixClient.prototype.getAccountData = function(eventType) {
@@ -1261,10 +1280,7 @@ MatrixClient.prototype.sendMessage = function(roomId, content, txnId, callback) 
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.text",
-         body: body,
-    };
+    const content = ContentHelpers.makeTextMessage(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1277,10 +1293,7 @@ MatrixClient.prototype.sendTextMessage = function(roomId, body, txnId, callback)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.notice",
-         body: body,
-    };
+    const content = ContentHelpers.makeNotice(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1293,10 +1306,7 @@ MatrixClient.prototype.sendNotice = function(roomId, body, txnId, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendEmoteMessage = function(roomId, body, txnId, callback) {
-    const content = {
-         msgtype: "m.emote",
-         body: body,
-    };
+    const content = ContentHelpers.makeEmoteMessage(body);
     return this.sendMessage(roomId, content, txnId, callback);
 };
 
@@ -1347,7 +1357,7 @@ MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, ca
          body: text,
     };
     return this.sendEvent(
-        roomId, "m.room.sticker", content, callback, undefined,
+        roomId, "m.sticker", content, callback, undefined,
     );
 };
 
@@ -1360,12 +1370,7 @@ MatrixClient.prototype.sendStickerMessage = function(roomId, url, info, text, ca
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.text",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlMessage(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
@@ -1378,12 +1383,7 @@ MatrixClient.prototype.sendHtmlMessage = function(roomId, body, htmlBody, callba
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.notice",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlNotice(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
@@ -1396,12 +1396,7 @@ MatrixClient.prototype.sendHtmlNotice = function(roomId, body, htmlBody, callbac
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.sendHtmlEmote = function(roomId, body, htmlBody, callback) {
-    const content = {
-        msgtype: "m.emote",
-        format: "org.matrix.custom.html",
-        body: body,
-        formatted_body: htmlBody,
-    };
+    const content = ContentHelpers.makeHtmlEmote(body, htmlBody);
     return this.sendMessage(roomId, content, callback);
 };
 
@@ -1577,17 +1572,12 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
         { $roomId: roomId },
     );
 
-    let identityServerUrl = this.getIdentityServerUrl();
+    const identityServerUrl = this.getIdentityServerUrl(true);
     if (!identityServerUrl) {
         return Promise.reject(new MatrixError({
             error: "No supplied identity server URL",
             errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
         }));
-    }
-    if (identityServerUrl.indexOf("http://") === 0 ||
-            identityServerUrl.indexOf("https://") === 0) {
-        // this request must not have the protocol part because reasons
-        identityServerUrl = identityServerUrl.split("://")[1];
     }
 
     return this._http.authedRequest(callback, "POST", path, undefined, {
@@ -1748,8 +1738,7 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
  */
 MatrixClient.prototype.getPushActionsForEvent = function(event) {
     if (!event.getPushActions()) {
-        const pushProcessor = new PushProcessor(this);
-        event.setPushActions(pushProcessor.actionsForEvent(event));
+        event.setPushActions(this._pushProcessor.actionsForEvent(event));
     }
     return event.getPushActions();
 };
@@ -3144,10 +3133,7 @@ function setupCallEventHandler(client) {
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
                 if (ignoreCallIds[e.getContent().call_id]) {
-                    console.log(
-                        'Ignoring previously answered/hungup call ' +
-                            e.getContent().call_id,
-                    );
+                    // This call has previously been ansered or hung up: ignore it
                     return;
                 }
                 callEventHandler(e);
@@ -3605,6 +3591,16 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @example
  * matrixClient.on("Session.logged_out", function(call){
  *   // show the login screen
+ * });
+ */
+
+/**
+ * Fires when the JS SDK receives a M_CONSENT_NOT_GIVEN error in response
+ * to a HTTP request.
+ * @event module:client~MatrixClient#"no_consent"
+ * @example
+ * matrixClient.on("no_consent", function(message, contentUri) {
+ *     console.info(message + ' Go to ' + contentUri);
  * });
  */
 
