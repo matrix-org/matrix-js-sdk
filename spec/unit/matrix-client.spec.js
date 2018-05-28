@@ -132,11 +132,12 @@ describe("MatrixClient", function() {
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         store = [
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-            "save", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
+            "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
             "getSyncAccumulator", "startup", "deleteAllData",
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+        store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
         store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",

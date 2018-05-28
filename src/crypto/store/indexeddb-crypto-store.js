@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -96,7 +97,7 @@ export default class IndexedDBCryptoStore {
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to localStorage store: ${e}`,
             );
-            return new LocalStorageCryptoStore();
+            return new LocalStorageCryptoStore(global.localStorage);
         }).catch((e) => {
             console.warn(
                 `unable to open localStorage: falling back to in-memory store: ${e}`,
@@ -227,6 +228,8 @@ export default class IndexedDBCryptoStore {
         });
     }
 
+    // Olm Account
+
     /*
      * Get the account pickle from the store.
      * This requires an active transaction. See doTxn().
@@ -248,6 +251,8 @@ export default class IndexedDBCryptoStore {
     storeAccount(txn, newData) {
         this._backendPromise.value().storeAccount(txn, newData);
     }
+
+    // Olm sessions
 
     /**
      * Returns the number of end-to-end sessions in the store
@@ -296,6 +301,112 @@ export default class IndexedDBCryptoStore {
         );
     }
 
+    // Inbound group saessions
+
+    /**
+     * Retrieve the end-to-end inbound group session for a given
+     * server key and session ID
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called with A map from sessionId
+     *     to Base64 end-to-end session.
+     */
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        this._backendPromise.value().getEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, txn, func,
+        );
+    }
+
+    /**
+     * Fetches all inbound group sessions in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called once for each group session
+     *     in the store with an object having keys {senderKey, sessionId,
+     *     sessionData}, then once with null to indicate the end of the list.
+     */
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        this._backendPromise.value().getAllEndToEndInboundGroupSessions(txn, func);
+    }
+
+    /**
+     * Adds an end-to-end inbound group session to the store.
+     * If there already exists an inbound group session with the same
+     * senderCurve25519Key and sessionID, the session will not be added.
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {object} sessionData The session data structure
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._backendPromise.value().addEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
+    }
+
+    /**
+     * Writes an end-to-end inbound group session to the store.
+     * If there already exists an inbound group session with the same
+     * senderCurve25519Key and sessionID, it will be overwritten.
+     * @param {string} senderCurve25519Key The sender's curve 25519 key
+     * @param {string} sessionId The ID of the session
+     * @param {object} sessionData The session data structure
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._backendPromise.value().storeEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
+    }
+
+    // End-to-end device tracking
+
+    /**
+     * Store the state of all tracked devices
+     * This contains devices for each user, a tracking state for each user
+     * and a sync token matching the point in time the snapshot represents.
+     * These all need to be written out in full each time such that the snapshot
+     * is always consistent, so they are stored in one object.
+     *
+     * @param {Object} deviceData
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndDeviceData(deviceData, txn) {
+        this._backendPromise.value().storeEndToEndDeviceData(deviceData, txn);
+    }
+
+    /**
+     * Get the state of all tracked devices
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(Object)} func Function called with the
+     *     device data
+     */
+    getEndToEndDeviceData(txn, func) {
+        this._backendPromise.value().getEndToEndDeviceData(txn, func);
+    }
+
+    // End to End Rooms
+
+    /**
+     * Store the end-to-end state for a room.
+     * @param {string} roomId The room's ID.
+     * @param {object} roomInfo The end-to-end info for the room.
+     * @param {*} txn An active transaction. See doTxn().
+     */
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        this._backendPromise.value().storeEndToEndRoom(roomId, roomInfo, txn);
+    }
+
+    /**
+     * Get an object of roomId->roomInfo for all e2e rooms in the store
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(Object)} func Function called with the end to end encrypted rooms
+     */
+    getEndToEndRooms(txn, func) {
+        this._backendPromise.value().getEndToEndRooms(txn, func);
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -326,3 +437,6 @@ export default class IndexedDBCryptoStore {
 
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
+IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
+IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
+IndexedDBCryptoStore.STORE_ROOMS = 'rooms';

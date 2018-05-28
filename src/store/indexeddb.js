@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -146,6 +147,14 @@ IndexedDBStore.prototype.getSavedSync = function() {
 };
 
 /**
+ * @return {Promise} If there is a saved sync, the nextBatch token
+ * for this sync, otherwise null.
+ */
+IndexedDBStore.prototype.getSavedSyncToken = function() {
+    return this.backend.getNextBatchToken();
+},
+
+/**
  * Delete all data from this store.
  * @return {Promise} Resolves if the data was deleted from the database.
  */
@@ -160,12 +169,26 @@ IndexedDBStore.prototype.deleteAllData = function() {
 };
 
 /**
+ * Whether this store would like to save its data
+ * Note that obviously whether the store wants to save or
+ * not could change between calling this function and calling
+ * save().
+ *
+ * @return {boolean} True if calling save() will actually save
+ *     (at the time this function is called).
+ */
+IndexedDBStore.prototype.wantsSave = function() {
+    const now = Date.now();
+    return now - this._syncTs > WRITE_DELAY_MS;
+};
+
+/**
  * Possibly write data to the database.
- * @return {Promise} Promise resolves after the write completes.
+ * @return {Promise} Promise resolves after the write completes
+ *     (or immediately if no write is performed)
  */
 IndexedDBStore.prototype.save = function() {
-    const now = Date.now();
-    if (now - this._syncTs > WRITE_DELAY_MS) {
+    if (this.wantsSave()) {
         return this._reallySave();
     }
     return Promise.resolve();

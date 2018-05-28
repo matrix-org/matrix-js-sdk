@@ -80,7 +80,10 @@ module.exports.MatrixEvent = function MatrixEvent(
     // intern the values of matrix events to force share strings and reduce the
     // amount of needless string duplication. This can save moderate amounts of
     // memory (~10% on a 350MB heap).
-    ["state_key", "type", "sender", "room_id"].forEach((prop) => {
+    // 'membership' at the event level (rather than the content level) is a legacy
+    // field that Riot never otherwise looks at, but it will still take up a lot
+    // of space if we don't intern it.
+    ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
         if (!event[prop]) {
             return;
         }
@@ -108,8 +111,6 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
-    this._date = this.event.origin_server_ts ?
-        new Date(this.event.origin_server_ts) : null;
 
     this._clearEvent = {};
 
@@ -204,7 +205,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
      */
     getDate: function() {
-        return this._date;
+        return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
     },
 
     /**
@@ -375,6 +376,21 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this._decryptionPromise = this._decryptionLoop(crypto);
         return this._decryptionPromise;
+    },
+
+    /**
+     * Cancel any room key request for this event and resend another.
+     *
+     * @param {module:crypto} crypto crypto module
+     */
+    cancelAndResendKeyRequest: function(crypto) {
+        const wireContent = this.getWireContent();
+        crypto.cancelRoomKeyRequest({
+            algorithm: wireContent.algorithm,
+            room_id: this.getRoomId(),
+            session_id: wireContent.session_id,
+            sender_key: wireContent.sender_key,
+        }, true);
     },
 
     _decryptionLoop: async function(crypto) {
@@ -652,7 +668,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         this.event = event;
         // successfully sent.
         this.status = null;
-        this._date = new Date(this.event.origin_server_ts);
      },
 });
 

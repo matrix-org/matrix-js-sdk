@@ -24,6 +24,9 @@ describe('NotificationService', function() {
                             name: testDisplayName,
                         };
                     },
+                    getJoinedMemberCount: function() {
+                        return 0;
+                    },
                     members: {},
                 },
             };

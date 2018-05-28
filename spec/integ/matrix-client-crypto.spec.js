@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -154,11 +155,15 @@ function aliDownloadsKeys() {
 
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
-    return Promise.all([p1, p2]).then(function() {
-        const devices = aliTestClient.storage.getEndToEndDevicesForUser(bobUserId);
-        expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
-        expect(devices[bobDeviceId].verified).
-            toBe(0); // DeviceVerification.UNVERIFIED
+    return Promise.all([p1, p2]).then(() => {
+        return aliTestClient.client._crypto._deviceList.saveIfDirty();
+    }).then(() => {
+        aliTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
+            const devices = data.devices[bobUserId];
+            expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
+            expect(devices[bobDeviceId].verified).
+                toBe(0); // DeviceVerification.UNVERIFIED
+        });
     });
 }
 

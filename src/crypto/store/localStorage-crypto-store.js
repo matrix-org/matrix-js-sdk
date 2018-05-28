@@ -1,5 +1,5 @@
 /*
-Copyright 2017 New Vector Ltd
+Copyright 2017, 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,19 +29,32 @@ import MemoryCryptoStore from './memory-crypto-store.js';
 
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
+const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
+const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
 
 function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
+}
+
+function keyEndToEndInboundGroupSession(senderKey, sessionId) {
+    return KEY_INBOUND_SESSION_PREFIX + senderKey + "/" + sessionId;
+}
+
+function keyEndToEndRoomsPrefix(roomId) {
+    return KEY_ROOMS_PREFIX + roomId;
 }
 
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export default class LocalStorageCryptoStore extends MemoryCryptoStore {
-    constructor() {
+    constructor(webStore) {
         super();
-        this.store = global.localStorage;
+        this.store = webStore;
     }
+
+    // Olm Sessions
 
     countEndToEndSessions(txn, func) {
         let count = 0;
@@ -72,6 +85,86 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
+    // Inbound Group Sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        func(getJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+        ));
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key.startsWith(KEY_INBOUND_SESSION_PREFIX)) {
+                // we can't use split, as the components we are trying to split out
+                // might themselves contain '/' characters. We rely on the
+                // senderKey being a (32-byte) curve25519 key, base64-encoded
+                // (hence 43 characters long).
+
+                func({
+                    senderKey: key.substr(KEY_INBOUND_SESSION_PREFIX.length, 43),
+                    sessionId: key.substr(KEY_INBOUND_SESSION_PREFIX.length + 44),
+                    sessionData: getJsonItem(this.store, key),
+                });
+            }
+        }
+        func(null);
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const existing = getJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+        );
+        if (!existing) {
+            this.storeEndToEndInboundGroupSession(
+                senderCurve25519Key, sessionId, sessionData, txn,
+            );
+        }
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        setJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+            sessionData,
+        );
+    }
+
+    getEndToEndDeviceData(txn, func) {
+        func(getJsonItem(
+            this.store, KEY_DEVICE_DATA,
+        ));
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        setJsonItem(
+            this.store, KEY_DEVICE_DATA, deviceData,
+        );
+    }
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        setJsonItem(
+            this.store, keyEndToEndRoomsPrefix(roomId), roomInfo,
+        );
+    }
+
+    getEndToEndRooms(txn, func) {
+        const result = {};
+        const prefix = keyEndToEndRoomsPrefix('');
+
+        for (let i = 0; i < this.store.length; ++i) {
+            const key = this.store.key(i);
+            if (key.startsWith(prefix)) {
+                const roomId = key.substr(prefix.length);
+                result[roomId] = getJsonItem(this.store, key);
+            }
+        }
+        func(result);
+    }
+
     /**
      * Delete all data from this store.
      *
@@ -82,13 +175,17 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         return Promise.resolve();
     }
 
+    // Olm account
+
     getAccount(txn, func) {
-        const account = this.store.getItem(KEY_END_TO_END_ACCOUNT);
+        const account = getJsonItem(this.store, KEY_END_TO_END_ACCOUNT);
         func(account);
     }
 
     storeAccount(txn, newData) {
-        this.store.setItem(KEY_END_TO_END_ACCOUNT, newData);
+        setJsonItem(
+            this.store, KEY_END_TO_END_ACCOUNT, newData,
+        );
     }
 
     doTxn(mode, stores, func) {

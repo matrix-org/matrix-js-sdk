@@ -89,9 +89,14 @@ MatrixBaseApis.prototype.getHomeserverUrl = function() {
 
 /**
  * Get the Identity Server URL of this client
+ * @param {boolean} stripProto whether or not to strip the protocol from the URL
  * @return {string} Identity Server URL of this client
  */
-MatrixBaseApis.prototype.getIdentityServerUrl = function() {
+MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
+    if (stripProto && (this.idBaseUrl.startsWith("http://") ||
+            this.idBaseUrl.startsWith("https://"))) {
+        return this.idBaseUrl.split("://")[1];
+    }
     return this.idBaseUrl;
 };
 
@@ -333,18 +338,29 @@ MatrixBaseApis.prototype.logout = function(callback) {
  * it is up to the caller to either reset or destroy the MatrixClient after
  * this method succeeds.
  * @param {object} auth Optional. Auth data to supply for User-Interactive auth.
- * @param {module:client.callback} callback Optional.
+ * @param {boolean} erase Optional. If set, send as `erase` attribute in the
+ * JSON request body, indicating whether the account should be erased. Defaults
+ * to false.
  * @return {module:client.Promise} Resolves: On success, the empty object
  */
-MatrixBaseApis.prototype.deactivateAccount = function(auth, callback) {
-    let body = {};
-    if (auth) {
-        body = {
-            auth: auth,
-        };
+MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
+    if (typeof(erase) === 'function') {
+        throw new Error(
+            'deactivateAccount no longer accepts a callback parameter',
+        );
     }
+
+    const body = {};
+    if (auth) {
+        body.auth = auth;
+    }
+    if (erase !== undefined) {
+        body.erase = erase;
+    }
+
     return this._http.authedRequestWithPrefix(
-        callback, "POST", '/account/deactivate', undefined, body, httpApi.PREFIX_UNSTABLE,
+        undefined, "POST", '/account/deactivate', undefined, body,
+        httpApi.PREFIX_R0,
     );
 };
 
@@ -435,6 +451,27 @@ MatrixBaseApis.prototype.setGroupProfile = function(groupId, profile) {
     const path = utils.encodeUri("/groups/$groupId/profile", {$groupId: groupId});
     return this._http.authedRequest(
         undefined, "POST", path, undefined, profile,
+    );
+};
+
+/**
+ * @param {string} groupId
+ * @param {object} policy The join policy for the group. Must include at
+ *     least a 'type' field which is 'open' if anyone can join the group
+ *     the group without prior approval, or 'invite' if an invite is
+ *     required to join.
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.setGroupJoinPolicy = function(groupId, policy) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/settings/m.join_policy",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(
+        undefined, "PUT", path, undefined, {
+            'm.join_policy': policy,
+        },
     );
 };
 
@@ -626,6 +663,19 @@ MatrixBaseApis.prototype.acceptGroupInvite = function(groupId, opts = null) {
         {$groupId: groupId},
     );
     return this._http.authedRequest(undefined, "PUT", path, undefined, opts || {});
+};
+
+/**
+ * @param {string} groupId
+ * @return {module:client.Promise} Resolves: Empty object
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.joinGroup = function(groupId) {
+    const path = utils.encodeUri(
+        "/groups/$groupId/self/join",
+        {$groupId: groupId},
+    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, {});
 };
 
 /**

@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +35,12 @@ export default class MemoryCryptoStore {
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
+        // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
+        this._inboundGroupSessions = {};
+        // Opaque device data object
+        this._deviceData = null;
+        // roomId -> Opaque roomInfo object
+        this._rooms = {};
     }
 
     /**
@@ -201,6 +208,8 @@ export default class MemoryCryptoStore {
         return Promise.resolve(null);
     }
 
+    // Olm Account
+
     getAccount(txn, func) {
         func(this._account);
     }
@@ -208,6 +217,8 @@ export default class MemoryCryptoStore {
     storeAccount(txn, newData) {
         this._account = newData;
     }
+
+    // Olm Sessions
 
     countEndToEndSessions(txn, func) {
         return Object.keys(this._sessions).length;
@@ -229,6 +240,59 @@ export default class MemoryCryptoStore {
             this._sessions[deviceKey] = deviceSessions;
         }
         deviceSessions[sessionId] = session;
+    }
+
+    // Inbound Group Sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        for (const key of Object.keys(this._inboundGroupSessions)) {
+            // we can't use split, as the components we are trying to split out
+            // might themselves contain '/' characters. We rely on the
+            // senderKey being a (32-byte) curve25519 key, base64-encoded
+            // (hence 43 characters long).
+
+            func({
+                senderKey: key.substr(0, 43),
+                sessionId: key.substr(44),
+                sessionData: this._inboundGroupSessions[key],
+            });
+        }
+        func(null);
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const k = senderCurve25519Key+'/'+sessionId;
+        if (this._inboundGroupSessions[k] === undefined) {
+            this._inboundGroupSessions[k] = sessionData;
+        }
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
+    // Device Data
+
+    getEndToEndDeviceData(txn, func) {
+        func(this._deviceData);
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        this._deviceData = deviceData;
+    }
+
+    // E2E rooms
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        this._rooms[roomId] = roomInfo;
+    }
+
+    getEndToEndRooms(txn, func) {
+        func(this._rooms);
     }
 
     doTxn(mode, stores, func) {

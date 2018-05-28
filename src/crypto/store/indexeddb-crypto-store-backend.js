@@ -1,7 +1,24 @@
+/*
+Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 import Promise from 'bluebird';
 import utils from '../../utils';
 
-export const VERSION = 3;
+export const VERSION = 6;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -62,9 +79,9 @@ export class Backend {
                 `enqueueing key request for ${requestBody.room_id} / ` +
                     requestBody.session_id,
             );
+            txn.oncomplete = () => { deferred.resolve(request); };
             const store = txn.objectStore("outgoingRoomKeyRequests");
             store.add(request);
-            txn.onsuccess = () => { deferred.resolve(request); };
         });
 
         return deferred.promise;
@@ -258,6 +275,8 @@ export class Backend {
         return promiseifyTxn(txn);
     }
 
+    // Olm Account
+
     getAccount(txn, func) {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
@@ -274,6 +293,8 @@ export class Backend {
         const objectStore = txn.objectStore("account");
         objectStore.put(newData, "-");
     }
+
+    // Olm Sessions
 
     countEndToEndSessions(txn, func) {
         const objectStore = txn.objectStore("sessions");
@@ -324,6 +345,121 @@ export class Backend {
         objectStore.put({deviceKey, sessionId, session});
     }
 
+    // Inbound group sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.get([senderCurve25519Key, sessionId]);
+        getReq.onsuccess = function() {
+            try {
+                if (getReq.result) {
+                    func(getReq.result.session);
+                } else {
+                    func(null);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                try {
+                    func({
+                        senderKey: cursor.value.senderCurve25519Key,
+                        sessionId: cursor.value.sessionId,
+                        sessionData: cursor.value.session,
+                    });
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+                cursor.continue();
+            } else {
+                try {
+                    func(null);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const addReq = objectStore.add({
+            senderCurve25519Key, sessionId, session: sessionData,
+        });
+        addReq.onerror = (ev) => {
+            if (addReq.error.name === 'ConstraintError') {
+                // This stops the error from triggering the txn's onerror
+                ev.stopPropagation();
+                // ...and this stops it from aborting the transaction
+                ev.preventDefault();
+                console.log(
+                    "Ignoring duplicate inbound group session: " +
+                    senderCurve25519Key + " / " + sessionId,
+                );
+            } else {
+                abortWithException(txn, new Error(
+                    "Failed to add inbound group session: " + addReq.error,
+                ));
+            }
+        };
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        objectStore.put({
+            senderCurve25519Key, sessionId, session: sessionData,
+        });
+    }
+
+    getEndToEndDeviceData(txn, func) {
+        const objectStore = txn.objectStore("device_data");
+        const getReq = objectStore.get("-");
+        getReq.onsuccess = function() {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        const objectStore = txn.objectStore("device_data");
+        objectStore.put(deviceData, "-");
+    }
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        const objectStore = txn.objectStore("rooms");
+        objectStore.put(roomInfo, roomId);
+    }
+
+    getEndToEndRooms(txn, func) {
+        const rooms = {};
+        const objectStore = txn.objectStore("rooms");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                rooms[cursor.key] = cursor.value;
+                cursor.continue();
+            } else {
+                try {
+                    func(rooms);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
@@ -351,6 +487,17 @@ export function upgradeDatabase(db, oldVersion) {
         });
         sessionsStore.createIndex("deviceKey", "deviceKey");
     }
+    if (oldVersion < 4) {
+        db.createObjectStore("inbound_group_sessions", {
+            keyPath: ["senderCurve25519Key", "sessionId"],
+        });
+    }
+    if (oldVersion < 5) {
+        db.createObjectStore("device_data");
+    }
+    if (oldVersion < 6) {
+        db.createObjectStore("rooms");
+    }
     // Expand as needed.
 }
 
@@ -376,13 +523,28 @@ function abortWithException(txn, e) {
     // We could alternatively make the thing we pass back to the app
     // an object containing the transaction and exception.
     txn._mx_abortexception = e;
-    txn.abort();
+    try {
+        txn.abort();
+    } catch (e) {
+        // sometimes we won't be able to abort the transaction
+        // (ie. if it's aborted or completed)
+    }
 }
 
 function promiseifyTxn(txn) {
     return new Promise((resolve, reject) => {
-        txn.oncomplete = resolve;
-        txn.onerror = reject;
+        txn.oncomplete = () => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            }
+            resolve();
+        };
+        txn.onerror = () => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            }
+            reject();
+        };
         txn.onabort = () => reject(txn._mx_abortexception);
     });
 }
