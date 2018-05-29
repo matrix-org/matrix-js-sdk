@@ -329,7 +329,7 @@ RoomState.prototype._hasSufficientPowerLevelFor = function(action, powerLevel) {
     }
 
     let requiredLevel = 50;
-    if (powerLevels[action] !== undefined) {
+    if (utils.isNumber(powerLevels[action])) {
         requiredLevel = powerLevels[action];
     }
 
@@ -417,18 +417,18 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
         power_levels = power_levels_event.getContent();
         events_levels = power_levels.events || {};
 
-        if (power_levels.state_default !== undefined) {
+        if (utils.isNumber(power_levels.state_default)) {
             state_default = power_levels.state_default;
         } else {
             state_default = 50;
         }
-        if (power_levels.events_default !== undefined) {
+        if (utils.isNumber(power_levels.events_default)) {
             events_default = power_levels.events_default;
         }
     }
 
     let required_level = state ? state_default : events_default;
-    if (events_levels[eventType] !== undefined) {
+    if (utils.isNumber(events_levels[eventType])) {
         required_level = events_levels[eventType];
     }
     return member.powerLevel >= required_level;
@@ -455,7 +455,7 @@ RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
         powerLevelsEvent &&
         powerLevelsEvent.getContent() &&
         powerLevelsEvent.getContent().notifications &&
-        powerLevelsEvent.getContent().notifications[notifLevelKey]
+        utils.isNumber(powerLevelsEvent.getContent().notifications[notifLevelKey])
     ) {
         notifLevel = powerLevelsEvent.getContent().notifications[notifLevelKey];
     }
