@@ -113,14 +113,9 @@ module.exports.MatrixHttpApi.prototype = {
      *
      * @param {object} opts  options object
      *
-     * @param {boolean=} opts.rawResponse Return the raw body, rather than
+    * @param {boolean=} opts.rawResponse Return the raw body, rather than
      *   parsing the JSON. Defaults to false (except on node.js, where it
      *   defaults to true for backwards compatibility).
-     *
-     * @param {boolean=} opts.onlyContentUri Just return the content URI,
-     *   rather than the whole body. Defaults to false (except on browsers,
-     *   where it defaults to true for backwards compatibility). Ignored if
-     *   opts.rawResponse is true.
      *
      * @param {Function=} opts.callback Deprecated. Optional. The callback to
      *    invoke on success/failure. See the promise return values for more
@@ -161,20 +156,6 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        let onlyContentUri = opts.onlyContentUri;
-        if (!rawResponse && onlyContentUri === undefined) {
-            if (global.XMLHttpRequest) {
-                console.warn(
-                    "Returning only the content-uri from uploadContent(). " +
-                    "Future versions of the js-sdk will change this " +
-                    "default, to return the whole response object. Set " +
-                    "opts.onlyContentUri=false to change this behaviour now.");
-                onlyContentUri = true;
-            } else {
-                onlyContentUri = false;
-            }
-        }
-
         let promise;
 
         // XMLHttpRequest doesn't parse JSON for us. request normally does, but
@@ -184,14 +165,7 @@ module.exports.MatrixHttpApi.prototype = {
         let bodyParser = null;
         if (!rawResponse) {
             bodyParser = function(rawBody) {
-                let body = JSON.parse(rawBody);
-                if (onlyContentUri) {
-                    body = body.content_uri;
-                    if (body === undefined) {
-                        throw Error('Bad response');
-                    }
-                }
-                return body;
+                return JSON.parse(rawBody);
             };
         }
 
@@ -218,9 +192,16 @@ module.exports.MatrixHttpApi.prototype = {
                             if (!xhr.responseText) {
                                 throw new Error('No response body.');
                             }
+
                             resp = xhr.responseText;
                             if (bodyParser) {
                                 resp = bodyParser(resp);
+                            }
+
+                            if (xhr.status != 200) {
+                                const { error } = resp;
+                                cb({ message: error, http_status: xhr.status });
+                                return;
                             }
                         } catch (err) {
                             err.http_status = xhr.status;
@@ -231,7 +212,7 @@ module.exports.MatrixHttpApi.prototype = {
                         break;
                 }
             };
-            let url = this.opts.baseUrl + "/_matrix/media/v1/resolve";
+            let url = this.opts.baseUrl + "/_matrix/media/v1/resolve_url";
             url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
 
             xhr.open("POST", url);
@@ -243,7 +224,7 @@ module.exports.MatrixHttpApi.prototype = {
             promise.abort = xhr.abort.bind(xhr);
         } else {
             promise = this.authedRequest(
-                opts.callback, "POST", "/resolve", {}, body, {
+                opts.callback, "POST", "/resolve_url", {}, body, {
                     prefix: "/_matrix/media/v1",
                     headers: {"Content-Type": contentType},
                     json: false,
