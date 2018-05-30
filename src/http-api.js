@@ -212,10 +212,9 @@ module.exports.MatrixHttpApi.prototype = {
                         break;
                 }
             };
-            let url = this.opts.baseUrl + "/_matrix/media/v1/resolve_url";
-            url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
 
-            xhr.open("POST", url);
+            const url = this.opts.baseUrl + "/_matrix/media/v1/resolve_url";
+            this.authedXHR(xhr, "POST", url);
             xhr.setRequestHeader("Content-Type", contentType);
             xhr.send(body);
             promise = defer.promise;
@@ -401,11 +400,9 @@ module.exports.MatrixHttpApi.prototype = {
                     });
                 }
             });
-            let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
-            url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
-            url += "&filename=" + encodeURIComponent(fileName);
 
-            xhr.open("POST", url);
+            const url = this.opts.baseUrl + "/_matrix/media/v1/upload";
+            this.authedXHR(xhr, "POST", url, { filename: encodeURIComponent(fileName) });
             xhr.setRequestHeader("Content-Type", contentType);
             xhr.send(body);
             promise = defer.promise;
@@ -446,6 +443,34 @@ module.exports.MatrixHttpApi.prototype = {
         this.uploads.push(upload);
 
         return promise0;
+    },
+
+    addQueryParams: function(path, params) {
+        if (Object.keys(params).length === 0) {
+            return path;
+        }
+
+        path = path + '?';
+        const qc = [];
+        for (const key in params) {
+            qc.push(key + '=' + params[key]);
+        }
+        return path + qc.join('&');
+    },
+
+    authedXHR: function(xhr, method, path, params) {
+        params = params || {};
+
+        if (this.useAuthorizationHeader) {
+            // we should open xhr before to set header
+            path = this.addQueryParams(path, params);
+            xhr.open(method, path);
+            xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
+        } else {
+            params.access_token = encodeURIComponent(this.opts.accessToken);
+            path = this.addQueryParams(path, params);
+            xhr.open(method, path);
+        }
     },
 
     cancelUpload: function(promise) {
