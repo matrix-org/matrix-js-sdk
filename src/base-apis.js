@@ -1066,9 +1066,6 @@ MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
  *
  * @param {object} opts  options object
  *
- * @param {string=} opts.name   Name to give the file on the server. Defaults
- *   to 'default'.
- *
  * @param {boolean=} opts.rawResponse Return the raw body, rather than
  *   parsing the JSON. Defaults to false (except on node.js, where it
  *   defaults to true for backwards compatibility).
