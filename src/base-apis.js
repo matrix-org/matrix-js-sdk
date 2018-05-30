@@ -1069,21 +1069,9 @@ MatrixBaseApis.prototype.searchUserDirectory = function(opts) {
  * @param {string=} opts.name   Name to give the file on the server. Defaults
  *   to 'default'.
  *
- * @param {string=} opts.type   Content-type for the upload. Defaults to
- *   <tt>applicaton/octet-stream</tt>.
- *
  * @param {boolean=} opts.rawResponse Return the raw body, rather than
  *   parsing the JSON. Defaults to false (except on node.js, where it
  *   defaults to true for backwards compatibility).
- *
- * @param {boolean=} opts.onlyContentUri Just return the content URI,
- *   rather than the whole body. Defaults to false (except on browsers,
- *   where it defaults to true for backwards compatibility). Ignored if
- *   opts.rawResponse is true.
- *
- * @param {Function=} opts.callback Deprecated. Optional. The callback to
- *    invoke on success/failure. See the promise return values for more
- *    information.
  *
  * @return {module:client.Promise} Resolves to response object, as
  *    determined by this.opts.onlyData, opts.rawResponse, and
