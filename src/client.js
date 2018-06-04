@@ -3686,6 +3686,16 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  */
 
 /**
+ * Fires when the JS SDK receives a M_CONSENT_NOT_GIVEN error in response
+ * to a HTTP request.
+ * @event module:client~MatrixClient#"no_consent"
+ * @example
+ * matrixClient.on("no_consent", function(message, contentUri) {
+ *     console.info(message + ' Go to ' + contentUri);
+ * });
+ */
+
+/**
  * Fires when a device is marked as verified/unverified/blocked/unblocked by
  * {@link module:client~MatrixClient#setDeviceVerified|MatrixClient.setDeviceVerified} or
  * {@link module:client~MatrixClient#setDeviceBlocked|MatrixClient.setDeviceBlocked}.
