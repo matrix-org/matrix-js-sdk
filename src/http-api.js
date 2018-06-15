@@ -271,9 +271,18 @@ module.exports.MatrixHttpApi.prototype = {
                     });
                 }
             });
-            let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
-            url += "?access_token=" + encodeURIComponent(this.opts.accessToken);
-            url += "&filename=" + encodeURIComponent(fileName);
+            let url = this.opts.baseUrl + "/_matrix/media/v1/upload?";
+
+            const queryArgs = ["filename=" + encodeURIComponent(fileName)];
+
+            if (this.useAuthorizationHeader) {
+                xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
+            } else {
+                queryArgs.push("access_token="
+                    + encodeURIComponent(this.opts.accessToken));
+            }
+
+            url += queryArgs.join("&");
 
             xhr.open("POST", url);
             xhr.setRequestHeader("Content-Type", contentType);
