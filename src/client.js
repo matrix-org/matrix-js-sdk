@@ -2209,7 +2209,8 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
         if (filter) {
             // XXX: it's horrific that /messages' filter parameter doesn't match
             // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            params.filter = JSON.stringify(filter.getRoomTimelineFilterComponent());
+            const component = filter.getRoomTimelineFilterComponent();
+            params.filter = JSON.stringify(component ? component.filter_json : undefined);
         }
 
         promise =
