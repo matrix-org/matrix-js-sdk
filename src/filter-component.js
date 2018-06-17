@@ -70,7 +70,7 @@ FilterComponent.prototype.check = function(event) {
         event.getRoomId(),
         event.getSender(),
         event.getType(),
-        event.getContent() ? event.getContent().url !== undefined : false,
+        event.getContent() ? typeof event.getContent().url === 'string' : false,
     );
 };
 
