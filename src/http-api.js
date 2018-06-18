@@ -118,9 +118,9 @@ module.exports.MatrixHttpApi.prototype = {
      * @param {string=} opts.name   Name to give the file on the server. Defaults
      *   to <tt>file.name</tt>.
      *
-     * @param {boolean=} opts.omitFilename if true will not send the filename,
+     * @param {boolean=} opts.includeFilename if false will not send the filename,
      *   e.g for encrypted file uploads where filename leaks are undesirable.
-     *   Defaults to false.
+     *   Defaults to true.
      *
      * @param {string=} opts.type   Content-type for the upload. Defaults to
      *   <tt>file.type</tt>, or <tt>applicaton/octet-stream</tt>.
@@ -155,6 +155,9 @@ module.exports.MatrixHttpApi.prototype = {
         } else if (opts === undefined) {
             opts = {};
         }
+
+        // default opts.includeFilename to true (ignoring falsey values)
+        const includeFilename = opts.includeFilename !== false;
 
         // if the file doesn't have a mime type, use a default since
         // the HS errors if we don't supply one.
@@ -279,7 +282,7 @@ module.exports.MatrixHttpApi.prototype = {
 
             const queryArgs = [];
 
-            if (!opts.omitFilename && fileName) {
+            if (includeFilename && fileName) {
                 queryArgs.push("filename=" + encodeURIComponent(fileName));
             }
 
@@ -305,7 +308,7 @@ module.exports.MatrixHttpApi.prototype = {
         } else {
             const queryParams = {};
 
-            if (!opts.omitFilename && fileName) {
+            if (includeFilename && fileName) {
                 queryParams.filename = fileName;
             }
 
