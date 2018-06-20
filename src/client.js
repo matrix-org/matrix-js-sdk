@@ -737,7 +737,7 @@ MatrixClient.prototype.getGroups = function() {
  */
 MatrixClient.prototype.getMediaLimits = function(callback) {
     return this._http.requestWithPrefix(
-        callback, "GET", "/limits", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
+        callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
     );
 };
 
