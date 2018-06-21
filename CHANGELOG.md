@@ -1,3 +1,18 @@
+Changes in [0.10.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.5-rc.1) (2018-06-21)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.4...v0.10.5-rc.1)
+
+ * fix auth header and filename=undefined
+   [\#659](https://github.com/matrix-org/matrix-js-sdk/pull/659)
+ * allow setting the output device for webrtc calls
+   [\#650](https://github.com/matrix-org/matrix-js-sdk/pull/650)
+ * arguments true and false are actually invalid
+   [\#596](https://github.com/matrix-org/matrix-js-sdk/pull/596)
+ * fix typo where `headers` was not being used and thus sent wrong content-type
+   [\#643](https://github.com/matrix-org/matrix-js-sdk/pull/643)
+ * fix some documentation typos
+   [\#642](https://github.com/matrix-org/matrix-js-sdk/pull/642)
+
 Changes in [0.10.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.4) (2018-06-12)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.4-rc.1...v0.10.4)
