@@ -664,10 +664,10 @@ module.exports.isNumber = function(value) {
 };
 
 /**
- * Strips zero width chars and padding spaces from the displayName
+ * Strips zero width chars, diaritics and whitespace from the displayName
  * @param {string} displayName the displayname to strip
  * @return {string} the stripped displayname
  */
 module.exports.stripDisplayName = function(displayName) {
-    return displayName.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    return displayName.normalize('NFD').replace(/[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g, '');
 };
