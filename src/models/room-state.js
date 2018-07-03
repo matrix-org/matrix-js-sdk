@@ -494,22 +494,30 @@ function _updateDisplayNameCache(roomState, userId, displayName) {
         // We clobber the user_id > name lookup but the name -> [user_id] lookup
         // means we need to remove that user ID from that array rather than nuking
         // the lot.
-        const existingUserIds = roomState._displayNameToUserIds[oldName] || [];
-        for (let i = 0; i < existingUserIds.length; i++) {
-            if (existingUserIds[i] === userId) {
-                // remove this user ID from this array
-                existingUserIds.splice(i, 1);
-                i--;
+        const strippedOldName = utils.stripDisplayName(oldName);
+        const existingUserIds = roomState._displayNameToUserIds[strippedOldName];
+        if (existingUserIds) {
+            for (let i = 0; i < existingUserIds.length; i++) {
+                if (existingUserIds[i] === userId) {
+                    // remove this user ID from this array
+                    existingUserIds.splice(i, 1);
+                    i--;
+                }
             }
+            roomState._displayNameToUserIds[strippedOldName] = existingUserIds;
         }
-        roomState._displayNameToUserIds[oldName] = existingUserIds;
     }
 
     roomState._userIdsToDisplayNames[userId] = displayName;
-    if (!roomState._displayNameToUserIds[displayName]) {
-        roomState._displayNameToUserIds[displayName] = [];
+
+    const strippedDisplayname = displayName && utils.stripDisplayName(displayName);
+    // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
+    if (strippedDisplayname) {
+        if (!roomState._displayNameToUserIds[strippedDisplayname]) {
+            roomState._displayNameToUserIds[strippedDisplayname] = [];
+        }
+        roomState._displayNameToUserIds[strippedDisplayname].push(userId);
     }
-    roomState._displayNameToUserIds[displayName].push(userId);
 }
 
 /**

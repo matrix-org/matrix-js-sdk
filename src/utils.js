@@ -662,3 +662,12 @@ module.exports.inherits = function(ctor, superCtor) {
 module.exports.isNumber = function(value) {
     return typeof value === 'number' && isFinite(value);
 };
+
+/**
+ * Strips zero width chars and padding spaces from the displayName
+ * @param {string} displayName the displayname to strip
+ * @return {string} the stripped displayname
+ */
+module.exports.stripDisplayName = function(displayName) {
+    return displayName.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+};
