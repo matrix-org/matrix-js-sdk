@@ -652,3 +652,13 @@ module.exports.inherits = function(ctor, superCtor) {
         },
     });
 };
+
+/**
+ * Returns whether the given value is a finite number without type-coercion
+ *
+ * @param {*} value the value to test
+ * @return {boolean} whether or not value is a finite number without type-coercion
+ */
+module.exports.isNumber = function(value) {
+    return typeof value === 'number' && isFinite(value);
+};

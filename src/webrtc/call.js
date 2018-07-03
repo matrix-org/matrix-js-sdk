@@ -1121,9 +1121,13 @@ const _tryPlayRemoteStream = function(self) {
     }
 };
 
-const _tryPlayRemoteAudioStream = function(self) {
+const _tryPlayRemoteAudioStream = async function(self) {
     if (self.getRemoteAudioElement() && self.remoteAStream) {
         const player = self.getRemoteAudioElement();
+
+        // if audioOutput is non-default:
+        if (audioOutput) await player.setSinkId(audioOutput);
+
         player.autoplay = true;
         self.assignElement(player, self.remoteAStream, "remoteAudio");
         setTimeout(function() {
@@ -1317,8 +1321,16 @@ const forAllTracksOnStream = function(s, f) {
 /** The MatrixCall class. */
 module.exports.MatrixCall = MatrixCall;
 
+let audioOutput;
 let audioInput;
 let videoInput;
+/**
+ * Set an audio output device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setAudioOutput = function(deviceId) { audioOutput = deviceId; };
 /**
  * Set an audio input device to use for MatrixCalls
  * @function
