@@ -669,5 +669,6 @@ module.exports.isNumber = function(value) {
  * @return {string} the stripped displayname
  */
 module.exports.stripDisplayName = function(displayName) {
-    return displayName.normalize('NFD').replace(/[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g, '');
+    return displayName.normalize('NFD').replace(stripDisplayNameRegex, '');
 };
+const stripDisplayNameRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
