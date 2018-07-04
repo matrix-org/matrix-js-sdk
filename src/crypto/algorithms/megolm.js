@@ -641,8 +641,9 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._requestKeysForEvent(event);
         }
+        // TODO: make OlmDevice throw base.DecryptionErrors too
         throw new base.DecryptionError(
-            "OLM_UNKNOWN_MESSAGE_INDEX",
+            "OLM_DECRYPT_GROUP_MESSAGE_ERROR",
             e.toString(), {
                 session: content.sender_key + '|' + content.session_id,
             },
