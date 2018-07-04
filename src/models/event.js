@@ -451,8 +451,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                     `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
                 );
 
-                console.dir(e);
-
                 res = this._badEncryptedMessage(e.message);
             }
 
