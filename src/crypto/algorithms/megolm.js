@@ -638,12 +638,16 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             event.getId(), event.getTs(),
         );
     } catch (e) {
+        let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._requestKeysForEvent(event);
+
+            errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
         }
-        // TODO: make OlmDevice throw base.DecryptionErrors too
+
         throw new base.DecryptionError(
-            "OLM_DECRYPT_GROUP_MESSAGE_ERROR",
+            errorCode,
             e.toString(), {
                 session: content.sender_key + '|' + content.session_id,
             },
