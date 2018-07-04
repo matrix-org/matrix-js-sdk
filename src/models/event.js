@@ -713,4 +713,7 @@ const _REDACT_KEEP_CONTENT_MAP = {
  *
  * @param {module:models/event.MatrixEvent} event
  *    The matrix event which has been decrypted
+ * @param {module:crypto/algorithms/base.DecryptionError?} err
+ *    The error that occured during decryption, or `undefined` if no
+ *    error occured.
  */
