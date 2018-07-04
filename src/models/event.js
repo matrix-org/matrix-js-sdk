@@ -140,6 +140,10 @@ module.exports.MatrixEvent = function MatrixEvent(
      * attempt may succeed)
      */
     this._retryDecryption = false;
+
+    // The last DecryptionError thrown when failing to decrypt the event, or
+    // null if the event never failed to decrypt.
+    this._lastDecryptionError = null;
 };
 utils.inherits(module.exports.MatrixEvent, EventEmitter);
 
@@ -333,6 +337,16 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Get the last error thrown if the event failed to be decrypted.
+     *
+     * @return {module:crypto/algorithms/base.DecryptionError?} The last error
+     * thrown if the event failed to be decrypted or `null` if it never failed.
+     */
+    getLastDecryptionFailureError: function() {
+        return this._lastDecryptionError;
+    },
+
+    /**
      * Start the process of trying to decrypt this event.
      *
      * (This is used within the SDK: it isn't intended for use by applications)
@@ -421,6 +435,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                     this._retryDecryption = false;
                     return;
                 }
+
+                this._lastDecryptionError = e;
 
                 // see if we have a retry queued.
                 //
