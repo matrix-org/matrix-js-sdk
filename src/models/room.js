@@ -457,6 +457,28 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  };
 
  /**
+  * Get a list of members we should be encrypting for in this room
+  * @return {RoomMember[]} A list of members who we should encrypt messages for
+  *                        in this room.
+  */
+ Room.prototype.getEncryptionTargetMembers = function() {
+    let members = this.getMembersWithMembership("join");
+    if (this.shouldEncryptForInvitedMembers()) {
+        members = members.concat(this.getMembersWithMembership("invite"));
+    }
+    return members;
+ };
+
+ /**
+  * Determine whether we should encrypt messages for invited users in this room
+  * @return {boolean} if we should encrypt messages for invited users
+  */
+ Room.prototype.shouldEncryptForInvitedMembers = function() {
+    const ev = this.currentState.getStateEvents("m.room.history_visibility", "");
+    return (ev && ev.getContent() && ev.getContent().history_visibility !== "joined");
+ };
+
+ /**
   * Get the default room name (i.e. what a given user would see if the
   * room had no m.room.name)
   * @param {string} userId The userId from whose perspective we want
@@ -949,7 +971,6 @@ Room.prototype.recalculate = function(userId) {
         this.emit("Room.name", this);
     }
 };
-
 
 /**
  * Get a list of user IDs who have <b>read up to</b> the given event.

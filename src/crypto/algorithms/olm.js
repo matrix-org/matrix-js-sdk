@@ -89,7 +89,7 @@ OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     // TODO: there is a race condition here! What if a new user turns up
     // just as you are sending a secret message?
 
-    const users = utils.map(room.getJoinedMembers(), function(u) {
+    const users = utils.map(room.getEncryptionTargetMembers(), function(u) {
         return u.userId;
     });
 
