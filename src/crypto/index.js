@@ -1275,6 +1275,7 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
     const AlgClass = algorithms.DECRYPTION_CLASSES[algorithm];
     if (!AlgClass) {
         throw new algorithms.DecryptionError(
+            'UNKNOWN_ENCRYPTION_ALGORITHM',
             'Unknown encryption algorithm "' + algorithm + '".',
         );
     }
