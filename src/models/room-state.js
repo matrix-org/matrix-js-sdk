@@ -498,14 +498,9 @@ function _updateDisplayNameCache(roomState, userId, displayName) {
 
         const existingUserIds = roomState._displayNameToUserIds[strippedOldName];
         if (existingUserIds) {
-            for (let i = 0; i < existingUserIds.length; i++) {
-                if (existingUserIds[i] === userId) {
-                    // remove this user ID from this array
-                    existingUserIds.splice(i, 1);
-                    i--;
-                }
-            }
-            roomState._displayNameToUserIds[strippedOldName] = existingUserIds;
+            // remove this user ID from this array
+            const filteredUserIDs = existingUserIds.filter((id) => id !== userId);
+            roomState._displayNameToUserIds[strippedOldName] = filteredUserIDs;
         }
     }
 
