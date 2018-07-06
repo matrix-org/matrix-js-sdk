@@ -664,11 +664,11 @@ module.exports.isNumber = function(value) {
 };
 
 /**
- * Strips zero width chars, diaritics and whitespace from the displayName
- * @param {string} displayName the displayname to strip
- * @return {string} the stripped displayname
+ * Removes zero width chars, diacritics and whitespace from the string
+ * @param {string} str the string to remove hidden characters from
+ * @return {string} a string with the hidden characters removed
  */
-module.exports.stripDisplayName = function(displayName) {
-    return displayName.normalize('NFD').replace(stripDisplayNameRegex, '');
+module.exports.removeHiddenChars = function(str) {
+    return str.normalize('NFD').replace(removeHiddenCharsRegex, '');
 };
-const stripDisplayNameRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
+const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;

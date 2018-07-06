@@ -231,7 +231,7 @@ function calculateDisplayName(member, event, roomState) {
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces
-    const strippedDisplayName = utils.stripDisplayName(displayName);
+    const strippedDisplayName = utils.removeHiddenChars(displayName);
     if (!strippedDisplayName) {
         return selfUserId;
     }
