@@ -662,3 +662,13 @@ module.exports.inherits = function(ctor, superCtor) {
 module.exports.isNumber = function(value) {
     return typeof value === 'number' && isFinite(value);
 };
+
+/**
+ * Removes zero width chars, diacritics and whitespace from the string
+ * @param {string} str the string to remove hidden characters from
+ * @return {string} a string with the hidden characters removed
+ */
+module.exports.removeHiddenChars = function(str) {
+    return str.normalize('NFD').replace(removeHiddenCharsRegex, '');
+};
+const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
