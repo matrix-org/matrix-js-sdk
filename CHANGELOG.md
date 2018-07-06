@@ -1,3 +1,12 @@
+Changes in [0.10.6-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.6-rc.1) (2018-07-06)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.5...v0.10.6-rc.1)
+
+ * Expose event decryption error via Event.decrypted event
+   [\#665](https://github.com/matrix-org/matrix-js-sdk/pull/665)
+ * Add decryption error codes to base.DecryptionError
+   [\#663](https://github.com/matrix-org/matrix-js-sdk/pull/663)
+
 Changes in [0.10.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.5) (2018-06-29)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.5-rc.1...v0.10.5)
