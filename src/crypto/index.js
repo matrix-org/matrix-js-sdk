@@ -1086,7 +1086,7 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
         // make sure we are tracking the deviceList for this user
         this._deviceList.startTrackingDeviceList(member.userId);
     } else if (member.membership == 'invite' &&
-             this._clientStore.getRoom(roomId).shouldEncryptForInvitedUsers()) {
+             this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
         console.log('Invite event for ' + member.userId + ' in ' + roomId);
         this._deviceList.startTrackingDeviceList(member.userId);
     }
