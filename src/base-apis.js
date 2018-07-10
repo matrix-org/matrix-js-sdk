@@ -418,6 +418,18 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 };
 
 /**
+ * @param {string} roomId
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.joinedMembers = function(roomId, callback) {
+    const path = utils.encodeUri("/rooms/$roomId/joined_members", {$roomId: roomId});
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+
+/**
  * @param {string} groupId
  * @return {module:client.Promise} Resolves: Group summary object
  * @return {module:http-api.MatrixError} Rejects: with an error response.

@@ -171,7 +171,10 @@ function Room(roomId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
+    // in case of lazy loading, to keep track of loading state
+    this._membersNeedLoading = true;
 }
+
 utils.inherits(Room, EventEmitter);
 
 /**
@@ -212,7 +215,22 @@ Room.prototype.getPendingEvents = function() {
 Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
+/**
+ * Get the lazy loading state, whether loading is needed or not.
+ */
+Room.prototype.membersNeedLoading = function() {
+    return this._membersNeedLoading;
+}
 
+/**
+ * 
+ */
+Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
+    this._membersNeedLoading = false;
+    const members = await joinedMembersPromise;
+    this.currentState.setJoinedMembers(members.joined);    
+    //for all timelines > room state, call setJoinedMembers?
+}
 
 /**
  * Reset the live timeline of all timelineSets, and start new ones.
