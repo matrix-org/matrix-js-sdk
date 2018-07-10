@@ -652,7 +652,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
     }
 
-    const members = room.getJoinedMembers();
+    const members = room.getEncryptionTargetMembers();
     members.forEach((m) => {
         this._deviceList.startTrackingDeviceList(m.userId);
     });
@@ -986,7 +986,7 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
 Crypto.prototype._getE2eUsers = function() {
     const e2eUserIds = [];
     for (const room of this._getE2eRooms()) {
-        const members = room.getJoinedMembers();
+        const members = room.getEncryptionTargetMembers();
         for (const member of members) {
             e2eUserIds.push(member.userId);
         }
@@ -1084,6 +1084,10 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     if (member.membership == 'join') {
         console.log('Join event for ' + member.userId + ' in ' + roomId);
         // make sure we are tracking the deviceList for this user
+        this._deviceList.startTrackingDeviceList(member.userId);
+    } else if (member.membership == 'invite' &&
+             this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
+        console.log('Invite event for ' + member.userId + ' in ' + roomId);
         this._deviceList.startTrackingDeviceList(member.userId);
     }
 

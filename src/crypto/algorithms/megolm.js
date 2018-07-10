@@ -536,8 +536,7 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  *     from userId to deviceId to deviceInfo
  */
 MegolmEncryption.prototype._getDevicesInRoom = function(room) {
-    // XXX what about rooms where invitees can see the content?
-    const roomMembers = utils.map(room.getJoinedMembers(), function(u) {
+    const roomMembers = utils.map(room.getEncryptionTargetMembers(), function(u) {
         return u.userId;
     });
 
