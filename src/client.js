@@ -743,6 +743,20 @@ MatrixClient.prototype.getRoom = function(roomId) {
 };
 
 /**
+ * Preloads the member list for the given room id,
+ * in case lazy loading of memberships is in use.
+ * @param {string} roomId The room ID
+ */
+MatrixClient.prototype.loadRoomMembersIfNeeded = function(roomId) {
+    const room = this.getRoom(roomId);
+    if (!room || !room.membersNeedLoading()) {
+        return;
+    }
+    const membersPromise = this.joinedMembers(roomId);
+    room.setLazilyLoadedMembers(membersPromise);
+}
+
+/**
  * Retrieve all known rooms.
  * @return {Room[]} A list of rooms, or an empty list if there is no data store.
  */
