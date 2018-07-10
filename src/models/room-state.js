@@ -228,15 +228,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             }
 
             member.setMembershipEvent(event, self);
-            // this member may have a power level already, so set it.
-            const pwrLvlEvent = self.getStateEvents("m.room.power_levels", "");
-            if (pwrLvlEvent) {
-                member.setPowerLevelEvent(pwrLvlEvent);
-            }
-
-            // blow away the sentinel which is now outdated
-            delete self._sentinels[userId];
-
+            self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
             const members = utils.values(self.members);
@@ -250,6 +242,35 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
         }
     });
 };
+
+RoomState.prototype._updateMember = function(member) {
+    // this member may have a power level already, so set it.
+    const pwrLvlEvent = this.getStateEvents("m.room.power_levels", "");
+    if (pwrLvlEvent) {
+        member.setPowerLevelEvent(pwrLvlEvent);
+    }
+
+    // blow away the sentinel which is now outdated
+    delete this._sentinels[member.userId];
+
+    this.members[member.userId] = member;
+    this._joinedMemberCount = null;
+}
+
+RoomState.prototype.setJoinedMembers = function(joinedMembers) {
+    const joinedRoomMembers = Object.entries(joinedMembers).map(([userId, details]) => {
+        const displayName = details.display_name;
+        const avatarUrl = details.avatar_url;
+        const member = new RoomMember(this.roomId, userId);
+        member.setAsJoinedMember(displayName, avatarUrl, this);
+        return member;
+    });
+    joinedRoomMembers.forEach(member => {
+        _updateDisplayNameCache(this, member.userId, member.name);
+        this._updateMember(member);
+    });
+    this.emit("Room");
+}
 
 /**
  * Set the current typing event for this room.
