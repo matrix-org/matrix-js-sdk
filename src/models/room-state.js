@@ -258,13 +258,19 @@ RoomState.prototype.setJoinedMembers = function(joinedMembers) {
         const avatarUrl = details.avatar_url;
         const member = new RoomMember(this.roomId, userId);
         member.setAsJoinedMember(displayName, avatarUrl, this);
-        return member;
+        const isNewMember = !this.members[userId];
+        return {member, isNewMember};
     });
-    joinedRoomMembers.forEach(member => {
+    joinedRoomMembers.forEach(({member, isNewMember}) => {
         _updateDisplayNameCache(this, member.userId, member.name);
         this._updateMember(member);
+        if (isNewMember) {
+            this.emit('RoomState.newMember', {}, self, member);
+        }
+        else {
+            this.emit('RoomState.members', {}, self, member);
+        }
     });
-    this.emit("Room");
 }
 
 /**
