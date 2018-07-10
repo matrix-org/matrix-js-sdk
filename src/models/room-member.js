@@ -58,6 +58,7 @@ function RoomMember(roomId, userId) {
     this.events = {
         member: null,
     };
+    this._lazyLoadAvatarUrl = null;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
@@ -81,7 +82,11 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
     this.membership = event.getDirectionalContent().membership;
 
     const oldName = this.name;
-    this.name = calculateDisplayName(this, event, roomState);
+    this.name = calculateDisplayName(
+        this.userId,
+        event.getDirectionalContent().displayname,
+        roomState);
+
     this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
     if (oldMembership !== this.membership) {
         this._updateModifiedTime();
@@ -92,6 +97,16 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         this.emit("RoomMember.name", event, this, oldName);
     }
 };
+/**
+ * Update this room member from a lazily loaded member
+ */
+RoomMember.prototype.setAsJoinedMember = function(displayName, avatarUrl, roomState) {
+    this.membership = "join";
+    this.name = calculateDisplayName(this.userId, displayName, roomState);
+    this.rawDisplayName = displayName || this.userId;
+    this._lazyLoadAvatarUrl = avatarUrl;
+    //TODO: race condition between existing membership events since started syncing
+}
 
 /**
  * Update this room member's power level event. May fire
@@ -200,10 +215,12 @@ RoomMember.prototype.getAvatarUrl =
     if (allowDefault === undefined) {
         allowDefault = true;
     }
-    if (!this.events.member && !allowDefault) {
+
+    const rawUrl = this._getRawAvatarMxcUrl();
+
+    if (!rawUrl && !allowDefault) {
         return null;
     }
-    const rawUrl = this.events.member ? this.events.member.getContent().avatar_url : null;
     const httpUrl = ContentRepo.getHttpUriForMxc(
         baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
     );
@@ -216,11 +233,20 @@ RoomMember.prototype.getAvatarUrl =
     }
     return null;
 };
+/**
+ * get the mxc avatar url, either from a state event, or from a lazily loaded member
+ * @return {string} the mxc avatar url
+ */
+RoomMember.prototype._getRawAvatarMxcUrl = function() {
+    if (this._lazyLoadAvatarUrl) {
+        return this._lazyLoadAvatarUrl;
+    } else if(this.events.member) {
+        return this.events.member.getContent().avatar_url;
+    }
+    return null;
+}
 
-function calculateDisplayName(member, event, roomState) {
-    const displayName = event.getDirectionalContent().displayname;
-    const selfUserId = member.userId;
-
+function calculateDisplayName(selfUserId, displayName, roomState) {
     if (!displayName) {
         return selfUserId;
     }
