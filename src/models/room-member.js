@@ -192,6 +192,37 @@ RoomMember.prototype.getLastModifiedTime = function() {
     return this._modified;
 };
 
+
+/**
+ * If this member was invited with the is_direct flag set, return
+ * the user that invited this member
+ * @return {string} user id of the inviter
+ */
+RoomMember.prototype.getDirectChatInviter = function() {
+    // when not available because that room state hasn't been loaded in,
+    // we don't really know, but more likely to not be a direct chat
+    if (this.events.member) {
+        // TODO: persist the is_direct flag on the member as more member events
+        //       come in caused by displayName changes.
+
+        // the is_direct flag is set on the invite member event.
+        // This is copied on the prev_content section of the join member event
+        // when the invite is accepted.
+
+        const memberEvent = this.events.member;
+        let memberContent = memberEvent.getContent();
+
+        if (memberContent.membership === "join") {
+            memberContent = memberEvent.getPrevContent();
+        }
+
+        if (memberContent.membership === "invite" && memberContent.is_direct) {
+            return memberEvent.getUnsigned().prev_sender;
+        }
+    }
+}
+
+
 /**
  * Get the avatar URL for a room member.
  * @param {string} baseUrl The base homeserver URL See
