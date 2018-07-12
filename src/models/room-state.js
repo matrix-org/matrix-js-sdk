@@ -262,6 +262,15 @@ RoomState.prototype.setJoinedMembers = function(joinedMembers) {
         const displayName = details.display_name;
         const avatarUrl = details.avatar_url;
         const member = new RoomMember(this.roomId, userId);
+        // try to find the member event for the user and set it first on the member
+        // so inspection of the event is possible later on if we have it
+        const membershipEvents = this.events["m.room.member"];
+        const userMemberEvent = membershipEvents && membershipEvents[userId];
+        if (userMemberEvent) {
+            member.setMembershipEvent(userMemberEvent, this);
+        }
+        // override the displayName and avatarUrl from the lazily loaded members
+        // as this is guaranteed to be the current state
         member.setAsJoinedMember(displayName, avatarUrl, this);
         const isNewMember = !this.members[userId];
         return {member, isNewMember};
