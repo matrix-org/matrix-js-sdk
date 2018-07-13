@@ -256,7 +256,7 @@ RoomMember.prototype.getAvatarUrl =
         allowDefault = true;
     }
 
-    const rawUrl = this._getRawAvatarMxcUrl();
+    const rawUrl = this.getMxcAvatarUrl();
 
     if (!rawUrl && !allowDefault) {
         return null;
@@ -277,11 +277,13 @@ RoomMember.prototype.getAvatarUrl =
  * get the mxc avatar url, either from a state event, or from a lazily loaded member
  * @return {string} the mxc avatar url
  */
-RoomMember.prototype._getRawAvatarMxcUrl = function() {
+RoomMember.prototype.getMxcAvatarUrl = function() {
     if (this._lazyLoadAvatarUrl) {
         return this._lazyLoadAvatarUrl;
     } else if(this.events.member) {
         return this.events.member.getContent().avatar_url;
+    } else if(this.user) {
+        return this.user.avatarUrl;
     }
     return null;
 }
