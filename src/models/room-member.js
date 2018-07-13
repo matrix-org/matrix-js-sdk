@@ -205,7 +205,7 @@ RoomMember.prototype.isKicked = function() {
  * the user that invited this member
  * @return {string} user id of the inviter
  */
-RoomMember.prototype.getDirectChatInviter = function() {
+RoomMember.prototype.getDMInviter = function() {
     // when not available because that room state hasn't been loaded in,
     // we don't really know, but more likely to not be a direct chat
     if (this.events.member) {
