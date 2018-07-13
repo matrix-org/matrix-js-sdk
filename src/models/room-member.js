@@ -59,6 +59,7 @@ function RoomMember(roomId, userId) {
         member: null,
     };
     this._lazyLoadAvatarUrl = null;
+    this._isLazilyLoaded = false;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
@@ -105,6 +106,7 @@ RoomMember.prototype.setAsJoinedMember = function(displayName, avatarUrl, roomSt
     this.name = calculateDisplayName(this.userId, displayName, roomState);
     this.rawDisplayName = displayName || this.userId;
     this._lazyLoadAvatarUrl = avatarUrl;
+    this._isLazilyLoaded = true;
     //TODO: race condition between existing membership events since started syncing
 }
 
@@ -193,6 +195,11 @@ RoomMember.prototype.getLastModifiedTime = function() {
 };
 
 
+RoomMember.prototype.isKicked = function() {
+    return this.membership === "leave" &&
+        this.events.member.getSender() !== this.events.member.getStateKey();
+};
+
 /**
  * If this member was invited with the is_direct flag set, return
  * the user that invited this member
@@ -211,13 +218,15 @@ RoomMember.prototype.getDirectChatInviter = function() {
 
         const memberEvent = this.events.member;
         let memberContent = memberEvent.getContent();
+        let inviteSender = memberEvent.getSender();
 
         if (memberContent.membership === "join") {
             memberContent = memberEvent.getPrevContent();
+            inviteSender = memberEvent.getUnsigned().prev_sender;
         }
 
         if (memberContent.membership === "invite" && memberContent.is_direct) {
-            return memberEvent.getUnsigned().prev_sender;
+            return inviteSender;
         }
     }
 }
