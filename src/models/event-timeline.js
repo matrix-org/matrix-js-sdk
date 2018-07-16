@@ -115,6 +115,15 @@ EventTimeline.prototype.getRoomId = function() {
 };
 
 /**
+ * Sets the lazily loaded members. For now only joined members.
+ * @param {Profile[]} array with {avatar_url, display_name } tuples
+ */
+EventTimeline.prototype.setJoinedMembers = function(joinedMembers) {
+    this._startState.setJoinedMembers(joinedMembers);
+    this._endState.setJoinedMembers(joinedMembers);
+}
+
+/**
  * Get the filter for this timeline's timelineSet (if any)
  * @return {Filter} filter
  */

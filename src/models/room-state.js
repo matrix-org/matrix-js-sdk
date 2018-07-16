@@ -252,6 +252,10 @@ RoomState.prototype._updateMember = function(member) {
     this._joinedMemberCount = null;
 }
 
+/**
+ * Sets the lazily loaded members. For now only joined members.
+ * @param {Profile[]} array with {avatar_url, display_name } tuples
+ */
 RoomState.prototype.setJoinedMembers = function(joinedMembers) {
     const joinedRoomMembers = Object.entries(joinedMembers).map(([userId, details]) => {
         const displayName = details.display_name;
