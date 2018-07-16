@@ -323,7 +323,7 @@ RoomState.prototype.getLastModifiedTime = function() {
 /**
  * Get user IDs with the specified display name.
  * @param {string} displayName The display name to get user IDs from.
- * @return {string[]} An array of user IDs or an empty array. 
+ * @return {string[]} An array of user IDs or an empty array.
  */
 RoomState.prototype.getUserIdsWithDisplayName = function(displayName) {
     return this._displayNameToUserIds[displayName] || [];
