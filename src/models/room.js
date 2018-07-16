@@ -223,13 +223,13 @@ Room.prototype.membersNeedLoading = function() {
 }
 
 /**
- * 
+ * Sets the lazily loaded members from the result of calling /joined_members
+ * @param {Promise} promise with result of /joined_members endpoint
  */
 Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     this._membersNeedLoading = false;
     const members = await joinedMembersPromise;
-    this.currentState.setJoinedMembers(members.joined);    
-    //for all timelines > room state, call setJoinedMembers?
+    this._timelineSets.forEach(tlSet => tlSet.setJoinedMembers(members.joined));
 }
 
 /**
