@@ -118,14 +118,12 @@ RoomState.prototype.getSentinelMember = function(userId) {
     let sentinel = this._sentinels[userId];
 
     if (sentinel === undefined) {
-        sentinel = new RoomMember(this.roomId, userId);
-        const membershipEvent = this.getStateEvents("m.room.member", userId);
-        if (!membershipEvent) return null;
-        sentinel.setMembershipEvent(membershipEvent, this);
-        const pwrLvlEvent = this.getStateEvents("m.room.power_levels", "");
-        if (pwrLvlEvent) {
-            sentinel.setPowerLevelEvent(pwrLvlEvent);
+        const member = this.members[userId];
+        if (!member) {
+            return null;
         }
+        sentinel = new RoomMember();
+        Object.assign(sentinel, member);
         this._sentinels[userId] = sentinel;
     }
     return sentinel;
