@@ -118,12 +118,11 @@ RoomState.prototype.getSentinelMember = function(userId) {
     let sentinel = this._sentinels[userId];
 
     if (sentinel === undefined) {
+        sentinel = new RoomMember(this.roomId, userId);
         const member = this.members[userId];
-        if (!member) {
-            return null;
+        if (member) {
+            Object.assign(sentinel, member);
         }
-        sentinel = new RoomMember();
-        Object.assign(sentinel, member);
         this._sentinels[userId] = sentinel;
     }
     return sentinel;
