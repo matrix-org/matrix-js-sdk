@@ -149,6 +149,24 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
     return event ? event : null;
 };
 
+/** 
+ * Creates a copy of this room state so that mutations to either won't affect the other.
+ */
+RoomState.prototype.clone = function() {
+    const copy = new RoomState(this.roomId);
+    //freeze and pass all state events to copy
+    Object.values(this.events).forEach(eventsByStateKey => {
+        const eventsForType = Object.values(eventsByStateKey);
+        copy.setStateEvents(eventsForType);
+    });
+    // clone lazily loaded members
+    const lazyLoadedMembers = Object.values(this.members).filter(member => member.isLazyLoaded());
+    lazyLoadedMembers.forEach(m => {
+        copy._setJoinedMember(m.userId, m.rawDisplayName, m.getMxcAvatarUrl());
+    });
+    return copy;
+};
+
 /**
  * Add an array of one or more state MatrixEvents, overwriting
  * any existing state with the same {type, stateKey} tuple. Will fire
@@ -254,33 +272,33 @@ RoomState.prototype._updateMember = function(member) {
  * @param {Profile[]} array with {avatar_url, display_name } tuples
  */
 RoomState.prototype.setJoinedMembers = function(joinedMembers) {
-    const joinedRoomMembers = Object.entries(joinedMembers).map(([userId, details]) => {
-        const displayName = details.display_name;
-        const avatarUrl = details.avatar_url;
-        const member = new RoomMember(this.roomId, userId);
-        // try to find the member event for the user and set it first on the member
-        // so inspection of the event is possible later on if we have it
-        const membershipEvents = this.events["m.room.member"];
-        const userMemberEvent = membershipEvents && membershipEvents[userId];
-        if (userMemberEvent) {
-            member.setMembershipEvent(userMemberEvent, this);
-        }
-        // override the displayName and avatarUrl from the lazily loaded members
-        // as this is guaranteed to be the current state
-        member.setAsJoinedMember(displayName, avatarUrl, this);
-        const isNewMember = !this.members[userId];
-        return {member, isNewMember};
+    Object.entries(joinedMembers).forEach(([userId, details]) => {
+        this._setJoinedMember(userId, details.display_name, details.avatar_url);
     });
-    joinedRoomMembers.forEach(({member, isNewMember}) => {
-        _updateDisplayNameCache(this, member.userId, member.name);
-        this._updateMember(member);
-        if (isNewMember) {
-            this.emit('RoomState.newMember', {}, self, member);
-        }
-        else {
-            this.emit('RoomState.members', {}, self, member);
-        }
-    });
+}
+
+RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) {
+    const member = new RoomMember(this.roomId, userId);
+    // try to find the member event for the user and set it first on the member
+    // so inspection of the event is possible later on if we have it
+    const membershipEvents = this.events["m.room.member"];
+    const userMemberEvent = membershipEvents && membershipEvents[userId];
+    if (userMemberEvent) {
+        member.setMembershipEvent(userMemberEvent, this);
+    }
+    // override the displayName and avatarUrl from the lazily loaded members
+    // as this is guaranteed to be the current state
+    member.setAsJoinedMember(displayName, avatarUrl, this);
+    const isNewMember = !this.members[userId];
+    
+    _updateDisplayNameCache(this, member.userId, member.name);
+    this._updateMember(member);
+    if (isNewMember) {
+        this.emit('RoomState.newMember', {}, self, member);
+    }
+    else {
+        this.emit('RoomState.members', {}, self, member);
+    }
 }
 
 /**

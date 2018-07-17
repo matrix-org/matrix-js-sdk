@@ -107,6 +107,38 @@ EventTimeline.prototype.initialiseState = function(stateEvents) {
 };
 
 /**
+ * Forks the (live) timeline, taking ownership of the existing directional state of this timeline.
+ * All attached listeners will keep receiving state updates from the new live timeline state.
+ * The end state of this timeline gets replaced with an independent copy of the current RoomState,
+ * and will need a new pagination token if it ever needs to paginate forwards.
+ */
+EventTimeline.prototype.forkLive = function(direction) {
+    const forkState = this.getState(direction);
+    const timeline = new EventTimeline(this._eventTimelineSet);    
+    timeline._startState = forkState.clone();
+    // Now clobber the end state of the new live timeline with that from the
+    // previous live timeline. It will be identical except that we'll keep
+    // using the same RoomMember objects for the 'live' set of members with any
+    // listeners still attached
+    timeline._endState = forkState;
+    // Firstly, we just stole the current timeline's end state, so it needs a new one.
+    // Make an immutable copy of the state so back pagination will get the correct sentinels.
+    this._endState = forkState.clone();
+    return timeline;
+};
+
+/**
+ * Creates an independent timeline, inheriting the directional state from this timeline.
+ */
+EventTimeline.prototype.fork = function(direction) {
+    const forkState = this.getState(direction);
+    const timeline = new EventTimeline(this._eventTimelineSet);
+    timeline._startState = forkState.clone();
+    timeline._endState = forkState.clone();
+    return timeline;
+};
+
+/**
  * Get the ID of the room for this timeline
  * @return {string} room ID
  */

@@ -64,6 +64,10 @@ function RoomMember(roomId, userId) {
 }
 utils.inherits(RoomMember, EventEmitter);
 
+RoomMember.prototype.isLazyLoaded = function() {
+    return this._isLazilyLoaded;
+}
+
 /**
  * Update this room member's membership event. May fire "RoomMember.name" if
  * this event updates this member's name.
