@@ -176,8 +176,9 @@ export {DecryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
  * @extends Error
  */
 class DecryptionError extends Error {
-    constructor(msg, details) {
+    constructor(code, msg, details) {
         super(msg);
+        this.code = code;
         this.name = 'DecryptionError';
         this.detailedString = _detailedStringForDecryptionError(this, details);
     }

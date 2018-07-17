@@ -404,6 +404,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._retryDecryption = false;
 
             let res;
+            let err;
             try {
                 if (!crypto) {
                     res = this._badEncryptedMessage("Encryption not enabled");
@@ -421,6 +422,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                     this._retryDecryption = false;
                     return;
                 }
+
+                err = e;
 
                 // see if we have a retry queued.
                 //
@@ -467,6 +470,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._decryptionPromise = null;
             this._retryDecryption = false;
             this._setClearData(res);
+
+            this.emit("Event.decrypted", this, err);
+
             return;
         }
     },
@@ -503,7 +509,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             decryptionResult.claimedEd25519Key || null;
         this._forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
-        this.emit("Event.decrypted", this);
     },
 
     /**
@@ -708,4 +713,7 @@ const _REDACT_KEEP_CONTENT_MAP = {
  *
  * @param {module:models/event.MatrixEvent} event
  *    The matrix event which has been decrypted
+ * @param {module:crypto/algorithms/base.DecryptionError?} err
+ *    The error that occured during decryption, or `undefined` if no
+ *    error occured.
  */
