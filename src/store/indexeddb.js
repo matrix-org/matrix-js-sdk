@@ -219,4 +219,12 @@ IndexedDBStore.prototype.setSyncData = function(syncData) {
     return this.backend.setSyncData(syncData);
 };
 
+IndexedDBStore.prototype.getOutOfBandMembers = function(roomId) {
+    return this.backend.getOutOfBandMembers(roomId);
+};
+
+IndexedDBStore.prototype.setOutOfBandMembers = function(roomId, members) {
+    return this.backend.setOutOfBandMembers(roomId, members);
+};
+
 module.exports.IndexedDBStore = IndexedDBStore;

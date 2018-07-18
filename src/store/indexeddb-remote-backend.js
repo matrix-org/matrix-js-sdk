@@ -87,6 +87,13 @@ RemoteIndexedDBStoreBackend.prototype = {
         return this._doCmd('syncToDatabase', [users]);
     },
 
+    getOutOfBandMembers: function(roomId) {
+        return this._doCmd('getOutOfBandMembers', [roomId]);
+    },
+
+    setOutOfBandMembers: function(roomId, members) {
+        return this._doCmd('setOutOfBandMembers', [roomId, members]);
+    },
 
     /**
      * Load all user presence events from the database. This is not cached.

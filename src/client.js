@@ -742,6 +742,20 @@ MatrixClient.prototype.getRoom = function(roomId) {
     return this.store.getRoom(roomId);
 };
 
+MatrixClient.prototype._loadMembers = async function(room) {
+    const roomId = room.roomId;
+    let rawMembersEvents = await this.store.getOutOfBandMembers(roomId);
+    if (rawMembersEvents.length == 0) {
+        const lastEventId = room.getLastEventId();
+        const response = await this.members(roomId, "join", "leave", lastEventId);
+        rawMembersEvents = response.chunk;
+        // TODO don't block on writing
+        await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
+    }
+    const memberEvents = rawMembersEvents.map(this.getEventMapper());
+    return memberEvents;
+};
+
 /**
  * Preloads the member list for the given room id,
  * in case lazy loading of memberships is in use.
@@ -752,13 +766,8 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     if (!room || !room.needsOutOfBandMembers()) {
         return;
     }
-
-    const lastEventId = room.getLastEventId();
-    const responsePromise = this.members(roomId, "join", "leave", lastEventId);
-    const eventsPromise = responsePromise.then((response) => {
-        return response.chunk.map(this.getEventMapper());
-    });
-    await room.loadOutOfBandMembers(eventsPromise);
+    const membersPromise = this._loadMembers(room);
+    await room.loadOutOfBandMembers(membersPromise);
 };
 
 /**

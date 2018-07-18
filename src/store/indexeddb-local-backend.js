@@ -19,7 +19,7 @@ import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
-const VERSION = 1;
+const VERSION = 2;
 
 function createDatabase(db) {
     // Make user store, clobber based on user ID. (userId property of User objects)
@@ -31,6 +31,11 @@ function createDatabase(db) {
 
     // Make /sync store (sync tokens, room data, etc), always clobber (const key).
     db.createObjectStore("sync", { keyPath: ["clobber"] });
+}
+
+function upgradeSchemaV2(db) {
+    const llMembersStore = db.createObjectStore("lazy_loaded_members", { keyPath: ["roomId", "userId"]});
+    llMembersStore.createIndex("room", "roomId");
 }
 
 /**
@@ -136,6 +141,9 @@ LocalIndexedDBStoreBackend.prototype = {
             if (oldVersion < 1) { // The database did not previously exist.
                 createDatabase(db);
             }
+            if (oldVersion < 2) {
+                upgradeSchemaV2(db);
+            }
             // Expand as needed.
         };
 
@@ -184,6 +192,56 @@ LocalIndexedDBStoreBackend.prototype = {
                     events: accountData,
                 },
             });
+        });
+    },
+
+    getOutOfBandMembers: function(roomId) {
+        return new Promise((resolve, reject) =>{
+            const tx = this.db.transaction(["lazy_loaded_members"], "readonly");
+            const store = tx.objectStore("lazy_loaded_members");
+            const roomIndex = store.index("room");
+            const range = IDBKeyRange.only(roomId);
+            const request = roomIndex.openCursor(range);
+
+            const members = [];
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (!cursor) {
+                    return resolve(members);
+                }
+                const record = cursor.value;
+                members.push({
+                    userId: record.userId,
+                    displayName: record.displayName,
+                    membership: record.membership,
+                    avatarUrl: record.avatarUrl,
+                });
+                cursor.continue();
+            };
+            request.onerror = (err) => {
+                reject(err);
+            };
+        });
+    },
+
+    setOutOfBandMembers: function(roomId, members) {
+        function ignoreResult() {};
+        // run everything in a promise so anything that throws will reject
+        return new Promise((resolve) =>{
+            const tx = this.db.transaction(["lazy_loaded_members"], "readwrite");
+            const store = tx.objectStore("lazy_loaded_members");
+            const puts = members.map((m) => {
+                const record = {
+                    roomId: roomId,
+                    userId: m.userId,
+                    displayName: m.displayName,
+                    avatarUrl: m.avatarUrl,
+                    membership: m.membership
+                };
+                let putPromise = promiseifyRequest(store.put(record));
+                return putPromise.then(ignoreResult);
+            });
+            resolve(Promise.all(puts).then(ignoreResult));
         });
     },
 
