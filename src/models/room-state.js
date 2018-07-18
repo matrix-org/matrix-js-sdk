@@ -297,8 +297,7 @@ RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) 
     this._updateMember(member);
     if (isNewMember) {
         this.emit('RoomState.newMember', {}, self, member);
-    }
-    else {
+    } else {
         this.emit('RoomState.members', {}, self, member);
     }
 };
