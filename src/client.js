@@ -754,7 +754,7 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = function(roomId) {
     }
     const membersPromise = this.joinedMembers(roomId);
     room.setLazilyLoadedMembers(membersPromise);
-}
+};
 
 /**
  * Retrieve all known rooms.

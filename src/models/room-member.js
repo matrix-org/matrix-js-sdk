@@ -66,7 +66,7 @@ utils.inherits(RoomMember, EventEmitter);
 
 RoomMember.prototype.isLazyLoaded = function() {
     return this._isLazilyLoaded;
-}
+};
 
 /**
  * Update this room member's membership event. May fire "RoomMember.name" if
@@ -102,8 +102,12 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         this.emit("RoomMember.name", event, this, oldName);
     }
 };
+
 /**
  * Update this room member from a lazily loaded member
+ * @param {string} displayName
+ * @param {string} avatarUrl
+ * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
 RoomMember.prototype.setAsJoinedMember = function(displayName, avatarUrl, roomState) {
     this.membership = "join";
@@ -112,7 +116,7 @@ RoomMember.prototype.setAsJoinedMember = function(displayName, avatarUrl, roomSt
     this._lazyLoadAvatarUrl = avatarUrl;
     this._isLazilyLoaded = true;
     //TODO: race condition between existing membership events since started syncing
-}
+};
 
 /**
  * Update this room member's power level event. May fire
@@ -233,7 +237,7 @@ RoomMember.prototype.getDMInviter = function() {
             return inviteSender;
         }
     }
-}
+};
 
 
 /**
@@ -290,7 +294,7 @@ RoomMember.prototype.getMxcAvatarUrl = function() {
         return this.user.avatarUrl;
     }
     return null;
-}
+};
 
 function calculateDisplayName(selfUserId, displayName, roomState) {
     if (!displayName) {
