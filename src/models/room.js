@@ -215,22 +215,28 @@ Room.prototype.getPendingEvents = function() {
 Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
+
 /**
  * Get the lazy loading state, whether loading is needed or not.
+ * @return {bool} whether or not the members of this room need to be loaded
  */
 Room.prototype.membersNeedLoading = function() {
     return this._membersNeedLoading;
-}
+};
 
 /**
  * Sets the lazily loaded members from the result of calling /joined_members
- * @param {Promise} promise with result of /joined_members endpoint
+ * @param {Promise} joinedMembersPromise promise with result of /joined_members endpoint
  */
 Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     this._membersNeedLoading = false;
     const members = await joinedMembersPromise;
-    this._timelineSets.forEach(tlSet => tlSet.setJoinedMembers(members.joined));
-}
+    //wait 10 seconds
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    console.log('set lazily loaded members!');
+    this._timelineSets.forEach((tlSet) => tlSet.setJoinedMembers(members.joined));
+    this.emit('Room', this);
+};
 
 /**
  * Reset the live timeline of all timelineSets, and start new ones.

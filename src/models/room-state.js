@@ -149,19 +149,21 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
     return event ? event : null;
 };
 
-/** 
+/**
  * Creates a copy of this room state so that mutations to either won't affect the other.
+ * @return {RoomState} the copy of the room state
  */
 RoomState.prototype.clone = function() {
     const copy = new RoomState(this.roomId);
     //freeze and pass all state events to copy
-    Object.values(this.events).forEach(eventsByStateKey => {
+    Object.values(this.events).forEach((eventsByStateKey) => {
         const eventsForType = Object.values(eventsByStateKey);
         copy.setStateEvents(eventsForType);
     });
     // clone lazily loaded members
-    const lazyLoadedMembers = Object.values(this.members).filter(member => member.isLazyLoaded());
-    lazyLoadedMembers.forEach(m => {
+    const lazyLoadedMembers = Object.values(this.members)
+        .filter((member) => member.isLazyLoaded());
+    lazyLoadedMembers.forEach((m) => {
         copy._setJoinedMember(m.userId, m.rawDisplayName, m.getMxcAvatarUrl());
     });
     return copy;
@@ -270,17 +272,17 @@ RoomState.prototype._updateMember = function(member) {
 
     this.members[member.userId] = member;
     this._joinedMemberCount = null;
-}
+};
 
 /**
  * Sets the lazily loaded members. For now only joined members.
- * @param {Profile[]} array with {avatar_url, display_name } tuples
+ * @param {Profile[]} joinedMembers array with {avatar_url, display_name } tuples
  */
 RoomState.prototype.setJoinedMembers = function(joinedMembers) {
     Object.entries(joinedMembers).forEach(([userId, details]) => {
         this._setJoinedMember(userId, details.display_name, details.avatar_url);
     });
-}
+};
 
 RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) {
     const member = new RoomMember(this.roomId, userId);
@@ -295,7 +297,7 @@ RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) 
     // as this is guaranteed to be the current state
     member.setAsJoinedMember(displayName, avatarUrl, this);
     const isNewMember = !this.members[userId];
-    
+
     _updateDisplayNameCache(this, member.userId, member.name);
     this._updateMember(member);
     if (isNewMember) {
@@ -304,7 +306,7 @@ RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) 
     else {
         this.emit('RoomState.members', {}, self, member);
     }
-}
+};
 
 /**
  * Set the current typing event for this room.
