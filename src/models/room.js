@@ -230,7 +230,16 @@ Room.prototype.membersNeedLoading = function() {
  */
 Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     this._membersNeedLoading = false;
-    const members = await joinedMembersPromise;
+    let members = null;
+    try {
+        members = await joinedMembersPromise;
+    }
+    catch (err) {
+        console.error(`Fetching room members for ${this.roomId} failed. Room members will appear incomplete.`);
+        console.error(err);
+        this._membersNeedLoading = true;
+        return;
+    }
     this._timelineSets.forEach((tlSet) => tlSet.setJoinedMembers(members.joined));
     this.emit('Room', this);
 };
