@@ -77,8 +77,8 @@ utils.inherits(EventTimelineSet, EventEmitter);
  * Sets the lazily loaded members.
  * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
-EventTimelineSet.prototype.setLazilyLoadedMembers = function(members) {
-    this._timelines.forEach((tl) => tl.setLazilyLoadedMembers(members));
+EventTimelineSet.prototype.setLazyLoadedMembers = function(members) {
+    this._timelines.forEach((tl) => tl.setLazyLoadedMembers(members));
 };
 
 /**

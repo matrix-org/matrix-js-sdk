@@ -779,7 +779,7 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
             };
         });
     });
-    await room.setLazilyLoadedMembers(membersPromise);
+    await room.setLazyLoadedMembers(membersPromise);
 };
 
 /**
