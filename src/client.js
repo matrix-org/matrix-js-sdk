@@ -747,13 +747,13 @@ MatrixClient.prototype.getRoom = function(roomId) {
  * in case lazy loading of memberships is in use.
  * @param {string} roomId The room ID
  */
-MatrixClient.prototype.loadRoomMembersIfNeeded = function(roomId) {
+MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     const room = this.getRoom(roomId);
     if (!room || !room.membersNeedLoading()) {
         return;
     }
     const membersPromise = this.joinedMembers(roomId);
-    room.setLazilyLoadedMembers(membersPromise);
+    await room.setLazilyLoadedMembers(membersPromise);
 };
 
 /**
