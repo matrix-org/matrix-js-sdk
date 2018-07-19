@@ -78,8 +78,8 @@ describe("RoomState", function() {
     });
 
     describe("getSentinelMember", function() {
-        it("should return null if there is no member", function() {
-            expect(state.getSentinelMember("@no-one:here")).toEqual(null);
+        it("should return a member with the user id as name", function() {
+            expect(state.getSentinelMember("@no-one:here").name).toEqual("@no-one:here");
         });
 
         it("should return a member which doesn't change when the state is updated",
