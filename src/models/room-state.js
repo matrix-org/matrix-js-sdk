@@ -288,8 +288,7 @@ RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) 
     const member = new RoomMember(this.roomId, userId);
     // try to find the member event for the user and set it first on the member
     // so inspection of the event is possible later on if we have it
-    const membershipEvents = this.events["m.room.member"];
-    const userMemberEvent = membershipEvents && membershipEvents[userId];
+    const userMemberEvent = this.getStateEvents("m.room.member", userId);
     if (userMemberEvent) {
         member.setMembershipEvent(userMemberEvent, this);
     }
