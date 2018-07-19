@@ -105,15 +105,14 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
 
 /**
  * Update this room member from a lazily loaded member
- * @param {string} displayName
- * @param {string} avatarUrl
+ * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
  * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
-RoomMember.prototype.setAsJoinedMember = function(displayName, avatarUrl, roomState) {
-    this.membership = "join";
-    this.name = calculateDisplayName(this.userId, displayName, roomState);
-    this.rawDisplayName = displayName || this.userId;
-    this._lazyLoadAvatarUrl = avatarUrl;
+RoomMember.prototype.setAsLazilyLoadedMember = function(memberInfo, roomState) {
+    this.membership = memberInfo.membership;
+    this.name = calculateDisplayName(this.userId, memberInfo.displayName, roomState);
+    this.rawDisplayName = memberInfo.displayName || this.userId;
+    this._lazyLoadAvatarUrl = memberInfo.avatarUrl;
     this._isLazilyLoaded = true;
     //TODO: race condition between existing membership events since started syncing
 };

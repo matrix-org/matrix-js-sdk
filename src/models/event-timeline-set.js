@@ -74,11 +74,11 @@ function EventTimelineSet(room, opts) {
 utils.inherits(EventTimelineSet, EventEmitter);
 
 /**
- * Sets the lazily loaded members. For now only joined members.
- * @param {Profile[]} joinedMembers array with {avatar_url, display_name } tuples
+ * Sets the lazily loaded members.
+ * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
-EventTimelineSet.prototype.setJoinedMembers = function(joinedMembers) {
-    this._timelines.forEach((tl) => tl.setJoinedMembers(joinedMembers));
+EventTimelineSet.prototype.setLazilyLoadedMembers = function(members) {
+    this._timelines.forEach((tl) => tl.setLazilyLoadedMembers(members));
 };
 
 /**
