@@ -81,6 +81,10 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
     if (event.getType() !== "m.room.member") {
         return;
     }
+
+    this._lazyLoadAvatarUrl = null;
+    this._isLazyLoaded = false;
+
     this.events.member = event;
 
     const oldMembership = this.membership;
