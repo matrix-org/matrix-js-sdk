@@ -234,12 +234,8 @@ Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     try {
         members = await joinedMembersPromise;
     } catch (err) {
-        const errorMessage = `Fetching room members for ${this.roomId} failed.` +
-            " Room members will appear incomplete.";
-        console.error(errorMessage);
-        console.error(err);
         this._membersNeedLoading = true;
-        return;
+        throw err;  //rethrow so calling code is aware operation failed
     }
     this._timelineSets.forEach((tlSet) => tlSet.setJoinedMembers(members.joined));
     this.emit('Room', this);
