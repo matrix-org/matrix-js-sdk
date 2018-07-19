@@ -214,18 +214,18 @@ Room.prototype.membersNeedLoading = function() {
 
 /**
  * Sets the lazily loaded members from the result of calling /joined_members
- * @param {Promise} joinedMembersPromise promise with result of /joined_members endpoint
+ * @param {Promise} membersPromise promise with array of {userId, avatarUrl, displayName, membership} tuples
  */
-Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
+Room.prototype.setLazilyLoadedMembers = async function(membersPromise) {
     this._membersNeedLoading = false;
     let members = null;
     try {
-        members = await joinedMembersPromise;
+        members = await membersPromise;
     } catch (err) {
         this._membersNeedLoading = true;
         throw err;  //rethrow so calling code is aware operation failed
     }
-    this._timelineSets.forEach((tlSet) => tlSet.setJoinedMembers(members.joined));
+    this._timelineSets.forEach((tlSet) => tlSet.setLazilyLoadedMembers(members));
     this.emit('Room', this);
 };
 

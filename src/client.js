@@ -752,7 +752,18 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     if (!room || !room.membersNeedLoading()) {
         return;
     }
-    const membersPromise = this.joinedMembers(roomId);
+    const joinedMembersPromise = this.joinedMembers(roomId);
+    const membersPromise = joinedMembersPromise.then((profiles) => {
+        return Object.entries(profiles).map(([userId, profile]) => {
+            return {
+                userId: userId,
+                avatarUrl: profile.avatar_url,
+                displayName: profile.display_name,
+                membership: "join",  // as we need to support invitees as well
+                                    // in the future, already include but hardcode it
+            };
+        });
+    });
     await room.setLazilyLoadedMembers(membersPromise);
 };
 

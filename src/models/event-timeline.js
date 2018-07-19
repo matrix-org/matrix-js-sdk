@@ -159,12 +159,12 @@ EventTimeline.prototype.getRoomId = function() {
 };
 
 /**
- * Sets the lazily loaded members. For now only joined members.
- * @param {Profile[]} joinedMembers array with {avatar_url, display_name } tuples
+ * Sets the lazily loaded members.
+ * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
-EventTimeline.prototype.setJoinedMembers = function(joinedMembers) {
-    this._startState.setJoinedMembers(joinedMembers);
-    this._endState.setJoinedMembers(joinedMembers);
+EventTimeline.prototype.setLazilyLoadedMembers = function(members) {
+    this._startState.setLazilyLoadedMembers(members);
+    this._endState.setLazilyLoadedMembers(members);
 };
 
 /**

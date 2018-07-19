@@ -270,27 +270,29 @@ RoomState.prototype._updateMember = function(member) {
 };
 
 /**
- * Sets the lazily loaded members. For now only joined members.
- * @param {Profile[]} joinedMembers array with {avatar_url, display_name } tuples
+ * Sets the lazily loaded members.
+ * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
-RoomState.prototype.setJoinedMembers = function(joinedMembers) {
-    Object.entries(joinedMembers).forEach(([userId, details]) => {
-        this._setJoinedMember(userId, details.display_name, details.avatar_url);
-    });
+RoomState.prototype.setLazilyLoadedMembers = function(members) {
+    members.forEach((member) => this._setLazilyLoadedMember(member));
 };
-
-RoomState.prototype._setJoinedMember = function(userId, displayName, avatarUrl) {
-    const member = new RoomMember(this.roomId, userId);
+/**
+ * Add/updates a lazily loaded member.
+ * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
+ */
+RoomState.prototype._setLazilyLoadedMember = function(memberInfo) {
+    const member = new RoomMember(this.roomId, memberInfo.userId);
     // try to find the member event for the user and set it first on the member
     // so inspection of the event is possible later on if we have it
-    const userMemberEvent = this.getStateEvents("m.room.member", userId);
+    const userMemberEvent = this.getStateEvents("m.room.member", member.userId);
     if (userMemberEvent) {
         member.setMembershipEvent(userMemberEvent, this);
     }
     // override the displayName and avatarUrl from the lazily loaded members
     // as this is guaranteed to be the current state
-    member.setAsJoinedMember(displayName, avatarUrl, this);
-    const isNewMember = !this.members[userId];
+    member.setAsLazilyLoadedMember(memberInfo, this);
+
+    const isNewMember = !this.members[member.userId];
 
     _updateDisplayNameCache(this, member.userId, member.name);
     this._updateMember(member);
