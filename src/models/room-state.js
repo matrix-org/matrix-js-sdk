@@ -273,14 +273,14 @@ RoomState.prototype._updateMember = function(member) {
  * Sets the lazily loaded members.
  * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
-RoomState.prototype.setLazilyLoadedMembers = function(members) {
-    members.forEach((member) => this._setLazilyLoadedMember(member));
+RoomState.prototype.setLazyLoadedMembers = function(members) {
+    members.forEach((member) => this._setLazyLoadedMember(member));
 };
 /**
  * Add/updates a lazily loaded member.
  * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
  */
-RoomState.prototype._setLazilyLoadedMember = function(memberInfo) {
+RoomState.prototype._setLazyLoadedMember = function(memberInfo) {
     const member = new RoomMember(this.roomId, memberInfo.userId);
     // try to find the member event for the user and set it first on the member
     // so inspection of the event is possible later on if we have it
@@ -290,7 +290,7 @@ RoomState.prototype._setLazilyLoadedMember = function(memberInfo) {
     }
     // override the displayName and avatarUrl from the lazily loaded members
     // as this is guaranteed to be the current state
-    member.setAsLazilyLoadedMember(memberInfo, this);
+    member.setAsLazyLoadedMember(memberInfo, this);
 
     const isNewMember = !this.members[member.userId];
 

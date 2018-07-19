@@ -59,13 +59,13 @@ function RoomMember(roomId, userId) {
         member: null,
     };
     this._lazyLoadAvatarUrl = null;
-    this._isLazilyLoaded = false;
+    this._isLazyLoaded = false;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
 
 RoomMember.prototype.isLazyLoaded = function() {
-    return this._isLazilyLoaded;
+    return this._isLazyLoaded;
 };
 
 /**
@@ -108,12 +108,12 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
  * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
  * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
-RoomMember.prototype.setAsLazilyLoadedMember = function(memberInfo, roomState) {
+RoomMember.prototype.setAsLazyLoadedMember = function(memberInfo, roomState) {
     this.membership = memberInfo.membership;
     this.name = calculateDisplayName(this.userId, memberInfo.displayName, roomState);
     this.rawDisplayName = memberInfo.displayName || this.userId;
     this._lazyLoadAvatarUrl = memberInfo.avatarUrl;
-    this._isLazilyLoaded = true;
+    this._isLazyLoaded = true;
     //TODO: race condition between existing membership events since started syncing
 };
 
