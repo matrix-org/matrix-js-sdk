@@ -231,9 +231,6 @@ Room.prototype.membersNeedLoading = function() {
 Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     this._membersNeedLoading = false;
     const members = await joinedMembersPromise;
-    //wait 10 seconds
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    console.log('set lazily loaded members!');
     this._timelineSets.forEach((tlSet) => tlSet.setJoinedMembers(members.joined));
     this.emit('Room', this);
 };
