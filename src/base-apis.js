@@ -420,7 +420,7 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 /**
  * @param {string} roomId
  * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: dictionary of userid to profile information
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.joinedMembers = function(roomId, callback) {
