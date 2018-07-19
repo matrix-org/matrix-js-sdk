@@ -754,7 +754,7 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     }
     const joinedMembersPromise = this.joinedMembers(roomId);
     const membersPromise = joinedMembersPromise.then((profiles) => {
-        return Object.entries(profiles).map(([userId, profile]) => {
+        return Object.entries(profiles.joined).map(([userId, profile]) => {
             return {
                 userId: userId,
                 avatarUrl: profile.avatar_url,
