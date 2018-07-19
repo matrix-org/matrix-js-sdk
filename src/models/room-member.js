@@ -113,12 +113,14 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
  * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
 RoomMember.prototype.setAsLazyLoadedMember = function(memberInfo, roomState) {
+    if (this.events.member) {
+        return;
+    }
     this.membership = memberInfo.membership;
     this.name = calculateDisplayName(this.userId, memberInfo.displayName, roomState);
     this.rawDisplayName = memberInfo.displayName || this.userId;
     this._lazyLoadAvatarUrl = memberInfo.avatarUrl;
     this._isLazyLoaded = true;
-    //TODO: race condition between existing membership events since started syncing
 };
 
 /**
