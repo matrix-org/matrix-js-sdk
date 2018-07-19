@@ -766,6 +766,10 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     if (!room || !room.needsOutOfBandMembers()) {
         return;
     }
+    // Note that we don't await _loadMembers here first.
+    // setLazyLoadedMembers sets a flag before it awaits the promise passed in
+    // to avoid a race when calling membersNeedLoading/loadOutOfBandMembers
+    // in fast succession, before the first promise resolves.
     const membersPromise = this._loadMembers(room);
     await room.loadOutOfBandMembers(membersPromise);
 };
