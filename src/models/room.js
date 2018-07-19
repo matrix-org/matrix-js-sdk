@@ -233,9 +233,10 @@ Room.prototype.setLazilyLoadedMembers = async function(joinedMembersPromise) {
     let members = null;
     try {
         members = await joinedMembersPromise;
-    }
-    catch (err) {
-        console.error(`Fetching room members for ${this.roomId} failed. Room members will appear incomplete.`);
+    } catch (err) {
+        const errorMessage = `Fetching room members for ${this.roomId} failed.` +
+            " Room members will appear incomplete.";
+        console.error(errorMessage);
         console.error(err);
         this._membersNeedLoading = true;
         return;
