@@ -752,7 +752,6 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     if (!room || !room.membersNeedLoading()) {
         return;
     }
-    const joinedMembersPromise = this.joinedMembers(roomId);
     // XXX: we should make sure that the members we get back represent the
     // room state at a given point in time. The plan is to do this by
     // passing the current next_batch sync token to the endpoint we use
@@ -761,6 +760,7 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     // so there is a race condition here between the current /sync call
     // and the /joined_members call: if the have conflicting information, which one
     // represents the most recent state?
+    const joinedMembersPromise = this.joinedMembers(roomId);
     const membersPromise = joinedMembersPromise.then((profiles) => {
         return Object.entries(profiles.joined).map(([userId, profile]) => {
             return {
