@@ -204,7 +204,7 @@ describe("RoomMember", function() {
         it("should allow precedence of state events",
         function() {
             const member = new RoomMember(roomId, lazyUserId);
-            member.setAsLazyLoadedMember(memberInfo);
+            member.setAsLazyLoadedMember(memberInfo.displayName, memberInfo.avatarUrl, memberInfo.membership);
             let url = member.getAvatarUrl(hsUrl);
             expect(url.indexOf("lazy/loaded")).toNotEqual(-1);
             expect(member.name).toEqual(displayName);

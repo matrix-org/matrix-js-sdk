@@ -112,14 +112,14 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
  * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
  * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
-RoomMember.prototype.setAsLazyLoadedMember = function(memberInfo, roomState) {
+RoomMember.prototype.setAsLazyLoadedMember = function(displayName, avatarUrl, membership, roomState) {
     if (this.events.member) {
         return;
     }
-    this.membership = memberInfo.membership;
-    this.name = calculateDisplayName(this.userId, memberInfo.displayName, roomState);
-    this.rawDisplayName = memberInfo.displayName || this.userId;
-    this._lazyLoadAvatarUrl = memberInfo.avatarUrl;
+    this.membership = membership;
+    this.name = calculateDisplayName(this.userId, displayName, roomState);
+    this.rawDisplayName = displayName || this.userId;
+    this._lazyLoadAvatarUrl = avatarUrl;
     this._isLazyLoaded = true;
 };
 
