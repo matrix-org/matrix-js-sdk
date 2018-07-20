@@ -1272,4 +1272,64 @@ describe("Room", function() {
             expect(callCount).toEqual(1);
         });
     });
+
+    describe("setLazyLoadedMembers", function() {
+        it("should apply member info in promise", async function() {
+            const room = new Room(roomId);
+            expect(room.membersNeedLoading()).toEqual(true);
+            const infoA = {userId: userA, membership: "invite"};
+            const infoB = {userId: userB, membership: "join"};
+            const promise = room.setLazyLoadedMembers(Promise.resolve([infoA, infoB]));
+            await promise;
+            expect(room.membersNeedLoading()).toEqual(false);
+            const memberA = room.getMember(userA);
+            const memberB = room.getMember(userB);
+            expect(memberA.membership).toEqual("invite");
+            expect(memberA.isLazyLoaded()).toEqual(true);
+            expect(memberB.membership).toEqual("join");
+            expect(memberB.isLazyLoaded()).toEqual(true);
+        });
+
+        it("should revert needs loading on error", async function() {
+            const room = new Room(roomId);
+            let hasThrown = false;
+            try {
+                await room.setLazyLoadedMembers(Promise.reject(new Error("bugger")));
+            }
+            catch(err) {
+                hasThrown = true;
+            }
+            expect(hasThrown).toEqual(true);
+            expect(room.membersNeedLoading()).toEqual(true);
+        });
+
+        it("should revert needs loading on error", async function() {
+            const room = new Room(roomId);
+            let hasThrown = false;
+            try {
+                await room.setLazyLoadedMembers(Promise.reject(new Error("bugger")));
+            }
+            catch(err) {
+                hasThrown = true;
+            }
+            expect(hasThrown).toEqual(true);
+            expect(room.membersNeedLoading()).toEqual(true);
+        });
+
+        it("second call (also in immediate succession) should be ignored", async function() {
+            const room = new Room(roomId);
+            const promise1 = room.setLazyLoadedMembers(Promise.resolve([
+                {userId: userA, membership: "join"},
+                {userId: userB, membership: "join"}
+            ]));
+            const promise2 = room.setLazyLoadedMembers(Promise.resolve([
+                {userId: userC, membership: "join"}
+            ]));
+            await Promise.all([promise1, promise2]);
+            expect(room.getMember(userA)).toBeTruthy();
+            expect(room.getMember(userB)).toBeTruthy();
+            expect(room.getMember(userC)).toBeFalsy();
+        });
+        
+    });
 });

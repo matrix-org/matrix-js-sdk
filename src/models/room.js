@@ -217,6 +217,9 @@ Room.prototype.membersNeedLoading = function() {
  * @param {Promise} membersPromise promise with array of {userId, avatarUrl, displayName, membership} tuples
  */
 Room.prototype.setLazyLoadedMembers = async function(membersPromise) {
+    if (!this._membersNeedLoading) {
+        return;
+    }
     this._membersNeedLoading = false;
     let members = null;
     try {
