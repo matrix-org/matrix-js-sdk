@@ -227,7 +227,7 @@ describe("RoomMember", function() {
             
             // check that the member can't be set as lazy loaded anymore
             // once it has a member event
-            for(let i = 0; i <= 2; ++i) {
+            for(let i = 0; i < 2; ++i) {
                 expect(url.indexOf("flibble/wibble")).toNotEqual(-1);
                 expect(member.name).toEqual("Mr. State");
                 expect(member.isLazyLoaded()).toEqual(false);
