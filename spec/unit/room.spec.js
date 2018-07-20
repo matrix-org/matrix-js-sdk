@@ -1295,41 +1295,27 @@ describe("Room", function() {
             let hasThrown = false;
             try {
                 await room.setLazyLoadedMembers(Promise.reject(new Error("bugger")));
-            }
-            catch(err) {
+            } catch(err) {
                 hasThrown = true;
             }
             expect(hasThrown).toEqual(true);
             expect(room.membersNeedLoading()).toEqual(true);
         });
 
-        it("should revert needs loading on error", async function() {
-            const room = new Room(roomId);
-            let hasThrown = false;
-            try {
-                await room.setLazyLoadedMembers(Promise.reject(new Error("bugger")));
-            }
-            catch(err) {
-                hasThrown = true;
-            }
-            expect(hasThrown).toEqual(true);
-            expect(room.membersNeedLoading()).toEqual(true);
-        });
-
-        it("second call (also in immediate succession) should be ignored", async function() {
+        it("second call (also in immediate succession) should be ignored",
+        async function() {
             const room = new Room(roomId);
             const promise1 = room.setLazyLoadedMembers(Promise.resolve([
                 {userId: userA, membership: "join"},
-                {userId: userB, membership: "join"}
+                {userId: userB, membership: "join"},
             ]));
             const promise2 = room.setLazyLoadedMembers(Promise.resolve([
-                {userId: userC, membership: "join"}
+                {userId: userC, membership: "join"},
             ]));
             await Promise.all([promise1, promise2]);
             expect(room.getMember(userA)).toBeTruthy();
             expect(room.getMember(userB)).toBeTruthy();
             expect(room.getMember(userC)).toBeFalsy();
         });
-        
     });
 });

@@ -109,10 +109,13 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
 
 /**
  * Update this room member from a lazily loaded member
- * @param {Member} memberInfo a {userId, avatarUrl, displayName, membership} tuple
+ * @param {string} displayName display name for lazy loaded member
+ * @param {string} avatarUrl avatar url for lazy loaded member
+ * @param {string} membership membership (join|invite|...) state for lazy loaded member
  * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
  */
-RoomMember.prototype.setAsLazyLoadedMember = function(displayName, avatarUrl, membership, roomState) {
+RoomMember.prototype.setAsLazyLoadedMember =
+function(displayName, avatarUrl, membership, roomState) {
     if (this.events.member) {
         return;
     }

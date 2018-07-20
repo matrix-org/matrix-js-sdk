@@ -198,13 +198,17 @@ describe("RoomMember", function() {
         const displayName = "Mr. Lazy";
         const memberInfo = {
             avatarUrl: "mxc://lazy/loaded",
-            displayName: displayName ,
-            membership: "join"
+            displayName: displayName,
+            membership: "join",
         };
         it("should allow precedence of state events",
         function() {
             const member = new RoomMember(roomId, lazyUserId);
-            member.setAsLazyLoadedMember(memberInfo.displayName, memberInfo.avatarUrl, memberInfo.membership);
+            member.setAsLazyLoadedMember(
+                memberInfo.displayName,
+                memberInfo.avatarUrl,
+                memberInfo.membership);
+
             let url = member.getAvatarUrl(hsUrl);
             expect(url.indexOf("lazy/loaded")).toNotEqual(-1);
             expect(member.name).toEqual(displayName);
@@ -224,7 +228,7 @@ describe("RoomMember", function() {
             }));
 
             url = member.getAvatarUrl(hsUrl);
-            
+
             // check that the member can't be set as lazy loaded anymore
             // once it has a member event
             for(let i = 0; i < 2; ++i) {
@@ -232,7 +236,7 @@ describe("RoomMember", function() {
                 expect(member.name).toEqual("Mr. State");
                 expect(member.isLazyLoaded()).toEqual(false);
                 member.setAsLazyLoadedMember(memberInfo);
-            }        
+            }
         });
     });
 
