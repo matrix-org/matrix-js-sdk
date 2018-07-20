@@ -11,6 +11,7 @@ describe("RoomState", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
     const userB = "@bob:bar";
+    const userLazy = "@lazy:bar";
     let state;
 
     beforeEach(function() {
@@ -260,6 +261,91 @@ describe("RoomState", function() {
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
                 memberEvent, state,
             );
+        });
+    });
+
+    describe("setLazyLoadedMembers", function() {
+        const mrLazy = "Mr. Lazy";
+
+        it("should add a unknown member", function() {
+            expect(state.getMember(userLazy)).toBeFalsy();
+            state.setLazyLoadedMembers([{userId: userLazy}]);
+            const member = state.getMember(userLazy);
+            expect(member.userId).toEqual(userLazy);
+            expect(member.isLazyLoaded()).toEqual(true);
+        });
+
+        it("should emit newMember when adding a member", function() {
+            expect(state.getMember(userLazy)).toBeFalsy();
+            let eventReceived = false;
+            state.once('RoomState.newMember', (_, __, member) => {
+                expect(member.userId).toEqual(userLazy);
+                eventReceived = true;
+            });
+            state.setLazyLoadedMembers([{userId: userLazy}]);
+            expect(eventReceived).toEqual(true);
+        });
+
+        it("should not overwrite an existing member", function() {
+            state.setLazyLoadedMembers([{userId: userA, displayName: mrLazy}]);
+            const memberA = state.getMember(userA);
+            expect(memberA.name).toNotEqual(mrLazy);
+            expect(memberA.isLazyLoaded()).toEqual(false);
+        });
+
+        it("should update lazily loaded members if already present", function() {
+            state.setLazyLoadedMembers([{userId: userLazy}]);
+            state.setLazyLoadedMembers([{userId: userLazy, displayName: mrLazy}]);
+            expect(state.getMember(userLazy).name).toEqual(mrLazy);
+        });
+
+        it("should emit members when updating a member", function() {
+            state.setLazyLoadedMembers([{userId: userLazy}]);
+            let eventReceived = false;
+            state.once('RoomState.members', (_, __, member) => {
+                expect(member.userId).toEqual(userLazy);
+                eventReceived = true;
+            });
+            state.setLazyLoadedMembers([{userId: userLazy, displayName: mrLazy}]);
+            expect(eventReceived).toEqual(true);
+        });
+        
+
+        it("should disambiguate name taking state event members into account", function() {
+            state.setLazyLoadedMembers([{userId: userLazy, displayName: userA}]);
+            const member = state.getMember(userLazy);
+            expect(member.name).toNotEqual(userA);  //contain userA but not be equal
+            expect(member.name.indexOf(userA)).toNotEqual(-1);
+        });
+
+    });
+
+    describe("clone", function() {
+        it("should contain same information as original", function() {
+            // include LL members in copy
+            state.setLazyLoadedMembers([{userId: userLazy}]);
+            const copy = state.clone();
+            const memberA = state.getMember(userA),
+                  memberACopy = copy.getMember(userA),
+                  memberB = state.getMember(userB),
+                  memberBCopy = copy.getMember(userB),
+                  memberLazy = state.getMember(userLazy),
+                  memberLazyCopy = copy.getMember(userLazy);
+            // check individual members
+            expect(memberA.name).toEqual(memberACopy.name);
+            expect(memberA.isLazyLoaded()).toEqual(memberACopy.isLazyLoaded());
+            expect(memberB.name).toEqual(memberBCopy.name);
+            expect(memberB.isLazyLoaded()).toEqual(memberBCopy.isLazyLoaded());
+            expect(memberLazy.name).toEqual(memberLazyCopy.name);
+            expect(memberLazy.isLazyLoaded()).toEqual(memberLazyCopy.isLazyLoaded());
+            // check member keys
+            expect(Object.keys(state.members)).toEqual(Object.keys(copy.members));
+            // check join count
+            expect(state.getJoinedMemberCount()).toEqual(copy.getJoinedMemberCount());
+        });
+
+        it("should return copy independent of original", function() {
+
         });
     });
 

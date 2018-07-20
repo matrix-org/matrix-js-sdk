@@ -155,7 +155,6 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
  */
 RoomState.prototype.clone = function() {
     const copy = new RoomState(this.roomId);
-    //freeze and pass all state events to copy
     Object.values(this.events).forEach((eventsByStateKey) => {
         const eventsForType = Object.values(eventsByStateKey);
         copy.setStateEvents(eventsForType);
@@ -164,7 +163,7 @@ RoomState.prototype.clone = function() {
     const lazyLoadedMembers = Object.values(this.members)
         .filter((member) => member.isLazyLoaded());
     lazyLoadedMembers.forEach((m) => {
-        copy._setJoinedMember(m.userId, m.rawDisplayName, m.getMxcAvatarUrl());
+        copy._setLazyLoadedMember(m.userId, m.rawDisplayName, m.getMxcAvatarUrl(), m.membership);
     });
     return copy;
 };
@@ -279,17 +278,40 @@ RoomState.prototype._updateMember = function(member) {
  * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
  */
 RoomState.prototype.setLazyLoadedMembers = function(members) {
-    let newMembers = members.filter((m) => !this.members.hasOwnProperty(m.userId));
-    newMembers.forEach((memberInfo) => {
-        const member = new RoomMember(this.roomId, memberInfo.userId);
-        // override the displayName and avatarUrl from the lazily loaded members
-        // as this is guaranteed to be the current state
-        member.setAsLazyLoadedMember(memberInfo, this);
-        _updateDisplayNameCache(this, member.userId, member.name);
-        this._updateMember(member);
-        this.emit('RoomState.newMember', {}, self, member);
+    members.forEach((m) => {
+        this._setLazyLoadedMember(
+            m.userId,
+            m.displayName,
+            m.avatarUrl,
+            m.membership
+        );
     });
 };
+
+/**
+ * Sets a single lazily loaded member, used by both setLazyLoadedMembers and clone
+ * @param {Member} members array of {userId, avatarUrl, displayName, membership} tuples
+ */
+RoomState.prototype._setLazyLoadedMember = function(userId, displayName, avatarUrl, membership) {
+    const preExistingMember = this.getMember(userId);
+    // don't overwrite existing state event members
+    if (preExistingMember && !preExistingMember.isLazyLoaded()) {
+        return;
+    }
+    const member = new RoomMember(this.roomId, userId);
+    member.setAsLazyLoadedMember(displayName, avatarUrl, membership, this);
+    _updateDisplayNameCache(this, member.userId, member.name);
+    this._updateMember(member);
+
+    if (preExistingMember) {
+        this.emit("RoomState.members", {}, this, member);
+    }
+    else {
+        this.emit('RoomState.newMember', {}, this, member);
+    }
+};
+
+
 
 /**
  * Set the current typing event for this room.
