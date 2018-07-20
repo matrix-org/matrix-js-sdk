@@ -756,10 +756,16 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     // room state at a given point in time. The plan is to do this by
     // passing the current next_batch sync token to the endpoint we use
     // to fetch the members. For now, this is a prototype that uses
-    // the /joined_members api, which does not support this synchronization,
-    // so there is a race condition here between the current /sync call
+    // the /joined_members api, which only tells us about the joined members
+    // (not invites for example) and does not support this synchronization.
+    // So there is a race condition here between the current /sync call
     // and the /joined_members call: if the have conflicting information, which one
     // represents the most recent state?
+    //
+    // Addressing this race condition and the fact that this only tells us about
+    // joined members is a prerequisite for taking this out of the prototype stage and
+    // enabling the feature flag (feature_lazyloading) that
+    // the call to this method is behind.
     const joinedMembersPromise = this.joinedMembers(roomId);
     const membersPromise = joinedMembersPromise.then((profiles) => {
         return Object.entries(profiles.joined).map(([userId, profile]) => {
