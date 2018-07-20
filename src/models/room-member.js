@@ -302,7 +302,7 @@ RoomMember.prototype.getMxcAvatarUrl = function() {
 };
 
 function calculateDisplayName(selfUserId, displayName, roomState) {
-    if (!displayName) {
+    if (!displayName || displayName === selfUserId) {
         return selfUserId;
     }
 
