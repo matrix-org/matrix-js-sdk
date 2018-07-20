@@ -163,7 +163,11 @@ RoomState.prototype.clone = function() {
     const lazyLoadedMembers = Object.values(this.members)
         .filter((member) => member.isLazyLoaded());
     lazyLoadedMembers.forEach((m) => {
-        copy._setLazyLoadedMember(m.userId, m.rawDisplayName, m.getMxcAvatarUrl(), m.membership);
+        copy._setLazyLoadedMember(
+            m.userId,
+            m.rawDisplayName,
+            m.getMxcAvatarUrl(),
+            m.membership);
     });
     return copy;
 };
@@ -278,16 +282,19 @@ RoomState.prototype.setLazyLoadedMembers = function(members) {
             m.userId,
             m.displayName,
             m.avatarUrl,
-            m.membership
-        );
+            m.membership);
     });
 };
 
 /**
  * Sets a single lazily loaded member, used by both setLazyLoadedMembers and clone
- * @param {Member} members array of {userId, avatarUrl, displayName, membership} tuples
+ * @param {string} userId user id for lazy loaded member
+ * @param {string} displayName display name for lazy loaded member
+ * @param {string} avatarUrl avatar url for lazy loaded member
+ * @param {string} membership membership (join|invite|...) state for lazy loaded member
  */
-RoomState.prototype._setLazyLoadedMember = function(userId, displayName, avatarUrl, membership) {
+RoomState.prototype._setLazyLoadedMember =
+function(userId, displayName, avatarUrl, membership) {
     const preExistingMember = this.getMember(userId);
     // don't overwrite existing state event members
     if (preExistingMember && !preExistingMember.isLazyLoaded()) {
@@ -300,13 +307,10 @@ RoomState.prototype._setLazyLoadedMember = function(userId, displayName, avatarU
 
     if (preExistingMember) {
         this.emit("RoomState.members", {}, this, member);
-    }
-    else {
+    } else {
         this.emit('RoomState.newMember', {}, this, member);
     }
 };
-
-
 
 /**
  * Set the current typing event for this room.

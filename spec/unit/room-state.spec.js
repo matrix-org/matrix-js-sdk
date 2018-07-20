@@ -308,15 +308,14 @@ describe("RoomState", function() {
             state.setLazyLoadedMembers([{userId: userLazy, displayName: mrLazy}]);
             expect(eventReceived).toEqual(true);
         });
-        
 
-        it("should disambiguate name taking state event members into account", function() {
+        it("should disambiguate name taking state event members into account",
+        function() {
             state.setLazyLoadedMembers([{userId: userLazy, displayName: userA}]);
             const member = state.getMember(userLazy);
             expect(member.name).toNotEqual(userA);  //contain userA but not be equal
             expect(member.name.indexOf(userA)).toNotEqual(-1);
         });
-
     });
 
     describe("clone", function() {
@@ -324,12 +323,12 @@ describe("RoomState", function() {
             // include LL members in copy
             state.setLazyLoadedMembers([{userId: userLazy}]);
             const copy = state.clone();
-            const memberA = state.getMember(userA),
-                  memberACopy = copy.getMember(userA),
-                  memberB = state.getMember(userB),
-                  memberBCopy = copy.getMember(userB),
-                  memberLazy = state.getMember(userLazy),
-                  memberLazyCopy = copy.getMember(userLazy);
+            const memberA = state.getMember(userA);
+            const memberACopy = copy.getMember(userA);
+            const memberB = state.getMember(userB);
+            const memberBCopy = copy.getMember(userB);
+            const memberLazy = state.getMember(userLazy);
+            const memberLazyCopy = copy.getMember(userLazy);
             // check individual members
             expect(memberA.name).toEqual(memberACopy.name);
             expect(memberA.isLazyLoaded()).toEqual(memberACopy.isLazyLoaded());
