@@ -12,6 +12,8 @@ describe("RoomState", function() {
     const userA = "@alice:bar";
     const userB = "@bob:bar";
     const userLazy = "@lazy:bar";
+    const mrLazy = "Mr. Lazy";
+
     let state;
 
     beforeEach(function() {
@@ -265,8 +267,6 @@ describe("RoomState", function() {
     });
 
     describe("setLazyLoadedMembers", function() {
-        const mrLazy = "Mr. Lazy";
-
         it("should add a unknown member", function() {
             expect(state.getMember(userLazy)).toBeFalsy();
             state.setLazyLoadedMembers([{userId: userLazy}]);
@@ -345,7 +345,22 @@ describe("RoomState", function() {
         });
 
         it("should return copy independent of original", function() {
+            // include LL members in copy
+            state.setLazyLoadedMembers([{userId: userLazy, membership: "join"}]);
+            const copy = state.clone();
+            const memberLazyCopy = copy.getMember(userLazy);
+            memberLazyCopy.setAsLazyLoadedMember(mrLazy, null, "join");
+            expect(state.getMember(userLazy).name).toEqual(userLazy);
+            expect(memberLazyCopy.name).toEqual(mrLazy);
 
+            expect(state.getJoinedMemberCount()).toEqual(3);
+
+            copy.setStateEvents([utils.mkMembership({  // userA leaves
+                event: true, mship: "leave", user: userA, room: roomId,
+            })]);
+
+            expect(state.getJoinedMemberCount()).toEqual(3);
+            expect(copy.getJoinedMemberCount()).toEqual(2);
         });
     });
 
