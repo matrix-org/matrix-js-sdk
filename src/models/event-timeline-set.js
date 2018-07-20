@@ -74,14 +74,6 @@ function EventTimelineSet(room, opts) {
 utils.inherits(EventTimelineSet, EventEmitter);
 
 /**
- * Sets the lazily loaded members.
- * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
- */
-EventTimelineSet.prototype.setLazyLoadedMembers = function(members) {
-    this._timelines.forEach((tl) => tl.setLazyLoadedMembers(members));
-};
-
-/**
  * Get the filter object this timeline set is filtered on, if any
  * @return {?Filter} the optional filter for this timelineSet
  */

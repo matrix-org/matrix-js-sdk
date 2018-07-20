@@ -159,15 +159,6 @@ EventTimeline.prototype.getRoomId = function() {
 };
 
 /**
- * Sets the lazily loaded members.
- * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
- */
-EventTimeline.prototype.setLazyLoadedMembers = function(members) {
-    this._startState.setLazyLoadedMembers(members);
-    this._endState.setLazyLoadedMembers(members);
-};
-
-/**
  * Get the filter for this timeline's timelineSet (if any)
  * @return {Filter} filter
  */
