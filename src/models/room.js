@@ -225,7 +225,7 @@ Room.prototype.setLazyLoadedMembers = async function(membersPromise) {
         this._membersNeedLoading = true;
         throw err;  //rethrow so calling code is aware operation failed
     }
-    this._timelineSets.forEach((tlSet) => tlSet.setLazyLoadedMembers(members));
+    this.currentState.setLazyLoadedMembers(members);
     this.emit('Room', this);
 };
 
