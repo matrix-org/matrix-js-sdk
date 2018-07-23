@@ -385,13 +385,6 @@ Room.prototype.setSummary = function(summary) {
         this.currentState.setJoinedMemberCount(count);
     }
     this._summaryHeroes = heros;
-
-    const oldName = this.name;
-    this.name = calculateRoomName(this, userId);
-    
-    if (oldName !== this.name) {
-        this.emit("Room.name", this);
-    }
 }
 
 /**
