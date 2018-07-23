@@ -63,6 +63,7 @@ class SyncAccumulator {
             //       { event: $event, token: null|token },
             //       ...
             //    ],
+            //    _summary: { m.heros: [ $user_id ], m.joined_member_count: $count }
             //    _accountData: { $event_type: json },
             //    _unreadNotifications: { ... unread_notifications JSON ... },
             //    _readReceipts: { $user_id: { data: $json, eventId: $event_id }}
@@ -242,6 +243,7 @@ class SyncAccumulator {
                 _timeline: [],
                 _accountData: Object.create(null),
                 _unreadNotifications: {},
+                _summary: {},
                 _readReceipts: {},
             };
         }
@@ -257,6 +259,9 @@ class SyncAccumulator {
         // these probably clobber, spec is unclear.
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
+        }
+        if (data.summary) {
+            currentData._summary = data.summary;
         }
 
         if (data.ephemeral && data.ephemeral.events) {
@@ -428,6 +433,7 @@ class SyncAccumulator {
                     prev_batch: null,
                 },
                 unread_notifications: roomData._unreadNotifications,
+                summary: roomData._summary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {

@@ -172,6 +172,7 @@ function Room(roomId, opts) {
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
     this._syncedMembership = null;
+    this._summaryHeroes = null;
 }
 
 utils.inherits(Room, EventEmitter);
@@ -364,6 +365,22 @@ Room.prototype.getUnreadNotificationCount = function(type) {
 Room.prototype.setUnreadNotificationCount = function(type, count) {
     this._notificationCounts[type] = count;
 };
+
+Room.prototype.setSummary = function(summary) {
+    const heros = summary["m.heros"];
+    const count = summary["m.joined_member_count"];
+    if (Number.isInteger(count)) {
+        this.currentState.setJoinedMemberCount(count);
+    }
+    this._summaryHeroes = heros;
+
+    const oldName = this.name;
+    this.name = calculateRoomName(this, userId);
+    
+    if (oldName !== this.name) {
+        this.emit("Room.name", this);
+    }
+}
 
 /**
  * Whether to send encrypted messages to devices within this room.
