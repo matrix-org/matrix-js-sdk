@@ -102,6 +102,10 @@ RoomState.prototype.getJoinedMemberCount = function() {
     return this._joinedMemberCount;
 };
 
+RoomState.prototype.setJoinedMemberCount = function(count) {
+    this._joinedMemberCount = count;
+}
+
 /**
  * Get all RoomMembers in this room.
  * @return {Array<RoomMember>} A list of RoomMembers.
