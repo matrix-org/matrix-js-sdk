@@ -1283,87 +1283,87 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         return alias;
     }
 
+    const joinedMemberCount = room.currentState.getJoinedMemberCount();
+    const invitedMemberCount = room.currentState.getMembers().reduce((count, m) => {
+        return m.membership === 'invite' ? count + 1 : count;
+    }, 0);
+    const inviteJoinCount = joinedMemberCount + invitedMemberCount;
+
     // get members that are NOT ourselves and are actually in the room.
-    const otherMembers = utils.filter(room.currentState.getMembers(), function(m) {
-        return (
-            m.userId !== userId && m.membership !== "leave" && m.membership !== "ban"
-        );
-    });
-    const allMembers = utils.filter(room.currentState.getMembers(), function(m) {
-        return (m.membership !== "leave");
-    });
-    const myMemberEventArray = utils.filter(room.currentState.getMembers(), function(m) {
-        return (m.userId == userId);
-    });
-    const myMemberEvent = (
-        (myMemberEventArray.length && myMemberEventArray[0].events) ?
-            myMemberEventArray[0].events.member.event : undefined
-    );
+    let otherMembers = null;
+    if (room._summaryHeroes) {
+        // if we have a summary, the member state events should have been in the room state
+        otherMembers = room._summaryHeroes.map((userId) => room.currentState.getMember(userId));
+    } else {
+        otherMembers = room.currentState.getMembers().filter((m) => {
+            return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
+        });
+        // sort by userId, as specified in the spec
+        otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+        otherMembers = otherMembers.slice(0, 5);    //only 5 first members, immitate summary api
+    }
+
+    const me = room.currentState.getMember(userId);
 
     // TODO: Localisation
-    if (myMemberEvent && myMemberEvent.content.membership == "invite") {
-        if (room.currentState.getMember(myMemberEvent.sender)) {
-            // extract who invited us to the room
-            return room.currentState.getMember(
-                myMemberEvent.sender,
-            ).name;
-        } else if (allMembers[0].events.member) {
-            // use the sender field from the invite event, although this only
-            // gets us the mxid
-            return myMemberEvent.sender;
+    // XXX: diverges from spec
+    if (me && me.membership == "invite" && me.events.member) {
+        const inviterId = me.events.member.getSender();
+        if (inviterId) {
+            // try extract who invited us to the room
+            const inviterMember = room.currentState.getMember(inviterId);
+            return inviterMember ? inviterMember : inviterId;
         } else {
             return "Room Invite";
         }
     }
 
+    if (otherMembers.length) {
+        return memberListToRoomName(otherMembers, inviteJoinCount);
+    }
 
-    if (otherMembers.length === 0) {
-        const leftMembers = utils.filter(room.currentState.getMembers(), function(m) {
-            return m.userId !== userId && m.membership === "leave";
-        });
-        if (allMembers.length === 1) {
-            // self-chat, peeked room with 1 participant,
-            // or inbound invite, or outbound 3PID invite.
-            if (allMembers[0].userId === userId) {
-                const thirdPartyInvites =
-                    room.currentState.getStateEvents("m.room.third_party_invite");
-                if (thirdPartyInvites && thirdPartyInvites.length > 0) {
-                    let name = "Inviting " +
-                               thirdPartyInvites[0].getContent().display_name;
-                    if (thirdPartyInvites.length > 1) {
-                        if (thirdPartyInvites.length == 2) {
-                            name += " and " +
-                                    thirdPartyInvites[1].getContent().display_name;
-                        } else {
-                            name += " and " +
-                                    thirdPartyInvites.length + " others";
-                        }
-                    }
-                    return name;
-                } else if (leftMembers.length === 1) {
-                    // if it was a chat with one person who's now left, it's still
-                    // notionally a chat with them
-                    return leftMembers[0].name;
-                } else {
-                    return "Empty room";
-                }
-            } else {
-                return allMembers[0].name;
-            }
-        } else {
-            // there really isn't anyone in this room...
-            return "Empty room";
+    const allMembers = room.currentState.getMembers().filter((m) => {
+        return m.userId !== userId;
+    });
+    const leftMembers = allMembers.filter((m) => {
+        return m.membership === "leave";
+    });
+
+    if (leftMembers.length) {
+        return `Empty room (was ${memberListToRoomName(leftMembers)})`;
+    }
+
+    if (me) {
+        const thirdPartyInvites =
+            room.currentState.getStateEvents("m.room.third_party_invite");
+        
+        if (thirdPartyInvites && thirdPartyInvites.length) {
+            const thirdPartyNames = thirdPartyInvites.map(i => {
+                return {name: i.getContent().display_name};
+            });
+
+            return `Inviting ${memberListToRoomName(thirdPartyNames)}`;
         }
-    } else if (otherMembers.length === 1) {
-        return otherMembers[0].name;
-    } else if (otherMembers.length === 2) {
-        return (
-            otherMembers[0].name + " and " + otherMembers[1].name
-        );
+    }
+
+    const notLeftMembers = allMembers.filter((m) => {
+        return m.membership !== "leave";
+    });
+
+    if (notLeftMembers.length) {
+        return `Empty room (was ${memberListToRoomName(leftMembers, leftMembers.length)})`;
     } else {
-        return (
-            otherMembers[0].name + " and " + (otherMembers.length - 1) + " others"
-        );
+        // there really isn't anyone in this room...
+        return "Empty room";
+    }
+}
+
+function memberListToRoomName(members, count = members.length) {
+    switch (members.length) {
+        case 0:  return null;
+        case 1:  return members[0].name;
+        case 2:  return members[0].name + " and " + members[1].name;
+        default: return members[0].name + " and " + (count - 1) + " others";
     }
 }
 
