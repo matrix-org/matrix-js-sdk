@@ -204,32 +204,38 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
-/**
- * Get the lazy loading state, whether loading is needed or not.
- * @return {bool} whether or not the members of this room need to be loaded
- */
-Room.prototype.membersNeedLoading = function() {
-    return this._membersNeedLoading;
+Room.prototype.getLastEventId = function() {
+    const liveEvents = this.getLiveTimeline().getEvents();
+    return liveEvents.length ? liveEvents[liveEvents.length - 1].getId() : undefined;
 };
 
 /**
- * Sets the lazily loaded members from the result of calling /joined_members
- * @param {Promise} membersPromise promise with array of {userId, avatarUrl, displayName, membership} tuples
+ * Get the out-of-band members loading state, whether loading is needed or not.
+ * Note that loading might be in progress and hence isn't needed.
+ * @return {bool} whether or not the members of this room need to be loaded
  */
-Room.prototype.setLazyLoadedMembers = async function(membersPromise) {
-    if (!this._membersNeedLoading) {
+Room.prototype.needsOutOfBandMembers = function() {
+    return this.currentState.needsOutOfBandMembers();
+};
+
+/**
+ * Loads the out-of-band members from the promise passed in
+ * @param {Promise} eventsPromise promise with array with state events
+ */
+Room.prototype.loadOutOfBandMembers = async function(eventsPromise) {
+    if (!this.membersNeedLoading()) {
         return;
     }
-    this._membersNeedLoading = false;
-    let members = null;
+    this.currentState.markOutOfBandMembersStarted();
+    let eventPojos = null;
     try {
-        members = await membersPromise;
+        eventPojos = await eventsPromise;
     } catch (err) {
-        this._membersNeedLoading = true;
+        this.currentState.markOutOfBandMembersFailed();
         throw err;  //rethrow so calling code is aware operation failed
     }
-    this.currentState.setLazyLoadedMembers(members);
-    this.emit('Room', this);
+    const events = eventPojos.map(this.client.getEventMapper());
+    this.currentState.setOutOfBandMembers(events);
 };
 
 /**
