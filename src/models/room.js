@@ -1291,10 +1291,10 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         otherMembers = room.currentState.getMembers().filter((m) => {
             return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
         });
-        // sort by userId, as specified in the spec
-        otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
-        otherMembers = otherMembers.slice(0, 5);    //only 5 first members, immitate summary api
     }
+    otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+    // sort by userId, as specified in the spec
+    otherMembers = otherMembers.slice(0, 5);    //only 5 first members, immitate _summaryHeroes
 
     const me = room.currentState.getMember(userId);
 
