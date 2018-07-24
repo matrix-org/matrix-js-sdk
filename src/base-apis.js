@@ -419,12 +419,30 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 
 /**
  * @param {string} roomId
+ * @param {string} includeMembership the membership type to include in the response
+ * @param {string} excludeMembership the membership type to exclude from the response
+ * @param {string} atEventId the id of the event for which moment in the timeline the members should be returned for
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: dictionary of userid to profile information
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.joinedMembers = function(roomId, callback) {
-    const path = utils.encodeUri("/rooms/$roomId/joined_members", {$roomId: roomId});
+MatrixBaseApis.prototype.members =
+function(roomId, includeMembership, excludeMembership, atEventId, callback) {
+    const queryParams = {};
+    if (includeMembership) {
+        queryParams.membership = includeMembership;
+    }
+    if (excludeMembership) {
+        queryParams.not_membership = excludeMembership;
+    }
+    if (atEventId) {
+        queryParams.at = atEventId;
+    }
+
+    const queryString = utils.encodeParams(queryParams);
+
+    const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+        {$roomId: roomId});
     return this._http.authedRequest(callback, "GET", path);
 };
 

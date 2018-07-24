@@ -22,6 +22,11 @@ const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const RoomMember = require("./room-member");
 
+// possible statuses for out-of-band member loading
+const OOB_STATUS_NOTSTARTED = 1;
+const OOB_STATUS_INPROGRESS = 2;
+const OOB_STATUS_FINISHED = 3;
+
 /**
  * Construct room state.
  *
@@ -46,13 +51,17 @@ const RoomMember = require("./room-member");
  * @constructor
  * @param {?string} roomId Optional. The ID of the room which has this state.
  * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
+ * @param {?object} oobMemberFlags Optional. The state of loading out of bound members.
+ * As the timeline might get reset while they are loading, this state needs to be inherited
+ * and shared when the room state is cloned for the new timeline.
+ * This should only be passed from clone.
  * @prop {Object.<string, RoomMember>} members The room member dictionary, keyed
  * on the user's ID.
  * @prop {Object.<string, Object.<string, MatrixEvent>>} events The state
  * events dictionary, keyed on the event type and then the state_key value.
  * @prop {string} paginationToken The pagination token for this state.
  */
-function RoomState(roomId) {
+function RoomState(roomId, oobMemberFlags = undefined) {
     this.roomId = roomId;
     this.members = {
         // userId: RoomMember
@@ -70,6 +79,12 @@ function RoomState(roomId) {
     this._userIdsToDisplayNames = {};
     this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
     this._joinedMemberCount = null; // cache of the number of joined members
+    if (!oobMemberFlags) {
+        oobMemberFlags = {
+            status: OOB_STATUS_NOTSTARTED,
+        };
+    }
+    this._oobMemberFlags = oobMemberFlags;
 }
 utils.inherits(RoomState, EventEmitter);
 
@@ -154,21 +169,45 @@ RoomState.prototype.getStateEvents = function(eventType, stateKey) {
  * @return {RoomState} the copy of the room state
  */
 RoomState.prototype.clone = function() {
-    const copy = new RoomState(this.roomId);
+    const copy = new RoomState(this.roomId, this._oobMemberFlags);
+
+    // Ugly hack: because setStateEvents will mark
+    // members as susperseding future out of bound members
+    // if loading is in progress (through _oobMemberFlags)
+    // since these are not new members, we're merely copying them
+    // set the status to not started
+    // after copying, we set back the status and
+    // copy the superseding flag from the current state
+    const status = this._oobMemberFlags.status;
+    this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
+
     Object.values(this.events).forEach((eventsByStateKey) => {
         const eventsForType = Object.values(eventsByStateKey);
         copy.setStateEvents(eventsForType);
     });
-    // clone lazily loaded members
-    const lazyLoadedMembers = Object.values(this.members)
-        .filter((member) => member.isLazyLoaded());
-    lazyLoadedMembers.forEach((m) => {
-        copy._setLazyLoadedMember(
-            m.userId,
-            m.rawDisplayName,
-            m.getMxcAvatarUrl(),
-            m.membership);
-    });
+
+    // Ugly hack: see above
+    this._oobMemberFlags.status = status;
+
+    // copy out of band flags if needed
+    if (this._oobMemberFlags.status == OOB_STATUS_FINISHED) {
+        // copy markOutOfBand flags
+        this.getMembers().forEach((member) => {
+            if (member.isOutOfBand()) {
+                const copyMember = copy.getMember(member.userId);
+                copyMember.markOutOfBand();
+            }
+        });
+    } else if (this._oobMemberFlags.status == OOB_STATUS_INPROGRESS) {
+        // copy markSupersedesOutOfBand flags
+        this.getMembers().forEach((member) => {
+            if (member.supersedesOutOfBand()) {
+                const copyMember = copy.getMember(member.userId);
+                copyMember.markSupersedesOutOfBand();
+            }
+        });
+    }
+
     return copy;
 };
 
@@ -195,10 +234,7 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             return;
         }
 
-        if (self.events[event.getType()] === undefined) {
-            self.events[event.getType()] = {};
-        }
-        self.events[event.getType()][event.getStateKey()] = event;
+        self._setStateEvent(event);
         if (event.getType() === "m.room.member") {
             _updateDisplayNameCache(
                 self, event.getStateKey(), event.getContent().displayname,
@@ -248,6 +284,13 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             }
 
             member.setMembershipEvent(event, self);
+
+            // if out of band members are loading,
+            // mark the member as more recent
+            if (self._oobMemberFlags.status == OOB_STATUS_INPROGRESS) {
+                member.markSupersedesOutOfBand();
+            }
+
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
@@ -261,6 +304,13 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._sentinels = {};
         }
     });
+};
+
+RoomState.prototype._setStateEvent = function(event) {
+    if (this.events[event.getType()] === undefined) {
+        this.events[event.getType()] = {};
+    }
+    this.events[event.getType()][event.getStateKey()] = event;
 };
 
 RoomState.prototype._updateMember = function(member) {
@@ -278,39 +328,95 @@ RoomState.prototype._updateMember = function(member) {
 };
 
 /**
- * Sets the lazily loaded members.
- * @param {Member[]} members array of {userId, avatarUrl, displayName, membership} tuples
+ * Get the out-of-band members loading state, whether loading is needed or not.
+ * Note that loading might be in progress and hence isn't needed.
+ * @return {bool} whether or not the members of this room need to be loaded
  */
-RoomState.prototype.setLazyLoadedMembers = function(members) {
-    members.forEach((m) => {
-        this._setLazyLoadedMember(
-            m.userId,
-            m.displayName,
-            m.avatarUrl,
-            m.membership);
-    });
+RoomState.prototype.needsOutOfBandMembers = function() {
+    return this._oobMemberFlags.status === OOB_STATUS_NOTSTARTED;
 };
 
 /**
- * Sets a single lazily loaded member, used by both setLazyLoadedMembers and clone
- * @param {string} userId user id for lazy loaded member
- * @param {string} displayName display name for lazy loaded member
- * @param {string} avatarUrl avatar url for lazy loaded member
- * @param {string} membership membership (join|invite|...) state for lazy loaded member
+ * Mark this room state as waiting for out-of-band members,
+ * ensuring it doesn't ask for them to be requested again
+ * through needsOutOfBandMembers
  */
-RoomState.prototype._setLazyLoadedMember =
-function(userId, displayName, avatarUrl, membership) {
-    const preExistingMember = this.getMember(userId);
-    // don't overwrite existing state event members
-    if (preExistingMember && !preExistingMember.isLazyLoaded()) {
+RoomState.prototype.markOutOfBandMembersStarted = function() {
+    if (this._oobMemberFlags.status !== OOB_STATUS_NOTSTARTED) {
         return;
     }
-    const member = new RoomMember(this.roomId, userId);
-    member.setAsLazyLoadedMember(displayName, avatarUrl, membership, this);
+    this._oobMemberFlags.status = OOB_STATUS_INPROGRESS;
+};
+
+/**
+ * Mark this room state as having failed to fetch out-of-band members
+ */
+RoomState.prototype.markOutOfBandMembersFailed = function() {
+    if (this._oobMemberFlags.status !== OOB_STATUS_INPROGRESS) {
+        return;
+    }
+    // the request failed, there is nothing to supersede
+    // in case of a retry, these event would not supersede the
+    // retry anymore.
+    this.getMembers().forEach((m) => {
+        m.clearSupersedesOutOfBand();
+    });
+    this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
+};
+
+/**
+ * Sets the loaded out-of-band members.
+ * @param {MatrixEvent[]} stateEvents array of membership state events
+ */
+RoomState.prototype.setOutOfBandMembers = function(stateEvents) {
+    if (this._oobMemberFlags.status !== OOB_STATUS_INPROGRESS) {
+        return;
+    }
+    this._oobMemberFlags.status = OOB_STATUS_FINISHED;
+    stateEvents.forEach((e) => this._setOutOfBandMember(e));
+};
+
+/**
+ * Sets a single out of band member, used by both setOutOfBandMembers and clone
+ * @param {MatrixEvent} stateEvent membership state event
+ */
+RoomState.prototype._setOutOfBandMember = function(stateEvent) {
+    if (stateEvent.getType() !== 'm.room.member') {
+        return;
+    }
+    const userId = stateEvent.getStateKey();
+    const existingMember = this.getMember(userId);
+    if (existingMember) {
+        const existingMemberEvent = existingMember.events.member;
+        // ignore out of band members with events we are
+        // already aware of.
+        if (existingMemberEvent.getId() === stateEvent.getId()) {
+            return;
+        }
+        // this member was updated since we started
+        // loading the out of band members.
+        // Ignore the out of band member and clear
+        // the "supersedes" flag as the out of members are now loaded
+        if (existingMember.supersedesOutOfBand()) {
+            existingMember.clearSupersedesOutOfBand();
+            return;
+        }
+    }
+
+    const member =
+        existingMember ? existingMember : new RoomMember(this.roomId, userId);
+    member.setMembershipEvent(stateEvent);
+    // needed to know which members need to be stored seperately
+    // as the are not part of the sync accumulator
+    // this is cleared by setMembershipEvent so when it's updated through /sync
+    member.markOutOfBand();
+
     _updateDisplayNameCache(this, member.userId, member.name);
+
+    this._setStateEvent(stateEvent);
     this._updateMember(member);
 
-    if (preExistingMember) {
+    if (existingMember) {
         this.emit("RoomState.members", {}, this, member);
     } else {
         this.emit('RoomState.newMember', {}, this, member);

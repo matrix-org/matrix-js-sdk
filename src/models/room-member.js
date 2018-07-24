@@ -58,14 +58,50 @@ function RoomMember(roomId, userId) {
     this.events = {
         member: null,
     };
-    this._lazyLoadAvatarUrl = null;
-    this._isLazyLoaded = false;
+    this._isOutOfBand = false;
+    this._supersedesOutOfBand = false;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
 
-RoomMember.prototype.isLazyLoaded = function() {
-    return this._isLazyLoaded;
+/**
+ * Mark the member as coming from a channel that is not sync
+ */
+RoomMember.prototype.markOutOfBand = function() {
+    this._isOutOfBand = true;
+};
+
+/**
+ * @returns {bool} does the member come from a channel that is not sync?
+ * This is used to store the member seperately
+ * from the sync state so it available across browser sessions.
+ */
+RoomMember.prototype.isOutOfBand = function() {
+    return this._isOutOfBand;
+};
+
+/**
+ * Does the member supersede an incoming out-of-band
+ * member? If so the out-of-band member should be ignored.
+ */
+RoomMember.prototype.supersedesOutOfBand = function() {
+    this._supersedesOutOfBand;
+};
+
+/**
+ * Mark the member as superseding the future incoming
+ * out-of-band members.
+ */
+RoomMember.prototype.markSupersedesOutOfBand = function() {
+    this._supersedesOutOfBand = true;
+};
+
+/**
+ * Clear the member superseding the future incoming
+ * out-of-band members, as loading finished or failed.
+ */
+RoomMember.prototype.clearSupersedesOutOfBand = function() {
+    this._supersedesOutOfBand = false;
 };
 
 /**
@@ -82,8 +118,7 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         return;
     }
 
-    this._lazyLoadAvatarUrl = null;
-    this._isLazyLoaded = false;
+    this._isOutOfBand = false;
 
     this.events.member = event;
 
@@ -105,25 +140,6 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
         this._updateModifiedTime();
         this.emit("RoomMember.name", event, this, oldName);
     }
-};
-
-/**
- * Update this room member from a lazily loaded member
- * @param {string} displayName display name for lazy loaded member
- * @param {string} avatarUrl avatar url for lazy loaded member
- * @param {string} membership membership (join|invite|...) state for lazy loaded member
- * @param {RoomState} roomState the room state this member is part of, needed to disambiguate the display name
- */
-RoomMember.prototype.setAsLazyLoadedMember =
-function(displayName, avatarUrl, membership, roomState) {
-    if (this.events.member) {
-        return;
-    }
-    this.membership = membership;
-    this.name = calculateDisplayName(this.userId, displayName, roomState);
-    this.rawDisplayName = displayName || this.userId;
-    this._lazyLoadAvatarUrl = avatarUrl;
-    this._isLazyLoaded = true;
 };
 
 /**
@@ -294,9 +310,7 @@ RoomMember.prototype.getAvatarUrl =
  * @return {string} the mxc avatar url
  */
 RoomMember.prototype.getMxcAvatarUrl = function() {
-    if (this._lazyLoadAvatarUrl) {
-        return this._lazyLoadAvatarUrl;
-    } else if(this.events.member) {
+    if(this.events.member) {
         return this.events.member.getContent().avatar_url;
     } else if(this.user) {
         return this.user.avatarUrl;
