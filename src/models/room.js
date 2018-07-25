@@ -212,12 +212,18 @@ Room.prototype.getLastEventId = function() {
 };
 
 /**
- * @return {string} the membership type (join | leave | invite) this room was received as during sync
+ * @param {string} myUserId the user id for the logged in member
+ * @return {string} the membership type (join | leave | invite) for the logged in user
  */
-Room.prototype.getSyncedMembership = function() {
+Room.prototype.getMyMembership = function(myUserId) {
+    if (myUserId) {
+        const me = this.getMember(myUserId);
+        if (me) {
+            return me.membership;
+        }
+    }
     return this._syncedMembership;
 };
-
 
 /**
  * Sets the membership this room was received as during sync
