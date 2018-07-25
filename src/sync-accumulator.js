@@ -268,7 +268,7 @@ class SyncAccumulator {
             const HEROES_KEY = "m.heroes";
             const INVITED_COUNT_KEY = "m.invited_member_count";
             const JOINED_COUNT_KEY = "m.joined_member_count";
-            
+
             const acc = currentData._summary;
             const sum = data.summary;
             acc[HEROES_KEY] = sum[HEROES_KEY] || acc[HEROES_KEY];
