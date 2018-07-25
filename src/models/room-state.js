@@ -110,7 +110,7 @@ RoomState.prototype.getJoinedMemberCount = function() {
  */
 RoomState.prototype.setJoinedMemberCount = function(count) {
     this._joinedMemberCount = count;
-}
+};
 /**
  * Returns the number of invited members in this room
  * @return {integer} The number of members in this room whose membership is 'invite'
@@ -130,7 +130,7 @@ RoomState.prototype.getInvitedMemberCount = function() {
  */
 RoomState.prototype.setInvitedMemberCount = function(count) {
     this._invitedMemberCount = count;
-}
+};
 
 /**
  * Get all RoomMembers in this room.

@@ -391,7 +391,7 @@ Room.prototype.setSummary = function(summary) {
     if (heroes) {
         this._summaryHeroes = heroes;
     }
-}
+};
 
 /**
  * Whether to send encrypted messages to devices within this room.
@@ -1301,11 +1301,15 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     // get members that are NOT ourselves and are actually in the room.
     let otherMembers = null;
     if (room._summaryHeroes) {
-        // if we have a summary, the member state events should have been in the room state
-        otherMembers = room._summaryHeroes.map((userId) => room.currentState.getMember(userId));
+        // if we have a summary, the member state events
+        // should be in the room state
+        otherMembers = room._summaryHeroes.map((userId) => {
+            return room.currentState.getMember(userId);
+        });
     } else {
         otherMembers = room.currentState.getMembers().filter((m) => {
-            return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
+            return m.userId !== userId &&
+                (m.membership === "invite" || m.membership === "join");
         });
         // make sure members have stable order
         otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
@@ -1323,7 +1327,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     if (myMembership == 'join') {
         const thirdPartyInvites =
             room.currentState.getStateEvents("m.room.third_party_invite");
-        
+
         if (thirdPartyInvites && thirdPartyInvites.length) {
             const thirdPartyNames = thirdPartyInvites.map((i) => {
                 return {name: i.getContent().display_name};
@@ -1344,17 +1348,16 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     }
     if(leftMembers.length) {
         return `Empty room (was ${memberListToRoomName(leftMembers)})`;
-    }
-    else {
+    } else {
         return "Empty room";
     }
 }
 
 function memberListToRoomName(members, count = members.length) {
     switch (members.length) {
-        case 0:  return null;
-        case 1:  return members[0].name;
-        case 2:  return members[0].name + " and " + members[1].name;
+        case 0: return null;
+        case 1: return members[0].name;
+        case 2: return members[0].name + " and " + members[1].name;
         default: return members[0].name + " and " + (count - 1) + " others";
     }
 }
