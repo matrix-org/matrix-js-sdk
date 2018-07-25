@@ -79,6 +79,8 @@ function RoomState(roomId, oobMemberFlags = undefined) {
     this._userIdsToDisplayNames = {};
     this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
     this._joinedMemberCount = null; // cache of the number of joined members
+    this._invitedMemberCount = null;
+
     if (!oobMemberFlags) {
         oobMemberFlags = {
             status: OOB_STATUS_NOTSTARTED,
@@ -102,8 +104,32 @@ RoomState.prototype.getJoinedMemberCount = function() {
     return this._joinedMemberCount;
 };
 
+/**
+ * Set the joined member count explicitly (like from summary part of the sync response)
+ * @param {number} count the amount of joined members
+ */
 RoomState.prototype.setJoinedMemberCount = function(count) {
     this._joinedMemberCount = count;
+}
+/**
+ * Returns the number of invited members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite'
+ */
+RoomState.prototype.getInvitedMemberCount = function() {
+    if (this._invitedMemberCount === null) {
+        this._invitedMemberCount = this.getMembers().filter((m) => {
+            return m.membership === 'invite';
+        }).length;
+    }
+    return this._invitedMemberCount;
+};
+
+/**
+ * Set the amount of invited members in this room
+ * @param {number} count the amount of invited members
+ */
+RoomState.prototype.setInvitedMemberCount = function(count) {
+    this._invitedMemberCount = count;
 }
 
 /**
@@ -192,6 +218,9 @@ RoomState.prototype.clone = function() {
 
     // Ugly hack: see above
     this._oobMemberFlags.status = status;
+
+    copy.setJoinedMemberCount(this.getJoinedMemberCount());
+    copy.setInvitedMemberCount(this.getInvitedMemberCount());
 
     // copy out of band flags if needed
     if (this._oobMemberFlags.status == OOB_STATUS_FINISHED) {
