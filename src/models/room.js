@@ -379,7 +379,7 @@ Room.prototype.setUnreadNotificationCount = function(type, count) {
 };
 
 Room.prototype.setSummary = function(summary) {
-    const heros = summary["m.heros"];
+    const heros = summary["m.heroes"];
     const count = summary["m.joined_member_count"];
     if (Number.isInteger(count)) {
         this.currentState.setJoinedMemberCount(count);
