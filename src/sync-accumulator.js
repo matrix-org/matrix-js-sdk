@@ -63,7 +63,7 @@ class SyncAccumulator {
             //       { event: $event, token: null|token },
             //       ...
             //    ],
-            //    _summary: { m.heros: [ $user_id ], m.joined_member_count: $count }
+            //    _summary: { m.heroes: [ $user_id ], m.joined_member_count: $count }
             //    _accountData: { $event_type: json },
             //    _unreadNotifications: { ... unread_notifications JSON ... },
             //    _readReceipts: { $user_id: { data: $json, eventId: $event_id }}
