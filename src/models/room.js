@@ -171,8 +171,6 @@ function Room(roomId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
-    // in case of lazy loading, to keep track of loading state
-    this._membersNeedLoading = true;
 }
 
 utils.inherits(Room, EventEmitter);
