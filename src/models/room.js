@@ -379,12 +379,18 @@ Room.prototype.setUnreadNotificationCount = function(type, count) {
 };
 
 Room.prototype.setSummary = function(summary) {
-    const heros = summary["m.heroes"];
-    const count = summary["m.joined_member_count"];
-    if (Number.isInteger(count)) {
-        this.currentState.setJoinedMemberCount(count);
+    const heroes = summary["m.heroes"];
+    const joinedCount = summary["m.joined_member_count"];
+    const invitedCount = summary["m.invited_member_count"];
+    if (Number.isInteger(joinedCount)) {
+        this.currentState.setJoinedMemberCount(joinedCount);
     }
-    this._summaryHeroes = heros;
+    if (Number.isInteger(invitedCount)) {
+        this.currentState.setInvitedMemberCount(invitedCount);
+    }
+    if (heroes) {
+        this._summaryHeroes = heroes;
+    }
 }
 
 /**

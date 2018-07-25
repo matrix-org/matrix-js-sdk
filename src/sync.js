@@ -823,7 +823,11 @@ SyncApi.prototype._processSyncResponse = async function(
     //          state: { events: [] },
     //          timeline: { events: [], prev_batch: $token, limited: true },
     //          ephemeral: { events: [] },
-    //          summary: { m.heroes: [ $userId ], m.joined_member_count: $count }
+    //          summary: {
+    //             m.heroes: [ $user_id ],
+    //             m.joined_member_count: $count,
+    //             m.invited_member_count: $count
+    //          },
     //          account_data: { events: [] },
     //          unread_notifications: {
     //              highlight_count: 0,
