@@ -12,7 +12,6 @@ describe("RoomState", function() {
     const userA = "@alice:bar";
     const userB = "@bob:bar";
     const userLazy = "@lazy:bar";
-    const mrLazy = "Mr. Lazy";
 
     let state;
 
@@ -265,100 +264,163 @@ describe("RoomState", function() {
         });
     });
 
-    describe("setLazyLoadedMembers", function() {
-        it("should add a unknown member", function() {
-            expect(state.getMember(userLazy)).toBeFalsy();
-            state.setLazyLoadedMembers([{userId: userLazy}]);
+    describe("setOutOfBandMembers", function() {
+        it("should add a new member", function() {
+            const oobMemberEvent = utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
+            });
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([oobMemberEvent]);
             const member = state.getMember(userLazy);
             expect(member.userId).toEqual(userLazy);
-            expect(member.isLazyLoaded()).toEqual(true);
+            expect(member.isOutOfBand()).toEqual(true);
+        });
+
+        it("should have no effect when not in correct status", function() {
+            state.setOutOfBandMembers([utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
+            })]);
+            expect(state.getMember(userLazy)).toBeFalsy();
         });
 
         it("should emit newMember when adding a member", function() {
-            expect(state.getMember(userLazy)).toBeFalsy();
+            const userLazy = "@oob:hs";
+            const oobMemberEvent = utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
+            });
             let eventReceived = false;
             state.once('RoomState.newMember', (_, __, member) => {
                 expect(member.userId).toEqual(userLazy);
                 eventReceived = true;
             });
-            state.setLazyLoadedMembers([{userId: userLazy}]);
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([oobMemberEvent]);
             expect(eventReceived).toEqual(true);
         });
 
-        it("should not overwrite an existing member", function() {
-            state.setLazyLoadedMembers([{userId: userA, displayName: mrLazy}]);
+        it("should overwrite existing members", function() {
+            const oobMemberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([oobMemberEvent]);
             const memberA = state.getMember(userA);
-            expect(memberA.name).toNotEqual(mrLazy);
-            expect(memberA.isLazyLoaded()).toEqual(false);
+            expect(memberA.events.member.getId()).toEqual(oobMemberEvent.getId());
+            expect(memberA.isOutOfBand()).toEqual(true);
         });
 
-        it("should update lazily loaded members if already present", function() {
-            state.setLazyLoadedMembers([{userId: userLazy}]);
-            state.setLazyLoadedMembers([{userId: userLazy, displayName: mrLazy}]);
-            expect(state.getMember(userLazy).name).toEqual(mrLazy);
+        it("should allow later state events to overwrite", function() {
+            const oobMemberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
+            const memberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
+
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([oobMemberEvent]);
+            state.setStateEvents([memberEvent]);
+
+            const memberA = state.getMember(userA);
+            expect(memberA.events.member.getId()).toEqual(memberEvent.getId());
+            expect(memberA.isOutOfBand()).toEqual(false);
         });
 
         it("should emit members when updating a member", function() {
-            state.setLazyLoadedMembers([{userId: userLazy}]);
+            const oobMemberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
             let eventReceived = false;
             state.once('RoomState.members', (_, __, member) => {
-                expect(member.userId).toEqual(userLazy);
+                expect(member.userId).toEqual(userA);
                 eventReceived = true;
             });
-            state.setLazyLoadedMembers([{userId: userLazy, displayName: mrLazy}]);
+
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([oobMemberEvent]);
             expect(eventReceived).toEqual(true);
         });
 
-        it("should disambiguate name taking state event members into account",
+
+        it("should not overwrite members updated since starting loading oob",
         function() {
-            state.setLazyLoadedMembers([{userId: userLazy, displayName: userA}]);
-            const member = state.getMember(userLazy);
-            expect(member.name).toNotEqual(userA);  //contain userA but not be equal
-            expect(member.name.indexOf(userA)).toNotEqual(-1);
+            const oobMemberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
+
+            const existingMemberEvent = utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            });
+
+            state.markOutOfBandMembersStarted();
+            state.setStateEvents([existingMemberEvent]);
+            expect(state.getMember(userA).supersedesOutOfBand()).toEqual(true);
+            state.setOutOfBandMembers([oobMemberEvent]);
+
+            const memberA = state.getMember(userA);
+            expect(memberA.events.member.getId()).toEqual(existingMemberEvent.getId());
+            expect(memberA.isOutOfBand()).toEqual(false);
+            expect(memberA.supersedesOutOfBand()).toEqual(false);
         });
     });
 
     describe("clone", function() {
         it("should contain same information as original", function() {
-            // include LL members in copy
-            state.setLazyLoadedMembers([{userId: userLazy}]);
+            // include OOB members in copy
+            state.markOutOfBandMembersStarted();
+            state.setOutOfBandMembers([utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
+            })]);
             const copy = state.clone();
-            const memberA = state.getMember(userA);
-            const memberACopy = copy.getMember(userA);
-            const memberB = state.getMember(userB);
-            const memberBCopy = copy.getMember(userB);
-            const memberLazy = state.getMember(userLazy);
-            const memberLazyCopy = copy.getMember(userLazy);
             // check individual members
-            expect(memberA.name).toEqual(memberACopy.name);
-            expect(memberA.isLazyLoaded()).toEqual(memberACopy.isLazyLoaded());
-            expect(memberB.name).toEqual(memberBCopy.name);
-            expect(memberB.isLazyLoaded()).toEqual(memberBCopy.isLazyLoaded());
-            expect(memberLazy.name).toEqual(memberLazyCopy.name);
-            expect(memberLazy.isLazyLoaded()).toEqual(memberLazyCopy.isLazyLoaded());
+            [userA, userB, userLazy].forEach((userId) => {
+                const member = state.getMember(userId);
+                const memberCopy = copy.getMember(userId);
+                expect(member.name).toEqual(memberCopy.name);
+                expect(member.isOutOfBand()).toEqual(memberCopy.isOutOfBand());
+            });
             // check member keys
             expect(Object.keys(state.members)).toEqual(Object.keys(copy.members));
             // check join count
             expect(state.getJoinedMemberCount()).toEqual(copy.getJoinedMemberCount());
         });
 
-        it("should return copy independent of original", function() {
-            // include LL members in copy
-            state.setLazyLoadedMembers([{userId: userLazy, membership: "join"}]);
+        it("should copy supersedes flag when OOB loading is progress",
+        function() {
+            // include OOB members in copy
+            state.markOutOfBandMembersStarted();
+            state.setStateEvents([utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            })]);
             const copy = state.clone();
-            const memberLazyCopy = copy.getMember(userLazy);
-            memberLazyCopy.setAsLazyLoadedMember(mrLazy, null, "join");
-            expect(state.getMember(userLazy).name).toEqual(userLazy);
-            expect(memberLazyCopy.name).toEqual(mrLazy);
+            const memberA = state.getMember(userA);
+            const memberACopy = copy.getMember(userA);
+            expect(memberA.supersedesOutOfBand()).toEqual(true);
+            expect(memberACopy.supersedesOutOfBand()).toEqual(true);
+        });
 
-            expect(state.getJoinedMemberCount()).toEqual(3);
+        it("should mark old copy as not waiting for out of band anymore", function() {
+            state.markOutOfBandMembersStarted();
+            const copy = state.clone();
+            copy.setOutOfBandMembers([utils.mkMembership({
+                user: userA, mship: "join", room: roomId, event: true,
+            })]);
+            // should have no effect as it should be marked in status finished just like copy
+            state.setOutOfBandMembers([utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
+            })]);
+            expect(state.getMember(userLazy)).toBeFalsy();
+        });
 
-            copy.setStateEvents([utils.mkMembership({  // userA leaves
-                event: true, mship: "leave", user: userA, room: roomId,
+        it("should return copy independent of original", function() {
+            const copy = state.clone();
+            copy.setStateEvents([utils.mkMembership({
+                user: userLazy, mship: "join", room: roomId, event: true,
             })]);
 
-            expect(state.getJoinedMemberCount()).toEqual(3);
-            expect(copy.getJoinedMemberCount()).toEqual(2);
+            expect(state.getMember(userLazy)).toBeFalsy();
+            expect(state.getJoinedMemberCount()).toEqual(2);
+            expect(copy.getJoinedMemberCount()).toEqual(3);
         });
     });
 

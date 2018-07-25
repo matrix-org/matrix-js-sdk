@@ -72,7 +72,7 @@ RoomMember.prototype.markOutOfBand = function() {
 };
 
 /**
- * @returns {bool} does the member come from a channel that is not sync?
+ * @return {bool} does the member come from a channel that is not sync?
  * This is used to store the member seperately
  * from the sync state so it available across browser sessions.
  */
@@ -83,9 +83,10 @@ RoomMember.prototype.isOutOfBand = function() {
 /**
  * Does the member supersede an incoming out-of-band
  * member? If so the out-of-band member should be ignored.
+ * @return {bool}
  */
 RoomMember.prototype.supersedesOutOfBand = function() {
-    this._supersedesOutOfBand;
+    return this._supersedesOutOfBand;
 };
 
 /**
