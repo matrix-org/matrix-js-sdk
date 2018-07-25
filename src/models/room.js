@@ -256,7 +256,7 @@ Room.prototype.needsOutOfBandMembers = function() {
 
 /**
  * Loads the out-of-band members from the promise passed in
- * @param {Promise<[MatrixEvent]>} eventsPromise state events for members
+ * @param {Promise} eventsPromise promise that resolves to an array with membership MatrixEvents for the members
  */
 Room.prototype.loadOutOfBandMembers = async function(eventsPromise) {
     if (!this.needsOutOfBandMembers()) {
