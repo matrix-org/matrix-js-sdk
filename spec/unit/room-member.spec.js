@@ -192,51 +192,28 @@ describe("RoomMember", function() {
         });
     });
 
-    describe("setAsLazyLoadedMember", function() {
-        const hsUrl = "https://my.home.server";
-        const lazyUserId = "@lazy:bar";
-        const displayName = "Mr. Lazy";
-        const memberInfo = {
-            avatarUrl: "mxc://lazy/loaded",
-            displayName: displayName,
-            membership: "join",
-        };
-        it("should allow precedence of state events",
-        function() {
-            const member = new RoomMember(roomId, lazyUserId);
-            member.setAsLazyLoadedMember(
-                memberInfo.displayName,
-                memberInfo.avatarUrl,
-                memberInfo.membership);
+    describe("isOutOfBand", function() {
+        it("should be set by markOutOfBand", function() {
+            const member = new RoomMember();
+            expect(member.isOutOfBand()).toEqual(false);
+            member.markOutOfBand();
+            expect(member.isOutOfBand()).toEqual(true);
+        });
+    });
 
-            let url = member.getAvatarUrl(hsUrl);
-            expect(url.indexOf("lazy/loaded")).toNotEqual(-1);
-            expect(member.name).toEqual(displayName);
-            expect(member.isLazyLoaded()).toEqual(true);
-
-            member.setMembershipEvent(utils.mkEvent({
-                event: true,
-                type: "m.room.member",
-                skey: lazyUserId,
-                room: roomId,
-                user: lazyUserId,
-                content: {
-                    displayname: "Mr. State",
-                    membership: "join",
-                    avatar_url: "mxc://flibble/wibble",
-                },
-            }));
-
-            url = member.getAvatarUrl(hsUrl);
-
-            // check that the member can't be set as lazy loaded anymore
-            // once it has a member event
-            for(let i = 0; i < 2; ++i) {
-                expect(url.indexOf("flibble/wibble")).toNotEqual(-1);
-                expect(member.name).toEqual("Mr. State");
-                expect(member.isLazyLoaded()).toEqual(false);
-                member.setAsLazyLoadedMember(memberInfo);
-            }
+    describe("supersedesOutOfBand", function() {
+        it("should be set by markSupersedesOutOfBand", function() {
+            const member = new RoomMember();
+            expect(member.supersedesOutOfBand()).toEqual(false);
+            member.markSupersedesOutOfBand();
+            expect(member.supersedesOutOfBand()).toEqual(true);
+        });
+        it("should be cleared by clearSupersedesOutOfBand", function() {
+            const member = new RoomMember();
+            member.markSupersedesOutOfBand();
+            expect(member.supersedesOutOfBand()).toEqual(true);
+            member.clearSupersedesOutOfBand();
+            expect(member.supersedesOutOfBand()).toEqual(false);
         });
     });
 
