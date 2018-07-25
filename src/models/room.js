@@ -1283,9 +1283,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     }
 
     const joinedMemberCount = room.currentState.getJoinedMemberCount();
-    const invitedMemberCount = room.currentState.getMembers().reduce((count, m) => {
-        return m.membership === 'invite' ? count + 1 : count;
-    }, 0);
+    const invitedMemberCount = room.currentState.getInvitedMemberCount();
     const inviteJoinCount = joinedMemberCount + invitedMemberCount;
 
     // get members that are NOT ourselves and are actually in the room.
@@ -1297,62 +1295,45 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         otherMembers = room.currentState.getMembers().filter((m) => {
             return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
         });
-    }
-    otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
-    // sort by userId, as specified in the spec
-    otherMembers = otherMembers.slice(0, 5);    //only 5 first members, immitate _summaryHeroes
-
-    const me = room.currentState.getMember(userId);
-
-    // TODO: Localisation
-    // XXX: diverges from spec
-    if (me && me.membership == "invite" && me.events.member) {
-        const inviterId = me.events.member.getSender();
-        if (inviterId) {
-            // try extract who invited us to the room
-            const inviterMember = room.currentState.getMember(inviterId);
-            return inviterMember ? inviterMember : inviterId;
-        } else {
-            return "Room Invite";
-        }
+        // make sure members have stable order
+        otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+        // only 5 first members, immitate _summaryHeroes
+        otherMembers = otherMembers.slice(0, 5);
     }
 
-    if (otherMembers.length) {
+    if (inviteJoinCount) {
         return memberListToRoomName(otherMembers, inviteJoinCount);
     }
 
-    const allMembers = room.currentState.getMembers().filter((m) => {
-        return m.userId !== userId;
-    });
-    const leftMembers = allMembers.filter((m) => {
-        return m.membership === "leave";
-    });
-
-    if (leftMembers.length) {
-        return `Empty room (was ${memberListToRoomName(leftMembers)})`;
-    }
-
-    if (me) {
+    const myMembership = room.getMyMembership(userId);
+    // if I have created a room and invited people throuh
+    // 3rd party invites
+    if (myMembership == 'join') {
         const thirdPartyInvites =
             room.currentState.getStateEvents("m.room.third_party_invite");
         
         if (thirdPartyInvites && thirdPartyInvites.length) {
-            const thirdPartyNames = thirdPartyInvites.map(i => {
+            const thirdPartyNames = thirdPartyInvites.map((i) => {
                 return {name: i.getContent().display_name};
             });
 
             return `Inviting ${memberListToRoomName(thirdPartyNames)}`;
         }
     }
-
-    const notLeftMembers = allMembers.filter((m) => {
-        return m.membership !== "leave";
-    });
-
-    if (notLeftMembers.length) {
-        return `Empty room (was ${memberListToRoomName(leftMembers, leftMembers.length)})`;
-    } else {
-        // there really isn't anyone in this room...
+    // let's try to figure out who was here before
+    let leftMembers = otherMembers;
+    // if we didn't have heroes, try finding them in the room state
+    if(!leftMembers.length) {
+        leftMembers = room.currentState.getMembers().filter((m) => {
+            return m.userId !== userId &&
+                m.membership !== "invite" &&
+                m.membership !== "join";
+        });
+    }
+    if(leftMembers.length) {
+        return `Empty room (was ${memberListToRoomName(leftMembers)})`;
+    }
+    else {
         return "Empty room";
     }
 }
