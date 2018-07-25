@@ -171,6 +171,7 @@ function Room(roomId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
+    this._syncedMembership = null;
 }
 
 utils.inherits(Room, EventEmitter);
@@ -214,9 +215,28 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
+/**
+ * @return {string} the id of the last event in the live timeline
+ */
 Room.prototype.getLastEventId = function() {
     const liveEvents = this.getLiveTimeline().getEvents();
     return liveEvents.length ? liveEvents[liveEvents.length - 1].getId() : undefined;
+};
+
+/**
+ * @return {string} the membership type (join | leave | invite) this room was received as during sync
+ */
+Room.prototype.getSyncedMembership = function() {
+    return this._syncedMembership;
+};
+
+
+/**
+ * Sets the membership this room was received as during sync
+ * @param {string} membership join | leave | invite
+ */
+Room.prototype.setSyncedMembership = function(membership) {
+    this._syncedMembership = membership;
 };
 
 /**
