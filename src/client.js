@@ -771,7 +771,7 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     const lastEventId = room.getLastEventId();
     const responsePromise = this.members(roomId, "join", "leave", lastEventId);
     const eventsPromise = responsePromise.then((response) => {
-        return response.chunk.map(this.getEventMapper())
+        return response.chunk.map(this.getEventMapper());
     });
     await room.loadOutOfBandMembers(eventsPromise);
 };
