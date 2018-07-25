@@ -1293,7 +1293,7 @@ describe("Room", function() {
             });
             const room = new Room(roomId);
 
-            const promise2 = Promise.resolve([memberEvent2])
+            const promise2 = Promise.resolve([memberEvent2]);
             const promise1 = promise2.then(() => [memberEvent]);
 
             await room.loadOutOfBandMembers(promise1);
