@@ -220,21 +220,20 @@ Room.prototype.needsOutOfBandMembers = function() {
 
 /**
  * Loads the out-of-band members from the promise passed in
- * @param {Promise} eventsPromise promise with array with state events
+ * @param {Promise<[MatrixEvent]>} eventsPromise state events for members
  */
 Room.prototype.loadOutOfBandMembers = async function(eventsPromise) {
-    if (!this.membersNeedLoading()) {
+    if (!this.needsOutOfBandMembers()) {
         return;
     }
     this.currentState.markOutOfBandMembersStarted();
-    let eventPojos = null;
+    let events = null;
     try {
-        eventPojos = await eventsPromise;
+        events = await eventsPromise;
     } catch (err) {
         this.currentState.markOutOfBandMembersFailed();
         throw err;  //rethrow so calling code is aware operation failed
     }
-    const events = eventPojos.map(this.client.getEventMapper());
     this.currentState.setOutOfBandMembers(events);
 };
 
