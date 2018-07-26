@@ -97,9 +97,9 @@ utils.inherits(RoomState, EventEmitter);
  */
 RoomState.prototype.getJoinedMemberCount = function() {
     if (this._joinedMemberCount === null) {
-        this._joinedMemberCount = this.getMembers().filter((m) => {
-            return m.membership === 'join';
-        }).length;
+        this._joinedMemberCount = this.getMembers().reduce((count, m) => {
+            return m.membership === 'join' ? count + 1 : count;
+        }, 0);
     }
     return this._joinedMemberCount;
 };
@@ -117,9 +117,9 @@ RoomState.prototype.setJoinedMemberCount = function(count) {
  */
 RoomState.prototype.getInvitedMemberCount = function() {
     if (this._invitedMemberCount === null) {
-        this._invitedMemberCount = this.getMembers().filter((m) => {
-            return m.membership === 'invite';
-        }).length;
+        this._invitedMemberCount = this.getMembers().reduce((count, m) => {
+            return m.membership === 'invite' ? count + 1 : count;
+        }, 0);
     }
     return this._invitedMemberCount;
 };
