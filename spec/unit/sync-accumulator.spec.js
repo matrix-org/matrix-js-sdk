@@ -52,6 +52,11 @@ describe("SyncAccumulator", function() {
                                 member("bob", "join"),
                             ],
                         },
+                        summary: {
+                            "m.heroes": undefined,
+                            "m.joined_member_count": undefined,
+                            "m.invited_member_count": undefined,
+                        },
                         timeline: {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
