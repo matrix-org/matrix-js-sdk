@@ -19,6 +19,8 @@ limitations under the License.
  * @module utils
  */
 
+const unhomoglyph = require('unhomoglyph');
+
 /**
  * Encode a dictionary of query parameters.
  * @param {Object} params A dict of key/values to encode e.g.
@@ -665,10 +667,11 @@ module.exports.isNumber = function(value) {
 
 /**
  * Removes zero width chars, diacritics and whitespace from the string
+ * Also applies an unhomoglyph on the string, to prevent similar looking chars
  * @param {string} str the string to remove hidden characters from
  * @return {string} a string with the hidden characters removed
  */
 module.exports.removeHiddenChars = function(str) {
-    return str.normalize('NFD').replace(removeHiddenCharsRegex, '');
+    return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
 };
 const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;

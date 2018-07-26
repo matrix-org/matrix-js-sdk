@@ -54,7 +54,8 @@
     "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
     "content-type": "^1.0.2",
-    "request": "^2.53.0"
+    "request": "^2.53.0",
+    "unhomoglyph": "^1.0.2"
   },
   "devDependencies": {
     "babel-cli": "^6.18.0",
