@@ -505,11 +505,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    const member = this.currentState.members[userId];
-    if (!member) {
-        return null;
-    }
-    return member;
+    return this.currentState.getMember(userId);
  };
 
 /**
