@@ -11,6 +11,7 @@ describe("RoomState", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
     const userB = "@bob:bar";
+    const userC = "@cleo:bar";
     const userLazy = "@lazy:bar";
 
     let state;
@@ -224,7 +225,6 @@ describe("RoomState", function() {
 
         it("should call setPowerLevelEvent on a new RoomMember if power levels exist",
         function() {
-            const userC = "@cleo:bar";
             const memberEvent = utils.mkMembership({
                 mship: "join", user: userC, room: roomId, event: true,
             });
@@ -525,6 +525,42 @@ describe("RoomState", function() {
 
             expect(state.maySendStateEvent('m.room.other_thing', userA)).toEqual(true);
             expect(state.maySendStateEvent('m.room.other_thing', userB)).toEqual(false);
+        });
+    });
+
+    describe("setJoinedMemberCount", function() {
+        it("should, once used, override counting members from state", function() {
+            state.setStateEvents([
+                utils.mkMembership({event: true, mship: "join",
+                    user: userA, room: roomId}),
+                utils.mkMembership({event: true, mship: "invite",
+                    user: userB, room: roomId}),
+            ]);
+            expect(state.getJoinedMemberCount()).toEqual(1);
+            state.setJoinedMemberCount(100);
+            expect(state.getJoinedMemberCount()).toEqual(100);
+            state.setStateEvents([
+                utils.mkMembership({event: true, mship: "join",
+                    user: userC, room: roomId}),
+            ]);
+            expect(state.getJoinedMemberCount()).toEqual(100);
+        });
+
+        it("should, once used, override counting members from state, " +
+        "also after clone", function() {
+            state.setStateEvents([
+                utils.mkMembership({event: true, mship: "join",
+                    user: userA, room: roomId}),
+                utils.mkMembership({event: true, mship: "invite",
+                    user: userB, room: roomId}),
+            ]);
+            state.setJoinedMemberCount(100);
+            const copy = state.clone();
+            copy.setStateEvents([
+                utils.mkMembership({event: true, mship: "join",
+                    user: userC, room: roomId}),
+            ]);
+            expect(state.getJoinedMemberCount()).toEqual(100);
         });
     });
 
