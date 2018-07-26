@@ -743,6 +743,25 @@ MatrixClient.prototype.getRoom = function(roomId) {
 };
 
 /**
+ * Preloads the member list for the given room id,
+ * in case lazy loading of memberships is in use.
+ * @param {string} roomId The room ID
+ */
+MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
+    const room = this.getRoom(roomId);
+    if (!room || !room.needsOutOfBandMembers()) {
+        return;
+    }
+
+    const lastEventId = room.getLastEventId();
+    const responsePromise = this.members(roomId, "join", "leave", lastEventId);
+    const eventsPromise = responsePromise.then((response) => {
+        return response.chunk.map(this.getEventMapper());
+    });
+    await room.loadOutOfBandMembers(eventsPromise);
+};
+
+/**
  * Retrieve all known rooms.
  * @return {Room[]} A list of rooms, or an empty list if there is no data store.
  */

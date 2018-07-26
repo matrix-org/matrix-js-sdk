@@ -1272,4 +1272,47 @@ describe("Room", function() {
             expect(callCount).toEqual(1);
         });
     });
+
+    describe("loadOutOfBandMembers", function() {
+        const memberEvent = utils.mkMembership({
+            user: "@user_a:bar", mship: "join",
+            room: roomId, event: true, name: "User A",
+        });
+
+        it("should apply member events", async function() {
+            const room = new Room(roomId);
+            await room.loadOutOfBandMembers(Promise.resolve([memberEvent]));
+            const memberA = room.getMember("@user_a:bar");
+            expect(memberA.name).toEqual("User A");
+        });
+
+        it("should apply first call, not first resolved promise", async function() {
+            const memberEvent2 = utils.mkMembership({
+                user: "@user_a:bar", mship: "join",
+                room: roomId, event: true, name: "Ms A",
+            });
+            const room = new Room(roomId);
+
+            const promise2 = Promise.resolve([memberEvent2]);
+            const promise1 = promise2.then(() => [memberEvent]);
+
+            await room.loadOutOfBandMembers(promise1);
+            await room.loadOutOfBandMembers(promise2);
+
+            const memberA = room.getMember("@user_a:bar");
+            expect(memberA.name).toEqual("User A");
+        });
+
+        it("should revert needs loading on error", async function() {
+            const room = new Room(roomId);
+            let hasThrown = false;
+            try {
+                await room.loadOutOfBandMembers(Promise.reject(new Error("bugger")));
+            } catch(err) {
+                hasThrown = true;
+            }
+            expect(hasThrown).toEqual(true);
+            expect(room.needsOutOfBandMembers()).toEqual(true);
+        });
+    });
 });

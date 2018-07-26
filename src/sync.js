@@ -945,6 +945,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle invites
     inviteRooms.forEach(function(inviteObj) {
         const room = inviteObj.room;
+        room.setSyncedMembership("invite");
         const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
         self._processRoomEvents(room, stateEvents);
@@ -961,6 +962,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle joins
     await Promise.mapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
+        room.setSyncedMembership("join");
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
@@ -1076,6 +1078,8 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
         const room = leaveObj.room;
+        room.setSyncedMembership("leave");
+
         const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
         const timelineEvents =

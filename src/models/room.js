@@ -171,7 +171,9 @@ function Room(roomId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
+    this._syncedMembership = null;
 }
+
 utils.inherits(Room, EventEmitter);
 
 /**
@@ -201,6 +203,63 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
+/**
+ * @return {string} the id of the last event in the live timeline
+ */
+Room.prototype.getLastEventId = function() {
+    const liveEvents = this.getLiveTimeline().getEvents();
+    return liveEvents.length ? liveEvents[liveEvents.length - 1].getId() : undefined;
+};
+
+/**
+ * @param {string} myUserId the user id for the logged in member
+ * @return {string} the membership type (join | leave | invite) for the logged in user
+ */
+Room.prototype.getMyMembership = function(myUserId) {
+    if (myUserId) {
+        const me = this.getMember(myUserId);
+        if (me) {
+            return me.membership;
+        }
+    }
+    return this._syncedMembership;
+};
+
+/**
+ * Sets the membership this room was received as during sync
+ * @param {string} membership join | leave | invite
+ */
+Room.prototype.setSyncedMembership = function(membership) {
+    this._syncedMembership = membership;
+};
+
+/**
+ * Get the out-of-band members loading state, whether loading is needed or not.
+ * Note that loading might be in progress and hence isn't needed.
+ * @return {bool} whether or not the members of this room need to be loaded
+ */
+Room.prototype.needsOutOfBandMembers = function() {
+    return this.currentState.needsOutOfBandMembers();
+};
+
+/**
+ * Loads the out-of-band members from the promise passed in
+ * @param {Promise} eventsPromise promise that resolves to an array with membership MatrixEvents for the members
+ */
+Room.prototype.loadOutOfBandMembers = async function(eventsPromise) {
+    if (!this.needsOutOfBandMembers()) {
+        return;
+    }
+    this.currentState.markOutOfBandMembersStarted();
+    let events = null;
+    try {
+        events = await eventsPromise;
+    } catch (err) {
+        this.currentState.markOutOfBandMembersFailed();
+        throw err;  //rethrow so calling code is aware operation failed
+    }
+    this.currentState.setOutOfBandMembers(events);
+};
 
 /**
  * Reset the live timeline of all timelineSets, and start new ones.
