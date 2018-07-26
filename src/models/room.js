@@ -1280,7 +1280,8 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
     const joinedMemberCount = room.currentState.getJoinedMemberCount();
     const invitedMemberCount = room.currentState.getInvitedMemberCount();
-    const inviteJoinCount = joinedMemberCount + invitedMemberCount;
+    // -1 because these numbers include the syncing user
+    const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
     // get members that are NOT ourselves and are actually in the room.
     let otherNames = null;

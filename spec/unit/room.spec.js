@@ -704,6 +704,7 @@ describe("Room", function() {
         describe("Room.recalculate => Room Name using room summary", function() {
             
             it("should use room heroes if available", function() {
+                addMember(userA, "invite");
                 addMember(userB);
                 addMember(userC);
                 addMember(userD);
@@ -718,7 +719,7 @@ describe("Room", function() {
             it("missing hero member state reverts to mxid", function() {
                 room.setSummary({
                     "m.heroes": [userB],
-                    "m.joined_member_count": 1
+                    "m.joined_member_count": 2
                 });
 
                 room.recalculate(userA);
@@ -727,6 +728,7 @@ describe("Room", function() {
 
             it("uses hero name from state", function() {
                 const name = "Mr B";
+                addMember(userA, "invite");
                 addMember(userB, "join", {name});
                 room.setSummary({
                     "m.heroes": [userB],
@@ -745,8 +747,41 @@ describe("Room", function() {
                     "m.invited_member_count": 50,
                 });
                 room.recalculate(userA);
-                expect(room.name).toEqual(`${name} and 99 others`);
+                expect(room.name).toEqual(`${name} and 98 others`);
             });
+
+            it("relies on heroes in case of absent counts", function() {
+                const nameB = "Mr Bean";
+                const nameC = "Mel C";
+                addMember(userB, "join", {name: nameB});
+                addMember(userC, "join", {name: nameC});
+                room.setSummary({
+                    "m.heroes": [userB, userC]
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${nameB} and ${nameC}`);
+            });
+
+            it("uses only heroes", function() {
+                const nameB = "Mr Bean";
+                addMember(userB, "join", {name: nameB});
+                addMember(userC, "join");
+                room.setSummary({
+                    "m.heroes": [userB]
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(nameB);
+            });
+
+            it("reverts to empty room in case of self chat", function() {
+                room.setSummary({
+                    "m.heroes": [],
+                    "m.invited_member_count": 1,
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual("Empty room");
+            });
+            
         });
 
         describe("Room.recalculate => Room Name", function() {
