@@ -617,33 +617,29 @@ describe("Room", function() {
     });
 
     describe("recalculate", function() {
-        let stateLookup = {
-            // event.type + "$" event.state_key : MatrixEvent
-        };
-
         const setJoinRule = function(rule) {
-            stateLookup["m.room.join_rules$"] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.join_rules", room: roomId, user: userA, content: {
                     join_rule: rule,
                 }, event: true,
-            });
+            })]);;
         };
         const setAliases = function(aliases, stateKey) {
             if (!stateKey) {
                 stateKey = "flibble";
             }
-            stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.aliases", room: roomId, skey: stateKey, content: {
                     aliases: aliases,
                 }, event: true,
-            });
+            })]);
         };
         const setRoomName = function(name) {
-            stateLookup["m.room.name$"] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, content: {
                     name: name,
                 }, event: true,
-            });
+            })]);
         };
         const addMember = function(userId, state, opts) {
             if (!state) {
@@ -655,56 +651,14 @@ describe("Room", function() {
             opts.user = opts.user || userId;
             opts.skey = userId;
             opts.event = true;
-            stateLookup["m.room.member$" + userId] = utils.mkMembership(opts);
+            const event = utils.mkMembership(opts);
+            room.addLiveEvents([event]);
+            return event;
         };
 
         beforeEach(function() {
-            stateLookup = {};
-            room.currentState.getStateEvents.andCall(function(type, key) {
-                if (key === undefined) {
-                    const prefix = type + "$";
-                    const list = [];
-                    for (const stateBlob in stateLookup) {
-                        if (!stateLookup.hasOwnProperty(stateBlob)) {
-                            continue;
-                        }
-                        if (stateBlob.indexOf(prefix) === 0) {
-                            list.push(stateLookup[stateBlob]);
-                        }
-                    }
-                    return list;
-                } else {
-                    return stateLookup[type + "$" + key];
-                }
-            });
-            room.currentState.getMembers.andCall(function() {
-                const memberEvents = room.currentState.getStateEvents("m.room.member");
-                const members = [];
-                for (let i = 0; i < memberEvents.length; i++) {
-                    members.push({
-                        name: memberEvents[i].event.content &&
-                                memberEvents[i].event.content.displayname ?
-                                memberEvents[i].event.content.displayname :
-                                memberEvents[i].getStateKey(),
-                        userId: memberEvents[i].getStateKey(),
-                        events: { member: memberEvents[i] },
-                    });
-                }
-                return members;
-            });
-            room.currentState.getMember.andCall(function(userId) {
-                const memberEvent = room.currentState.getStateEvents(
-                    "m.room.member", userId,
-                );
-                return {
-                    name: memberEvent.event.content &&
-                            memberEvent.event.content.displayname ?
-                            memberEvent.event.content.displayname :
-                            memberEvent.getStateKey(),
-                    userId: memberEvent.getStateKey(),
-                    events: { member: memberEvent },
-                };
-            });
+            // no mocking
+            room = new Room(roomId);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -712,8 +666,8 @@ describe("Room", function() {
             "room is an invite room", function() {
                 const roomName = "flibble";
 
-                addMember(userA, "invite");
-                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                const event = addMember(userA, "invite");
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",
@@ -724,29 +678,26 @@ describe("Room", function() {
                 ];
 
                 room.recalculate(userA);
-                expect(room.currentState.setStateEvents).toHaveBeenCalled();
-                // first call, first arg (which is an array), first element in array
-                const fakeEvent = room.currentState.setStateEvents.calls[0].
-                      arguments[0][0];
-                expect(fakeEvent.getContent()).toEqual({
-                    name: roomName,
-                });
+                expect(room.name).toEqual(roomName);
             });
 
             it("should not clobber state events if it isn't an invite room", function() {
-                addMember(userA, "join");
-                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                const event = addMember(userA, "join");
+                const roomName = "flibble";
+                setRoomName(roomName);
+                const roomNameToIgnore = "ignoreme";
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",
                         content: {
-                            name: "flibble",
+                            name: roomNameToIgnore,
                         },
                     },
                 ];
 
                 room.recalculate(userA);
-                expect(room.currentState.setStateEvents).toNotHaveBeenCalled();
+                expect(room.name).toEqual(roomName);
             });
         });
 
@@ -867,8 +818,7 @@ describe("Room", function() {
                 setJoinRule("public");
                 setRoomName(roomName);
                 room.recalculate(userA);
-                const name = room.name;
-                expect(name).toEqual(roomName);
+                expect(room.name).toEqual(roomName);
             });
 
             it("should return 'Empty room' for private (invite join_rules) rooms if" +
@@ -876,8 +826,7 @@ describe("Room", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 room.recalculate(userA);
-                const name = room.name;
-                expect(name).toEqual("Empty room");
+                expect(room.name).toEqual("Empty room");
             });
 
             it("should return 'Empty room' for public (public join_rules) rooms if a" +

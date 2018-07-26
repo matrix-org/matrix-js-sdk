@@ -1339,7 +1339,8 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
 function memberListToRoomName(members, count = members.length) {
     switch (members.length) {
-        case 0: return null;
+        // count would be 1 for a self-chat
+        case 0: return count <= 1 ? "Empty room" : null;
         case 1: return members[0].name;
         case 2: return members[0].name + " and " + members[1].name;
         default: return members[0].name + " and " + (count - 1) + " others";
