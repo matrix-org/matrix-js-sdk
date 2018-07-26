@@ -1283,16 +1283,16 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     const inviteJoinCount = joinedMemberCount + invitedMemberCount;
 
     // get members that are NOT ourselves and are actually in the room.
-    let otherMembers = null;
+    let otherNames = null;
     if (room._summaryHeroes) {
         // if we have a summary, the member state events
         // should be in the room state
-        otherMembers = room._summaryHeroes.map((userId) => {
+        otherNames = room._summaryHeroes.map((userId) => {
             const member = room.getMember(userId);
-            return member ? member : {name: userId};
+            return member ? member.name : userId;
         });
     } else {
-        otherMembers = room.currentState.getMembers().filter((m) => {
+        let otherMembers = room.currentState.getMembers().filter((m) => {
             return m.userId !== userId &&
                 (m.membership === "invite" || m.membership === "join");
         });
@@ -1300,10 +1300,11 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
         // only 5 first members, immitate _summaryHeroes
         otherMembers = otherMembers.slice(0, 5);
+        otherNames = otherMembers.map((m) => m.name);
     }
 
     if (inviteJoinCount) {
-        return memberListToRoomName(otherMembers, inviteJoinCount);
+        return memberNamesToRoomName(otherNames, inviteJoinCount);
     }
 
     const myMembership = room.getMyMembership(userId);
@@ -1315,43 +1316,43 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 
         if (thirdPartyInvites && thirdPartyInvites.length) {
             const thirdPartyNames = thirdPartyInvites.map((i) => {
-                return {name: i.getContent().display_name};
+                return i.getContent().display_name;
             });
 
-            return `Inviting ${memberListToRoomName(thirdPartyNames)}`;
+            return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
         }
     }
     // let's try to figure out who was here before
-    let leftMembers = otherMembers;
+    let leftNames = otherNames;
     // if we didn't have heroes, try finding them in the room state
-    if(!leftMembers.length) {
-        leftMembers = room.currentState.getMembers().filter((m) => {
+    if(!leftNames.length) {
+        leftNames = room.currentState.getMembers().filter((m) => {
             return m.userId !== userId &&
                 m.membership !== "invite" &&
                 m.membership !== "join";
-        });
+        }).map((m) => m.name);
     }
-    if(leftMembers.length) {
-        return `Empty room (was ${memberListToRoomName(leftMembers)})`;
+    if(leftNames.length) {
+        return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
     } else {
         return "Empty room";
     }
 }
 
-function memberListToRoomName(members, count = (members.length + 1)) {
+function memberNamesToRoomName(names, count = (names.length + 1)) {
     const countWithoutMe = count - 1;
-    if (!members.length) {
+    if (!names.length) {
        return count <= 1 ? "Empty room" : null; 
-    } else if (members.length === 1 && countWithoutMe <= 1) {
-        return members[0].name;
-    } else if (members.length === 2 && countWithoutMe <= 2) {
-        return `${members[0].name} and ${members[1].name}`;
+    } else if (names.length === 1 && countWithoutMe <= 1) {
+        return names[0];
+    } else if (names.length === 2 && countWithoutMe <= 2) {
+        return `${names[0]} and ${names[1]}`;
     } else {
         const plural = countWithoutMe > 1;
         if (plural) {
-            return `${members[0].name} and ${countWithoutMe} others`;
+            return `${names[0]} and ${countWithoutMe} others`;
         } else {
-            return `${members[0].name} and 1 other`;
+            return `${names[0]} and 1 other`;
         }
     }
 }
