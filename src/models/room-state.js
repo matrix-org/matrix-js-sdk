@@ -376,6 +376,7 @@ RoomState.prototype._updateMember = function(member) {
 
     this.members[member.userId] = member;
     this._joinedMemberCount = null;
+    this._invitedMemberCount = null;
 };
 
 /**
