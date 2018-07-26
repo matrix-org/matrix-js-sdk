@@ -701,6 +701,54 @@ describe("Room", function() {
             });
         });
 
+        describe("Room.recalculate => Room Name using room summary", function() {
+            
+            it("should use room heroes if available", function() {
+                addMember(userB);
+                addMember(userC);
+                addMember(userD);
+                room.setSummary({
+                    "m.heroes": [userB, userC, userD]
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${userB} and 2 others`);
+            });
+
+            it("missing hero member state reverts to mxid", function() {
+                room.setSummary({
+                    "m.heroes": [userB],
+                    "m.joined_member_count": 1
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(userB);
+            });
+
+            it("uses hero name from state", function() {
+                const name = "Mr B";
+                addMember(userB, "join", {name});
+                room.setSummary({
+                    "m.heroes": [userB],
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(name);
+            });
+
+            it("uses counts from summary", function() {
+                const name = "Mr B";
+                addMember(userB, "join", {name});
+                room.setSummary({
+                    "m.heroes": [userB],
+                    "m.joined_member_count": 50,
+                    "m.invited_member_count": 50,
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${name} and 99 others`);
+            });
+        });
+
         describe("Room.recalculate => Room Name", function() {
             it("should return the names of members in a private (invite join_rules)" +
             " room if a room name and alias don't exist and there are >3 members.",
