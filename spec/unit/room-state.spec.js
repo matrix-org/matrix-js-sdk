@@ -533,7 +533,7 @@ describe("RoomState", function() {
         beforeEach(() => {
             state = new RoomState(roomId);
         });
-        
+
         it("should update after adding joined member", function() {
             state.setStateEvents([
                 utils.mkMembership({event: true, mship: "join",
@@ -552,7 +552,7 @@ describe("RoomState", function() {
         beforeEach(() => {
             state = new RoomState(roomId);
         });
-        
+
         it("should update after adding invited member", function() {
             state.setStateEvents([
                 utils.mkMembership({event: true, mship: "invite",
@@ -571,7 +571,7 @@ describe("RoomState", function() {
         beforeEach(() => {
             state = new RoomState(roomId);
         });
-        
+
         it("should, once used, override counting members from state", function() {
             state.setStateEvents([
                 utils.mkMembership({event: true, mship: "join",
