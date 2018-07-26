@@ -67,13 +67,14 @@ describe("Room", function() {
 
     describe("getMember", function() {
         beforeEach(function() {
-            // clobber members property with test data
-            room.currentState.members = {
-                "@alice:bar": {
-                    userId: userA,
-                    roomId: roomId,
-                },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": {
+                        userId: userA,
+                        roomId: roomId,
+                    },
+                }[userId];
+            });
         });
 
         it("should return null if the member isn't in current state", function() {
@@ -570,40 +571,47 @@ describe("Room", function() {
     describe("hasMembershipState", function() {
         it("should return true for a matching userId and membership",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-                "@bob:bar": { userId: "@bob:bar", membership: "invite" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                    "@bob:bar": { userId: "@bob:bar", membership: "invite" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
 
         it("should return false if match membership but no match userId",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
 
         it("should return false if match userId but no match membership",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
 
         it("should return false if no match membership or userId",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
 
         it("should return false if no members exist",
         function() {
-            room.currentState.members = {};
             expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
         });
     });
