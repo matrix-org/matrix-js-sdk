@@ -355,7 +355,7 @@ describe("SyncAccumulator", function() {
                 "m.heroes": ["@alice:bar"],
                 "m.invited_member_count": 2,
             }));
-            let summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
             expect(summary["m.invited_member_count"]).toEqual(2);
             expect(summary["m.heroes"]).toEqual(["@alice:bar"]);
         });
@@ -369,14 +369,12 @@ describe("SyncAccumulator", function() {
                 "m.heroes": ["@bob:bar"],
                 "m.joined_member_count": 5,
             }));
-            
-            let summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
             expect(summary["m.invited_member_count"]).toEqual(2);
             expect(summary["m.joined_member_count"]).toEqual(5);
             expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
         });
-
-    })
+    });
 });
 
 function syncSkeleton(joinObj) {

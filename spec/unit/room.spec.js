@@ -622,7 +622,7 @@ describe("Room", function() {
                 type: "m.room.join_rules", room: roomId, user: userA, content: {
                     join_rule: rule,
                 }, event: true,
-            })]);;
+            })]);
         };
         const setAliases = function(aliases, stateKey) {
             if (!stateKey) {
@@ -702,14 +702,13 @@ describe("Room", function() {
         });
 
         describe("Room.recalculate => Room Name using room summary", function() {
-            
             it("should use room heroes if available", function() {
                 addMember(userA, "invite");
                 addMember(userB);
                 addMember(userC);
                 addMember(userD);
                 room.setSummary({
-                    "m.heroes": [userB, userC, userD]
+                    "m.heroes": [userB, userC, userD],
                 });
 
                 room.recalculate(userA);
@@ -719,7 +718,7 @@ describe("Room", function() {
             it("missing hero member state reverts to mxid", function() {
                 room.setSummary({
                     "m.heroes": [userB],
-                    "m.joined_member_count": 2
+                    "m.joined_member_count": 2,
                 });
 
                 room.recalculate(userA);
@@ -756,7 +755,7 @@ describe("Room", function() {
                 addMember(userB, "join", {name: nameB});
                 addMember(userC, "join", {name: nameC});
                 room.setSummary({
-                    "m.heroes": [userB, userC]
+                    "m.heroes": [userB, userC],
                 });
                 room.recalculate(userA);
                 expect(room.name).toEqual(`${nameB} and ${nameC}`);
@@ -767,7 +766,7 @@ describe("Room", function() {
                 addMember(userB, "join", {name: nameB});
                 addMember(userC, "join");
                 room.setSummary({
-                    "m.heroes": [userB]
+                    "m.heroes": [userB],
                 });
                 room.recalculate(userA);
                 expect(room.name).toEqual(nameB);
@@ -781,7 +780,6 @@ describe("Room", function() {
                 room.recalculate(userA);
                 expect(room.name).toEqual("Empty room");
             });
-            
         });
 
         describe("Room.recalculate => Room Name", function() {
