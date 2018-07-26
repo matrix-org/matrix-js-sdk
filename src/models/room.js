@@ -1300,7 +1300,8 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         // if we have a summary, the member state events
         // should be in the room state
         otherMembers = room._summaryHeroes.map((userId) => {
-            return room.currentState.getMember(userId);
+            const member = room.getMember(userId);
+            return member ? member : {name: userId};
         });
     } else {
         otherMembers = room.currentState.getMembers().filter((m) => {
@@ -1349,13 +1350,21 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
     }
 }
 
-function memberListToRoomName(members, count = members.length) {
-    switch (members.length) {
-        // count would be 1 for a self-chat
-        case 0: return count <= 1 ? "Empty room" : null;
-        case 1: return members[0].name;
-        case 2: return members[0].name + " and " + members[1].name;
-        default: return members[0].name + " and " + (count - 1) + " others";
+function memberListToRoomName(members, count = (members.length + 1)) {
+    const countWithoutMe = count - 1;
+    if (!members.length) {
+       return count <= 1 ? "Empty room" : null; 
+    } else if (members.length === 1 && countWithoutMe <= 1) {
+        return members[0].name;
+    } else if (members.length === 2 && countWithoutMe <= 2) {
+        return `${members[0].name} and ${members[1].name}`;
+    } else {
+        const plural = countWithoutMe > 1;
+        if (plural) {
+            return `${members[0].name} and ${countWithoutMe} others`;
+        } else {
+            return `${members[0].name} and 1 other`;
+        }
     }
 }
 
