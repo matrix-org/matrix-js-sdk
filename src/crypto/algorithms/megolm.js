@@ -618,7 +618,10 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     if (!content.sender_key || !content.session_id ||
         !content.ciphertext
        ) {
-        throw new base.DecryptionError("Missing fields in input");
+        throw new base.DecryptionError(
+            "MEGOLM_MISSING_FIELDS",
+            "Missing fields in input",
+        );
     }
 
     // we add the event to the pending list *before* we start decryption.
@@ -635,10 +638,16 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             event.getId(), event.getTs(),
         );
     } catch (e) {
+        let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._requestKeysForEvent(event);
+
+            errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
         }
+
         throw new base.DecryptionError(
+            errorCode,
             e.toString(), {
                 session: content.sender_key + '|' + content.session_id,
             },
@@ -655,6 +664,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
         throw new base.DecryptionError(
+            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
             "The sender's device has not sent us the keys for this message.",
             {
                 session: content.sender_key + '|' + content.session_id,
@@ -673,6 +683,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     // room, so neither the sender nor a MITM can lie about the room_id).
     if (payload.room_id !== event.getRoomId()) {
         throw new base.DecryptionError(
+            "MEGOLM_BAD_ROOM",
             "Message intended for room " + payload.room_id,
         );
     }

@@ -38,6 +38,8 @@ module.exports.MatrixError = require("./http-api").MatrixError;
 module.exports.MatrixClient = require("./client").MatrixClient;
 /** The {@link module:models/room|Room} class. */
 module.exports.Room = require("./models/room");
+/** The {@link module:models/group|Group} class. */
+module.exports.Group = require("./models/group");
 /** The {@link module:models/event-timeline~EventTimeline} class. */
 module.exports.EventTimeline = require("./models/event-timeline");
 /** The {@link module:models/event-timeline-set~EventTimelineSet} class. */
@@ -81,6 +83,13 @@ module.exports.IndexedDBCryptoStore =
 module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCall;
 
 
+/**
+ * Set an audio output device to use for MatrixCalls
+ * @function
+ * @param {string=} deviceId the identifier for the device
+ * undefined treated as unset
+ */
+module.exports.setMatrixCallAudioOutput = require('./webrtc/call').setAudioOutput;
 /**
  * Set an audio input device to use for MatrixCalls
  * @function

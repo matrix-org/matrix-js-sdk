@@ -1,3 +1,52 @@
+Changes in [0.10.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.6) (2018-07-09)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6-rc.1...v0.10.6)
+
+ * No changes since rc.1
+
+Changes in [0.10.6-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.6-rc.1) (2018-07-06)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.5...v0.10.6-rc.1)
+
+ * Expose event decryption error via Event.decrypted event
+   [\#665](https://github.com/matrix-org/matrix-js-sdk/pull/665)
+ * Add decryption error codes to base.DecryptionError
+   [\#663](https://github.com/matrix-org/matrix-js-sdk/pull/663)
+
+Changes in [0.10.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.5) (2018-06-29)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.5-rc.1...v0.10.5)
+
+ * No changes since rc.1
+
+Changes in [0.10.5-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.5-rc.1) (2018-06-21)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.4...v0.10.5-rc.1)
+
+ * fix auth header and filename=undefined
+   [\#659](https://github.com/matrix-org/matrix-js-sdk/pull/659)
+ * allow setting the output device for webrtc calls
+   [\#650](https://github.com/matrix-org/matrix-js-sdk/pull/650)
+ * arguments true and false are actually invalid
+   [\#596](https://github.com/matrix-org/matrix-js-sdk/pull/596)
+ * fix typo where `headers` was not being used and thus sent wrong content-type
+   [\#643](https://github.com/matrix-org/matrix-js-sdk/pull/643)
+ * fix some documentation typos
+   [\#642](https://github.com/matrix-org/matrix-js-sdk/pull/642)
+
+Changes in [0.10.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.4) (2018-06-12)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.4-rc.1...v0.10.4)
+
+ * No changes since rc.1
+
+Changes in [0.10.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.4-rc.1) (2018-06-06)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.3...v0.10.4-rc.1)
+
+ * check whether notif level is undefined, because `0` is falsey
+   [\#651](https://github.com/matrix-org/matrix-js-sdk/pull/651)
+
 Changes in [0.10.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.3) (2018-05-25)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.3-rc.1...v0.10.3)

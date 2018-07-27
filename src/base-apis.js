@@ -1090,6 +1090,10 @@ MatrixBaseApis.prototype.resolveUrl = function(url, opts) {
  * @param {string=} opts.name   Name to give the file on the server. Defaults
  *   to <tt>file.name</tt>.
  *
+ * @param {boolean=} opts.includeFilename if false will not send the filename,
+ *   e.g for encrypted file uploads where filename leaks are undesirable.
+ *   Defaults to true.
+ *
  * @param {string=} opts.type   Content-type for the upload. Defaults to
  *   <tt>file.type</tt>, or <tt>applicaton/octet-stream</tt>.
  *
