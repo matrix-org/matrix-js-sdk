@@ -217,8 +217,13 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             }
 
             let member = self.members[userId];
+            self._joinedMemberCount = null;
+
             if (!member) {
                 member = new RoomMember(event.getRoomId(), userId);
+                // add member to members before emitting any events,
+                // as event handlers often lookup the member
+                self.members[userId] = member;
                 self.emit("RoomState.newMember", event, self, member);
             }
 
@@ -232,8 +237,6 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             // blow away the sentinel which is now outdated
             delete self._sentinels[userId];
 
-            self.members[userId] = member;
-            self._joinedMemberCount = null;
             self.emit("RoomState.members", event, self, member);
         } else if (event.getType() === "m.room.power_levels") {
             const members = utils.values(self.members);
