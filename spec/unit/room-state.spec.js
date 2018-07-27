@@ -162,6 +162,7 @@ describe("RoomState", function() {
             ];
             let emitCount = 0;
             state.on("RoomState.newMember", function(ev, st, mem) {
+                expect(state.getMember(mem.userId)).toEqual(mem);
                 expect(mem.userId).toEqual(memberEvents[emitCount].getSender());
                 expect(mem.membership).toBeFalsy();  // not defined yet
                 emitCount += 1;
