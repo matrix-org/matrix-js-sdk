@@ -546,7 +546,8 @@ function _updateDisplayNameCache(roomState, userId, displayName) {
 
  /**
  * Fires whenever a member is added to the members dictionary. The RoomMember
- * will not be fully populated yet (e.g. no membership state).
+ * will not be fully populated yet (e.g. no membership state) but will already
+ * be available in the members dictionary.
  * @event module:client~MatrixClient#"RoomState.newMember"
  * @param {MatrixEvent} event The matrix event which caused this event to fire.
  * @param {RoomState} state The room state whose RoomState.members dictionary
