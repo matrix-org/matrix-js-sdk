@@ -809,6 +809,11 @@ SyncApi.prototype._processSyncResponse = async function(
     //          state: { events: [] },
     //          timeline: { events: [], prev_batch: $token, limited: true },
     //          ephemeral: { events: [] },
+    //          summary: {
+    //             m.heroes: [ $user_id ],
+    //             m.joined_member_count: $count,
+    //             m.invited_member_count: $count
+    //          },
     //          account_data: { events: [] },
     //          unread_notifications: {
     //              highlight_count: 0,
@@ -1041,6 +1046,13 @@ SyncApi.prototype._processSyncResponse = async function(
         }
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
+
+        // set summary after processing events,
+        // because it will trigger a name calculation
+        // which needs the room state to be up to date
+        if (joinObj.summary) {
+            room.setSummary(joinObj.summary);
+        }
 
         // XXX: should we be adding ephemeralEvents to the timeline?
         // It feels like that for symmetry with room.addAccountData()

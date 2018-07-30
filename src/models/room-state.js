@@ -79,6 +79,16 @@ function RoomState(roomId, oobMemberFlags = undefined) {
     this._userIdsToDisplayNames = {};
     this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
     this._joinedMemberCount = null; // cache of the number of joined members
+    // joined members count from summary api
+    // once set, we know the server supports the summary api
+    // and we should only trust that
+    // we could also only trust that before OOB members
+    // are loaded but doesn't seem worth the hassle atm
+    this._summaryJoinedMemberCount = null;
+    // same for invited member count
+    this._invitedMemberCount = null;
+    this._summaryInvitedMemberCount = null;
+
     if (!oobMemberFlags) {
         oobMemberFlags = {
             status: OOB_STATUS_NOTSTARTED,
@@ -94,12 +104,46 @@ utils.inherits(RoomState, EventEmitter);
  * @return {integer} The number of members in this room whose membership is 'join'
  */
 RoomState.prototype.getJoinedMemberCount = function() {
+    if (this._summaryJoinedMemberCount !== null) {
+        return this._summaryJoinedMemberCount;
+    }
     if (this._joinedMemberCount === null) {
-        this._joinedMemberCount = this.getMembers().filter((m) => {
-            return m.membership === 'join';
-        }).length;
+        this._joinedMemberCount = this.getMembers().reduce((count, m) => {
+            return m.membership === 'join' ? count + 1 : count;
+        }, 0);
     }
     return this._joinedMemberCount;
+};
+
+/**
+ * Set the joined member count explicitly (like from summary part of the sync response)
+ * @param {number} count the amount of joined members
+ */
+RoomState.prototype.setJoinedMemberCount = function(count) {
+    this._summaryJoinedMemberCount = count;
+};
+/**
+ * Returns the number of invited members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite'
+ */
+RoomState.prototype.getInvitedMemberCount = function() {
+    if (this._summaryInvitedMemberCount !== null) {
+        return this._summaryInvitedMemberCount;
+    }
+    if (this._invitedMemberCount === null) {
+        this._invitedMemberCount = this.getMembers().reduce((count, m) => {
+            return m.membership === 'invite' ? count + 1 : count;
+        }, 0);
+    }
+    return this._invitedMemberCount;
+};
+
+/**
+ * Set the amount of invited members in this room
+ * @param {number} count the amount of invited members
+ */
+RoomState.prototype.setInvitedMemberCount = function(count) {
+    this._summaryInvitedMemberCount = count;
 };
 
 /**
@@ -188,6 +232,13 @@ RoomState.prototype.clone = function() {
 
     // Ugly hack: see above
     this._oobMemberFlags.status = status;
+
+    if (this._summaryInvitedMemberCount !== null) {
+        copy.setInvitedMemberCount(this.getInvitedMemberCount());
+    }
+    if (this._summaryJoinedMemberCount !== null) {
+        copy.setJoinedMemberCount(this.getJoinedMemberCount());
+    }
 
     // copy out of band flags if needed
     if (this._oobMemberFlags.status == OOB_STATUS_FINISHED) {
@@ -320,6 +371,7 @@ RoomState.prototype._updateMember = function(member) {
 
     this.members[member.userId] = member;
     this._joinedMemberCount = null;
+    this._invitedMemberCount = null;
 };
 
 /**

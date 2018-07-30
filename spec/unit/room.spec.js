@@ -67,13 +67,14 @@ describe("Room", function() {
 
     describe("getMember", function() {
         beforeEach(function() {
-            // clobber members property with test data
-            room.currentState.members = {
-                "@alice:bar": {
-                    userId: userA,
-                    roomId: roomId,
-                },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": {
+                        userId: userA,
+                        roomId: roomId,
+                    },
+                }[userId];
+            });
         });
 
         it("should return null if the member isn't in current state", function() {
@@ -570,72 +571,75 @@ describe("Room", function() {
     describe("hasMembershipState", function() {
         it("should return true for a matching userId and membership",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-                "@bob:bar": { userId: "@bob:bar", membership: "invite" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                    "@bob:bar": { userId: "@bob:bar", membership: "invite" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(true);
         });
 
         it("should return false if match membership but no match userId",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "join")).toBe(false);
         });
 
         it("should return false if match userId but no match membership",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@alice:bar", "ban")).toBe(false);
         });
 
         it("should return false if no match membership or userId",
         function() {
-            room.currentState.members = {
-                "@alice:bar": { userId: "@alice:bar", membership: "join" },
-            };
+            room.currentState.getMember.andCall(function(userId) {
+                return {
+                    "@alice:bar": { userId: "@alice:bar", membership: "join" },
+                }[userId];
+            });
             expect(room.hasMembershipState("@bob:bar", "invite")).toBe(false);
         });
 
         it("should return false if no members exist",
         function() {
-            room.currentState.members = {};
             expect(room.hasMembershipState("@foo:bar", "join")).toBe(false);
         });
     });
 
     describe("recalculate", function() {
-        let stateLookup = {
-            // event.type + "$" event.state_key : MatrixEvent
-        };
-
         const setJoinRule = function(rule) {
-            stateLookup["m.room.join_rules$"] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.join_rules", room: roomId, user: userA, content: {
                     join_rule: rule,
                 }, event: true,
-            });
+            })]);
         };
         const setAliases = function(aliases, stateKey) {
             if (!stateKey) {
                 stateKey = "flibble";
             }
-            stateLookup["m.room.aliases$" + stateKey] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.aliases", room: roomId, skey: stateKey, content: {
                     aliases: aliases,
                 }, event: true,
-            });
+            })]);
         };
         const setRoomName = function(name) {
-            stateLookup["m.room.name$"] = utils.mkEvent({
+            room.addLiveEvents([utils.mkEvent({
                 type: "m.room.name", room: roomId, user: userA, content: {
                     name: name,
                 }, event: true,
-            });
+            })]);
         };
         const addMember = function(userId, state, opts) {
             if (!state) {
@@ -647,56 +651,14 @@ describe("Room", function() {
             opts.user = opts.user || userId;
             opts.skey = userId;
             opts.event = true;
-            stateLookup["m.room.member$" + userId] = utils.mkMembership(opts);
+            const event = utils.mkMembership(opts);
+            room.addLiveEvents([event]);
+            return event;
         };
 
         beforeEach(function() {
-            stateLookup = {};
-            room.currentState.getStateEvents.andCall(function(type, key) {
-                if (key === undefined) {
-                    const prefix = type + "$";
-                    const list = [];
-                    for (const stateBlob in stateLookup) {
-                        if (!stateLookup.hasOwnProperty(stateBlob)) {
-                            continue;
-                        }
-                        if (stateBlob.indexOf(prefix) === 0) {
-                            list.push(stateLookup[stateBlob]);
-                        }
-                    }
-                    return list;
-                } else {
-                    return stateLookup[type + "$" + key];
-                }
-            });
-            room.currentState.getMembers.andCall(function() {
-                const memberEvents = room.currentState.getStateEvents("m.room.member");
-                const members = [];
-                for (let i = 0; i < memberEvents.length; i++) {
-                    members.push({
-                        name: memberEvents[i].event.content &&
-                                memberEvents[i].event.content.displayname ?
-                                memberEvents[i].event.content.displayname :
-                                memberEvents[i].getStateKey(),
-                        userId: memberEvents[i].getStateKey(),
-                        events: { member: memberEvents[i] },
-                    });
-                }
-                return members;
-            });
-            room.currentState.getMember.andCall(function(userId) {
-                const memberEvent = room.currentState.getStateEvents(
-                    "m.room.member", userId,
-                );
-                return {
-                    name: memberEvent.event.content &&
-                            memberEvent.event.content.displayname ?
-                            memberEvent.event.content.displayname :
-                            memberEvent.getStateKey(),
-                    userId: memberEvent.getStateKey(),
-                    events: { member: memberEvent },
-                };
-            });
+            // no mocking
+            room = new Room(roomId);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -704,8 +666,8 @@ describe("Room", function() {
             "room is an invite room", function() {
                 const roomName = "flibble";
 
-                addMember(userA, "invite");
-                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                const event = addMember(userA, "invite");
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",
@@ -716,29 +678,107 @@ describe("Room", function() {
                 ];
 
                 room.recalculate(userA);
-                expect(room.currentState.setStateEvents).toHaveBeenCalled();
-                // first call, first arg (which is an array), first element in array
-                const fakeEvent = room.currentState.setStateEvents.calls[0].
-                      arguments[0][0];
-                expect(fakeEvent.getContent()).toEqual({
-                    name: roomName,
-                });
+                expect(room.name).toEqual(roomName);
             });
 
             it("should not clobber state events if it isn't an invite room", function() {
-                addMember(userA, "join");
-                stateLookup["m.room.member$" + userA].event.invite_room_state = [
+                const event = addMember(userA, "join");
+                const roomName = "flibble";
+                setRoomName(roomName);
+                const roomNameToIgnore = "ignoreme";
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",
                         content: {
-                            name: "flibble",
+                            name: roomNameToIgnore,
                         },
                     },
                 ];
 
                 room.recalculate(userA);
-                expect(room.currentState.setStateEvents).toNotHaveBeenCalled();
+                expect(room.name).toEqual(roomName);
+            });
+        });
+
+        describe("Room.recalculate => Room Name using room summary", function() {
+            it("should use room heroes if available", function() {
+                addMember(userA, "invite");
+                addMember(userB);
+                addMember(userC);
+                addMember(userD);
+                room.setSummary({
+                    "m.heroes": [userB, userC, userD],
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${userB} and 2 others`);
+            });
+
+            it("missing hero member state reverts to mxid", function() {
+                room.setSummary({
+                    "m.heroes": [userB],
+                    "m.joined_member_count": 2,
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(userB);
+            });
+
+            it("uses hero name from state", function() {
+                const name = "Mr B";
+                addMember(userA, "invite");
+                addMember(userB, "join", {name});
+                room.setSummary({
+                    "m.heroes": [userB],
+                });
+
+                room.recalculate(userA);
+                expect(room.name).toEqual(name);
+            });
+
+            it("uses counts from summary", function() {
+                const name = "Mr B";
+                addMember(userB, "join", {name});
+                room.setSummary({
+                    "m.heroes": [userB],
+                    "m.joined_member_count": 50,
+                    "m.invited_member_count": 50,
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${name} and 98 others`);
+            });
+
+            it("relies on heroes in case of absent counts", function() {
+                const nameB = "Mr Bean";
+                const nameC = "Mel C";
+                addMember(userB, "join", {name: nameB});
+                addMember(userC, "join", {name: nameC});
+                room.setSummary({
+                    "m.heroes": [userB, userC],
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(`${nameB} and ${nameC}`);
+            });
+
+            it("uses only heroes", function() {
+                const nameB = "Mr Bean";
+                addMember(userB, "join", {name: nameB});
+                addMember(userC, "join");
+                room.setSummary({
+                    "m.heroes": [userB],
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual(nameB);
+            });
+
+            it("reverts to empty room in case of self chat", function() {
+                room.setSummary({
+                    "m.heroes": [],
+                    "m.invited_member_count": 1,
+                });
+                room.recalculate(userA);
+                expect(room.name).toEqual("Empty room");
             });
         });
 
@@ -859,8 +899,7 @@ describe("Room", function() {
                 setJoinRule("public");
                 setRoomName(roomName);
                 room.recalculate(userA);
-                const name = room.name;
-                expect(name).toEqual(roomName);
+                expect(room.name).toEqual(roomName);
             });
 
             it("should return 'Empty room' for private (invite join_rules) rooms if" +
@@ -868,8 +907,7 @@ describe("Room", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 room.recalculate(userA);
-                const name = room.name;
-                expect(name).toEqual("Empty room");
+                expect(room.name).toEqual("Empty room");
             });
 
             it("should return 'Empty room' for public (public join_rules) rooms if a" +
