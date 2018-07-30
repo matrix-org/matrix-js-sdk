@@ -34,8 +34,8 @@ function createDatabase(db) {
 }
 
 function upgradeSchemaV2(db) {
-    const llMembersStore = db.createObjectStore("lazy_loaded_members", { keyPath: ["roomId", "userId"]});
-    llMembersStore.createIndex("room", "roomId");
+    const oobMembersStore = db.createObjectStore("oob_membership_events", { keyPath: ["room_id", "state_key"]});
+    oobMembersStore.createIndex("room", "room_id");
 }
 
 /**
@@ -197,25 +197,20 @@ LocalIndexedDBStoreBackend.prototype = {
 
     getOutOfBandMembers: function(roomId) {
         return new Promise((resolve, reject) =>{
-            const tx = this.db.transaction(["lazy_loaded_members"], "readonly");
-            const store = tx.objectStore("lazy_loaded_members");
+            const tx = this.db.transaction(["oob_membership_events"], "readonly");
+            const store = tx.objectStore("oob_membership_events");
             const roomIndex = store.index("room");
             const range = IDBKeyRange.only(roomId);
             const request = roomIndex.openCursor(range);
 
-            const members = [];
+            const membershipEvents = [];
             request.onsuccess = (event) => {
                 const cursor = event.target.result;
                 if (!cursor) {
-                    return resolve(members);
+                    return resolve(membershipEvents);
                 }
                 const record = cursor.value;
-                members.push({
-                    userId: record.userId,
-                    displayName: record.displayName,
-                    membership: record.membership,
-                    avatarUrl: record.avatarUrl,
-                });
+                membershipEvents.push(record);
                 cursor.continue();
             };
             request.onerror = (err) => {
@@ -224,21 +219,14 @@ LocalIndexedDBStoreBackend.prototype = {
         });
     },
 
-    setOutOfBandMembers: function(roomId, members) {
+    setOutOfBandMembers: function(roomId, membershipEvents) {
         function ignoreResult() {};
         // run everything in a promise so anything that throws will reject
         return new Promise((resolve) =>{
-            const tx = this.db.transaction(["lazy_loaded_members"], "readwrite");
-            const store = tx.objectStore("lazy_loaded_members");
-            const puts = members.map((m) => {
-                const record = {
-                    roomId: roomId,
-                    userId: m.userId,
-                    displayName: m.displayName,
-                    avatarUrl: m.avatarUrl,
-                    membership: m.membership
-                };
-                let putPromise = promiseifyRequest(store.put(record));
+            const tx = this.db.transaction(["oob_membership_events"], "readwrite");
+            const store = tx.objectStore("oob_membership_events");
+            const puts = membershipEvents.map((e) => {
+                let putPromise = promiseifyRequest(store.put(e));
                 return putPromise.then(ignoreResult);
             });
             resolve(Promise.all(puts).then(ignoreResult));
