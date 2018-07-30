@@ -323,19 +323,8 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
                     event.getPrevContent().displayname;
             }
 
-            let member = self.members[userId];
-            self._joinedMemberCount = null;
-
-            if (!member) {
-                member = new RoomMember(event.getRoomId(), userId);
-                // add member to members before emitting any events,
-                // as event handlers often lookup the member
-                self.members[userId] = member;
-                self.emit("RoomState.newMember", event, self, member);
-            }
-
+            const member = self._getOrCreateMember(userId, event);
             member.setMembershipEvent(event, self);
-
             // if out of band members are loading,
             // mark the member as more recent
             if (self._oobMemberFlags.status == OOB_STATUS_INPROGRESS) {
@@ -355,6 +344,28 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
             self._sentinels = {};
         }
     });
+};
+
+/**
+ * Looks up a member by the given userId, and if it doesn't exist,
+ * create it and emit the `RoomState.newMember` event.
+ * This method makes sure the member is added to the members dictionary
+ * before emitting, as this is done from setStateEvents and _setOutOfBandMember.
+ * @param {string} userId the id of the user to look up
+ * @param {MatrixEvent} event the membership event for the (new) member. Used to emit.
+ * @fires module:client~MatrixClient#event:"RoomState.newMember"
+ * @returns {RoomMember} the member, existing or newly created.
+ */
+RoomState.prototype._getOrCreateMember = function(userId, event) {
+    let member = this.members[userId];
+    if (!member) {
+        member = new RoomMember(this.roomId, userId);
+        // add member to members before emitting any events,
+        // as event handlers often lookup the member
+        this.members[userId] = member;
+        this.emit("RoomState.newMember", event, this, member);
+    }
+    return member;
 };
 
 RoomState.prototype._setStateEvent = function(event) {
@@ -455,8 +466,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
         }
     }
 
-    const member =
-        existingMember ? existingMember : new RoomMember(this.roomId, userId);
+    const member = this._getOrCreateMember(userId, stateEvent);
     member.setMembershipEvent(stateEvent);
     // needed to know which members need to be stored seperately
     // as the are not part of the sync accumulator
@@ -467,12 +477,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
 
     this._setStateEvent(stateEvent);
     this._updateMember(member);
-
-    if (existingMember) {
-        this.emit("RoomState.members", {}, this, member);
-    } else {
-        this.emit('RoomState.newMember', {}, this, member);
-    }
+    this.emit("RoomState.members", {}, stateEvent, member);
 };
 
 /**
