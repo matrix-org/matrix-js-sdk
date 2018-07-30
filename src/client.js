@@ -752,8 +752,6 @@ MatrixClient.prototype._loadMembers = async function(room) {
         const lastEventId = room.getLastEventId();
         const response = await this.members(roomId, "join", "leave", lastEventId);
         rawMembersEvents = response.chunk;
-        // TODO don't block on writing
-        await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
     }
     const memberEvents = rawMembersEvents.map(this.getEventMapper());
     return {memberEvents, fromServer};
