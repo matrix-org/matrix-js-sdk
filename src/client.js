@@ -744,8 +744,11 @@ MatrixClient.prototype.getRoom = function(roomId) {
 
 MatrixClient.prototype._loadMembers = async function(room) {
     const roomId = room.roomId;
+    // were the members loaded from the server?
+    let fromServer = false;
     let rawMembersEvents = await this.store.getOutOfBandMembers(roomId);
     if (rawMembersEvents.length == 0) {
+        fromServer = true;
         const lastEventId = room.getLastEventId();
         const response = await this.members(roomId, "join", "leave", lastEventId);
         rawMembersEvents = response.chunk;
@@ -753,7 +756,7 @@ MatrixClient.prototype._loadMembers = async function(room) {
         await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
     }
     const memberEvents = rawMembersEvents.map(this.getEventMapper());
-    return memberEvents;
+    return {memberEvents, fromServer};
 };
 
 /**
@@ -770,8 +773,30 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     // setLazyLoadedMembers sets a flag before it awaits the promise passed in
     // to avoid a race when calling membersNeedLoading/loadOutOfBandMembers
     // in fast succession, before the first promise resolves.
-    const membersPromise = this._loadMembers(room);
+    let membersPromise = this._loadMembers(room);
+    // intercept whether we need to store oob members afterwards
+    let membersNeedStoring = false;
+    membersPromise = membersPromise.then(({memberEvents, fromServer}) => {
+        membersNeedStoring = fromServer;
+        return memberEvents;
+    });
     await room.loadOutOfBandMembers(membersPromise);
+    // if loadOutOfBandMembers throws, this wont be called
+    // but that's fine as we don't want to store members
+    // that caused an error.
+    if (membersNeedStoring) {
+        const rawMembersEvents = room.currentState.getMembers()
+            .filter((m) => m.isOutOfBand())
+            .map((m) => m.events.member.event);
+        // TODO: probably need a way to mark a room as lazy loaded
+        // even though we didn't store any members, as we'll just
+        // lazy loaded the room in every session. This is a likely
+        // scenario for DM's where all the members would likely
+        // be known without lazy loading.
+        if (rawMembersEvents.length) {
+            await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
+        }
+    }
 };
 
 /**
