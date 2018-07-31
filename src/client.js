@@ -767,6 +767,7 @@ MatrixClient.prototype._loadMembers = async function(room) {
         const lastEventId = room.getLastEventId();
         const response = await this.members(roomId, "join", "leave", lastEventId);
         rawMembersEvents = response.chunk;
+        console.log(`LL: got ${rawMembersEvents.length} members from server`);
     }
     const memberEvents = rawMembersEvents.map(this.getEventMapper());
     return {memberEvents, fromServer};
@@ -807,7 +808,11 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
         // scenario for DM's where all the members would likely
         // be known without lazy loading.
         if (rawMembersEvents.length) {
+            console.log(`LL: telling backend to store ${rawMembersEvents.length} members`);
             await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
+        }
+        else {
+            console.log(`LL: no members needed to be stored`);
         }
     }
 };
