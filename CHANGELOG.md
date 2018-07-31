@@ -1,3 +1,16 @@
+Changes in [0.10.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7) (2018-07-30)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7-rc.1...v0.10.7)
+
+ * No changes since rc.1
+
+Changes in [0.10.7-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7-rc.1) (2018-07-24)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6...v0.10.7-rc.1)
+
+ * encrypt for invited users if history visibility allows.
+   [\#666](https://github.com/matrix-org/matrix-js-sdk/pull/666)
+
 Changes in [0.10.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.6) (2018-07-09)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6-rc.1...v0.10.6)
