@@ -34,7 +34,10 @@ function createDatabase(db) {
 }
 
 function upgradeSchemaV2(db) {
-    const oobMembersStore = db.createObjectStore("oob_membership_events", { keyPath: ["room_id", "state_key"]});
+    const oobMembersStore = db.createObjectStore(
+        "oob_membership_events", {
+            keyPath: ["room_id", "state_key"],
+        });
     oobMembersStore.createIndex("room", "room_id");
 }
 
@@ -195,6 +198,13 @@ LocalIndexedDBStoreBackend.prototype = {
         });
     },
 
+    /**
+     * Returns the out-of-band membership events for this room that
+     * were previously loaded.
+     * @param {string} roomId
+     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns {null} in case the members for this room haven't been stored yet
+     */
     getOutOfBandMembers: function(roomId) {
         return new Promise((resolve, reject) =>{
             const tx = this.db.transaction(["oob_membership_events"], "readonly");
@@ -204,36 +214,73 @@ LocalIndexedDBStoreBackend.prototype = {
             const request = roomIndex.openCursor(range);
 
             const membershipEvents = [];
+            // did we encounter the oob_written marker object
+            // amongst the results? That means OOB member
+            // loading already happened for this room
+            // but there were no members to persist as they
+            // were all known already
+            let oobWritten = false;
+
             request.onsuccess = (event) => {
                 const cursor = event.target.result;
                 if (!cursor) {
+                    // Unknown room
+                    if (!membershipEvents.length && !oobWritten) {
+                        return resolve(null);
+                    }
                     return resolve(membershipEvents);
                 }
                 const record = cursor.value;
-                membershipEvents.push(record);
+                if (record.oob_written) {
+                    oobWritten = true;
+                } else {
+                    membershipEvents.push(record);
+                }
                 cursor.continue();
             };
             request.onerror = (err) => {
                 reject(err);
             };
-        }).then((membershipEvents) => {
-            console.log(`LL: got ${membershipEvents.length} membershipEvents from storage for room ${roomId} ...`);
-            return membershipEvents;
+        }).then((events) => {
+            console.log(`LL: got ${events && events.length}` +
+                ` membershipEvents from storage for room ${roomId} ...`);
+            return events;
         });
     },
 
+    /**
+     * Stores the out-of-band membership events for this room. Note that
+     * it still makes sense to store an empty array as the OOB status for the room is
+     * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+     * @param {string} roomId
+     * @param {event[]} membershipEvents the membership events to store
+     * @returns {Promise} when all members have been stored
+     */
     setOutOfBandMembers: function(roomId, membershipEvents) {
-        console.log(`LL: backend about to store ${membershipEvents.length} members for ${roomId}`);
-        function ignoreResult() {};
+        console.log(`LL: backend about to store ${membershipEvents.length}` +
+            ` members for ${roomId}`);
+        function ignoreResult() {}
         // run everything in a promise so anything that throws will reject
         return new Promise((resolve) =>{
             const tx = this.db.transaction(["oob_membership_events"], "readwrite");
             const store = tx.objectStore("oob_membership_events");
-            const puts = membershipEvents.map((e) => {
-                let putPromise = promiseifyRequest(store.put(e));
+            const eventPuts = membershipEvents.map((e) => {
+                const putPromise = promiseifyRequest(store.put(e));
                 return putPromise.then(ignoreResult);
             });
-            resolve(Promise.all(puts).then(ignoreResult));
+            // aside from all the events, we also write a marker object to the store
+            // to mark the fact that OOB members have been written for this room.
+            // It's possible that 0 members need to be written as all where previously know
+            // but we still need to know whether to return null or [] from getOutOfBandMembers
+            // where null means out of band members haven't been stored yet for this room
+            const markerObject = {
+                room_id: roomId,
+                oob_written: true,
+                state_key: 0,
+            };
+            const markerPut = promiseifyRequest(store.put(markerObject));
+            const allPuts = eventPuts.concat(markerPut);
+            resolve(Promise.all(allPuts).then(ignoreResult));
         }).then(() => {
             console.log(`LL: backend done storing for ${roomId}!`);
         });
