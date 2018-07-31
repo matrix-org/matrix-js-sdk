@@ -87,12 +87,27 @@ RemoteIndexedDBStoreBackend.prototype = {
         return this._doCmd('syncToDatabase', [users]);
     },
 
+    /**
+     * Returns the out-of-band membership events for this room that
+     * were previously loaded.
+     * @param {string} roomId
+     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns {null} in case the members for this room haven't been stored yet
+     */
     getOutOfBandMembers: function(roomId) {
         return this._doCmd('getOutOfBandMembers', [roomId]);
     },
 
-    setOutOfBandMembers: function(roomId, members) {
-        return this._doCmd('setOutOfBandMembers', [roomId, members]);
+    /**
+     * Stores the out-of-band membership events for this room. Note that
+     * it still makes sense to store an empty array as the OOB status for the room is
+     * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+     * @param {string} roomId
+     * @param {event[]} membershipEvents the membership events to store
+     * @returns {Promise} when all members have been stored
+     */
+    setOutOfBandMembers: function(roomId, membershipEvents) {
+        return this._doCmd('setOutOfBandMembers', [roomId, membershipEvents]);
     },
 
     /**

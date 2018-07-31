@@ -762,7 +762,7 @@ MatrixClient.prototype._loadMembers = async function(room) {
     // were the members loaded from the server?
     let fromServer = false;
     let rawMembersEvents = await this.store.getOutOfBandMembers(roomId);
-    if (rawMembersEvents.length == 0) {
+    if (rawMembersEvents === null) {
         fromServer = true;
         const lastEventId = room.getLastEventId();
         const response = await this.members(roomId, "join", "leave", lastEventId);
@@ -802,18 +802,8 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
         const rawMembersEvents = room.currentState.getMembers()
             .filter((m) => m.isOutOfBand())
             .map((m) => m.events.member.event);
-        // TODO: probably need a way to mark a room as lazy loaded
-        // even though we didn't store any members, as we'll just
-        // lazy loaded the room in every session. This is a likely
-        // scenario for DM's where all the members would likely
-        // be known without lazy loading.
-        if (rawMembersEvents.length) {
-            console.log(`LL: telling backend to store ${rawMembersEvents.length} members`);
-            await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
-        }
-        else {
-            console.log(`LL: no members needed to be stored`);
-        }
+        console.log(`LL: telling backend to store ${rawMembersEvents.length} members`);
+        await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
     }
 };
 
