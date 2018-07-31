@@ -216,10 +216,14 @@ LocalIndexedDBStoreBackend.prototype = {
             request.onerror = (err) => {
                 reject(err);
             };
+        }).then((membershipEvents) => {
+            console.log(`LL: got ${membershipEvents.length} membershipEvents from storage for room ${roomId} ...`);
+            return membershipEvents;
         });
     },
 
     setOutOfBandMembers: function(roomId, membershipEvents) {
+        console.log(`LL: backend about to store ${membershipEvents.length} members for ${roomId}`);
         function ignoreResult() {};
         // run everything in a promise so anything that throws will reject
         return new Promise((resolve) =>{
@@ -230,6 +234,8 @@ LocalIndexedDBStoreBackend.prototype = {
                 return putPromise.then(ignoreResult);
             });
             resolve(Promise.all(puts).then(ignoreResult));
+        }).then(() => {
+            console.log(`LL: backend done storing for ${roomId}!`);
         });
     },
 
