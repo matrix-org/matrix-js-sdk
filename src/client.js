@@ -1984,14 +1984,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: room.roomId},
-    );
-    const params = {
-        from: room.oldState.paginationToken,
-        limit: limit,
-        dir: 'b',
-    };
     const defer = Promise.defer();
     info = {
         promise: defer.promise,
@@ -2001,7 +1993,11 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
     Promise.delay(timeToWaitMs).then(function() {
-        return self._http.authedRequest(callback, "GET", path, params);
+        return self._createMessagesRequest(
+            room.roomId,
+            room.oldState.paginationToken,
+            limit,
+            'b');
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
@@ -2062,11 +2058,16 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
         limit: ('limit' in opts) ? opts.limit : 30,
         dir: dir,
     };
+    if (this._clientOpts.filter) {
+        params.filter = JSON.stringify({lazy_load_members: true});
+    }
+
+    const roomId = eventContext.getEvent().getRoomId();
+    const promise = this._createMessagesRequest(
+        roomId, token, opts.limit, dir);
 
     const self = this;
-    const promise =
-        self._http.authedRequest(undefined, "GET", path, params,
-    ).then(function(res) {
+    promise.then(function(res) {
         let token = res.end;
         if (res.chunk.length === 0) {
             token = null;
@@ -2167,6 +2168,35 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     return promise;
 };
 
+MatrixClient.prototype._createMessagesRequest = function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/messages", {$roomId: roomId},
+    );
+    if (limit === undefined) {
+        limit = 30;
+    }
+    const params = {
+        from: fromToken,
+        limit: limit,
+        dir: dir,
+    };
+
+    let filter = null;
+    if (this._clientOpts.lazyLoadMembers) {
+        filter = {lazy_load_members: true};
+    }
+    if (timelineFilter) {
+        // XXX: it's horrific that /messages' filter parameter doesn't match
+        // /sync's one - see https://matrix.org/jira/browse/SPEC-451
+        filter = filter || {};
+        Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
+    }
+    if (filter) {
+        params.filter = JSON.stringify(filter);
+    }
+    return this._http.authedRequest(undefined, "GET", path, params);
+}
+
 
 /**
  * Take an EventTimeline, and back/forward-fill results.
@@ -2261,25 +2291,13 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
-        path = utils.encodeUri(
-            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()},
-        );
-        params = {
-            from: token,
-            limit: ('limit' in opts) ? opts.limit : 30,
-            dir: dir,
-        };
-
-        const filter = eventTimeline.getFilter();
-        if (filter) {
-            // XXX: it's horrific that /messages' filter parameter doesn't match
-            // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            params.filter = JSON.stringify(filter.getRoomTimelineFilterComponent());
-        }
-
-        promise =
-            this._http.authedRequest(undefined, "GET", path, params,
-        ).then(function(res) {
+        promise = this._createMessagesRequest(
+            eventTimeline.getRoomId(),
+            token,
+            opts.limit,
+            dir,
+            eventTimeline.getFilter());
+        promise.then(function(res) {
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()
