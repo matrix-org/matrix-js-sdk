@@ -2000,6 +2000,10 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
             'b');
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+        if (res.state) {
+            const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+            room.currentState.prependStateEvents(stateEvents);
+        }
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
         if (res.chunk.length === 0) {
@@ -2068,6 +2072,7 @@ MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
 
     const self = this;
     promise.then(function(res) {
+        // TODO: no RoomState on EventContext, where should the members go?
         let token = res.end;
         if (res.chunk.length === 0) {
             token = null;
@@ -2298,6 +2303,11 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             dir,
             eventTimeline.getFilter());
         promise.then(function(res) {
+            if (res.state) {
+                const roomState = eventTimeline.getState(dir);
+                const stateEvents = utils.map(res.state, self.getEventMapper());
+                roomState.prependStateEvents(stateEvents);
+            }
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()

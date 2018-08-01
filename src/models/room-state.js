@@ -262,6 +262,15 @@ RoomState.prototype.clone = function() {
     return copy;
 };
 
+
+RoomState.prototype.prependStateEvents = function(events) {
+    const unknownStateEvents = events.filter((event) => {
+        return this.events[event.getType()] === undefined ||
+            this.events[event.getType()][event.getStateKey()] === undefined;
+    });
+
+    return this.setStateEvents(unknownStateEvents);
+}
 /**
  * Add an array of one or more state MatrixEvents, overwriting
  * any existing state with the same {type, stateKey} tuple. Will fire
