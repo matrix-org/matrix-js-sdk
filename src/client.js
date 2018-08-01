@@ -3038,6 +3038,8 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
+ * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
+ * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
  */
 MatrixClient.prototype.startClient = function(opts) {
     if (this.clientRunning) {
