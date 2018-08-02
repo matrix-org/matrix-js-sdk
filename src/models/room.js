@@ -260,7 +260,7 @@ Room.prototype.getDMInviter = function() {
             return this._summaryHeroes[0];
         }
     }
-}
+};
 
 /**
  * Sets the membership this room was received as during sync
