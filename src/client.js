@@ -45,6 +45,18 @@ const ContentHelpers = require("./content-helpers");
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 
+
+const LAZY_LOADING_MESSAGES_FILTER = {
+    lazy_load_members: true,
+};
+
+const LAZY_LOADING_SYNC_FILTER = {
+    room: {
+        state: LAZY_LOADING_MESSAGES_FILTER,
+    },
+};
+
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -2069,7 +2081,7 @@ MatrixClient.prototype._createMessagesRequest = function(roomId, fromToken, limi
 
     let filter = null;
     if (this._clientOpts.lazyLoadMembers) {
-        filter = {lazy_load_members: true};
+        filter = LAZY_LOADING_MESSAGES_FILTER;
     }
     if (timelineFilter) {
         // XXX: it's horrific that /messages' filter parameter doesn't match
@@ -2995,8 +3007,9 @@ MatrixClient.prototype.getTurnServers = function() {
  * updating presence.
  * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
  * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
+ * This will override the filter option at this moment.
  */
-MatrixClient.prototype.startClient = function(opts) {
+MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
         // client is already running.
         return;
@@ -3025,6 +3038,10 @@ MatrixClient.prototype.startClient = function(opts) {
 
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
+
+    if (opts.lazyLoadMembers) {
+        opts.filter = await this.createFilter(LAZY_LOADING_SYNC_FILTER);
+    }
 
     opts.crypto = this._crypto;
     opts.canResetEntireTimeline = (roomId) => {
