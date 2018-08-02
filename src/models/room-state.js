@@ -262,15 +262,23 @@ RoomState.prototype.clone = function() {
     return copy;
 };
 
-
+/**
+ * Add previously unknown state events just before
+ * prepending events to the timeline.
+ * When lazy loading members while back-paginating,
+ * the relevant room state for the timeline chunk at the end
+ * of the chunk can be set with this method.
+ * @param {MatrixEvent[]} events state events to prepend
+ */
 RoomState.prototype.prependStateEvents = function(events) {
     const unknownStateEvents = events.filter((event) => {
         return this.events[event.getType()] === undefined ||
             this.events[event.getType()][event.getStateKey()] === undefined;
     });
 
-    return this.setStateEvents(unknownStateEvents);
-}
+    this.setStateEvents(unknownStateEvents);
+};
+
 /**
  * Add an array of one or more state MatrixEvents, overwriting
  * any existing state with the same {type, stateKey} tuple. Will fire
