@@ -240,6 +240,21 @@ Room.prototype.getMyMembership = function() {
     return this._syncedMembership;
 };
 
+Room.prototype.getDMInviter = function() {
+    if (this.myUserId) {
+        const me = this.getMember(this.myUserId);
+        if (me) {
+            return me.getDMInviter();
+        }
+    }
+    // fall back to summary information
+    const memberCount = room.currentState.getJoinedMemberCount() + 
+        room.currentState.getInvitedMemberCount();
+    if (memberCount == 2 && this._summaryHeroes.length) {
+        return this._summaryHeroes[0];
+    }
+}
+
 /**
  * Sets the membership this room was received as during sync
  * @param {string} membership join | leave | invite
