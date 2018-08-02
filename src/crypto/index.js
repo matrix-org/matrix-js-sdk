@@ -1008,14 +1008,8 @@ Crypto.prototype._getE2eRooms = function() {
         }
 
         // ignore any rooms which we have left
-        const me = room.getMember(this._userId);
-        if (!me || (
-            me.membership !== "join" && me.membership !== "invite"
-        )) {
-            return false;
-        }
-
-        return true;
+        const myMembership = room.getMyMembership();
+        return myMembership === "join" || myMembership === "invite";
     });
 };
 
