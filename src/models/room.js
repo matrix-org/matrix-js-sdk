@@ -228,6 +228,11 @@ Room.prototype.getMyMembership = function() {
     return this._syncedMembership;
 };
 
+/**
+ * If this room is a DM we're invited to,
+ * try to find out who invited us
+ * @return {string} user id of the inviter
+ */
 Room.prototype.getDMInviter = function() {
     if (this.myUserId) {
         const me = this.getMember(this.myUserId);
@@ -235,11 +240,13 @@ Room.prototype.getDMInviter = function() {
             return me.getDMInviter();
         }
     }
-    // fall back to summary information
-    const memberCount = room.currentState.getJoinedMemberCount() + 
-        room.currentState.getInvitedMemberCount();
-    if (memberCount == 2 && this._summaryHeroes.length) {
-        return this._summaryHeroes[0];
+    if (this._syncedMembership === "invite") {
+        // fall back to summary information
+        const memberCount = this.currentState.getJoinedMemberCount() +
+            this.currentState.getInvitedMemberCount();
+        if (memberCount == 2 && this._summaryHeroes.length) {
+            return this._summaryHeroes[0];
+        }
     }
 }
 
