@@ -2112,7 +2112,20 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     return promise;
 };
 
-MatrixClient.prototype._createMessagesRequest = function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+/**
+ * Makes a request to /messages with the appropriate lazy loading filter set.
+ * XXX: if we do get rid of scrollback (as it's not used at the moment),
+ * we could inline this method again in paginateEventTimeline as that would
+ * then be the only call-site
+ * @param {string} roomId
+ * @param {string} fromToken
+ * @param {number} limit the maximum amount of events the retrieve
+ * @param {string} dir 'f' or 'b'
+ * @param {Filter} timelineFilter the timeline filter to pass
+ * @return {Promise}
+ */
+MatrixClient.prototype._createMessagesRequest =
+function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
     const path = utils.encodeUri(
         "/rooms/$roomId/messages", {$roomId: roomId},
     );
@@ -2139,8 +2152,7 @@ MatrixClient.prototype._createMessagesRequest = function(roomId, fromToken, limi
         params.filter = JSON.stringify(filter);
     }
     return this._http.authedRequest(undefined, "GET", path, params);
-}
-
+};
 
 /**
  * Take an EventTimeline, and back/forward-fill results.
