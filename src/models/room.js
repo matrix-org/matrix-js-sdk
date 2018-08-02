@@ -1143,7 +1143,7 @@ Room.prototype.addTags = function(event) {
     // }
 
     // XXX: do we need to deep copy here?
-    this.tags = event.getContent().tags;
+    this.tags = event.getContent().tags || {};
 
     // XXX: we could do a deep-comparison to see if the tags have really
     // changed - but do we want to bother?
