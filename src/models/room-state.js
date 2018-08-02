@@ -180,7 +180,7 @@ RoomState.prototype.getSentinelMember = function(userId) {
         sentinel = new RoomMember(this.roomId, userId);
         const member = this.members[userId];
         if (member) {
-            Object.assign(sentinel, member);
+            sentinel.setMembershipEvent(member.events.member);
         }
         this._sentinels[userId] = sentinel;
     }
