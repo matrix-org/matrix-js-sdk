@@ -312,7 +312,7 @@ RoomMember.prototype.getAvatarUrl =
  */
 RoomMember.prototype.getMxcAvatarUrl = function() {
     if(this.events.member) {
-        return this.events.member.getContent().avatar_url;
+        return this.events.member.getDirectionalContent().avatar_url;
     } else if(this.user) {
         return this.user.avatarUrl;
     }
