@@ -1355,7 +1355,8 @@ describe("Room", function() {
     });
 
     describe("getMyMembership", function() {
-        it("should return synced membership if membership isn't available yet", async function() {
+        it("should return synced membership if membership isn't available yet",
+        async function() {
             const room = new Room(roomId, userA);
             room.setSyncedMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
