@@ -68,6 +68,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @constructor
  * @alias module:models/room
  * @param {string} roomId Required. The ID of this room.
+ * @param {string} myUserId Required. The ID of the syncing user.
  * @param {Object=} opts Configuration options
  * @param {*} opts.storageToken Optional. The token which a data store can use
  * to remember the state of the room. What this means is dependent on the store
@@ -102,7 +103,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-function Room(roomId, opts) {
+function Room(roomId, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -115,6 +116,7 @@ function Room(roomId, opts) {
         );
     }
 
+    this.myUserId = myUserId;
     this.roomId = roomId;
     this.name = roomId;
     this.tags = {
@@ -216,14 +218,36 @@ Room.prototype.getLastEventId = function() {
  * @param {string} myUserId the user id for the logged in member
  * @return {string} the membership type (join | leave | invite) for the logged in user
  */
-Room.prototype.getMyMembership = function(myUserId) {
-    if (myUserId) {
-        const me = this.getMember(myUserId);
+Room.prototype.getMyMembership = function() {
+    if (this.myUserId) {
+        const me = this.getMember(this.myUserId);
         if (me) {
             return me.membership;
         }
     }
     return this._syncedMembership;
+};
+
+/**
+ * If this room is a DM we're invited to,
+ * try to find out who invited us
+ * @return {string} user id of the inviter
+ */
+Room.prototype.getDMInviter = function() {
+    if (this.myUserId) {
+        const me = this.getMember(this.myUserId);
+        if (me) {
+            return me.getDMInviter();
+        }
+    }
+    if (this._syncedMembership === "invite") {
+        // fall back to summary information
+        const memberCount = this.currentState.getJoinedMemberCount() +
+            this.currentState.getInvitedMemberCount();
+        if (memberCount == 2 && this._summaryHeroes.length) {
+            return this._summaryHeroes[0];
+        }
+    }
 };
 
 /**
@@ -1002,15 +1026,14 @@ Room.prototype.removeEvent = function(eventId) {
  * Recalculate various aspects of the room, including the room name and
  * room summary. Call this any time the room's current state is modified.
  * May fire "Room.name" if the room name is updated.
- * @param {string} userId The client's user ID.
  * @fires module:client~MatrixClient#event:"Room.name"
  */
-Room.prototype.recalculate = function(userId) {
+Room.prototype.recalculate = function() {
     // set fake stripped state events if this is an invite room so logic remains
     // consistent elsewhere.
     const self = this;
     const membershipEvent = this.currentState.getStateEvents(
-        "m.room.member", userId,
+        "m.room.member", this.myUserId,
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
         const strippedStateEvents = membershipEvent.event.invite_room_state || [];
@@ -1026,14 +1049,14 @@ Room.prototype.recalculate = function(userId) {
                     content: strippedEvent.content,
                     event_id: "$fake" + Date.now(),
                     room_id: self.roomId,
-                    user_id: userId, // technically a lie
+                    user_id: self.myUserId, // technically a lie
                 })]);
             }
         });
     }
 
     const oldName = this.name;
-    this.name = calculateRoomName(this, userId);
+    this.name = calculateRoomName(this, this.myUserId);
     this.summary = new RoomSummary(this.roomId, {
         title: this.name,
     });
@@ -1308,7 +1331,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         return memberNamesToRoomName(otherNames, inviteJoinCount);
     }
 
-    const myMembership = room.getMyMembership(userId);
+    const myMembership = room.getMyMembership();
     // if I have created a room and invited people throuh
     // 3rd party invites
     if (myMembership == 'join') {

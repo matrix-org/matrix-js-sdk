@@ -387,7 +387,7 @@ describe("Room", function() {
         let events = null;
 
         beforeEach(function() {
-            room = new Room(roomId, {timelineSupport: timelineSupport});
+            room = new Room(roomId, null, {timelineSupport: timelineSupport});
             // set events each time to avoid resusing Event objects (which
             // doesn't work because they get frozen)
             events = [
@@ -469,7 +469,7 @@ describe("Room", function() {
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
-            room = new Room(roomId, {timelineSupport: true});
+            room = new Room(roomId, null, {timelineSupport: true});
         });
 
         const events = [
@@ -658,7 +658,7 @@ describe("Room", function() {
 
         beforeEach(function() {
             // no mocking
-            room = new Room(roomId);
+            room = new Room(roomId, userA);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -677,7 +677,7 @@ describe("Room", function() {
                     },
                 ];
 
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(roomName);
             });
 
@@ -696,7 +696,7 @@ describe("Room", function() {
                     },
                 ];
 
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(roomName);
             });
         });
@@ -711,7 +711,7 @@ describe("Room", function() {
                     "m.heroes": [userB, userC, userD],
                 });
 
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(`${userB} and 2 others`);
             });
 
@@ -721,7 +721,7 @@ describe("Room", function() {
                     "m.joined_member_count": 2,
                 });
 
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(userB);
             });
 
@@ -733,7 +733,7 @@ describe("Room", function() {
                     "m.heroes": [userB],
                 });
 
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(name);
             });
 
@@ -745,7 +745,7 @@ describe("Room", function() {
                     "m.joined_member_count": 50,
                     "m.invited_member_count": 50,
                 });
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(`${name} and 98 others`);
             });
 
@@ -757,7 +757,7 @@ describe("Room", function() {
                 room.setSummary({
                     "m.heroes": [userB, userC],
                 });
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(`${nameB} and ${nameC}`);
             });
 
@@ -768,7 +768,7 @@ describe("Room", function() {
                 room.setSummary({
                     "m.heroes": [userB],
                 });
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(nameB);
             });
 
@@ -777,7 +777,7 @@ describe("Room", function() {
                     "m.heroes": [],
                     "m.invited_member_count": 1,
                 });
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual("Empty room");
             });
         });
@@ -791,7 +791,7 @@ describe("Room", function() {
                 addMember(userB);
                 addMember(userC);
                 addMember(userD);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 // we expect at least 1 member to be mentioned
                 const others = [userB, userC, userD];
@@ -812,7 +812,7 @@ describe("Room", function() {
                 addMember(userA);
                 addMember(userB);
                 addMember(userC);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
                 expect(name.indexOf(userC)).toNotEqual(-1, name);
@@ -825,7 +825,7 @@ describe("Room", function() {
                 addMember(userA);
                 addMember(userB);
                 addMember(userC);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
                 expect(name.indexOf(userC)).toNotEqual(-1, name);
@@ -837,7 +837,7 @@ describe("Room", function() {
                 setJoinRule("public");
                 addMember(userA);
                 addMember(userB);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
@@ -848,7 +848,7 @@ describe("Room", function() {
                 setJoinRule("invite");
                 addMember(userA);
                 addMember(userB);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
@@ -858,7 +858,7 @@ describe("Room", function() {
                 setJoinRule("invite");
                 addMember(userA, "invite", {user: userB});
                 addMember(userB);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
@@ -868,7 +868,7 @@ describe("Room", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("invite");
                 setAliases([alias, "#another:one"]);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
             });
@@ -878,7 +878,7 @@ describe("Room", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("public");
                 setAliases([alias, "#another:one"]);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(alias);
             });
@@ -888,7 +888,7 @@ describe("Room", function() {
                 const roomName = "A mighty name indeed";
                 setJoinRule("invite");
                 setRoomName(roomName);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual(roomName);
             });
@@ -898,7 +898,7 @@ describe("Room", function() {
                 const roomName = "A mighty name indeed";
                 setJoinRule("public");
                 setRoomName(roomName);
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual(roomName);
             });
 
@@ -906,7 +906,7 @@ describe("Room", function() {
             " a room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("invite");
                 addMember(userA);
-                room.recalculate(userA);
+                room.recalculate();
                 expect(room.name).toEqual("Empty room");
             });
 
@@ -914,7 +914,7 @@ describe("Room", function() {
             " room name and alias don't exist and it is a self-chat.", function() {
                 setJoinRule("public");
                 addMember(userA);
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual("Empty room");
             });
@@ -922,7 +922,7 @@ describe("Room", function() {
             it("should return 'Empty room' if there is no name, " +
                "alias or members in the room.",
             function() {
-                room.recalculate(userA);
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual("Empty room");
             });
@@ -931,9 +931,9 @@ describe("Room", function() {
                "available",
             function() {
                 setJoinRule("invite");
-                addMember(userA, 'join', {name: "Alice"});
-                addMember(userB, "invite", {user: userA});
-                room.recalculate(userB);
+                addMember(userB, 'join', {name: "Alice"});
+                addMember(userA, "invite", {user: userA});
+                room.recalculate();
                 const name = room.name;
                 expect(name).toEqual("Alice");
             });
@@ -941,11 +941,11 @@ describe("Room", function() {
             it("should return inviter mxid if display name not available",
             function() {
                 setJoinRule("invite");
-                addMember(userA);
-                addMember(userB, "invite", {user: userA});
-                room.recalculate(userB);
+                addMember(userB);
+                addMember(userA, "invite", {user: userA});
+                room.recalculate();
                 const name = room.name;
-                expect(name).toEqual(userA);
+                expect(name).toEqual(userB);
             });
         });
     });
@@ -1192,7 +1192,7 @@ describe("Room", function() {
     describe("addPendingEvent", function() {
         it("should add pending events to the pendingEventList if " +
                       "pendingEventOrdering == 'detached'", function() {
-            const room = new Room(roomId, {
+            const room = new Room(roomId, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({
@@ -1218,7 +1218,7 @@ describe("Room", function() {
 
         it("should add pending events to the timeline if " +
                       "pendingEventOrdering == 'chronological'", function() {
-            room = new Room(roomId, {
+            room = new Room(roomId, userA, {
                 pendingEventOrdering: "chronological",
             });
             const eventA = utils.mkMessage({
@@ -1242,7 +1242,7 @@ describe("Room", function() {
 
     describe("updatePendingEvent", function() {
         it("should remove cancelled events from the pending list", function() {
-            const room = new Room(roomId, {
+            const room = new Room(roomId, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({
@@ -1278,7 +1278,7 @@ describe("Room", function() {
 
 
         it("should remove cancelled events from the timeline", function() {
-            const room = new Room(roomId);
+            const room = new Room(roomId, userA);
             const eventA = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
@@ -1318,7 +1318,7 @@ describe("Room", function() {
         });
 
         it("should apply member events", async function() {
-            const room = new Room(roomId);
+            const room = new Room(roomId, null);
             await room.loadOutOfBandMembers(Promise.resolve([memberEvent]));
             const memberA = room.getMember("@user_a:bar");
             expect(memberA.name).toEqual("User A");
@@ -1329,7 +1329,7 @@ describe("Room", function() {
                 user: "@user_a:bar", mship: "join",
                 room: roomId, event: true, name: "Ms A",
             });
-            const room = new Room(roomId);
+            const room = new Room(roomId, null);
 
             const promise2 = Promise.resolve([memberEvent2]);
             const promise1 = promise2.then(() => [memberEvent]);
@@ -1342,7 +1342,7 @@ describe("Room", function() {
         });
 
         it("should revert needs loading on error", async function() {
-            const room = new Room(roomId);
+            const room = new Room(roomId, null);
             let hasThrown = false;
             try {
                 await room.loadOutOfBandMembers(Promise.reject(new Error("bugger")));
@@ -1351,6 +1351,20 @@ describe("Room", function() {
             }
             expect(hasThrown).toEqual(true);
             expect(room.needsOutOfBandMembers()).toEqual(true);
+        });
+    });
+
+    describe("getMyMembership", function() {
+        it("should return synced membership if membership isn't available yet",
+        async function() {
+            const room = new Room(roomId, userA);
+            room.setSyncedMembership("invite");
+            expect(room.getMyMembership()).toEqual("invite");
+            room.addLiveEvents([utils.mkMembership({
+                user: userA, mship: "join",
+                room: roomId, event: true,
+            })]);
+            expect(room.getMyMembership()).toEqual("join");
         });
     });
 });
