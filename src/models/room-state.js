@@ -448,9 +448,11 @@ RoomState.prototype.markOutOfBandMembersFailed = function() {
  * @param {MatrixEvent[]} stateEvents array of membership state events
  */
 RoomState.prototype.setOutOfBandMembers = function(stateEvents) {
+    console.log(`LL: RoomState about to set ${stateEvents.length} OOB members ...`);
     if (this._oobMemberFlags.status !== OOB_STATUS_INPROGRESS) {
         return;
     }
+    console.log(`LL: RoomState put in OOB_STATUS_FINISHED state ...`);
     this._oobMemberFlags.status = OOB_STATUS_FINISHED;
     stateEvents.forEach((e) => this._setOutOfBandMember(e));
 };
