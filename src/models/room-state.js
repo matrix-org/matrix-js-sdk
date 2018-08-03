@@ -180,7 +180,7 @@ RoomState.prototype.getSentinelMember = function(userId) {
         sentinel = new RoomMember(this.roomId, userId);
         const member = this.members[userId];
         if (member) {
-            Object.assign(sentinel, member);
+            sentinel.setMembershipEvent(member.events.member);
         }
         this._sentinels[userId] = sentinel;
     }
@@ -260,6 +260,22 @@ RoomState.prototype.clone = function() {
     }
 
     return copy;
+};
+
+/**
+ * Add previously unknown state events.
+ * When lazy loading members while back-paginating,
+ * the relevant room state for the timeline chunk at the end
+ * of the chunk can be set with this method.
+ * @param {MatrixEvent[]} events state events to prepend
+ */
+RoomState.prototype.setUnknownStateEvents = function(events) {
+    const unknownStateEvents = events.filter((event) => {
+        return this.events[event.getType()] === undefined ||
+            this.events[event.getType()][event.getStateKey()] === undefined;
+    });
+
+    this.setStateEvents(unknownStateEvents);
 };
 
 /**

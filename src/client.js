@@ -45,6 +45,18 @@ const ContentHelpers = require("./content-helpers");
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 
+
+const LAZY_LOADING_MESSAGES_FILTER = {
+    lazy_load_members: true,
+};
+
+const LAZY_LOADING_SYNC_FILTER = {
+    room: {
+        state: LAZY_LOADING_MESSAGES_FILTER,
+    },
+};
+
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -1938,14 +1950,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: room.roomId},
-    );
-    const params = {
-        from: room.oldState.paginationToken,
-        limit: limit,
-        dir: 'b',
-    };
     const defer = Promise.defer();
     info = {
         promise: defer.promise,
@@ -1955,9 +1959,17 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
     Promise.delay(timeToWaitMs).then(function() {
-        return self._http.authedRequest(callback, "GET", path, params);
+        return self._createMessagesRequest(
+            room.roomId,
+            room.oldState.paginationToken,
+            limit,
+            'b');
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+        if (res.state) {
+            const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+            room.currentState.setUnknownStateEvents(stateEvents);
+        }
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
         if (res.chunk.length === 0) {
@@ -1974,73 +1986,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     });
     this._ongoingScrollbacks[room.roomId] = info;
     return defer.promise;
-};
-
-/**
- * Take an EventContext, and back/forward-fill results.
- *
- * @param {module:models/event-context.EventContext} eventContext  context
- *    object to be updated
- * @param {Object}  opts
- * @param {boolean} opts.backwards  true to fill backwards, false to go forwards
- * @param {boolean} opts.limit      number of events to request
- *
- * @return {module:client.Promise} Resolves: updated EventContext object
- * @return {Error} Rejects: with an error response.
- */
-MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
-    // TODO: we should implement a backoff (as per scrollback()) to deal more
-    // nicely with HTTP errors.
-    opts = opts || {};
-    const backwards = opts.backwards || false;
-
-    const token = eventContext.getPaginateToken(backwards);
-    if (!token) {
-        // no more results.
-        return Promise.reject(new Error("No paginate token"));
-    }
-
-    const dir = backwards ? 'b' : 'f';
-    const pendingRequest = eventContext._paginateRequests[dir];
-
-    if (pendingRequest) {
-        // already a request in progress - return the existing promise
-        return pendingRequest;
-    }
-
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()},
-    );
-    const params = {
-        from: token,
-        limit: ('limit' in opts) ? opts.limit : 30,
-        dir: dir,
-    };
-
-    const self = this;
-    const promise =
-        self._http.authedRequest(undefined, "GET", path, params,
-    ).then(function(res) {
-        let token = res.end;
-        if (res.chunk.length === 0) {
-            token = null;
-        } else {
-            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
-            if (backwards) {
-                // eventContext expects the events in timeline order, but
-                // back-pagination returns them in reverse order.
-                matrixEvents.reverse();
-            }
-            eventContext.addEvents(matrixEvents, backwards);
-        }
-        eventContext.setPaginateToken(token, backwards);
-        return eventContext;
-    }).finally(function() {
-        eventContext._paginateRequests[dir] = null;
-    });
-    eventContext._paginateRequests[dir] = promise;
-
-    return promise;
 };
 
 /**
@@ -2121,6 +2066,47 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     return promise;
 };
 
+/**
+ * Makes a request to /messages with the appropriate lazy loading filter set.
+ * XXX: if we do get rid of scrollback (as it's not used at the moment),
+ * we could inline this method again in paginateEventTimeline as that would
+ * then be the only call-site
+ * @param {string} roomId
+ * @param {string} fromToken
+ * @param {number} limit the maximum amount of events the retrieve
+ * @param {string} dir 'f' or 'b'
+ * @param {Filter} timelineFilter the timeline filter to pass
+ * @return {Promise}
+ */
+MatrixClient.prototype._createMessagesRequest =
+function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/messages", {$roomId: roomId},
+    );
+    if (limit === undefined) {
+        limit = 30;
+    }
+    const params = {
+        from: fromToken,
+        limit: limit,
+        dir: dir,
+    };
+
+    let filter = null;
+    if (this._clientOpts.lazyLoadMembers) {
+        filter = LAZY_LOADING_MESSAGES_FILTER;
+    }
+    if (timelineFilter) {
+        // XXX: it's horrific that /messages' filter parameter doesn't match
+        // /sync's one - see https://matrix.org/jira/browse/SPEC-451
+        filter = filter || {};
+        Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
+    }
+    if (filter) {
+        params.filter = JSON.stringify(filter);
+    }
+    return this._http.authedRequest(undefined, "GET", path, params);
+};
 
 /**
  * Take an EventTimeline, and back/forward-fill results.
@@ -2215,25 +2201,18 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
-        path = utils.encodeUri(
-            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()},
-        );
-        params = {
-            from: token,
-            limit: ('limit' in opts) ? opts.limit : 30,
-            dir: dir,
-        };
-
-        const filter = eventTimeline.getFilter();
-        if (filter) {
-            // XXX: it's horrific that /messages' filter parameter doesn't match
-            // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            params.filter = JSON.stringify(filter.getRoomTimelineFilterComponent());
-        }
-
-        promise =
-            this._http.authedRequest(undefined, "GET", path, params,
-        ).then(function(res) {
+        promise = this._createMessagesRequest(
+            eventTimeline.getRoomId(),
+            token,
+            opts.limit,
+            dir,
+            eventTimeline.getFilter());
+        promise.then(function(res) {
+            if (res.state) {
+                const roomState = eventTimeline.getState(dir);
+                const stateEvents = utils.map(res.state, self.getEventMapper());
+                roomState.prependStateEvents(stateEvents);
+            }
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()
@@ -3038,8 +3017,11 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
+ * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
+ * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
+ * This will override the filter option at this moment.
  */
-MatrixClient.prototype.startClient = function(opts) {
+MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
         // client is already running.
         return;
@@ -3068,6 +3050,10 @@ MatrixClient.prototype.startClient = function(opts) {
 
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
+
+    if (opts.lazyLoadMembers) {
+        opts.filter = await this.createFilter(LAZY_LOADING_SYNC_FILTER);
+    }
 
     opts.crypto = this._crypto;
     opts.canResetEntireTimeline = (roomId) => {
