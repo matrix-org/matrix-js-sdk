@@ -2014,7 +2014,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
         if (res.state) {
             const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
-            room.currentState.prependStateEvents(stateEvents);
+            room.currentState.setUnknownStateEvents(stateEvents);
         }
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
