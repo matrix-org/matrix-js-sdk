@@ -1,3 +1,15 @@
+Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (TDB)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6...v0.11.0)
+
+ * Support for lazy loading members. This should improve performance for
+   users who joined big rooms a lot. Pass to `lazyLoadMembers = true` option when calling `startClient`.
+
+BREAKING CHANGE
+---------------
+
+ * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
+
 Changes in [0.10.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7) (2018-07-30)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7-rc.1...v0.10.7)
