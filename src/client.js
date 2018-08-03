@@ -768,17 +768,17 @@ MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
     if (!room || !room.needsOutOfBandMembers()) {
         return;
     }
+    // intercept whether we need to store oob members afterwards
+    let membersNeedStoring = false;
     // Note that we don't await _loadMembers here first.
     // setLazyLoadedMembers sets a flag before it awaits the promise passed in
     // to avoid a race when calling membersNeedLoading/loadOutOfBandMembers
     // in fast succession, before the first promise resolves.
-    let membersPromise = this._loadMembers(room);
-    // intercept whether we need to store oob members afterwards
-    let membersNeedStoring = false;
-    membersPromise = membersPromise.then(({memberEvents, fromServer}) => {
-        membersNeedStoring = fromServer;
-        return memberEvents;
-    });
+    const membersPromise = this._loadMembers(room)
+        .then(({memberEvents, fromServer}) => {
+            membersNeedStoring = fromServer;
+            return memberEvents;
+        });
     await room.loadOutOfBandMembers(membersPromise);
     // if loadOutOfBandMembers throws, this wont be called
     // but that's fine as we don't want to store members

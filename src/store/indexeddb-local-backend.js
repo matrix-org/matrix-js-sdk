@@ -202,7 +202,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
      * @param {string} roomId
-     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns {Promise<event[]>} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
     getOutOfBandMembers: function(roomId) {
