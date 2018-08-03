@@ -2257,7 +2257,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             if (res.state) {
                 const roomState = eventTimeline.getState(dir);
                 const stateEvents = utils.map(res.state, self.getEventMapper());
-                roomState.prependStateEvents(stateEvents);
+                roomState.setUnknownStateEvents(stateEvents);
             }
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
