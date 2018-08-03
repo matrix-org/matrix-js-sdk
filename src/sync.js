@@ -763,7 +763,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     // fails, since long lived HTTP connections will
     // go away sometimes and we shouldn't treat this as
     // erroneous. We set the state to 'reconnecting'
-    // instead, so that clients can onserve this state
+    // instead, so that clients can observe this state
     // if they wish.
     this._startKeepAlives().then(() => {
         this._sync(syncOptions);
@@ -774,6 +774,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     this._updateSyncState(
         this._failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
             "ERROR" : "RECONNECTING",
+        { error: err },
     );
 };
 
