@@ -266,6 +266,9 @@ LocalIndexedDBStoreBackend.prototype = {
             const store = tx.objectStore("oob_membership_events");
             const eventPuts = membershipEvents.map((e) => {
                 const putPromise = promiseifyRequest(store.put(e));
+                // ignoring the result makes sure we discard the IDB success event
+                // ASAP, and not create a potentially big array containing them
+                // unneccesarily later on by calling Promise.all.
                 return putPromise.then(ignoreResult);
             });
             // aside from all the events, we also write a marker object to the store
@@ -280,6 +283,9 @@ LocalIndexedDBStoreBackend.prototype = {
             };
             const markerPut = promiseifyRequest(store.put(markerObject));
             const allPuts = eventPuts.concat(markerPut);
+            // ignore the empty array Promise.all creates
+            // as this method should just resolve
+            // to undefined on success
             resolve(Promise.all(allPuts).then(ignoreResult));
         }).then(() => {
             console.log(`LL: backend done storing for ${roomId}!`);
