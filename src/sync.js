@@ -93,6 +93,7 @@ function SyncApi(client, opts) {
     this._peekRoomId = null;
     this._currentSyncRequest = null;
     this._syncState = null;
+    this._syncStateData = null; // additional data (eg. error object for failed sync)
     this._catchingUp = false;
     this._running = false;
     this._keepAliveTimer = null;
@@ -394,6 +395,18 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
  */
 SyncApi.prototype.getSyncState = function() {
     return this._syncState;
+};
+
+/**
+ * Returns the additional data object associated with
+ * the current sync state, or null if there is no
+ * such data.
+ * Sync errors, if available, are put in the 'error' key of
+ * this object.
+ * @return {?Object}
+ */
+SyncApi.prototype.getSyncStateData = function() {
+    return this._syncStateData;
 };
 
 SyncApi.prototype.recoverFromSyncStartupError = async function(savedSyncPromise, err) {
@@ -1451,6 +1464,7 @@ SyncApi.prototype._getGuestFilter = function() {
 SyncApi.prototype._updateSyncState = function(newState, data) {
     const old = this._syncState;
     this._syncState = newState;
+    this._syncStateData = data;
     this.client.emit("sync", this._syncState, old, data);
 };
 
