@@ -2052,11 +2052,16 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         },
     );
 
+    let params = undefined;
+    if (this._clientOpts.lazyLoadMembers) {
+        params = {filter: JSON.stringify(LAZY_LOADING_MESSAGES_FILTER)};
+    }
+
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     const self = this;
     const promise =
-        self._http.authedRequest(undefined, "GET", path,
+        self._http.authedRequest(undefined, "GET", path, params,
     ).then(function(res) {
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
@@ -2083,6 +2088,8 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
             timeline.initialiseState(utils.map(res.state,
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+        } else {
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
