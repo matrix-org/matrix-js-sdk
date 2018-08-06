@@ -266,7 +266,8 @@ Room.prototype.setSyncedMembership = function(membership) {
  * @return {bool} whether or not the members of this room need to be loaded
  */
 Room.prototype.needsOutOfBandMembers = function() {
-    return this.currentState.needsOutOfBandMembers();
+    return this._opts.lazyLoadMembers &&
+        this.currentState.needsOutOfBandMembers();
 };
 
 /**
