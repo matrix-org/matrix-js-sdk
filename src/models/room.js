@@ -175,6 +175,8 @@ function Room(roomId, myUserId, opts) {
     this._blacklistUnverifiedDevices = null;
     this._syncedMembership = null;
     this._summaryHeroes = null;
+    // awaited by getEncryptionTargetMembers while room mebers are loading
+    this._oobMembersPromise = null;
 }
 
 utils.inherits(Room, EventEmitter);
@@ -271,19 +273,21 @@ Room.prototype.needsOutOfBandMembers = function() {
  * Loads the out-of-band members from the promise passed in
  * @param {Promise} eventsPromise promise that resolves to an array with membership MatrixEvents for the members
  */
-Room.prototype.loadOutOfBandMembers = async function(eventsPromise) {
+Room.prototype.loadOutOfBandMembers = function(eventsPromise) {
     if (!this.needsOutOfBandMembers()) {
-        return;
+        return Promise.resolve();
     }
     this.currentState.markOutOfBandMembersStarted();
-    let events = null;
-    try {
-        events = await eventsPromise;
-    } catch (err) {
+
+    // store the promise that already updated the room state
+    // to ensure that happens first
+    this._oobMembersPromise = eventsPromise.then((events) => {
+        this.currentState.setOutOfBandMembers(events);
+    }, (err) => {
         this.currentState.markOutOfBandMembersFailed();
         throw err;  //rethrow so calling code is aware operation failed
-    }
-    this.currentState.setOutOfBandMembers(events);
+    });
+    return this._oobMembersPromise;
 };
 
 /**
