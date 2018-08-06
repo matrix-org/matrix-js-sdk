@@ -175,7 +175,7 @@ function Room(roomId, myUserId, opts) {
     this._blacklistUnverifiedDevices = null;
     this._syncedMembership = null;
     this._summaryHeroes = null;
-    // awaited by getEncryptionTargetMembers while room mebers are loading
+    // awaited by getEncryptionTargetMembers while room members are loading
     this._oobMembersPromise = null;
 }
 
