@@ -569,10 +569,13 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
 
  /**
   * Get a list of members we should be encrypting for in this room
-  * @return {RoomMember[]} A list of members who we should encrypt messages for
-  *                        in this room.
+  * @return {Promise<RoomMember[]>} A list of members who
+  * we should encrypt messages for in this room.
   */
- Room.prototype.getEncryptionTargetMembers = function() {
+ Room.prototype.getEncryptionTargetMembers = async function() {
+    if (this._oobMembersPromise) {
+        await _oobMembersPromise;
+    }
     let members = this.getMembersWithMembership("join");
     if (this.shouldEncryptForInvitedMembers()) {
         members = members.concat(this.getMembersWithMembership("invite"));

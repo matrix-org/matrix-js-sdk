@@ -652,7 +652,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
     }
 
-    const members = room.getEncryptionTargetMembers();
+    const members = await room.getEncryptionTargetMembers();
     members.forEach((m) => {
         this._deviceList.startTrackingDeviceList(m.userId);
     });
@@ -852,7 +852,7 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
     // If we didn't make this assumption, we'd have to use the /keys/changes API
     // to get key changes between the sync token in the device list and the 'old'
     // sync token used here to make sure we didn't miss any.
-    this._evalDeviceListChanges(syncDeviceLists);
+    await this._evalDeviceListChanges(syncDeviceLists);
 };
 
 /**
@@ -968,7 +968,7 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
         // Check we really don't share any rooms with these users
         // any more: the server isn't required to give us the
         // exact correct set.
-        const e2eUserIds = new Set(this._getE2eUsers());
+        const e2eUserIds = new Set(await this._getE2eUsers());
 
         deviceLists.left.forEach((u) => {
             if (!e2eUserIds.has(u)) {
@@ -983,10 +983,10 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
  *
  * @returns {string[]} List of user IDs
  */
-Crypto.prototype._getE2eUsers = function() {
+Crypto.prototype._getE2eUsers = async function() {
     const e2eUserIds = [];
     for (const room of this._getE2eRooms()) {
-        const members = room.getEncryptionTargetMembers();
+        const members = await room.getEncryptionTargetMembers();
         for (const member of members) {
             e2eUserIds.push(member.userId);
         }
