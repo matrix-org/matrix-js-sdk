@@ -288,6 +288,21 @@ MatrixClient.prototype.getSyncState = function() {
 };
 
 /**
+ * Returns the additional data object associated with
+ * the current sync state, or null if there is no
+ * such data.
+ * Sync errors, if available, are put in the 'error' key of
+ * this object.
+ * @return {?Object}
+ */
+MatrixClient.prototype.getSyncStateData = function() {
+    if (!this._syncApi) {
+        return null;
+    }
+    return this._syncApi.getSyncStateData();
+};
+
+/**
  * Return whether the client is configured for a guest account.
  * @return {boolean} True if this is a guest access_token (or no token is supplied).
  */
