@@ -574,7 +574,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
   */
  Room.prototype.getEncryptionTargetMembers = async function() {
     if (this._oobMembersPromise) {
-        await _oobMembersPromise;
+        await this._oobMembersPromise;
     }
     let members = this.getMembersWithMembership("join");
     if (this.shouldEncryptForInvitedMembers()) {
