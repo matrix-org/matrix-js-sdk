@@ -177,6 +177,9 @@ function Room(roomId, myUserId, opts) {
     this._summaryHeroes = null;
     // awaited by getEncryptionTargetMembers while room members are loading
     this._oobMembersPromise = null;
+    if (this._opts.lazyLoadMembers) {
+        this._oobMembersPromise = new utils.Deferred();
+    }
 }
 
 utils.inherits(Room, EventEmitter);
@@ -282,13 +285,19 @@ Room.prototype.loadOutOfBandMembers = function(eventsPromise) {
 
     // store the promise that already updated the room state
     // to ensure that happens first
-    this._oobMembersPromise = eventsPromise.then((events) => {
+    const updatedRoomStatePromise = eventsPromise.then((events) => {
         this.currentState.setOutOfBandMembers(events);
     }, (err) => {
         this.currentState.markOutOfBandMembersFailed();
         throw err;  //rethrow so calling code is aware operation failed
     });
-    return this._oobMembersPromise;
+    // resolve the Deferred with the pending updated room promise,
+    // this will signal OOB members are now available to
+    // dependant code like getEncryptionTargetMembers
+    if (this._oobMembersPromise) {
+        this._oobMembersPromise.resolve(updatedRoomStatePromise);
+    }
+    return updatedRoomStatePromise;
 };
 
 /**

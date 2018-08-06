@@ -672,3 +672,12 @@ module.exports.removeHiddenChars = function(str) {
     return str.normalize('NFD').replace(removeHiddenCharsRegex, '');
 };
 const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
+
+module.exports.Deferred = function Deferred() {
+    let resolve = null;
+    const promise = new Promise((r) => {
+        resolve = r;
+    });
+    promise.resolve = resolve;
+    return promise;
+};
