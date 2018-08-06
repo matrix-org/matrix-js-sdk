@@ -644,19 +644,20 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     });
     this._roomEncryptors[roomId] = alg;
 
-    // make sure we are tracking the device lists for all users in this room.
-    console.log("Enabling encryption in " + roomId + "; " +
-                "starting to track device lists for all users therein");
-    const room = this._clientStore.getRoom(roomId);
-    if (!room) {
-        throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
-    }
 
-    const members = await room.getEncryptionTargetMembers();
-    members.forEach((m) => {
-        this._deviceList.startTrackingDeviceList(m.userId);
-    });
     if (!inhibitDeviceQuery) {
+        // make sure we are tracking the device lists for all users in this room.
+        console.log("Enabling encryption in " + roomId + "; " +
+                    "starting to track device lists for all users therein");
+        const room = this._clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
+        }
+
+        const members = await room.getEncryptionTargetMembers();
+        members.forEach((m) => {
+            this._deviceList.startTrackingDeviceList(m.userId);
+        });
         this._deviceList.refreshOutdatedDeviceLists();
     }
 };
