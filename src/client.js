@@ -769,56 +769,6 @@ MatrixClient.prototype.getRoom = function(roomId) {
     return this.store.getRoom(roomId);
 };
 
-MatrixClient.prototype._loadMembers = async function(room) {
-    const roomId = room.roomId;
-    // were the members loaded from the server?
-    let fromServer = false;
-    let rawMembersEvents = await this.store.getOutOfBandMembers(roomId);
-    if (rawMembersEvents === null) {
-        fromServer = true;
-        const lastEventId = room.getLastEventId();
-        const response = await this.members(roomId, "join", "leave", lastEventId);
-        rawMembersEvents = response.chunk;
-        console.log(`LL: got ${rawMembersEvents.length} members from server`);
-    }
-    const memberEvents = rawMembersEvents.map(this.getEventMapper());
-    return {memberEvents, fromServer};
-};
-
-/**
- * Preloads the member list for the given room id,
- * in case lazy loading of memberships is in use.
- * @param {string} roomId The room ID
- */
-MatrixClient.prototype.loadRoomMembersIfNeeded = async function(roomId) {
-    const room = this.getRoom(roomId);
-    if (!room || !room.needsOutOfBandMembers()) {
-        return;
-    }
-    // intercept whether we need to store oob members afterwards
-    let membersNeedStoring = false;
-    // Note that we don't await _loadMembers here first.
-    // setLazyLoadedMembers sets a flag before it awaits the promise passed in
-    // to avoid a race when calling membersNeedLoading/loadOutOfBandMembers
-    // in fast succession, before the first promise resolves.
-    const membersPromise = this._loadMembers(room)
-        .then(({memberEvents, fromServer}) => {
-            membersNeedStoring = fromServer;
-            return memberEvents;
-        });
-    await room.loadOutOfBandMembers(membersPromise);
-    // if loadOutOfBandMembers throws, this wont be called
-    // but that's fine as we don't want to store members
-    // that caused an error.
-    if (membersNeedStoring) {
-        const rawMembersEvents = room.currentState.getMembers()
-            .filter((m) => m.isOutOfBand())
-            .map((m) => m.events.member.event);
-        console.log(`LL: telling backend to store ${rawMembersEvents.length} members`);
-        await this.store.setOutOfBandMembers(roomId, rawMembersEvents);
-    }
-};
-
 /**
  * Retrieve all known rooms.
  * @return {Room[]} A list of rooms, or an empty list if there is no data store.
