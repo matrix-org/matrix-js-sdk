@@ -275,7 +275,7 @@ Room.prototype._loadMembersFromServer = async function() {
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
         {$roomId: this.roomId});
     const http = this._client._http;
-    const response = await http.authedRequest(callback, "GET", path);
+    const response = await http.authedRequest(undefined, "GET", path);
     return response.chunk;
 };
 
@@ -319,10 +319,10 @@ Room.prototype.loadMembersIfNeeded = function() {
             const oobMembers = this.currentState.getMembers()
                 .filter((m) => m.isOutOfBand())
                 .map((m) => m.events.member.event);
-            console.log(`LL: telling store to write ${oobEvents.length}`
+            console.log(`LL: telling store to write ${oobMembers.length}`
                 + ` members for room ${this.roomId}`);
             const store = this._client.store;
-            return store.setOutOfBandMembers(roomId, oobMembers)
+            return store.setOutOfBandMembers(this.roomId, oobMembers)
                 // swallow any IDB error as we don't want to fail
                 // because of this
                 .catch((err) => {
