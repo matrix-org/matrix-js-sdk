@@ -179,6 +179,11 @@ function Room(roomId, myUserId, opts) {
     this._oobMembersPromise = null;
     if (this._opts.lazyLoadMembers) {
         this._oobMembersPromise = new utils.Deferred();
+    this._client = client;
+    if (!this._opts.lazyLoadMembers) {
+        this._membersPromise = Promise.resolve();
+    } else {
+        this._membersPromise = null;
     }
 }
 
@@ -263,41 +268,79 @@ Room.prototype.setSyncedMembership = function(membership) {
     this._syncedMembership = membership;
 };
 
-/**
- * Get the out-of-band members loading state, whether loading is needed or not.
- * Note that loading might be in progress and hence isn't needed.
- * @return {bool} whether or not the members of this room need to be loaded
- */
-Room.prototype.needsOutOfBandMembers = function() {
-    return this._opts.lazyLoadMembers &&
-        this.currentState.needsOutOfBandMembers();
+Room.prototype._loadMembersFromServer = async function() {
+    const queryString = utils.encodeParams({
+        membership: "join",
+        not_membership: "leave",
+        at: this.getLastEventId(),
+    });
+    const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+        {$roomId: this.roomId});
+    const http = this._client._http;
+    const response = await http.authedRequest(callback, "GET", path);
+    return response.chunk;
+};
+
+
+Room.prototype._loadMembers = async function() {
+    // were the members loaded from the server?
+    let fromServer = false;
+    let rawMembersEvents = 
+        await this._client.store.getOutOfBandMembers(this.roomId);
+    if (rawMembersEvents === null) {
+        fromServer = true;
+        rawMembersEvents = await this._loadMembersFromServer();
+        console.log(`LL: got ${rawMembersEvents.length}` +
+            `members from server for room ${this.roomId}`);
+    }
+    const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
+    return {memberEvents, fromServer};
 };
 
 /**
- * Loads the out-of-band members from the promise passed in
- * @param {Promise} eventsPromise promise that resolves to an array with membership MatrixEvents for the members
+ * Preloads the member list in case lazy loading
+ * of memberships is in use. Can be called multiple times,
+ * it will only preload once.
+ * @return {Promise} when preloading is done and
+ * accessing the members on the room will take
+ * all members in the room into account
  */
-Room.prototype.loadOutOfBandMembers = function(eventsPromise) {
-    if (!this.needsOutOfBandMembers()) {
-        return Promise.resolve();
+Room.prototype.loadMembersIfNeeded = function() {
+    if (this._membersPromise) {
+        return this._membersPromise;
     }
+
+    // mark the state so that incoming messages while
+    // the request is in flight get marked as superseding
+    // the OOB members
     this.currentState.markOutOfBandMembersStarted();
 
-    // store the promise that already updated the room state
-    // to ensure that happens first
-    const updatedRoomStatePromise = eventsPromise.then((events) => {
-        this.currentState.setOutOfBandMembers(events);
-    }, (err) => {
-        this.currentState.markOutOfBandMembersFailed();
-        throw err;  //rethrow so calling code is aware operation failed
+    const promise = this._loadMembers().then(({memberEvents, fromServer}) => {
+        this.currentState.setOutOfBandMembers(memberEvents);
+        if (fromServer) {
+            const oobMembers = this.currentState.getMembers()
+                .filter((m) => m.isOutOfBand())
+                .map((m) => m.events.member.event);
+            console.log(`LL: telling store to write ${oobEvents.length}`
+                + ` members for room ${this.roomId}`);
+            const store = this._client.store;
+            return store.setOutOfBandMembers(roomId, oobMembers)
+                // swallow any IDB error as we don't want to fail
+                // because of this
+                .catch((err) => {
+                    console.log("LL: storing OOB room members failed, oh well",
+                        err);
+                });
+        }
+    }).catch((err) => {
+        // allow retries on fail
+        this._membersPromise = null;
+        this.currentState.markOutOfBandMembersFailed()
+        throw err;
     });
-    // resolve the Deferred with the pending updated room promise,
-    // this will signal OOB members are now available to
-    // dependant code like getEncryptionTargetMembers
-    if (this._oobMembersPromise) {
-        this._oobMembersPromise.resolve(updatedRoomStatePromise);
-    }
-    return updatedRoomStatePromise;
+
+    this._membersPromise = promise;
+    return this._membersPromise;
 };
 
 /**

@@ -112,7 +112,7 @@ function SyncApi(client, opts) {
  */
 SyncApi.prototype.createRoom = function(roomId) {
     const client = this.client;
-    const room = new Room(roomId, client.getUserId(), {
+    const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: this.opts.lazyLoadMembers,
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,

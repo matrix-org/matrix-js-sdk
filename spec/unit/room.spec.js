@@ -469,7 +469,7 @@ describe("Room", function() {
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
-            room = new Room(roomId, null, {timelineSupport: true});
+            room = new Room(roomId, null, null, null, {timelineSupport: true});
         });
 
         const events = [
