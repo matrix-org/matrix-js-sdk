@@ -68,6 +68,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @constructor
  * @alias module:models/room
  * @param {string} roomId Required. The ID of this room.
+ * @param {MatrixClient} client Required. The client, used to lazy load members.
  * @param {string} myUserId Required. The ID of the syncing user.
  * @param {Object=} opts Configuration options
  * @param {*} opts.storageToken Optional. The token which a data store can use
@@ -176,7 +177,7 @@ function Room(roomId, client, myUserId, opts) {
     this._syncedMembership = null;
     this._summaryHeroes = null;
     // awaited by getEncryptionTargetMembers while room members are loading
-    
+
     this._client = client;
     if (!this._opts.lazyLoadMembers) {
         this._membersPromise = Promise.resolve();
@@ -283,7 +284,7 @@ Room.prototype._loadMembersFromServer = async function() {
 Room.prototype._loadMembers = async function() {
     // were the members loaded from the server?
     let fromServer = false;
-    let rawMembersEvents = 
+    let rawMembersEvents =
         await this._client.store.getOutOfBandMembers(this.roomId);
     if (rawMembersEvents === null) {
         fromServer = true;
@@ -333,7 +334,7 @@ Room.prototype.loadMembersIfNeeded = function() {
     }).catch((err) => {
         // allow retries on fail
         this._membersPromise = null;
-        this.currentState.markOutOfBandMembersFailed()
+        this.currentState.markOutOfBandMembersFailed();
         throw err;
     });
 
