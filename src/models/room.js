@@ -103,7 +103,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-function Room(roomId, myUserId, opts) {
+function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -176,9 +176,7 @@ function Room(roomId, myUserId, opts) {
     this._syncedMembership = null;
     this._summaryHeroes = null;
     // awaited by getEncryptionTargetMembers while room members are loading
-    this._oobMembersPromise = null;
-    if (this._opts.lazyLoadMembers) {
-        this._oobMembersPromise = new utils.Deferred();
+    
     this._client = client;
     if (!this._opts.lazyLoadMembers) {
         this._membersPromise = Promise.resolve();
@@ -614,9 +612,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
   * we should encrypt messages for in this room.
   */
  Room.prototype.getEncryptionTargetMembers = async function() {
-    if (this._oobMembersPromise) {
-        await this._oobMembersPromise;
-    }
+    await this.loadMembersIfNeeded();
     let members = this.getMembersWithMembership("join");
     if (this.shouldEncryptForInvitedMembers()) {
         members = members.concat(this.getMembersWithMembership("invite"));
