@@ -1060,13 +1060,15 @@ SyncApi.prototype._processSyncResponse = async function(
             client.emit("event", e);
             if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
 
+                /*
                 // XXX: get device
-                if (!device.getSuggestedKeyRestore() && 
+                if (!device.getSuggestedKeyRestore() &&
                     !device.backupKey && !device.selfCrossSigs.length)
                 {
                     client.emit("crypto.suggestKeyRestore");
                     device.setSuggestedKeyRestore(true);
                 }
+                */
 
                 await self.opts.crypto.onCryptoEvent(e);
             }

@@ -703,6 +703,90 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
+    let path;
+    if (sessionId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+    } else if (roomId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId", {
+            $roomId: roomId,
+        });
+    } else {
+        path = "/room_keys/keys";
+    }
+    const queryData = version === undefined ? undefined : {version : version};
+    return {
+        path: path,
+        queryData: queryData,
+    }
+}
+
+/**
+ * Back up session keys to the homeserver.
+ * @param {string} roomId ID of the room that the keys are for Optional.
+ * @param {string} sessionId ID of the session that the keys are for Optional.
+ * @param {integer} version backup version Optional.
+ * @param {object} key data
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} a promise that will resolve when the keys
+ * are uploaded
+ */
+MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        callback, "PUT", path.path, path.queryData, data,
+    );
+};
+
+MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessionId, version, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "GET", path.path, path.queryData,
+    ).then((response) => {
+        if (response.code === 200) {
+            const keys = [];
+            // FIXME: for each room, session, if response has multiple
+            // decrypt response.data.session_data
+            const data = response.data;
+            const key = JSON.parse(decryptionKey.decrypt(data.session_data.ephemeral, data.session_data.mac, data.session_data.ciphertext));
+            // set room_id and session_id
+            key.room_id = roomId;
+            key.session_id = sessionId;
+            keys.push(key);
+            return this.importRoomKeys(keys);
+        } else {
+            callback("aargh!");
+            return Promise.reject("aaargh!");
+        }
+    }).then(() => {
+        if (callback) {
+            callback();
+        }
+    })
+};
+
+MatrixClient.prototype.deleteKeyBackups = function(roomId, sessionId, version, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        callback, "DELETE", path.path, path.queryData,
+    )
+};
+
 // Group ops
 // =========
 // Operations on groups that come down the sync stream (ie. ones the
