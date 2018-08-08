@@ -387,7 +387,7 @@ describe("Room", function() {
         let events = null;
 
         beforeEach(function() {
-            room = new Room(roomId, null, {timelineSupport: timelineSupport});
+            room = new Room(roomId, null, null, {timelineSupport: timelineSupport});
             // set events each time to avoid resusing Event objects (which
             // doesn't work because they get frozen)
             events = [
@@ -469,7 +469,7 @@ describe("Room", function() {
 
     describe("compareEventOrdering", function() {
         beforeEach(function() {
-            room = new Room(roomId, null, {timelineSupport: true});
+            room = new Room(roomId, null, null, {timelineSupport: true});
         });
 
         const events = [
@@ -658,7 +658,7 @@ describe("Room", function() {
 
         beforeEach(function() {
             // no mocking
-            room = new Room(roomId, userA);
+            room = new Room(roomId, null, userA);
         });
 
         describe("Room.recalculate => Stripped State Events", function() {
@@ -1192,7 +1192,7 @@ describe("Room", function() {
     describe("addPendingEvent", function() {
         it("should add pending events to the pendingEventList if " +
                       "pendingEventOrdering == 'detached'", function() {
-            const room = new Room(roomId, userA, {
+            const room = new Room(roomId, null, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({
@@ -1218,7 +1218,7 @@ describe("Room", function() {
 
         it("should add pending events to the timeline if " +
                       "pendingEventOrdering == 'chronological'", function() {
-            room = new Room(roomId, userA, {
+            room = new Room(roomId, null, userA, {
                 pendingEventOrdering: "chronological",
             });
             const eventA = utils.mkMessage({
@@ -1242,7 +1242,7 @@ describe("Room", function() {
 
     describe("updatePendingEvent", function() {
         it("should remove cancelled events from the pending list", function() {
-            const room = new Room(roomId, userA, {
+            const room = new Room(roomId, null, userA, {
                 pendingEventOrdering: "detached",
             });
             const eventA = utils.mkMessage({
@@ -1278,7 +1278,7 @@ describe("Room", function() {
 
 
         it("should remove cancelled events from the timeline", function() {
-            const room = new Room(roomId, userA);
+            const room = new Room(roomId, null, userA);
             const eventA = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
@@ -1311,53 +1311,93 @@ describe("Room", function() {
         });
     });
 
-    describe("loadOutOfBandMembers", function() {
+    describe("loadMembersIfNeeded", function() {
+        function createClientMock(serverResponse, storageResponse = null) {
+            return {
+                getEventMapper: function() {
+                    // events should already be MatrixEvents
+                    return function(event) {return event;};
+                },
+                _http: {
+                    serverResponse,
+                    authedRequest: function() {
+                        if (this.serverResponse instanceof Error) {
+                            return Promise.reject(this.serverResponse);
+                        } else {
+                            return Promise.resolve({chunk: this.serverResponse});
+                        }
+                    },
+                },
+                store: {
+                    storageResponse,
+                    storedMembers: null,
+                    getOutOfBandMembers: function() {
+                        if (this.storageResponse instanceof Error) {
+                            return Promise.reject(this.storageResponse);
+                        } else {
+                            return Promise.resolve(this.storageResponse);
+                        }
+                    },
+                    setOutOfBandMembers: function(roomId, memberEvents) {
+                        this.storedMembers = memberEvents;
+                        return Promise.resolve();
+                    },
+                },
+            };
+        }
+
         const memberEvent = utils.mkMembership({
             user: "@user_a:bar", mship: "join",
             room: roomId, event: true, name: "User A",
         });
 
-        it("should apply member events", async function() {
-            const room = new Room(roomId, null);
-            await room.loadOutOfBandMembers(Promise.resolve([memberEvent]));
+        it("should load members from server on first call", async function() {
+            const client = createClientMock([memberEvent]);
+            const room = new Room(roomId, client, null, {lazyLoadMembers: true});
+            await room.loadMembersIfNeeded();
             const memberA = room.getMember("@user_a:bar");
             expect(memberA.name).toEqual("User A");
+            const storedMembers = client.store.storedMembers;
+            expect(storedMembers.length).toEqual(1);
+            expect(storedMembers[0].event_id).toEqual(memberEvent.getId());
         });
 
-        it("should apply first call, not first resolved promise", async function() {
+        it("should take members from storage if available", async function() {
             const memberEvent2 = utils.mkMembership({
                 user: "@user_a:bar", mship: "join",
                 room: roomId, event: true, name: "Ms A",
             });
-            const room = new Room(roomId, null);
+            const client = createClientMock([memberEvent2], [memberEvent]);
+            const room = new Room(roomId, client, null, {lazyLoadMembers: true});
 
-            const promise2 = Promise.resolve([memberEvent2]);
-            const promise1 = promise2.then(() => [memberEvent]);
-
-            await room.loadOutOfBandMembers(promise1);
-            await room.loadOutOfBandMembers(promise2);
+            await room.loadMembersIfNeeded();
 
             const memberA = room.getMember("@user_a:bar");
             expect(memberA.name).toEqual("User A");
         });
 
-        it("should revert needs loading on error", async function() {
-            const room = new Room(roomId, null);
+        it("should allow retry on error", async function() {
+            const client = createClientMock(new Error("server says no"));
+            const room = new Room(roomId, client, null, {lazyLoadMembers: true});
             let hasThrown = false;
             try {
-                await room.loadOutOfBandMembers(Promise.reject(new Error("bugger")));
+                await room.loadMembersIfNeeded();
             } catch(err) {
                 hasThrown = true;
             }
             expect(hasThrown).toEqual(true);
-            expect(room.needsOutOfBandMembers()).toEqual(true);
+
+            client._http.serverResponse = [memberEvent];
+            await room.loadMembersIfNeeded();
+            const memberA = room.getMember("@user_a:bar");
+            expect(memberA.name).toEqual("User A");
         });
     });
 
     describe("getMyMembership", function() {
         it("should return synced membership if membership isn't available yet",
         async function() {
-            const room = new Room(roomId, userA);
+            const room = new Room(roomId, null, userA);
             room.setSyncedMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
             room.addLiveEvents([utils.mkMembership({
