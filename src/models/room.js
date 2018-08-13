@@ -228,14 +228,6 @@ Room.prototype.getLiveTimeline = function() {
 };
 
 /**
- * @return {string} the id of the last event in the live timeline
- */
-Room.prototype.getLastEventId = function() {
-    const liveEvents = this.getLiveTimeline().getEvents();
-    return liveEvents.length ? liveEvents[liveEvents.length - 1].getId() : undefined;
-};
-
-/**
  * @param {string} myUserId the user id for the logged in member
  * @return {string} the membership type (join | leave | invite) for the logged in user
  */
@@ -280,10 +272,11 @@ Room.prototype.setSyncedMembership = function(membership) {
 };
 
 Room.prototype._loadMembersFromServer = async function() {
+    const lastSyncToken = this._client.store.getSyncToken();
     const queryString = utils.encodeParams({
         membership: "join",
         not_membership: "leave",
-        at: this.getLastEventId(),
+        at: lastSyncToken,
     });
     const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
         {$roomId: this.roomId});
