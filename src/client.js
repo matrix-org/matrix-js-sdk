@@ -203,6 +203,8 @@ function MatrixClient(opts) {
 
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
+
+    this._serverSupportsLazyLoading = null;
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -3040,7 +3042,14 @@ MatrixClient.prototype.startClient = async function(opts) {
     opts = Object.assign({}, opts);
 
     if (opts.lazyLoadMembers) {
-        opts.filter = await this.createFilter(LAZY_LOADING_SYNC_FILTER);
+        const supported = await this.doesServerSupportLazyLoading();
+        if (supported) {
+            opts.filter = await this.createFilter(LAZY_LOADING_SYNC_FILTER);
+        } else {
+            console.log("LL: lazy loading requested but not supported " +
+                "by server, so disabling");
+            opts.lazyLoadMembers = false;
+        }
     }
 
     opts.crypto = this._crypto;
@@ -3076,6 +3085,28 @@ MatrixClient.prototype.stopClient = function() {
         this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
+};
+
+/*
+ * Query the server to see if it support members lazy loading
+ * @return {Promise<boolean>} true if server supports lazy loading
+ */
+MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
+    if (this._serverSupportsLazyLoading === null) {
+        const response = await this._http.request(
+            undefined, // callback
+            "GET", "/_matrix/client/versions",
+            undefined, // queryParams
+            undefined, // data
+            {
+                prefix: '',
+            },
+        );
+        const unstableFeatures = response["unstable_features"];
+        this._serverSupportsLazyLoading =
+            unstableFeatures && unstableFeatures["m.lazy_load_members"];
+    }
+    return this._serverSupportsLazyLoading;
 };
 
 /*
