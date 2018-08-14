@@ -294,7 +294,7 @@ Room.prototype._loadMembers = async function() {
     if (rawMembersEvents === null) {
         fromServer = true;
         rawMembersEvents = await this._loadMembersFromServer();
-        console.log(`LL: got ${rawMembersEvents.length}` +
+        console.log(`LL: got ${rawMembersEvents.length} ` +
             `members from server for room ${this.roomId}`);
     }
     const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
