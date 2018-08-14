@@ -175,6 +175,18 @@ function Room(roomId, opts) {
 utils.inherits(Room, EventEmitter);
 
 /**
+ * Gets the version of the room
+ * @returns {string} The version of the room, or null if it could not be determined
+ */
+Room.prototype.getVersion = function() {
+    const createEvent = this.currentState.getStateEvents("m.room.create", "");
+    if (!createEvent) return null;
+    const ver = createEvent.getContent()['room_version'];
+    if (ver === undefined) return '1';
+    return ver;
+};
+
+/**
  * Get the list of pending sent events for this room
  *
  * @return {module:models/event.MatrixEvent[]} A list of the sent events
