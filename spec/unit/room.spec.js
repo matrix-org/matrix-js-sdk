@@ -1342,6 +1342,7 @@ describe("Room", function() {
                         this.storedMembers = memberEvents;
                         return Promise.resolve();
                     },
+                    getSyncToken: () => "sync_token",
                 },
             };
         }
