@@ -58,9 +58,52 @@ function RoomMember(roomId, userId) {
     this.events = {
         member: null,
     };
+    this._isOutOfBand = false;
+    this._supersedesOutOfBand = false;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
+
+/**
+ * Mark the member as coming from a channel that is not sync
+ */
+RoomMember.prototype.markOutOfBand = function() {
+    this._isOutOfBand = true;
+};
+
+/**
+ * @return {bool} does the member come from a channel that is not sync?
+ * This is used to store the member seperately
+ * from the sync state so it available across browser sessions.
+ */
+RoomMember.prototype.isOutOfBand = function() {
+    return this._isOutOfBand;
+};
+
+/**
+ * Does the member supersede an incoming out-of-band
+ * member? If so the out-of-band member should be ignored.
+ * @return {bool}
+ */
+RoomMember.prototype.supersedesOutOfBand = function() {
+    return this._supersedesOutOfBand;
+};
+
+/**
+ * Mark the member as superseding the future incoming
+ * out-of-band members.
+ */
+RoomMember.prototype.markSupersedesOutOfBand = function() {
+    this._supersedesOutOfBand = true;
+};
+
+/**
+ * Clear the member superseding the future incoming
+ * out-of-band members, as loading finished or failed.
+ */
+RoomMember.prototype.clearSupersedesOutOfBand = function() {
+    this._supersedesOutOfBand = false;
+};
 
 /**
  * Update this room member's membership event. May fire "RoomMember.name" if
@@ -75,13 +118,20 @@ RoomMember.prototype.setMembershipEvent = function(event, roomState) {
     if (event.getType() !== "m.room.member") {
         return;
     }
+
+    this._isOutOfBand = false;
+
     this.events.member = event;
 
     const oldMembership = this.membership;
     this.membership = event.getDirectionalContent().membership;
 
     const oldName = this.name;
-    this.name = calculateDisplayName(this, event, roomState);
+    this.name = calculateDisplayName(
+        this.userId,
+        event.getDirectionalContent().displayname,
+        roomState);
+
     this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
     if (oldMembership !== this.membership) {
         this._updateModifiedTime();
@@ -177,6 +227,44 @@ RoomMember.prototype.getLastModifiedTime = function() {
     return this._modified;
 };
 
+
+RoomMember.prototype.isKicked = function() {
+    return this.membership === "leave" &&
+        this.events.member.getSender() !== this.events.member.getStateKey();
+};
+
+/**
+ * If this member was invited with the is_direct flag set, return
+ * the user that invited this member
+ * @return {string} user id of the inviter
+ */
+RoomMember.prototype.getDMInviter = function() {
+    // when not available because that room state hasn't been loaded in,
+    // we don't really know, but more likely to not be a direct chat
+    if (this.events.member) {
+        // TODO: persist the is_direct flag on the member as more member events
+        //       come in caused by displayName changes.
+
+        // the is_direct flag is set on the invite member event.
+        // This is copied on the prev_content section of the join member event
+        // when the invite is accepted.
+
+        const memberEvent = this.events.member;
+        let memberContent = memberEvent.getContent();
+        let inviteSender = memberEvent.getSender();
+
+        if (memberContent.membership === "join") {
+            memberContent = memberEvent.getPrevContent();
+            inviteSender = memberEvent.getUnsigned().prev_sender;
+        }
+
+        if (memberContent.membership === "invite" && memberContent.is_direct) {
+            return inviteSender;
+        }
+    }
+};
+
+
 /**
  * Get the avatar URL for a room member.
  * @param {string} baseUrl The base homeserver URL See
@@ -200,10 +288,12 @@ RoomMember.prototype.getAvatarUrl =
     if (allowDefault === undefined) {
         allowDefault = true;
     }
-    if (!this.events.member && !allowDefault) {
+
+    const rawUrl = this.getMxcAvatarUrl();
+
+    if (!rawUrl && !allowDefault) {
         return null;
     }
-    const rawUrl = this.events.member ? this.events.member.getContent().avatar_url : null;
     const httpUrl = ContentRepo.getHttpUriForMxc(
         baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
     );
@@ -216,12 +306,21 @@ RoomMember.prototype.getAvatarUrl =
     }
     return null;
 };
+/**
+ * get the mxc avatar url, either from a state event, or from a lazily loaded member
+ * @return {string} the mxc avatar url
+ */
+RoomMember.prototype.getMxcAvatarUrl = function() {
+    if(this.events.member) {
+        return this.events.member.getDirectionalContent().avatar_url;
+    } else if(this.user) {
+        return this.user.avatarUrl;
+    }
+    return null;
+};
 
-function calculateDisplayName(member, event, roomState) {
-    const displayName = event.getDirectionalContent().displayname;
-    const selfUserId = member.userId;
-
-    if (!displayName) {
+function calculateDisplayName(selfUserId, displayName, roomState) {
+    if (!displayName || displayName === selfUserId) {
         return selfUserId;
     }
 

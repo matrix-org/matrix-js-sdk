@@ -535,8 +535,9 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  * @return {module:client.Promise} Promise which resolves to a map
  *     from userId to deviceId to deviceInfo
  */
-MegolmEncryption.prototype._getDevicesInRoom = function(room) {
-    const roomMembers = utils.map(room.getEncryptionTargetMembers(), function(u) {
+MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
+    const members = await room.getEncryptionTargetMembers();
+    const roomMembers = utils.map(members, function(u) {
         return u.userId;
     });
 
@@ -555,29 +556,28 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // common and then added new devices before joining this one? --Matthew
     //
     // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
-    return this._crypto.downloadKeys(roomMembers, false).then((devices) => {
-        // remove any blocked devices
-        for (const userId in devices) {
-            if (!devices.hasOwnProperty(userId)) {
+    const devices = await this._crypto.downloadKeys(roomMembers, false);
+    // remove any blocked devices
+    for (const userId in devices) {
+        if (!devices.hasOwnProperty(userId)) {
+            continue;
+        }
+
+        const userDevices = devices[userId];
+        for (const deviceId in userDevices) {
+            if (!userDevices.hasOwnProperty(deviceId)) {
                 continue;
             }
 
-            const userDevices = devices[userId];
-            for (const deviceId in userDevices) {
-                if (!userDevices.hasOwnProperty(deviceId)) {
-                    continue;
-                }
-
-                if (userDevices[deviceId].isBlocked() ||
-                    (userDevices[deviceId].isUnverified() && isBlacklisting)
-                   ) {
-                    delete userDevices[deviceId];
-                }
+            if (userDevices[deviceId].isBlocked() ||
+                (userDevices[deviceId].isUnverified() && isBlacklisting)
+               ) {
+                delete userDevices[deviceId];
             }
         }
+    }
 
-        return devices;
-    });
+    return devices;
 };
 
 /**

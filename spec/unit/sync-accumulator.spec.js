@@ -52,6 +52,11 @@ describe("SyncAccumulator", function() {
                                 member("bob", "join"),
                             ],
                         },
+                        summary: {
+                            "m.heroes": undefined,
+                            "m.joined_member_count": undefined,
+                            "m.invited_member_count": undefined,
+                        },
                         timeline: {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
@@ -316,6 +321,58 @@ describe("SyncAccumulator", function() {
                     },
                 },
             },
+        });
+    });
+
+    describe("summary field", function() {
+        function createSyncResponseWithSummary(summary) {
+            return {
+                next_batch: "abc",
+                rooms: {
+                    invite: {},
+                    leave: {},
+                    join: {
+                        "!foo:bar": {
+                            account_data: { events: [] },
+                            ephemeral: { events: [] },
+                            unread_notifications: {},
+                            state: {
+                                events: [],
+                            },
+                            summary: summary,
+                            timeline: {
+                                events: [],
+                                prev_batch: "something",
+                            },
+                        },
+                    },
+                },
+            };
+        }
+
+        it("should copy summary properties", function() {
+            sa.accumulate(createSyncResponseWithSummary({
+                "m.heroes": ["@alice:bar"],
+                "m.invited_member_count": 2,
+            }));
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            expect(summary["m.invited_member_count"]).toEqual(2);
+            expect(summary["m.heroes"]).toEqual(["@alice:bar"]);
+        });
+
+        it("should accumulate summary properties", function() {
+            sa.accumulate(createSyncResponseWithSummary({
+                "m.heroes": ["@alice:bar"],
+                "m.invited_member_count": 2,
+            }));
+            sa.accumulate(createSyncResponseWithSummary({
+                "m.heroes": ["@bob:bar"],
+                "m.joined_member_count": 5,
+            }));
+            const summary = sa.getJSON().roomsData.join["!foo:bar"].summary;
+            expect(summary["m.invited_member_count"]).toEqual(2);
+            expect(summary["m.joined_member_count"]).toEqual(5);
+            expect(summary["m.heroes"]).toEqual(["@bob:bar"]);
         });
     });
 });
