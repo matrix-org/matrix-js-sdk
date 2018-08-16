@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Home</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Home</h1>
+
+    
+
+
+
+    
+
+
+    <h3>matrix-js-sdk 0.10.8-rc.1</h3>
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    <section>
+        <article><h1>Matrix Javascript SDK</h1><p><a href="http://matrix.org/jenkins/job/JavascriptSDK/"><img src="http://matrix.org/jenkins/buildStatus/icon?job=JavascriptSDK" alt="Build Status"></a></p>
+<p>This is the <a href="https://matrix.org">Matrix</a> Client-Server v1/v2 alpha SDK for
+JavaScript. This SDK can be run in a browser or in Node.js.</p>
+<h1>Quickstart</h1><h2>In a browser</h2><p>Download either the full or minified version from
+https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
+<code>&lt;script&gt;</code> to your page. There will be a global variable <code>matrixcs</code>
+attached to <code>window</code> through which you can access the SDK. See below for how to
+include libolm to enable end-to-end-encryption.</p>
+<p>Please check <a href="examples/browser">the working browser example</a> for more information.</p>
+<h2>In Node.js</h2><p><code>npm install matrix-js-sdk</code></p>
+<pre class="prettyprint source lang-javascript"><code>  var sdk = require(&quot;matrix-js-sdk&quot;);
+  var client = sdk.createClient(&quot;https://matrix.org&quot;);
+  client.publicRooms(function(err, data) {
+    console.log(&quot;Public Rooms: %s&quot;, JSON.stringify(data));
+  });</code></pre><p>See below for how to include libolm to enable end-to-end-encryption. Please check
+<a href="examples/node">the Node.js terminal app</a> for a more complex example.</p>
+<h2>What does this SDK do?</h2><p>This SDK provides a full object model around the Matrix Client-Server API and emits
+events for incoming data and state changes. Aside from wrapping the HTTP API, it:</p>
+<ul>
+<li>Handles syncing (via <code>/initialSync</code> and <code>/events</code>)</li>
+<li>Handles the generation of &quot;friendly&quot; room and member names.</li>
+<li>Handles historical <code>RoomMember</code> information (e.g. display names).</li>
+<li>Manages room member state across multiple events (e.g. it handles typing, power
+levels and membership changes).</li>
+<li>Exposes high-level objects like <code>Rooms</code>, <code>RoomState</code>, <code>RoomMembers</code> and <code>Users</code>
+which can be listened to for things like name changes, new messages, membership
+changes, presence changes, and more.</li>
+<li>Handle &quot;local echo&quot; of messages sent using the SDK. This means that messages
+that have just been sent will appear in the timeline as 'sending', until it
+completes. This is beneficial because it prevents there being a gap between
+hitting the send button and having the &quot;remote echo&quot; arrive.</li>
+<li>Mark messages which failed to send as not sent.</li>
+<li>Automatically retry requests to send messages due to network errors.</li>
+<li>Automatically retry requests to send messages due to rate limiting errors.</li>
+<li>Handle queueing of messages.</li>
+<li>Handles pagination.</li>
+<li>Handle assigning push actions for events.</li>
+<li>Handles room initial sync on accepting invites.</li>
+<li>Handles WebRTC calling.</li>
+</ul>
+<p>Later versions of the SDK will:</p>
+<ul>
+<li>Expose a <code>RoomSummary</code> which would be suitable for a recents page.</li>
+<li>Provide different pluggable storage layers (e.g. local storage, database-backed)</li>
+</ul>
+<h1>Usage</h1><h2>Conventions</h2><h3>Emitted events</h3><p>The SDK will emit events using an <code>EventEmitter</code>. It also
+emits object models (e.g. <code>Rooms</code>, <code>RoomMembers</code>) when they
+are updated.</p>
+<pre class="prettyprint source lang-javascript"><code>  // Listen for low-level MatrixEvents
+  client.on(&quot;event&quot;, function(event) {
+    console.log(event.getType());
+  });
+
+  // Listen for typing changes
+  client.on(&quot;RoomMember.typing&quot;, function(event, member) {
+    if (member.typing) {
+      console.log(member.name + &quot; is typing...&quot;);
+    }
+    else {
+      console.log(member.name + &quot; stopped typing.&quot;);
+    }
+  });
+
+  // start the client to setup the connection to the server
+  client.startClient();</code></pre><h3>Promises and Callbacks</h3><p>Most of the methods in the SDK are asynchronous: they do not directly return a
+result, but instead return a <a href="http://documentup.com/kriskowal/q/">Promise</a>
+which will be fulfilled in the future.</p>
+<p>The typical usage is something like:</p>
+<pre class="prettyprint source lang-javascript"><code>  matrixClient.someMethod(arg1, arg2).done(function(result) {
+    ...
+  });</code></pre><p>Alternatively, if you have a Node.js-style <code>callback(err, result)</code> function,
+you can pass the result of the promise into it with something like:</p>
+<pre class="prettyprint source lang-javascript"><code>  matrixClient.someMethod(arg1, arg2).nodeify(callback);</code></pre><p>The main thing to note is that it is an error to discard the result of a
+promise-returning function, as that will cause exceptions to go unobserved. If
+you have nothing better to do with the result, just call <code>.done()</code> on it. See
+http://documentup.com/kriskowal/q/#the-end for more information.</p>
+<p>Methods which return a promise show this in their documentation.</p>
+<p>Many methods in the SDK support <em>both</em> Node.js-style callbacks <em>and</em> Promises,
+via an optional <code>callback</code> argument. The callback support is now deprecated:
+new methods do not include a <code>callback</code> argument, and in the future it may be
+removed from existing methods.</p>
+<h2>Examples</h2><p>This section provides some useful code snippets which demonstrate the
+core functionality of the SDK. These examples assume the SDK is setup like this:</p>
+<pre class="prettyprint source lang-javascript"><code>   var sdk = require(&quot;matrix-js-sdk&quot;);
+   var myUserId = &quot;@example:localhost&quot;;
+   var myAccessToken = &quot;QGV4YW1wbGU6bG9jYWxob3N0.qPEvLuYfNBjxikiCjP&quot;;
+   var matrixClient = sdk.createClient({
+       baseUrl: &quot;http://localhost:8008&quot;,
+       accessToken: myAccessToken,
+       userId: myUserId
+   });</code></pre><h3>Automatically join rooms when invited</h3><pre class="prettyprint source lang-javascript"><code>   matrixClient.on(&quot;RoomMember.membership&quot;, function(event, member) {
+       if (member.membership === &quot;invite&quot; && member.userId === myUserId) {
+           matrixClient.joinRoom(member.roomId).done(function() {
+               console.log(&quot;Auto-joined %s&quot;, member.roomId);
+           });
+       }
+   });
+
+   matrixClient.startClient();</code></pre><h3>Print out messages for all rooms</h3><pre class="prettyprint source lang-javascript"><code>   matrixClient.on(&quot;Room.timeline&quot;, function(event, room, toStartOfTimeline) {
+       if (toStartOfTimeline) {
+           return; // don't print paginated results
+       }
+       if (event.getType() !== &quot;m.room.message&quot;) {
+           return; // only print messages
+       }
+       console.log(
+           // the room name will update with m.room.name events automatically
+           &quot;(%s) %s :: %s&quot;, room.name, event.getSender(), event.getContent().body
+       );
+   });
+
+   matrixClient.startClient();</code></pre><p>Output:</p>
+<pre class="prettyprint source"><code>  (My Room) @megan:localhost :: Hello world
+  (My Room) @megan:localhost :: how are you?
+  (My Room) @example:localhost :: I am good
+  (My Room) @example:localhost :: change the room name
+  (My New Room) @megan:localhost :: done</code></pre><h3>Print out membership lists whenever they are changed</h3><pre class="prettyprint source lang-javascript"><code>   matrixClient.on(&quot;RoomState.members&quot;, function(event, state, member) {
+       var room = matrixClient.getRoom(state.roomId);
+       if (!room) {
+           return;
+       }
+       var memberList = state.getMembers();
+       console.log(room.name);
+       console.log(Array(room.name.length + 1).join(&quot;=&quot;));  // underline
+       for (var i = 0; i &lt; memberList.length; i++) {
+           console.log(
+               &quot;(%s) %s&quot;,
+               memberList[i].membership,
+               memberList[i].name
+           );
+       }
+   });
+
+   matrixClient.startClient();</code></pre><p>Output:</p>
+<pre class="prettyprint source"><code>  My Room
+  =======
+  (join) @example:localhost
+  (leave) @alice:localhost
+  (join) Bob
+  (invite) @charlie:localhost</code></pre><h1>API Reference</h1><p>A hosted reference can be found at
+http://matrix-org.github.io/matrix-js-sdk/index.html</p>
+<p>This SDK uses JSDoc3 style comments. You can manually build and
+host the API reference from the source files like this:</p>
+<pre class="prettyprint source"><code>  $ npm run gendoc
+  $ cd .jsdoc
+  $ python -m SimpleHTTPServer 8005</code></pre><p>Then visit <code>http://localhost:8005</code> to see the API docs.</p>
+<h1>End-to-end encryption support</h1><p>The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
+<a href="http://matrix.org/git/olm">libolm</a>. It is left up to the application to make
+libolm available, via the <code>Olm</code> global.</p>
+<p>It is also necessry to call <code>matrixClient.initCrypto()</code> after creating a new
+<code>MatrixClient</code> (but <strong>before</strong> calling <code>matrixClient.startClient()</code>) to
+initialise the crypto layer.</p>
+<p>If the <code>Olm</code> global is not available, the SDK will show a warning, as shown
+below; <code>initCrypto()</code> will also fail.</p>
+<pre class="prettyprint source"><code>Unable to load crypto module: crypto will be disabled: Error: global.Olm is not defined</code></pre><p>If the crypto layer is not (successfully) initialised, the SDK will continue to
+work for unencrypted rooms, but it will not support the E2E parts of the Matrix
+specification.</p>
+<p>To provide the Olm library in a browser application:</p>
+<ul>
+<li>download the transpiled libolm (from https://matrix.org/packages/npm/olm/).</li>
+<li>load <code>olm.js</code> as a <code>&lt;script&gt;</code> <em>before</em> <code>browser-matrix.js</code>.</li>
+</ul>
+<p>To provide the Olm library in a node.js application:</p>
+<ul>
+<li><code>npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz</code>
+(replace the URL with the latest version you want to use from
+ https://matrix.org/packages/npm/olm/)</li>
+<li><code>global.Olm = require('olm');</code> <em>before</em> loading <code>matrix-js-sdk</code>.</li>
+</ul>
+<p>If you want to package Olm as dependency for your node.js application, you
+can use <code>npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz 
+--save-optional</code> (if your application also works without e2e crypto enabled)
+or <code>--save</code> (if it doesn't) to do so.</p>
+<h1>Contributing</h1><p><em>This section is for people who want to modify the SDK. If you just
+want to use this SDK, skip this section.</em></p>
+<p>First, you need to pull in the right build tools:</p>
+<pre class="prettyprint source"><code> $ npm install</code></pre><h2>Building</h2><p>To build a browser version from scratch when developing::</p>
+<pre class="prettyprint source"><code> $ npm run build</code></pre><p>To constantly do builds when files are modified (using <code>watchify</code>)::</p>
+<pre class="prettyprint source"><code> $ npm run watch</code></pre><p>To run tests (Jasmine)::</p>
+<pre class="prettyprint source"><code> $ npm test</code></pre><p>To run linting:</p>
+<pre class="prettyprint source"><code> $ npm run lint</code></pre></article>
+    </section>
+
+
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto_.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_store_base_.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-reemit.html">reemit</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="Backend.html">Backend</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto_.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator-SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentHelpers">ContentHelpers</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#Group">Group</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallAudioOutput">setMatrixCallAudioOutput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Thu Aug 16 2018 15:19:07 GMT+0100 (BST)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
