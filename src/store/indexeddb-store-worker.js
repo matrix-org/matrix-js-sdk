@@ -92,6 +92,12 @@ class IndexedDBStoreWorker {
             case 'getNextBatchToken':
                 prom = this.backend.getNextBatchToken();
                 break;
+            case 'getOutOfBandMembers':
+                prom = this.backend.getOutOfBandMembers(msg.args[0]);
+                break;
+            case 'setOutOfBandMembers':
+                prom = this.backend.setOutOfBandMembers(msg.args[0], msg.args[1]);
+                break;
         }
 
         if (prom === undefined) {

@@ -113,7 +113,8 @@ function SyncApi(client, opts) {
  */
 SyncApi.prototype.createRoom = function(roomId) {
     const client = this.client;
-    const room = new Room(roomId, {
+    const room = new Room(roomId, client, client.getUserId(), {
+        lazyLoadMembers: this.opts.lazyLoadMembers,
         pendingEventOrdering: this.opts.pendingEventOrdering,
         timelineSupport: client.timelineSupport,
     });
@@ -232,7 +233,7 @@ SyncApi.prototype.syncLeftRooms = function() {
 
             self._processRoomEvents(room, stateEvents, timelineEvents);
 
-            room.recalculate(client.credentials.userId);
+            room.recalculate();
             client.store.storeRoom(room);
             client.emit("Room", room);
 
@@ -303,7 +304,7 @@ SyncApi.prototype.peek = function(roomId) {
         peekRoom.currentState.setStateEvents(stateEvents);
 
         self._resolveInvites(peekRoom);
-        peekRoom.recalculate(self.client.credentials.userId);
+        peekRoom.recalculate();
 
         // roll backwards to diverge old state. addEventsToTimeline
         // will overwrite the pagination token, so make sure it overwrites
@@ -823,6 +824,11 @@ SyncApi.prototype._processSyncResponse = async function(
     //          state: { events: [] },
     //          timeline: { events: [], prev_batch: $token, limited: true },
     //          ephemeral: { events: [] },
+    //          summary: {
+    //             m.heroes: [ $user_id ],
+    //             m.joined_member_count: $count,
+    //             m.invited_member_count: $count
+    //          },
     //          account_data: { events: [] },
     //          unread_notifications: {
     //              highlight_count: 0,
@@ -959,11 +965,12 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle invites
     inviteRooms.forEach(function(inviteObj) {
         const room = inviteObj.room;
+        room.setSyncedMembership("invite");
         const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
-            room.recalculate(client.credentials.userId);
+            room.recalculate();
             client.store.storeRoom(room);
             client.emit("Room", room);
         }
@@ -975,6 +982,7 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle joins
     await Promise.mapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
+        room.setSyncedMembership("join");
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
@@ -1054,6 +1062,13 @@ SyncApi.prototype._processSyncResponse = async function(
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
 
+        // set summary after processing events,
+        // because it will trigger a name calculation
+        // which needs the room state to be up to date
+        if (joinObj.summary) {
+            room.setSummary(joinObj.summary);
+        }
+
         // XXX: should we be adding ephemeralEvents to the timeline?
         // It feels like that for symmetry with room.addAccountData()
         // there should be a room.addEphemeralEvents() or similar.
@@ -1062,7 +1077,7 @@ SyncApi.prototype._processSyncResponse = async function(
         // we deliberately don't add accountData to the timeline
         room.addAccountData(accountDataEvents);
 
-        room.recalculate(client.credentials.userId);
+        room.recalculate();
         if (joinObj.isBrandNewRoom) {
             client.store.storeRoom(room);
             client.emit("Room", room);
@@ -1090,6 +1105,8 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
         const room = leaveObj.room;
+        room.setSyncedMembership("leave");
+
         const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
         const timelineEvents =
@@ -1100,7 +1117,7 @@ SyncApi.prototype._processSyncResponse = async function(
         self._processRoomEvents(room, stateEvents, timelineEvents);
         room.addAccountData(accountDataEvents);
 
-        room.recalculate(client.credentials.userId);
+        room.recalculate();
         if (leaveObj.isBrandNewRoom) {
             client.store.storeRoom(room);
             client.emit("Room", room);
@@ -1390,7 +1407,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // a recalculation (like m.room.name) we won't recalculate until we've
     // finished adding all the events, which will cause the notification to have
     // the old room name rather than the new one.
-    room.recalculate(this.client.credentials.userId);
+    room.recalculate();
 
     // If the timeline wasn't empty, we process the state events here: they're
     // defined as updates to the state before the start of the timeline, so this
