@@ -1,3 +1,18 @@
+Changes in [0.10.8-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.8-rc.1) (2018-08-16)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7...v0.10.8-rc.1)
+
+ * Add getVersion to Room
+   [\#689](https://github.com/matrix-org/matrix-js-sdk/pull/689)
+ * Add getSyncStateData()
+   [\#680](https://github.com/matrix-org/matrix-js-sdk/pull/680)
+ * Send sync error to listener
+   [\#679](https://github.com/matrix-org/matrix-js-sdk/pull/679)
+ * make sure room.tags is always a valid object to avoid crashes
+   [\#675](https://github.com/matrix-org/matrix-js-sdk/pull/675)
+ * Fix infinite spinner upon joining a room
+   [\#673](https://github.com/matrix-org/matrix-js-sdk/pull/673)
+
 Changes in [0.10.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7) (2018-07-30)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7-rc.1...v0.10.7)
