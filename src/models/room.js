@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,8 +30,7 @@ const EventTimelineSet = require("./event-timeline-set");
 
 import ReEmitter from '../ReEmitter';
 
-//const LATEST_ROOM_VERSION = '1';
-const LATEST_ROOM_VERSION = 'badger';
+const LATEST_ROOM_VERSION = '1';
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
