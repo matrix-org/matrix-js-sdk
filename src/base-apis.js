@@ -455,7 +455,9 @@ function(roomId, includeMembership, excludeMembership, atEventId, callback) {
  */
 MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
     const path = utils.encodeUri("/rooms/$roomId/upgrade", {$roomId: roomId});
-    return this._http.authedRequest(undefined, "POST", path, undefined, {new_version: newVersion});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, {new_version: newVersion},
+    );
 };
 
 
