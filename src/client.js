@@ -2078,6 +2078,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
  *
  * @param {string} roomId  The ID of the room to look in
  * @param {string} eventId  The ID of the event to look for
+ * @param {module:client.callback} callback Optional.
  *
  * @return {Promise} Resolves to an object containing the event.
  */
@@ -2091,7 +2092,7 @@ MatrixClient.prototype.fetchRoomEvent = function(roomId, eventId, callback) {
     return this._http.authedRequest(
         callback, "GET", path,
     );
-}
+};
 
 /**
  * Makes a request to /messages with the appropriate lazy loading filter set.
