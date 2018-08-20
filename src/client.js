@@ -2081,7 +2081,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
  *
  * @return {Promise} Resolves to an object containing the event.
  */
-MatrixClient.prototype.fetchRoomEvent = function(roomId, eventId) {
+MatrixClient.prototype.fetchRoomEvent = function(roomId, eventId, callback) {
     const path = utils.encodeUri(
         "/rooms/$roomId/event/$eventId", {
             $roomId: roomId,
