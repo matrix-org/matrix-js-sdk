@@ -2072,6 +2072,28 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
 };
 
 /**
+ * Get an event in a room by its event id.
+ *
+ * This blindly calls the /rooms/$roomId/event/$eventId endpoint.
+ *
+ * @param {string} roomId  The ID of the room to look in
+ * @param {string} eventId  The ID of the event to look for
+ *
+ * @return {Promise} Resolves to an object containing the event.
+ */
+MatrixClient.prototype.fetchRoomEvent = function(roomId, eventId) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/event/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        },
+    );
+    return this._http.authedRequest(
+        callback, "GET", path,
+    );
+}
+
+/**
  * Makes a request to /messages with the appropriate lazy loading filter set.
  * XXX: if we do get rid of scrollback (as it's not used at the moment),
  * we could inline this method again in paginateEventTimeline as that would
