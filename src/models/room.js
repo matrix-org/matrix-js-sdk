@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +29,8 @@ const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
 import ReEmitter from '../ReEmitter';
+
+const LATEST_ROOM_VERSION = '1';
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -198,6 +201,27 @@ Room.prototype.getVersion = function() {
     const ver = createEvent.getContent()['room_version'];
     if (ver === undefined) return '1';
     return ver;
+};
+
+/**
+ * Determines whether this room needs to be upgraded to a new version
+ * @returns {string?} What version the room should be upgraded to, or null if
+ *     the room does not require upgrading at this time.
+ */
+Room.prototype.shouldUpgradeToVersion = function() {
+    // This almost certainly won't be the way this actually works - this
+    // is essentially a stub method.
+    if (this.getVersion() === LATEST_ROOM_VERSION) return null;
+    return LATEST_ROOM_VERSION;
+};
+
+/**
+ * Determines whether the given user is permitted to perform a room upgrade
+ * @param {String} userId The ID of the user to test against
+ * @returns {bool} True if the given user is permitted to upgrade the room
+ */
+Room.prototype.userMayUpgradeRoom = function(userId) {
+    return this.currentState.maySendStateEvent("m.room.tombstone", userId);
 };
 
 /**

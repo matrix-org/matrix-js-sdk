@@ -446,6 +446,20 @@ function(roomId, includeMembership, excludeMembership, atEventId, callback) {
     return this._http.authedRequest(callback, "GET", path);
 };
 
+/**
+ * Upgrades a room to a new protocol version
+ * @param {string} roomId
+ * @param {string} newVersion The target version to upgrade to
+ * @return {module:client.Promise} Resolves: Object with key 'replacement_room'
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
+    const path = utils.encodeUri("/rooms/$roomId/upgrade", {$roomId: roomId});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, {new_version: newVersion},
+    );
+};
+
 
 /**
  * @param {string} groupId
