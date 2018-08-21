@@ -418,6 +418,25 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 };
 
 /**
+ * Get an event in a room by its event id.
+ * @param {string} roomId
+ * @param {string} eventId
+ * @param {module:client.callback} callback Optional.
+ *
+ * @return {Promise} Resolves to an object containing the event.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.fetchRoomEvent = function(roomId, eventId, callback) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/event/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        },
+    );
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
  * @param {string} roomId
  * @param {string} includeMembership the membership type to include in the response
  * @param {string} excludeMembership the membership type to exclude from the response
