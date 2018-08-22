@@ -637,6 +637,14 @@ Room.prototype.getJoinedMemberCount = function() {
 };
 
 /**
+ * Returns the number of invited members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite'
+ */
+Room.prototype.getInvitedMemberCount = function() {
+    return this.currentState.getInvitedMemberCount();
+};
+
+/**
  * Get a list of members with given membership state.
  * @param {string} membership The membership state.
  * @return {RoomMember[]} A list of members with the given membership state.
