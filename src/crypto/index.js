@@ -669,7 +669,7 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
         members.forEach((m) => {
             this._deviceList.startTrackingDeviceList(m.userId);
         });
-        return refreshPromise = this._deviceList.refreshOutdatedDeviceLists();
+        return this._deviceList.refreshOutdatedDeviceLists();
     };
 
     let promise = this._roomDeviceTrackingState[roomId];
