@@ -780,6 +780,37 @@ MatrixClient.prototype.getRooms = function() {
 };
 
 /**
+ * Retrieve all rooms that should be displayed to the user
+ * This is essentially getRooms() with some rooms filtered out, eg. old versions
+ * of rooms that have been replaced or (in future) other rooms that have been
+ * markewd at the protocol level as not to be displayed to the user.
+ * @return {Room[]} A list of rooms, or an empty list if there is no data store.
+ */
+MatrixClient.prototype.getVisibleRooms = function() {
+    const allRooms = this.store.getRooms();
+
+    const replacedRooms = new Set();
+    for (const r of allRooms) {
+        const createEvent = r.currentState.getStateEvents('m.room.create', '');
+        // invites are included in this list and we don't know their create events yet
+        if (createEvent) {
+            const predecessor = createEvent.getContent()['predecessor'];
+            if (predecessor && predecessor['room_id']) {
+                replacedRooms.add(predecessor['room_id']);
+            }
+        }
+    }
+
+    return allRooms.filter((r) => {
+        const tombstone = r.currentState.getStateEvents('m.room.tombstone', '');
+        if (tombstone && replacedRooms.has(r.roomId)) {
+            return false;
+        }
+        return true;
+    });
+};
+
+/**
  * Retrieve a user.
  * @param {string} userId The user ID to retrieve.
  * @return {?User} A user or null if there is no data store or the user does
