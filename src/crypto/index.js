@@ -654,19 +654,31 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config) {
  *
  * @param {string} roomId The room ID to start tracking devices in.
  */
-Crypto.prototype._trackRoomDevices = async function(roomId) {
-    const room = this._clientStore.getRoom(roomId);
-    if (!room) {
-        throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
-    }
-    console.log(`Starting to track devices for room ${roomId} ...`);
-    const members = await room.getEncryptionTargetMembers();
-    members.forEach((m) => {
-        this._deviceList.startTrackingDeviceList(m.userId);
-    });
-    return this._deviceList.refreshOutdatedDeviceLists();
-}
+Crypto.prototype.trackRoomDevices = function(roomId) {
+    const trackAndRefresh = async () => {
+        // not an encrypted room
+        if (!this._roomEncryptors[roomId]) {
+            return;
+        }
+        const room = this._clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
+        }
+        console.log(`Starting to track devices for room ${roomId} ...`);
+        const members = await room.getEncryptionTargetMembers();
+        members.forEach((m) => {
+            this._deviceList.startTrackingDeviceList(m.userId);
+        });
+        return refreshPromise = this._deviceList.refreshOutdatedDeviceLists();
+    };
 
+    let promise = this._roomDeviceTrackingState[roomId];
+    if (!promise) {
+        promise = trackAndRefresh();
+        this._roomDeviceTrackingState[roomId] = promise;
+    }
+    return promise;
+}
 
 /**
  * @typedef {Object} module:crypto~OlmSessionResult
@@ -788,7 +800,7 @@ Crypto.prototype.encryptEvent = async function(event, room) {
     }
 
     if (!this._roomDeviceTrackingState[roomId]) {
-        this._roomDeviceTrackingState[roomId] = this._trackRoomDevices(roomId);
+        this.trackRoomDevices(roomId);
     }
     // wait for all the room devices to be loaded
     await this._roomDeviceTrackingState[roomId];
@@ -974,11 +986,12 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
         });
     }
 
-    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+    if (deviceLists.left && Array.isArray(deviceLists.left) &&
+        deviceLists.left.length) {
         // Check we really don't share any rooms with these users
         // any more: the server isn't required to give us the
         // exact correct set.
-        const e2eUserIds = new Set(await this._getE2eUsers());
+        const e2eUserIds = new Set(await this._getTrackedE2eUsers());
 
         deviceLists.left.forEach((u) => {
             if (!e2eUserIds.has(u)) {
@@ -990,12 +1003,13 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
 
 /**
  * Get a list of all the IDs of users we share an e2e room with
+ * for which we are tracking devices already
  *
  * @returns {string[]} List of user IDs
  */
-Crypto.prototype._getE2eUsers = async function() {
+Crypto.prototype._getTrackedE2eUsers = async function() {
     const e2eUserIds = [];
-    for (const room of this._getE2eRooms()) {
+    for (const room of this._getTrackedE2eRooms()) {
         const members = await room.getEncryptionTargetMembers();
         for (const member of members) {
             e2eUserIds.push(member.userId);
@@ -1005,15 +1019,19 @@ Crypto.prototype._getE2eUsers = async function() {
 };
 
 /**
- * Get a list of the e2e-enabled rooms we are members of
+ * Get a list of the e2e-enabled rooms we are members of,
+ * and for which we are already tracking the devices
  *
  * @returns {module:models.Room[]}
  */
-Crypto.prototype._getE2eRooms = function() {
+Crypto.prototype._getTrackedE2eRooms = function() {
     return this._clientStore.getRooms().filter((room) => {
         // check for rooms with encryption enabled
         const alg = this._roomEncryptors[room.roomId];
         if (!alg) {
+            return false;
+        }
+        if (!this._roomDeviceTrackingState[room.roomId]) {
             return false;
         }
 

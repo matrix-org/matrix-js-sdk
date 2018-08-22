@@ -368,6 +368,11 @@ Room.prototype.loadMembersIfNeeded = function() {
     });
 
     this._membersPromise = promise;
+    // now the members are loaded, start to track the e2e devices if needed
+    if (this._client.isRoomEncrypted(this.roomId)) {
+        this._client._crypto.trackRoomDevices(this.roomId);
+    }
+
     return this._membersPromise;
 };
 
