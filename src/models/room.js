@@ -626,6 +626,25 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  };
 
 /**
+ * Returns the number of joined members in this room
+ * This method caches the result.
+ * This is a wrapper around the method of the same name in roomState, returning
+ * its result for the room's current state.
+ * @return {integer} The number of members in this room whose membership is 'join'
+ */
+Room.prototype.getJoinedMemberCount = function() {
+    return this.currentState.getJoinedMemberCount();
+};
+
+/**
+ * Returns the number of invited members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite'
+ */
+Room.prototype.getInvitedMemberCount = function() {
+    return this.currentState.getInvitedMemberCount();
+};
+
+/**
  * Get a list of members with given membership state.
  * @param {string} membership The membership state.
  * @return {RoomMember[]} A list of members with the given membership state.
