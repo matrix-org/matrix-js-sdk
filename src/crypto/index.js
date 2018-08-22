@@ -653,6 +653,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config) {
  * Make sure we are tracking the device lists for all users in this room.
  *
  * @param {string} roomId The room ID to start tracking devices in.
+ * @returns {Promise} when all devices for the room have been fetched and marked to track
  */
 Crypto.prototype.trackRoomDevices = function(roomId) {
     const trackAndRefresh = async () => {
@@ -678,7 +679,7 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
         this._roomDeviceTrackingState[roomId] = promise;
     }
     return promise;
-}
+};
 
 /**
  * @typedef {Object} module:crypto~OlmSessionResult
@@ -770,7 +771,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
         },
     );
 };
-
+/* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.
  *
@@ -781,6 +782,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
  * @return {module:client.Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
+/* eslint-enable valid-jsdoc */
 Crypto.prototype.encryptEvent = async function(event, room) {
     if (!room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
@@ -816,7 +818,7 @@ Crypto.prototype.encryptEvent = async function(event, room) {
     }
 
     const encryptedContent = await alg.encryptMessage(
-        room, event.getType(), content)
+        room, event.getType(), content);
 
     if (mRelatesTo) {
         encryptedContent['m.relates_to'] = mRelatesTo;
