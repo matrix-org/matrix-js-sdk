@@ -783,7 +783,7 @@ MatrixClient.prototype.getRooms = function() {
  * Retrieve all rooms that should be displayed to the user
  * This is essentially getRooms() with some rooms filtered out, eg. old versions
  * of rooms that have been replaced or (in future) other rooms that have been
- * markewd at the protocol level as not to be displayed to the user.
+ * marked at the protocol level as not to be displayed to the user.
  * @return {Room[]} A list of rooms, or an empty list if there is no data store.
  */
 MatrixClient.prototype.getVisibleRooms = function() {
