@@ -71,9 +71,6 @@ export default class RoomList {
     }
 
     async setRoomEncryption(roomId, roomInfo) {
-        // important that this happens before calling into the store
-        // as it prevents the Crypto::setRoomEncryption for calling
-        // this twice for consecutive m.room.encryption events
         this._roomEncryption[roomId] = roomInfo;
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
