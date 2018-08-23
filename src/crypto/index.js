@@ -688,10 +688,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     console.log("Enabling encryption in " + roomId);
 
     if (!this._lazyLoadMembers) {
-        const members = await room.getEncryptionTargetMembers();
-        members.forEach((m) => {
-            this._deviceList.startTrackingDeviceList(m.userId);
-        });
+        await this.trackRoomDevices(roomId);
     }
 };
 
@@ -717,7 +714,6 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
         members.forEach((m) => {
             this._deviceList.startTrackingDeviceList(m.userId);
         });
-        return this._deviceList.refreshOutdatedDeviceLists();
     };
 
     let promise = this._roomDeviceTrackingState[roomId];
@@ -848,13 +844,11 @@ Crypto.prototype.encryptEvent = async function(event, room) {
         );
     }
 
-    if (this._lazyLoadMembers) {
-        if (!this._roomDeviceTrackingState[roomId]) {
-            this.trackRoomDevices(roomId);
-        }
-        // wait for all the room devices to be loaded
-        await this._roomDeviceTrackingState[roomId];
+    if (!this._roomDeviceTrackingState[roomId]) {
+        this.trackRoomDevices(roomId);
     }
+    // wait for all the room devices to be loaded
+    await this._roomDeviceTrackingState[roomId];
 
     let content = event.getContent();
     // If event has an m.relates_to then we need
@@ -1082,7 +1076,7 @@ Crypto.prototype._getTrackedE2eRooms = function() {
         if (!alg) {
             return false;
         }
-        if (this._lazyLoadMembers && !this._roomDeviceTrackingState[room.roomId]) {
+        if (!this._roomDeviceTrackingState[room.roomId]) {
             return false;
         }
 
@@ -1157,7 +1151,7 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     // this way we don't start device queries after sync on behalf of this room which we won't use
     // the result of anyway, as we'll need to do a query again once all the members are fetched
     // by calling _trackRoomDevices
-    if (!this._lazyLoadMembers || this._roomDeviceTrackingState[roomId]) {
+    if (this._roomDeviceTrackingState[roomId]) {
         if (member.membership == 'join') {
             console.log('Join event for ' + member.userId + ' in ' + roomId);
             // make sure we are tracking the deviceList for this user
