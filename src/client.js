@@ -707,6 +707,10 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
  * Get information about the current key backup.
  */
 MatrixClient.prototype.getKeyBackupVersion = function(callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
     return this._http.authedRequest(
         undefined, "GET", "/room_keys/version",
     ).then((res) => {
@@ -733,6 +737,10 @@ MatrixClient.prototype.getKeyBackupVersion = function(callback) {
  * getKeyBackupVersion.
  */
 MatrixClient.prototype.enableKeyBackup = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
     this._crypto.backupKey = new global.Olm.PkEncryption();
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 }
@@ -741,6 +749,10 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
  * Disable backing up of keys.
  */
 MatrixClient.prototype.disableKeyBackup = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
     this._crypto.backupKey = undefined;
 }
 
@@ -748,6 +760,10 @@ MatrixClient.prototype.disableKeyBackup = function() {
  * Create a new key backup version and enable it.
  */
 MatrixClient.prototype.createKeyBackupVersion = function(callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
     const decryption = new global.Olm.PkDecryption();
     const public_key = decryption.generate_key();
     const encryption = new global.Olm.PkEncryption();
