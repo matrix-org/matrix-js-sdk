@@ -753,22 +753,21 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessi
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData,
-    ).then((response) => {
-        if (response.code === 200) {
-            const keys = [];
-            // FIXME: for each room, session, if response has multiple
-            // decrypt response.data.session_data
-            const data = response.data;
-            const key = JSON.parse(decryptionKey.decrypt(data.session_data.ephemeral, data.session_data.mac, data.session_data.ciphertext));
-            // set room_id and session_id
-            key.room_id = roomId;
-            key.session_id = sessionId;
-            keys.push(key);
-            return this.importRoomKeys(keys);
-        } else {
-            callback("aargh!");
-            return Promise.reject("aaargh!");
-        }
+    ).then((res) => {
+        const keys = [];
+        // FIXME: for each room, session, if response has multiple
+        // decrypt response.data.session_data
+        const session_data = res.session_data;
+        const key = JSON.parse(decryptionKey.decrypt(
+            session_data.ephemeral,
+            session_data.mac,
+            session_data.ciphertext
+        ));
+        // set room_id and session_id
+        key.room_id = roomId;
+        key.session_id = sessionId;
+        keys.push(key);
+        return this.importRoomKeys(keys);
     }).then(() => {
         if (callback) {
             callback();
