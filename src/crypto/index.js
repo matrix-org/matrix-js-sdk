@@ -106,6 +106,11 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+    // controls whether device tracking is delayed
+    // until calling encryptEvent or trackRoomDevices,
+    // or done immediately upon enabling room encryption.
+    this._lazyLoadMembers = false;
+    // in case _lazyLoadMembers is true,
     // track if an initial tracking of all the room members
     // has happened for a given room. This is delayed
     // to avoid loading room members as long as possible.
@@ -169,6 +174,15 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+};
+
+
+
+
+/**
+ */
+Crypto.prototype.enableLazyLoading = function() {
+    this._lazyLoadMembers = true;
 };
 
 /**
@@ -672,6 +686,13 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         await storeConfigPromise;
     }
     console.log("Enabling encryption in " + roomId);
+
+    if (!this._lazyLoadMembers) {
+        const members = await room.getEncryptionTargetMembers();
+        members.forEach((m) => {
+            this._deviceList.startTrackingDeviceList(m.userId);
+        });
+    }
 };
 
 
@@ -827,11 +848,13 @@ Crypto.prototype.encryptEvent = async function(event, room) {
         );
     }
 
-    if (!this._roomDeviceTrackingState[roomId]) {
-        this.trackRoomDevices(roomId);
+    if (this._lazyLoadMembers) {
+        if (!this._roomDeviceTrackingState[roomId]) {
+            this.trackRoomDevices(roomId);
+        }
+        // wait for all the room devices to be loaded
+        await this._roomDeviceTrackingState[roomId];
     }
-    // wait for all the room devices to be loaded
-    await this._roomDeviceTrackingState[roomId];
 
     let content = event.getContent();
     // If event has an m.relates_to then we need
@@ -1059,7 +1082,7 @@ Crypto.prototype._getTrackedE2eRooms = function() {
         if (!alg) {
             return false;
         }
-        if (!this._roomDeviceTrackingState[room.roomId]) {
+        if (this._lazyLoadMembers && !this._roomDeviceTrackingState[room.roomId]) {
             return false;
         }
 
@@ -1134,7 +1157,7 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     // this way we don't start device queries after sync on behalf of this room which we won't use
     // the result of anyway, as we'll need to do a query again once all the members are fetched
     // by calling _trackRoomDevices
-    if (this._roomDeviceTrackingState[roomId]) {
+    if (!this._lazyLoadMembers || this._roomDeviceTrackingState[roomId]) {
         if (member.membership == 'join') {
             console.log('Join event for ' + member.userId + ' in ' + roomId);
             // make sure we are tracking the deviceList for this user
