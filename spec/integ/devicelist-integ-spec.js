@@ -331,8 +331,8 @@ describe("DeviceList management:", function() {
             aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
-                expect(bobStat).toEqual(
-                    0, "Alice should have marked bob's device list as untracked",
+                expect(bobStat).toBeFalsy( //0 or undefined
+                    "Alice should have marked bob's device list as untracked",
                 );
             });
         });
@@ -367,8 +367,8 @@ describe("DeviceList management:", function() {
             aliceTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
-                expect(bobStat).toEqual(
-                    0, "Alice should have marked bob's device list as untracked",
+                expect(bobStat).toBeFalsy( //0 or undefined
+                    "Alice should have marked bob's device list as untracked",
                 );
             });
         });
@@ -388,8 +388,8 @@ describe("DeviceList management:", function() {
                 anotherTestClient.cryptoStore.getEndToEndDeviceData(null, (data) => {
                     const bobStat = data.trackingStatus['@bob:xyz'];
 
-                    expect(bobStat).toEqual(
-                        0, "Alice should have marked bob's device list as untracked",
+                    expect(bobStat).toBeFalsy( //0 or undefined
+                        "Alice should have marked bob's device list as untracked",
                     );
                 });
             } finally {
