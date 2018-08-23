@@ -765,7 +765,7 @@ MatrixClient.prototype.createKeyBackupVersion = function(callback) {
         this._crypto.backupKey = encryption;
         // FIXME: pickle isn't the right thing to use, but we don't have
         // anything else yet
-        const recovery_key = decryption.pickle("");
+        const recovery_key = decryption.pickle("secret_key");
         callback(null, recovery_key);
         return recovery_key;
     });
@@ -818,6 +818,10 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessi
         throw new Error("End-to-end encryption disabled");
     }
 
+    // FIXME: see the FIXME in createKeyBackupVersion
+    const decryption = new global.Olm.PkDecryption();
+    decryption.unpickle("secret_key", decryptionKey);
+
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData,
@@ -826,7 +830,7 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessi
         // FIXME: for each room, session, if response has multiple
         // decrypt response.data.session_data
         const session_data = res.session_data;
-        const key = JSON.parse(decryptionKey.decrypt(
+        const key = JSON.parse(decryption.decrypt(
             session_data.ephemeral,
             session_data.mac,
             session_data.ciphertext

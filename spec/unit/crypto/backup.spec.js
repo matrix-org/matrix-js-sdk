@@ -215,14 +215,9 @@ describe("MegolmBackup", function() {
                     }
                 });
             };
-            const decryption = new global.Olm.PkDecryption();
-            decryption.unpickle(
-                "secret_key",
-                "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
-                + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA"
-            );
             return client.restoreKeyBackups(
-                decryption,
+                "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
+                + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
                 ROOM_ID,
                 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc'
             ).then(() => {
