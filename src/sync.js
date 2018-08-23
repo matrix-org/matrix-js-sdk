@@ -1085,15 +1085,16 @@ SyncApi.prototype._processSyncResponse = async function(
 
         self._processEventsForNotifs(room, timelineEvents);
 
-        async function processRoomEvent(e) {
+        function processRoomEvent(e) {
             client.emit("event", e);
             if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
-                await self.opts.crypto.onCryptoEvent(e);
+                self.opts.crypto.onCryptoEvent(e);
             }
         }
 
-        await Promise.mapSeries(stateEvents, processRoomEvent);
-        await Promise.mapSeries(timelineEvents, processRoomEvent);
+        stateEvents.forEach(processRoomEvent);
+        timelineEvents.forEach(processRoomEvent);
+
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
