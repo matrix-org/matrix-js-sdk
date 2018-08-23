@@ -703,6 +703,74 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+/**
+ * Get information about the current key backup.
+ */
+MatrixClient.prototype.getKeyBackupVersion = function(callback) {
+    return this._http.authedRequest(
+        undefined, "GET", "/room_keys/version",
+    ).then((res) => {
+        if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
+            const err = "Unknown backup algorithm: " + res.algorithm;
+            callback(err);
+            return Promise.reject(err);
+        } else if (!(typeof res.auth_data === "object")
+                   || !res.auth_data.public_key) {
+            const err = "Invalid backup data returned";
+            callback(err);
+            return Promise.reject(err);
+        } else {
+            if (callback) {
+                callback(null, res);
+            }
+            return res;
+        }
+    });
+}
+
+/**
+ * Enable backing up of keys, using data previously returned from
+ * getKeyBackupVersion.
+ */
+MatrixClient.prototype.enableKeyBackup = function(info) {
+    this._crypto.backupKey = new global.Olm.PkEncryption();
+    this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
+}
+
+/**
+ * Disable backing up of keys.
+ */
+MatrixClient.prototype.disableKeyBackup = function() {
+    this._crypto.backupKey = undefined;
+}
+
+/**
+ * Create a new key backup version and enable it.
+ */
+MatrixClient.prototype.createKeyBackupVersion = function(callback) {
+    const decryption = new global.Olm.PkDecryption();
+    const public_key = decryption.generate_key();
+    const encryption = new global.Olm.PkEncryption();
+    encryption.set_recipient_key(public_key);
+    const data = {
+        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+        auth_data: {
+            public_key: public_key,
+        }
+    };
+    this._crypto._signObject(data.auth_data);
+    return this._http.authedRequest(
+        undefined, "POST", "/room_keys/version", undefined, data,
+    ).then((res) => {
+        this._crypto.backupKey = encryption;
+        // FIXME: pickle isn't the right thing to use, but we don't have
+        // anything else yet
+        const recovery_key = decryption.pickle("");
+        callback(null, recovery_key);
+        return recovery_key;
+    });
+}
+
 MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
     let path;
     if (sessionId !== undefined) {
