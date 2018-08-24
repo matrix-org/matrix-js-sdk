@@ -732,6 +732,177 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+/**
+ * Get information about the current key backup.
+ */
+MatrixClient.prototype.getKeyBackupVersion = function(callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    return this._http.authedRequest(
+        undefined, "GET", "/room_keys/version",
+    ).then((res) => {
+        if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
+            const err = "Unknown backup algorithm: " + res.algorithm;
+            callback(err);
+            return Promise.reject(err);
+        } else if (!(typeof res.auth_data === "object")
+                   || !res.auth_data.public_key) {
+            const err = "Invalid backup data returned";
+            callback(err);
+            return Promise.reject(err);
+        } else {
+            if (callback) {
+                callback(null, res);
+            }
+            return res;
+        }
+    });
+}
+
+/**
+ * Enable backing up of keys, using data previously returned from
+ * getKeyBackupVersion.
+ */
+MatrixClient.prototype.enableKeyBackup = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupKey = new global.Olm.PkEncryption();
+    this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
+}
+
+/**
+ * Disable backing up of keys.
+ */
+MatrixClient.prototype.disableKeyBackup = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupKey = undefined;
+}
+
+/**
+ * Create a new key backup version and enable it.
+ */
+MatrixClient.prototype.createKeyBackupVersion = function(callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const decryption = new global.Olm.PkDecryption();
+    const public_key = decryption.generate_key();
+    const encryption = new global.Olm.PkEncryption();
+    encryption.set_recipient_key(public_key);
+    const data = {
+        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+        auth_data: {
+            public_key: public_key,
+        }
+    };
+    this._crypto._signObject(data.auth_data);
+    return this._http.authedRequest(
+        undefined, "POST", "/room_keys/version", undefined, data,
+    ).then((res) => {
+        this._crypto.backupKey = encryption;
+        // FIXME: pickle isn't the right thing to use, but we don't have
+        // anything else yet
+        const recovery_key = decryption.pickle("secret_key");
+        callback(null, recovery_key);
+        return recovery_key;
+    });
+}
+
+MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
+    let path;
+    if (sessionId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+    } else if (roomId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId", {
+            $roomId: roomId,
+        });
+    } else {
+        path = "/room_keys/keys";
+    }
+    const queryData = version === undefined ? undefined : {version : version};
+    return {
+        path: path,
+        queryData: queryData,
+    }
+}
+
+/**
+ * Back up session keys to the homeserver.
+ * @param {string} roomId ID of the room that the keys are for Optional.
+ * @param {string} sessionId ID of the session that the keys are for Optional.
+ * @param {integer} version backup version Optional.
+ * @param {object} key data
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} a promise that will resolve when the keys
+ * are uploaded
+ */
+MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        callback, "PUT", path.path, path.queryData, data,
+    );
+};
+
+MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessionId, version, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    // FIXME: see the FIXME in createKeyBackupVersion
+    const decryption = new global.Olm.PkDecryption();
+    decryption.unpickle("secret_key", decryptionKey);
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "GET", path.path, path.queryData,
+    ).then((res) => {
+        const keys = [];
+        // FIXME: for each room, session, if response has multiple
+        // decrypt response.data.session_data
+        const session_data = res.session_data;
+        const key = JSON.parse(decryption.decrypt(
+            session_data.ephemeral,
+            session_data.mac,
+            session_data.ciphertext
+        ));
+        // set room_id and session_id
+        key.room_id = roomId;
+        key.session_id = sessionId;
+        keys.push(key);
+        return this.importRoomKeys(keys);
+    }).then(() => {
+        if (callback) {
+            callback();
+        }
+    })
+};
+
+MatrixClient.prototype.deleteKeyBackups = function(roomId, sessionId, version, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        callback, "DELETE", path.path, path.queryData,
+    )
+};
+
 // Group ops
 // =========
 // Operations on groups that come down the sync stream (ie. ones the
@@ -3695,6 +3866,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * });
  */
 
+/**
+ * Fires when we want to suggest to the user that they restore their megolm keys
+ * from backup or by cross-signing the device.
+ *
+ * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
 
 // EventEmitter JSDocs
 

@@ -72,6 +72,11 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
 
+    // track whether this device's megolm keys are being backed up incrementally
+    // to the server or not.
+    // XXX: this should probably have a single source of truth from OlmAccount
+    this.backupKey = null;
+
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
         baseApis, cryptoStore, sessionStore, this._olmDevice,
