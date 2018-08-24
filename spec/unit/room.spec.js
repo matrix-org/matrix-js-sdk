@@ -1318,6 +1318,9 @@ describe("Room", function() {
                     // events should already be MatrixEvents
                     return function(event) {return event;};
                 },
+                isRoomEncrypted: function() {
+                    return false;
+                },
                 _http: {
                     serverResponse,
                     authedRequest: function() {
