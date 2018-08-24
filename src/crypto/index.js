@@ -619,19 +619,34 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if we already have encryption in this room, we should ignore this event
     // (for now at least. maybe we should alert the user somehow?)
-    const existingConfig = this._roomList.getRoomEncryption(roomId);
-    if (existingConfig && JSON.stringify(existingConfig) != JSON.stringify(config)) {
-        console.error("Ignoring m.room.encryption event which requests " +
-                      "a change of config in " + roomId);
+    const existingAlg = this._roomEncryptors[roomId];
+    if (existingAlg) {
         return;
+    }
+    // _roomList.getRoomEncryption will not race with _roomList.setRoomEncryption
+    // because it first stores in memory. We should await the promise only
+    // after all the in-memory state (_roomEncryptors and _roomList) has been updated
+    // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
+    let storeConfigPromise;
+    // if state is being replayed from storage, we might already have a configuration
+    // for this room. We just need to make sure the algorithm in
+    // _roomEncryptors and config in _roomList are in sync
+    // by making sure the existingConfig is identical to config.
+    const existingConfig = this._roomList.getRoomEncryption(roomId);
+    if (existingConfig) {
+        if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
+            console.error("Ignoring m.room.encryption event which requests " +
+                          "a change of config in " + roomId);
+            return;
+        }
+    } else {
+        const storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
     const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
     if (!AlgClass) {
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
-
-    await this._roomList.setRoomEncryption(roomId, config);
 
     const alg = new AlgClass({
         userId: this._userId,
@@ -643,6 +658,10 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         config: config,
     });
     this._roomEncryptors[roomId] = alg;
+
+    if (storeConfigPromise) {
+        await storeConfigPromise;
+    }
 
     // make sure we are tracking the device lists for all users in this room.
     console.log("Enabling encryption in " + roomId + "; " +
