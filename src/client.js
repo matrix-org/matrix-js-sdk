@@ -41,6 +41,7 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 const ContentHelpers = require("./content-helpers");
+const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
@@ -782,7 +783,9 @@ MatrixClient.prototype.createKeyBackupVersion = function(callback) {
         // FIXME: pickle isn't the right thing to use, but we don't have
         // anything else yet
         const recovery_key = decryption.pickle("secret_key");
-        callback(null, recovery_key);
+        if (callback) {
+            callback(null, recovery_key);
+        }
         return recovery_key;
     });
 }
