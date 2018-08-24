@@ -627,7 +627,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // because it first stores in memory. We should await the promise only
     // after all the in-memory state (_roomEncryptors and _roomList) has been updated
     // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-    let storeConfigPromise;
+    let storeConfigPromise = null;
     // if state is being replayed from storage, we might already have a configuration
     // for this room. We just need to make sure the algorithm in
     // _roomEncryptors and config in _roomList are in sync
