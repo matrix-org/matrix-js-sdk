@@ -977,6 +977,8 @@ Crypto.prototype.onCryptoEvent = async function(event) {
     const content = event.getContent();
 
     try {
+        // inhibit the device list refresh for now - it will happen once we've
+        // finished processing the sync, in onSyncCompleted.
         await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
