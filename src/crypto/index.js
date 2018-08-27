@@ -617,21 +617,11 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  *   users in the room (for now)
  */
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
-    // if we already have encryption in this room, we should ignore this event
-    // (for now at least. maybe we should alert the user somehow?)
-    const existingAlg = this._roomEncryptors[roomId];
-    if (existingAlg) {
-        return;
-    }
-    // _roomList.getRoomEncryption will not race with _roomList.setRoomEncryption
-    // because it first stores in memory. We should await the promise only
-    // after all the in-memory state (_roomEncryptors and _roomList) has been updated
-    // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-    let storeConfigPromise = null;
     // if state is being replayed from storage, we might already have a configuration
-    // for this room. We just need to make sure the algorithm in
-    // _roomEncryptors and config in _roomList are in sync
-    // by making sure the existingConfig is identical to config.
+    // for this room as they are persisted as well.
+    // We just need to make sure the algorithm is initialized in this case.
+    // However, if the new config is different,
+    // we should bail out as room encryption can't be changed once set.
     const existingConfig = this._roomList.getRoomEncryption(roomId);
     if (existingConfig) {
         if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
@@ -639,7 +629,25 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
                           "a change of config in " + roomId);
             return;
         }
-    } else {
+    }
+    // if we already have encryption in this room, we should ignore this event,
+    // as it would reset the encryption algorithm.
+    // This is at least expected to be called twice, as sync calls onCryptoEvent
+    // for both the timeline and state sections in the /sync response,
+    // the encryption event would appear in both.
+    // If it's called more than twice though,
+    // it signals a bug on client or server.
+    const existingAlg = this._roomEncryptors[roomId];
+    if (existingAlg) {
+        return;
+    }
+
+    // _roomList.getRoomEncryption will not race with _roomList.setRoomEncryption
+    // because it first stores in memory. We should await the promise only
+    // after all the in-memory state (_roomEncryptors and _roomList) has been updated
+    // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
+    let storeConfigPromise = null;
+    if(!existingConfig) {
         const storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
