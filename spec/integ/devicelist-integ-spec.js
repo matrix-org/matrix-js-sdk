@@ -139,7 +139,6 @@ describe("DeviceList management:", function() {
         });
     });
 
-
     it("We should not get confused by out-of-order device query responses",
        () => {
            // https://github.com/vector-im/riot-web/issues/3126
@@ -396,5 +395,39 @@ describe("DeviceList management:", function() {
                 anotherTestClient.stop();
             }
         });
+    });
+
+    it("Alice shouldn't do a /query before sending a message with lazy loading enabled", async function() {
+        console.log("starting client");
+        await aliceTestClient.start({lazyLoadMembers: true})
+        const syncResponse = getSyncResponse(['@bob:xyz']);
+        aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
+        console.log("flushSync");
+        await aliceTestClient.flushSync();
+        await aliceTestClient.httpBackend.flush('/keys/query', 0);
+
+        console.log("send text");
+        await aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+        console.log("flush key query");
+        await aliceTestClient.httpBackend.flush('/keys/query', 1);
+
+        aliceTestClient.stop();
+        // done();
+/*        console.log("Telling alice to send a megolm message");
+
+        aliceTestClient.httpBackend.when(
+            'PUT', '/send/',
+        ).respond(200, {
+                event_id: '$event_id',
+        });
+
+        await Promise.all([
+            aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+
+            // the crypto stuff can take a while, so give the requests a whole second.
+            aliceTestClient.httpBackend.flushAllExpected({
+                timeout: 1000,
+            }),
+        ]); */
     });
 });

@@ -77,7 +77,7 @@ TestClient.prototype.toString = function() {
  *
  * @return {Promise}
  */
-TestClient.prototype.start = function() {
+TestClient.prototype.start = function(options) {
     console.log(this + ': starting');
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -87,10 +87,10 @@ TestClient.prototype.start = function() {
     // it will upload one-time keys.
     this.httpBackend.when("GET", "/sync").respond(200, { next_batch: 1 });
 
-    this.client.startClient({
+    this.client.startClient(Object.assign({
         // set this so that we can get hold of failed events
-        pendingEventOrdering: 'detached',
-    });
+        pendingEventOrdering: 'detached'
+    }, options || {}));
 
     return Promise.all([
         this.httpBackend.flushAllExpected(),
