@@ -648,7 +648,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
     let storeConfigPromise = null;
     if(!existingConfig) {
-        const storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
+        storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
     const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
