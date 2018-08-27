@@ -1094,7 +1094,6 @@ SyncApi.prototype._processSyncResponse = async function(
 
         await Promise.mapSeries(stateEvents, processRoomEvent);
         await Promise.mapSeries(timelineEvents, processRoomEvent);
-
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
