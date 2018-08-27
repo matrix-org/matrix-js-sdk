@@ -176,9 +176,6 @@ Crypto.prototype.init = async function() {
     }
 };
 
-
-
-
 /**
  */
 Crypto.prototype.enableLazyLoading = function() {
@@ -630,6 +627,10 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * @param {string} roomId The room ID to enable encryption in.
  *
  * @param {object} config The encryption config for the room.
+ *
+ * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
+ *   users in the room (for now). In case lazy loading is enabled,
+ *   the device query is always inhibited as the members are not tracked.
  */
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if state is being replayed from storage, we might already have a configuration
@@ -685,10 +686,21 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     if (storeConfigPromise) {
         await storeConfigPromise;
     }
-    console.log("Enabling encryption in " + roomId);
 
     if (!this._lazyLoadMembers) {
+        console.log("Enabling encryption in " + roomId + "; " +
+            "starting to track device lists for all users therein");
+
         await this.trackRoomDevices(roomId);
+        // TODO: this flag is only not used from MatrixClient::setRoomEncryption
+        // which is never used (inside riot at least)
+        // but didn't want to remove it as it technically would
+        // be a breaking change.
+        if(!this.inhibitDeviceQuery) {
+            this._deviceList.refreshOutdatedDeviceLists();
+        }
+    } else {
+        console.log("Enabling encryption in " + roomId);
     }
 };
 
@@ -700,7 +712,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
  * @returns {Promise} when all devices for the room have been fetched and marked to track
  */
 Crypto.prototype.trackRoomDevices = function(roomId) {
-    const trackAndRefresh = async () => {
+    const trackMembers = async () => {
         // not an encrypted room
         if (!this._roomEncryptors[roomId]) {
             return;
@@ -718,7 +730,7 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
 
     let promise = this._roomDeviceTrackingState[roomId];
     if (!promise) {
-        promise = trackAndRefresh();
+        promise = trackMembers();
         this._roomDeviceTrackingState[roomId] = promise;
     }
     return promise;
@@ -965,7 +977,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
     const content = event.getContent();
 
     try {
-        await this.setRoomEncryption(roomId, content);
+        await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
         console.error("Error configuring encryption in room " + roomId +
                       ":", e);
