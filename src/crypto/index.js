@@ -106,6 +106,15 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+    // controls whether device tracking is delayed
+    // until calling encryptEvent or trackRoomDevices,
+    // or done immediately upon enabling room encryption.
+    this._lazyLoadMembers = false;
+    // in case _lazyLoadMembers is true,
+    // track if an initial tracking of all the room members
+    // has happened for a given room. This is delayed
+    // to avoid loading room members as long as possible.
+    this._roomDeviceTrackingState = {};
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -165,6 +174,12 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+};
+
+/**
+ */
+Crypto.prototype.enableLazyLoading = function() {
+    this._lazyLoadMembers = true;
 };
 
 /**
@@ -614,7 +629,8 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * @param {object} config The encryption config for the room.
  *
  * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
- *   users in the room (for now)
+ *   users in the room (for now). In case lazy loading is enabled,
+ *   the device query is always inhibited as the members are not tracked.
  */
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
     // if state is being replayed from storage, we might already have a configuration
@@ -671,23 +687,54 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
         await storeConfigPromise;
     }
 
-    // make sure we are tracking the device lists for all users in this room.
-    console.log("Enabling encryption in " + roomId + "; " +
-                "starting to track device lists for all users therein");
-    const room = this._clientStore.getRoom(roomId);
-    if (!room) {
-        throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
-    }
+    if (!this._lazyLoadMembers) {
+        console.log("Enabling encryption in " + roomId + "; " +
+            "starting to track device lists for all users therein");
 
-    const members = await room.getEncryptionTargetMembers();
-    members.forEach((m) => {
-        this._deviceList.startTrackingDeviceList(m.userId);
-    });
-    if (!inhibitDeviceQuery) {
-        this._deviceList.refreshOutdatedDeviceLists();
+        await this.trackRoomDevices(roomId);
+        // TODO: this flag is only not used from MatrixClient::setRoomEncryption
+        // which is never used (inside riot at least)
+        // but didn't want to remove it as it technically would
+        // be a breaking change.
+        if(!this.inhibitDeviceQuery) {
+            this._deviceList.refreshOutdatedDeviceLists();
+        }
+    } else {
+        console.log("Enabling encryption in " + roomId);
     }
 };
 
+
+/**
+ * Make sure we are tracking the device lists for all users in this room.
+ *
+ * @param {string} roomId The room ID to start tracking devices in.
+ * @returns {Promise} when all devices for the room have been fetched and marked to track
+ */
+Crypto.prototype.trackRoomDevices = function(roomId) {
+    const trackMembers = async () => {
+        // not an encrypted room
+        if (!this._roomEncryptors[roomId]) {
+            return;
+        }
+        const room = this._clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
+        }
+        console.log(`Starting to track devices for room ${roomId} ...`);
+        const members = await room.getEncryptionTargetMembers();
+        members.forEach((m) => {
+            this._deviceList.startTrackingDeviceList(m.userId);
+        });
+    };
+
+    let promise = this._roomDeviceTrackingState[roomId];
+    if (!promise) {
+        promise = trackMembers();
+        this._roomDeviceTrackingState[roomId] = promise;
+    }
+    return promise;
+};
 
 /**
  * @typedef {Object} module:crypto~OlmSessionResult
@@ -779,7 +826,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
         },
     );
 };
-
+/* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.
  *
@@ -790,7 +837,8 @@ Crypto.prototype.importRoomKeys = function(keys) {
  * @return {module:client.Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
-Crypto.prototype.encryptEvent = function(event, room) {
+/* eslint-enable valid-jsdoc */
+Crypto.prototype.encryptEvent = async function(event, room) {
     if (!room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
     }
@@ -808,6 +856,12 @@ Crypto.prototype.encryptEvent = function(event, room) {
         );
     }
 
+    if (!this._roomDeviceTrackingState[roomId]) {
+        this.trackRoomDevices(roomId);
+    }
+    // wait for all the room devices to be loaded
+    await this._roomDeviceTrackingState[roomId];
+
     let content = event.getContent();
     // If event has an m.relates_to then we need
     // to put this on the wrapping event instead
@@ -818,20 +872,19 @@ Crypto.prototype.encryptEvent = function(event, room) {
         delete content['m.relates_to'];
     }
 
-    return alg.encryptMessage(
-        room, event.getType(), content,
-    ).then((encryptedContent) => {
-        if (mRelatesTo) {
-            encryptedContent['m.relates_to'] = mRelatesTo;
-        }
+    const encryptedContent = await alg.encryptMessage(
+        room, event.getType(), content);
 
-        event.makeEncrypted(
-            "m.room.encrypted",
-            encryptedContent,
-            this._olmDevice.deviceCurve25519Key,
-            this._olmDevice.deviceEd25519Key,
-        );
-    });
+    if (mRelatesTo) {
+        encryptedContent['m.relates_to'] = mRelatesTo;
+    }
+
+    event.makeEncrypted(
+        "m.room.encrypted",
+        encryptedContent,
+        this._olmDevice.deviceCurve25519Key,
+        this._olmDevice.deviceEd25519Key,
+    );
 };
 
 /**
@@ -946,6 +999,7 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         // at which point we'll start tracking all the users of that room.
         console.log("Initial sync performed - resetting device tracking state");
         this._deviceList.stopTrackingAllDeviceLists();
+        this._roomDeviceTrackingState = {};
     }
 };
 
@@ -991,11 +1045,12 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
         });
     }
 
-    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+    if (deviceLists.left && Array.isArray(deviceLists.left) &&
+        deviceLists.left.length) {
         // Check we really don't share any rooms with these users
         // any more: the server isn't required to give us the
         // exact correct set.
-        const e2eUserIds = new Set(await this._getE2eUsers());
+        const e2eUserIds = new Set(await this._getTrackedE2eUsers());
 
         deviceLists.left.forEach((u) => {
             if (!e2eUserIds.has(u)) {
@@ -1007,12 +1062,13 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
 
 /**
  * Get a list of all the IDs of users we share an e2e room with
+ * for which we are tracking devices already
  *
  * @returns {string[]} List of user IDs
  */
-Crypto.prototype._getE2eUsers = async function() {
+Crypto.prototype._getTrackedE2eUsers = async function() {
     const e2eUserIds = [];
-    for (const room of this._getE2eRooms()) {
+    for (const room of this._getTrackedE2eRooms()) {
         const members = await room.getEncryptionTargetMembers();
         for (const member of members) {
             e2eUserIds.push(member.userId);
@@ -1022,15 +1078,19 @@ Crypto.prototype._getE2eUsers = async function() {
 };
 
 /**
- * Get a list of the e2e-enabled rooms we are members of
+ * Get a list of the e2e-enabled rooms we are members of,
+ * and for which we are already tracking the devices
  *
  * @returns {module:models.Room[]}
  */
-Crypto.prototype._getE2eRooms = function() {
+Crypto.prototype._getTrackedE2eRooms = function() {
     return this._clientStore.getRooms().filter((room) => {
         // check for rooms with encryption enabled
         const alg = this._roomEncryptors[room.roomId];
         if (!alg) {
+            return false;
+        }
+        if (!this._roomDeviceTrackingState[room.roomId]) {
             return false;
         }
 
@@ -1101,15 +1161,20 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
         // not encrypting in this room
         return;
     }
-
-    if (member.membership == 'join') {
-        console.log('Join event for ' + member.userId + ' in ' + roomId);
-        // make sure we are tracking the deviceList for this user
-        this._deviceList.startTrackingDeviceList(member.userId);
-    } else if (member.membership == 'invite' &&
-             this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
-        console.log('Invite event for ' + member.userId + ' in ' + roomId);
-        this._deviceList.startTrackingDeviceList(member.userId);
+    // only mark users in this room as tracked if we already started tracking in this room
+    // this way we don't start device queries after sync on behalf of this room which we won't use
+    // the result of anyway, as we'll need to do a query again once all the members are fetched
+    // by calling _trackRoomDevices
+    if (this._roomDeviceTrackingState[roomId]) {
+        if (member.membership == 'join') {
+            console.log('Join event for ' + member.userId + ' in ' + roomId);
+            // make sure we are tracking the deviceList for this user
+            this._deviceList.startTrackingDeviceList(member.userId);
+        } else if (member.membership == 'invite' &&
+                 this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
+            console.log('Invite event for ' + member.userId + ' in ' + roomId);
+            this._deviceList.startTrackingDeviceList(member.userId);
+        }
     }
 
     alg.onRoomMembership(event, member, oldMembership);

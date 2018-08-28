@@ -3098,6 +3098,10 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
 
+    if (opts.lazyLoadMembers && this._crypto) {
+        this._crypto.enableLazyLoading();
+    }
+
     opts.crypto = this._crypto;
     opts.canResetEntireTimeline = (roomId) => {
         if (!this._canResetTimelineCallback) {
