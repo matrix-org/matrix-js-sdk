@@ -667,15 +667,17 @@ describe("Room", function() {
                 const roomName = "flibble";
 
                 const event = addMember(userA, "invite");
-                event.event.invite_room_state = [
-                    {
-                        type: "m.room.name",
-                        state_key: "",
-                        content: {
-                            name: roomName,
+                event.event.unsigned = {
+                    invite_room_state: [
+                        {
+                            type: "m.room.name",
+                            state_key: "",
+                            content: {
+                                name: roomName,
+                            },
                         },
-                    },
-                ];
+                    ],
+                };
 
                 room.recalculate();
                 expect(room.name).toEqual(roomName);
