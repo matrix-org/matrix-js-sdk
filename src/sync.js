@@ -780,6 +780,13 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     // instead, so that clients can observe this state
     // if they wish.
     this._startKeepAlives().then(() => {
+        if (this.getSyncState() == 'ERROR') {
+            this._updateSyncState("PREPARED", {
+                oldSyncToken: null,
+                nextSyncToken: null,
+                catchingUp: true,
+            });
+        }
         this._sync(syncOptions);
     });
 
