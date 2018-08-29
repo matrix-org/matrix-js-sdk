@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -494,6 +495,16 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
         session.useCount++;
         return encryptedContent;
     });
+};
+
+/**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * This should not normally be necessary.
+ */
+MegolmEncryption.prototype.forceDiscardSession = function() {
+    this._setupPromise = this._setupPromise.then(() => null);
 };
 
 /**

@@ -622,6 +622,23 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 };
 
 /**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * @param roomId The ID of the room to discard the session for
+ *
+ * This should not normally be necessary.
+ */
+Crypto.prototype.forceDiscardSession = function(roomId) {
+    const alg = this._roomEncryptors[roomId];
+    if (alg === undefined) throw new Error("Room not encrypted");
+    if (alg.forceDiscardSession === undefined) {
+        throw new Error("Room encryption algorithm doesn't support session discarding");
+    }
+    alg.forceDiscardSession();
+};
+
+/**
  * Configure a room to use encryption (ie, save a flag in the sessionstore).
  *
  * @param {string} roomId The room ID to enable encryption in.
