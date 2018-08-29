@@ -706,7 +706,7 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
  * Forces the current outbound group session to be discarded such
  * that another one will be created next time an event is sent.
  *
- * @param roomId The ID of the room to discard the session for
+ * @param {string} roomId The ID of the room to discard the session for
  *
  * This should not normally be necessary.
  */
@@ -714,7 +714,7 @@ MatrixClient.prototype.forceDiscardSession = function(roomId) {
     if (!this._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    return this._crypto.forceDiscardSession(roomId);
+    this._crypto.forceDiscardSession(roomId);
 };
 
 /**

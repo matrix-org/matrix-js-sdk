@@ -625,7 +625,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * Forces the current outbound group session to be discarded such
  * that another one will be created next time an event is sent.
  *
- * @param roomId The ID of the room to discard the session for
+ * @param {string} roomId The ID of the room to discard the session for
  *
  * This should not normally be necessary.
  */
