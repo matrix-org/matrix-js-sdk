@@ -286,6 +286,24 @@ Room.prototype.getDMInviter = function() {
     }
 };
 
+
+Room.prototype.getAvatarFallbackMember = function() {
+    const memberCount = this.getInvitedAndJoinedMemberCount();
+    if (memberCount <= 2) {
+        if (this._summaryHeroes.length) {
+            return this._summaryHeroes[0];
+        }
+        const members = this.currentState.getMembers();
+        // could be different than memberCount
+        // as this includes left members
+        if (members.length <= 2) {
+            return members.find((m) => {
+                return m.userId !== this.myUserId
+            });
+        }
+    }
+}
+
 /**
  * Sets the membership this room was received as during sync
  * @param {string} membership join | leave | invite
