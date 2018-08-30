@@ -326,7 +326,7 @@ Room.prototype.guessDMUserId = function() {
 Room.prototype.getAvatarFallbackMember = function() {
     const memberCount = this.getInvitedAndJoinedMemberCount();
     if (memberCount <= 2) {
-        if (this._summaryHeroes.length) {
+        if (this._summaryHeroes && this._summaryHeroes.length) {
             return this._summaryHeroes[0];
         }
         const members = this.currentState.getMembers();
