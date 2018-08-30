@@ -667,7 +667,7 @@ describe("Room", function() {
                 const roomName = "flibble";
 
                 const event = addMember(userA, "invite");
-                event.event.unsigned.invite_room_state = [
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",
@@ -686,7 +686,7 @@ describe("Room", function() {
                 const roomName = "flibble";
                 setRoomName(roomName);
                 const roomNameToIgnore = "ignoreme";
-                event.event.unsigned.invite_room_state = [
+                event.event.invite_room_state = [
                     {
                         type: "m.room.name",
                         state_key: "",

@@ -1215,10 +1215,7 @@ Room.prototype.recalculate = function() {
         "m.room.member", this.myUserId,
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
-        const strippedStateEvents = (
-            membershipEvent.event.unsigned ?
-            membershipEvent.event.unsigned.invite_room_state :
-            []) || [];
+        const strippedStateEvents = membershipEvent.event.invite_room_state || [];
         utils.forEach(strippedStateEvents, function(strippedEvent) {
             const existingEvent = self.currentState.getStateEvents(
                 strippedEvent.type, strippedEvent.state_key,
