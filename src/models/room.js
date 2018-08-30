@@ -287,6 +287,43 @@ Room.prototype.getDMInviter = function() {
 };
 
 
+
+/**
+ * Assuming this room is a DM room, tries to guess with which user.
+ * @return {string} user id of the other member, if found, otherwise undefined.
+ * Will never return the syncing users user id.
+ */
+Room.prototype.guessDMUserId = function() {
+    const me = this.getMember(this.myUserId);
+    if (me) {
+        const inviterId = me.getDMInviter();
+        if (inviterId) {
+            return inviterId;
+        }
+    }
+    const fallbackMember = this.getAvatarFallbackMember();
+    if (fallbackMember) {
+        return fallbackMember.userId;
+    }
+    // now we're getting into sketchy territory,
+    // but we're assuming this room is marked as a DM
+    // so we're going to make a wild-ish guess with whom
+    if (this._summaryHeroes.length) {
+        return this._summaryHeroes[0];
+    }
+    const anyMember = members.filter((m) => m.userId !== this.myUserId);
+    if (anyMember) {
+        return anyMember;
+    }
+    const createEvent = this.currentState.getStateEvents("m.room.create", "");
+    if (createEvent) {
+        const sender = createEvent.getSender();
+        if (sender !== this.myUserId) {
+            return sender;
+        }
+    }
+};
+
 Room.prototype.getAvatarFallbackMember = function() {
     const memberCount = this.getInvitedAndJoinedMemberCount();
     if (memberCount <= 2) {
