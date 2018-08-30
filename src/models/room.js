@@ -279,10 +279,66 @@ Room.prototype.getDMInviter = function() {
     }
     if (this._syncedMembership === "invite") {
         // fall back to summary information
-        const memberCount = this.currentState.getJoinedMemberCount() +
-            this.currentState.getInvitedMemberCount();
+        const memberCount = this.getInvitedAndJoinedMemberCount();
         if (memberCount == 2 && this._summaryHeroes.length) {
             return this._summaryHeroes[0];
+        }
+    }
+};
+
+/**
+ * Assuming this room is a DM room, tries to guess with which user.
+ * @return {string} user id of the other member (could be syncing user)
+ */
+Room.prototype.guessDMUserId = function() {
+    const me = this.getMember(this.myUserId);
+    if (me) {
+        const inviterId = me.getDMInviter();
+        if (inviterId) {
+            return inviterId;
+        }
+    }
+    const fallbackMember = this.getAvatarFallbackMember();
+    if (fallbackMember) {
+        return fallbackMember.userId;
+    }
+    // now we're getting into sketchy territory,
+    // but we're assuming this room is marked as a DM
+    // so we're going to make a wild-ish guess with whom
+    if (this._summaryHeroes.length) {
+        return this._summaryHeroes[0];
+    }
+    const members = this.currentState.getMembers();
+    const anyMember = members.filter((m) => m.userId !== this.myUserId);
+    if (anyMember) {
+        return anyMember;
+    }
+    const createEvent = this.currentState.getStateEvents("m.room.create", "");
+    if (createEvent) {
+        const sender = createEvent.getSender();
+        if (sender !== this.myUserId) {
+            return sender;
+        }
+    }
+    // it really seems like I'm the only user in the room
+    // so I probably created a room with just me in it
+    // and marked it as a DM. Ok then
+    return this.myUserId;
+};
+
+Room.prototype.getAvatarFallbackMember = function() {
+    const memberCount = this.getInvitedAndJoinedMemberCount();
+    if (memberCount <= 2) {
+        if (this._summaryHeroes && this._summaryHeroes.length) {
+            return this._summaryHeroes[0];
+        }
+        const members = this.currentState.getMembers();
+        // could be different than memberCount
+        // as this includes left members
+        if (members.length <= 2) {
+            return members.find((m) => {
+                return m.userId !== this.myUserId;
+            });
         }
     }
 };
@@ -490,8 +546,13 @@ Room.prototype.setSummary = function(summary) {
     if (Number.isInteger(invitedCount)) {
         this.currentState.setInvitedMemberCount(invitedCount);
     }
-    if (heroes) {
-        this._summaryHeroes = heroes;
+    if (Array.isArray(heroes)) {
+        // be cautious about trusting server values,
+        // and make sure heroes doesn't contain our own id
+        // just to be sure
+        this._summaryHeroes = heroes.filter((userId) => {
+            return userId !== this.myUserId;
+        });
     }
 };
 
@@ -647,6 +708,14 @@ Room.prototype.getJoinedMemberCount = function() {
  */
 Room.prototype.getInvitedMemberCount = function() {
     return this.currentState.getInvitedMemberCount();
+};
+
+/**
+ * Returns the number of invited + joined members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite' or 'join'
+ */
+Room.prototype.getInvitedAndJoinedMemberCount = function() {
+    return this.getInvitedMemberCount() + this.getJoinedMemberCount();
 };
 
 /**
