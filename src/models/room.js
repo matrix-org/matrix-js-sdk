@@ -286,8 +286,6 @@ Room.prototype.getDMInviter = function() {
     }
 };
 
-
-
 /**
  * Assuming this room is a DM room, tries to guess with which user.
  * @return {string} user id of the other member, if found, otherwise undefined.
@@ -311,6 +309,7 @@ Room.prototype.guessDMUserId = function() {
     if (this._summaryHeroes.length) {
         return this._summaryHeroes[0];
     }
+    const members = this.currentState.getMembers();
     const anyMember = members.filter((m) => m.userId !== this.myUserId);
     if (anyMember) {
         return anyMember;
@@ -335,11 +334,11 @@ Room.prototype.getAvatarFallbackMember = function() {
         // as this includes left members
         if (members.length <= 2) {
             return members.find((m) => {
-                return m.userId !== this.myUserId
+                return m.userId !== this.myUserId;
             });
         }
     }
-}
+};
 
 /**
  * Sets the membership this room was received as during sync
