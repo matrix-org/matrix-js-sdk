@@ -288,8 +288,7 @@ Room.prototype.getDMInviter = function() {
 
 /**
  * Assuming this room is a DM room, tries to guess with which user.
- * @return {string} user id of the other member, if found, otherwise undefined.
- * Will never return the syncing users user id.
+ * @return {string} user id of the other member (could be syncing user)
  */
 Room.prototype.guessDMUserId = function() {
     const me = this.getMember(this.myUserId);
@@ -321,6 +320,10 @@ Room.prototype.guessDMUserId = function() {
             return sender;
         }
     }
+    // it really seems like I'm the only user in the room
+    // so I probably created a room with just me in it
+    // and marked it as a DM. Ok then
+    return this.myUserId;
 };
 
 Room.prototype.getAvatarFallbackMember = function() {
