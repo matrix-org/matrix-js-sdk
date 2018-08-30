@@ -354,7 +354,6 @@ Room.prototype.setSyncedMembership = function(membership) {
 Room.prototype._loadMembersFromServer = async function() {
     const lastSyncToken = this._client.store.getSyncToken();
     const queryString = utils.encodeParams({
-        membership: "join",
         not_membership: "leave",
         at: lastSyncToken,
     });
