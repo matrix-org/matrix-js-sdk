@@ -279,8 +279,7 @@ Room.prototype.getDMInviter = function() {
     }
     if (this._syncedMembership === "invite") {
         // fall back to summary information
-        const memberCount = this.currentState.getJoinedMemberCount() +
-            this.currentState.getInvitedMemberCount();
+        const memberCount = this.getInvitedAndJoinedMemberCount();
         if (memberCount == 2 && this._summaryHeroes.length) {
             return this._summaryHeroes[0];
         }
@@ -490,8 +489,13 @@ Room.prototype.setSummary = function(summary) {
     if (Number.isInteger(invitedCount)) {
         this.currentState.setInvitedMemberCount(invitedCount);
     }
-    if (heroes) {
-        this._summaryHeroes = heroes;
+    if (Array.isArray(heroes)) {
+        // be cautious about trusting server values,
+        // and make sure heroes doesn't contain our own id
+        // just to be sure
+        this._summaryHeroes = heroes.filter((userId) => {
+            return userId !== this.myUserId;
+        });
     }
 };
 
@@ -647,6 +651,14 @@ Room.prototype.getJoinedMemberCount = function() {
  */
 Room.prototype.getInvitedMemberCount = function() {
     return this.currentState.getInvitedMemberCount();
+};
+
+/**
+ * Returns the number of invited + joined members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite' or 'join'
+ */
+Room.prototype.getInvitedAndJoinedMemberCount = function() {
+    return this.getInvitedMemberCount() + this.getJoinedMemberCount();
 };
 
 /**
