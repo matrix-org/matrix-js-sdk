@@ -22,6 +22,7 @@ const EventEmitter = require("events").EventEmitter;
 
 const EventStatus = require("./event").EventStatus;
 const RoomSummary = require("./room-summary");
+const RoomMember = require("./room-member");
 const MatrixEvent = require("./event").MatrixEvent;
 const utils = require("../utils");
 const ContentRepo = require("../content-repo");
@@ -350,6 +351,19 @@ Room.prototype.getAvatarFallbackMember = function() {
         });
         if (availableMember) {
             return availableMember;
+        }
+    }
+    // if all else fails, try falling back to a user,
+    // and create a one-off member for it
+    if (hasHeroes) {
+        const availableUser = this._summaryHeroes.map((userId) => {
+            return this._client.getUser(userId);
+        }).find((user) => !!user);
+        if (availableUser) {
+            const member = new RoomMember(
+                this.roomId, availableUser.userId);
+            member.user = availableUser;
+            return member;
         }
     }
 };
