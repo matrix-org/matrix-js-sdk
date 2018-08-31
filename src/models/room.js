@@ -458,6 +458,29 @@ Room.prototype.loadMembersIfNeeded = function() {
 };
 
 /**
+ * Removes the lazily loaded members from storage if needed
+ */
+Room.prototype.clearLoadedMembersIfNeeded = async function() {
+    if (this._opts.lazyLoadMembers && this._membersPromise) {
+        await this.loadMembersIfNeeded();
+        this._membersPromise = null;
+        await this._client.store.clearOutOfBandMembers(this.roomId);
+    }
+};
+
+/**
+ * called when sync receives this room in the leave section
+ * to do cleanup after leaving a room. Possibly called multiple times.
+ */
+Room.prototype.onLeft = function() {
+    this.clearLoadedMembersIfNeeded().catch((err) => {
+        console.error(`error after clearing loaded members from ` +
+            `room ${this.roomId} after leaving`);
+        console.dir(err);
+    });
+};
+
+/**
  * Reset the live timeline of all timelineSets, and start new ones.
  *
  * <p>This is used when /sync returns a 'limited' timeline.

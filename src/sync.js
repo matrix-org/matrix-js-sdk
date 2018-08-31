@@ -1106,6 +1106,7 @@ SyncApi.prototype._processSyncResponse = async function(
     leaveRooms.forEach(function(leaveObj) {
         const room = leaveObj.room;
         room.setSyncedMembership("leave");
+        room.onLeft();
 
         const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
