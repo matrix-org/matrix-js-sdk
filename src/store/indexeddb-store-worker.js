@@ -95,6 +95,9 @@ class IndexedDBStoreWorker {
             case 'getOutOfBandMembers':
                 prom = this.backend.getOutOfBandMembers(msg.args[0]);
                 break;
+            case 'clearOutOfBandMembers':
+                prom = this.backend.clearOutOfBandMembers(msg.args[0]);
+                break;
             case 'setOutOfBandMembers':
                 prom = this.backend.setOutOfBandMembers(msg.args[0], msg.args[1]);
                 break;

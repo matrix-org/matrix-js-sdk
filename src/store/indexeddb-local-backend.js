@@ -71,7 +71,7 @@ function selectQuery(store, keyRange, resultMapper) {
     });
 }
 
-function promiseifyTxn(txn) {
+function txnAsPromise(txn) {
     return new Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
             resolve(event);
@@ -82,7 +82,7 @@ function promiseifyTxn(txn) {
     });
 }
 
-function promiseifyRequest(req) {
+function reqAsEventPromise(req) {
     return new Promise((resolve, reject) => {
         req.onsuccess = function(event) {
             resolve(event);
@@ -91,6 +91,17 @@ function promiseifyRequest(req) {
             reject(event);
         };
     });
+}
+
+function reqAsPromise(req) {
+    return new Promise((resolve, reject) => {
+        req.onsuccess = () => resolve(req);
+        req.onerror = (err) => reject(err);
+    });
+}
+
+function reqAsCursorPromise(req) {
+    return reqAsEventPromise(req).then((event) => event.target.result);
 }
 
 /**
@@ -159,7 +170,7 @@ LocalIndexedDBStoreBackend.prototype = {
         console.log(
             `LocalIndexedDBStoreBackend.connect: awaiting connection...`,
         );
-        return promiseifyRequest(req).then((ev) => {
+        return reqAsEventPromise(req).then((ev) => {
             console.log(
                 `LocalIndexedDBStoreBackend.connect: connected`,
             );
@@ -265,7 +276,7 @@ LocalIndexedDBStoreBackend.prototype = {
             const tx = this.db.transaction(["oob_membership_events"], "readwrite");
             const store = tx.objectStore("oob_membership_events");
             const eventPuts = membershipEvents.map((e) => {
-                const putPromise = promiseifyRequest(store.put(e));
+                const putPromise = reqAsEventPromise(store.put(e));
                 // ignoring the result makes sure we discard the IDB success event
                 // ASAP, and not create a potentially big array containing them
                 // unneccesarily later on by calling Promise.all.
@@ -281,7 +292,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 oob_written: true,
                 state_key: 0,
             };
-            const markerPut = promiseifyRequest(store.put(markerObject));
+            const markerPut = reqAsEventPromise(store.put(markerObject));
             const allPuts = eventPuts.concat(markerPut);
             // ignore the empty array Promise.all creates
             // as this method should just resolve
@@ -290,6 +301,55 @@ LocalIndexedDBStoreBackend.prototype = {
         }).then(() => {
             console.log(`LL: backend done storing for ${roomId}!`);
         });
+    },
+
+    clearOutOfBandMembers: async function(roomId) {
+        // the approach to delete all members for a room
+        // is to get the min and max state key from the index
+        // for that room, and then delete between those
+        // keys in the store.
+        // this should be way faster than deleting every member
+        // individually for a large room.
+        const readTx = this.db.transaction(
+            ["oob_membership_events"],
+            "readonly");
+        const store = readTx.objectStore("oob_membership_events");
+        const roomIndex = store.index("room");
+        const roomRange = IDBKeyRange.only(roomId);
+
+        const indexCount = (await reqAsPromise(roomIndex.count(roomRange))).result;
+
+        const minStateKeyProm = reqAsCursorPromise(
+                roomIndex.openKeyCursor(roomRange, "next"),
+            ).then((cursor) => cursor && cursor.primaryKey[1]);
+        const maxStateKeyProm = reqAsCursorPromise(
+                roomIndex.openKeyCursor(roomRange, "prev"),
+            ).then((cursor) => cursor && cursor.primaryKey[1]);
+        const [minStateKey, maxStateKey] = await Promise.all(
+            [minStateKeyProm, maxStateKeyProm]);
+
+        const writeTx = this.db.transaction(
+            ["oob_membership_events"],
+            "readwrite");
+        const writeStore = writeTx.objectStore("oob_membership_events");
+        const membersKeyRange = IDBKeyRange.bound(
+            [roomId, minStateKey],
+            [roomId, maxStateKey],
+        );
+        const count =
+            (await reqAsPromise(writeStore.count(membersKeyRange))).result;
+
+        // Leaving this for now to make sure
+        if (count !== indexCount) {
+            console.error(`not deleting all members, ` +
+                `oob_membership_events and its index room ` +
+                `dont seem to have the same key order`);
+        }
+
+        console.log(`LL: Deleting ${count} users + marker for ` +
+            `room ${roomId}, with key range:`,
+            [roomId, minStateKey], [roomId, maxStateKey]);
+        await reqAsPromise(writeStore.delete(membersKeyRange));
     },
 
     /**
@@ -389,7 +449,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 roomsData: roomsData,
                 groupsData: groupsData,
             }); // put == UPSERT
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 
@@ -406,7 +466,7 @@ LocalIndexedDBStoreBackend.prototype = {
             for (let i = 0; i < accountData.length; i++) {
                 store.put(accountData[i]); // put == UPSERT
             }
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 
@@ -428,7 +488,7 @@ LocalIndexedDBStoreBackend.prototype = {
                     event: tuple[1],
                 }); // put == UPSERT
             }
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 
