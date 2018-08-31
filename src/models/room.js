@@ -465,6 +465,7 @@ Room.prototype.clearLoadedMembersIfNeeded = async function() {
         await this.loadMembersIfNeeded();
         this._membersPromise = null;
         await this._client.store.clearOutOfBandMembers(this.roomId);
+        this.currentState.clearOutOfBandMembers();
     }
 };
 

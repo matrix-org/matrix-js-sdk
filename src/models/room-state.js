@@ -444,6 +444,22 @@ RoomState.prototype.markOutOfBandMembersFailed = function() {
 };
 
 /**
+ * Clears the loaded out-of-band members
+ */
+RoomState.prototype.clearOutOfBandMembers = function() {
+    let count = 0;
+    Object.keys(this.members).forEach((userId) => {
+        const member = this.members[userId];
+        if (member.isOutOfBand()) {
+            ++count;
+            delete this.members[userId];
+        }
+    });
+    console.log(`LL: RoomState removed ${count} members...`);
+    this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
+};
+
+/**
  * Sets the loaded out-of-band members.
  * @param {MatrixEvent[]} stateEvents array of membership state events
  */
