@@ -328,17 +328,28 @@ Room.prototype.guessDMUserId = function() {
 
 Room.prototype.getAvatarFallbackMember = function() {
     const memberCount = this.getInvitedAndJoinedMemberCount();
-    if (memberCount <= 2) {
-        if (this._summaryHeroes && this._summaryHeroes.length) {
-            return this._summaryHeroes[0];
+    if (memberCount > 2) {
+        return;
+    }
+    const hasHeroes = Array.isArray(this._summaryHeroes) &&
+        this._summaryHeroes.length;
+    if (hasHeroes) {
+        const availableMember = this._summaryHeroes.map((userId) => {
+            return this.getMember(userId);
+        }).find((member) => !!member);
+        if (availableMember) {
+            return availableMember;
         }
-        const members = this.currentState.getMembers();
-        // could be different than memberCount
-        // as this includes left members
-        if (members.length <= 2) {
-            return members.find((m) => {
-                return m.userId !== this.myUserId;
-            });
+    }
+    const members = this.currentState.getMembers();
+    // could be different than memberCount
+    // as this includes left members
+    if (members.length <= 2) {
+        const availableMember = members.find((m) => {
+            return m.userId !== this.myUserId;
+        });
+        if (availableMember) {
+            return availableMember;
         }
     }
 };
