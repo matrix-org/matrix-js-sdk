@@ -317,8 +317,6 @@ LocalIndexedDBStoreBackend.prototype = {
         const roomIndex = store.index("room");
         const roomRange = IDBKeyRange.only(roomId);
 
-        const indexCount = (await reqAsPromise(roomIndex.count(roomRange))).result;
-
         const minStateKeyProm = reqAsCursorPromise(
                 roomIndex.openKeyCursor(roomRange, "next"),
             ).then((cursor) => cursor && cursor.primaryKey[1]);
@@ -336,17 +334,8 @@ LocalIndexedDBStoreBackend.prototype = {
             [roomId, minStateKey],
             [roomId, maxStateKey],
         );
-        const count =
-            (await reqAsPromise(writeStore.count(membersKeyRange))).result;
 
-        // Leaving this for now to make sure
-        if (count !== indexCount) {
-            console.error(`not deleting all members, ` +
-                `oob_membership_events and its index room ` +
-                `dont seem to have the same key order`);
-        }
-
-        console.log(`LL: Deleting ${count} users + marker for ` +
+        console.log(`LL: Deleting all users + marker in storage for ` +
             `room ${roomId}, with key range:`,
             [roomId, minStateKey], [roomId, maxStateKey]);
         await reqAsPromise(writeStore.delete(membersKeyRange));
