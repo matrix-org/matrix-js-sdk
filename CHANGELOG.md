@@ -1,3 +1,41 @@
+Changes in [0.10.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9) (2018-09-03)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.2...v0.10.9)
+
+ * No changes since rc.2
+
+Changes in [0.10.9-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.2) (2018-08-31)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.1...v0.10.9-rc.2)
+
+ * Fix for "otherMember.getAvatarUrl is not a function"
+   [\#708](https://github.com/matrix-org/matrix-js-sdk/pull/708)
+
+Changes in [0.10.9-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.1) (2018-08-30)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.8...v0.10.9-rc.1)
+
+ * Fix DM avatar
+   [\#706](https://github.com/matrix-org/matrix-js-sdk/pull/706)
+ * Lazy loading: avoid loading members at initial sync for e2e rooms
+   [\#699](https://github.com/matrix-org/matrix-js-sdk/pull/699)
+ * Improve setRoomEncryption guard against multiple m.room.encryption st…
+   [\#700](https://github.com/matrix-org/matrix-js-sdk/pull/700)
+ * Revert "Lazy loading: don't block on setting up room crypto"
+   [\#698](https://github.com/matrix-org/matrix-js-sdk/pull/698)
+ * Lazy loading: don't block on setting up room crypto
+   [\#696](https://github.com/matrix-org/matrix-js-sdk/pull/696)
+ * Add getVisibleRooms()
+   [\#695](https://github.com/matrix-org/matrix-js-sdk/pull/695)
+ * Add wrapper around getJoinedMemberCount()
+   [\#697](https://github.com/matrix-org/matrix-js-sdk/pull/697)
+ * Api to fetch events via /room/.../event/..
+   [\#694](https://github.com/matrix-org/matrix-js-sdk/pull/694)
+ * Support for room upgrades
+   [\#693](https://github.com/matrix-org/matrix-js-sdk/pull/693)
+ * Lazy loading of room members
+   [\#691](https://github.com/matrix-org/matrix-js-sdk/pull/691)
+
 BREAKING CHANGE
 ---------------
 
