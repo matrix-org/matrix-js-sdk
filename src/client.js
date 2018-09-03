@@ -3175,6 +3175,14 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
 };
 
 /*
+ * Get if lazy loading members is being used.
+ * @return {boolean} Whether or not members are lazy loaded by this client
+ */
+MatrixClient.prototype.hasLazyLoadMembersEnabled = function() {
+    return !!this._clientOpts.lazyLoadMembers;
+};
+
+/*
  * Set a function which is called when /sync returns a 'limited' response.
  * It is called with a room ID and returns a boolean. It should return 'true' if the SDK
  * can SAFELY remove events from this room. It may not be safe to remove events if there
