@@ -2145,7 +2145,7 @@ function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
 
     let filter = null;
     if (this._clientOpts.lazyLoadMembers) {
-        filter = LAZY_LOADING_MESSAGES_FILTER;
+        filter = Object.assign({}, LAZY_LOADING_MESSAGES_FILTER);
     }
     if (timelineFilter) {
         // XXX: it's horrific that /messages' filter parameter doesn't match
