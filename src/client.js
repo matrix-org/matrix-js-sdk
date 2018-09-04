@@ -2145,6 +2145,8 @@ function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
 
     let filter = null;
     if (this._clientOpts.lazyLoadMembers) {
+        // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
+        // so the timelineFilter doesn't get written into it below
         filter = Object.assign({}, LAZY_LOADING_MESSAGES_FILTER);
     }
     if (timelineFilter) {
