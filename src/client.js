@@ -3527,6 +3527,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
  * previous API.</i></li>
  *
+ * <li>CATCHUP: The client has detected the connection to the server might be
+ * available again and will now try to do a sync again. As this sync might take
+ * a long time (depending how long ago was last synced, and general server
+ * performance) the client is put in this mode so the UI can reflect trying
+ * to catch up with the server after losing connection.</li>
+ *
  * <li>SYNCING : The client is currently polling for new events from the server.
  * This will be called <i>after</i> processing latest events from a sync.</li>
  *
@@ -3550,11 +3556,11 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *                                          +---->STOPPED
  *                                          |
  *              +----->PREPARED -------> SYNCING <--+
- *              |        ^                |  ^      |
- *              |        |                |  |      |
- *              |        |                V  |      |
- *   null ------+        |  +--------RECONNECTING   |
- *              |        |  V                       |
+ *              |                        ^  |  ^    |
+ *              |      CATCHUP ----------+  |  |    |
+ *              |        ^                  V  |    |
+ *   null ------+        |  +------- RECONNECTING   |
+ *              |        V  V                       |
  *              +------->ERROR ---------------------+
  *
  * NB: 'null' will never be emitted by this event.

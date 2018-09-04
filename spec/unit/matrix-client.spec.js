@@ -380,7 +380,7 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        it("should transition ERROR -> PREPARED after /sync if prev failed",
+        it("should transition ERROR -> CATCHUP after /sync if prev failed",
         function(done) {
             const expectedStates = [];
             acceptKeepalives = false;
@@ -403,7 +403,7 @@ describe("MatrixClient", function() {
 
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            expectedStates.push(["PREPARED", "ERROR"]);
+            expectedStates.push(["CATCHUP", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
