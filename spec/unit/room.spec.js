@@ -1414,13 +1414,13 @@ describe("Room", function() {
 
     describe("guessDMUserId", function() {
         it("should return first hero id",
-        async function() {
+        function() {
             const room = new Room(roomId, null, userA);
             room.setSummary({'m.heroes': [userB]});
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return first member that isn't self",
-        async function() {
+        function() {
             const room = new Room(roomId, null, userA);
             room.addLiveEvents([utils.mkMembership({
                 user: userB, mship: "join",
@@ -1429,7 +1429,7 @@ describe("Room", function() {
             expect(room.guessDMUserId()).toEqual(userB);
         });
         it("should return self if only member present",
-        async function() {
+        function() {
             const room = new Room(roomId, null, userA);
             expect(room.guessDMUserId()).toEqual(userA);
         });
