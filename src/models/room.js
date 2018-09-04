@@ -299,27 +299,17 @@ Room.prototype.guessDMUserId = function() {
             return inviterId;
         }
     }
-    const fallbackMember = this.getAvatarFallbackMember();
-    if (fallbackMember) {
-        return fallbackMember.userId;
-    }
-    // now we're getting into sketchy territory,
-    // but we're assuming this room is marked as a DM
-    // so we're going to make a wild-ish guess with whom
-    if (this._summaryHeroes.length) {
+    // remember, we're assuming this room is a DM,
+    // so returning the first member we find should be fine
+    const hasHeroes = Array.isArray(this._summaryHeroes) &&
+        this._summaryHeroes.length;
+    if (hasHeroes) {
         return this._summaryHeroes[0];
     }
     const members = this.currentState.getMembers();
-    const anyMember = members.filter((m) => m.userId !== this.myUserId);
+    const anyMember = members.find((m) => m.userId !== this.myUserId);
     if (anyMember) {
-        return anyMember;
-    }
-    const createEvent = this.currentState.getStateEvents("m.room.create", "");
-    if (createEvent) {
-        const sender = createEvent.getSender();
-        if (sender !== this.myUserId) {
-            return sender;
-        }
+        return anyMember.userId;
     }
     // it really seems like I'm the only user in the room
     // so I probably created a room with just me in it
