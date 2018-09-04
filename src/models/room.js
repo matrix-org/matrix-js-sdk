@@ -310,7 +310,7 @@ Room.prototype.guessDMUserId = function() {
         return this._summaryHeroes[0];
     }
     const members = this.currentState.getMembers();
-    const anyMember = members.filter((m) => m.userId !== this.myUserId);
+    const anyMember = members.find((m) => m.userId !== this.myUserId);
     if (anyMember) {
     }
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
