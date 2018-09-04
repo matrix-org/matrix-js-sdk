@@ -1141,6 +1141,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.onLeft();
     });
 
     // update the notification timeline, if appropriate.

@@ -272,6 +272,10 @@ StubStore.prototype = {
     setOutOfBandMembers: function() {
         return Promise.resolve();
     },
+
+    clearOutOfBandMembers: function() {
+        return Promise.resolve();
+    },
 };
 
 /** Stub Store class. */
