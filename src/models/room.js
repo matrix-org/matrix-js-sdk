@@ -312,7 +312,6 @@ Room.prototype.guessDMUserId = function() {
     const members = this.currentState.getMembers();
     const anyMember = members.filter((m) => m.userId !== this.myUserId);
     if (anyMember) {
-        return anyMember;
     }
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (createEvent) {
@@ -320,6 +319,7 @@ Room.prototype.guessDMUserId = function() {
         if (sender !== this.myUserId) {
             return sender;
         }
+        return anyMember.userId;
     }
     // it really seems like I'm the only user in the room
     // so I probably created a room with just me in it
