@@ -303,10 +303,11 @@ Room.prototype.guessDMUserId = function() {
     if (fallbackMember) {
         return fallbackMember.userId;
     }
-    // now we're getting into sketchy territory,
-    // but we're assuming this room is marked as a DM
-    // so we're going to make a wild-ish guess with whom
-    if (this._summaryHeroes.length) {
+    // remember, we're assuming this room is a DM,
+    // so returning the first member we find should be fine
+    const hasHeroes = Array.isArray(this._summaryHeroes) &&
+        this._summaryHeroes.length;
+    if (hasHeroes) {
         return this._summaryHeroes[0];
     }
     const members = this.currentState.getMembers();
