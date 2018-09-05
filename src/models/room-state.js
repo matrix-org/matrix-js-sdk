@@ -667,6 +667,11 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
  *                        according to the room's state.
  */
 RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
+    const member = this.getMember(userId);
+    if (!member || member.membership == 'leave') {
+        return false;
+    }
+
     const power_levels_event = this.getStateEvents('m.room.power_levels', '');
 
     let power_levels;
@@ -674,34 +679,25 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
 
     let state_default = 0;
     let events_default = 0;
-    let powerLevel = 0;
     if (power_levels_event) {
         power_levels = power_levels_event.getContent();
         events_levels = power_levels.events || {};
 
-        if (Number.isFinite(power_levels.state_default)) {
+        if (utils.isNumber(power_levels.state_default)) {
             state_default = power_levels.state_default;
         } else {
             state_default = 50;
         }
-
-        const userPowerLevel = power_levels.users && power_levels.users[userId];
-        if (Number.isFinite(userPowerLevel)) {
-            powerLevel = userPowerLevel;
-        } else if(Number.isFinite(power_levels.users_default)) {
-            powerLevel = power_levels.users_default;
-        }
-
-        if (Number.isFinite(power_levels.events_default)) {
+        if (utils.isNumber(power_levels.events_default)) {
             events_default = power_levels.events_default;
         }
     }
 
     let required_level = state ? state_default : events_default;
-    if (Number.isFinite(events_levels[eventType])) {
+    if (utils.isNumber(events_levels[eventType])) {
         required_level = events_levels[eventType];
     }
-    return powerLevel >= required_level;
+    return member.powerLevel >= required_level;
 };
 
 /**
