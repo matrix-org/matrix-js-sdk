@@ -1,17 +1,3 @@
-Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (TDB)
-==================================================================================================
-[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9...v0.11.0)
-
- * Support for lazy loading members. This should improve performance for
-   users who joined big rooms a lot. Pass to `lazyLoadMembers = true` option when calling `startClient`.
-
-BREAKING CHANGES
-----------------
-
- * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
- * A new `CATCHUP` sync state, emitted by `MatrixClient#"sync"` and returned by `MatrixClient::getSyncState()`, when doing initial sync after the `ERROR` state. See `MatrixClient` documentation for details.
- * `RoomState::maySendEvent('m.room.message', userId)` & `RoomState::maySendMessage(userId)` do not check the membership of the user anymore, only the power level. To check if the syncing user is allowed to write in a room, use `Room::maySendMessage()` as `RoomState` is not always aware of the syncing user's membership anymore, in case lazy loading of members is enabled.
-
 Changes in [0.10.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9) (2018-09-03)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.2...v0.10.9)
@@ -49,6 +35,19 @@ Changes in [0.10.9-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
    [\#693](https://github.com/matrix-org/matrix-js-sdk/pull/693)
  * Lazy loading of room members
    [\#691](https://github.com/matrix-org/matrix-js-sdk/pull/691)
+
+BREAKING CHANGE
+---------------
+
+ * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
+ * A new `CATCHUP` sync state, emitted by `MatrixClient#"sync"` and returned by `MatrixClient::getSyncState()`, when doing initial sync after the `ERROR` state. See `MatrixClient` documentation for details.
+
+Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (TDB)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6...v0.11.0)
+
+ * Support for lazy loading members. This should improve performance for
+   users who joined big rooms a lot. Pass to `lazyLoadMembers = true` option when calling `startClient`.
 
 Changes in [0.10.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.8) (2018-08-20)
 ==================================================================================================

@@ -447,6 +447,13 @@ describe("RoomState", function() {
     });
 
     describe("maySendStateEvent", function() {
+        it("should say non-joined members may not send state",
+        function() {
+            expect(state.maySendStateEvent(
+                'm.room.name', "@nobody:nowhere",
+            )).toEqual(false);
+        });
+
         it("should say any member may send state with no power level event",
         function() {
             expect(state.maySendStateEvent('m.room.name', userA)).toEqual(true);
@@ -633,6 +640,14 @@ describe("RoomState", function() {
     });
 
     describe("maySendEvent", function() {
+        it("should say non-joined members may not send events",
+        function() {
+            expect(state.maySendEvent(
+                'm.room.message', "@nobody:nowhere",
+            )).toEqual(false);
+            expect(state.maySendMessage("@nobody:nowhere")).toEqual(false);
+        });
+
         it("should say any member may send events with no power level event",
         function() {
             expect(state.maySendEvent('m.room.message', userA)).toEqual(true);

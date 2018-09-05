@@ -1400,7 +1400,7 @@ describe("Room", function() {
 
     describe("getMyMembership", function() {
         it("should return synced membership if membership isn't available yet",
-        function() {
+        async function() {
             const room = new Room(roomId, null, userA);
             room.setSyncedMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
@@ -1432,19 +1432,6 @@ describe("Room", function() {
         function() {
             const room = new Room(roomId, null, userA);
             expect(room.guessDMUserId()).toEqual(userA);
-        });
-    });
-
-    describe("maySendMessage", function() {
-        it("should return false if synced membership not join",
-        function() {
-            const room = new Room(roomId, null, userA);
-            room.setSyncedMembership("invite");
-            expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("leave");
-            expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("join");
-            expect(room.maySendMessage()).toEqual(true);
         });
     });
 });
