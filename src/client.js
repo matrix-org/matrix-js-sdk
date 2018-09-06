@@ -3612,7 +3612,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *
  * @param {?Object} data Data about this transition.
  *
- * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ * @param {MatrixError} data.error The matrix error if <code>state=ERROR</code>.
  *
  * @param {String} data.oldSyncToken The 'since' token passed to /sync.
  *    <code>null</code> for the first successful sync since this client was
