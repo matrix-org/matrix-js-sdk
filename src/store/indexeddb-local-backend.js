@@ -265,7 +265,6 @@ LocalIndexedDBStoreBackend.prototype = {
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
      * @param {string} roomId
      * @param {event[]} membershipEvents the membership events to store
-     * @returns {Promise} when all members have been stored
      */
     setOutOfBandMembers: async function(roomId, membershipEvents) {
         console.log(`LL: backend about to store ${membershipEvents.length}` +
