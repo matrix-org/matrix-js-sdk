@@ -1485,6 +1485,17 @@ Room.prototype.getAccountData = function(type) {
     return this.accountData[type];
 };
 
+
+/**
+ * Returns wheter the syncing user has permission to send a message in the room
+ * @return {boolean} true if the user should be permitted to send
+ *                   message events into the room.
+ */
+Room.prototype.maySendMessage = function() {
+    return this.getMyMembership() === 'join' &&
+        this.currentState.maySendEvent('m.room.message', this.myUserId);
+};
+
 /**
  * This is an internal method. Calculates the name of the room from the current
  * room state.
