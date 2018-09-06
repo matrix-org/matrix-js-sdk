@@ -269,7 +269,6 @@ LocalIndexedDBStoreBackend.prototype = {
     setOutOfBandMembers: async function(roomId, membershipEvents) {
         console.log(`LL: backend about to store ${membershipEvents.length}` +
             ` members for ${roomId}`);
-        // run everything in a promise so anything that throws will reject
         const tx = this.db.transaction(["oob_membership_events"], "readwrite");
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {
@@ -286,9 +285,6 @@ LocalIndexedDBStoreBackend.prototype = {
             state_key: 0,
         };
         store.put(markerObject);
-        // ignore the empty array Promise.all creates
-        // as this method should just resolve
-        // to undefined on success
         await txnAsPromise(tx);
         console.log(`LL: backend done storing for ${roomId}!`);
     },
