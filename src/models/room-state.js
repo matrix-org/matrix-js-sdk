@@ -511,7 +511,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
 
     this._setStateEvent(stateEvent);
     this._updateMember(member);
-    this.emit("RoomState.members", {}, stateEvent, member);
+    this.emit("RoomState.members", stateEvent, this, member);
 };
 
 /**
