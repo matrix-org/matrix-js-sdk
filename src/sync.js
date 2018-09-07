@@ -779,8 +779,12 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     // erroneous. We set the state to 'reconnecting'
     // instead, so that clients can observe this state
     // if they wish.
-    this._startKeepAlives().then(() => {
-        if (this.getSyncState() === 'ERROR') {
+    this._startKeepAlives().then((connDidFail) => {
+        // Only emit CATCHUP if we detected a connectivity error: if we didn't,
+        // it's quite likely the sync will fail again for the same reason and we
+        // want to stay in ERROR rather than keep flip-flopping between ERROR
+        // and CATCHUP.
+        if (connDidFail && this.getSyncState() === 'ERROR') {
             this._updateSyncState("CATCHUP", {
                 oldSyncToken: null,
                 nextSyncToken: null,
@@ -1215,13 +1219,16 @@ SyncApi.prototype._startKeepAlives = function(delay) {
  *
  * On failure, schedules a call back to itself. On success, resolves
  * this._connectionReturnedDefer.
+ *
+ * @param {bool} connDidFail True if a connectivity failure has been detected. Optional.
  */
-SyncApi.prototype._pokeKeepAlive = function() {
+SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
+    if (connDidFail === undefined) connDidFail = false;
     const self = this;
     function success() {
         clearTimeout(self._keepAliveTimer);
         if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.resolve();
+            self._connectionReturnedDefer.resolve(connDidFail);
             self._connectionReturnedDefer = null;
         }
     }
@@ -1246,8 +1253,9 @@ SyncApi.prototype._pokeKeepAlive = function() {
             // responses fail, this will mean we don't hammer in a loop.
             self._keepAliveTimer = setTimeout(success, 2000);
         } else {
+            connDidFail = true;
             self._keepAliveTimer = setTimeout(
-                self._pokeKeepAlive.bind(self),
+                self._pokeKeepAlive.bind(self, connDidFail),
                 5000 + Math.floor(Math.random() * 5000),
             );
             // A keepalive has failed, so we emit the
@@ -1255,7 +1263,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
             // first failure).
             // Note we do this after setting the timer:
             // this lets the unit tests advance the mock
-            // clock when the get the error.
+            // clock when they get the error.
             self._updateSyncState("ERROR", { error: err });
         }
     });
