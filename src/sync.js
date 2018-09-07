@@ -1245,7 +1245,7 @@ SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
     ).done(function() {
         success();
     }, function(err) {
-        if (err.httpStatus == 400) {
+        if (err.httpStatus == 400 || err.httpStatus == 404) {
             // treat this as a success because the server probably just doesn't
             // support /versions: point is, we're getting a response.
             // We wait a short time though, just in case somehow the server
