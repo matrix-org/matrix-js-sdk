@@ -413,8 +413,21 @@ Room.prototype.loadMembersIfNeeded = function() {
     // the OOB members
     this.currentState.markOutOfBandMembersStarted();
 
-    const promise = this._loadMembers().then(({memberEvents, fromServer}) => {
-        this.currentState.setOutOfBandMembers(memberEvents);
+    const inMemoryUpdate = this._loadMembers().then((result) => {
+        this.currentState.setOutOfBandMembers(result.memberEvents);
+        // now the members are loaded, start to track the e2e devices if needed
+        if (this._client.isRoomEncrypted(this.roomId)) {
+            this._client._crypto.trackRoomDevices(this.roomId);
+        }
+        return result.fromServer;
+    }).catch((err) => {
+        // allow retries on fail
+        this._membersPromise = null;
+        this.currentState.markOutOfBandMembersFailed();
+        throw err;
+    });
+    // update members in storage, but don't wait for it
+    inMemoryUpdate.then((fromServer) => {
         if (fromServer) {
             const oobMembers = this.currentState.getMembers()
                 .filter((m) => m.isOutOfBand())
@@ -431,17 +444,12 @@ Room.prototype.loadMembersIfNeeded = function() {
                 });
         }
     }).catch((err) => {
-        // allow retries on fail
-        this._membersPromise = null;
-        this.currentState.markOutOfBandMembersFailed();
-        throw err;
+        // as this is not awaited anywhere,
+        // at least show the error in the console
+        console.error(err);
     });
 
-    this._membersPromise = promise;
-    // now the members are loaded, start to track the e2e devices if needed
-    if (this._client.isRoomEncrypted(this.roomId)) {
-        this._client._crypto.trackRoomDevices(this.roomId);
-    }
+    this._membersPromise = inMemoryUpdate;
 
     return this._membersPromise;
 };
