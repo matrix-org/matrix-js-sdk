@@ -704,6 +704,21 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
 };
 
 /**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * @param {string} roomId The ID of the room to discard the session for
+ *
+ * This should not normally be necessary.
+ */
+MatrixClient.prototype.forceDiscardSession = function(roomId) {
+    if (!this._crypto) {
+        throw new Error("End-to-End encryption disabled");
+    }
+    this._crypto.forceDiscardSession(roomId);
+};
+
+/**
  * Get a list containing all of the room keys
  *
  * This should be encrypted before returning it to the user.
@@ -2318,7 +2333,9 @@ function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
 
     let filter = null;
     if (this._clientOpts.lazyLoadMembers) {
-        filter = LAZY_LOADING_MESSAGES_FILTER;
+        // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
+        // so the timelineFilter doesn't get written into it below
+        filter = Object.assign({}, LAZY_LOADING_MESSAGES_FILTER);
     }
     if (timelineFilter) {
         // XXX: it's horrific that /messages' filter parameter doesn't match
@@ -3286,6 +3303,10 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
 
+    if (opts.lazyLoadMembers && this._crypto) {
+        this._crypto.enableLazyLoading();
+    }
+
     opts.crypto = this._crypto;
     opts.canResetEntireTimeline = (roomId) => {
         if (!this._canResetTimelineCallback) {
@@ -3341,6 +3362,14 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
             unstableFeatures && unstableFeatures["m.lazy_load_members"];
     }
     return this._serverSupportsLazyLoading;
+};
+
+/*
+ * Get if lazy loading members is being used.
+ * @return {boolean} Whether or not members are lazy loaded by this client
+ */
+MatrixClient.prototype.hasLazyLoadMembersEnabled = function() {
+    return !!this._clientOpts.lazyLoadMembers;
 };
 
 /*
@@ -3688,6 +3717,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
  * previous API.</i></li>
  *
+ * <li>CATCHUP: The client has detected the connection to the server might be
+ * available again and will now try to do a sync again. As this sync might take
+ * a long time (depending how long ago was last synced, and general server
+ * performance) the client is put in this mode so the UI can reflect trying
+ * to catch up with the server after losing connection.</li>
+ *
  * <li>SYNCING : The client is currently polling for new events from the server.
  * This will be called <i>after</i> processing latest events from a sync.</li>
  *
@@ -3711,11 +3746,11 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *                                          +---->STOPPED
  *                                          |
  *              +----->PREPARED -------> SYNCING <--+
- *              |        ^                |  ^      |
- *              |        |                |  |      |
- *              |        |                V  |      |
- *   null ------+        |  +--------RECONNECTING   |
- *              |        |  V                       |
+ *              |                        ^  |  ^    |
+ *              |      CATCHUP ----------+  |  |    |
+ *              |        ^                  V  |    |
+ *   null ------+        |  +------- RECONNECTING   |
+ *              |        V  V                       |
  *              +------->ERROR ---------------------+
  *
  * NB: 'null' will never be emitted by this event.
@@ -3765,7 +3800,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *
  * @param {?Object} data Data about this transition.
  *
- * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ * @param {MatrixError} data.error The matrix error if <code>state=ERROR</code>.
  *
  * @param {String} data.oldSyncToken The 'since' token passed to /sync.
  *    <code>null</code> for the first successful sync since this client was

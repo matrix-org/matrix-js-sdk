@@ -779,7 +779,18 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     // erroneous. We set the state to 'reconnecting'
     // instead, so that clients can observe this state
     // if they wish.
-    this._startKeepAlives().then(() => {
+    this._startKeepAlives().then((connDidFail) => {
+        // Only emit CATCHUP if we detected a connectivity error: if we didn't,
+        // it's quite likely the sync will fail again for the same reason and we
+        // want to stay in ERROR rather than keep flip-flopping between ERROR
+        // and CATCHUP.
+        if (connDidFail && this.getSyncState() === 'ERROR') {
+            this._updateSyncState("CATCHUP", {
+                oldSyncToken: null,
+                nextSyncToken: null,
+                catchingUp: true,
+            });
+        }
         this._sync(syncOptions);
     });
 
@@ -1145,6 +1156,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.onLeft();
     });
 
     // update the notification timeline, if appropriate.
@@ -1217,13 +1230,16 @@ SyncApi.prototype._startKeepAlives = function(delay) {
  *
  * On failure, schedules a call back to itself. On success, resolves
  * this._connectionReturnedDefer.
+ *
+ * @param {bool} connDidFail True if a connectivity failure has been detected. Optional.
  */
-SyncApi.prototype._pokeKeepAlive = function() {
+SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
+    if (connDidFail === undefined) connDidFail = false;
     const self = this;
     function success() {
         clearTimeout(self._keepAliveTimer);
         if (self._connectionReturnedDefer) {
-            self._connectionReturnedDefer.resolve();
+            self._connectionReturnedDefer.resolve(connDidFail);
             self._connectionReturnedDefer = null;
         }
     }
@@ -1240,7 +1256,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
     ).done(function() {
         success();
     }, function(err) {
-        if (err.httpStatus == 400) {
+        if (err.httpStatus == 400 || err.httpStatus == 404) {
             // treat this as a success because the server probably just doesn't
             // support /versions: point is, we're getting a response.
             // We wait a short time though, just in case somehow the server
@@ -1248,8 +1264,9 @@ SyncApi.prototype._pokeKeepAlive = function() {
             // responses fail, this will mean we don't hammer in a loop.
             self._keepAliveTimer = setTimeout(success, 2000);
         } else {
+            connDidFail = true;
             self._keepAliveTimer = setTimeout(
-                self._pokeKeepAlive.bind(self),
+                self._pokeKeepAlive.bind(self, connDidFail),
                 5000 + Math.floor(Math.random() * 5000),
             );
             // A keepalive has failed, so we emit the
@@ -1257,7 +1274,7 @@ SyncApi.prototype._pokeKeepAlive = function() {
             // first failure).
             // Note we do this after setting the timer:
             // this lets the unit tests advance the mock
-            // clock when the get the error.
+            // clock when they get the error.
             self._updateSyncState("ERROR", { error: err });
         }
     });

@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -488,12 +489,24 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
             session_id: session.sessionId,
              // Include our device ID so that recipients can send us a
              // m.new_device message if they don't have our session key.
+             // XXX: Do we still need this now that m.new_device messages
+             // no longer exist since #483?
             device_id: self._deviceId,
         };
 
         session.useCount++;
         return encryptedContent;
     });
+};
+
+/**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * This should not normally be necessary.
+ */
+MegolmEncryption.prototype.forceDiscardSession = function() {
+    this._setupPromise = this._setupPromise.then(() => null);
 };
 
 /**
@@ -550,12 +563,9 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     // We are happy to use a cached version here: we assume that if we already
     // have a list of the user's devices, then we already share an e2e room
     // with them, which means that they will have announced any new devices via
-    // an m.new_device.
-    //
-    // XXX: what if the cache is stale, and the user left the room we had in
-    // common and then added new devices before joining this one? --Matthew
-    //
-    // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
+    // device_lists in their /sync response.  This cache should then be maintained
+    // using all the device_lists changes and left fields.
+    // See https://github.com/vector-im/riot-web/issues/2305 for details.
     const devices = await this._crypto.downloadKeys(roomMembers, false);
     // remove any blocked devices
     for (const userId in devices) {

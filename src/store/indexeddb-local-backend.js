@@ -71,7 +71,7 @@ function selectQuery(store, keyRange, resultMapper) {
     });
 }
 
-function promiseifyTxn(txn) {
+function txnAsPromise(txn) {
     return new Promise((resolve, reject) => {
         txn.oncomplete = function(event) {
             resolve(event);
@@ -82,7 +82,7 @@ function promiseifyTxn(txn) {
     });
 }
 
-function promiseifyRequest(req) {
+function reqAsEventPromise(req) {
     return new Promise((resolve, reject) => {
         req.onsuccess = function(event) {
             resolve(event);
@@ -91,6 +91,17 @@ function promiseifyRequest(req) {
             reject(event);
         };
     });
+}
+
+function reqAsPromise(req) {
+    return new Promise((resolve, reject) => {
+        req.onsuccess = () => resolve(req);
+        req.onerror = (err) => reject(err);
+    });
+}
+
+function reqAsCursorPromise(req) {
+    return reqAsEventPromise(req).then((event) => event.target.result);
 }
 
 /**
@@ -159,7 +170,7 @@ LocalIndexedDBStoreBackend.prototype = {
         console.log(
             `LocalIndexedDBStoreBackend.connect: awaiting connection...`,
         );
-        return promiseifyRequest(req).then((ev) => {
+        return reqAsEventPromise(req).then((ev) => {
             console.log(
                 `LocalIndexedDBStoreBackend.connect: connected`,
             );
@@ -254,42 +265,66 @@ LocalIndexedDBStoreBackend.prototype = {
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
      * @param {string} roomId
      * @param {event[]} membershipEvents the membership events to store
-     * @returns {Promise} when all members have been stored
      */
-    setOutOfBandMembers: function(roomId, membershipEvents) {
+    setOutOfBandMembers: async function(roomId, membershipEvents) {
         console.log(`LL: backend about to store ${membershipEvents.length}` +
             ` members for ${roomId}`);
-        function ignoreResult() {}
-        // run everything in a promise so anything that throws will reject
-        return new Promise((resolve) =>{
-            const tx = this.db.transaction(["oob_membership_events"], "readwrite");
-            const store = tx.objectStore("oob_membership_events");
-            const eventPuts = membershipEvents.map((e) => {
-                const putPromise = promiseifyRequest(store.put(e));
-                // ignoring the result makes sure we discard the IDB success event
-                // ASAP, and not create a potentially big array containing them
-                // unneccesarily later on by calling Promise.all.
-                return putPromise.then(ignoreResult);
-            });
-            // aside from all the events, we also write a marker object to the store
-            // to mark the fact that OOB members have been written for this room.
-            // It's possible that 0 members need to be written as all where previously know
-            // but we still need to know whether to return null or [] from getOutOfBandMembers
-            // where null means out of band members haven't been stored yet for this room
-            const markerObject = {
-                room_id: roomId,
-                oob_written: true,
-                state_key: 0,
-            };
-            const markerPut = promiseifyRequest(store.put(markerObject));
-            const allPuts = eventPuts.concat(markerPut);
-            // ignore the empty array Promise.all creates
-            // as this method should just resolve
-            // to undefined on success
-            resolve(Promise.all(allPuts).then(ignoreResult));
-        }).then(() => {
-            console.log(`LL: backend done storing for ${roomId}!`);
+        const tx = this.db.transaction(["oob_membership_events"], "readwrite");
+        const store = tx.objectStore("oob_membership_events");
+        membershipEvents.forEach((e) => {
+            store.put(e);
         });
+        // aside from all the events, we also write a marker object to the store
+        // to mark the fact that OOB members have been written for this room.
+        // It's possible that 0 members need to be written as all where previously know
+        // but we still need to know whether to return null or [] from getOutOfBandMembers
+        // where null means out of band members haven't been stored yet for this room
+        const markerObject = {
+            room_id: roomId,
+            oob_written: true,
+            state_key: 0,
+        };
+        store.put(markerObject);
+        await txnAsPromise(tx);
+        console.log(`LL: backend done storing for ${roomId}!`);
+    },
+
+    clearOutOfBandMembers: async function(roomId) {
+        // the approach to delete all members for a room
+        // is to get the min and max state key from the index
+        // for that room, and then delete between those
+        // keys in the store.
+        // this should be way faster than deleting every member
+        // individually for a large room.
+        const readTx = this.db.transaction(
+            ["oob_membership_events"],
+            "readonly");
+        const store = readTx.objectStore("oob_membership_events");
+        const roomIndex = store.index("room");
+        const roomRange = IDBKeyRange.only(roomId);
+
+        const minStateKeyProm = reqAsCursorPromise(
+                roomIndex.openKeyCursor(roomRange, "next"),
+            ).then((cursor) => cursor && cursor.primaryKey[1]);
+        const maxStateKeyProm = reqAsCursorPromise(
+                roomIndex.openKeyCursor(roomRange, "prev"),
+            ).then((cursor) => cursor && cursor.primaryKey[1]);
+        const [minStateKey, maxStateKey] = await Promise.all(
+            [minStateKeyProm, maxStateKeyProm]);
+
+        const writeTx = this.db.transaction(
+            ["oob_membership_events"],
+            "readwrite");
+        const writeStore = writeTx.objectStore("oob_membership_events");
+        const membersKeyRange = IDBKeyRange.bound(
+            [roomId, minStateKey],
+            [roomId, maxStateKey],
+        );
+
+        console.log(`LL: Deleting all users + marker in storage for ` +
+            `room ${roomId}, with key range:`,
+            [roomId, minStateKey], [roomId, maxStateKey]);
+        await reqAsPromise(writeStore.delete(membersKeyRange));
     },
 
     /**
@@ -389,7 +424,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 roomsData: roomsData,
                 groupsData: groupsData,
             }); // put == UPSERT
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 
@@ -406,7 +441,7 @@ LocalIndexedDBStoreBackend.prototype = {
             for (let i = 0; i < accountData.length; i++) {
                 store.put(accountData[i]); // put == UPSERT
             }
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 
@@ -428,7 +463,7 @@ LocalIndexedDBStoreBackend.prototype = {
                     event: tuple[1],
                 }); // put == UPSERT
             }
-            return promiseifyTxn(txn);
+            return txnAsPromise(txn);
         });
     },
 

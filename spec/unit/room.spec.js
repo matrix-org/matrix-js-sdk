@@ -1318,6 +1318,9 @@ describe("Room", function() {
                     // events should already be MatrixEvents
                     return function(event) {return event;};
                 },
+                isRoomEncrypted: function() {
+                    return false;
+                },
                 _http: {
                     serverResponse,
                     authedRequest: function() {
@@ -1397,7 +1400,7 @@ describe("Room", function() {
 
     describe("getMyMembership", function() {
         it("should return synced membership if membership isn't available yet",
-        async function() {
+        function() {
             const room = new Room(roomId, null, userA);
             room.setSyncedMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
@@ -1406,6 +1409,42 @@ describe("Room", function() {
                 room: roomId, event: true,
             })]);
             expect(room.getMyMembership()).toEqual("join");
+        });
+    });
+
+    describe("guessDMUserId", function() {
+        it("should return first hero id",
+        function() {
+            const room = new Room(roomId, null, userA);
+            room.setSummary({'m.heroes': [userB]});
+            expect(room.guessDMUserId()).toEqual(userB);
+        });
+        it("should return first member that isn't self",
+        function() {
+            const room = new Room(roomId, null, userA);
+            room.addLiveEvents([utils.mkMembership({
+                user: userB, mship: "join",
+                room: roomId, event: true,
+            })]);
+            expect(room.guessDMUserId()).toEqual(userB);
+        });
+        it("should return self if only member present",
+        function() {
+            const room = new Room(roomId, null, userA);
+            expect(room.guessDMUserId()).toEqual(userA);
+        });
+    });
+
+    describe("maySendMessage", function() {
+        it("should return false if synced membership not join",
+        function() {
+            const room = new Room(roomId, null, userA);
+            room.setSyncedMembership("invite");
+            expect(room.maySendMessage()).toEqual(false);
+            room.setSyncedMembership("leave");
+            expect(room.maySendMessage()).toEqual(false);
+            room.setSyncedMembership("join");
+            expect(room.maySendMessage()).toEqual(true);
         });
     });
 });

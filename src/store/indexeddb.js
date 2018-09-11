@@ -242,4 +242,8 @@ IndexedDBStore.prototype.setOutOfBandMembers = function(roomId, membershipEvents
     return this.backend.setOutOfBandMembers(roomId, membershipEvents);
 };
 
+IndexedDBStore.prototype.clearOutOfBandMembers = function(roomId) {
+    return this.backend.clearOutOfBandMembers(roomId);
+};
+
 module.exports.IndexedDBStore = IndexedDBStore;

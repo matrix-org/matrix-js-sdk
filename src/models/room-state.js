@@ -444,6 +444,22 @@ RoomState.prototype.markOutOfBandMembersFailed = function() {
 };
 
 /**
+ * Clears the loaded out-of-band members
+ */
+RoomState.prototype.clearOutOfBandMembers = function() {
+    let count = 0;
+    Object.keys(this.members).forEach((userId) => {
+        const member = this.members[userId];
+        if (member.isOutOfBand()) {
+            ++count;
+            delete this.members[userId];
+        }
+    });
+    console.log(`LL: RoomState removed ${count} members...`);
+    this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
+};
+
+/**
  * Sets the loaded out-of-band members.
  * @param {MatrixEvent[]} stateEvents array of membership state events
  */
@@ -495,7 +511,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
 
     this._setStateEvent(stateEvent);
     this._updateMember(member);
-    this.emit("RoomState.members", {}, stateEvent, member);
+    this.emit("RoomState.members", stateEvent, this, member);
 };
 
 /**
@@ -651,11 +667,6 @@ RoomState.prototype.maySendStateEvent = function(stateEventType, userId) {
  *                        according to the room's state.
  */
 RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
-    const member = this.getMember(userId);
-    if (!member || member.membership == 'leave') {
-        return false;
-    }
-
     const power_levels_event = this.getStateEvents('m.room.power_levels', '');
 
     let power_levels;
@@ -663,25 +674,34 @@ RoomState.prototype._maySendEventOfType = function(eventType, userId, state) {
 
     let state_default = 0;
     let events_default = 0;
+    let powerLevel = 0;
     if (power_levels_event) {
         power_levels = power_levels_event.getContent();
         events_levels = power_levels.events || {};
 
-        if (utils.isNumber(power_levels.state_default)) {
+        if (Number.isFinite(power_levels.state_default)) {
             state_default = power_levels.state_default;
         } else {
             state_default = 50;
         }
-        if (utils.isNumber(power_levels.events_default)) {
+
+        const userPowerLevel = power_levels.users && power_levels.users[userId];
+        if (Number.isFinite(userPowerLevel)) {
+            powerLevel = userPowerLevel;
+        } else if(Number.isFinite(power_levels.users_default)) {
+            powerLevel = power_levels.users_default;
+        }
+
+        if (Number.isFinite(power_levels.events_default)) {
             events_default = power_levels.events_default;
         }
     }
 
     let required_level = state ? state_default : events_default;
-    if (utils.isNumber(events_levels[eventType])) {
+    if (Number.isFinite(events_levels[eventType])) {
         required_level = events_levels[eventType];
     }
-    return member.powerLevel >= required_level;
+    return powerLevel >= required_level;
 };
 
 /**

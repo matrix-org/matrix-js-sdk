@@ -1,14 +1,92 @@
-BREAKING CHANGE
----------------
-
- * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
-
-Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (TDB)
+Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (2018-09-10)
 ==================================================================================================
-[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6...v0.11.0)
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.0-rc.1...v0.11.0)
+
+BREAKING CHANGES
+----------------
+ * v0.11.0-rc.1 introduced some breaking changes - see the respective release notes.
+
+No changes since rc.1
+
+Changes in [0.11.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0-rc.1) (2018-09-07)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9...v0.11.0-rc.1)
 
  * Support for lazy loading members. This should improve performance for
    users who joined big rooms a lot. Pass to `lazyLoadMembers = true` option when calling `startClient`.
+
+BREAKING CHANGES
+----------------
+
+ * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
+ * A new `CATCHUP` sync state, emitted by `MatrixClient#"sync"` and returned by `MatrixClient::getSyncState()`, when doing initial sync after the `ERROR` state. See `MatrixClient` documentation for details.
+ * `RoomState::maySendEvent('m.room.message', userId)` & `RoomState::maySendMessage(userId)` do not check the membership of the user anymore, only the power level. To check if the syncing user is allowed to write in a room, use `Room::maySendMessage()` as `RoomState` is not always aware of the syncing user's membership anymore, in case lazy loading of members is enabled.
+
+All Changes
+-----------
+
+ * Only emit CATCHUP if recovering from conn error
+   [\#727](https://github.com/matrix-org/matrix-js-sdk/pull/727)
+ * Fix docstring for sync data.error
+   [\#725](https://github.com/matrix-org/matrix-js-sdk/pull/725)
+ * Re-apply "Don't rely on members to query if syncing user can post to room"
+   [\#723](https://github.com/matrix-org/matrix-js-sdk/pull/723)
+ * Revert "Don't rely on members to query if syncing user can post to room"
+   [\#721](https://github.com/matrix-org/matrix-js-sdk/pull/721)
+ * Don't rely on members to query if syncing user can post to room
+   [\#717](https://github.com/matrix-org/matrix-js-sdk/pull/717)
+ * Fixes for room.guessDMUserId
+   [\#719](https://github.com/matrix-org/matrix-js-sdk/pull/719)
+ * Fix filepanel also filtering main timeline with LL turned on.
+   [\#716](https://github.com/matrix-org/matrix-js-sdk/pull/716)
+ * Remove lazy loaded members when leaving room
+   [\#711](https://github.com/matrix-org/matrix-js-sdk/pull/711)
+ * Fix: show spinner again while recovering from connection error
+   [\#702](https://github.com/matrix-org/matrix-js-sdk/pull/702)
+ * Add method to query LL state in client
+   [\#714](https://github.com/matrix-org/matrix-js-sdk/pull/714)
+ * Fix: also load invited members when lazy loading members
+   [\#707](https://github.com/matrix-org/matrix-js-sdk/pull/707)
+ * Pass through function to discard megolm session
+   [\#704](https://github.com/matrix-org/matrix-js-sdk/pull/704)
+
+Changes in [0.10.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9) (2018-09-03)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.2...v0.10.9)
+
+ * No changes since rc.2
+
+Changes in [0.10.9-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.2) (2018-08-31)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.1...v0.10.9-rc.2)
+
+ * Fix for "otherMember.getAvatarUrl is not a function"
+   [\#708](https://github.com/matrix-org/matrix-js-sdk/pull/708)
+
+Changes in [0.10.9-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.1) (2018-08-30)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.8...v0.10.9-rc.1)
+
+ * Fix DM avatar
+   [\#706](https://github.com/matrix-org/matrix-js-sdk/pull/706)
+ * Lazy loading: avoid loading members at initial sync for e2e rooms
+   [\#699](https://github.com/matrix-org/matrix-js-sdk/pull/699)
+ * Improve setRoomEncryption guard against multiple m.room.encryption st…
+   [\#700](https://github.com/matrix-org/matrix-js-sdk/pull/700)
+ * Revert "Lazy loading: don't block on setting up room crypto"
+   [\#698](https://github.com/matrix-org/matrix-js-sdk/pull/698)
+ * Lazy loading: don't block on setting up room crypto
+   [\#696](https://github.com/matrix-org/matrix-js-sdk/pull/696)
+ * Add getVisibleRooms()
+   [\#695](https://github.com/matrix-org/matrix-js-sdk/pull/695)
+ * Add wrapper around getJoinedMemberCount()
+   [\#697](https://github.com/matrix-org/matrix-js-sdk/pull/697)
+ * Api to fetch events via /room/.../event/..
+   [\#694](https://github.com/matrix-org/matrix-js-sdk/pull/694)
+ * Support for room upgrades
+   [\#693](https://github.com/matrix-org/matrix-js-sdk/pull/693)
+ * Lazy loading of room members
+   [\#691](https://github.com/matrix-org/matrix-js-sdk/pull/691)
 
 Changes in [0.10.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.8) (2018-08-20)
 ==================================================================================================
