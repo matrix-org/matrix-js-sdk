@@ -41,6 +41,7 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 const ContentHelpers = require("./content-helpers");
+const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
@@ -786,33 +787,49 @@ MatrixClient.prototype.disableKeyBackup = function() {
 }
 
 /**
- * Create a new key backup version and enable it.
+ * Set up the data required to create a new backup version.  The backup version
+ * will not be created and enabled until createKeyBackupVersion is called.
  */
-MatrixClient.prototype.createKeyBackupVersion = function(callback) {
+MatrixClient.prototype.prepareKeyBackupVersion = function(callback) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
     const decryption = new global.Olm.PkDecryption();
     const public_key = decryption.generate_key();
-    const encryption = new global.Olm.PkEncryption();
-    encryption.set_recipient_key(public_key);
-    const data = {
+    return {
         algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
         auth_data: {
             public_key: public_key,
-        }
+        },
+        // FIXME: pickle isn't the right thing to use, but we don't have
+        // anything else yet, so use it for now
+        recovery_key: decryption.pickle("secret_key"),
     };
+}
+
+/**
+ * Create a new key backup version and enable it, using the information return
+ * from prepareKeyBackupVersion.
+ */
+MatrixClient.prototype.createKeyBackupVersion = function(info, callback) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const data = {
+        algorithm: info.algorithm,
+        auth_data: info.auth_data, // FIXME: should this be cloned?
+    }
     this._crypto._signObject(data.auth_data);
     return this._http.authedRequest(
         undefined, "POST", "/room_keys/version", undefined, data,
     ).then((res) => {
-        this._crypto.backupKey = encryption;
-        // FIXME: pickle isn't the right thing to use, but we don't have
-        // anything else yet
-        const recovery_key = decryption.pickle("secret_key");
-        callback(null, recovery_key);
-        return recovery_key;
+        this.enableKeyBackup(info);
+        if (callback) {
+            callback(null, res);
+        }
+        return res;
     });
 }
 
