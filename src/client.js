@@ -2102,7 +2102,8 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         } else {
-            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state);
+            const stateEvents = utils.map(res.state, self.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
