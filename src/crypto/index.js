@@ -75,7 +75,8 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     // track whether this device's megolm keys are being backed up incrementally
     // to the server or not.
     // XXX: this should probably have a single source of truth from OlmAccount
-    this.backupKey = null;
+    this.backupInfo = null; // The info dict from /room_keys/version
+    this.backupKey = null; // The encryption key object
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -848,6 +849,83 @@ Crypto.prototype.importRoomKeys = function(keys) {
         },
     );
 };
+
+Crypto.prototype._backupPayloadForSession = function(
+    senderKey, forwardingCurve25519KeyChain,
+    sessionId, sessionKey, keysClaimed,
+    exportFormat,
+) {
+    // new session.
+    const session = new Olm.InboundGroupSession();
+    let first_known_index;
+    try {
+        if (exportFormat) {
+            session.import_session(sessionKey);
+        } else {
+            session.create(sessionKey);
+        }
+        if (sessionId != session.session_id()) {
+            throw new Error(
+                "Mismatched group session ID from senderKey: " +
+                    senderKey,
+            );
+        }
+
+        if (!exportFormat) {
+            sessionKey = session.export_session();
+        }
+        const first_known_index = session.first_known_index();
+
+        const sessionData = {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            sender_key: senderKey,
+            sender_claimed_keys: keysClaimed,
+            session_key: sessionKey,
+            forwarding_curve25519_key_chain: forwardingCurve25519KeyChain,
+        };
+        const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
+        return {
+            first_message_index: first_known_index,
+            forwarded_count: forwardingCurve25519KeyChain.length,
+            is_verified: false, // FIXME: how do we determine this?
+            session_data: encrypted,
+        };
+    } finally {
+        session.free();
+    }
+};
+
+Crypto.prototype.backupGroupSession = function(
+    roomId, senderKey, forwardingCurve25519KeyChain,
+    sessionId, sessionKey, keysClaimed,
+    exportFormat,
+) {
+    if (!this.backupInfo) {
+        throw new Error("Key backups are not enabled");
+    }
+
+    const data = this._backupPayloadForSession(
+        senderKey, forwardingCurve25519KeyChain,
+        sessionId, sessionKey, keysClaimed,
+        exportFormat,
+    );
+    return this._baseApis.sendKeyBackup(roomId, sessionId, this.backupInfo.version, data);
+};
+
+Crypto.prototype.backupAllGroupSessions = async function(version) {
+    const keys = await this.exportRoomKeys();
+    const data = {};
+    for (const key of keys) {
+        if (data[key.room_id] === undefined) data[key.room_id] = {sessions: {}};
+
+        data[key.room_id]['sessions'][key.session_id] = this._backupPayloadForSession(
+            key.sender_key, key.forwarding_curve25519_key_chain,
+            key.session_id, key.session_key, key.sender_claimed_keys, true,
+        );
+    }
+    return this._baseApis.sendKeyBackup(undefined, undefined, version, {rooms: data});
+};
+
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.

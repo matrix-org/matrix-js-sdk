@@ -774,7 +774,25 @@ MatrixClient.prototype.getKeyBackupVersion = function(callback) {
             }
             return res;
         }
+    }).catch(e => {
+        if (e.errcode === 'M_NOT_FOUND') {
+            if (callback) callback(null);
+            return null;
+        } else {
+            throw e;
+        }
     });
+}
+
+/**
+ * @returns {bool} true if the client is configured to back up keys to
+ *     the server, otherwise false.
+ */
+MatrixClient.prototype.getKeyBackupEnabled = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return Boolean(this._crypto.backupKey);
 }
 
 /**
@@ -786,6 +804,7 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
         throw new Error("End-to-end encryption disabled");
     }
 
+    this._crypto.backupInfo = info;
     this._crypto.backupKey = new global.Olm.PkEncryption();
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 }
@@ -798,7 +817,8 @@ MatrixClient.prototype.disableKeyBackup = function() {
         throw new Error("End-to-end encryption disabled");
     }
 
-    this._crypto.backupKey = undefined;
+    this._crypto.backupInfo = null;
+    this._crypto.backupKey = null;
 }
 
 /**
@@ -836,17 +856,43 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, callback) {
         algorithm: info.algorithm,
         auth_data: info.auth_data, // FIXME: should this be cloned?
     }
-    this._crypto._signObject(data.auth_data);
-    return this._http.authedRequest(
-        undefined, "POST", "/room_keys/version", undefined, data,
-    ).then((res) => {
-        this.enableKeyBackup(info);
+    return this._crypto._signObject(data.auth_data).then(() => {
+        return this._http.authedRequest(
+            undefined, "POST", "/room_keys/version", undefined, data,
+        );
+    }).then((res) => {
+        this.enableKeyBackup({
+            algorithm: info.algorithm,
+            auth_data: info.auth_data,
+            version: res.version,
+        });
         if (callback) {
             callback(null, res);
         }
         return res;
     });
 }
+
+MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    // If we're currently backing up to this backup... stop.
+    // (We start using it automatically in createKeyBackupVersion
+    // so this is symmetrical).
+    if (this._crypto.backupInfo && this._crypto.backupInfo.version === version) {
+        this.disableKeyBackup();
+    }
+
+    const path = utils.encodeUri("/room_keys/version/$version", {
+        $version: version,
+    });
+
+    return this._http.authedRequest(
+        undefined, "DELETE", path, undefined, undefined,
+    );
+};
 
 MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
     let path;
@@ -890,6 +936,14 @@ MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data
     );
 };
 
+MatrixClient.prototype.backupAllGroupSessions = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    return this._crypto.backupAllGroupSessions(version);
+};
+
 MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessionId, version, callback) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -924,7 +978,7 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessi
     })
 };
 
-MatrixClient.prototype.deleteKeyBackups = function(roomId, sessionId, version, callback) {
+MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version, callback) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }

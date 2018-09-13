@@ -263,6 +263,14 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
+    if (this._crypto.backupInfo) {
+        // Not strictly necessary to wait for this
+        await this._crypto.backupGroupSession(
+            this._roomId, this._olmDevice.deviceCurve25519Key, [],
+            sessionId, key.key,
+        );
+    }
+
     return new OutboundSessionInfo(sessionId);
 };
 
@@ -840,11 +848,13 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         // have another go at decrypting events sent with this session.
         this._retryDecryption(senderKey, sessionId);
     }).then(() => {
-        return this.backupGroupSession(
-            content.room_id, senderKey, forwardingKeyChain,
-            content.session_id, content.session_key, keysClaimed,
-            exportFormat,
-        );
+        if (this._crypto.backupInfo) {
+            return this._crypto.backupGroupSession(
+                content.room_id, senderKey, forwardingKeyChain,
+                content.session_id, content.session_key, keysClaimed,
+                exportFormat,
+            );
+        }
     }).catch((e) => {
         console.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -966,54 +976,6 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         this._retryDecryption(session.sender_key, session.session_id);
     });
 };
-
-MegolmDecryption.prototype.backupGroupSession = async function(
-    roomId, senderKey, forwardingCurve25519KeyChain,
-    sessionId, sessionKey, keysClaimed,
-    exportFormat,
-) {
-    // new session.
-    const session = new Olm.InboundGroupSession();
-    let first_known_index;
-    try {
-        if (exportFormat) {
-            session.import_session(sessionKey);
-        } else {
-            session.create(sessionKey);
-        }
-        if (sessionId != session.session_id()) {
-            throw new Error(
-                "Mismatched group session ID from senderKey: " +
-                    senderKey,
-            );
-        }
-
-        if (!exportFormat) {
-            sessionKey = session.export_session();
-        }
-        const first_known_index = session.first_known_index();
-
-        const sessionData = {
-            algorithm: olmlib.MEGOLM_ALGORITHM,
-            sender_key: senderKey,
-            sender_claimed_keys: keysClaimed,
-            forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
-            session_key: sessionKey
-        };
-        const encrypted = this._crypto.backupKey.encrypt(JSON.stringify(sessionData));
-        const data = {
-            first_message_index: first_known_index,
-            forwarded_count: forwardingCurve25519KeyChain.length,
-            is_verified: false, // FIXME: how do we determine this?
-            session_data: encrypted
-        };
-        return this._baseApis.sendKeyBackup(roomId, sessionId, data);
-    } catch (e) {
-        return Promise.reject(e);
-    } finally {
-        session.free();
-    }
-}
 
 /**
  * Have another go at decrypting events after we receive a key
