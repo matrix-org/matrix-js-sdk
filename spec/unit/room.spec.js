@@ -863,24 +863,24 @@ describe("Room", function() {
                 expect(name.indexOf(userB)).toNotEqual(-1, name);
             });
 
-            it("should show the room alias if one exists for private " +
+            it("should not show the room alias if one exists for private " +
             "(invite join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("invite");
                 setAliases([alias, "#another:one"]);
                 room.recalculate();
                 const name = room.name;
-                expect(name).toEqual(alias);
+                expect(name).toEqual("Empty room");
             });
 
-            it("should show the room alias if one exists for public " +
+            it("should not show the room alias if one exists for public " +
             "(public join_rules) rooms if a room name doesn't exist.", function() {
                 const alias = "#room_alias:here";
                 setJoinRule("public");
                 setAliases([alias, "#another:one"]);
                 room.recalculate();
                 const name = room.name;
-                expect(name).toEqual(alias);
+                expect(name).toEqual("Empty room");
             });
 
             it("should show the room name if one exists for private " +
