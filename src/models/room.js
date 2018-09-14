@@ -1524,15 +1524,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         }
     }
 
-    let alias = room.getCanonicalAlias();
-
-    if (!alias) {
-        const aliases = room.getAliases();
-
-        if (aliases.length) {
-            alias = aliases[0];
-        }
-    }
+    const alias = room.getCanonicalAlias();
     if (alias) {
         return alias;
     }
