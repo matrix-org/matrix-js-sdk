@@ -849,6 +849,8 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         this._retryDecryption(senderKey, sessionId);
     }).then(() => {
         if (this._crypto.backupInfo) {
+            // XXX: No retries on this at all: if this request dies for whatever
+            // reason, this key will never be uploaded.
             return this._crypto.backupGroupSession(
                 content.room_id, senderKey, forwardingKeyChain,
                 content.session_id, content.session_key, keysClaimed,

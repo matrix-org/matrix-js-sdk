@@ -544,7 +544,15 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
     if (verified === undefined) {
         verified = true;
     }
-    return _setDeviceVerification(this, userId, deviceId, verified, null);
+    const prom = _setDeviceVerification(this, userId, deviceId, verified, null);
+
+    // if one of the user's own devices is being marked as verified / unverified,
+    // check the key backup status, since whether or not we use this depends on
+    // whether it has a signature from a verified device
+    if (userId == this.credentials.userId) {
+        this._crypto.checkKeyBackup();
+    }
+    return prom;
 };
 
 /**
@@ -752,10 +760,6 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
  * Get information about the current key backup.
  */
 MatrixClient.prototype.getKeyBackupVersion = function(callback) {
-    if (this._crypto === null) {
-        throw new Error("End-to-end encryption disabled");
-    }
-
     return this._http.authedRequest(
         undefined, "GET", "/room_keys/version",
     ).then((res) => {
@@ -785,6 +789,20 @@ MatrixClient.prototype.getKeyBackupVersion = function(callback) {
 }
 
 /**
+ * @param {object} info key backup info dict from getKeyBackupVersion()
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+MatrixClient.prototype.isKeyBackupTrusted = function(info) {
+    return this._crypto.isKeyBackupTrusted(info);
+};
+
+/**
  * @returns {bool} true if the client is configured to back up keys to
  *     the server, otherwise false.
  */
@@ -807,6 +825,8 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupInfo = info;
     this._crypto.backupKey = new global.Olm.PkEncryption();
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
+
+    this.emit('keyBackupStatus', true);
 }
 
 /**
@@ -819,6 +839,8 @@ MatrixClient.prototype.disableKeyBackup = function() {
 
     this._crypto.backupInfo = null;
     this._crypto.backupKey = null;
+
+    this.emit('keyBackupStatus', false);
 }
 
 /**
@@ -3969,6 +3991,18 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @example
  * matrixClient.on("accountData", function(event){
  *   myAccountData[event.type] = event.content;
+ * });
+ */
+
+/**
+ * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
+ * @event module:client~MatrixClient#"keyBackupStatus"
+ * @param {bool} enabled true if key backup has been enabled, otherwise false
+ * @example
+ * matrixClient.on("keyBackupStatus", function(enabled){
+ *   if (enabled) {
+ *     [...]
+ *   }
  * });
  */
 

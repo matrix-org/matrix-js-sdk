@@ -77,6 +77,7 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     // XXX: this should probably have a single source of truth from OlmAccount
     this.backupInfo = null; // The info dict from /room_keys/version
     this.backupKey = null; // The encryption key object
+    this._checkedForBackup = false; // Have we checked the server for a backup we can use?
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -180,6 +181,113 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+
+    this._checkAndStartKeyBackup();
+};
+
+/**
+ * Check the server for an active key backup and
+ * if one is present and has a valid signature from
+ * one of the user's verified devices, start backing up
+ * to it.
+ */
+Crypto.prototype._checkAndStartKeyBackup = async function() {
+    console.log("Checking key backup status...");
+    let backupInfo;
+    try {
+        backupInfo = await this._baseApis.getKeyBackupVersion();
+    } catch (e) {
+        console.log("Error checking for active key backup", e);
+        if (Number.isFinite(e.httpStatus) && e.httpStatus / 100 === 4) {
+            // well that's told us. we won't try again.
+            this._checkedForBackup = true;
+        }
+        return;
+    }
+    this._checkedForBackup = true;
+
+    const trustInfo = await this.isKeyBackupTrusted(backupInfo);
+
+    if (trustInfo.usable && !this.backupInfo) {
+        console.log("Found usable key backup: enabling key backups");
+        this._baseApis.enableKeyBackup(backupInfo);
+    } else if (!trustInfo.usable && this.backupInfo) {
+        console.log("No usable key backup: disabling key backup");
+        this._baseApis.disableKeyBackup();
+    } else if (!trustInfo.usable && !this.backupInfo) {
+        console.log("No usable key backup: not enabling key backup");
+    }
+};
+
+/**
+ * Forces a re-check of the key backup and enables/disables it
+ * as appropriate
+ */
+Crypto.prototype.checkKeyBackup = async function(backupInfo) {
+    this._checkedForBackup = false;
+    await this._checkAndStartKeyBackup();
+};
+
+/**
+ * @param {object} backupInfo key backup info dict from /room_keys/version
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
+    const ret = {
+        usable: false,
+        sigs: [],
+    };
+
+    if (
+        !backupInfo ||
+        !backupInfo.algorithm ||
+        !backupInfo.auth_data ||
+        !backupInfo.auth_data.public_key ||
+        !backupInfo.auth_data.signatures
+    ) {
+        console.log("Key backup is absent or missing required data");
+        return ret;
+    }
+
+    const mySigs = backupInfo.auth_data.signatures[this._userId];
+    if (!mySigs || mySigs.length === 0) {
+        console.log("Ignoring key backup because it lacks any signatures from this user");
+        return ret;
+    }
+
+    for (const keyId of Object.keys(mySigs)) {
+        const device = this._deviceList.getStoredDevice(
+            this._userId, keyId.split(':')[1], // XXX: is this how we're supposed to get the device ID?
+        );
+        if (!device) {
+            console.log("Ignoring signature from unknown key " + keyId);
+            continue;
+        }
+        const sigInfo = { device };
+        try {
+            await olmlib.verifySignature(
+                this._olmDevice,
+                backupInfo.auth_data,
+                this._userId,
+                device.deviceId,
+                device.getFingerprint(),
+            );
+            sigInfo.valid = true;
+        } catch (e) {
+            console.log("Bad signature from device " + device.deviceId, e);
+            sigInfo.valid = false;
+        }
+        ret.sigs.push(sigInfo);
+    }
+
+    ret.usable = ret.sigs.some(s => s.valid && s.device.isVerified());
+    return ret;
 };
 
 /**
@@ -1231,6 +1339,12 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     if (!content.room_id || !content.algorithm) {
         console.error("key event is missing fields");
         return;
+    }
+
+    if (!this._checkedForBackup) {
+        // don't bother awaiting on this - the important thing is that we retry if we
+        // haven't managed to check before
+        this._checkAndStartKeyBackup();
     }
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
