@@ -1405,6 +1405,23 @@ describe("Room", function() {
             room.updateMyMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
         });
+        it("should emit a Room.myMembership event on a change",
+        function() {
+            const room = new Room(roomId, null, userA);
+            const events = [];
+            room.on("Room.myMembership", (_room, membership, oldMembership) => {
+                events.push({membership, oldMembership});
+            });
+            room.updateMyMembership("invite");
+            expect(room.getMyMembership()).toEqual("invite");
+            expect(events[0]).toEqual({membership: "invite", oldMembership: null});
+            events.splice(0);   //clear
+            room.updateMyMembership("invite");
+            expect(events.length).toEqual(0);
+            room.updateMyMembership("join");
+            expect(room.getMyMembership()).toEqual("join");
+            expect(events[0]).toEqual({membership: "join", oldMembership: "invite"});
+        });
     });
 
     describe("guessDMUserId", function() {
