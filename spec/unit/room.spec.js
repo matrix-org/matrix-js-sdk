@@ -1402,13 +1402,8 @@ describe("Room", function() {
         it("should return synced membership if membership isn't available yet",
         function() {
             const room = new Room(roomId, null, userA);
-            room.setSyncedMembership("invite");
+            room.updateMyMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
-            room.addLiveEvents([utils.mkMembership({
-                user: userA, mship: "join",
-                room: roomId, event: true,
-            })]);
-            expect(room.getMyMembership()).toEqual("join");
         });
     });
 
@@ -1439,11 +1434,11 @@ describe("Room", function() {
         it("should return false if synced membership not join",
         function() {
             const room = new Room(roomId, null, userA);
-            room.setSyncedMembership("invite");
+            room.updateMyMembership("invite");
             expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("leave");
+            room.updateMyMembership("leave");
             expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("join");
+            room.updateMyMembership("join");
             expect(room.maySendMessage()).toEqual(true);
         });
     });
