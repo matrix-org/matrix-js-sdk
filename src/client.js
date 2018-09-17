@@ -991,6 +991,24 @@ MatrixClient.prototype.backupAllGroupSessions = function(version) {
     return this._crypto.backupAllGroupSessions(version);
 };
 
+MatrixClient.prototype.isValidRecoveryKey = function(decryptionKey) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        // FIXME: see the FIXME in createKeyBackupVersion
+        decryption.unpickle("secret_key", decryptionKey);
+        return true;
+    } catch (e) {
+        console.log(e);
+        return false;
+    } finally {
+        decryption.free();
+    }
+};
+
 MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, targetRoomId, targetSessionId, version) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
