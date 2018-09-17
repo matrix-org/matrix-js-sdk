@@ -86,7 +86,7 @@ function keyFromRecoverySession(session, decryptionKey, keys) {
         keys.push(JSON.parse(decryptionKey.decrypt(
             session.session_data.ephemeral,
             session.session_data.mac,
-            session.session_data.ciphertext
+            session.session_data.ciphertext,
         )));
     } catch (e) {
         console.log("Failed to decrypt key from backup", e);
@@ -783,35 +783,30 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
 
 /**
  * Get information about the current key backup.
+ * @returns {Promise} Information object from API or null
  */
-MatrixClient.prototype.getKeyBackupVersion = function(callback) {
+MatrixClient.prototype.getKeyBackupVersion = function() {
     return this._http.authedRequest(
         undefined, "GET", "/room_keys/version",
     ).then((res) => {
         if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
             const err = "Unknown backup algorithm: " + res.algorithm;
-            callback(err);
             return Promise.reject(err);
         } else if (!(typeof res.auth_data === "object")
                    || !res.auth_data.public_key) {
             const err = "Invalid backup data returned";
-            callback(err);
             return Promise.reject(err);
         } else {
-            if (callback) {
-                callback(null, res);
-            }
             return res;
         }
-    }).catch(e => {
+    }).catch((e) => {
         if (e.errcode === 'M_NOT_FOUND') {
-            if (callback) callback(null);
             return null;
         } else {
             throw e;
         }
     });
-}
+};
 
 /**
  * @param {object} info key backup info dict from getKeyBackupVersion()
@@ -836,11 +831,13 @@ MatrixClient.prototype.getKeyBackupEnabled = function() {
         throw new Error("End-to-end encryption disabled");
     }
     return Boolean(this._crypto.backupKey);
-}
+};
 
 /**
  * Enable backing up of keys, using data previously returned from
  * getKeyBackupVersion.
+ *
+ * @param {object} info Backup information object as returned by getKeyBackupVersion
  */
 MatrixClient.prototype.enableKeyBackup = function(info) {
     if (this._crypto === null) {
@@ -852,7 +849,7 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
     this.emit('keyBackupStatus', true);
-}
+};
 
 /**
  * Disable backing up of keys.
@@ -866,35 +863,41 @@ MatrixClient.prototype.disableKeyBackup = function() {
     this._crypto.backupKey = null;
 
     this.emit('keyBackupStatus', false);
-}
+};
 
 /**
  * Set up the data required to create a new backup version.  The backup version
  * will not be created and enabled until createKeyBackupVersion is called.
+ *
+ * @returns {object} Object that can be passed to createKeyBackupVersion and
+ *     additionally has a 'recovery_key' member with the user-facing recovery key string.
  */
-MatrixClient.prototype.prepareKeyBackupVersion = function(callback) {
+MatrixClient.prototype.prepareKeyBackupVersion = function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
     const decryption = new global.Olm.PkDecryption();
-    const public_key = decryption.generate_key();
+    const publicKey = decryption.generate_key();
     return {
         algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
         auth_data: {
-            public_key: public_key,
+            public_key: publicKey,
         },
         // FIXME: pickle isn't the right thing to use, but we don't have
         // anything else yet, so use it for now
         recovery_key: decryption.pickle("secret_key"),
     };
-}
+};
 
 /**
  * Create a new key backup version and enable it, using the information return
  * from prepareKeyBackupVersion.
+ *
+ * @param {object} info Info object from prepareKeyBackupVersion
+ * @returns {Promise<object>} Object with 'version' param indicating the version created
  */
-MatrixClient.prototype.createKeyBackupVersion = function(info, callback) {
+MatrixClient.prototype.createKeyBackupVersion = function(info) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -902,7 +905,7 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, callback) {
     const data = {
         algorithm: info.algorithm,
         auth_data: info.auth_data, // FIXME: should this be cloned?
-    }
+    };
     return this._crypto._signObject(data.auth_data).then(() => {
         return this._http.authedRequest(
             undefined, "POST", "/room_keys/version", undefined, data,
@@ -913,12 +916,9 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, callback) {
             auth_data: info.auth_data,
             version: res.version,
         });
-        if (callback) {
-            callback(null, res);
-        }
         return res;
     });
-}
+};
 
 MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
     if (this._crypto === null) {
@@ -955,31 +955,30 @@ MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version)
     } else {
         path = "/room_keys/keys";
     }
-    const queryData = version === undefined ? undefined : {version : version};
+    const queryData = version === undefined ? undefined : { version: version };
     return {
         path: path,
         queryData: queryData,
-    }
-}
+    };
+};
 
 /**
  * Back up session keys to the homeserver.
  * @param {string} roomId ID of the room that the keys are for Optional.
  * @param {string} sessionId ID of the session that the keys are for Optional.
  * @param {integer} version backup version Optional.
- * @param {object} key data
- * @param {module:client.callback} callback Optional.
+ * @param {object} data Object keys to send
  * @return {module:client.Promise} a promise that will resolve when the keys
  * are uploaded
  */
-MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data, callback) {
+MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
-        callback, "PUT", path.path, path.queryData, data,
+        undefined, "PUT", path.path, path.queryData, data,
     );
 };
 
@@ -1009,7 +1008,9 @@ MatrixClient.prototype.isValidRecoveryKey = function(decryptionKey) {
     }
 };
 
-MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, targetRoomId, targetSessionId, version) {
+MatrixClient.prototype.restoreKeyBackups = function(
+    decryptionKey, targetRoomId, targetSessionId, version,
+) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -1039,27 +1040,32 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, targetRoomId,
             }
         } else if (res.sessions) {
             totalKeyCount = Object.keys(res.sessions).length;
-            keys.push(...keysFromRecoverySession(res.sessions, decryption, roomId, keys));
+            keys.push(...keysFromRecoverySession(
+                res.sessions, decryption, targetRoomId, keys,
+            ));
         } else {
             totalKeyCount = 1;
-            keys.push(keyFromRecoverySession(res, decryption, keys));
+            const key = keyFromRecoverySession(res, decryption, keys);
+            key.room_id = targetRoomId;
+            key.session_id = targetSessionId;
+            keys.push(key);
         }
 
         return this.importRoomKeys(keys);
     }).then(() => {
         return {total: totalKeyCount, imported: keys.length};
-    })
+    });
 };
 
-MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version, callback) {
+MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
-        callback, "DELETE", path.path, path.queryData,
-    )
+        undefined, "DELETE", path.path, path.queryData,
+    );
 };
 
 // Group ops
