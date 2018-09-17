@@ -178,7 +178,7 @@ function Room(roomId, client, myUserId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
-    this._syncedMembership = null;
+    this._selfMembership = null;
     this._summaryHeroes = null;
     // awaited by getEncryptionTargetMembers while room members are loading
 
@@ -263,7 +263,7 @@ Room.prototype.getMyMembership = function() {
             return me.membership;
         }
     }
-    return this._syncedMembership;
+    return this._selfMembership;
 };
 
 /**
@@ -278,7 +278,7 @@ Room.prototype.getDMInviter = function() {
             return me.getDMInviter();
         }
     }
-    if (this._syncedMembership === "invite") {
+    if (this._selfMembership === "invite") {
         // fall back to summary information
         const memberCount = this.getInvitedAndJoinedMemberCount();
         if (memberCount == 2 && this._summaryHeroes.length) {
@@ -362,8 +362,15 @@ Room.prototype.getAvatarFallbackMember = function() {
  * Sets the membership this room was received as during sync
  * @param {string} membership join | leave | invite
  */
-Room.prototype.setSyncedMembership = function(membership) {
-    this._syncedMembership = membership;
+Room.prototype.updateMyMembership = function(membership) {
+    const prevMembership = this._selfMembership;
+    this._selfMembership = membership;
+    if (prevMembership !== membership) {
+        if (membership === "leave") {
+            this._cleanupAfterLeaving();
+        }
+        this.emit("Room.myMembership", this, membership, prevMembership);
+    }
 };
 
 Room.prototype._loadMembersFromServer = async function() {
@@ -470,7 +477,7 @@ Room.prototype.clearLoadedMembersIfNeeded = async function() {
  * called when sync receives this room in the leave section
  * to do cleanup after leaving a room. Possibly called multiple times.
  */
-Room.prototype.onLeft = function() {
+Room.prototype._cleanupAfterLeaving = function() {
     this.clearLoadedMembersIfNeeded().catch((err) => {
         console.error(`error after clearing loaded members from ` +
             `room ${this.roomId} after leaving`);
