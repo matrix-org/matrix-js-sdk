@@ -257,12 +257,6 @@ Room.prototype.getLiveTimeline = function() {
  * @return {string} the membership type (join | leave | invite) for the logged in user
  */
 Room.prototype.getMyMembership = function() {
-    if (this.myUserId) {
-        const me = this.getMember(this.myUserId);
-        if (me) {
-            return me.membership;
-        }
-    }
     return this._selfMembership;
 };
 
