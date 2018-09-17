@@ -36,6 +36,11 @@ const DeviceList = require('./DeviceList').default;
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
+const Olm = global.Olm;
+if (!Olm) {
+    throw new Error("global.Olm is not defined");
+}
+
 /**
  * Cryptography bits
  *
@@ -222,6 +227,8 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
 /**
  * Forces a re-check of the key backup and enables/disables it
  * as appropriate
+ *
+ * @param {object} backupInfo Backup info from /room_keys/version endpoint
  */
 Crypto.prototype.checkKeyBackup = async function(backupInfo) {
     this._checkedForBackup = false;
@@ -286,7 +293,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         ret.sigs.push(sigInfo);
     }
 
-    ret.usable = ret.sigs.some(s => s.valid && s.device.isVerified());
+    ret.usable = ret.sigs.some((s) => s.valid && s.device.isVerified());
     return ret;
 };
 
@@ -965,7 +972,6 @@ Crypto.prototype._backupPayloadForSession = function(
 ) {
     // new session.
     const session = new Olm.InboundGroupSession();
-    let first_known_index;
     try {
         if (exportFormat) {
             session.import_session(sessionKey);
@@ -982,7 +988,7 @@ Crypto.prototype._backupPayloadForSession = function(
         if (!exportFormat) {
             sessionKey = session.export_session();
         }
-        const first_known_index = session.first_known_index();
+        const firstKnownIndex = session.first_known_index();
 
         const sessionData = {
             algorithm: olmlib.MEGOLM_ALGORITHM,
@@ -993,7 +999,7 @@ Crypto.prototype._backupPayloadForSession = function(
         };
         const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
         return {
-            first_message_index: first_known_index,
+            first_message_index: firstKnownIndex,
             forwarded_count: forwardingCurve25519KeyChain.length,
             is_verified: false, // FIXME: how do we determine this?
             session_data: encrypted,
