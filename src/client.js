@@ -68,6 +68,31 @@ try {
     console.warn("Unable to load crypto module: crypto will be disabled: " + e);
 }
 
+function keysFromRecoverySession(sessions, decryptionKey, roomId, keys) {
+    for (const [sessionId, sessionData] of Object.entries(sessions)) {
+        try {
+            const decrypted = keyFromRecoverySession(sessionData, decryptionKey, keys);
+            decrypted.session_id = sessionId;
+            decrypted.room_id = roomId;
+            return decrypted;
+        } catch (e) {
+            console.log("Failed to decrypt session from backup");
+        }
+    }
+}
+
+function keyFromRecoverySession(session, decryptionKey, keys) {
+    try {
+        keys.push(JSON.parse(decryptionKey.decrypt(
+            session.session_data.ephemeral,
+            session.session_data.mac,
+            session.session_data.ciphertext
+        )));
+    } catch (e) {
+        console.log("Failed to decrypt key from backup", e);
+    }
+}
+
 /**
  * Construct a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -966,7 +991,7 @@ MatrixClient.prototype.backupAllGroupSessions = function(version) {
     return this._crypto.backupAllGroupSessions(version);
 };
 
-MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessionId, version, callback) {
+MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, targetRoomId, targetSessionId, version) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -975,28 +1000,36 @@ MatrixClient.prototype.restoreKeyBackups = function(decryptionKey, roomId, sessi
     const decryption = new global.Olm.PkDecryption();
     decryption.unpickle("secret_key", decryptionKey);
 
-    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    let totalKeyCount = 0;
+    const keys = [];
+
+    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData,
     ).then((res) => {
-        const keys = [];
-        // FIXME: for each room, session, if response has multiple
-        // decrypt response.data.session_data
-        const session_data = res.session_data;
-        const key = JSON.parse(decryption.decrypt(
-            session_data.ephemeral,
-            session_data.mac,
-            session_data.ciphertext
-        ));
-        // set room_id and session_id
-        key.room_id = roomId;
-        key.session_id = sessionId;
-        keys.push(key);
+        if (res.rooms) {
+            for (const [roomId, roomData] of Object.entries(res.rooms)) {
+                if (!roomData.sessions) continue;
+
+                totalKeyCount += Object.keys(roomData.sessions).length;
+                const roomKeys = [];
+                keysFromRecoverySession(roomData.sessions, decryption, roomId, roomKeys);
+                for (const k of roomKeys) {
+                    k.room_id = roomId;
+                    keys.push(k);
+                }
+            }
+        } else if (res.sessions) {
+            totalKeyCount = Object.keys(res.sessions).length;
+            keys.push(...keysFromRecoverySession(res.sessions, decryption, roomId, keys));
+        } else {
+            totalKeyCount = 1;
+            keys.push(keyFromRecoverySession(res, decryption, keys));
+        }
+
         return this.importRoomKeys(keys);
     }).then(() => {
-        if (callback) {
-            callback();
-        }
+        return {total: totalKeyCount, imported: keys.length};
     })
 };
 
