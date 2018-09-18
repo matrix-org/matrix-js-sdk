@@ -845,6 +845,7 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     }
 
     this._crypto.backupInfo = info;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
     this._crypto.backupKey = new global.Olm.PkEncryption();
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
@@ -860,6 +861,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
     }
 
     this._crypto.backupInfo = null;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
     this._crypto.backupKey = null;
 
     this.emit('keyBackupStatus', false);
@@ -878,16 +880,20 @@ MatrixClient.prototype.prepareKeyBackupVersion = function() {
     }
 
     const decryption = new global.Olm.PkDecryption();
-    const publicKey = decryption.generate_key();
-    return {
-        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-        auth_data: {
-            public_key: publicKey,
-        },
-        // FIXME: pickle isn't the right thing to use, but we don't have
-        // anything else yet, so use it for now
-        recovery_key: decryption.pickle("secret_key"),
-    };
+    try {
+        const publicKey = decryption.generate_key();
+        return {
+            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+            auth_data: {
+                public_key: publicKey,
+            },
+            // FIXME: pickle isn't the right thing to use, but we don't have
+            // anything else yet, so use it for now
+            recovery_key: decryption.pickle("secret_key"),
+        };
+    } finally {
+        decryption.free();
+    }
 };
 
 /**
@@ -1014,15 +1020,20 @@ MatrixClient.prototype.restoreKeyBackups = function(
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-
-    // FIXME: see the FIXME in createKeyBackupVersion
-    const decryption = new global.Olm.PkDecryption();
-    decryption.unpickle("secret_key", decryptionKey);
-
     let totalKeyCount = 0;
     const keys = [];
 
     const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
+
+    // FIXME: see the FIXME in createKeyBackupVersion
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        decryption.unpickle("secret_key", decryptionKey);
+    } catch(e) {
+        decryption.free();
+        throw e;
+    }
+
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData,
     ).then((res) => {
@@ -1055,6 +1066,8 @@ MatrixClient.prototype.restoreKeyBackups = function(
         return this.importRoomKeys(keys);
     }).then(() => {
         return {total: totalKeyCount, imported: keys.length};
+    }).finally(() => {
+        decryption.free();
     });
 };
 
