@@ -43,6 +43,42 @@ const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';
 
+const ENCRYPTED_EVENT = new MatrixEvent({
+    type: 'm.room.encrypted',
+    room_id: '!ROOM:ID',
+    content: {
+        algorithm: 'm.megolm.v1.aes-sha2',
+        sender_key: 'SENDER_CURVE25519',
+        session_id: 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
+        ciphertext: 'AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N'
+            + 'CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl'
+            + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs',
+    },
+    event_id: '$event1',
+    origin_server_ts: 1507753886000,
+});
+
+const KEY_BACKUP_DATA = {
+    first_message_index: 0,
+    forwarded_count: 0,
+    is_verified: false,
+    session_data: {
+        ciphertext: '2z2M7CZ+azAiTHN1oFzZ3smAFFt+LEOYY6h3QO3XXGdw'
+            + '6YpNn/gpHDO6I/rgj1zNd4FoTmzcQgvKdU8kN20u5BWRHxaHTZ'
+            + 'Slne5RxE6vUdREsBgZePglBNyG0AogR/PVdcrv/v18Y6rLM5O9'
+            + 'SELmwbV63uV9Kuu/misMxoqbuqEdG7uujyaEKtjlQsJ5MGPQOy'
+            + 'Syw7XrnesSwF6XWRMxcPGRV0xZr3s9PI350Wve3EncjRgJ9IGF'
+            + 'ru1bcptMqfXgPZkOyGvrphHoFfoK7nY3xMEHUiaTRfRIjq8HNV'
+            + '4o8QY1qmWGnxNBQgOlL8MZlykjg3ULmQ3DtFfQPj/YYGS3jzxv'
+            + 'C+EBjaafmsg+52CTeK3Rswu72PX450BnSZ1i3If4xWAUKvjTpe'
+            + 'Ug5aDLqttOv1pITolTJDw5W/SD+b5rjEKg1CFCHGEGE9wwV3Nf'
+            + 'QHVCQL+dfpd7Or0poy4dqKMAi3g0o3Tg7edIF8d5rREmxaALPy'
+            + 'iie8PHD8mj/5Y0GLqrac4CD6+Mop7eUTzVovprjg',
+        mac: '5lxYBHQU80M',
+        ephemeral: '/Bn0A4UMFwJaDDvh0aEk1XZj3k1IfgCxgFY9P9a0b14',
+    },
+};
+
 describe("MegolmBackup", function() {
     if (!global.Olm) {
         console.warn('Not running megolm backup unit tests: libolm not present');
@@ -179,41 +215,8 @@ describe("MegolmBackup", function() {
         });
 
         it('can restore from backup', function() {
-            const event = new MatrixEvent({
-                type: 'm.room.encrypted',
-                room_id: '!ROOM:ID',
-                content: {
-                    algorithm: 'm.megolm.v1.aes-sha2',
-                    sender_key: 'SENDER_CURVE25519',
-                    session_id: 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
-                    ciphertext: 'AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N'
-                        + 'CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl'
-                        + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs',
-                },
-                event_id: '$event1',
-                origin_server_ts: 1507753886000,
-            });
             client._http.authedRequest = function() {
-                return Promise.resolve({
-                    first_message_index: 0,
-                    forwarded_count: 0,
-                    is_verified: false,
-                    session_data: {
-                        ciphertext: '2z2M7CZ+azAiTHN1oFzZ3smAFFt+LEOYY6h3QO3XXGdw'
-                            + '6YpNn/gpHDO6I/rgj1zNd4FoTmzcQgvKdU8kN20u5BWRHxaHTZ'
-                            + 'Slne5RxE6vUdREsBgZePglBNyG0AogR/PVdcrv/v18Y6rLM5O9'
-                            + 'SELmwbV63uV9Kuu/misMxoqbuqEdG7uujyaEKtjlQsJ5MGPQOy'
-                            + 'Syw7XrnesSwF6XWRMxcPGRV0xZr3s9PI350Wve3EncjRgJ9IGF'
-                            + 'ru1bcptMqfXgPZkOyGvrphHoFfoK7nY3xMEHUiaTRfRIjq8HNV'
-                            + '4o8QY1qmWGnxNBQgOlL8MZlykjg3ULmQ3DtFfQPj/YYGS3jzxv'
-                            + 'C+EBjaafmsg+52CTeK3Rswu72PX450BnSZ1i3If4xWAUKvjTpe'
-                            + 'Ug5aDLqttOv1pITolTJDw5W/SD+b5rjEKg1CFCHGEGE9wwV3Nf'
-                            + 'QHVCQL+dfpd7Or0poy4dqKMAi3g0o3Tg7edIF8d5rREmxaALPy'
-                            + 'iie8PHD8mj/5Y0GLqrac4CD6+Mop7eUTzVovprjg',
-                        mac: '5lxYBHQU80M',
-                        ephemeral: '/Bn0A4UMFwJaDDvh0aEk1XZj3k1IfgCxgFY9P9a0b14',
-                    },
-                });
+                return Promise.resolve(KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackups(
                 "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
@@ -221,7 +224,29 @@ describe("MegolmBackup", function() {
                 ROOM_ID,
                 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
             ).then(() => {
-                return megolmDecryption.decryptEvent(event);
+                return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
+            }).then((res) => {
+                expect(res.clearEvent.content).toEqual('testytest');
+            });
+        });
+
+        it('can restore backup by room', function() {
+            client._http.authedRequest = function() {
+                return Promise.resolve({
+                    rooms: {
+                        [ROOM_ID]: {
+                            sessions: {
+                                'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc': KEY_BACKUP_DATA,
+                            },
+                        },
+                    }
+                });
+            };
+            return client.restoreKeyBackups(
+                "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
+                + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
+            ).then(() => {
+                return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
                 expect(res.clearEvent.content).toEqual('testytest');
             });

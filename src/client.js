@@ -68,29 +68,27 @@ try {
     console.warn("Unable to load crypto module: crypto will be disabled: " + e);
 }
 
-function keysFromRecoverySession(sessions, decryptionKey, roomId, keys) {
+function keysFromRecoverySession(sessions, decryptionKey, roomId) {
+    const keys = [];
     for (const [sessionId, sessionData] of Object.entries(sessions)) {
         try {
-            const decrypted = keyFromRecoverySession(sessionData, decryptionKey, keys);
+            const decrypted = keyFromRecoverySession(sessionData, decryptionKey);
             decrypted.session_id = sessionId;
             decrypted.room_id = roomId;
-            return decrypted;
+            keys.push(decrypted);
         } catch (e) {
             console.log("Failed to decrypt session from backup");
         }
     }
+    return keys;
 }
 
-function keyFromRecoverySession(session, decryptionKey, keys) {
-    try {
-        keys.push(JSON.parse(decryptionKey.decrypt(
-            session.session_data.ephemeral,
-            session.session_data.mac,
-            session.session_data.ciphertext,
-        )));
-    } catch (e) {
-        console.log("Failed to decrypt key from backup", e);
-    }
+function keyFromRecoverySession(session, decryptionKey) {
+    return JSON.parse(decryptionKey.decrypt(
+        session.session_data.ephemeral,
+        session.session_data.mac,
+        session.session_data.ciphertext,
+    ));
 }
 
 /**
@@ -1021,7 +1019,7 @@ MatrixClient.prototype.restoreKeyBackups = function(
         throw new Error("End-to-end encryption disabled");
     }
     let totalKeyCount = 0;
-    const keys = [];
+    let keys = [];
 
     const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
 
@@ -1042,8 +1040,7 @@ MatrixClient.prototype.restoreKeyBackups = function(
                 if (!roomData.sessions) continue;
 
                 totalKeyCount += Object.keys(roomData.sessions).length;
-                const roomKeys = [];
-                keysFromRecoverySession(roomData.sessions, decryption, roomId, roomKeys);
+                const roomKeys = keysFromRecoverySession(roomData.sessions, decryption, roomId, roomKeys);
                 for (const k of roomKeys) {
                     k.room_id = roomId;
                     keys.push(k);
@@ -1051,15 +1048,18 @@ MatrixClient.prototype.restoreKeyBackups = function(
             }
         } else if (res.sessions) {
             totalKeyCount = Object.keys(res.sessions).length;
-            keys.push(...keysFromRecoverySession(
+            keys = keysFromRecoverySession(
                 res.sessions, decryption, targetRoomId, keys,
-            ));
+            );
         } else {
             totalKeyCount = 1;
-            keyFromRecoverySession(res, decryption, keys);
-            if (keys.length) {
-                keys[0].room_id = targetRoomId;
-                keys[0].session_id = targetSessionId;
+            try {
+                const key = keyFromRecoverySession(res, decryption);
+                key.room_id = targetRoomId;
+                key.session_id = targetSessionId;
+                keys.push(key);
+            } catch (e) {
+                console.log("Failed to decrypt session from backup");
             }
         }
 
