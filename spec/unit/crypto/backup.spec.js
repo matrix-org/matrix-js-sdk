@@ -56,13 +56,13 @@ describe("MegolmBackup", function() {
     let sessionStore;
     let cryptoStore;
     let megolmDecryption;
-    beforeEach(function () {
+    beforeEach(function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockCrypto.backupKey = new global.Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
-            "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
+            "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK",
         );
         mockCrypto.backupInfo = {
             version: 1,
@@ -125,24 +125,6 @@ describe("MegolmBackup", function() {
                 return Promise.resolve(decryptedData);
             };
 
-            const sessionId = groupSession.session_id();
-            const cipherText = groupSession.encrypt(JSON.stringify({
-                room_id: ROOM_ID,
-                content: 'testytest',
-            }));
-            const msgevent = new MatrixEvent({
-                type: 'm.room.encrypted',
-                room_id: ROOM_ID,
-                content: {
-                    algorithm: 'm.megolm.v1.aes-sha2',
-                    sender_key: "SENDER_CURVE25519",
-                    session_id: sessionId,
-                    ciphertext: cipherText,
-                },
-                event_id: "$event1",
-                origin_server_ts: 1507753886000,
-            });
-
             mockBaseApis.sendKeyBackup = expect.createSpy();
 
             return event.attemptDecryption(mockCrypto).then(() => {
@@ -153,7 +135,7 @@ describe("MegolmBackup", function() {
         });
     });
 
-    describe("restore", function () {
+    describe("restore", function() {
         let client;
 
         beforeEach(function() {
@@ -163,9 +145,9 @@ describe("MegolmBackup", function() {
             ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
             const store = [
                 "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
-                "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
-                "getSyncAccumulator", "startup", "deleteAllData",
+                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
+                "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
+                "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
             ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
             store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
             store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
@@ -196,7 +178,7 @@ describe("MegolmBackup", function() {
             return client.initCrypto();
         });
 
-        it('can restore from backup', function () {
+        it('can restore from backup', function() {
             const event = new MatrixEvent({
                 type: 'm.room.encrypted',
                 room_id: '!ROOM:ID',
@@ -206,12 +188,12 @@ describe("MegolmBackup", function() {
                     session_id: 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
                     ciphertext: 'AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N'
                         + 'CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl'
-                        + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs'
+                        + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs',
                 },
                 event_id: '$event1',
                 origin_server_ts: 1507753886000,
             });
-            client._http.authedRequest = function () {
+            client._http.authedRequest = function() {
                 return Promise.resolve({
                     first_message_index: 0,
                     forwarded_count: 0,
@@ -230,14 +212,14 @@ describe("MegolmBackup", function() {
                             + 'iie8PHD8mj/5Y0GLqrac4CD6+Mop7eUTzVovprjg',
                         mac: '5lxYBHQU80M',
                         ephemeral: '/Bn0A4UMFwJaDDvh0aEk1XZj3k1IfgCxgFY9P9a0b14',
-                    }
+                    },
                 });
             };
             return client.restoreKeyBackups(
                 "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
                 + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
                 ROOM_ID,
-                'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc'
+                'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
             ).then(() => {
                 return megolmDecryption.decryptEvent(event);
             }).then((res) => {
