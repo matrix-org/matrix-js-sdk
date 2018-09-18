@@ -64,6 +64,9 @@ describe("MegolmBackup", function() {
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
         );
+        mockCrypto.backupInfo = {
+            version: 1,
+        };
 
         mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
@@ -145,7 +148,7 @@ describe("MegolmBackup", function() {
             return event.attemptDecryption(mockCrypto).then(() => {
                 return megolmDecryption.onRoomKeyEvent(event);
             }).then(() => {
-                expect(mockBaseApis.sendKeyBackup).toHaveBeenCalled();
+                expect(mockCrypto.backupGroupSession).toHaveBeenCalled();
             });
         });
     });

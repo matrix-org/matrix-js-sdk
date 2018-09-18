@@ -1045,10 +1045,11 @@ MatrixClient.prototype.restoreKeyBackups = function(
             ));
         } else {
             totalKeyCount = 1;
-            const key = keyFromRecoverySession(res, decryption, keys);
-            key.room_id = targetRoomId;
-            key.session_id = targetSessionId;
-            keys.push(key);
+            keyFromRecoverySession(res, decryption, keys);
+            if (keys.length) {
+                keys[0].room_id = targetRoomId;
+                keys[0].session_id = targetSessionId;
+            }
         }
 
         return this.importRoomKeys(keys);
