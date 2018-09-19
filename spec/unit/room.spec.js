@@ -1402,13 +1402,25 @@ describe("Room", function() {
         it("should return synced membership if membership isn't available yet",
         function() {
             const room = new Room(roomId, null, userA);
-            room.setSyncedMembership("invite");
+            room.updateMyMembership("invite");
             expect(room.getMyMembership()).toEqual("invite");
-            room.addLiveEvents([utils.mkMembership({
-                user: userA, mship: "join",
-                room: roomId, event: true,
-            })]);
+        });
+        it("should emit a Room.myMembership event on a change",
+        function() {
+            const room = new Room(roomId, null, userA);
+            const events = [];
+            room.on("Room.myMembership", (_room, membership, oldMembership) => {
+                events.push({membership, oldMembership});
+            });
+            room.updateMyMembership("invite");
+            expect(room.getMyMembership()).toEqual("invite");
+            expect(events[0]).toEqual({membership: "invite", oldMembership: null});
+            events.splice(0);   //clear
+            room.updateMyMembership("invite");
+            expect(events.length).toEqual(0);
+            room.updateMyMembership("join");
             expect(room.getMyMembership()).toEqual("join");
+            expect(events[0]).toEqual({membership: "join", oldMembership: "invite"});
         });
     });
 
@@ -1439,11 +1451,11 @@ describe("Room", function() {
         it("should return false if synced membership not join",
         function() {
             const room = new Room(roomId, null, userA);
-            room.setSyncedMembership("invite");
+            room.updateMyMembership("invite");
             expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("leave");
+            room.updateMyMembership("leave");
             expect(room.maySendMessage()).toEqual(false);
-            room.setSyncedMembership("join");
+            room.updateMyMembership("join");
             expect(room.maySendMessage()).toEqual(true);
         });
     });
