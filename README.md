@@ -30,9 +30,61 @@ In Node.js
     console.log("Public Rooms: %s", JSON.stringify(data));
   });
 ```
+
 See below for how to include libolm to enable end-to-end-encryption. Please check
 [the Node.js terminal app](examples/node) for a more complex example.
 
+To start the client:
+
+```javascript
+client.startClient({initialSyncLimit: 10});
+```
+
+You can perform a call to `/sync` to get the current state of the client:
+
+```javascript
+client.once('sync', function(state, prevState, res) {
+    if(state === 'PREPARED') {
+        console.log("prepared");
+    } else {
+        console.log(state);
+        process.exit(1);
+    }
+});
+```
+
+To send a message:
+
+```javascript
+var content = {
+    "body": "message text",
+    "msgtype": "m.text"
+};
+client.sendEvent("roomId", "m.room.message", content, "", (err, res) => {
+    console.log(err);
+});
+```
+
+To listen for message events:
+
+```javascript
+client.on("Room.timeline", function(event, room, toStartOfTimeline) {
+  if (event.getType() !== "m.room.message") {
+    return; // only use messages
+  }
+  console.log(event.event.content.body);
+});
+```
+
+By default, the `matrix-js-sdk` client uses the `MatrixInMemoryStore` to store events as they are received. Access this via `client.store`. For example to iterate through the currently stored timeline for a room:
+
+```javascript
+Object.keys(client.store.rooms).forEach((roomId) => {
+  client.store.rooms[roomId].timeline.forEach(t => {
+      console.log(t.event);
+  });
+});
+```
 
 What does this SDK do?
 ----------------------
