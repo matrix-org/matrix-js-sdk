@@ -506,6 +506,7 @@ SyncApi.prototype.sync = function() {
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
             console.log("Sending first sync request...");
+            self._stats.initialSync = true;
             self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
         }
 
