@@ -766,6 +766,10 @@ module.exports.MatrixHttpApi.prototype = {
                         }
                     }
 
+                    if (typeof opts.reportContentLength === "function") {
+                        opts.reportContentLength(body ? body.length : 0);
+                    }
+
                     const handlerFn = requestCallback(
                         defer, callback, self.opts.onlyData,
                         bodyParser,

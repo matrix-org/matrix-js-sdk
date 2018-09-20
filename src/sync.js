@@ -714,9 +714,12 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
 SyncApi.prototype._doSyncRequest = function(syncOptions, syncToken) {
     const qps = this._getSyncParams(syncOptions, syncToken);
+    const requestOpts = {
+        localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
+        reportContentLength: (len) => this._stats.responseSize = len,
+    };
     return this.client._http.authedRequest(
-        undefined, "GET", "/sync", qps, undefined,
-        qps.timeout + BUFFER_PERIOD_MS,
+        undefined, "GET", "/sync", qps, undefined, requestOpts,
     );
 };
 
