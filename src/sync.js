@@ -59,6 +59,18 @@ function debuglog(...params) {
     console.log(...params);
 }
 
+function initialiseStats() {
+    return {
+        initialSync: false,
+        processingDuration: 0,
+        requestDuration: 0,
+        memberEventsInLimitedTimelines: 0,
+        memberEvents: 0,
+        limitedTimelines: 0,
+        responseSize: 0
+    };
+}
+
 
 /**
  * <b>Internal class - unstable.</b>
@@ -89,6 +101,8 @@ function SyncApi(client, opts) {
             return false;
         };
     }
+    // stats gathered to track sync performance
+    this._stats = initialiseStats();
     this.opts = opts;
     this._peekRoomId = null;
     this._currentSyncRequest = null;
@@ -614,17 +628,20 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
     let data;
     try {
+        const duration = utils.startDuration();
         //debuglog('Starting sync since=' + syncToken);
         if (this._currentSyncRequest === null) {
             this._currentSyncRequest = this._doSyncRequest(syncOptions, syncToken);
         }
         data = await this._currentSyncRequest;
+        this._stats.requestDuration = duration();
     } catch (e) {
         this._onSyncError(e, syncOptions);
         return;
     } finally {
         this._currentSyncRequest = null;
     }
+    const processingDuration = utils.startDuration();
 
     //debuglog('Completed sync, next_batch=' + data.next_batch);
 
@@ -652,6 +669,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
 
     try {
         await this._processSyncResponse(syncEventData, data);
+        this._stats.processingDuration = processingDuration();
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
@@ -1000,6 +1018,11 @@ SyncApi.prototype._processSyncResponse = async function(
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
         const accountDataEvents = self._mapSyncEventsFormat(joinObj.account_data);
 
+        const memberEventCount = stateEvents.reduce((count, e) => {
+            return count + (e.getType() === "m.room.member" ? 1 : 0);
+        }, 0);
+        self._stats.memberEvents += memberEventCount;
+
         // we do this first so it's correct when any of the events fire
         if (joinObj.unread_notifications) {
             room.setUnreadNotificationCount(
@@ -1071,6 +1094,8 @@ SyncApi.prototype._processSyncResponse = async function(
                 client.resetNotifTimelineSet();
 
                 self._registerStateListeners(room);
+                self._stats.limitedTimelines += 1;
+                self._stats.memberEventsInLimitedTimelines += memberEventCount;
             }
         }
 
@@ -1501,6 +1526,11 @@ SyncApi.prototype._updateSyncState = function(newState, data) {
     const old = this._syncState;
     this._syncState = newState;
     this._syncStateData = data;
+
+    if (newState === "SYNCING") {
+        this.client.emit("sync_stats", this._stats);
+        this._stats = initialiseStats();
+    }
     this.client.emit("sync", this._syncState, old, data);
 };
 

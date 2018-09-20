@@ -20,6 +20,18 @@ limitations under the License.
  */
 
 /**
+ * Start measuring the duration of an operation.
+ * @return {Function} A function to call to end the measurement,
+ * returns elapsed milliseconds.
+ */
+module.exports.startDuration = function() {
+    const start = performance.now();
+    return function() {
+        const end = performance.now();
+        return end - start;
+    }
+};
+/**
  * Encode a dictionary of query parameters.
  * @param {Object} params A dict of key/values to encode e.g.
  * {"foo": "bar", "baz": "taz"}
