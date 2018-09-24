@@ -55,6 +55,7 @@ module.exports.MatrixInMemoryStore = function MatrixInMemoryStore(opts) {
     this._oobMembers = {
         // roomId: [member events]
     };
+    this._clientOptions = {};
 };
 
 module.exports.MatrixInMemoryStore.prototype = {
@@ -401,5 +402,13 @@ module.exports.MatrixInMemoryStore.prototype = {
     setOutOfBandMembers: function(roomId, membershipEvents) {
         this._oobMembers[roomId] = membershipEvents;
         return Promise.resolve();
+    },
+
+    getClientOptions: function() {
+        return this._clientOptions;
+    },
+
+    storeClientOptions: function(options) {
+        return this._clientOptions = Object.assign({}, options);
     },
 };

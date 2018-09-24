@@ -101,6 +101,12 @@ class IndexedDBStoreWorker {
             case 'setOutOfBandMembers':
                 prom = this.backend.setOutOfBandMembers(msg.args[0], msg.args[1]);
                 break;
+            case 'getClientOptions':
+                prom = this.backend.getClientOptions();
+                break;
+            case 'storeClientOptions':
+                prom = this.backend.storeClientOptions(msg.args[0]);
+                break;
         }
 
         if (prom === undefined) {

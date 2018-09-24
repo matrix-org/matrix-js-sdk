@@ -114,6 +114,14 @@ RemoteIndexedDBStoreBackend.prototype = {
         return this._doCmd('clearOutOfBandMembers', [roomId]);
     },
 
+    getClientOptions: function() {
+        return this._doCmd('getClientOptions');
+    },
+
+    storeClientOptions: function(options) {
+        return this._doCmd('storeClientOptions', [options]);
+    },
+
     /**
      * Load all user presence events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of presence events in their raw form.

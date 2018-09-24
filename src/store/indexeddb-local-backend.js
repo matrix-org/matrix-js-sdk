@@ -19,7 +19,7 @@ import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
-const VERSION = 2;
+const VERSION = 3;
 
 function createDatabase(db) {
     // Make user store, clobber based on user ID. (userId property of User objects)
@@ -40,6 +40,12 @@ function upgradeSchemaV2(db) {
         });
     oobMembersStore.createIndex("room", "room_id");
 }
+
+function upgradeSchemaV3(db) {
+    const clientOptionsStore = db.createObjectStore(
+        "client_options", { keyPath: ["clobber"]});
+}
+
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
@@ -157,6 +163,9 @@ LocalIndexedDBStoreBackend.prototype = {
             }
             if (oldVersion < 2) {
                 upgradeSchemaV2(db);
+            }
+            if (oldVersion < 3) {
+                upgradeSchemaV3(db);
             }
             // Expand as needed.
         };
@@ -529,6 +538,30 @@ LocalIndexedDBStoreBackend.prototype = {
             });
         });
     },
+
+    getClientOptions: function() {
+        return Promise.resolve().then(() => {
+            const txn = this.db.transaction(["client_options"], "readonly");
+            const store = txn.objectStore("client_options");
+            return selectQuery(store, undefined, (cursor) => {
+                if (cursor.value && cursor.value && cursor.value.options) {
+                    return cursor.value.options;
+                }
+            }).then((results) => results[0]);
+        });
+    },
+
+    storeClientOptions: function(options) {
+        return Promise.resolve().then(() => {
+            const txn = this.db.transaction(["client_options"], "readwrite");
+            const store = txn.objectStore("client_options");
+            store.put({
+                clobber: "-", // constant key so will always clobber
+                options: options
+            }); // put == UPSERT
+            return txnAsPromise(txn);
+        });
+    }
 };
 
 export default LocalIndexedDBStoreBackend;
