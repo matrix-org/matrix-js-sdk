@@ -6,6 +6,7 @@ import expect from 'expect';
 
 const sdk = require("../..");
 
+const Olm = global.Olm;
 
 describe("Crypto", function() {
     if (!sdk.CRYPTO_ENABLED) {

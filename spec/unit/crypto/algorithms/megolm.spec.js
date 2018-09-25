@@ -21,6 +21,8 @@ const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';
 
+const Olm = global.Olm;
+
 describe("MegolmDecryption", function() {
     if (!global.Olm) {
         console.warn('Not running megolm unit tests: libolm not present');

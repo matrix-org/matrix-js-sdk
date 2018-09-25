@@ -60,7 +60,7 @@ const LAZY_LOADING_SYNC_FILTER = {
 
 
 const SCROLLBACK_DELAY_MS = 3000;
-let CRYPTO_ENABLED = isCryptoAvailable();
+const CRYPTO_ENABLED = isCryptoAvailable();
 
 /**
  * Construct a Matrix Client. Only directly construct this if you want to use
@@ -383,7 +383,6 @@ MatrixClient.prototype.initCrypto = async function() {
             `End-to-end encryption not supported in this js-sdk build: did ` +
                 `you remember to load the olm library?`,
         );
-        return;
     }
 
     if (this._crypto) {
