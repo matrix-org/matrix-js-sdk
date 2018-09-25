@@ -3115,7 +3115,16 @@ MatrixClient.prototype.startClient = async function(opts) {
             opts.lazyLoadMembers = false;
         }
     }
-
+    // need to vape the store when enabling LL and wasn't enabled before
+    let hadLLEnabledBefore = false;
+    const prevClientOptions = await this.store.getClientOptions();
+    if (prevClientOptions) {
+        hadLLEnabledBefore = !!prevClientOptions.lazyLoadMembers;
+    }
+    if (!hadLLEnabledBefore && opts.lazyLoadMembers) {
+        await this.store.deleteAllData();
+        throw new Error("vaped the store, you need to resync");
+    }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
     }
@@ -3128,6 +3137,7 @@ MatrixClient.prototype.startClient = async function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
+    await this.store.storeClientOptions(this._clientOpts);
 
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
