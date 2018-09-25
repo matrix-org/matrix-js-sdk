@@ -405,10 +405,11 @@ module.exports.MatrixInMemoryStore.prototype = {
     },
 
     getClientOptions: function() {
-        return this._clientOptions;
+        return Promise.resolve(this._clientOptions);
     },
 
     storeClientOptions: function(options) {
-        return this._clientOptions = Object.assign({}, options);
+        this._clientOptions = Object.assign({}, options);
+        return Promise.resolve();
     },
 };
