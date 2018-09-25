@@ -23,9 +23,6 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  * @module crypto/OlmDevice
  */
 const Olm = global.Olm;
-if (!Olm) {
-    throw new Error("global.Olm is not defined");
-}
 
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
