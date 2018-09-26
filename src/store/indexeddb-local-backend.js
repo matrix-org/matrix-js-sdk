@@ -557,16 +557,14 @@ LocalIndexedDBStoreBackend.prototype = {
         });
     },
 
-    storeClientOptions: function(options) {
-        return Promise.resolve().then(() => {
-            const txn = this.db.transaction(["client_options"], "readwrite");
-            const store = txn.objectStore("client_options");
-            store.put({
-                clobber: "-", // constant key so will always clobber
-                options: options,
-            }); // put == UPSERT
-            return txnAsPromise(txn);
-        });
+    storeClientOptions: async function(options) {
+        const txn = this.db.transaction(["client_options"], "readwrite");
+        const store = txn.objectStore("client_options");
+        store.put({
+            clobber: "-", // constant key so will always clobber
+            options: options,
+        }); // put == UPSERT
+        await txnAsPromise(txn);
     },
 };
 
