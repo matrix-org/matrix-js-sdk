@@ -113,7 +113,7 @@ class IndexedDBStoreWorker {
         }
 
         if (prom === undefined) {
-            postMessage({
+            this.postMessage({
                 command: 'cmd_fail',
                 seq: msg.seq,
                 // Can't be an Error because they're not structured cloneable
