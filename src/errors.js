@@ -1,7 +1,8 @@
 // can't just do InvalidStoreError extends Error
 // because of http://babeljs.io/docs/usage/caveats/#classes
 function InvalidStoreError(reason) {
-    const message = `Store is invalid because ${reason}, please delete all data and retry`;
+    const message = `Store is invalid because ${reason}, ` +
+        `please delete all data and retry`;
     const instance = Reflect.construct(Error, [message]);
     Reflect.setPrototypeOf(instance, Reflect.getPrototypeOf(this));
     instance.reason = reason;
@@ -15,8 +16,8 @@ InvalidStoreError.prototype = Object.create(Error.prototype, {
     value: Error,
     enumerable: false,
     writable: true,
-    configurable: true
-  }
+    configurable: true,
+  },
 });
 Reflect.setPrototypeOf(InvalidStoreError, Error);
 
