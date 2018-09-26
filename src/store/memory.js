@@ -68,6 +68,10 @@ module.exports.MatrixInMemoryStore.prototype = {
         return this.syncToken;
     },
 
+    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return Promise.resolve(true);
+    },
 
     /**
      * Set the token to stream from.

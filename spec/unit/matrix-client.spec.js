@@ -141,6 +141,7 @@ describe("MatrixClient", function() {
         store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
         store.getClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
         store.storeClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
+        store.isNewlyCreated = expect.createSpy().andReturn(Promise.resolve(true));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,

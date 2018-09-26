@@ -3116,14 +3116,12 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
     // need to vape the store when enabling LL and wasn't enabled before
-    let hadLLEnabledBefore = false;
-    const prevClientOptions = await this.store.getClientOptions();
-    if (prevClientOptions) {
-        hadLLEnabledBefore = !!prevClientOptions.lazyLoadMembers;
-    }
-    if (!hadLLEnabledBefore && opts.lazyLoadMembers) {
-        await this.store.deleteAllData();
-        throw new Error("vaped the store, you need to resync");
+    if (opts.lazyLoadMembers) {
+        const shouldClear = await this._shouldClearSyncDataIfLL();
+        if (shouldClear) {
+            await this.store.deleteAllData();
+            throw new Error("vaped the store, you need to resync");
+        }
     }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
@@ -3141,6 +3139,22 @@ MatrixClient.prototype.startClient = async function(opts) {
 
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+};
+
+/** @return {bool} need to clear the store when enabling LL and wasn't enabled before? */
+MatrixClient.prototype._shouldClearSyncDataIfLL = async function() {
+    let hadLLEnabledBefore = false;
+    const isStoreNewlyCreated = await this.store.isNewlyCreated();
+    if (!isStoreNewlyCreated) {
+        const prevClientOptions = await this.store.getClientOptions();
+        if (prevClientOptions) {
+            hadLLEnabledBefore = !!prevClientOptions.lazyLoadMembers;
+        }
+        if (!hadLLEnabledBefore) {
+            return true;
+        }
+    }
+    return false;
 };
 
 /**

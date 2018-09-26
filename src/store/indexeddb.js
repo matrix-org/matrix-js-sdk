@@ -146,6 +146,11 @@ IndexedDBStore.prototype.getSavedSync = function() {
     return this.backend.getSavedSync();
 };
 
+/** @return {Promise<bool>} whether or not the database was newly created in this session. */
+IndexedDBStore.prototype.isNewlyCreated = function() {
+    return this.backend.isNewlyCreated();
+};
+
 /**
  * @return {Promise} If there is a saved sync, the nextBatch token
  * for this sync, otherwise null.

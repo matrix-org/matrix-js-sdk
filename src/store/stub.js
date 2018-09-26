@@ -32,6 +32,11 @@ function StubStore() {
 
 StubStore.prototype = {
 
+    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return Promise.resolve(true);
+    },
+
     /**
      * Get the sync token.
      * @return {string}

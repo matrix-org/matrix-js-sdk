@@ -67,6 +67,9 @@ class IndexedDBStoreWorker {
             case 'connect':
                 prom = this.backend.connect();
                 break;
+            case 'isNewlyCreated':
+                prom = this.backend.isNewlyCreated();
+                break;
             case 'clearDatabase':
                 prom = this.backend.clearDatabase().then((result) => {
                     // This returns special classes which can't be cloned

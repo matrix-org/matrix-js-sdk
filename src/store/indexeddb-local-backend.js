@@ -129,6 +129,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this.db = null;
     this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
+    this._isNewlyCreated = false;
 };
 
 
@@ -159,6 +160,7 @@ LocalIndexedDBStoreBackend.prototype = {
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
             if (oldVersion < 1) { // The database did not previously exist.
+                this._isNewlyCreated = true;
                 createDatabase(db);
             }
             if (oldVersion < 2) {
@@ -193,6 +195,10 @@ LocalIndexedDBStoreBackend.prototype = {
 
             return this._init();
         });
+    },
+    /** @return {bool} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return this._isNewlyCreated;
     },
 
     /**
