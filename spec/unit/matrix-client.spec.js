@@ -215,8 +215,7 @@ describe("MatrixClient", function() {
         });
 
         it("should return the same sync state as emitted sync events", async function() {
-            /* const syncingPromise = new Promise((resolve) => {
-                throw new Error("fail!!");
+            const syncingPromise = new Promise((resolve) => {
                 client.on("sync", function syncListener(state) {
                     expect(state).toEqual(client.getSyncState());
                     if (state === "SYNCING") {
@@ -225,9 +224,8 @@ describe("MatrixClient", function() {
                     }
                 });
             });
-            */
             await client.startClient();
-            // await syncingPromise;
+            await syncingPromise;
         });
     });
 
