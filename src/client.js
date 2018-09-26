@@ -3117,7 +3117,7 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
     // need to vape the store when enabling LL and wasn't enabled before
-    const shouldClear = await this._shouldClearSyncDataIfLLToggled(opts.lazyLoadMembers);
+    const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
     if (shouldClear) {
         const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
         throw new InvalidStoreError(reason);
@@ -3139,8 +3139,11 @@ MatrixClient.prototype.startClient = async function(opts) {
     this._syncApi.sync();
 };
 
-/** @return {bool} need to clear the store when toggling LL compared to previous session? */
-MatrixClient.prototype._shouldClearSyncDataIfLLToggled = async function(lazyLoadMembers) {
+/**
+ * Is the lazy loading option different than in previous session?
+ * @param {bool} lazyLoadMembers current options for lazy loading
+ * @return {bool} whether or not the option has changed compared to the previous session */
+MatrixClient.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
     lazyLoadMembers = !!lazyLoadMembers;
     // assume it was turned off before
     // if we don't know any better
