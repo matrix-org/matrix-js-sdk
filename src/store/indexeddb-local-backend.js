@@ -42,8 +42,8 @@ function upgradeSchemaV2(db) {
 }
 
 function upgradeSchemaV3(db) {
-    const clientOptionsStore = db.createObjectStore(
-        "client_options", { keyPath: ["clobber"]});
+    db.createObjectStore("client_options",
+        { keyPath: ["clobber"]});
 }
 
 
@@ -557,11 +557,11 @@ LocalIndexedDBStoreBackend.prototype = {
             const store = txn.objectStore("client_options");
             store.put({
                 clobber: "-", // constant key so will always clobber
-                options: options
+                options: options,
             }); // put == UPSERT
             return txnAsPromise(txn);
         });
-    }
+    },
 };
 
 export default LocalIndexedDBStoreBackend;
