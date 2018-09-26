@@ -17,14 +17,6 @@ limitations under the License.
 
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
-/**
- * olm.js wrapper
- *
- * @module crypto/OlmDevice
- */
-const Olm = global.Olm;
-
-
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
 const MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
@@ -124,7 +116,7 @@ OlmDevice.prototype.init = async function() {
     await this._migrateFromSessionStore();
 
     let e2eKeys;
-    const account = new Olm.Account();
+    const account = new global.Olm.Account();
     try {
         await _initialiseAccount(
             this._sessionStore, this._cryptoStore, this._pickleKey, account,
@@ -158,7 +150,7 @@ async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account)
  * @return {array} The version of Olm.
  */
 OlmDevice.getOlmVersion = function() {
-    return Olm.get_library_version();
+    return global.Olm.get_library_version();
 };
 
 OlmDevice.prototype._migrateFromSessionStore = async function() {
@@ -265,7 +257,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
  */
 OlmDevice.prototype._getAccount = function(txn, func) {
     this._cryptoStore.getAccount(txn, (pickledAccount) => {
-        const account = new Olm.Account();
+        const account = new global.Olm.Account();
         try {
             account.unpickle(this._pickleKey, pickledAccount);
             func(account);
@@ -318,7 +310,7 @@ OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
  * @private
  */
 OlmDevice.prototype._unpickleSession = function(pickledSession, func) {
-    const session = new Olm.Session();
+    const session = new global.Olm.Session();
     try {
         session.unpickle(this._pickleKey, pickledSession);
         func(session);
@@ -351,7 +343,7 @@ OlmDevice.prototype._saveSession = function(deviceKey, session, txn) {
  * @private
  */
 OlmDevice.prototype._getUtility = function(func) {
-    const utility = new Olm.Utility();
+    const utility = new global.Olm.Utility();
     try {
         return func(utility);
     } finally {
@@ -463,7 +455,7 @@ OlmDevice.prototype.createOutboundSession = async function(
         ],
         (txn) => {
             this._getAccount(txn, (account) => {
-                const session = new Olm.Session();
+                const session = new global.Olm.Session();
                 try {
                     session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
                     newSessionId = session.session_id();
@@ -507,7 +499,7 @@ OlmDevice.prototype.createInboundSession = async function(
         ],
         (txn) => {
             this._getAccount(txn, (account) => {
-                const session = new Olm.Session();
+                const session = new global.Olm.Session();
                 try {
                     session.create_inbound_from(
                         account, theirDeviceIdentityKey, ciphertext,
@@ -725,7 +717,7 @@ OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
         throw new Error("Unknown outbound group session " + sessionId);
     }
 
-    const session = new Olm.OutboundGroupSession();
+    const session = new global.Olm.OutboundGroupSession();
     try {
         session.unpickle(this._pickleKey, pickled);
         return func(session);
@@ -741,7 +733,7 @@ OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
  * @return {string} sessionId for the outbound session.
  */
 OlmDevice.prototype.createOutboundGroupSession = function() {
-    const session = new Olm.OutboundGroupSession();
+    const session = new global.Olm.OutboundGroupSession();
     try {
         session.create();
         this._saveOutboundGroupSession(session);
@@ -813,7 +805,7 @@ OlmDevice.prototype.getOutboundGroupSessionKey = function(sessionId) {
  * @return {*} result of func
  */
 OlmDevice.prototype._unpickleInboundGroupSession = function(sessionData, func) {
-    const session = new Olm.InboundGroupSession();
+    const session = new global.Olm.InboundGroupSession();
     try {
         session.unpickle(this._pickleKey, sessionData.session);
         return func(session);
@@ -894,7 +886,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                     }
 
                     // new session.
-                    const session = new Olm.InboundGroupSession();
+                    const session = new global.Olm.InboundGroupSession();
                     try {
                         if (exportFormat) {
                             session.import_session(sessionKey);

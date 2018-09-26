@@ -36,10 +36,8 @@ const DeviceList = require('./DeviceList').default;
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
-const Olm = global.Olm;
-
 export function isCryptoAvailable() {
-    return Boolean(Olm);
+    return Boolean(global.Olm);
 }
 
 /**
@@ -132,7 +130,7 @@ utils.inherits(Crypto, EventEmitter);
 Crypto.prototype.init = async function() {
     // Olm is just an object with a .then, not a fully-fledged promise, so
     // pass it into bluebird to make it a proper promise.
-    await Olm.init();
+    await global.Olm.init();
 
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
