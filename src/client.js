@@ -44,6 +44,7 @@ const ContentHelpers = require("./content-helpers");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
+import {InvalidStoreError} from './errors';
 
 
 const LAZY_LOADING_MESSAGES_FILTER = {
@@ -3116,12 +3117,10 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
     // need to vape the store when enabling LL and wasn't enabled before
-    if (opts.lazyLoadMembers) {
-        const shouldClear = await this._shouldClearSyncDataIfLL();
-        if (shouldClear) {
-            await this.store.deleteAllData();
-            throw new Error("vaped the store, you need to resync");
-        }
+    const shouldClear = await this._shouldClearSyncDataIfLLToggled(opts.lazyLoadMembers);
+    if (shouldClear) {
+        const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+        throw new InvalidStoreError(reason);
     }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
@@ -3140,18 +3139,19 @@ MatrixClient.prototype.startClient = async function(opts) {
     this._syncApi.sync();
 };
 
-/** @return {bool} need to clear the store when enabling LL and wasn't enabled before? */
-MatrixClient.prototype._shouldClearSyncDataIfLL = async function() {
-    let hadLLEnabledBefore = false;
+/** @return {bool} need to clear the store when toggling LL compared to previous session? */
+MatrixClient.prototype._shouldClearSyncDataIfLLToggled = async function(lazyLoadMembers) {
+    lazyLoadMembers = !!lazyLoadMembers;
+    // assume it was turned off before
+    // if we don't know any better
+    let lazyLoadMembersBefore = false;
     const isStoreNewlyCreated = await this.store.isNewlyCreated();
     if (!isStoreNewlyCreated) {
         const prevClientOptions = await this.store.getClientOptions();
         if (prevClientOptions) {
-            hadLLEnabledBefore = !!prevClientOptions.lazyLoadMembers;
+            lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
         }
-        if (!hadLLEnabledBefore) {
-            return true;
-        }
+        return lazyLoadMembersBefore !== lazyLoadMembers;
     }
     return false;
 };
