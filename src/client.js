@@ -3135,8 +3135,7 @@ MatrixClient.prototype.startClient = async function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-    await this.store.storeClientOptions(this._clientOpts);
-
+    await this._storeClientOptions(this._clientOpts);
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
 };
@@ -3155,6 +3154,25 @@ MatrixClient.prototype._shouldClearSyncDataIfLL = async function() {
         }
     }
     return false;
+};
+
+/**
+ * store client options with boolean/string/numeric values
+ * to know in the next session what flags the sync data was
+ * created with (e.g. lazy loading)
+ * @param {object} opts the complete set of client options
+ * @return {Promise} for store operation */
+MatrixClient.prototype._storeClientOptions = function(opts) {
+    const primTypes = ["boolean", "string", "number"];
+    const serializableOpts = Object.entries(opts)
+        .filter(([key, value]) => {
+            return primTypes.includes(typeof value);
+        })
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    return this.store.storeClientOptions(serializableOpts);
 };
 
 /**
