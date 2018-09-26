@@ -198,7 +198,7 @@ LocalIndexedDBStoreBackend.prototype = {
     },
     /** @return {bool} whether or not the database was newly created in this session. */
     isNewlyCreated: function() {
-        return this._isNewlyCreated;
+        return Promise.resolve(this._isNewlyCreated);
     },
 
     /**
