@@ -3120,7 +3120,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
     if (shouldClear) {
         const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-        throw new InvalidStoreError(reason);
+        throw new InvalidStoreError(reason, !!opts.lazyLoadMembers);
     }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
