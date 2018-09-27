@@ -3117,6 +3117,9 @@ MatrixClient.prototype.startClient = async function(opts) {
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
 
+    if (opts.lazyLoadMembers && this.isGuest()) {
+        opts.lazyLoadMembers = false;
+    }
     if (opts.lazyLoadMembers) {
         const supported = await this.doesServerSupportLazyLoading();
         if (supported) {
