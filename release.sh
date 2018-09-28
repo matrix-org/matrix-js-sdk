@@ -11,7 +11,17 @@
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
-hub --version > /dev/null || (echo "hub is required: please install it"; kill $$)
+if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
+    HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
+    HUB_VERSION_MINOR=${BASH_REMATCH[2]}
+    if [[ $HUB_VERSION_MAJOR -lt 2 ]] || [[ $HUB_VERSION_MAJOR -eq 2 && $HUB_VERSION_MINOR -lt 5 ]]; then
+        echo "hub version 2.5 is required, you have $HUB_VERSION_MAJOR.$HUB_VERSION_MINOR installed"
+        exit
+    fi
+else
+    echo "hub is required: please install it"
+    exit
+fi
 
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
@@ -255,7 +265,7 @@ release_text=`mktemp`
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags $assets -f "${release_text}" "$tag"
+hub release create $hubflags $assets -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
