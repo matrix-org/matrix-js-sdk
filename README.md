@@ -37,7 +37,7 @@ See below for how to include libolm to enable end-to-end-encryption. Please chec
 To start the client:
 
 ```javascript
-client.startClient({initialSyncLimit: 10});
+await client.startClient({initialSyncLimit: 10});
 ```
 
 You can perform a call to `/sync` to get the current state of the client:
@@ -76,11 +76,11 @@ client.on("Room.timeline", function(event, room, toStartOfTimeline) {
 });
 ```
 
-By default, the `matrix-js-sdk` client uses the `MatrixInMemoryStore` to store events as they are received. Access this via `client.store`. For example to iterate through the currently stored timeline for a room:
+By default, the `matrix-js-sdk` client uses the `MatrixInMemoryStore` to store events as they are received. For example to iterate through the currently stored timeline for a room:
 
 ```javascript
 Object.keys(client.store.rooms).forEach((roomId) => {
-  client.store.rooms[roomId].timeline.forEach(t => {
+  client.getRoom(roomId).timeline.forEach(t => {
       console.log(t.event);
   });
 });
