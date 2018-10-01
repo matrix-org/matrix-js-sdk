@@ -772,17 +772,6 @@ MatrixClient.prototype.getGroups = function() {
     return this.store.getGroups();
 };
 
-/**
- * Get the config for the media repository.
- * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves with an object containing the config.
- */
-MatrixClient.prototype.getMediaConfig = function(callback) {
-    return this._http.requestWithPrefix(
-        callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
-    );
-};
-
 // Room ops
 // ========
 
