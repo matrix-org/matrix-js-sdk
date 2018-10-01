@@ -65,7 +65,10 @@ RemoteIndexedDBStoreBackend.prototype = {
     clearDatabase: function() {
         return this._ensureStarted().then(() => this._doCmd('clearDatabase'));
     },
-
+    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return this._doCmd('isNewlyCreated');
+    },
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
@@ -112,6 +115,14 @@ RemoteIndexedDBStoreBackend.prototype = {
 
     clearOutOfBandMembers: function(roomId) {
         return this._doCmd('clearOutOfBandMembers', [roomId]);
+    },
+
+    getClientOptions: function() {
+        return this._doCmd('getClientOptions');
+    },
+
+    storeClientOptions: function(options) {
+        return this._doCmd('storeClientOptions', [options]);
     },
 
     /**

@@ -245,7 +245,7 @@ release_text=`mktemp`
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags $assets -f "${release_text}" "$tag"
+hub release create $hubflags $assets -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"

@@ -19,7 +19,7 @@ import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
-const VERSION = 2;
+const VERSION = 3;
 
 function createDatabase(db) {
     // Make user store, clobber based on user ID. (userId property of User objects)
@@ -40,6 +40,12 @@ function upgradeSchemaV2(db) {
         });
     oobMembersStore.createIndex("room", "room_id");
 }
+
+function upgradeSchemaV3(db) {
+    db.createObjectStore("client_options",
+        { keyPath: ["clobber"]});
+}
+
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
@@ -123,6 +129,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this.db = null;
     this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
+    this._isNewlyCreated = false;
 };
 
 
@@ -153,10 +160,14 @@ LocalIndexedDBStoreBackend.prototype = {
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
             if (oldVersion < 1) { // The database did not previously exist.
+                this._isNewlyCreated = true;
                 createDatabase(db);
             }
             if (oldVersion < 2) {
                 upgradeSchemaV2(db);
+            }
+            if (oldVersion < 3) {
+                upgradeSchemaV3(db);
             }
             // Expand as needed.
         };
@@ -184,6 +195,10 @@ LocalIndexedDBStoreBackend.prototype = {
 
             return this._init();
         });
+    },
+    /** @return {bool} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return Promise.resolve(this._isNewlyCreated);
     },
 
     /**
@@ -265,42 +280,28 @@ LocalIndexedDBStoreBackend.prototype = {
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
      * @param {string} roomId
      * @param {event[]} membershipEvents the membership events to store
-     * @returns {Promise} when all members have been stored
      */
-    setOutOfBandMembers: function(roomId, membershipEvents) {
+    setOutOfBandMembers: async function(roomId, membershipEvents) {
         console.log(`LL: backend about to store ${membershipEvents.length}` +
             ` members for ${roomId}`);
-        function ignoreResult() {}
-        // run everything in a promise so anything that throws will reject
-        return new Promise((resolve) =>{
-            const tx = this.db.transaction(["oob_membership_events"], "readwrite");
-            const store = tx.objectStore("oob_membership_events");
-            const eventPuts = membershipEvents.map((e) => {
-                const putPromise = reqAsEventPromise(store.put(e));
-                // ignoring the result makes sure we discard the IDB success event
-                // ASAP, and not create a potentially big array containing them
-                // unneccesarily later on by calling Promise.all.
-                return putPromise.then(ignoreResult);
-            });
-            // aside from all the events, we also write a marker object to the store
-            // to mark the fact that OOB members have been written for this room.
-            // It's possible that 0 members need to be written as all where previously know
-            // but we still need to know whether to return null or [] from getOutOfBandMembers
-            // where null means out of band members haven't been stored yet for this room
-            const markerObject = {
-                room_id: roomId,
-                oob_written: true,
-                state_key: 0,
-            };
-            const markerPut = reqAsEventPromise(store.put(markerObject));
-            const allPuts = eventPuts.concat(markerPut);
-            // ignore the empty array Promise.all creates
-            // as this method should just resolve
-            // to undefined on success
-            resolve(Promise.all(allPuts).then(ignoreResult));
-        }).then(() => {
-            console.log(`LL: backend done storing for ${roomId}!`);
+        const tx = this.db.transaction(["oob_membership_events"], "readwrite");
+        const store = tx.objectStore("oob_membership_events");
+        membershipEvents.forEach((e) => {
+            store.put(e);
         });
+        // aside from all the events, we also write a marker object to the store
+        // to mark the fact that OOB members have been written for this room.
+        // It's possible that 0 members need to be written as all where previously know
+        // but we still need to know whether to return null or [] from getOutOfBandMembers
+        // where null means out of band members haven't been stored yet for this room
+        const markerObject = {
+            room_id: roomId,
+            oob_written: true,
+            state_key: 0,
+        };
+        store.put(markerObject);
+        await txnAsPromise(tx);
+        console.log(`LL: backend done storing for ${roomId}!`);
     },
 
     clearOutOfBandMembers: async function(roomId) {
@@ -542,6 +543,28 @@ LocalIndexedDBStoreBackend.prototype = {
                 return (results.length > 0 ? results[0] : {});
             });
         });
+    },
+
+    getClientOptions: function() {
+        return Promise.resolve().then(() => {
+            const txn = this.db.transaction(["client_options"], "readonly");
+            const store = txn.objectStore("client_options");
+            return selectQuery(store, undefined, (cursor) => {
+                if (cursor.value && cursor.value && cursor.value.options) {
+                    return cursor.value.options;
+                }
+            }).then((results) => results[0]);
+        });
+    },
+
+    storeClientOptions: async function(options) {
+        const txn = this.db.transaction(["client_options"], "readwrite");
+        const store = txn.objectStore("client_options");
+        store.put({
+            clobber: "-", // constant key so will always clobber
+            options: options,
+        }); // put == UPSERT
+        await txnAsPromise(txn);
     },
 };
 
