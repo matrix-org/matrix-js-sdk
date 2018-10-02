@@ -49,6 +49,7 @@ import {InvalidStoreError} from './errors';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
+import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 
 const LAZY_LOADING_MESSAGES_FILTER = {
     lazy_load_members: true,
@@ -882,9 +883,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = function() {
             auth_data: {
                 public_key: publicKey,
             },
-            // FIXME: pickle isn't the right thing to use, but we don't have
-            // anything else yet, so use it for now
-            recovery_key: decryption.pickle("secret_key"),
+            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
         };
     } finally {
         decryption.free();
@@ -991,26 +990,17 @@ MatrixClient.prototype.backupAllGroupSessions = function(version) {
     return this._crypto.backupAllGroupSessions(version);
 };
 
-MatrixClient.prototype.isValidRecoveryKey = function(decryptionKey) {
-    if (this._crypto === null) {
-        throw new Error("End-to-end encryption disabled");
-    }
-
-    const decryption = new global.Olm.PkDecryption();
+MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     try {
-        // FIXME: see the FIXME in createKeyBackupVersion
-        decryption.unpickle("secret_key", decryptionKey);
+        decodeRecoveryKey(recoveryKey);
         return true;
     } catch (e) {
-        console.log(e);
         return false;
-    } finally {
-        decryption.free();
     }
 };
 
 MatrixClient.prototype.restoreKeyBackups = function(
-    decryptionKey, targetRoomId, targetSessionId, version,
+    recoveryKey, targetRoomId, targetSessionId, version,
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1021,9 +1011,10 @@ MatrixClient.prototype.restoreKeyBackups = function(
     const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
 
     // FIXME: see the FIXME in createKeyBackupVersion
+    const privkey = decodeRecoveryKey(recoveryKey);
     const decryption = new global.Olm.PkDecryption();
     try {
-        decryption.unpickle("secret_key", decryptionKey);
+        decryption.init_with_private_key(privkey);
     } catch(e) {
         decryption.free();
         throw e;
