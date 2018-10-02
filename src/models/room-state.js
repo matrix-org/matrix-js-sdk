@@ -180,7 +180,7 @@ RoomState.prototype.getSentinelMember = function(userId) {
         sentinel = new RoomMember(this.roomId, userId);
         const member = this.members[userId];
         if (member) {
-            sentinel.setMembershipEvent(member.events.member);
+            sentinel.setMembershipEvent(member.events.member, this);
         }
         this._sentinels[userId] = sentinel;
     }
@@ -501,7 +501,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
     }
 
     const member = this._getOrCreateMember(userId, stateEvent);
-    member.setMembershipEvent(stateEvent);
+    member.setMembershipEvent(stateEvent, this);
     // needed to know which members need to be stored seperately
     // as the are not part of the sync accumulator
     // this is cleared by setMembershipEvent so when it's updated through /sync

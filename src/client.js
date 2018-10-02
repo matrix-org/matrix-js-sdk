@@ -45,6 +45,7 @@ const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
+import {InvalidStoreError} from './errors';
 
 
 const LAZY_LOADING_MESSAGES_FILTER = {
@@ -2437,7 +2438,8 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         } else {
-            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state);
+            const stateEvents = utils.map(res.state, self.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
@@ -3439,6 +3441,9 @@ MatrixClient.prototype.startClient = async function(opts) {
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
 
+    if (opts.lazyLoadMembers && this.isGuest()) {
+        opts.lazyLoadMembers = false;
+    }
     if (opts.lazyLoadMembers) {
         const supported = await this.doesServerSupportLazyLoading();
         if (supported) {
@@ -3449,7 +3454,12 @@ MatrixClient.prototype.startClient = async function(opts) {
             opts.lazyLoadMembers = false;
         }
     }
-
+    // need to vape the store when enabling LL and wasn't enabled before
+    const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
+    if (shouldClear) {
+        const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+        throw new InvalidStoreError(reason, !!opts.lazyLoadMembers);
+    }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
     }
@@ -3462,9 +3472,48 @@ MatrixClient.prototype.startClient = async function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-
+    await this._storeClientOptions(this._clientOpts);
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+};
+
+/**
+ * Is the lazy loading option different than in previous session?
+ * @param {bool} lazyLoadMembers current options for lazy loading
+ * @return {bool} whether or not the option has changed compared to the previous session */
+MatrixClient.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
+    lazyLoadMembers = !!lazyLoadMembers;
+    // assume it was turned off before
+    // if we don't know any better
+    let lazyLoadMembersBefore = false;
+    const isStoreNewlyCreated = await this.store.isNewlyCreated();
+    if (!isStoreNewlyCreated) {
+        const prevClientOptions = await this.store.getClientOptions();
+        if (prevClientOptions) {
+            lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+        }
+        return lazyLoadMembersBefore !== lazyLoadMembers;
+    }
+    return false;
+};
+
+/**
+ * store client options with boolean/string/numeric values
+ * to know in the next session what flags the sync data was
+ * created with (e.g. lazy loading)
+ * @param {object} opts the complete set of client options
+ * @return {Promise} for store operation */
+MatrixClient.prototype._storeClientOptions = function(opts) {
+    const primTypes = ["boolean", "string", "number"];
+    const serializableOpts = Object.entries(opts)
+        .filter(([key, value]) => {
+            return primTypes.includes(typeof value);
+        })
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    return this.store.storeClientOptions(serializableOpts);
 };
 
 /**

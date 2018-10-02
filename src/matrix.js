@@ -34,6 +34,8 @@ module.exports.SyncAccumulator = require("./sync-accumulator");
 module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
 /** The {@link module:http-api.MatrixError|MatrixError} class. */
 module.exports.MatrixError = require("./http-api").MatrixError;
+/** The {@link module:errors.InvalidStoreError|InvalidStoreError} class. */
+module.exports.InvalidStoreError = require("./errors").InvalidStoreError;
 /** The {@link module:client.MatrixClient|MatrixClient} class. */
 module.exports.MatrixClient = require("./client").MatrixClient;
 /** The {@link module:models/room|Room} class. */
