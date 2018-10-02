@@ -47,6 +47,8 @@ import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 import {InvalidStoreError} from './errors';
 
+import Crypto from './crypto';
+import { isCryptoAvailable } from './crypto';
 
 const LAZY_LOADING_MESSAGES_FILTER = {
     lazy_load_members: true,
@@ -60,14 +62,7 @@ const LAZY_LOADING_SYNC_FILTER = {
 
 
 const SCROLLBACK_DELAY_MS = 3000;
-let CRYPTO_ENABLED = false;
-
-try {
-    var Crypto = require("./crypto");
-    CRYPTO_ENABLED = true;
-} catch (e) {
-    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
-}
+const CRYPTO_ENABLED = isCryptoAvailable();
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -165,6 +160,8 @@ function MatrixClient(opts) {
 
     MatrixBaseApis.call(this, opts);
 
+    this.olmVersion = null; // Populated after initCrypto is done
+
     this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
@@ -216,10 +213,6 @@ function MatrixClient(opts) {
     this._sessionStore = opts.sessionStore;
 
     this._forceTURN = opts.forceTURN || false;
-
-    if (CRYPTO_ENABLED) {
-        this.olmVersion = Crypto.getOlmVersion();
-    }
 
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -410,6 +403,13 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
  * successfully initialised.
  */
 MatrixClient.prototype.initCrypto = async function() {
+    if (!isCryptoAvailable()) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
     if (this._crypto) {
         console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
         return;
@@ -426,13 +426,6 @@ MatrixClient.prototype.initCrypto = async function() {
 
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
     await this._roomList.init();
-
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
 
     const userId = this.getUserId();
     if (userId === null) {
@@ -464,6 +457,9 @@ MatrixClient.prototype.initCrypto = async function() {
     ]);
 
     await crypto.init();
+
+    this.olmVersion = Crypto.getOlmVersion();
+
 
     // if crypto initialisation was successful, tell it to attach its event
     // handlers.
