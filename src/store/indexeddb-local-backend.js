@@ -83,7 +83,7 @@ function txnAsPromise(txn) {
             resolve(event);
         };
         txn.onerror = function(event) {
-            reject(event);
+            reject(event.target.error);
         };
     });
 }
@@ -94,7 +94,7 @@ function reqAsEventPromise(req) {
             resolve(event);
         };
         req.onerror = function(event) {
-            reject(event);
+            reject(event.target.error);
         };
     });
 }
