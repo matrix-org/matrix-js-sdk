@@ -97,7 +97,9 @@ export default class IndexedDBCryptoStore {
             // Try a dummy query which will fail if the browser doesn't support compund keys, so
             // we can fall back to a different backend.
             return backend.doTxn(
-                'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+                'readonly',
+                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                (txn) => {
                     backend.getEndToEndInboundGroupSession('', '', txn, () => {});
                 }).then(() => {
                     return backend;
