@@ -19,7 +19,7 @@ import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 
-const VERSION = 2;
+const VERSION = 3;
 
 function createDatabase(db) {
     // Make user store, clobber based on user ID. (userId property of User objects)
@@ -40,6 +40,12 @@ function upgradeSchemaV2(db) {
         });
     oobMembersStore.createIndex("room", "room_id");
 }
+
+function upgradeSchemaV3(db) {
+    db.createObjectStore("client_options",
+        { keyPath: ["clobber"]});
+}
+
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
@@ -77,7 +83,7 @@ function txnAsPromise(txn) {
             resolve(event);
         };
         txn.onerror = function(event) {
-            reject(event);
+            reject(event.target.error);
         };
     });
 }
@@ -88,7 +94,7 @@ function reqAsEventPromise(req) {
             resolve(event);
         };
         req.onerror = function(event) {
-            reject(event);
+            reject(event.target.error);
         };
     });
 }
@@ -123,6 +129,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this.db = null;
     this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
+    this._isNewlyCreated = false;
 };
 
 
@@ -153,10 +160,14 @@ LocalIndexedDBStoreBackend.prototype = {
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
             if (oldVersion < 1) { // The database did not previously exist.
+                this._isNewlyCreated = true;
                 createDatabase(db);
             }
             if (oldVersion < 2) {
                 upgradeSchemaV2(db);
+            }
+            if (oldVersion < 3) {
+                upgradeSchemaV3(db);
             }
             // Expand as needed.
         };
@@ -184,6 +195,10 @@ LocalIndexedDBStoreBackend.prototype = {
 
             return this._init();
         });
+    },
+    /** @return {bool} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return Promise.resolve(this._isNewlyCreated);
     },
 
     /**
@@ -528,6 +543,28 @@ LocalIndexedDBStoreBackend.prototype = {
                 return (results.length > 0 ? results[0] : {});
             });
         });
+    },
+
+    getClientOptions: function() {
+        return Promise.resolve().then(() => {
+            const txn = this.db.transaction(["client_options"], "readonly");
+            const store = txn.objectStore("client_options");
+            return selectQuery(store, undefined, (cursor) => {
+                if (cursor.value && cursor.value && cursor.value.options) {
+                    return cursor.value.options;
+                }
+            }).then((results) => results[0]);
+        });
+    },
+
+    storeClientOptions: async function(options) {
+        const txn = this.db.transaction(["client_options"], "readwrite");
+        const store = txn.objectStore("client_options");
+        store.put({
+            clobber: "-", // constant key so will always clobber
+            options: options,
+        }); // put == UPSERT
+        await txnAsPromise(txn);
     },
 };
 

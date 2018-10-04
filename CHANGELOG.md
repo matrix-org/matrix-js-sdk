@@ -1,3 +1,38 @@
+Changes in [0.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1) (2018-10-01)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1-rc.1...v0.11.1)
+
+ * No changes since rc.1
+
+Changes in [0.11.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1-rc.1) (2018-09-27)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.0...v0.11.1-rc.1)
+
+ * make usage of hub compatible with latest version (2.5)
+   [\#747](https://github.com/matrix-org/matrix-js-sdk/pull/747)
+ * Detect when lazy loading has been toggled in client.startClient
+   [\#746](https://github.com/matrix-org/matrix-js-sdk/pull/746)
+ * Add getMediaLimits to client
+   [\#644](https://github.com/matrix-org/matrix-js-sdk/pull/644)
+ * Split npm start into an init and watch script
+   [\#742](https://github.com/matrix-org/matrix-js-sdk/pull/742)
+ * Revert "room name should only take canonical alias into account"
+   [\#738](https://github.com/matrix-org/matrix-js-sdk/pull/738)
+ * fix display name disambiguation with LL
+   [\#737](https://github.com/matrix-org/matrix-js-sdk/pull/737)
+ * Introduce Room.myMembership event
+   [\#735](https://github.com/matrix-org/matrix-js-sdk/pull/735)
+ * room name should only take canonical alias into account
+   [\#733](https://github.com/matrix-org/matrix-js-sdk/pull/733)
+ * state events from context response were not wrapped in a MatrixEvent
+   [\#732](https://github.com/matrix-org/matrix-js-sdk/pull/732)
+ * Reduce amount of promises created when inserting members
+   [\#724](https://github.com/matrix-org/matrix-js-sdk/pull/724)
+ * dont wait for LL members to be stored to resolve the members
+   [\#726](https://github.com/matrix-org/matrix-js-sdk/pull/726)
+ * RoomState.members emitted with wrong argument order for OOB members
+   [\#728](https://github.com/matrix-org/matrix-js-sdk/pull/728)
+
 Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (2018-09-10)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.0-rc.1...v0.11.0)

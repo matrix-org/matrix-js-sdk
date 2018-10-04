@@ -55,6 +55,7 @@ module.exports.MatrixInMemoryStore = function MatrixInMemoryStore(opts) {
     this._oobMembers = {
         // roomId: [member events]
     };
+    this._clientOptions = {};
 };
 
 module.exports.MatrixInMemoryStore.prototype = {
@@ -67,6 +68,10 @@ module.exports.MatrixInMemoryStore.prototype = {
         return this.syncToken;
     },
 
+    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return Promise.resolve(true);
+    },
 
     /**
      * Set the token to stream from.
@@ -400,6 +405,15 @@ module.exports.MatrixInMemoryStore.prototype = {
      */
     setOutOfBandMembers: function(roomId, membershipEvents) {
         this._oobMembers[roomId] = membershipEvents;
+        return Promise.resolve();
+    },
+
+    getClientOptions: function() {
+        return Promise.resolve(this._clientOptions);
+    },
+
+    storeClientOptions: function(options) {
+        this._clientOptions = Object.assign({}, options);
         return Promise.resolve();
     },
 };
