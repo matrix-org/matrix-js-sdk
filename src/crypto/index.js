@@ -128,8 +128,6 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
-    // Olm is just an object with a .then, not a fully-fledged promise, so
-    // pass it into bluebird to make it a proper promise.
     await global.Olm.init();
 
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
