@@ -460,6 +460,71 @@ export class Backend {
         };
     }
 
+    // session backups
+
+    getSessionsNeedingBackup(limit) {
+        return new Promise((resolve, reject) => {
+            const sessions = [];
+
+            const txn = this._db.transaction(["sessions_needing_backup", "inbound_group_sessions"], "readonly");
+            txn.onerror = reject;
+            txn.oncomplete = function() {
+                resolve(sessions);
+            }
+            const objectStore = txn.objectStore("sessions_needing_backup");
+            const sessionStore = txn.objectStore("inbound_group_sessions");
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function() {
+                const cursor = getReq.result;
+                if (cursor) {
+                    const sessionGetReq = sessionStore.get(cursor.key)
+                    sessionGetReq.onsuccess = function() {
+                        sessions.push({
+                            senderKey: sessionGetReq.result.senderCurve25519Key,
+                            sessionId: sessionGetReq.result.sessionId,
+                            sessionData: sessionGetReq.result.session
+                        });
+                    }
+                    //sessions.push(cursor.value);
+                    if (!limit || sessions.length < limit) {
+                        cursor.continue();
+                    }
+                }
+            }
+        });
+    }
+
+    unmarkSessionsNeedingBackup(sessions) {
+        const txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map((session) => {
+            return new Promise((resolve, reject) => {
+                console.log(session);
+                const req = objectStore.delete([session.senderKey, session.sessionId]);
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+    }
+
+    markSessionsNeedingBackup(sessions, txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map((session) => {
+            return new Promise((resolve, reject) => {
+                const req = objectStore.put({
+                    senderCurve25519Key: session.senderKey,
+                    sessionId: session.sessionId
+                });
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
@@ -497,6 +562,11 @@ export function upgradeDatabase(db, oldVersion) {
     }
     if (oldVersion < 6) {
         db.createObjectStore("rooms");
+    }
+    if (oldVersion < 7) {
+        db.createObjectStore("sessions_needing_backup", {
+            keyPath: ["senderCurve25519Key", "sessionId"],
+        });
     }
     // Expand as needed.
 }

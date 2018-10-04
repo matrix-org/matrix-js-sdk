@@ -98,7 +98,7 @@ describe("MegolmBackup", function() {
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockCrypto.backupKey = new global.Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
-            "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK",
+            "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
         );
         mockCrypto.backupInfo = {
             version: 1,
@@ -134,7 +134,7 @@ describe("MegolmBackup", function() {
             megolmDecryption.olmlib = mockOlmLib;
         });
 
-        it('automatically backs up keys', function() {
+        it('automatically calls the key back up', function() {
             const groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -168,6 +168,194 @@ describe("MegolmBackup", function() {
             }).then(() => {
                 expect(mockCrypto.backupGroupSession).toHaveBeenCalled();
             });
+        });
+
+        it('sends backups to the server', function () {
+            const groupSession = new global.Olm.OutboundGroupSession();
+            groupSession.create();
+            const ibGroupSession = new global.Olm.InboundGroupSession();
+            ibGroupSession.create(groupSession.session_key());
+
+            const scheduler = [
+                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+                "setProcessFunction",
+            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            const store = [
+                "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
+                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
+                "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
+                "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
+            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+            store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+            store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
+            const client = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: "https://identity.server",
+                accessToken: "my.access.token",
+                request: function() {}, // NOP
+                store: store,
+                scheduler: scheduler,
+                userId: "@alice:bar",
+                deviceId: "device",
+                sessionStore: sessionStore,
+                cryptoStore: cryptoStore,
+            });
+
+            megolmDecryption = new MegolmDecryption({
+                userId: '@user:id',
+                crypto: mockCrypto,
+                olmDevice: olmDevice,
+                baseApis: client,
+                roomId: ROOM_ID,
+            });
+
+            megolmDecryption.olmlib = mockOlmLib;
+
+            return client.initCrypto()
+                .then(() => {
+                    return cryptoStore.doTxn("readwrite", [cryptoStore.STORE_SESSION], (txn) => {
+                        cryptoStore.addEndToEndInboundGroupSession(
+                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                            groupSession.session_id(),
+                            {
+                                forwardingCurve25519KeyChain: undefined,
+                                keysClaimed: {
+                                    ed25519: "SENDER_ED25519",
+                                },
+                                room_id: ROOM_ID,
+                                session: ibGroupSession.pickle(olmDevice._pickleKey),
+                            },
+                            txn);
+                    });
+                })
+                .then(() => {
+                    client.enableKeyBackup({
+                        algorithm: "foobar",
+                        version: 1,
+                        auth_data: {
+                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
+                        },
+                    });
+                    let numCalls = 0;
+                    return new Promise((resolve, reject) => {
+                        client._http.authedRequest = function(callback, method, path, queryParams, data, opts) {
+                            expect(++numCalls <= 1);
+                            if (numCalls >= 2) {
+                                // exit out of retry loop if there's something wrong
+                                reject(new Error("authedRequest called too many timmes"));
+                                return Promise.resolve({});
+                            }
+                            expect(method).toBe("PUT");
+                            expect(path).toBe("/room_keys/keys");
+                            expect(queryParams.version).toBe(1);
+                            expect(data.rooms[ROOM_ID].sessions).toExist();
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(groupSession.session_id());
+                            resolve();
+                            return Promise.resolve({});
+                        };
+                        client._crypto.backupGroupSession("roomId", "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI", [], groupSession.session_id(), groupSession.session_key());
+                    })
+                        .then(() => {
+                            expect(numCalls).toBe(1);
+                        });
+                });
+        });
+
+        it('retries when a backup fails', function () {
+            const groupSession = new global.Olm.OutboundGroupSession();
+            groupSession.create();
+            const ibGroupSession = new global.Olm.InboundGroupSession();
+            ibGroupSession.create(groupSession.session_key());
+
+            const scheduler = [
+                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+                "setProcessFunction",
+            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            const store = [
+                "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
+                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
+                "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
+                "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
+            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+            store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+            store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
+            const client = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: "https://identity.server",
+                accessToken: "my.access.token",
+                request: function() {}, // NOP
+                store: store,
+                scheduler: scheduler,
+                userId: "@alice:bar",
+                deviceId: "device",
+                sessionStore: sessionStore,
+                cryptoStore: cryptoStore,
+            });
+
+            megolmDecryption = new MegolmDecryption({
+                userId: '@user:id',
+                crypto: mockCrypto,
+                olmDevice: olmDevice,
+                baseApis: client,
+                roomId: ROOM_ID,
+            });
+
+            megolmDecryption.olmlib = mockOlmLib;
+
+            return client.initCrypto()
+                .then(() => {
+                    return cryptoStore.doTxn("readwrite", [cryptoStore.STORE_SESSION], (txn) => {
+                        cryptoStore.addEndToEndInboundGroupSession(
+                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                            groupSession.session_id(),
+                            {
+                                forwardingCurve25519KeyChain: undefined,
+                                keysClaimed: {
+                                    ed25519: "SENDER_ED25519",
+                                },
+                                room_id: ROOM_ID,
+                                session: ibGroupSession.pickle(olmDevice._pickleKey),
+                            },
+                            txn);
+                    });
+                })
+                .then(() => {
+                    client.enableKeyBackup({
+                        algorithm: "foobar",
+                        version: 1,
+                        auth_data: {
+                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
+                        },
+                    });
+                    let numCalls = 0;
+                    return new Promise((resolve, reject) => {
+                        client._http.authedRequest = function(callback, method, path, queryParams, data, opts) {
+                            expect(++numCalls <= 2);
+                            if (numCalls >= 3) {
+                                // exit out of retry loop if there's something wrong
+                                reject(new Error("authedRequest called too many timmes"));
+                                return Promise.resolve({});
+                            }
+                            expect(method).toBe("PUT");
+                            expect(path).toBe("/room_keys/keys");
+                            expect(queryParams.version).toBe(1);
+                            expect(data.rooms[ROOM_ID].sessions).toExist();
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(groupSession.session_id());
+                            if (numCalls > 1) {
+                                resolve();
+                                return Promise.resolve({});
+                            } else {
+                                return Promise.reject(new Error("this is an expected failure"));
+                            }
+                        };
+                        client._crypto.backupGroupSession("roomId", "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI", [], groupSession.session_id(), groupSession.session_key());
+                    })
+                        .then(() => {
+                            expect(numCalls).toBe(2);
+                        });
+                });
         });
     });
 

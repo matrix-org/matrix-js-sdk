@@ -83,6 +83,7 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this.backupInfo = null; // The info dict from /room_keys/version
     this.backupKey = null; // The encryption key object
     this._checkedForBackup = false; // Have we checked the server for a backup we can use?
+    this._sendingBackups = false; // Are we currently sending backups?
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -965,51 +966,62 @@ Crypto.prototype.importRoomKeys = function(keys) {
     );
 };
 
-Crypto.prototype._backupPayloadForSession = function(
-    senderKey, forwardingCurve25519KeyChain,
-    sessionId, sessionKey, keysClaimed,
-    exportFormat,
-) {
-    // new session.
-    const session = new Olm.InboundGroupSession();
-    try {
-        if (exportFormat) {
-            session.import_session(sessionKey);
-        } else {
-            session.create(sessionKey);
-        }
-        if (sessionId != session.session_id()) {
-            throw new Error(
-                "Mismatched group session ID from senderKey: " +
-                    senderKey,
-            );
-        }
+Crypto.prototype._maybeSendKeyBackup = async function() {
+    if (!this._sendingBackups) {
+        this._sendingBackups = true;
+        while (1) {
+            if (!this.backupKey) {
+                this._sendingBackups = false;
+                return;
+            }
+            // FIXME: figure out what limit is reasonable
+            const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
+            if (!sessions.length) {
+                this._sendingBackups = false;
+                return;
+            }
+            const data = {};
+            for (const session of sessions) {
+                const room_id = session.sessionData.room_id;
+                if (data[room_id] === undefined)
+                    data[room_id] = {sessions: {}};
 
-        if (!exportFormat) {
-            sessionKey = session.export_session();
-        }
-        const firstKnownIndex = session.first_known_index();
+                const sessionData = await this._olmDevice.exportInboundGroupSession(session.senderKey, session.sessionId, session.sessionData);
+                sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
+                delete sessionData.session_id;
+                delete sessionData.room_id;
+                const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
 
-        const sessionData = {
-            algorithm: olmlib.MEGOLM_ALGORITHM,
-            sender_key: senderKey,
-            sender_claimed_keys: keysClaimed,
-            session_key: sessionKey,
-            forwarding_curve25519_key_chain: forwardingCurve25519KeyChain,
-        };
-        const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
-        return {
-            first_message_index: firstKnownIndex,
-            forwarded_count: forwardingCurve25519KeyChain.length,
-            is_verified: false, // FIXME: how do we determine this?
-            session_data: encrypted,
-        };
-    } finally {
-        session.free();
+                data[room_id]['sessions'][session.sessionId] = {
+                    first_message_index: 1, // FIXME
+                    forwarded_count: (sessionData.forwardingCurve25519KeyChain || []).length,
+                    is_verified: false, // FIXME: how do we determine this?
+                    session_data: encrypted,
+                };
+            }
+
+            let successful = false;
+            do {
+                if (!this.backupKey) {
+                    this._sendingBackups = false;
+                    return;
+                }
+                try {
+                    await this._baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, {rooms: data});
+                    successful = true;
+                    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
+                }
+                catch (e) {
+                    console.log("send failed", e);
+                    // FIXME: pause
+                }
+            } while (!successful);
+            // FIXME: pause between iterations?
+        }
     }
-};
+}
 
-Crypto.prototype.backupGroupSession = function(
+Crypto.prototype.backupGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
     sessionId, sessionKey, keysClaimed,
     exportFormat,
@@ -1018,26 +1030,26 @@ Crypto.prototype.backupGroupSession = function(
         throw new Error("Key backups are not enabled");
     }
 
-    const data = this._backupPayloadForSession(
-        senderKey, forwardingCurve25519KeyChain,
-        sessionId, sessionKey, keysClaimed,
-        exportFormat,
-    );
-    return this._baseApis.sendKeyBackup(roomId, sessionId, this.backupInfo.version, data);
+    await this._cryptoStore.markSessionsNeedingBackup([{
+        senderKey: senderKey,
+        sessionId: sessionId,
+    }]);
+
+    this._maybeSendKeyBackup();
 };
 
 Crypto.prototype.backupAllGroupSessions = async function(version) {
-    const keys = await this.exportRoomKeys();
-    const data = {};
-    for (const key of keys) {
-        if (data[key.room_id] === undefined) data[key.room_id] = {sessions: {}};
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP], (txn) => {
+            this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
+                if (session !== null) {
+                    this._cryptoStore.markSessionsNeedingBackup([session], txn);
+                }
+            });
+        }
+    );
 
-        data[key.room_id]['sessions'][key.session_id] = this._backupPayloadForSession(
-            key.sender_key, key.forwarding_curve25519_key_chain,
-            key.session_id, key.session_key, key.sender_claimed_keys, true,
-        );
-    }
-    return this._baseApis.sendKeyBackup(undefined, undefined, version, {rooms: data});
+    this._maybeSendKeyBackup();
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
