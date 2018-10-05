@@ -281,7 +281,7 @@ fi
 echo "updating master branch"
 git checkout master
 git pull
-git merge --ff-only "$rel_branch"
+git merge "$rel_branch"
 
 # push master  and docs (if generated) to github
 git push origin master
