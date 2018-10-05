@@ -112,9 +112,6 @@ const IndexedDBStore = function IndexedDBStore(opts) {
 };
 utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 
-/**
- * @return {Promise} Resolved when loaded from indexed db.
-  */
 IndexedDBStore.prototype.startup = async function() {
     if (this.startedUp) {
         console.log(`IndexedDBStore.startup: already started`);
