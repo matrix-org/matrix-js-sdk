@@ -11,6 +11,7 @@ function InvalidStoreError(reason, value) {
 }
 
 InvalidStoreError.TOGGLED_LAZY_LOADING = "TOGGLED_LAZY_LOADING";
+InvalidStoreError.NEEDS_DOWNGRADE = "NEEDS_DOWNGRADE";
 
 InvalidStoreError.prototype = Object.create(Error.prototype, {
   constructor: {

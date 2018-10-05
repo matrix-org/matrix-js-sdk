@@ -21,6 +21,7 @@ import utils from "../utils";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
 import User from "../models/user";
+import {InvalidStoreError} from "../errors";
 import {MatrixEvent} from "../models/event";
 
 /**
@@ -114,26 +115,32 @@ utils.inherits(IndexedDBStore, MatrixInMemoryStore);
 /**
  * @return {Promise} Resolved when loaded from indexed db.
   */
-IndexedDBStore.prototype.startup = function() {
+IndexedDBStore.prototype.startup = async function() {
     if (this.startedUp) {
         console.log(`IndexedDBStore.startup: already started`);
-        return Promise.resolve();
+        return;
     }
 
     console.log(`IndexedDBStore.startup: connecting to backend`);
-    return this.backend.connect().then(() => {
-        console.log(`IndexedDBStore.startup: loading presence events`);
-        return this.backend.getUserPresenceEvents();
-    }).then((userPresenceEvents) => {
-        console.log(`IndexedDBStore.startup: processing presence events`);
-        userPresenceEvents.forEach(([userId, rawEvent]) => {
-            const u = new User(userId);
-            if (rawEvent) {
-                u.setPresenceEvent(new MatrixEvent(rawEvent));
-            }
-            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
-            this.storeUser(u);
-        });
+    try {
+        await this.backend.connect();
+    } catch(err) {
+        if (err.name === "VersionError") {
+            throw new InvalidStoreError(InvalidStoreError.NEEDS_DOWNGRADE);
+        }
+        throw err;
+    }
+
+    console.log(`IndexedDBStore.startup: loading presence events`);
+    const userPresenceEvents = await this.backend.getUserPresenceEvents();
+    console.log(`IndexedDBStore.startup: processing presence events`);
+    userPresenceEvents.forEach(([userId, rawEvent]) => {
+        const u = new User(userId);
+        if (rawEvent) {
+            u.setPresenceEvent(new MatrixEvent(rawEvent));
+        }
+        this._userModifiedMap[u.userId] = u.getLastModifiedTime();
+        this.storeUser(u);
     });
 };
 
