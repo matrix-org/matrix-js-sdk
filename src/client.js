@@ -46,6 +46,9 @@ import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 import {InvalidStoreError} from './errors';
 
+// Disable warnings for now: we use deprecated bluebird functions
+// and need to migrate, but they spam the console with warnings.
+Promise.config({warnings: false});
 
 const LAZY_LOADING_MESSAGES_FILTER = {
     lazy_load_members: true,
