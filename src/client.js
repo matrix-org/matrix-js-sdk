@@ -3123,8 +3123,8 @@ MatrixClient.prototype.startClient = async function(opts) {
         }
     }
     // need to vape the store when enabling LL and wasn't enabled before
-    const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
-    if (shouldClear) {
+    const hasInvalidStore = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
+    if (hasInvalidStore) {
         const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
         throw new InvalidStoreError(reason, !!opts.lazyLoadMembers);
     }
