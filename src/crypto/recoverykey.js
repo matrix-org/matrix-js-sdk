@@ -53,7 +53,10 @@ export function decodeRecoveryKey(recoverykey) {
         }
     }
 
-    if (result.length !== OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH + 1) {
+    if (
+        result.length !==
+        OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH + 1
+    ) {
         throw new Error("Incorrect length");
     }
 

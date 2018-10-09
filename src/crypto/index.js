@@ -974,7 +974,7 @@ Crypto.prototype._backupPayloadForSession = function(
     exportFormat,
 ) {
     // new session.
-    const session = new Olm.InboundGroupSession();
+    const session = new global.Olm.InboundGroupSession();
     try {
         if (exportFormat) {
             session.import_session(sessionKey);

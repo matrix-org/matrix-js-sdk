@@ -43,13 +43,14 @@ const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';
 
+const SESSION_ID = 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc';
 const ENCRYPTED_EVENT = new MatrixEvent({
     type: 'm.room.encrypted',
     room_id: '!ROOM:ID',
     content: {
         algorithm: 'm.megolm.v1.aes-sha2',
         sender_key: 'SENDER_CURVE25519',
-        session_id: 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
+        session_id: SESSION_ID,
         ciphertext: 'AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N'
             + 'CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl'
             + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs',
@@ -222,7 +223,7 @@ describe("MegolmBackup", function() {
                 "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
                 + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
                 ROOM_ID,
-                'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc',
+                SESSION_ID,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
@@ -236,10 +237,10 @@ describe("MegolmBackup", function() {
                     rooms: {
                         [ROOM_ID]: {
                             sessions: {
-                                'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc': KEY_BACKUP_DATA,
+                                SESSION_ID: KEY_BACKUP_DATA,
                             },
                         },
-                    }
+                    },
                 });
             };
             return client.restoreKeyBackups(
