@@ -92,6 +92,19 @@ export default class IndexedDBCryptoStore {
                 console.log(`connected to indexeddb ${this._dbName}`);
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
+        }).then((backend) => {
+            // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
+            // Try a dummy query which will fail if the browser doesn't support compund keys, so
+            // we can fall back to a different backend.
+            return backend.doTxn(
+                'readonly',
+                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                (txn) => {
+                    backend.getEndToEndInboundGroupSession('', '', txn, () => {});
+                }).then(() => {
+                    return backend;
+                },
+            );
         }).catch((e) => {
             console.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
