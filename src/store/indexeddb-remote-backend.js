@@ -184,7 +184,9 @@ RemoteIndexedDBStoreBackend.prototype = {
             if (msg.command == 'cmd_success') {
                 def.resolve(msg.result);
             } else {
-                def.reject(msg.error);
+                const error = new Error(msg.error.message);
+                error.name = msg.error.name;
+                def.reject(error);
             }
         } else {
             console.warn("Unrecognised message from worker: " + msg);
