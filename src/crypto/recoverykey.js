@@ -14,31 +14,51 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import base58check from 'base58check';
+import bs58 from 'bs58';
 
 // picked arbitrarily but to try & avoid clashing with any bitcoin ones
+// (also base58 encoded, albeit with a lot of hashing)
 const OLM_RECOVERY_KEY_PREFIX = [0x8B, 0x01];
 
 export function encodeRecoveryKey(key) {
-    const base58key = base58check.encode(Buffer.from(OLM_RECOVERY_KEY_PREFIX), Buffer.from(key));
+    const buf = new Uint8Array(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
+    buf.set(OLM_RECOVERY_KEY_PREFIX, 0);
+    buf.set(key, OLM_RECOVERY_KEY_PREFIX.length);
+
+    let parity = 0;
+    for (let i = 0; i < buf.length - 1; ++i) {
+        parity ^= buf[i];
+    }
+    buf[buf.length - 1] = parity;
+    const base58key = bs58.encode(buf);
+
+
     return base58key.match(/.{1,4}/g).join(" ");
 }
 
 export function decodeRecoveryKey(recoverykey) {
-    const result = base58check.decode(recoverykey.replace(/ /, ''));
-    // the encoding doesn't include the length of the prefix, so the
-    // decoder assumes it's 1 byte. sigh.
-    const prefix = Buffer.concat([result.prefix, result.data.slice(0, OLM_RECOVERY_KEY_PREFIX.length - 1)]);
+    const result = bs58.decode(recoverykey.replace(/ /g, ''));
 
-    if (!prefix.equals(Buffer.from(OLM_RECOVERY_KEY_PREFIX))) {
-        throw new Error("Incorrect prefix");
+    let parity = 0;
+    for (const b of result) {
+        parity ^= b;
+    }
+    if (parity !== 0) {
+        throw new Error("Incorrect parity");
     }
 
-    const key = result.data.slice(OLM_RECOVERY_KEY_PREFIX.length - 1);
+    for (let i = 0; i < OLM_RECOVERY_KEY_PREFIX.length; ++i) {
+        if (result[i] !== OLM_RECOVERY_KEY_PREFIX[i]) {
+            throw new Error("Incorrect prefix");
+        }
+    }
 
-    if (key.length !== global.Olm.PRIVATE_KEY_LENGTH) {
+    if (result.length !== OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH + 1) {
         throw new Error("Incorrect length");
     }
 
-    return key;
+    return result.slice(
+        OLM_RECOVERY_KEY_PREFIX.length,
+        OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH,
+    );
 }
