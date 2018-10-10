@@ -51,6 +51,17 @@ function Filter(userId, filterId) {
     this.definition = {};
 }
 
+Filter.LAZY_LOADING_MESSAGES_FILTER = {
+    lazy_load_members: true,
+};
+
+Filter.LAZY_LOADING_SYNC_FILTER = {
+    room: {
+        state: Filter.LAZY_LOADING_MESSAGES_FILTER,
+    },
+};
+
+
 /**
  * Get the ID of this filter on your homeserver (if known)
  * @return {?Number} The filter ID
