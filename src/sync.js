@@ -33,6 +33,8 @@ const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 
+import {InvalidStoreError} from './errors';
+
 const DEBUG = true;
 
 // /sync requests allow you to set a timeout= but the request may continue
@@ -100,6 +102,7 @@ function SyncApi(client, opts) {
     this._connectionReturnedDefer = null;
     this._notifEvents = []; // accumulator of sync events in the current sync response
     this._failedSyncCount = 0; // Number of consecutive failed /sync requests
+    this._storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
     if (client.getNotifTimelineSet()) {
         client.reEmitter.reEmit(client.getNotifTimelineSet(),
@@ -423,6 +426,28 @@ SyncApi.prototype.recoverFromSyncStartupError = async function(savedSyncPromise,
 };
 
 /**
+ * Is the lazy loading option different than in previous session?
+ * @param {bool} lazyLoadMembers current options for lazy loading
+ * @return {bool} whether or not the option has changed compared to the previous session */
+SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
+    lazyLoadMembers = !!lazyLoadMembers;
+    // assume it was turned off before
+    // if we don't know any better
+    let lazyLoadMembersBefore = false;
+    const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
+    console.log("store newly created? "+isStoreNewlyCreated);
+    if (!isStoreNewlyCreated) {
+        const prevClientOptions = await this.client.store.getClientOptions();
+        if (prevClientOptions) {
+            lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+        }
+        console.log("prev ll: "+lazyLoadMembersBefore);
+        return lazyLoadMembersBefore !== lazyLoadMembers;
+    }
+    return false;
+};
+
+/**
  * Main entry point
  */
 SyncApi.prototype.sync = function() {
@@ -444,6 +469,8 @@ SyncApi.prototype.sync = function() {
     //   1) We need to get push rules so we can check if events should bing as we get
     //      them from /sync.
     //   2) We need to get/create a filter which we can use for /sync.
+    //   3) We need to check the lazy loading option matches what was used in the
+    //       stored sync. If it doesn't, we can't use the stored sync.
 
     async function getPushRules() {
         try {
@@ -458,8 +485,48 @@ SyncApi.prototype.sync = function() {
             getPushRules();
             return;
         }
-        getFilter(); // Now get the filter and start syncing
+        checkLazyLoadStatus(); // advance to the next stage
     }
+
+    const checkLazyLoadStatus = async () => {
+        if (this.opts.lazyLoadMembers && client.isGuest()) {
+            this.opts.lazyLoadMembers = false;
+        }
+        if (this.opts.lazyLoadMembers) {
+            const supported = await client.doesServerSupportLazyLoading();
+            console.log("server supports ll? "+supported);
+            if (supported) {
+                this.opts.filter = await client.createFilter(
+                    Filter.LAZY_LOADING_SYNC_FILTER,
+                );
+            } else {
+                console.log("LL: lazy loading requested but not supported " +
+                    "by server, so disabling");
+                this.opts.lazyLoadMembers = false;
+            }
+        }
+        // need to vape the store when enabling LL and wasn't enabled before
+        const shouldClear = await this._wasLazyLoadingToggled(this.opts.lazyLoadMembers);
+        console.log("was toggled? "+shouldClear);
+        if (shouldClear) {
+            this._storeIsInvalid = true;
+            const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+            const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
+            this._updateSyncState("ERROR", { error });
+            // bail out of the sync loop now: the app needs to respond to this error.
+            // we leave the state as 'ERROR' which isn't great since this normally means
+            // we're retrying. The client must be stopped before clearing the stores anyway
+            // so the app should stop the client, clear the store and start it again.
+            console.warn("InvalidStoreError: store is not usable: stopping sync.");
+            return;
+        }
+        if (this.opts.lazyLoadMembers && this._crypto) {
+            this.opts.crypto.enableLazyLoading();
+        }
+        await this.client._storeClientOptions();
+
+        getFilter(); // Now get the filter and start syncing
+    };
 
     async function getFilter() {
         let filter;
@@ -588,7 +655,12 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
         console.error("Error processing cached sync", e.stack || e);
     }
 
-    this._updateSyncState("PREPARED", syncEventData);
+    // Don't emit a prepared if we've bailed because the store is invalid:
+    // in this case the client will not be usable until stopped & restarted
+    // so this would be useless and misleading.
+    if (!this._storeIsInvalid) {
+        this._updateSyncState("PREPARED", syncEventData);
+    }
 };
 
 /**
