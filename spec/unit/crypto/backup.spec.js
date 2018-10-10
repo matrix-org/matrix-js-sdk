@@ -171,6 +171,7 @@ describe("MegolmBackup", function() {
         });
 
         it('sends backups to the server', function () {
+            this.timeout(12000);
             const groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new global.Olm.InboundGroupSession();
@@ -263,6 +264,7 @@ describe("MegolmBackup", function() {
         });
 
         it('retries when a backup fails', function () {
+            this.timeout(12000);
             const groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new global.Olm.InboundGroupSession();

@@ -969,54 +969,68 @@ Crypto.prototype.importRoomKeys = function(keys) {
 Crypto.prototype._maybeSendKeyBackup = async function() {
     if (!this._sendingBackups) {
         this._sendingBackups = true;
-        while (1) {
-            if (!this.backupKey) {
-                this._sendingBackups = false;
-                return;
-            }
-            // FIXME: figure out what limit is reasonable
-            const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
-            if (!sessions.length) {
-                this._sendingBackups = false;
-                return;
-            }
-            const data = {};
-            for (const session of sessions) {
-                const room_id = session.sessionData.room_id;
-                if (data[room_id] === undefined)
-                    data[room_id] = {sessions: {}};
-
-                const sessionData = await this._olmDevice.exportInboundGroupSession(session.senderKey, session.sessionId, session.sessionData);
-                sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
-                delete sessionData.session_id;
-                delete sessionData.room_id;
-                const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
-
-                data[room_id]['sessions'][session.sessionId] = {
-                    first_message_index: 1, // FIXME
-                    forwarded_count: (sessionData.forwardingCurve25519KeyChain || []).length,
-                    is_verified: false, // FIXME: how do we determine this?
-                    session_data: encrypted,
-                };
-            }
-
-            let successful = false;
-            do {
+        try {
+            // wait between 0 and 10 seconds, to avoid backup requests from
+            // different clients hitting the server all at the same time when a
+            // new key is sent
+            await new Promise((resolve, reject) => {
+                setTimeout(resolve, Math.random() * 10000);
+            });
+            let numFailures = 0; // number of consecutive failures
+            while (1) {
                 if (!this.backupKey) {
-                    this._sendingBackups = false;
                     return;
                 }
+                // FIXME: figure out what limit is reasonable
+                const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
+                if (!sessions.length) {
+                    return;
+                }
+                const data = {};
+                for (const session of sessions) {
+                    const room_id = session.sessionData.room_id;
+                    if (data[room_id] === undefined)
+                        data[room_id] = {sessions: {}};
+
+                    const sessionData = await this._olmDevice.exportInboundGroupSession(session.senderKey, session.sessionId, session.sessionData);
+                    sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
+                    delete sessionData.session_id;
+                    delete sessionData.room_id;
+                    const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
+
+                    data[room_id]['sessions'][session.sessionId] = {
+                        first_message_index: 1, // FIXME
+                        forwarded_count: (sessionData.forwardingCurve25519KeyChain || []).length,
+                        is_verified: false, // FIXME: how do we determine this?
+                        session_data: encrypted,
+                    };
+                }
+
                 try {
                     await this._baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, {rooms: data});
-                    successful = true;
+                    numFailures = 0;
                     await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
                 }
-                catch (e) {
-                    console.log("send failed", e);
-                    // FIXME: pause
+                catch (err) {
+                    numFailures++;
+                    console.log("send failed", err);
+                    if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
+                        // retrying probably won't help much, so we should give up
+                        // FIXME: disable backups?
+                        return;
+                    }
                 }
-            } while (!successful);
-            // FIXME: pause between iterations?
+                if (numFailures) {
+                    // exponential backoff if we have failures
+                    await new Promise((resolve, reject) => {
+                        setTimeout(resolve, 1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                    });
+                }
+            }
+        }
+        finally
+        {
+            this._sendingBackups = false;
         }
     }
 }
