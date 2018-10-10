@@ -435,13 +435,11 @@ SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
     // if we don't know any better
     let lazyLoadMembersBefore = false;
     const isStoreNewlyCreated = await this.client.store.isNewlyCreated();
-    console.log("store newly created? "+isStoreNewlyCreated);
     if (!isStoreNewlyCreated) {
         const prevClientOptions = await this.client.store.getClientOptions();
         if (prevClientOptions) {
             lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
         }
-        console.log("prev ll: "+lazyLoadMembersBefore);
         return lazyLoadMembersBefore !== lazyLoadMembers;
     }
     return false;
@@ -494,7 +492,6 @@ SyncApi.prototype.sync = function() {
         }
         if (this.opts.lazyLoadMembers) {
             const supported = await client.doesServerSupportLazyLoading();
-            console.log("server supports ll? "+supported);
             if (supported) {
                 this.opts.filter = await client.createFilter(
                     Filter.LAZY_LOADING_SYNC_FILTER,
@@ -507,7 +504,6 @@ SyncApi.prototype.sync = function() {
         }
         // need to vape the store when enabling LL and wasn't enabled before
         const shouldClear = await this._wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-        console.log("was toggled? "+shouldClear);
         if (shouldClear) {
             this._storeIsInvalid = true;
             const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
