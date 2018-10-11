@@ -483,21 +483,9 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
     }
     const userId = stateEvent.getStateKey();
     const existingMember = this.getMember(userId);
-    if (existingMember) {
-        const existingMemberEvent = existingMember.events.member;
-        // ignore out of band members with events we are
-        // already aware of.
-        if (existingMemberEvent.getId() === stateEvent.getId()) {
-            return;
-        }
-        // this member was updated since we started
-        // loading the out of band members.
-        // Ignore the out of band member and clear
-        // the "supersedes" flag as the out of members are now loaded
-        if (existingMember.supersedesOutOfBand()) {
-            existingMember.clearSupersedesOutOfBand();
-            return;
-        }
+    // never replace members replaced as part of the sync
+    if (existingMember && !existingMember.isOutOfBand()) {
+        return;
     }
 
     const member = this._getOrCreateMember(userId, stateEvent);
