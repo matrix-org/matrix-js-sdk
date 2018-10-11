@@ -45,7 +45,15 @@ const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
+import {InvalidStoreError} from './errors';
 
+import Crypto from './crypto';
+import { isCryptoAvailable } from './crypto';
+import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
+
+// Disable warnings for now: we use deprecated bluebird functions
+// and need to migrate, but they spam the console with warnings.
+Promise.config({warnings: false});
 
 const LAZY_LOADING_MESSAGES_FILTER = {
     lazy_load_members: true,
@@ -59,14 +67,7 @@ const LAZY_LOADING_SYNC_FILTER = {
 
 
 const SCROLLBACK_DELAY_MS = 3000;
-let CRYPTO_ENABLED = false;
-
-try {
-    var Crypto = require("./crypto");
-    CRYPTO_ENABLED = true;
-} catch (e) {
-    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
-}
+const CRYPTO_ENABLED = isCryptoAvailable();
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -164,6 +165,8 @@ function MatrixClient(opts) {
 
     MatrixBaseApis.call(this, opts);
 
+    this.olmVersion = null; // Populated after initCrypto is done
+
     this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
@@ -215,10 +218,6 @@ function MatrixClient(opts) {
     this._sessionStore = opts.sessionStore;
 
     this._forceTURN = opts.forceTURN || false;
-
-    if (CRYPTO_ENABLED) {
-        this.olmVersion = Crypto.getOlmVersion();
-    }
 
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -409,6 +408,13 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
  * successfully initialised.
  */
 MatrixClient.prototype.initCrypto = async function() {
+    if (!isCryptoAvailable()) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
     if (this._crypto) {
         console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
         return;
@@ -425,13 +431,6 @@ MatrixClient.prototype.initCrypto = async function() {
 
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
     await this._roomList.init();
-
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
 
     const userId = this.getUserId();
     if (userId === null) {
@@ -463,6 +462,9 @@ MatrixClient.prototype.initCrypto = async function() {
     ]);
 
     await crypto.init();
+
+    this.olmVersion = Crypto.getOlmVersion();
+
 
     // if crypto initialisation was successful, tell it to attach its event
     // handlers.
@@ -887,9 +889,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = function() {
             auth_data: {
                 public_key: publicKey,
             },
-            // FIXME: pickle isn't the right thing to use, but we don't have
-            // anything else yet, so use it for now
-            recovery_key: decryption.pickle("secret_key"),
+            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
         };
     } finally {
         decryption.free();
@@ -996,26 +996,17 @@ MatrixClient.prototype.backupAllGroupSessions = function(version) {
     return this._crypto.backupAllGroupSessions(version);
 };
 
-MatrixClient.prototype.isValidRecoveryKey = function(decryptionKey) {
-    if (this._crypto === null) {
-        throw new Error("End-to-end encryption disabled");
-    }
-
-    const decryption = new global.Olm.PkDecryption();
+MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     try {
-        // FIXME: see the FIXME in createKeyBackupVersion
-        decryption.unpickle("secret_key", decryptionKey);
+        decodeRecoveryKey(recoveryKey);
         return true;
     } catch (e) {
-        console.log(e);
         return false;
-    } finally {
-        decryption.free();
     }
 };
 
 MatrixClient.prototype.restoreKeyBackups = function(
-    decryptionKey, targetRoomId, targetSessionId, version,
+    recoveryKey, targetRoomId, targetSessionId, version,
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1026,9 +1017,10 @@ MatrixClient.prototype.restoreKeyBackups = function(
     const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
 
     // FIXME: see the FIXME in createKeyBackupVersion
+    const privkey = decodeRecoveryKey(recoveryKey);
     const decryption = new global.Olm.PkDecryption();
     try {
-        decryption.unpickle("secret_key", decryptionKey);
+        decryption.init_with_private_key(privkey);
     } catch(e) {
         decryption.free();
         throw e;
@@ -1042,7 +1034,9 @@ MatrixClient.prototype.restoreKeyBackups = function(
                 if (!roomData.sessions) continue;
 
                 totalKeyCount += Object.keys(roomData.sessions).length;
-                const roomKeys = keysFromRecoverySession(roomData.sessions, decryption, roomId, roomKeys);
+                const roomKeys = keysFromRecoverySession(
+                    roomData.sessions, decryption, roomId, roomKeys,
+                );
                 for (const k of roomKeys) {
                     k.room_id = roomId;
                     keys.push(k);
@@ -2439,7 +2433,8 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
         } else {
-            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state);
+            const stateEvents = utils.map(res.state, self.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
@@ -3441,6 +3436,9 @@ MatrixClient.prototype.startClient = async function(opts) {
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
 
+    if (opts.lazyLoadMembers && this.isGuest()) {
+        opts.lazyLoadMembers = false;
+    }
     if (opts.lazyLoadMembers) {
         const supported = await this.doesServerSupportLazyLoading();
         if (supported) {
@@ -3451,7 +3449,12 @@ MatrixClient.prototype.startClient = async function(opts) {
             opts.lazyLoadMembers = false;
         }
     }
-
+    // need to vape the store when enabling LL and wasn't enabled before
+    const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
+    if (shouldClear) {
+        const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+        throw new InvalidStoreError(reason, !!opts.lazyLoadMembers);
+    }
     if (opts.lazyLoadMembers && this._crypto) {
         this._crypto.enableLazyLoading();
     }
@@ -3464,9 +3467,48 @@ MatrixClient.prototype.startClient = async function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-
+    await this._storeClientOptions(this._clientOpts);
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+};
+
+/**
+ * Is the lazy loading option different than in previous session?
+ * @param {bool} lazyLoadMembers current options for lazy loading
+ * @return {bool} whether or not the option has changed compared to the previous session */
+MatrixClient.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
+    lazyLoadMembers = !!lazyLoadMembers;
+    // assume it was turned off before
+    // if we don't know any better
+    let lazyLoadMembersBefore = false;
+    const isStoreNewlyCreated = await this.store.isNewlyCreated();
+    if (!isStoreNewlyCreated) {
+        const prevClientOptions = await this.store.getClientOptions();
+        if (prevClientOptions) {
+            lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
+        }
+        return lazyLoadMembersBefore !== lazyLoadMembers;
+    }
+    return false;
+};
+
+/**
+ * store client options with boolean/string/numeric values
+ * to know in the next session what flags the sync data was
+ * created with (e.g. lazy loading)
+ * @param {object} opts the complete set of client options
+ * @return {Promise} for store operation */
+MatrixClient.prototype._storeClientOptions = function(opts) {
+    const primTypes = ["boolean", "string", "number"];
+    const serializableOpts = Object.entries(opts)
+        .filter(([key, value]) => {
+            return primTypes.includes(typeof value);
+        })
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    return this.store.storeClientOptions(serializableOpts);
 };
 
 /**

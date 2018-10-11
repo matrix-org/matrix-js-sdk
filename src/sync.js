@@ -123,6 +123,7 @@ SyncApi.prototype.createRoom = function(roomId) {
                           "Room.timelineReset",
                           "Room.localEchoUpdated",
                           "Room.accountData",
+                          "Room.myMembership",
                          ]);
     this._registerStateListeners(room);
     return room;
@@ -976,9 +977,10 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle invites
     inviteRooms.forEach(function(inviteObj) {
         const room = inviteObj.room;
-        room.setSyncedMembership("invite");
         const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
+
+        room.updateMyMembership("invite");
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
             room.recalculate();
@@ -993,7 +995,6 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle joins
     await Promise.mapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
-        room.setSyncedMembership("join");
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
         const ephemeralEvents = self._mapSyncEventsFormat(joinObj.ephemeral);
@@ -1008,6 +1009,8 @@ SyncApi.prototype._processSyncResponse = async function(
                 'highlight', joinObj.unread_notifications.highlight_count,
             );
         }
+
+        room.updateMyMembership("join");
 
         joinObj.timeline = joinObj.timeline || {};
 
@@ -1116,14 +1119,14 @@ SyncApi.prototype._processSyncResponse = async function(
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
         const room = leaveObj.room;
-        room.setSyncedMembership("leave");
-
         const stateEvents =
             self._mapSyncEventsFormat(leaveObj.state, room);
         const timelineEvents =
             self._mapSyncEventsFormat(leaveObj.timeline, room);
         const accountDataEvents =
             self._mapSyncEventsFormat(leaveObj.account_data);
+
+        room.updateMyMembership("leave");
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
         room.addAccountData(accountDataEvents);
@@ -1145,8 +1148,6 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
-
-        room.onLeft();
     });
 
     // update the notification timeline, if appropriate.
