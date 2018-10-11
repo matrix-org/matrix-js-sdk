@@ -483,7 +483,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
     }
     const userId = stateEvent.getStateKey();
     const existingMember = this.getMember(userId);
-    // never replace members replaced as part of the sync
+    // never replace members received as part of the sync
     if (existingMember && !existingMember.isOutOfBand()) {
         return;
     }
