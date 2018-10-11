@@ -220,8 +220,7 @@ RoomState.prototype.clone = function() {
     // if loading is in progress (through _oobMemberFlags)
     // since these are not new members, we're merely copying them
     // set the status to not started
-    // after copying, we set back the status and
-    // copy the superseding flag from the current state
+    // after copying, we set back the status
     const status = this._oobMemberFlags.status;
     this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
 
@@ -247,14 +246,6 @@ RoomState.prototype.clone = function() {
             if (member.isOutOfBand()) {
                 const copyMember = copy.getMember(member.userId);
                 copyMember.markOutOfBand();
-            }
-        });
-    } else if (this._oobMemberFlags.status == OOB_STATUS_INPROGRESS) {
-        // copy markSupersedesOutOfBand flags
-        this.getMembers().forEach((member) => {
-            if (member.supersedesOutOfBand()) {
-                const copyMember = copy.getMember(member.userId);
-                copyMember.markSupersedesOutOfBand();
             }
         });
     }
@@ -341,11 +332,6 @@ RoomState.prototype.setStateEvents = function(stateEvents) {
 
             const member = self._getOrCreateMember(userId, event);
             member.setMembershipEvent(event, self);
-            // if out of band members are loading,
-            // mark the member as more recent
-            if (self._oobMemberFlags.status == OOB_STATUS_INPROGRESS) {
-                member.markSupersedesOutOfBand();
-            }
 
             self._updateMember(member);
             self.emit("RoomState.members", event, self, member);
@@ -434,12 +420,6 @@ RoomState.prototype.markOutOfBandMembersFailed = function() {
     if (this._oobMemberFlags.status !== OOB_STATUS_INPROGRESS) {
         return;
     }
-    // the request failed, there is nothing to supersede
-    // in case of a retry, these event would not supersede the
-    // retry anymore.
-    this.getMembers().forEach((m) => {
-        m.clearSupersedesOutOfBand();
-    });
     this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
 };
 
@@ -491,7 +471,7 @@ RoomState.prototype._setOutOfBandMember = function(stateEvent) {
     const member = this._getOrCreateMember(userId, stateEvent);
     member.setMembershipEvent(stateEvent, this);
     // needed to know which members need to be stored seperately
-    // as the are not part of the sync accumulator
+    // as they are not part of the sync accumulator
     // this is cleared by setMembershipEvent so when it's updated through /sync
     member.markOutOfBand();
 
