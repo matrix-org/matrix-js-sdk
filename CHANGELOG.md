@@ -1,3 +1,14 @@
+Latest Changes:
+===============
+
+BREAKING CHANGES
+----------------
+ * If js-sdk finds data in the store that is incompatible with the options currently being used,
+   it will emit sync state ERROR with an error of type InvalidStoreError. It will also stop trying
+   to sync in this situation: the app must stop the client and then either clear the store or
+   change the options (in this case, enable or disable lazy loading of members) and then start
+   the client again.
+
 Changes in [0.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1) (2018-10-01)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1-rc.1...v0.11.1)
