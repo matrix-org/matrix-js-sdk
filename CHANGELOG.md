@@ -1,3 +1,30 @@
+Changes in [0.12.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0-rc.1) (2018-10-11)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1...v0.12.0-rc.1)
+
+ * never replace /sync'ed memberships with OOB ones
+   [\#760](https://github.com/matrix-org/matrix-js-sdk/pull/760)
+ * Don't fail to start up if lazy load check fails
+   [\#759](https://github.com/matrix-org/matrix-js-sdk/pull/759)
+ * Make e2e work on Edge
+   [\#754](https://github.com/matrix-org/matrix-js-sdk/pull/754)
+ * throw error with same name and message over idb worker boundary
+   [\#758](https://github.com/matrix-org/matrix-js-sdk/pull/758)
+ * Default to a room version of 1 when there is no room create event
+   [\#755](https://github.com/matrix-org/matrix-js-sdk/pull/755)
+ * Silence bluebird warnings
+   [\#757](https://github.com/matrix-org/matrix-js-sdk/pull/757)
+ * allow non-ff merge from release branch into master
+   [\#750](https://github.com/matrix-org/matrix-js-sdk/pull/750)
+ * Reject with the actual error on indexeddb error
+   [\#751](https://github.com/matrix-org/matrix-js-sdk/pull/751)
+ * Update mocha to v5
+   [\#744](https://github.com/matrix-org/matrix-js-sdk/pull/744)
+ * disable lazy loading for guests as they cant create filters
+   [\#748](https://github.com/matrix-org/matrix-js-sdk/pull/748)
+ * Revert "Add getMediaLimits to client"
+   [\#745](https://github.com/matrix-org/matrix-js-sdk/pull/745)
+
 Latest Changes:
 ===============
 
