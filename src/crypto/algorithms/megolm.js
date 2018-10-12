@@ -264,8 +264,8 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
     );
 
     if (this._crypto.backupInfo) {
-        // Not strictly necessary to wait for this
-        await this._crypto.backupGroupSession(
+        // don't wait for it to complete
+        this._crypto.backupGroupSession(
             this._roomId, this._olmDevice.deviceCurve25519Key, [],
             sessionId, key.key,
         );
@@ -849,7 +849,8 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         this._retryDecryption(senderKey, sessionId);
     }).then(() => {
         if (this._crypto.backupInfo) {
-            return this._crypto.backupGroupSession(
+            // don't wait for it to complete
+            this._crypto.backupGroupSession(
                 content.room_id, senderKey, forwardingKeyChain,
                 content.session_id, content.session_key, keysClaimed,
                 exportFormat,
@@ -972,6 +973,18 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         session.sender_claimed_keys,
         true,
     ).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for it to complete
+            this._crypto.backupGroupSession(
+                session.room_id,
+                session.sender_key,
+                session.forwarding_curve25519_key_chain,
+                session.session_id,
+                session.session_key,
+                session.sender_claimed_keys,
+                true,
+            );
+        }
         // have another go at decrypting events sent with this session.
         this._retryDecryption(session.sender_key, session.session_id);
     });

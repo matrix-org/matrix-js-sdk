@@ -501,7 +501,6 @@ export class Backend {
         const objectStore = txn.objectStore("sessions_needing_backup");
         return Promise.all(sessions.map((session) => {
             return new Promise((resolve, reject) => {
-                console.log(session);
                 const req = objectStore.delete([session.senderKey, session.sessionId]);
                 req.onsuccess = resolve;
                 req.onerror = reject;

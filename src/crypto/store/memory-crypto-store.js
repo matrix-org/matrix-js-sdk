@@ -315,15 +315,17 @@ export default class MemoryCryptoStore {
     }
 
     unmarkSessionsNeedingBackup(sessions) {
-        for(const session of sessions) {
-            delete this._sessionsNeedingBackup[session.senderKey + '/' + session.sessionId];
+        for (const session of sessions) {
+            const sessionKey = session.senderKey + '/' + session.sessionId;
+            delete this._sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
     }
 
     markSessionsNeedingBackup(sessions) {
-        for(const session of sessions) {
-            this._sessionsNeedingBackup[session.senderKey + '/' + session.sessionId] = true;
+        for (const session of sessions) {
+            const sessionKey = session.senderKey + '/' + session.sessionId;
+            this._sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();
     }

@@ -1061,7 +1061,7 @@ Crypto.prototype.backupGroupSession = async function(
         sessionId: sessionId,
     }]);
 
-    this._maybeSendKeyBackup();
+    await this._maybeSendKeyBackup();
 };
 
 Crypto.prototype.backupAllGroupSessions = async function(version) {
@@ -1077,7 +1077,7 @@ Crypto.prototype.backupAllGroupSessions = async function(version) {
         },
     );
 
-    this._maybeSendKeyBackup();
+    await this._maybeSendKeyBackup();
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
