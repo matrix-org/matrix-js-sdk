@@ -16,6 +16,7 @@ module.exports = {
     },
     extends: ["eslint:recommended", "google"],
     rules: {
+        "indent": ["error", 4],
         // rules we've always adhered to or now do
         "max-len": ["error", {
             code: 90,

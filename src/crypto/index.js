@@ -991,33 +991,41 @@ Crypto.prototype._maybeSendKeyBackup = async function() {
                 }
                 const data = {};
                 for (const session of sessions) {
-                    const room_id = session.sessionData.room_id;
-                    if (data[room_id] === undefined)
-                        data[room_id] = {sessions: {}};
+                    const roomId = session.sessionData.room_id;
+                    if (data[roomId] === undefined) {
+                        data[roomId] = {sessions: {}};
+                    }
 
-                    const sessionData = await this._olmDevice.exportInboundGroupSession(session.senderKey, session.sessionId, session.sessionData);
+                    const sessionData = await this._olmDevice.exportInboundGroupSession(
+                        session.senderKey, session.sessionId, session.sessionData,
+                    );
                     sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
                     delete sessionData.session_id;
                     delete sessionData.room_id;
                     const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
 
-                    data[room_id]['sessions'][session.sessionId] = {
+                    data[roomId]['sessions'][session.sessionId] = {
                         first_message_index: 1, // FIXME
-                        forwarded_count: (sessionData.forwardingCurve25519KeyChain || []).length,
+                        forwarded_count:
+                        (sessionData.forwardingCurve25519KeyChain || []).length,
                         is_verified: false, // FIXME: how do we determine this?
                         session_data: encrypted,
                     };
                 }
 
                 try {
-                    await this._baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, {rooms: data});
+                    await this._baseApis.sendKeyBackup(
+                        undefined, undefined, this.backupInfo.version,
+                        {rooms: data},
+                    );
                     numFailures = 0;
                     await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
-                }
-                catch (err) {
+                } catch (err) {
                     numFailures++;
                     console.log("send failed", err);
-                    if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
+                    if (err.httpStatus === 400
+                        || err.httpStatus === 403
+                        || err.httpStatus === 401) {
                         // retrying probably won't help much, so we should give up
                         // FIXME: disable backups?
                         return;
@@ -1026,17 +1034,18 @@ Crypto.prototype._maybeSendKeyBackup = async function() {
                 if (numFailures) {
                     // exponential backoff if we have failures
                     await new Promise((resolve, reject) => {
-                        setTimeout(resolve, 1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                        setTimeout(
+                            resolve,
+                            1000 * Math.pow(2, Math.min(numFailures - 1, 4)),
+                        );
                     });
                 }
             }
-        }
-        finally
-        {
+        } finally {
             this._sendingBackups = false;
         }
     }
-}
+};
 
 Crypto.prototype.backupGroupSession = async function(
     roomId, senderKey, forwardingCurve25519KeyChain,
@@ -1057,13 +1066,15 @@ Crypto.prototype.backupGroupSession = async function(
 
 Crypto.prototype.backupAllGroupSessions = async function(version) {
     await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP], (txn) => {
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
+        (txn) => {
             this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
                 if (session !== null) {
                     this._cryptoStore.markSessionsNeedingBackup([session], txn);
                 }
             });
-        }
+        },
     );
 
     this._maybeSendKeyBackup();

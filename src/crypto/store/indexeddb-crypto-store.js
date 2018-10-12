@@ -407,10 +407,13 @@ export default class IndexedDBCryptoStore {
         this._backendPromise.value().getEndToEndRooms(txn, func);
     }
 
+    // session backups
+
     /**
      * Get the inbound group sessions that need to be backed up.
      * @param {integer} limit The maximum number of sessions to retrieve.  0
      * for no limit.
+     * @returns {Promise} resolves to an array of inbound group sessions
      */
     getSessionsNeedingBackup(limit) {
         return this._connect().then((backend) => {
@@ -420,7 +423,8 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Unmark sessions as needing to be backed up.
-     * @param {[object]} The sessions that need to be backed up.
+     * @param {[object]} sessions The sessions that need to be backed up.
+     * @returns {Promise} resolves when the sessions are unmarked
      */
     unmarkSessionsNeedingBackup(sessions) {
         return this._connect().then((backend) => {
@@ -430,8 +434,9 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Mark sessions as needing to be backed up.
-     * @param {[object]} The sessions that need to be backed up.
+     * @param {[object]} sessions The sessions that need to be backed up.
      * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} resolves when the sessions are marked
      */
     markSessionsNeedingBackup(sessions, txn) {
         return this._connect().then((backend) => {

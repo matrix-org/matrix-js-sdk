@@ -37,6 +37,8 @@ if (global.Olm) {
     Crypto = require('../../../lib/crypto');
 }
 
+const Olm = global.Olm;
+
 const MatrixClient = sdk.MatrixClient;
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
@@ -93,16 +95,21 @@ describe("MegolmBackup", function() {
     let sessionStore;
     let cryptoStore;
     let megolmDecryption;
-    beforeEach(function() {
+    beforeEach(async function() {
+        await Olm.init();
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
 
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
-        mockCrypto.backupKey = new global.Olm.PkEncryption();
+        mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
         );
         mockCrypto.backupInfo = {
+            algorithm: "m.megolm_backup.v1",
             version: 1,
+            auth_data: {
+                public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+            },
         };
 
         mockStorage = new MockStorageApi();
@@ -136,7 +143,7 @@ describe("MegolmBackup", function() {
         });
 
         it('automatically calls the key back up', function() {
-            const groupSession = new global.Olm.OutboundGroupSession();
+            const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
             // construct a fake decrypted key event via the use of a mocked
@@ -161,8 +168,9 @@ describe("MegolmBackup", function() {
             mockCrypto.decryptEvent = function() {
                 return Promise.resolve(decryptedData);
             };
+            mockCrypto.cancelRoomKeyRequest = function() {};
 
-            mockBaseApis.sendKeyBackup = expect.createSpy();
+            mockCrypto.backupGroupSession = expect.createSpy();
 
             return event.attemptDecryption(mockCrypto).then(() => {
                 return megolmDecryption.onRoomKeyEvent(event);
@@ -171,23 +179,23 @@ describe("MegolmBackup", function() {
             });
         });
 
-        it('sends backups to the server', function () {
-            this.timeout(12000);
-            const groupSession = new global.Olm.OutboundGroupSession();
+        it('sends backups to the server', function() {
+            this.timeout(12000); // eslint-disable-line no-invalid-this
+            const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
-            const ibGroupSession = new global.Olm.InboundGroupSession();
+            const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
             const scheduler = [
                 "getQueueForEvent", "queueEvent", "removeEventFromQueue",
                 "setProcessFunction",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             const store = [
                 "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
                 "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
                 "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
                 "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
             store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
             store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
@@ -216,32 +224,37 @@ describe("MegolmBackup", function() {
 
             return client.initCrypto()
                 .then(() => {
-                    return cryptoStore.doTxn("readwrite", [cryptoStore.STORE_SESSION], (txn) => {
-                        cryptoStore.addEndToEndInboundGroupSession(
-                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
-                            groupSession.session_id(),
-                            {
-                                forwardingCurve25519KeyChain: undefined,
-                                keysClaimed: {
-                                    ed25519: "SENDER_ED25519",
+                    return cryptoStore.doTxn(
+                        "readwrite",
+                        [cryptoStore.STORE_SESSION],
+                        (txn) => {
+                            cryptoStore.addEndToEndInboundGroupSession(
+                                "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                                groupSession.session_id(),
+                                {
+                                    forwardingCurve25519KeyChain: undefined,
+                                    keysClaimed: {
+                                        ed25519: "SENDER_ED25519",
+                                    },
+                                    room_id: ROOM_ID,
+                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
                                 },
-                                room_id: ROOM_ID,
-                                session: ibGroupSession.pickle(olmDevice._pickleKey),
-                            },
-                            txn);
-                    });
+                                txn);
+                        });
                 })
                 .then(() => {
                     client.enableKeyBackup({
-                        algorithm: "foobar",
+                        algorithm: "m.megolm_backup.v1",
                         version: 1,
                         auth_data: {
-                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
+                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
                         },
                     });
                     let numCalls = 0;
                     return new Promise((resolve, reject) => {
-                        client._http.authedRequest = function(callback, method, path, queryParams, data, opts) {
+                        client._http.authedRequest = function(
+                            callback, method, path, queryParams, data, opts,
+                        ) {
                             expect(++numCalls <= 1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
@@ -252,11 +265,19 @@ describe("MegolmBackup", function() {
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe(1);
                             expect(data.rooms[ROOM_ID].sessions).toExist();
-                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(groupSession.session_id());
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(
+                                groupSession.session_id(),
+                            );
                             resolve();
                             return Promise.resolve({});
                         };
-                        client._crypto.backupGroupSession("roomId", "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI", [], groupSession.session_id(), groupSession.session_key());
+                        client._crypto.backupGroupSession(
+                            "roomId",
+                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                            [],
+                            groupSession.session_id(),
+                            groupSession.session_key(),
+                        );
                     })
                         .then(() => {
                             expect(numCalls).toBe(1);
@@ -264,23 +285,23 @@ describe("MegolmBackup", function() {
                 });
         });
 
-        it('retries when a backup fails', function () {
-            this.timeout(12000);
-            const groupSession = new global.Olm.OutboundGroupSession();
+        it('retries when a backup fails', function() {
+            this.timeout(12000); // eslint-disable-line no-invalid-this
+            const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
-            const ibGroupSession = new global.Olm.InboundGroupSession();
+            const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
             const scheduler = [
                 "getQueueForEvent", "queueEvent", "removeEventFromQueue",
                 "setProcessFunction",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             const store = [
                 "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
                 "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
                 "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
                 "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
             store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
             store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
@@ -309,32 +330,37 @@ describe("MegolmBackup", function() {
 
             return client.initCrypto()
                 .then(() => {
-                    return cryptoStore.doTxn("readwrite", [cryptoStore.STORE_SESSION], (txn) => {
-                        cryptoStore.addEndToEndInboundGroupSession(
-                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
-                            groupSession.session_id(),
-                            {
-                                forwardingCurve25519KeyChain: undefined,
-                                keysClaimed: {
-                                    ed25519: "SENDER_ED25519",
+                    return cryptoStore.doTxn(
+                        "readwrite",
+                        [cryptoStore.STORE_SESSION],
+                        (txn) => {
+                            cryptoStore.addEndToEndInboundGroupSession(
+                                "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                                groupSession.session_id(),
+                                {
+                                    forwardingCurve25519KeyChain: undefined,
+                                    keysClaimed: {
+                                        ed25519: "SENDER_ED25519",
+                                    },
+                                    room_id: ROOM_ID,
+                                    session: ibGroupSession.pickle(olmDevice._pickleKey),
                                 },
-                                room_id: ROOM_ID,
-                                session: ibGroupSession.pickle(olmDevice._pickleKey),
-                            },
-                            txn);
-                    });
+                                txn);
+                        });
                 })
                 .then(() => {
                     client.enableKeyBackup({
                         algorithm: "foobar",
                         version: 1,
                         auth_data: {
-                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmoK"
+                            public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
                         },
                     });
                     let numCalls = 0;
                     return new Promise((resolve, reject) => {
-                        client._http.authedRequest = function(callback, method, path, queryParams, data, opts) {
+                        client._http.authedRequest = function(
+                            callback, method, path, queryParams, data, opts,
+                        ) {
                             expect(++numCalls <= 2);
                             if (numCalls >= 3) {
                                 // exit out of retry loop if there's something wrong
@@ -345,15 +371,25 @@ describe("MegolmBackup", function() {
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe(1);
                             expect(data.rooms[ROOM_ID].sessions).toExist();
-                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(groupSession.session_id());
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(
+                                groupSession.session_id(),
+                            );
                             if (numCalls > 1) {
                                 resolve();
                                 return Promise.resolve({});
                             } else {
-                                return Promise.reject(new Error("this is an expected failure"));
+                                return Promise.reject(
+                                    new Error("this is an expected failure"),
+                                );
                             }
                         };
-                        client._crypto.backupGroupSession("roomId", "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI", [], groupSession.session_id(), groupSession.session_key());
+                        client._crypto.backupGroupSession(
+                            "roomId",
+                            "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
+                            [],
+                            groupSession.session_id(),
+                            groupSession.session_key(),
+                        );
                     })
                         .then(() => {
                             expect(numCalls).toBe(2);
@@ -369,13 +405,13 @@ describe("MegolmBackup", function() {
             const scheduler = [
                 "getQueueForEvent", "queueEvent", "removeEventFromQueue",
                 "setProcessFunction",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             const store = [
                 "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
                 "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
                 "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
                 "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
             store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
             store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
@@ -411,7 +447,7 @@ describe("MegolmBackup", function() {
             };
             return client.restoreKeyBackups(
                 "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
-                + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
+                    + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
                 ROOM_ID,
                 SESSION_ID,
             ).then(() => {
@@ -435,7 +471,7 @@ describe("MegolmBackup", function() {
             };
             return client.restoreKeyBackups(
                 "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
-                + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
+                    + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {

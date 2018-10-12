@@ -466,31 +466,33 @@ export class Backend {
         return new Promise((resolve, reject) => {
             const sessions = [];
 
-            const txn = this._db.transaction(["sessions_needing_backup", "inbound_group_sessions"], "readonly");
+            const txn = this._db.transaction(
+                ["sessions_needing_backup", "inbound_group_sessions"],
+                "readonly",
+            );
             txn.onerror = reject;
             txn.oncomplete = function() {
                 resolve(sessions);
-            }
+            };
             const objectStore = txn.objectStore("sessions_needing_backup");
             const sessionStore = txn.objectStore("inbound_group_sessions");
             const getReq = objectStore.openCursor();
             getReq.onsuccess = function() {
                 const cursor = getReq.result;
                 if (cursor) {
-                    const sessionGetReq = sessionStore.get(cursor.key)
+                    const sessionGetReq = sessionStore.get(cursor.key);
                     sessionGetReq.onsuccess = function() {
                         sessions.push({
                             senderKey: sessionGetReq.result.senderCurve25519Key,
                             sessionId: sessionGetReq.result.sessionId,
-                            sessionData: sessionGetReq.result.session
+                            sessionData: sessionGetReq.result.session,
                         });
-                    }
-                    //sessions.push(cursor.value);
+                    };
                     if (!limit || sessions.length < limit) {
                         cursor.continue();
                     }
                 }
-            }
+            };
         });
     }
 
@@ -516,13 +518,12 @@ export class Backend {
             return new Promise((resolve, reject) => {
                 const req = objectStore.put({
                     senderCurve25519Key: session.senderKey,
-                    sessionId: session.sessionId
+                    sessionId: session.sessionId,
                 });
                 req.onsuccess = resolve;
                 req.onerror = reject;
             });
         }));
-
     }
 
     doTxn(mode, stores, func) {
