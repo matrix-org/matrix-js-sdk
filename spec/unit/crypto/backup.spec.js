@@ -446,8 +446,7 @@ describe("MegolmBackup", function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackups(
-                "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
-                    + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
+                "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                 ROOM_ID,
                 SESSION_ID,
             ).then(() => {
@@ -463,15 +462,14 @@ describe("MegolmBackup", function() {
                     rooms: {
                         [ROOM_ID]: {
                             sessions: {
-                                SESSION_ID: KEY_BACKUP_DATA,
+                                [SESSION_ID]: KEY_BACKUP_DATA,
                             },
                         },
                     },
                 });
             };
             return client.restoreKeyBackups(
-                "qx37WTQrjZLz5tId/uBX9B3/okqAbV1ofl9UnHKno1eipByCpXleAAlAZoJgYnCDOQZD"
-                    + "QWzo3luTSfkF9pU1mOILCbbouubs6TVeDyPfgGD9i86J8irHjA",
+                "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
