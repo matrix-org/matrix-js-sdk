@@ -59,7 +59,6 @@ function RoomMember(roomId, userId) {
         member: null,
     };
     this._isOutOfBand = false;
-    this._supersedesOutOfBand = false;
     this._updateModifiedTime();
 }
 utils.inherits(RoomMember, EventEmitter);
@@ -78,31 +77,6 @@ RoomMember.prototype.markOutOfBand = function() {
  */
 RoomMember.prototype.isOutOfBand = function() {
     return this._isOutOfBand;
-};
-
-/**
- * Does the member supersede an incoming out-of-band
- * member? If so the out-of-band member should be ignored.
- * @return {bool}
- */
-RoomMember.prototype.supersedesOutOfBand = function() {
-    return this._supersedesOutOfBand;
-};
-
-/**
- * Mark the member as superseding the future incoming
- * out-of-band members.
- */
-RoomMember.prototype.markSupersedesOutOfBand = function() {
-    this._supersedesOutOfBand = true;
-};
-
-/**
- * Clear the member superseding the future incoming
- * out-of-band members, as loading finished or failed.
- */
-RoomMember.prototype.clearSupersedesOutOfBand = function() {
-    this._supersedesOutOfBand = false;
 };
 
 /**

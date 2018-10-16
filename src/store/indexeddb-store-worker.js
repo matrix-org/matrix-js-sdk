@@ -135,7 +135,10 @@ class IndexedDBStoreWorker {
                 command: 'cmd_fail',
                 seq: msg.seq,
                 // Just send a string because Error objects aren't cloneable
-                error: "Error running command",
+                error: {
+                    message: err.message,
+                    name: err.name,
+                },
             });
         });
     }

@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -74,8 +74,8 @@
     "jsdoc": "^3.5.5",
     "lolex": "^1.5.2",
     "matrix-mock-request": "^1.2.0",
-    "mocha": "^3.2.0",
-    "mocha-jenkins-reporter": "^0.3.6",
+    "mocha": "^5.2.0",
+    "mocha-jenkins-reporter": "^0.4.0",
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
