@@ -83,60 +83,62 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
  *
  * @return {module:client.Promise} Promise which resolves to the new event body
  */
-OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
+OlmEncryption.prototype.encryptMessage = async function(room, eventType, content) {
     // pick the list of recipients based on the membership list.
     //
     // TODO: there is a race condition here! What if a new user turns up
     // just as you are sending a secret message?
 
-    const users = utils.map(room.getJoinedMembers(), function(u) {
+    const members = await room.getEncryptionTargetMembers();
+
+    const users = utils.map(members, function(u) {
         return u.userId;
     });
 
     const self = this;
-    return this._ensureSession(users).then(function() {
-        const payloadFields = {
-            room_id: room.roomId,
-            type: eventType,
-            content: content,
-        };
+    await this._ensureSession(users);
 
-        const encryptedContent = {
-            algorithm: olmlib.OLM_ALGORITHM,
-            sender_key: self._olmDevice.deviceCurve25519Key,
-            ciphertext: {},
-        };
+    const payloadFields = {
+        room_id: room.roomId,
+        type: eventType,
+        content: content,
+    };
 
-        const promises = [];
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: self._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
-            const devices = self._crypto.getStoredDevicesForUser(userId);
+    const promises = [];
 
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
-                const key = deviceInfo.getIdentityKey();
-                if (key == self._olmDevice.deviceCurve25519Key) {
-                    // don't bother sending to ourself
-                    continue;
-                }
-                if (deviceInfo.verified == DeviceVerification.BLOCKED) {
-                    // don't bother setting up sessions with blocked users
-                    continue;
-                }
+    for (let i = 0; i < users.length; ++i) {
+        const userId = users[i];
+        const devices = self._crypto.getStoredDevicesForUser(userId);
 
-                promises.push(
-                    olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        self._userId, self._deviceId, self._olmDevice,
-                        userId, deviceInfo, payloadFields,
-                    ),
-                );
+        for (let j = 0; j < devices.length; ++j) {
+            const deviceInfo = devices[j];
+            const key = deviceInfo.getIdentityKey();
+            if (key == self._olmDevice.deviceCurve25519Key) {
+                // don't bother sending to ourself
+                continue;
             }
-        }
+            if (deviceInfo.verified == DeviceVerification.BLOCKED) {
+                // don't bother setting up sessions with blocked users
+                continue;
+            }
 
-        return Promise.all(promises).return(encryptedContent);
-    });
+            promises.push(
+                olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    self._userId, self._deviceId, self._olmDevice,
+                    userId, deviceInfo, payloadFields,
+                ),
+            );
+        }
+    }
+
+    return await Promise.all(promises).return(encryptedContent);
 };
 
 /**
@@ -168,11 +170,17 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     const ciphertext = content.ciphertext;
 
     if (!ciphertext) {
-        throw new base.DecryptionError("Missing ciphertext");
+        throw new base.DecryptionError(
+            "OLM_MISSING_CIPHERTEXT",
+            "Missing ciphertext",
+        );
     }
 
     if (!(this._olmDevice.deviceCurve25519Key in ciphertext)) {
-        throw new base.DecryptionError("Not included in recipients");
+        throw new base.DecryptionError(
+            "OLM_NOT_INCLUDED_IN_RECIPIENTS",
+            "Not included in recipients",
+        );
     }
     const message = ciphertext[this._olmDevice.deviceCurve25519Key];
     let payloadString;
@@ -181,6 +189,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
         payloadString = await this._decryptMessage(deviceKey, message);
     } catch (e) {
         throw new base.DecryptionError(
+            "OLM_BAD_ENCRYPTED_MESSAGE",
             "Bad Encrypted Message", {
                 sender: deviceKey,
                 err: e,
@@ -194,12 +203,14 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     // https://github.com/vector-im/vector-web/issues/2483
     if (payload.recipient != this._userId) {
         throw new base.DecryptionError(
+            "OLM_BAD_RECIPIENT",
             "Message was intented for " + payload.recipient,
         );
     }
 
     if (payload.recipient_keys.ed25519 != this._olmDevice.deviceEd25519Key) {
         throw new base.DecryptionError(
+            "OLM_BAD_RECIPIENT_KEY",
             "Message not intended for this device", {
                 intended: payload.recipient_keys.ed25519,
                 our_key: this._olmDevice.deviceEd25519Key,
@@ -213,6 +224,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     // which is checked elsewhere).
     if (payload.sender != event.getSender()) {
         throw new base.DecryptionError(
+            "OLM_FORWARDED_MESSAGE",
             "Message forwarded from " + payload.sender, {
                 reported_sender: event.getSender(),
             },
@@ -222,6 +234,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     // Olm events intended for a room have a room_id.
     if (payload.room_id !== event.getRoomId()) {
         throw new base.DecryptionError(
+            "OLM_BAD_ROOM",
             "Message intended for room " + payload.room_id, {
                 reported_room: event.room_id,
             },

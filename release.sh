@@ -245,7 +245,7 @@ release_text=`mktemp`
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags $assets -f "${release_text}" "$tag"
+hub release create $hubflags $assets -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
@@ -281,7 +281,7 @@ fi
 echo "updating master branch"
 git checkout master
 git pull
-git merge --ff-only "$rel_branch"
+git merge "$rel_branch"
 
 # push master  and docs (if generated) to github
 git push origin master

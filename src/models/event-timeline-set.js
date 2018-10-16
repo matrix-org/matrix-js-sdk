@@ -168,49 +168,19 @@ EventTimelineSet.prototype.resetLiveTimeline = function(
     // if timeline support is disabled, forget about the old timelines
     const resetAllTimelines = !this._timelineSupport || !forwardPaginationToken;
 
-    let newTimeline;
+    const oldTimeline = this._liveTimeline;
+    const newTimeline = resetAllTimelines ?
+        oldTimeline.forkLive(EventTimeline.FORWARDS) :
+        oldTimeline.fork(EventTimeline.FORWARDS);
+
     if (resetAllTimelines) {
-        newTimeline = new EventTimeline(this);
         this._timelines = [newTimeline];
         this._eventIdToTimeline = {};
     } else {
-        newTimeline = this.addTimeline();
+        this._timelines.push(newTimeline);
     }
 
-    const oldTimeline = this._liveTimeline;
-
-    // Collect the state events from the old timeline
-    const evMap = oldTimeline.getState(EventTimeline.FORWARDS).events;
-    const events = [];
-    for (const evtype in evMap) {
-        if (!evMap.hasOwnProperty(evtype)) {
-            continue;
-        }
-        for (const stateKey in evMap[evtype]) {
-            if (!evMap[evtype].hasOwnProperty(stateKey)) {
-                continue;
-            }
-            events.push(evMap[evtype][stateKey]);
-        }
-    }
-
-    // Use those events to initialise the state of the new live timeline
-    newTimeline.initialiseState(events);
-
-    const freshEndState = newTimeline._endState;
-    // Now clobber the end state of the new live timeline with that from the
-    // previous live timeline. It will be identical except that we'll keep
-    // using the same RoomMember objects for the 'live' set of members with any
-    // listeners still attached
-    newTimeline._endState = oldTimeline._endState;
-
-    // If we're not resetting all timelines, we need to fix up the old live timeline
-    if (!resetAllTimelines) {
-        // Firstly, we just stole the old timeline's end state, so it needs a new one.
-        // Just swap them around and give it the one we just generated for the
-        // new live timeline.
-        oldTimeline._endState = freshEndState;
-
+    if (forwardPaginationToken) {
         // Now set the forward pagination token on the old live timeline
         // so it can be forward-paginated.
         oldTimeline.setPaginationToken(

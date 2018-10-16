@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@ const EventEmitter = require("events").EventEmitter;
 
 const EventStatus = require("./event").EventStatus;
 const RoomSummary = require("./room-summary");
+const RoomMember = require("./room-member");
 const MatrixEvent = require("./event").MatrixEvent;
 const utils = require("../utils");
 const ContentRepo = require("../content-repo");
@@ -28,6 +30,8 @@ const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
 import ReEmitter from '../ReEmitter';
+
+const LATEST_ROOM_VERSION = '1';
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -68,6 +72,8 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @constructor
  * @alias module:models/room
  * @param {string} roomId Required. The ID of this room.
+ * @param {MatrixClient} client Required. The client, used to lazy load members.
+ * @param {string} myUserId Required. The ID of the syncing user.
  * @param {Object=} opts Configuration options
  * @param {*} opts.storageToken Optional. The token which a data store can use
  * to remember the state of the room. What this means is dependent on the store
@@ -102,7 +108,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-function Room(roomId, opts) {
+function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -115,6 +121,7 @@ function Room(roomId, opts) {
         );
     }
 
+    this.myUserId = myUserId;
     this.roomId = roomId;
     this.name = roomId;
     this.tags = {
@@ -171,8 +178,55 @@ function Room(roomId, opts) {
 
     // read by megolm; boolean value - null indicates "use global value"
     this._blacklistUnverifiedDevices = null;
+    this._selfMembership = null;
+    this._summaryHeroes = null;
+    // awaited by getEncryptionTargetMembers while room members are loading
+
+    this._client = client;
+    if (!this._opts.lazyLoadMembers) {
+        this._membersPromise = Promise.resolve();
+    } else {
+        this._membersPromise = null;
+    }
 }
+
 utils.inherits(Room, EventEmitter);
+
+/**
+ * Gets the version of the room
+ * @returns {string} The version of the room, or null if it could not be determined
+ */
+Room.prototype.getVersion = function() {
+    const createEvent = this.currentState.getStateEvents("m.room.create", "");
+    if (!createEvent) {
+        console.warn("Room " + this.room_id + " does not have an m.room.create event");
+        return '1';
+    }
+    const ver = createEvent.getContent()['room_version'];
+    if (ver === undefined) return '1';
+    return ver;
+};
+
+/**
+ * Determines whether this room needs to be upgraded to a new version
+ * @returns {string?} What version the room should be upgraded to, or null if
+ *     the room does not require upgrading at this time.
+ */
+Room.prototype.shouldUpgradeToVersion = function() {
+    // This almost certainly won't be the way this actually works - this
+    // is essentially a stub method.
+    if (this.getVersion() === LATEST_ROOM_VERSION) return null;
+    return LATEST_ROOM_VERSION;
+};
+
+/**
+ * Determines whether the given user is permitted to perform a room upgrade
+ * @param {String} userId The ID of the user to test against
+ * @returns {bool} True if the given user is permitted to upgrade the room
+ */
+Room.prototype.userMayUpgradeRoom = function(userId) {
+    return this.currentState.maySendStateEvent("m.room.tombstone", userId);
+};
 
 /**
  * Get the list of pending sent events for this room
@@ -201,6 +255,232 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
+/**
+ * @param {string} myUserId the user id for the logged in member
+ * @return {string} the membership type (join | leave | invite) for the logged in user
+ */
+Room.prototype.getMyMembership = function() {
+    return this._selfMembership;
+};
+
+/**
+ * If this room is a DM we're invited to,
+ * try to find out who invited us
+ * @return {string} user id of the inviter
+ */
+Room.prototype.getDMInviter = function() {
+    if (this.myUserId) {
+        const me = this.getMember(this.myUserId);
+        if (me) {
+            return me.getDMInviter();
+        }
+    }
+    if (this._selfMembership === "invite") {
+        // fall back to summary information
+        const memberCount = this.getInvitedAndJoinedMemberCount();
+        if (memberCount == 2 && this._summaryHeroes.length) {
+            return this._summaryHeroes[0];
+        }
+    }
+};
+
+/**
+ * Assuming this room is a DM room, tries to guess with which user.
+ * @return {string} user id of the other member (could be syncing user)
+ */
+Room.prototype.guessDMUserId = function() {
+    const me = this.getMember(this.myUserId);
+    if (me) {
+        const inviterId = me.getDMInviter();
+        if (inviterId) {
+            return inviterId;
+        }
+    }
+    // remember, we're assuming this room is a DM,
+    // so returning the first member we find should be fine
+    const hasHeroes = Array.isArray(this._summaryHeroes) &&
+        this._summaryHeroes.length;
+    if (hasHeroes) {
+        return this._summaryHeroes[0];
+    }
+    const members = this.currentState.getMembers();
+    const anyMember = members.find((m) => m.userId !== this.myUserId);
+    if (anyMember) {
+        return anyMember.userId;
+    }
+    // it really seems like I'm the only user in the room
+    // so I probably created a room with just me in it
+    // and marked it as a DM. Ok then
+    return this.myUserId;
+};
+
+Room.prototype.getAvatarFallbackMember = function() {
+    const memberCount = this.getInvitedAndJoinedMemberCount();
+    if (memberCount > 2) {
+        return;
+    }
+    const hasHeroes = Array.isArray(this._summaryHeroes) &&
+        this._summaryHeroes.length;
+    if (hasHeroes) {
+        const availableMember = this._summaryHeroes.map((userId) => {
+            return this.getMember(userId);
+        }).find((member) => !!member);
+        if (availableMember) {
+            return availableMember;
+        }
+    }
+    const members = this.currentState.getMembers();
+    // could be different than memberCount
+    // as this includes left members
+    if (members.length <= 2) {
+        const availableMember = members.find((m) => {
+            return m.userId !== this.myUserId;
+        });
+        if (availableMember) {
+            return availableMember;
+        }
+    }
+    // if all else fails, try falling back to a user,
+    // and create a one-off member for it
+    if (hasHeroes) {
+        const availableUser = this._summaryHeroes.map((userId) => {
+            return this._client.getUser(userId);
+        }).find((user) => !!user);
+        if (availableUser) {
+            const member = new RoomMember(
+                this.roomId, availableUser.userId);
+            member.user = availableUser;
+            return member;
+        }
+    }
+};
+
+/**
+ * Sets the membership this room was received as during sync
+ * @param {string} membership join | leave | invite
+ */
+Room.prototype.updateMyMembership = function(membership) {
+    const prevMembership = this._selfMembership;
+    this._selfMembership = membership;
+    if (prevMembership !== membership) {
+        if (membership === "leave") {
+            this._cleanupAfterLeaving();
+        }
+        this.emit("Room.myMembership", this, membership, prevMembership);
+    }
+};
+
+Room.prototype._loadMembersFromServer = async function() {
+    const lastSyncToken = this._client.store.getSyncToken();
+    const queryString = utils.encodeParams({
+        not_membership: "leave",
+        at: lastSyncToken,
+    });
+    const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+        {$roomId: this.roomId});
+    const http = this._client._http;
+    const response = await http.authedRequest(undefined, "GET", path);
+    return response.chunk;
+};
+
+
+Room.prototype._loadMembers = async function() {
+    // were the members loaded from the server?
+    let fromServer = false;
+    let rawMembersEvents =
+        await this._client.store.getOutOfBandMembers(this.roomId);
+    if (rawMembersEvents === null) {
+        fromServer = true;
+        rawMembersEvents = await this._loadMembersFromServer();
+        console.log(`LL: got ${rawMembersEvents.length} ` +
+            `members from server for room ${this.roomId}`);
+    }
+    const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
+    return {memberEvents, fromServer};
+};
+
+/**
+ * Preloads the member list in case lazy loading
+ * of memberships is in use. Can be called multiple times,
+ * it will only preload once.
+ * @return {Promise} when preloading is done and
+ * accessing the members on the room will take
+ * all members in the room into account
+ */
+Room.prototype.loadMembersIfNeeded = function() {
+    if (this._membersPromise) {
+        return this._membersPromise;
+    }
+
+    // mark the state so that incoming messages while
+    // the request is in flight get marked as superseding
+    // the OOB members
+    this.currentState.markOutOfBandMembersStarted();
+
+    const inMemoryUpdate = this._loadMembers().then((result) => {
+        this.currentState.setOutOfBandMembers(result.memberEvents);
+        // now the members are loaded, start to track the e2e devices if needed
+        if (this._client.isRoomEncrypted(this.roomId)) {
+            this._client._crypto.trackRoomDevices(this.roomId);
+        }
+        return result.fromServer;
+    }).catch((err) => {
+        // allow retries on fail
+        this._membersPromise = null;
+        this.currentState.markOutOfBandMembersFailed();
+        throw err;
+    });
+    // update members in storage, but don't wait for it
+    inMemoryUpdate.then((fromServer) => {
+        if (fromServer) {
+            const oobMembers = this.currentState.getMembers()
+                .filter((m) => m.isOutOfBand())
+                .map((m) => m.events.member.event);
+            console.log(`LL: telling store to write ${oobMembers.length}`
+                + ` members for room ${this.roomId}`);
+            const store = this._client.store;
+            return store.setOutOfBandMembers(this.roomId, oobMembers)
+                // swallow any IDB error as we don't want to fail
+                // because of this
+                .catch((err) => {
+                    console.log("LL: storing OOB room members failed, oh well",
+                        err);
+                });
+        }
+    }).catch((err) => {
+        // as this is not awaited anywhere,
+        // at least show the error in the console
+        console.error(err);
+    });
+
+    this._membersPromise = inMemoryUpdate;
+
+    return this._membersPromise;
+};
+
+/**
+ * Removes the lazily loaded members from storage if needed
+ */
+Room.prototype.clearLoadedMembersIfNeeded = async function() {
+    if (this._opts.lazyLoadMembers && this._membersPromise) {
+        await this.loadMembersIfNeeded();
+        await this._client.store.clearOutOfBandMembers(this.roomId);
+        this.currentState.clearOutOfBandMembers();
+        this._membersPromise = null;
+    }
+};
+
+/**
+ * called when sync receives this room in the leave section
+ * to do cleanup after leaving a room. Possibly called multiple times.
+ */
+Room.prototype._cleanupAfterLeaving = function() {
+    this.clearLoadedMembersIfNeeded().catch((err) => {
+        console.error(`error after clearing loaded members from ` +
+            `room ${this.roomId} after leaving`);
+        console.dir(err);
+    });
+};
 
 /**
  * Reset the live timeline of all timelineSets, and start new ones.
@@ -304,6 +584,26 @@ Room.prototype.getUnreadNotificationCount = function(type) {
  */
 Room.prototype.setUnreadNotificationCount = function(type, count) {
     this._notificationCounts[type] = count;
+};
+
+Room.prototype.setSummary = function(summary) {
+    const heroes = summary["m.heroes"];
+    const joinedCount = summary["m.joined_member_count"];
+    const invitedCount = summary["m.invited_member_count"];
+    if (Number.isInteger(joinedCount)) {
+        this.currentState.setJoinedMemberCount(joinedCount);
+    }
+    if (Number.isInteger(invitedCount)) {
+        this.currentState.setInvitedMemberCount(invitedCount);
+    }
+    if (Array.isArray(heroes)) {
+        // be cautious about trusting server values,
+        // and make sure heroes doesn't contain our own id
+        // just to be sure
+        this._summaryHeroes = heroes.filter((userId) => {
+            return userId !== this.myUserId;
+        });
+    }
 };
 
 /**
@@ -430,11 +730,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    const member = this.currentState.members[userId];
-    if (!member) {
-        return null;
-    }
-    return member;
+    return this.currentState.getMember(userId);
  };
 
 /**
@@ -446,6 +742,33 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  };
 
 /**
+ * Returns the number of joined members in this room
+ * This method caches the result.
+ * This is a wrapper around the method of the same name in roomState, returning
+ * its result for the room's current state.
+ * @return {integer} The number of members in this room whose membership is 'join'
+ */
+Room.prototype.getJoinedMemberCount = function() {
+    return this.currentState.getJoinedMemberCount();
+};
+
+/**
+ * Returns the number of invited members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite'
+ */
+Room.prototype.getInvitedMemberCount = function() {
+    return this.currentState.getInvitedMemberCount();
+};
+
+/**
+ * Returns the number of invited + joined members in this room
+ * @return {integer} The number of members in this room whose membership is 'invite' or 'join'
+ */
+Room.prototype.getInvitedAndJoinedMemberCount = function() {
+    return this.getInvitedMemberCount() + this.getJoinedMemberCount();
+};
+
+/**
  * Get a list of members with given membership state.
  * @param {string} membership The membership state.
  * @return {RoomMember[]} A list of members with the given membership state.
@@ -454,6 +777,29 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
     return utils.filter(this.currentState.getMembers(), function(m) {
         return m.membership === membership;
     });
+ };
+
+ /**
+  * Get a list of members we should be encrypting for in this room
+  * @return {Promise<RoomMember[]>} A list of members who
+  * we should encrypt messages for in this room.
+  */
+ Room.prototype.getEncryptionTargetMembers = async function() {
+    await this.loadMembersIfNeeded();
+    let members = this.getMembersWithMembership("join");
+    if (this.shouldEncryptForInvitedMembers()) {
+        members = members.concat(this.getMembersWithMembership("invite"));
+    }
+    return members;
+ };
+
+ /**
+  * Determine whether we should encrypt messages for invited users in this room
+  * @return {boolean} if we should encrypt messages for invited users
+  */
+ Room.prototype.shouldEncryptForInvitedMembers = function() {
+    const ev = this.currentState.getStateEvents("m.room.history_visibility", "");
+    return (ev && ev.getContent() && ev.getContent().history_visibility !== "joined");
  };
 
  /**
@@ -909,15 +1255,14 @@ Room.prototype.removeEvent = function(eventId) {
  * Recalculate various aspects of the room, including the room name and
  * room summary. Call this any time the room's current state is modified.
  * May fire "Room.name" if the room name is updated.
- * @param {string} userId The client's user ID.
  * @fires module:client~MatrixClient#event:"Room.name"
  */
-Room.prototype.recalculate = function(userId) {
+Room.prototype.recalculate = function() {
     // set fake stripped state events if this is an invite room so logic remains
     // consistent elsewhere.
     const self = this;
     const membershipEvent = this.currentState.getStateEvents(
-        "m.room.member", userId,
+        "m.room.member", this.myUserId,
     );
     if (membershipEvent && membershipEvent.getContent().membership === "invite") {
         const strippedStateEvents = membershipEvent.event.invite_room_state || [];
@@ -933,14 +1278,14 @@ Room.prototype.recalculate = function(userId) {
                     content: strippedEvent.content,
                     event_id: "$fake" + Date.now(),
                     room_id: self.roomId,
-                    user_id: userId, // technically a lie
+                    user_id: self.myUserId, // technically a lie
                 })]);
             }
         });
     }
 
     const oldName = this.name;
-    this.name = calculateRoomName(this, userId);
+    this.name = calculateRoomName(this, this.myUserId);
     this.summary = new RoomSummary(this.roomId, {
         title: this.name,
     });
@@ -949,7 +1294,6 @@ Room.prototype.recalculate = function(userId) {
         this.emit("Room.name", this);
     }
 };
-
 
 /**
  * Get a list of user IDs who have <b>read up to</b> the given event.
@@ -1122,7 +1466,7 @@ Room.prototype.addTags = function(event) {
     // }
 
     // XXX: do we need to deep copy here?
-    this.tags = event.getContent().tags;
+    this.tags = event.getContent().tags || {};
 
     // XXX: we could do a deep-comparison to see if the tags have really
     // changed - but do we want to bother?
@@ -1151,6 +1495,17 @@ Room.prototype.addAccountData = function(events) {
  */
 Room.prototype.getAccountData = function(type) {
     return this.accountData[type];
+};
+
+
+/**
+ * Returns wheter the syncing user has permission to send a message in the room
+ * @return {boolean} true if the user should be permitted to send
+ *                   message events into the room.
+ */
+Room.prototype.maySendMessage = function() {
+    return this.getMyMembership() === 'join' &&
+        this.currentState.maySendEvent('m.room.message', this.myUserId);
 };
 
 /**
@@ -1186,87 +1541,83 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         return alias;
     }
 
-    // get members that are NOT ourselves and are actually in the room.
-    const otherMembers = utils.filter(room.currentState.getMembers(), function(m) {
-        return (
-            m.userId !== userId && m.membership !== "leave" && m.membership !== "ban"
-        );
-    });
-    const allMembers = utils.filter(room.currentState.getMembers(), function(m) {
-        return (m.membership !== "leave");
-    });
-    const myMemberEventArray = utils.filter(room.currentState.getMembers(), function(m) {
-        return (m.userId == userId);
-    });
-    const myMemberEvent = (
-        (myMemberEventArray.length && myMemberEventArray[0].events) ?
-            myMemberEventArray[0].events.member.event : undefined
-    );
+    const joinedMemberCount = room.currentState.getJoinedMemberCount();
+    const invitedMemberCount = room.currentState.getInvitedMemberCount();
+    // -1 because these numbers include the syncing user
+    const inviteJoinCount = joinedMemberCount + invitedMemberCount - 1;
 
-    // TODO: Localisation
-    if (myMemberEvent && myMemberEvent.content.membership == "invite") {
-        if (room.currentState.getMember(myMemberEvent.sender)) {
-            // extract who invited us to the room
-            return room.currentState.getMember(
-                myMemberEvent.sender,
-            ).name;
-        } else if (allMembers[0].events.member) {
-            // use the sender field from the invite event, although this only
-            // gets us the mxid
-            return myMemberEvent.sender;
-        } else {
-            return "Room Invite";
-        }
+    // get members that are NOT ourselves and are actually in the room.
+    let otherNames = null;
+    if (room._summaryHeroes) {
+        // if we have a summary, the member state events
+        // should be in the room state
+        otherNames = room._summaryHeroes.map((userId) => {
+            const member = room.getMember(userId);
+            return member ? member.name : userId;
+        });
+    } else {
+        let otherMembers = room.currentState.getMembers().filter((m) => {
+            return m.userId !== userId &&
+                (m.membership === "invite" || m.membership === "join");
+        });
+        // make sure members have stable order
+        otherMembers.sort((a, b) => a.userId.localeCompare(b.userId));
+        // only 5 first members, immitate _summaryHeroes
+        otherMembers = otherMembers.slice(0, 5);
+        otherNames = otherMembers.map((m) => m.name);
     }
 
+    if (inviteJoinCount) {
+        return memberNamesToRoomName(otherNames, inviteJoinCount);
+    }
 
-    if (otherMembers.length === 0) {
-        const leftMembers = utils.filter(room.currentState.getMembers(), function(m) {
-            return m.userId !== userId && m.membership === "leave";
-        });
-        if (allMembers.length === 1) {
-            // self-chat, peeked room with 1 participant,
-            // or inbound invite, or outbound 3PID invite.
-            if (allMembers[0].userId === userId) {
-                const thirdPartyInvites =
-                    room.currentState.getStateEvents("m.room.third_party_invite");
-                if (thirdPartyInvites && thirdPartyInvites.length > 0) {
-                    let name = "Inviting " +
-                               thirdPartyInvites[0].getContent().display_name;
-                    if (thirdPartyInvites.length > 1) {
-                        if (thirdPartyInvites.length == 2) {
-                            name += " and " +
-                                    thirdPartyInvites[1].getContent().display_name;
-                        } else {
-                            name += " and " +
-                                    thirdPartyInvites.length + " others";
-                        }
-                    }
-                    return name;
-                } else if (leftMembers.length === 1) {
-                    // if it was a chat with one person who's now left, it's still
-                    // notionally a chat with them
-                    return leftMembers[0].name;
-                } else {
-                    return "Empty room";
-                }
-            } else {
-                return allMembers[0].name;
-            }
-        } else {
-            // there really isn't anyone in this room...
-            return "Empty room";
+    const myMembership = room.getMyMembership();
+    // if I have created a room and invited people throuh
+    // 3rd party invites
+    if (myMembership == 'join') {
+        const thirdPartyInvites =
+            room.currentState.getStateEvents("m.room.third_party_invite");
+
+        if (thirdPartyInvites && thirdPartyInvites.length) {
+            const thirdPartyNames = thirdPartyInvites.map((i) => {
+                return i.getContent().display_name;
+            });
+
+            return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
         }
-    } else if (otherMembers.length === 1) {
-        return otherMembers[0].name;
-    } else if (otherMembers.length === 2) {
-        return (
-            otherMembers[0].name + " and " + otherMembers[1].name
-        );
+    }
+    // let's try to figure out who was here before
+    let leftNames = otherNames;
+    // if we didn't have heroes, try finding them in the room state
+    if(!leftNames.length) {
+        leftNames = room.currentState.getMembers().filter((m) => {
+            return m.userId !== userId &&
+                m.membership !== "invite" &&
+                m.membership !== "join";
+        }).map((m) => m.name);
+    }
+    if(leftNames.length) {
+        return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
     } else {
-        return (
-            otherMembers[0].name + " and " + (otherMembers.length - 1) + " others"
-        );
+        return "Empty room";
+    }
+}
+
+function memberNamesToRoomName(names, count = (names.length + 1)) {
+    const countWithoutMe = count - 1;
+    if (!names.length) {
+       return count <= 1 ? "Empty room" : null;
+    } else if (names.length === 1 && countWithoutMe <= 1) {
+        return names[0];
+    } else if (names.length === 2 && countWithoutMe <= 2) {
+        return `${names[0]} and ${names[1]}`;
+    } else {
+        const plural = countWithoutMe > 1;
+        if (plural) {
+            return `${names[0]} and ${countWithoutMe} others`;
+        } else {
+            return `${names[0]} and 1 other`;
+        }
     }
 }
 

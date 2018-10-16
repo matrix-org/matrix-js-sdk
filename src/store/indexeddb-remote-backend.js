@@ -65,7 +65,10 @@ RemoteIndexedDBStoreBackend.prototype = {
     clearDatabase: function() {
         return this._ensureStarted().then(() => this._doCmd('clearDatabase'));
     },
-
+    /** @return {Promise<bool>} whether or not the database was newly created in this session. */
+    isNewlyCreated: function() {
+        return this._doCmd('isNewlyCreated');
+    },
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
@@ -87,6 +90,40 @@ RemoteIndexedDBStoreBackend.prototype = {
         return this._doCmd('syncToDatabase', [users]);
     },
 
+    /**
+     * Returns the out-of-band membership events for this room that
+     * were previously loaded.
+     * @param {string} roomId
+     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns {null} in case the members for this room haven't been stored yet
+     */
+    getOutOfBandMembers: function(roomId) {
+        return this._doCmd('getOutOfBandMembers', [roomId]);
+    },
+
+    /**
+     * Stores the out-of-band membership events for this room. Note that
+     * it still makes sense to store an empty array as the OOB status for the room is
+     * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+     * @param {string} roomId
+     * @param {event[]} membershipEvents the membership events to store
+     * @returns {Promise} when all members have been stored
+     */
+    setOutOfBandMembers: function(roomId, membershipEvents) {
+        return this._doCmd('setOutOfBandMembers', [roomId, membershipEvents]);
+    },
+
+    clearOutOfBandMembers: function(roomId) {
+        return this._doCmd('clearOutOfBandMembers', [roomId]);
+    },
+
+    getClientOptions: function() {
+        return this._doCmd('getClientOptions');
+    },
+
+    storeClientOptions: function(options) {
+        return this._doCmd('storeClientOptions', [options]);
+    },
 
     /**
      * Load all user presence events from the database. This is not cached.
@@ -147,7 +184,9 @@ RemoteIndexedDBStoreBackend.prototype = {
             if (msg.command == 'cmd_success') {
                 def.resolve(msg.result);
             } else {
-                def.reject(msg.error);
+                const error = new Error(msg.error.message);
+                error.name = msg.error.name;
+                def.reject(error);
             }
         } else {
             console.warn("Unrecognised message from worker: " + msg);

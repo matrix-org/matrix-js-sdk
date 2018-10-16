@@ -192,6 +192,15 @@ describe("RoomMember", function() {
         });
     });
 
+    describe("isOutOfBand", function() {
+        it("should be set by markOutOfBand", function() {
+            const member = new RoomMember();
+            expect(member.isOutOfBand()).toEqual(false);
+            member.markOutOfBand();
+            expect(member.isOutOfBand()).toEqual(true);
+        });
+    });
+
     describe("setMembershipEvent", function() {
         const joinEvent = utils.mkMembership({
             event: true,

@@ -418,6 +418,69 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
 };
 
 /**
+ * Get an event in a room by its event id.
+ * @param {string} roomId
+ * @param {string} eventId
+ * @param {module:client.callback} callback Optional.
+ *
+ * @return {Promise} Resolves to an object containing the event.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.fetchRoomEvent = function(roomId, eventId, callback) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/event/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        },
+    );
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
+ * @param {string} roomId
+ * @param {string} includeMembership the membership type to include in the response
+ * @param {string} excludeMembership the membership type to exclude from the response
+ * @param {string} atEventId the id of the event for which moment in the timeline the members should be returned for
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: dictionary of userid to profile information
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.members =
+function(roomId, includeMembership, excludeMembership, atEventId, callback) {
+    const queryParams = {};
+    if (includeMembership) {
+        queryParams.membership = includeMembership;
+    }
+    if (excludeMembership) {
+        queryParams.not_membership = excludeMembership;
+    }
+    if (atEventId) {
+        queryParams.at = atEventId;
+    }
+
+    const queryString = utils.encodeParams(queryParams);
+
+    const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+        {$roomId: roomId});
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
+ * Upgrades a room to a new protocol version
+ * @param {string} roomId
+ * @param {string} newVersion The target version to upgrade to
+ * @return {module:client.Promise} Resolves: Object with key 'replacement_room'
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
+    const path = utils.encodeUri("/rooms/$roomId/upgrade", {$roomId: roomId});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, {new_version: newVersion},
+    );
+};
+
+
+/**
  * @param {string} groupId
  * @return {module:client.Promise} Resolves: Group summary object
  * @return {module:http-api.MatrixError} Rejects: with an error response.

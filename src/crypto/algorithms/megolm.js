@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -488,12 +489,24 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
             session_id: session.sessionId,
              // Include our device ID so that recipients can send us a
              // m.new_device message if they don't have our session key.
+             // XXX: Do we still need this now that m.new_device messages
+             // no longer exist since #483?
             device_id: self._deviceId,
         };
 
         session.useCount++;
         return encryptedContent;
     });
+};
+
+/**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * This should not normally be necessary.
+ */
+MegolmEncryption.prototype.forceDiscardSession = function() {
+    this._setupPromise = this._setupPromise.then(() => null);
 };
 
 /**
@@ -535,9 +548,9 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  * @return {module:client.Promise} Promise which resolves to a map
  *     from userId to deviceId to deviceInfo
  */
-MegolmEncryption.prototype._getDevicesInRoom = function(room) {
-    // XXX what about rooms where invitees can see the content?
-    const roomMembers = utils.map(room.getJoinedMembers(), function(u) {
+MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
+    const members = await room.getEncryptionTargetMembers();
+    const roomMembers = utils.map(members, function(u) {
         return u.userId;
     });
 
@@ -550,35 +563,31 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // We are happy to use a cached version here: we assume that if we already
     // have a list of the user's devices, then we already share an e2e room
     // with them, which means that they will have announced any new devices via
-    // an m.new_device.
-    //
-    // XXX: what if the cache is stale, and the user left the room we had in
-    // common and then added new devices before joining this one? --Matthew
-    //
-    // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
-    return this._crypto.downloadKeys(roomMembers, false).then((devices) => {
-        // remove any blocked devices
-        for (const userId in devices) {
-            if (!devices.hasOwnProperty(userId)) {
+    // device_lists in their /sync response.  This cache should then be maintained
+    // using all the device_lists changes and left fields.
+    // See https://github.com/vector-im/riot-web/issues/2305 for details.
+    const devices = await this._crypto.downloadKeys(roomMembers, false);
+    // remove any blocked devices
+    for (const userId in devices) {
+        if (!devices.hasOwnProperty(userId)) {
+            continue;
+        }
+
+        const userDevices = devices[userId];
+        for (const deviceId in userDevices) {
+            if (!userDevices.hasOwnProperty(deviceId)) {
                 continue;
             }
 
-            const userDevices = devices[userId];
-            for (const deviceId in userDevices) {
-                if (!userDevices.hasOwnProperty(deviceId)) {
-                    continue;
-                }
-
-                if (userDevices[deviceId].isBlocked() ||
-                    (userDevices[deviceId].isUnverified() && isBlacklisting)
-                   ) {
-                    delete userDevices[deviceId];
-                }
+            if (userDevices[deviceId].isBlocked() ||
+                (userDevices[deviceId].isUnverified() && isBlacklisting)
+               ) {
+                delete userDevices[deviceId];
             }
         }
+    }
 
-        return devices;
-    });
+    return devices;
 };
 
 /**
@@ -618,7 +627,10 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     if (!content.sender_key || !content.session_id ||
         !content.ciphertext
        ) {
-        throw new base.DecryptionError("Missing fields in input");
+        throw new base.DecryptionError(
+            "MEGOLM_MISSING_FIELDS",
+            "Missing fields in input",
+        );
     }
 
     // we add the event to the pending list *before* we start decryption.
@@ -635,10 +647,16 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             event.getId(), event.getTs(),
         );
     } catch (e) {
+        let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
+
         if (e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._requestKeysForEvent(event);
+
+            errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
         }
+
         throw new base.DecryptionError(
+            errorCode,
             e.toString(), {
                 session: content.sender_key + '|' + content.session_id,
             },
@@ -655,6 +673,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
         throw new base.DecryptionError(
+            "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
             "The sender's device has not sent us the keys for this message.",
             {
                 session: content.sender_key + '|' + content.session_id,
@@ -673,6 +692,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     // room, so neither the sender nor a MITM can lie about the room_id).
     if (payload.room_id !== event.getRoomId()) {
         throw new base.DecryptionError(
+            "MEGOLM_BAD_ROOM",
             "Message intended for room " + payload.room_id,
         );
     }

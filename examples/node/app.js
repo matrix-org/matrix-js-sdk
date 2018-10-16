@@ -202,9 +202,9 @@ function printRoomList() {
             dateStr = new Date(msg.getTs()).toISOString().replace(
                 /T/, ' ').replace(/\..+/, '');
         }
-        var me = roomList[i].getMember(myUserId);
-        if (me) {
-            fmt = fmts[me.membership];
+        var myMembership = roomList[i].getMyMembership();
+        if (myMembership) {
+            fmt = fmts[myMembership];
         }
         var roomName = fixWidth(roomList[i].name, 25);
         print(

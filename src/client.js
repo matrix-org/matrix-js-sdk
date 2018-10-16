@@ -45,6 +45,11 @@ const ContentHelpers = require("./content-helpers");
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 
+// Disable warnings for now: we use deprecated bluebird functions
+// and need to migrate, but they spam the console with warnings.
+Promise.config({warnings: false});
+
+
 const SCROLLBACK_DELAY_MS = 3000;
 let CRYPTO_ENABLED = false;
 
@@ -191,6 +196,8 @@ function MatrixClient(opts) {
 
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
+
+    this._serverSupportsLazyLoading = null;
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -285,6 +292,21 @@ MatrixClient.prototype.getSyncState = function() {
         return null;
     }
     return this._syncApi.getSyncState();
+};
+
+/**
+ * Returns the additional data object associated with
+ * the current sync state, or null if there is no
+ * such data.
+ * Sync errors, if available, are put in the 'error' key of
+ * this object.
+ * @return {?Object}
+ */
+MatrixClient.prototype.getSyncStateData = function() {
+    if (!this._syncApi) {
+        return null;
+    }
+    return this._syncApi.getSyncStateData();
 };
 
 /**
@@ -674,6 +696,21 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
 };
 
 /**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * @param {string} roomId The ID of the room to discard the session for
+ *
+ * This should not normally be necessary.
+ */
+MatrixClient.prototype.forceDiscardSession = function(roomId) {
+    if (!this._crypto) {
+        throw new Error("End-to-End encryption disabled");
+    }
+    this._crypto.forceDiscardSession(roomId);
+};
+
+/**
  * Get a list containing all of the room keys
  *
  * This should be encrypted before returning it to the user.
@@ -759,6 +796,37 @@ MatrixClient.prototype.getRoom = function(roomId) {
  */
 MatrixClient.prototype.getRooms = function() {
     return this.store.getRooms();
+};
+
+/**
+ * Retrieve all rooms that should be displayed to the user
+ * This is essentially getRooms() with some rooms filtered out, eg. old versions
+ * of rooms that have been replaced or (in future) other rooms that have been
+ * marked at the protocol level as not to be displayed to the user.
+ * @return {Room[]} A list of rooms, or an empty list if there is no data store.
+ */
+MatrixClient.prototype.getVisibleRooms = function() {
+    const allRooms = this.store.getRooms();
+
+    const replacedRooms = new Set();
+    for (const r of allRooms) {
+        const createEvent = r.currentState.getStateEvents('m.room.create', '');
+        // invites are included in this list and we don't know their create events yet
+        if (createEvent) {
+            const predecessor = createEvent.getContent()['predecessor'];
+            if (predecessor && predecessor['room_id']) {
+                replacedRooms.add(predecessor['room_id']);
+            }
+        }
+    }
+
+    return allRooms.filter((r) => {
+        const tombstone = r.currentState.getStateEvents('m.room.tombstone', '');
+        if (tombstone && replacedRooms.has(r.roomId)) {
+            return false;
+        }
+        return true;
+    });
 };
 
 /**
@@ -1930,14 +1998,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: room.roomId},
-    );
-    const params = {
-        from: room.oldState.paginationToken,
-        limit: limit,
-        dir: 'b',
-    };
     const defer = Promise.defer();
     info = {
         promise: defer.promise,
@@ -1947,9 +2007,17 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
     Promise.delay(timeToWaitMs).then(function() {
-        return self._http.authedRequest(callback, "GET", path, params);
+        return self._createMessagesRequest(
+            room.roomId,
+            room.oldState.paginationToken,
+            limit,
+            'b');
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+        if (res.state) {
+            const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+            room.currentState.setUnknownStateEvents(stateEvents);
+        }
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
         if (res.chunk.length === 0) {
@@ -1966,73 +2034,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     });
     this._ongoingScrollbacks[room.roomId] = info;
     return defer.promise;
-};
-
-/**
- * Take an EventContext, and back/forward-fill results.
- *
- * @param {module:models/event-context.EventContext} eventContext  context
- *    object to be updated
- * @param {Object}  opts
- * @param {boolean} opts.backwards  true to fill backwards, false to go forwards
- * @param {boolean} opts.limit      number of events to request
- *
- * @return {module:client.Promise} Resolves: updated EventContext object
- * @return {Error} Rejects: with an error response.
- */
-MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
-    // TODO: we should implement a backoff (as per scrollback()) to deal more
-    // nicely with HTTP errors.
-    opts = opts || {};
-    const backwards = opts.backwards || false;
-
-    const token = eventContext.getPaginateToken(backwards);
-    if (!token) {
-        // no more results.
-        return Promise.reject(new Error("No paginate token"));
-    }
-
-    const dir = backwards ? 'b' : 'f';
-    const pendingRequest = eventContext._paginateRequests[dir];
-
-    if (pendingRequest) {
-        // already a request in progress - return the existing promise
-        return pendingRequest;
-    }
-
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()},
-    );
-    const params = {
-        from: token,
-        limit: ('limit' in opts) ? opts.limit : 30,
-        dir: dir,
-    };
-
-    const self = this;
-    const promise =
-        self._http.authedRequest(undefined, "GET", path, params,
-    ).then(function(res) {
-        let token = res.end;
-        if (res.chunk.length === 0) {
-            token = null;
-        } else {
-            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
-            if (backwards) {
-                // eventContext expects the events in timeline order, but
-                // back-pagination returns them in reverse order.
-                matrixEvents.reverse();
-            }
-            eventContext.addEvents(matrixEvents, backwards);
-        }
-        eventContext.setPaginateToken(token, backwards);
-        return eventContext;
-    }).finally(function() {
-        eventContext._paginateRequests[dir] = null;
-    });
-    eventContext._paginateRequests[dir] = promise;
-
-    return promise;
 };
 
 /**
@@ -2068,11 +2069,16 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         },
     );
 
+    let params = undefined;
+    if (this._clientOpts.lazyLoadMembers) {
+        params = {filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER)};
+    }
+
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     const self = this;
     const promise =
-        self._http.authedRequest(undefined, "GET", path,
+        self._http.authedRequest(undefined, "GET", path, params,
     ).then(function(res) {
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
@@ -2099,6 +2105,9 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
             timeline.initialiseState(utils.map(res.state,
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+        } else {
+            const stateEvents = utils.map(res.state, self.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
@@ -2113,6 +2122,49 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     return promise;
 };
 
+/**
+ * Makes a request to /messages with the appropriate lazy loading filter set.
+ * XXX: if we do get rid of scrollback (as it's not used at the moment),
+ * we could inline this method again in paginateEventTimeline as that would
+ * then be the only call-site
+ * @param {string} roomId
+ * @param {string} fromToken
+ * @param {number} limit the maximum amount of events the retrieve
+ * @param {string} dir 'f' or 'b'
+ * @param {Filter} timelineFilter the timeline filter to pass
+ * @return {Promise}
+ */
+MatrixClient.prototype._createMessagesRequest =
+function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/messages", {$roomId: roomId},
+    );
+    if (limit === undefined) {
+        limit = 30;
+    }
+    const params = {
+        from: fromToken,
+        limit: limit,
+        dir: dir,
+    };
+
+    let filter = null;
+    if (this._clientOpts.lazyLoadMembers) {
+        // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
+        // so the timelineFilter doesn't get written into it below
+        filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
+    }
+    if (timelineFilter) {
+        // XXX: it's horrific that /messages' filter parameter doesn't match
+        // /sync's one - see https://matrix.org/jira/browse/SPEC-451
+        filter = filter || {};
+        Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
+    }
+    if (filter) {
+        params.filter = JSON.stringify(filter);
+    }
+    return this._http.authedRequest(undefined, "GET", path, params);
+};
 
 /**
  * Take an EventTimeline, and back/forward-fill results.
@@ -2207,25 +2259,18 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
-        path = utils.encodeUri(
-            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()},
-        );
-        params = {
-            from: token,
-            limit: ('limit' in opts) ? opts.limit : 30,
-            dir: dir,
-        };
-
-        const filter = eventTimeline.getFilter();
-        if (filter) {
-            // XXX: it's horrific that /messages' filter parameter doesn't match
-            // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            params.filter = JSON.stringify(filter.getRoomTimelineFilterComponent());
-        }
-
-        promise =
-            this._http.authedRequest(undefined, "GET", path, params,
-        ).then(function(res) {
+        promise = this._createMessagesRequest(
+            eventTimeline.getRoomId(),
+            token,
+            opts.limit,
+            dir,
+            eventTimeline.getFilter());
+        promise.then(function(res) {
+            if (res.state) {
+                const roomState = eventTimeline.getState(dir);
+                const stateEvents = utils.map(res.state, self.getEventMapper());
+                roomState.setUnknownStateEvents(stateEvents);
+            }
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()
@@ -3030,8 +3075,11 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
+ * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
+ * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
+ * This will override the filter option at this moment.
  */
-MatrixClient.prototype.startClient = function(opts) {
+MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
         // client is already running.
         return;
@@ -3069,9 +3117,27 @@ MatrixClient.prototype.startClient = function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+};
+
+/**
+ * store client options with boolean/string/numeric values
+ * to know in the next session what flags the sync data was
+ * created with (e.g. lazy loading)
+ * @param {object} opts the complete set of client options
+ * @return {Promise} for store operation */
+MatrixClient.prototype._storeClientOptions = function() {
+    const primTypes = ["boolean", "string", "number"];
+    const serializableOpts = Object.entries(this._clientOpts)
+        .filter(([key, value]) => {
+            return primTypes.includes(typeof value);
+        })
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    return this.store.storeClientOptions(serializableOpts);
 };
 
 /**
@@ -3094,6 +3160,36 @@ MatrixClient.prototype.stopClient = function() {
         this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
+};
+
+/*
+ * Query the server to see if it support members lazy loading
+ * @return {Promise<boolean>} true if server supports lazy loading
+ */
+MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
+    if (this._serverSupportsLazyLoading === null) {
+        const response = await this._http.request(
+            undefined, // callback
+            "GET", "/_matrix/client/versions",
+            undefined, // queryParams
+            undefined, // data
+            {
+                prefix: '',
+            },
+        );
+        const unstableFeatures = response["unstable_features"];
+        this._serverSupportsLazyLoading =
+            unstableFeatures && unstableFeatures["m.lazy_load_members"];
+    }
+    return this._serverSupportsLazyLoading;
+};
+
+/*
+ * Get if lazy loading members is being used.
+ * @return {boolean} Whether or not members are lazy loaded by this client
+ */
+MatrixClient.prototype.hasLazyLoadMembersEnabled = function() {
+    return !!this._clientOpts.lazyLoadMembers;
 };
 
 /*
@@ -3441,6 +3537,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
  * previous API.</i></li>
  *
+ * <li>CATCHUP: The client has detected the connection to the server might be
+ * available again and will now try to do a sync again. As this sync might take
+ * a long time (depending how long ago was last synced, and general server
+ * performance) the client is put in this mode so the UI can reflect trying
+ * to catch up with the server after losing connection.</li>
+ *
  * <li>SYNCING : The client is currently polling for new events from the server.
  * This will be called <i>after</i> processing latest events from a sync.</li>
  *
@@ -3464,11 +3566,11 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *                                          +---->STOPPED
  *                                          |
  *              +----->PREPARED -------> SYNCING <--+
- *              |        ^                |  ^      |
- *              |        |                |  |      |
- *              |        |                V  |      |
- *   null ------+        |  +--------RECONNECTING   |
- *              |        |  V                       |
+ *              |                        ^  |  ^    |
+ *              |      CATCHUP ----------+  |  |    |
+ *              |        ^                  V  |    |
+ *   null ------+        |  +------- RECONNECTING   |
+ *              |        V  V                       |
  *              +------->ERROR ---------------------+
  *
  * NB: 'null' will never be emitted by this event.
@@ -3518,7 +3620,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *
  * @param {?Object} data Data about this transition.
  *
- * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ * @param {MatrixError} data.error The matrix error if <code>state=ERROR</code>.
  *
  * @param {String} data.oldSyncToken The 'since' token passed to /sync.
  *    <code>null</code> for the first successful sync since this client was
