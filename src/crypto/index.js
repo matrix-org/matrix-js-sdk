@@ -940,6 +940,7 @@ Crypto.prototype.exportRoomKeys = async function() {
                 const sess = this._olmDevice.exportInboundGroupSession(
                     s.senderKey, s.sessionId, s.sessionData,
                 );
+                delete sess.first_known_index;
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 exportedSessions.push(sess);
             });
@@ -1002,13 +1003,21 @@ Crypto.prototype._maybeSendKeyBackup = async function() {
                     sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
                     delete sessionData.session_id;
                     delete sessionData.room_id;
+                    const firstKnownIndex = sessionData.first_known_index;
+                    delete sessionData.first_known_index;
                     const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
 
+                    const forwardedCount =
+                          (sessionData.forwardingCurve25519KeyChain || []).length;
+
+                    const device = this._deviceList.getDeviceByIdentityKey(
+                        olmlib.MEGOLM_ALGORITHM, session.senderKey,
+                    );
+
                     data[roomId]['sessions'][session.sessionId] = {
-                        first_message_index: 1, // FIXME
-                        forwarded_count:
-                        (sessionData.forwardingCurve25519KeyChain || []).length,
-                        is_verified: false, // FIXME: how do we determine this?
+                        first_message_index: firstKnownIndex,
+                        forwarded_count: forwardedCount,
+                        is_verified: !!(device && device.isVerified()),
                         session_data: encrypted,
                     };
                 }

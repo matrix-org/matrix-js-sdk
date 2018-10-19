@@ -71,6 +71,9 @@ export default class DeviceList {
         // }
         this._devices = {};
 
+        // map of identity keys to the user who owns it
+        this._userByIdentityKey = {};
+
         // which users we are tracking device status for.
         // userId -> TRACKING_STATUS_*
         this._deviceTrackingStatus = {}; // loaded from storage in load()
@@ -127,6 +130,19 @@ export default class DeviceList {
                         this._deviceTrackingStatus = deviceData ?
                             deviceData.trackingStatus : {};
                         this._syncToken = deviceData ? deviceData.syncToken : null;
+                    }
+                    this._userByIdentityKey = {};
+                    for (const user in this._devices) {
+                        if (!this._devices.hasOwnProperty(user)) {
+                            continue;
+                        }
+                        const userDevices = this._devices[user];
+                        for (const device in userDevices) {
+                            if (!userDevices.hasOwnProperty(device)) {
+                                continue;
+                            }
+                            this._userByIdentityKey[userDevices[device].senderKey] = user;
+                        }
                     }
                 });
             },
@@ -357,13 +373,24 @@ export default class DeviceList {
     /**
      * Find a device by curve25519 identity key
      *
-     * @param {string} userId     owner of the device
+     * @param {string} userId     owner of the device (optional)
      * @param {string} algorithm  encryption algorithm
      * @param {string} senderKey  curve25519 key to match
      *
      * @return {module:crypto/deviceinfo?}
      */
     getDeviceByIdentityKey(userId, algorithm, senderKey) {
+        if (arguments.length === 2) {
+            // if userId is omitted, shift the other arguments, and look up the
+            // userid
+            senderKey = algorithm;
+            algorithm = userId;
+            userId = this._userByIdentityKey[senderKey];
+            if (!userId) {
+                return null;
+            }
+        }
+
         if (
             algorithm !== olmlib.OLM_ALGORITHM &&
             algorithm !== olmlib.MEGOLM_ALGORITHM
@@ -409,6 +436,12 @@ export default class DeviceList {
      */
     storeDevicesForUser(u, devs) {
         this._devices[u] = devs;
+        for (const device in devs) {
+            if (!devs.hasOwnProperty(device)) {
+                continue;
+            }
+            this._userByIdentityKey[devs[device].senderKey] = u;
+        }
         this._dirty = true;
     }
 
@@ -526,6 +559,12 @@ export default class DeviceList {
      */
     _setRawStoredDevicesForUser(userId, devices) {
         this._devices[userId] = devices;
+        for (const device in devices) {
+            if (!devices.hasOwnProperty(device)) {
+                continue;
+            }
+            this._userByIdentityKey[devices[device].senderKey] = userId;
+        }
     }
 
     /**
