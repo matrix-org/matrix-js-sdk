@@ -38,7 +38,7 @@ module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
 /**
  * matrix algorithm tag for megolm backups
  */
-module.exports.MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1";
+module.exports.MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
 
 
 /**
