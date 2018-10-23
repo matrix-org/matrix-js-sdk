@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import logger from '../logger';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
 /**
@@ -173,7 +174,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                     // Migrate from sessionStore
                     pickledAccount = this._sessionStore.getEndToEndAccount();
                     if (pickledAccount !== null) {
-                        console.log("Migrating account from session store");
+                        logger.log("Migrating account from session store");
                         this._cryptoStore.storeAccount(txn, pickledAccount);
                     }
                 }
@@ -195,7 +196,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                 // has run against the same localstorage and created some spurious sessions.
                 this._cryptoStore.countEndToEndSessions(txn, (count) => {
                     if (count) {
-                        console.log("Crypto store already has sessions: not migrating");
+                        logger.log("Crypto store already has sessions: not migrating");
                         return;
                     }
                     let numSessions = 0;
@@ -207,7 +208,7 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                             );
                         }
                     }
-                    console.log(
+                    logger.log(
                         "Migrating " + numSessions + " sessions from session store",
                     );
                 });
@@ -236,14 +237,14 @@ OlmDevice.prototype._migrateFromSessionStore = async function() {
                             ), txn,
                         );
                     } catch (e) {
-                        console.warn(
+                        logger.warn(
                             "Failed to migrate session " + s.senderKey + "/" +
                             s.sessionId + ": " + e.stack || e,
                         );
                     }
                     ++numIbSessions;
                 }
-                console.log(
+                logger.log(
                     "Migrated " + numIbSessions +
                     " inbound group sessions from session store",
                 );
@@ -889,7 +890,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                 roomId, senderKey, sessionId, txn,
                 (existingSession, existingSessionData) => {
                     if (existingSession) {
-                        console.log(
+                        logger.log(
                             "Update for megolm session " + senderKey + "/" + sessionId,
                         );
                         // for now we just ignore updates. TODO: implement something here
@@ -1034,7 +1035,7 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
                     }
 
                     if (roomId !== sessionData.room_id) {
-                        console.warn(
+                        logger.warn(
                             `requested keys for inbound group session ${senderKey}|` +
                             `${sessionId}, with incorrect room_id ` +
                             `(expected ${sessionData.room_id}, ` +
