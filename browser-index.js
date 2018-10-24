@@ -1,5 +1,5 @@
 var matrixcs = require("./lib/matrix");
-matrixcs.request(require("browser-request"));
+matrixcs.request(require("request"));
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.
