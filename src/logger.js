@@ -12,7 +12,7 @@ const log = require("loglevel");
 // Part of #332 is introducing a logging library in the first place.
 const DEFAULT_NAME_SPACE = "matrix";
 const logger = log.getLogger(DEFAULT_NAME_SPACE);
-log.setLevel(log.levels.WARN);
+log.setLevel(log.levels.DEBUG);
 
 /**
  * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
