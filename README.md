@@ -267,13 +267,13 @@ To provide the Olm library in a browser application:
  
 To provide the Olm library in a node.js application:
 
- * ``npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz``
+ * ``npm install https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``
    (replace the URL with the latest version you want to use from
     https://matrix.org/packages/npm/olm/)
  * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
 
 If you want to package Olm as dependency for your node.js application, you
-can use ``npm install https://matrix.org/packages/npm/olm/olm-2.2.2.tgz 
+can use ``npm install https://matrix.org/packages/npm/olm/olm-3.0.0.tgz
 --save-optional`` (if your application also works without e2e crypto enabled)
 or ``--save`` (if it doesn't) to do so.
 
