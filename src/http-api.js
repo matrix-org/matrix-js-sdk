@@ -755,7 +755,7 @@ module.exports.MatrixHttpApi.prototype = {
                     method: method,
                     withCredentials: false,
                     qs: queryParams,
-                    //qsStringifyOptions: opts.qsStringifyOptions,
+                    qsStringifyOptions: opts.qsStringifyOptions,
                     useQuerystring: true,
                     body: data,
                     json: false,
