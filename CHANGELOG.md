@@ -1,3 +1,14 @@
+Changes in [0.12.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.1-rc.1) (2018-10-24)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.0...v0.12.1-rc.1)
+
+ * Add repository type to package.json to make it valid
+   [\#762](https://github.com/matrix-org/matrix-js-sdk/pull/762)
+ * Add getMediaConfig()
+   [\#761](https://github.com/matrix-org/matrix-js-sdk/pull/761)
+ * add new examples, to be expanded into a post
+   [\#739](https://github.com/matrix-org/matrix-js-sdk/pull/739)
+
 Changes in [0.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0) (2018-10-16)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.0-rc.1...v0.12.0)
