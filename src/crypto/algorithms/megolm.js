@@ -263,6 +263,14 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
+    if (this._crypto.backupInfo) {
+        // don't wait for it to complete
+        this._crypto.backupGroupSession(
+            this._roomId, this._olmDevice.deviceCurve25519Key, [],
+            sessionId, key.key,
+        );
+    }
+
     return new OutboundSessionInfo(sessionId);
 };
 
@@ -824,7 +832,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
     }
 
     console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
-    this._olmDevice.addInboundGroupSession(
+    return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
         exportFormat,
@@ -839,6 +847,15 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
         // have another go at decrypting events sent with this session.
         this._retryDecryption(senderKey, sessionId);
+    }).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for it to complete
+            this._crypto.backupGroupSession(
+                content.room_id, senderKey, forwardingKeyChain,
+                content.session_id, content.session_key, keysClaimed,
+                exportFormat,
+            );
+        }
     }).catch((e) => {
         console.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -956,6 +973,18 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         session.sender_claimed_keys,
         true,
     ).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for it to complete
+            this._crypto.backupGroupSession(
+                session.room_id,
+                session.sender_key,
+                session.forwarding_curve25519_key_chain,
+                session.session_id,
+                session.session_key,
+                session.sender_claimed_keys,
+                true,
+            );
+        }
         // have another go at decrypting events sent with this session.
         this._retryDecryption(session.sender_key, session.session_id);
     });

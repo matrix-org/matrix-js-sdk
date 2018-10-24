@@ -36,6 +36,10 @@ const DeviceList = require('./DeviceList').default;
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
+export function isCryptoAvailable() {
+    return Boolean(global.Olm);
+}
+
 /**
  * Cryptography bits
  *
@@ -62,7 +66,7 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  *
  * @param {RoomList} roomList An initialised RoomList object
  */
-function Crypto(baseApis, sessionStore, userId, deviceId,
+export default function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore, roomList) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -71,6 +75,14 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
+
+    // track whether this device's megolm keys are being backed up incrementally
+    // to the server or not.
+    // XXX: this should probably have a single source of truth from OlmAccount
+    this.backupInfo = null; // The info dict from /room_keys/version
+    this.backupKey = null; // The encryption key object
+    this._checkedForBackup = false; // Have we checked the server for a backup we can use?
+    this._sendingBackups = false; // Are we currently sending backups?
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -124,6 +136,10 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    // Olm is just an object with a .then, not a fully-fledged promise, so
+    // pass it into bluebird to make it a proper promise.
+    await global.Olm.init();
+
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
     await this._cryptoStore.doTxn(
@@ -174,6 +190,115 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+
+    this._checkAndStartKeyBackup();
+};
+
+/**
+ * Check the server for an active key backup and
+ * if one is present and has a valid signature from
+ * one of the user's verified devices, start backing up
+ * to it.
+ */
+Crypto.prototype._checkAndStartKeyBackup = async function() {
+    console.log("Checking key backup status...");
+    let backupInfo;
+    try {
+        backupInfo = await this._baseApis.getKeyBackupVersion();
+    } catch (e) {
+        console.log("Error checking for active key backup", e);
+        if (Number.isFinite(e.httpStatus) && e.httpStatus / 100 === 4) {
+            // well that's told us. we won't try again.
+            this._checkedForBackup = true;
+        }
+        return;
+    }
+    this._checkedForBackup = true;
+
+    const trustInfo = await this.isKeyBackupTrusted(backupInfo);
+
+    if (trustInfo.usable && !this.backupInfo) {
+        console.log("Found usable key backup: enabling key backups");
+        this._baseApis.enableKeyBackup(backupInfo);
+    } else if (!trustInfo.usable && this.backupInfo) {
+        console.log("No usable key backup: disabling key backup");
+        this._baseApis.disableKeyBackup();
+    } else if (!trustInfo.usable && !this.backupInfo) {
+        console.log("No usable key backup: not enabling key backup");
+    }
+};
+
+/**
+ * Forces a re-check of the key backup and enables/disables it
+ * as appropriate
+ *
+ * @param {object} backupInfo Backup info from /room_keys/version endpoint
+ */
+Crypto.prototype.checkKeyBackup = async function(backupInfo) {
+    this._checkedForBackup = false;
+    await this._checkAndStartKeyBackup();
+};
+
+/**
+ * @param {object} backupInfo key backup info dict from /room_keys/version
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
+    const ret = {
+        usable: false,
+        sigs: [],
+    };
+
+    if (
+        !backupInfo ||
+        !backupInfo.algorithm ||
+        !backupInfo.auth_data ||
+        !backupInfo.auth_data.public_key ||
+        !backupInfo.auth_data.signatures
+    ) {
+        console.log("Key backup is absent or missing required data");
+        return ret;
+    }
+
+    const mySigs = backupInfo.auth_data.signatures[this._userId];
+    if (!mySigs || mySigs.length === 0) {
+        console.log("Ignoring key backup because it lacks any signatures from this user");
+        return ret;
+    }
+
+    for (const keyId of Object.keys(mySigs)) {
+        const device = this._deviceList.getStoredDevice(
+            this._userId, keyId.split(':')[1], // XXX: is this how we're supposed to get the device ID?
+        );
+        if (!device) {
+            console.log("Ignoring signature from unknown key " + keyId);
+            continue;
+        }
+        const sigInfo = { device };
+        try {
+            await olmlib.verifySignature(
+                this._olmDevice,
+                backupInfo.auth_data,
+                this._userId,
+                device.deviceId,
+                device.getFingerprint(),
+            );
+            sigInfo.valid = true;
+        } catch (e) {
+            console.log("Bad signature from device " + device.deviceId, e);
+            sigInfo.valid = false;
+        }
+        ret.sigs.push(sigInfo);
+    }
+
+    ret.usable = ret.sigs.some((s) => s.valid && s.device.isVerified());
+    return ret;
 };
 
 /**
@@ -815,6 +940,7 @@ Crypto.prototype.exportRoomKeys = async function() {
                 const sess = this._olmDevice.exportInboundGroupSession(
                     s.senderKey, s.sessionId, s.sessionData,
                 );
+                delete sess.first_known_index;
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 exportedSessions.push(sess);
             });
@@ -843,6 +969,126 @@ Crypto.prototype.importRoomKeys = function(keys) {
         },
     );
 };
+
+Crypto.prototype._maybeSendKeyBackup = async function() {
+    if (!this._sendingBackups) {
+        this._sendingBackups = true;
+        try {
+            // wait between 0 and 10 seconds, to avoid backup requests from
+            // different clients hitting the server all at the same time when a
+            // new key is sent
+            await new Promise((resolve, reject) => {
+                setTimeout(resolve, Math.random() * 10000);
+            });
+            let numFailures = 0; // number of consecutive failures
+            while (1) {
+                if (!this.backupKey) {
+                    return;
+                }
+                // FIXME: figure out what limit is reasonable
+                const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
+                if (!sessions.length) {
+                    return;
+                }
+                const data = {};
+                for (const session of sessions) {
+                    const roomId = session.sessionData.room_id;
+                    if (data[roomId] === undefined) {
+                        data[roomId] = {sessions: {}};
+                    }
+
+                    const sessionData = await this._olmDevice.exportInboundGroupSession(
+                        session.senderKey, session.sessionId, session.sessionData,
+                    );
+                    sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
+                    delete sessionData.session_id;
+                    delete sessionData.room_id;
+                    const firstKnownIndex = sessionData.first_known_index;
+                    delete sessionData.first_known_index;
+                    const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
+
+                    const forwardedCount =
+                          (sessionData.forwardingCurve25519KeyChain || []).length;
+
+                    const device = this._deviceList.getDeviceByIdentityKey(
+                        olmlib.MEGOLM_ALGORITHM, session.senderKey,
+                    );
+
+                    data[roomId]['sessions'][session.sessionId] = {
+                        first_message_index: firstKnownIndex,
+                        forwarded_count: forwardedCount,
+                        is_verified: !!(device && device.isVerified()),
+                        session_data: encrypted,
+                    };
+                }
+
+                try {
+                    await this._baseApis.sendKeyBackup(
+                        undefined, undefined, this.backupInfo.version,
+                        {rooms: data},
+                    );
+                    numFailures = 0;
+                    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
+                } catch (err) {
+                    numFailures++;
+                    console.log("send failed", err);
+                    if (err.httpStatus === 400
+                        || err.httpStatus === 403
+                        || err.httpStatus === 401) {
+                        // retrying probably won't help much, so we should give up
+                        // FIXME: disable backups?
+                        return;
+                    }
+                }
+                if (numFailures) {
+                    // exponential backoff if we have failures
+                    await new Promise((resolve, reject) => {
+                        setTimeout(
+                            resolve,
+                            1000 * Math.pow(2, Math.min(numFailures - 1, 4)),
+                        );
+                    });
+                }
+            }
+        } finally {
+            this._sendingBackups = false;
+        }
+    }
+};
+
+Crypto.prototype.backupGroupSession = async function(
+    roomId, senderKey, forwardingCurve25519KeyChain,
+    sessionId, sessionKey, keysClaimed,
+    exportFormat,
+) {
+    if (!this.backupInfo) {
+        throw new Error("Key backups are not enabled");
+    }
+
+    await this._cryptoStore.markSessionsNeedingBackup([{
+        senderKey: senderKey,
+        sessionId: sessionId,
+    }]);
+
+    await this._maybeSendKeyBackup();
+};
+
+Crypto.prototype.backupAllGroupSessions = async function(version) {
+    await this._cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
+        (txn) => {
+            this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
+                if (session !== null) {
+                    this._cryptoStore.markSessionsNeedingBackup([session], txn);
+                }
+            });
+        },
+    );
+
+    await this._maybeSendKeyBackup();
+};
+
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.
@@ -1148,6 +1394,12 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     if (!content.room_id || !content.algorithm) {
         console.error("key event is missing fields");
         return;
+    }
+
+    if (!this._checkedForBackup) {
+        // don't bother awaiting on this - the important thing is that we retry if we
+        // haven't managed to check before
+        this._checkAndStartKeyBackup();
     }
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
@@ -1518,6 +1770,3 @@ class IncomingRoomKeyRequestCancellation {
  * @event module:client~MatrixClient#"crypto.warning"
  * @param {string} type One of the strings listed above
  */
-
-/** */
-module.exports = Crypto;

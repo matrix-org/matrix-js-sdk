@@ -32,6 +32,7 @@ const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
+const KEY_SESSIONS_NEEDING_BACKUP = E2E_PREFIX + "sessionsneedingbackup";
 
 function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
@@ -163,6 +164,57 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
             }
         }
         func(result);
+    }
+
+    getSessionsNeedingBackup(limit) {
+        const sessionsNeedingBackup
+              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        const sessions = [];
+
+        for (const session in sessionsNeedingBackup) {
+            if (Object.prototype.hasOwnProperty.call(sessionsNeedingBackup, session)) {
+                const senderKey = session.substr(0, 43);
+                const sessionId = session.substr(44);
+                this.getEndToEndInboundGroupSession(
+                    senderKey, sessionId, null,
+                    (sessionData) => {
+                        sessions.push({
+                            senderKey: senderKey,
+                            sessionId: sessionId,
+                            sessionData: sessionData,
+                        });
+                    },
+                );
+                if (limit && session.length >= limit) {
+                    break;
+                }
+            }
+        }
+        return Promise.resolve(sessions);
+    }
+
+    unmarkSessionsNeedingBackup(sessions) {
+        const sessionsNeedingBackup
+              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        for (const session of sessions) {
+            delete sessionsNeedingBackup[session.senderKey + '/' + session.sessionId];
+        }
+        setJsonItem(
+            this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup,
+        );
+        return Promise.resolve();
+    }
+
+    markSessionsNeedingBackup(sessions) {
+        const sessionsNeedingBackup
+              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        for (const session of sessions) {
+            sessionsNeedingBackup[session.senderKey + '/' + session.sessionId] = true;
+        }
+        setJsonItem(
+            this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup,
+        );
+        return Promise.resolve();
     }
 
     /**

@@ -41,9 +41,14 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 const ContentHelpers = require("./content-helpers");
+const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
+
+import Crypto from './crypto';
+import { isCryptoAvailable } from './crypto';
+import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
@@ -51,13 +56,29 @@ Promise.config({warnings: false});
 
 
 const SCROLLBACK_DELAY_MS = 3000;
-let CRYPTO_ENABLED = false;
+const CRYPTO_ENABLED = isCryptoAvailable();
 
-try {
-    var Crypto = require("./crypto");
-    CRYPTO_ENABLED = true;
-} catch (e) {
-    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
+function keysFromRecoverySession(sessions, decryptionKey, roomId) {
+    const keys = [];
+    for (const [sessionId, sessionData] of Object.entries(sessions)) {
+        try {
+            const decrypted = keyFromRecoverySession(sessionData, decryptionKey);
+            decrypted.session_id = sessionId;
+            decrypted.room_id = roomId;
+            keys.push(decrypted);
+        } catch (e) {
+            console.log("Failed to decrypt session from backup");
+        }
+    }
+    return keys;
+}
+
+function keyFromRecoverySession(session, decryptionKey) {
+    return JSON.parse(decryptionKey.decrypt(
+        session.session_data.ephemeral,
+        session.session_data.mac,
+        session.session_data.ciphertext,
+    ));
 }
 
 /**
@@ -133,6 +154,8 @@ function MatrixClient(opts) {
 
     MatrixBaseApis.call(this, opts);
 
+    this.olmVersion = null; // Populated after initCrypto is done
+
     this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
@@ -184,10 +207,6 @@ function MatrixClient(opts) {
     this._sessionStore = opts.sessionStore;
 
     this._forceTURN = opts.forceTURN || false;
-
-    if (CRYPTO_ENABLED) {
-        this.olmVersion = Crypto.getOlmVersion();
-    }
 
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -378,6 +397,13 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
  * successfully initialised.
  */
 MatrixClient.prototype.initCrypto = async function() {
+    if (!isCryptoAvailable()) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
     if (this._crypto) {
         console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
         return;
@@ -394,13 +420,6 @@ MatrixClient.prototype.initCrypto = async function() {
 
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
     await this._roomList.init();
-
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
 
     const userId = this.getUserId();
     if (userId === null) {
@@ -432,6 +451,9 @@ MatrixClient.prototype.initCrypto = async function() {
     ]);
 
     await crypto.init();
+
+    this.olmVersion = Crypto.getOlmVersion();
+
 
     // if crypto initialisation was successful, tell it to attach its event
     // handlers.
@@ -536,7 +558,15 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
     if (verified === undefined) {
         verified = true;
     }
-    return _setDeviceVerification(this, userId, deviceId, verified, null);
+    const prom = _setDeviceVerification(this, userId, deviceId, verified, null);
+
+    // if one of the user's own devices is being marked as verified / unverified,
+    // check the key backup status, since whether or not we use this depends on
+    // whether it has a signature from a verified device
+    if (userId == this.credentials.userId) {
+        this._crypto.checkKeyBackup();
+    }
+    return prom;
 };
 
 /**
@@ -738,6 +768,303 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
         throw new Error("End-to-end encryption disabled");
     }
     return this._crypto.importRoomKeys(keys);
+};
+
+/**
+ * Get information about the current key backup.
+ * @returns {Promise} Information object from API or null
+ */
+MatrixClient.prototype.getKeyBackupVersion = function() {
+    return this._http.authedRequest(
+        undefined, "GET", "/room_keys/version",
+    ).then((res) => {
+        if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
+            const err = "Unknown backup algorithm: " + res.algorithm;
+            return Promise.reject(err);
+        } else if (!(typeof res.auth_data === "object")
+                   || !res.auth_data.public_key) {
+            const err = "Invalid backup data returned";
+            return Promise.reject(err);
+        } else {
+            return res;
+        }
+    }).catch((e) => {
+        if (e.errcode === 'M_NOT_FOUND') {
+            return null;
+        } else {
+            throw e;
+        }
+    });
+};
+
+/**
+ * @param {object} info key backup info dict from getKeyBackupVersion()
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+MatrixClient.prototype.isKeyBackupTrusted = function(info) {
+    return this._crypto.isKeyBackupTrusted(info);
+};
+
+/**
+ * @returns {bool} true if the client is configured to back up keys to
+ *     the server, otherwise false.
+ */
+MatrixClient.prototype.getKeyBackupEnabled = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return Boolean(this._crypto.backupKey);
+};
+
+/**
+ * Enable backing up of keys, using data previously returned from
+ * getKeyBackupVersion.
+ *
+ * @param {object} info Backup information object as returned by getKeyBackupVersion
+ */
+MatrixClient.prototype.enableKeyBackup = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupInfo = info;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
+    this._crypto.backupKey = new global.Olm.PkEncryption();
+    this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
+
+    this.emit('keyBackupStatus', true);
+
+    this._crypto._maybeSendKeyBackup();
+};
+
+/**
+ * Disable backing up of keys.
+ */
+MatrixClient.prototype.disableKeyBackup = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupInfo = null;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
+    this._crypto.backupKey = null;
+
+    this.emit('keyBackupStatus', false);
+};
+
+/**
+ * Set up the data required to create a new backup version.  The backup version
+ * will not be created and enabled until createKeyBackupVersion is called.
+ *
+ * @returns {object} Object that can be passed to createKeyBackupVersion and
+ *     additionally has a 'recovery_key' member with the user-facing recovery key string.
+ */
+MatrixClient.prototype.prepareKeyBackupVersion = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        const publicKey = decryption.generate_key();
+        return {
+            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+            auth_data: {
+                public_key: publicKey,
+            },
+            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
+        };
+    } finally {
+        decryption.free();
+    }
+};
+
+/**
+ * Create a new key backup version and enable it, using the information return
+ * from prepareKeyBackupVersion.
+ *
+ * @param {object} info Info object from prepareKeyBackupVersion
+ * @returns {Promise<object>} Object with 'version' param indicating the version created
+ */
+MatrixClient.prototype.createKeyBackupVersion = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const data = {
+        algorithm: info.algorithm,
+        auth_data: info.auth_data, // FIXME: should this be cloned?
+    };
+    return this._crypto._signObject(data.auth_data).then(() => {
+        return this._http.authedRequest(
+            undefined, "POST", "/room_keys/version", undefined, data,
+        );
+    }).then((res) => {
+        this.enableKeyBackup({
+            algorithm: info.algorithm,
+            auth_data: info.auth_data,
+            version: res.version,
+        });
+        return res;
+    });
+};
+
+MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    // If we're currently backing up to this backup... stop.
+    // (We start using it automatically in createKeyBackupVersion
+    // so this is symmetrical).
+    if (this._crypto.backupInfo && this._crypto.backupInfo.version === version) {
+        this.disableKeyBackup();
+    }
+
+    const path = utils.encodeUri("/room_keys/version/$version", {
+        $version: version,
+    });
+
+    return this._http.authedRequest(
+        undefined, "DELETE", path, undefined, undefined,
+    );
+};
+
+MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
+    let path;
+    if (sessionId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+    } else if (roomId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId", {
+            $roomId: roomId,
+        });
+    } else {
+        path = "/room_keys/keys";
+    }
+    const queryData = version === undefined ? undefined : { version: version };
+    return {
+        path: path,
+        queryData: queryData,
+    };
+};
+
+/**
+ * Back up session keys to the homeserver.
+ * @param {string} roomId ID of the room that the keys are for Optional.
+ * @param {string} sessionId ID of the session that the keys are for Optional.
+ * @param {integer} version backup version Optional.
+ * @param {object} data Object keys to send
+ * @return {module:client.Promise} a promise that will resolve when the keys
+ * are uploaded
+ */
+MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "PUT", path.path, path.queryData, data,
+    );
+};
+
+MatrixClient.prototype.backupAllGroupSessions = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    return this._crypto.backupAllGroupSessions(version);
+};
+
+MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
+    try {
+        decodeRecoveryKey(recoveryKey);
+        return true;
+    } catch (e) {
+        return false;
+    }
+};
+
+MatrixClient.prototype.restoreKeyBackups = function(
+    recoveryKey, targetRoomId, targetSessionId, version,
+) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    let totalKeyCount = 0;
+    let keys = [];
+
+    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
+
+    // FIXME: see the FIXME in createKeyBackupVersion
+    const privkey = decodeRecoveryKey(recoveryKey);
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        decryption.init_with_private_key(privkey);
+    } catch(e) {
+        decryption.free();
+        throw e;
+    }
+
+    return this._http.authedRequest(
+        undefined, "GET", path.path, path.queryData,
+    ).then((res) => {
+        if (res.rooms) {
+            for (const [roomId, roomData] of Object.entries(res.rooms)) {
+                if (!roomData.sessions) continue;
+
+                totalKeyCount += Object.keys(roomData.sessions).length;
+                const roomKeys = keysFromRecoverySession(
+                    roomData.sessions, decryption, roomId, roomKeys,
+                );
+                for (const k of roomKeys) {
+                    k.room_id = roomId;
+                    keys.push(k);
+                }
+            }
+        } else if (res.sessions) {
+            totalKeyCount = Object.keys(res.sessions).length;
+            keys = keysFromRecoverySession(
+                res.sessions, decryption, targetRoomId, keys,
+            );
+        } else {
+            totalKeyCount = 1;
+            try {
+                const key = keyFromRecoverySession(res, decryption);
+                key.room_id = targetRoomId;
+                key.session_id = targetSessionId;
+                keys.push(key);
+            } catch (e) {
+                console.log("Failed to decrypt session from backup");
+            }
+        }
+
+        return this.importRoomKeys(keys);
+    }).then(() => {
+        return {total: totalKeyCount, imported: keys.length};
+    }).finally(() => {
+        decryption.free();
+    });
+};
+
+MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "DELETE", path.path, path.queryData,
+    );
 };
 
 // Group ops
@@ -3738,6 +4065,24 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * });
  */
 
+/**
+ * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
+ * @event module:client~MatrixClient#"keyBackupStatus"
+ * @param {bool} enabled true if key backup has been enabled, otherwise false
+ * @example
+ * matrixClient.on("keyBackupStatus", function(enabled){
+ *   if (enabled) {
+ *     [...]
+ *   }
+ * });
+ */
+
+/**
+ * Fires when we want to suggest to the user that they restore their megolm keys
+ * from backup or by cross-signing the device.
+ *
+ * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
 
 // EventEmitter JSDocs
 

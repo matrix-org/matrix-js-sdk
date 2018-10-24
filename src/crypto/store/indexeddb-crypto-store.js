@@ -420,6 +420,43 @@ export default class IndexedDBCryptoStore {
         this._backendPromise.value().getEndToEndRooms(txn, func);
     }
 
+    // session backups
+
+    /**
+     * Get the inbound group sessions that need to be backed up.
+     * @param {integer} limit The maximum number of sessions to retrieve.  0
+     * for no limit.
+     * @returns {Promise} resolves to an array of inbound group sessions
+     */
+    getSessionsNeedingBackup(limit) {
+        return this._connect().then((backend) => {
+            return backend.getSessionsNeedingBackup(limit);
+        });
+    }
+
+    /**
+     * Unmark sessions as needing to be backed up.
+     * @param {[object]} sessions The sessions that need to be backed up.
+     * @returns {Promise} resolves when the sessions are unmarked
+     */
+    unmarkSessionsNeedingBackup(sessions) {
+        return this._connect().then((backend) => {
+            return backend.unmarkSessionsNeedingBackup(sessions);
+        });
+    }
+
+    /**
+     * Mark sessions as needing to be backed up.
+     * @param {[object]} sessions The sessions that need to be backed up.
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} resolves when the sessions are marked
+     */
+    markSessionsNeedingBackup(sessions, txn) {
+        return this._connect().then((backend) => {
+            return backend.markSessionsNeedingBackup(sessions, txn);
+        });
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -453,3 +490,4 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
+IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';
