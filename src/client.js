@@ -44,7 +44,6 @@ const ContentHelpers = require("./content-helpers");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
-import {InvalidStoreError} from './errors';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
@@ -52,16 +51,6 @@ import { isCryptoAvailable } from './crypto';
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
 Promise.config({warnings: false});
-
-const LAZY_LOADING_MESSAGES_FILTER = {
-    lazy_load_members: true,
-};
-
-const LAZY_LOADING_SYNC_FILTER = {
-    room: {
-        state: LAZY_LOADING_MESSAGES_FILTER,
-    },
-};
 
 
 const SCROLLBACK_DELAY_MS = 3000;
@@ -770,6 +759,17 @@ MatrixClient.prototype.getGroup = function(groupId) {
  */
 MatrixClient.prototype.getGroups = function() {
     return this.store.getGroups();
+};
+
+/**
+ * Get the config for the media repository.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves with an object containing the config.
+ */
+MatrixClient.prototype.getMediaConfig = function(callback) {
+    return this._http.requestWithPrefix(
+        callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
+    );
 };
 
 // Room ops
@@ -2068,7 +2068,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
 
     let params = undefined;
     if (this._clientOpts.lazyLoadMembers) {
-        params = {filter: JSON.stringify(LAZY_LOADING_MESSAGES_FILTER)};
+        params = {filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER)};
     }
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
@@ -2149,7 +2149,7 @@ function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
     if (this._clientOpts.lazyLoadMembers) {
         // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
         // so the timelineFilter doesn't get written into it below
-        filter = Object.assign({}, LAZY_LOADING_MESSAGES_FILTER);
+        filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
     }
     if (timelineFilter) {
         // XXX: it's horrific that /messages' filter parameter doesn't match
@@ -3106,29 +3106,6 @@ MatrixClient.prototype.startClient = async function(opts) {
     // shallow-copy the opts dict before modifying and storing it
     opts = Object.assign({}, opts);
 
-    if (opts.lazyLoadMembers && this.isGuest()) {
-        opts.lazyLoadMembers = false;
-    }
-    if (opts.lazyLoadMembers) {
-        const supported = await this.doesServerSupportLazyLoading();
-        if (supported) {
-            opts.filter = await this.createFilter(LAZY_LOADING_SYNC_FILTER);
-        } else {
-            console.log("LL: lazy loading requested but not supported " +
-                "by server, so disabling");
-            opts.lazyLoadMembers = false;
-        }
-    }
-    // need to vape the store when enabling LL and wasn't enabled before
-    const shouldClear = await this._wasLazyLoadingToggled(opts.lazyLoadMembers);
-    if (shouldClear) {
-        const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-        throw new InvalidStoreError(reason, !!opts.lazyLoadMembers);
-    }
-    if (opts.lazyLoadMembers && this._crypto) {
-        this._crypto.enableLazyLoading();
-    }
-
     opts.crypto = this._crypto;
     opts.canResetEntireTimeline = (roomId) => {
         if (!this._canResetTimelineCallback) {
@@ -3137,29 +3114,8 @@ MatrixClient.prototype.startClient = async function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-    await this._storeClientOptions(this._clientOpts);
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
-};
-
-/**
- * Is the lazy loading option different than in previous session?
- * @param {bool} lazyLoadMembers current options for lazy loading
- * @return {bool} whether or not the option has changed compared to the previous session */
-MatrixClient.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
-    lazyLoadMembers = !!lazyLoadMembers;
-    // assume it was turned off before
-    // if we don't know any better
-    let lazyLoadMembersBefore = false;
-    const isStoreNewlyCreated = await this.store.isNewlyCreated();
-    if (!isStoreNewlyCreated) {
-        const prevClientOptions = await this.store.getClientOptions();
-        if (prevClientOptions) {
-            lazyLoadMembersBefore = !!prevClientOptions.lazyLoadMembers;
-        }
-        return lazyLoadMembersBefore !== lazyLoadMembers;
-    }
-    return false;
 };
 
 /**
@@ -3168,9 +3124,9 @@ MatrixClient.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) 
  * created with (e.g. lazy loading)
  * @param {object} opts the complete set of client options
  * @return {Promise} for store operation */
-MatrixClient.prototype._storeClientOptions = function(opts) {
+MatrixClient.prototype._storeClientOptions = function() {
     const primTypes = ["boolean", "string", "number"];
-    const serializableOpts = Object.entries(opts)
+    const serializableOpts = Object.entries(this._clientOpts)
         .filter(([key, value]) => {
             return primTypes.includes(typeof value);
         })

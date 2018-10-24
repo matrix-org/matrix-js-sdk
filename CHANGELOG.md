@@ -1,3 +1,47 @@
+Changes in [0.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0) (2018-10-16)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.0-rc.1...v0.12.0)
+
+ * No changes since rc.1
+
+Changes in [0.12.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0-rc.1) (2018-10-11)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1...v0.12.0-rc.1)
+
+BREAKING CHANGES
+----------------
+ * If js-sdk finds data in the store that is incompatible with the options currently being used,
+   it will emit sync state ERROR with an error of type InvalidStoreError. It will also stop trying
+   to sync in this situation: the app must stop the client and then either clear the store or
+   change the options (in this case, enable or disable lazy loading of members) and then start
+   the client again.
+
+All Changes
+-----------
+
+ * never replace /sync'ed memberships with OOB ones
+   [\#760](https://github.com/matrix-org/matrix-js-sdk/pull/760)
+ * Don't fail to start up if lazy load check fails
+   [\#759](https://github.com/matrix-org/matrix-js-sdk/pull/759)
+ * Make e2e work on Edge
+   [\#754](https://github.com/matrix-org/matrix-js-sdk/pull/754)
+ * throw error with same name and message over idb worker boundary
+   [\#758](https://github.com/matrix-org/matrix-js-sdk/pull/758)
+ * Default to a room version of 1 when there is no room create event
+   [\#755](https://github.com/matrix-org/matrix-js-sdk/pull/755)
+ * Silence bluebird warnings
+   [\#757](https://github.com/matrix-org/matrix-js-sdk/pull/757)
+ * allow non-ff merge from release branch into master
+   [\#750](https://github.com/matrix-org/matrix-js-sdk/pull/750)
+ * Reject with the actual error on indexeddb error
+   [\#751](https://github.com/matrix-org/matrix-js-sdk/pull/751)
+ * Update mocha to v5
+   [\#744](https://github.com/matrix-org/matrix-js-sdk/pull/744)
+ * disable lazy loading for guests as they cant create filters
+   [\#748](https://github.com/matrix-org/matrix-js-sdk/pull/748)
+ * Revert "Add getMediaLimits to client"
+   [\#745](https://github.com/matrix-org/matrix-js-sdk/pull/745)
+
 Changes in [0.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1) (2018-10-01)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1-rc.1...v0.11.1)

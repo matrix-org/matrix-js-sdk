@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -21,6 +21,7 @@
     "prepublish": "npm run clean && npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
+    "type": "git",
     "url": "https://github.com/matrix-org/matrix-js-sdk"
   },
   "keywords": [

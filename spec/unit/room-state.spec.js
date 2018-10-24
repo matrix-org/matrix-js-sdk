@@ -299,69 +299,31 @@ describe("RoomState", function() {
             expect(eventReceived).toEqual(true);
         });
 
-        it("should overwrite existing members", function() {
+        it("should never overwrite existing members", function() {
             const oobMemberEvent = utils.mkMembership({
                 user: userA, mship: "join", room: roomId, event: true,
             });
             state.markOutOfBandMembersStarted();
             state.setOutOfBandMembers([oobMemberEvent]);
             const memberA = state.getMember(userA);
-            expect(memberA.events.member.getId()).toEqual(oobMemberEvent.getId());
-            expect(memberA.isOutOfBand()).toEqual(true);
-        });
-
-        it("should allow later state events to overwrite", function() {
-            const oobMemberEvent = utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
-            });
-            const memberEvent = utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
-            });
-
-            state.markOutOfBandMembersStarted();
-            state.setOutOfBandMembers([oobMemberEvent]);
-            state.setStateEvents([memberEvent]);
-
-            const memberA = state.getMember(userA);
-            expect(memberA.events.member.getId()).toEqual(memberEvent.getId());
+            expect(memberA.events.member.getId()).toNotEqual(oobMemberEvent.getId());
             expect(memberA.isOutOfBand()).toEqual(false);
         });
 
         it("should emit members when updating a member", function() {
+            const doesntExistYetUserId = "@doesntexistyet:hs";
             const oobMemberEvent = utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
+                user: doesntExistYetUserId, mship: "join", room: roomId, event: true,
             });
             let eventReceived = false;
             state.once('RoomState.members', (_, __, member) => {
-                expect(member.userId).toEqual(userA);
+                expect(member.userId).toEqual(doesntExistYetUserId);
                 eventReceived = true;
             });
 
             state.markOutOfBandMembersStarted();
             state.setOutOfBandMembers([oobMemberEvent]);
             expect(eventReceived).toEqual(true);
-        });
-
-
-        it("should not overwrite members updated since starting loading oob",
-        function() {
-            const oobMemberEvent = utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
-            });
-
-            const existingMemberEvent = utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
-            });
-
-            state.markOutOfBandMembersStarted();
-            state.setStateEvents([existingMemberEvent]);
-            expect(state.getMember(userA).supersedesOutOfBand()).toEqual(true);
-            state.setOutOfBandMembers([oobMemberEvent]);
-
-            const memberA = state.getMember(userA);
-            expect(memberA.events.member.getId()).toEqual(existingMemberEvent.getId());
-            expect(memberA.isOutOfBand()).toEqual(false);
-            expect(memberA.supersedesOutOfBand()).toEqual(false);
         });
     });
 
@@ -384,20 +346,6 @@ describe("RoomState", function() {
             expect(Object.keys(state.members)).toEqual(Object.keys(copy.members));
             // check join count
             expect(state.getJoinedMemberCount()).toEqual(copy.getJoinedMemberCount());
-        });
-
-        it("should copy supersedes flag when OOB loading is progress",
-        function() {
-            // include OOB members in copy
-            state.markOutOfBandMembersStarted();
-            state.setStateEvents([utils.mkMembership({
-                user: userA, mship: "join", room: roomId, event: true,
-            })]);
-            const copy = state.clone();
-            const memberA = state.getMember(userA);
-            const memberACopy = copy.getMember(userA);
-            expect(memberA.supersedesOutOfBand()).toEqual(true);
-            expect(memberACopy.supersedesOutOfBand()).toEqual(true);
         });
 
         it("should mark old copy as not waiting for out of band anymore", function() {

@@ -201,22 +201,6 @@ describe("RoomMember", function() {
         });
     });
 
-    describe("supersedesOutOfBand", function() {
-        it("should be set by markSupersedesOutOfBand", function() {
-            const member = new RoomMember();
-            expect(member.supersedesOutOfBand()).toEqual(false);
-            member.markSupersedesOutOfBand();
-            expect(member.supersedesOutOfBand()).toEqual(true);
-        });
-        it("should be cleared by clearSupersedesOutOfBand", function() {
-            const member = new RoomMember();
-            member.markSupersedesOutOfBand();
-            expect(member.supersedesOutOfBand()).toEqual(true);
-            member.clearSupersedesOutOfBand();
-            expect(member.supersedesOutOfBand()).toEqual(false);
-        });
-    });
-
     describe("setMembershipEvent", function() {
         const joinEvent = utils.mkMembership({
             event: true,
