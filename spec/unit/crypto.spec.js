@@ -18,6 +18,6 @@ describe("Crypto", function() {
     });
 
     it("Crypto exposes the correct olm library version", function() {
-        expect(Crypto.getOlmVersion()[0]).toEqual(2);
+        expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 });
