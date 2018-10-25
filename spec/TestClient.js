@@ -102,6 +102,7 @@ TestClient.prototype.start = function() {
 
 /**
  * stop the client
+ * @return {Promise} Resolves once the mock http backend has finished all pending flushes
  */
 TestClient.prototype.stop = function() {
     this.client.stopClient();
