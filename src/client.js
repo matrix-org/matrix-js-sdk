@@ -968,7 +968,8 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         }
 
         const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
-        return self._http.authedRequest(undefined, "POST", path, queryString, data, reqOpts);
+        return self._http.authedRequest(
+            undefined, "POST", path, queryString, data, reqOpts);
     }).then(function(res) {
         const roomId = res.room_id;
         const syncApi = new SyncApi(self, self._clientOpts);

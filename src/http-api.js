@@ -668,9 +668,6 @@ module.exports.MatrixHttpApi.prototype = {
      * @param {function=} opts.bodyParser function to parse the body of the
      *    response before passing it to the promise and callback.
      *
-     * @param (object=} opts.qsStringifyOptions options for stringifying the
-     *    query string.
-     *
      * @return {module:client.Promise} a promise which resolves to either the
      * response object (if this.opts.onlyData is truthy), or the parsed
      * body. Rejects
