@@ -338,6 +338,7 @@ Crypto.prototype.start = function() {
 /** Stop background processes related to crypto */
 Crypto.prototype.stop = function() {
     this._outgoingRoomKeyRequestManager.stop();
+    this._deviceList.stop();
 };
 
 /**
