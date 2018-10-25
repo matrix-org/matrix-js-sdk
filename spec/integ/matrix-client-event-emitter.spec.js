@@ -30,6 +30,7 @@ describe("MatrixClient events", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
+        return httpBackend.stop();
     });
 
     describe("emissions", function() {

@@ -410,10 +410,10 @@ describe("MatrixClient crypto", function() {
     });
 
     afterEach(function() {
-        aliTestClient.stop();
         aliTestClient.httpBackend.verifyNoOutstandingExpectation();
-        bobTestClient.stop();
         bobTestClient.httpBackend.verifyNoOutstandingExpectation();
+
+        return Promise.all([aliTestClient.stop(), bobTestClient.stop()]);
     });
 
     it("Bob uploads device keys", function() {

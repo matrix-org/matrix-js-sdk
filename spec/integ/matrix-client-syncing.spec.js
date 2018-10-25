@@ -38,6 +38,7 @@ describe("MatrixClient syncing", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
+        return httpBackend.stop();
     });
 
     describe("startClient", function() {

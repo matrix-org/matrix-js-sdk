@@ -17,6 +17,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../../logger';
 import utils from '../../utils';
 
 /**
@@ -71,7 +72,7 @@ export default class MemoryCryptoStore {
 
             if (existing) {
                 // this entry matches the request - return it.
-                console.log(
+                logger.log(
                     `already have key request outstanding for ` +
                     `${requestBody.room_id} / ${requestBody.session_id}: ` +
                     `not sending another`,
@@ -81,7 +82,7 @@ export default class MemoryCryptoStore {
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            console.log(
+            logger.log(
                 `enqueueing key request for ${requestBody.room_id} / ` +
                 requestBody.session_id,
             );
@@ -163,7 +164,7 @@ export default class MemoryCryptoStore {
             }
 
             if (req.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${req.state}`,
                 );
@@ -194,7 +195,7 @@ export default class MemoryCryptoStore {
             }
 
             if (req.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot delete room key request in state ${req.state} `
                     + `(expected ${expectedState})`,
                 );
