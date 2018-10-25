@@ -22,6 +22,7 @@ limitations under the License.
  */
 import Promise from 'bluebird';
 
+const logger = require("../../logger");
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const DeviceInfo = require("../deviceinfo");
@@ -273,7 +274,7 @@ OlmDecryption.prototype._decryptMessage = async function(
             const payload = await this._olmDevice.decryptMessage(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
-            console.log(
+            logger.log(
                 "Decrypted Olm message from " + theirDeviceIdentityKey +
                     " with session " + sessionId,
             );
@@ -328,7 +329,7 @@ OlmDecryption.prototype._decryptMessage = async function(
         );
     }
 
-    console.log(
+    logger.log(
         "created new inbound Olm session ID " +
             res.session_id + " with " + theirDeviceIdentityKey,
     );
