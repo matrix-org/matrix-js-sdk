@@ -29,13 +29,8 @@ import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js'
 import MockStorageApi from '../../MockStorageApi';
 import testUtils from '../../test-utils';
 
-// Crypto and OlmDevice won't import unless we have global.Olm
-let OlmDevice;
-let Crypto;
-if (global.Olm) {
-    OlmDevice = require('../../../lib/crypto/OlmDevice');
-    Crypto = require('../../../lib/crypto');
-}
+import OlmDevice from '../../../lib/crypto/OlmDevice';
+import Crypto from '../../../lib/crypto';
 
 const Olm = global.Olm;
 
