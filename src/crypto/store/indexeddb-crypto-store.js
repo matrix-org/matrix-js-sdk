@@ -17,6 +17,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../../logger';
 import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
@@ -64,7 +65,7 @@ export default class IndexedDBCryptoStore {
                 return;
             }
 
-            console.log(`connecting to indexeddb ${this._dbName}`);
+            logger.log(`connecting to indexeddb ${this._dbName}`);
 
             const req = this._indexedDB.open(
                 this._dbName, IndexedDBCryptoStoreBackend.VERSION,
@@ -77,7 +78,7 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onblocked = () => {
-                console.log(
+                logger.log(
                     `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
@@ -89,7 +90,7 @@ export default class IndexedDBCryptoStore {
             req.onsuccess = (r) => {
                 const db = r.target.result;
 
-                console.log(`connected to indexeddb ${this._dbName}`);
+                logger.log(`connected to indexeddb ${this._dbName}`);
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
         }).then((backend) => {
@@ -106,13 +107,13 @@ export default class IndexedDBCryptoStore {
                 },
             );
         }).catch((e) => {
-            console.warn(
+            logger.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to localStorage store: ${e}`,
             );
             return new LocalStorageCryptoStore(global.localStorage);
         }).catch((e) => {
-            console.warn(
+            logger.warn(
                 `unable to open localStorage: falling back to in-memory store: ${e}`,
             );
             return new MemoryCryptoStore();
@@ -133,11 +134,11 @@ export default class IndexedDBCryptoStore {
                 return;
             }
 
-            console.log(`Removing indexeddb instance: ${this._dbName}`);
+            logger.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this._indexedDB.deleteDatabase(this._dbName);
 
             req.onblocked = () => {
-                console.log(
+                logger.log(
                     `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
@@ -147,14 +148,14 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onsuccess = () => {
-                console.log(`Removed indexeddb instance: ${this._dbName}`);
+                logger.log(`Removed indexeddb instance: ${this._dbName}`);
                 resolve();
             };
         }).catch((e) => {
             // in firefox, with indexedDB disabled, this fails with a
             // DOMError. We treat this as non-fatal, so that people can
             // still use the app.
-            console.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
+            logger.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
     }
 

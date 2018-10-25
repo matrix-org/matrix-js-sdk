@@ -24,6 +24,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+const logger = require("../../logger");
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const base = require("./base");
@@ -65,7 +66,7 @@ OutboundSessionInfo.prototype.needsRotation = function(
     if (this.useCount >= rotationPeriodMsgs ||
         sessionLifetime >= rotationPeriodMs
        ) {
-        console.log(
+        logger.log(
             "Rotating megolm session after " + this.useCount +
                 " messages, " + sessionLifetime + "ms",
         );
@@ -103,7 +104,7 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
         }
 
         if (!devicesInRoom.hasOwnProperty(userId)) {
-            console.log("Starting new session because we shared with " + userId);
+            logger.log("Starting new session because we shared with " + userId);
             return true;
         }
 
@@ -113,7 +114,7 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
             }
 
             if (!devicesInRoom[userId].hasOwnProperty(deviceId)) {
-                console.log(
+                logger.log(
                     "Starting new session because we shared with " +
                         userId + ":" + deviceId,
                 );
@@ -182,7 +183,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         if (session && session.needsRotation(self._sessionRotationPeriodMsgs,
                                              self._sessionRotationPeriodMs)
            ) {
-            console.log("Starting new megolm session because we need to rotate.");
+            logger.log("Starting new megolm session because we need to rotate.");
             session = null;
         }
 
@@ -192,7 +193,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         }
 
         if (!session) {
-            console.log(`Starting new megolm session for room ${self._roomId}`);
+            logger.log(`Starting new megolm session for room ${self._roomId}`);
             session = await self._prepareNewSession();
         }
 
@@ -327,7 +328,7 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
                 continue;
             }
 
-            console.log(
+            logger.log(
                 "share keys with device " + userId + ":" + deviceId,
             );
 
@@ -449,10 +450,10 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
             await this._encryptAndSendKeysToDevices(
                 session, key.chain_index, userDeviceMaps[i], payload,
             );
-            console.log(`Completed megolm keyshare in ${this._roomId} `
+            logger.log(`Completed megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length})`);
         } catch (e) {
-            console.log(`megolm keyshare in ${this._roomId} `
+            logger.log(`megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
             throw e;
@@ -471,7 +472,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
  */
 MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     const self = this;
-    console.log(`Starting to encrypt event for ${this._roomId}`);
+    logger.log(`Starting to encrypt event for ${this._roomId}`);
 
     return this._getDevicesInRoom(room).then(function(devicesInRoom) {
         // check if any of these devices are not yet known to the user.
@@ -790,12 +791,12 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         !sessionId ||
         !content.session_key
        ) {
-        console.error("key event is missing fields");
+        logger.error("key event is missing fields");
         return;
     }
 
     if (!senderKey) {
-        console.error("key event has no sender key (not encrypted?)");
+        logger.error("key event has no sender key (not encrypted?)");
         return;
     }
 
@@ -812,13 +813,13 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
         senderKey = content.sender_key;
         if (!senderKey) {
-            console.error("forwarded_room_key event is missing sender_key field");
+            logger.error("forwarded_room_key event is missing sender_key field");
             return;
         }
 
         const ed25519Key = content.sender_claimed_ed25519_key;
         if (!ed25519Key) {
-            console.error(
+            logger.error(
                 `forwarded_room_key_event is missing sender_claimed_ed25519_key field`,
             );
             return;
@@ -831,7 +832,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         keysClaimed = event.getKeysClaimed();
     }
 
-    console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
+    logger.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
     return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
@@ -857,7 +858,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
             );
         }
     }).catch((e) => {
-        console.error(`Error handling m.room_key_event: ${e}`);
+        logger.error(`Error handling m.room_key_event: ${e}`);
     });
 };
 
@@ -899,7 +900,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             return null;
         }
 
-        console.log(
+        logger.log(
             "sharing keys for session " + body.sender_key + "|"
             + body.session_id + " with device "
             + userId + ":" + deviceId,

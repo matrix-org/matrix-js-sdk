@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
+
+import logger from '../../logger';
 import MemoryCryptoStore from './memory-crypto-store.js';
 
 /**
@@ -251,8 +253,8 @@ function getJsonItem(store, key) {
         // JSON.parse(null) === null, so this returns null.
         return JSON.parse(store.getItem(key));
     } catch (e) {
-        console.log("Error: Failed to get key %s: %s", key, e.stack || e);
-        console.log(e.stack);
+        logger.log("Error: Failed to get key %s: %s", key, e.stack || e);
+        logger.log(e.stack);
     }
     return null;
 }

@@ -97,7 +97,7 @@ describe("DeviceList management:", function() {
     });
 
     afterEach(function() {
-        aliceTestClient.stop();
+        return aliceTestClient.stop();
     });
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {

@@ -130,6 +130,7 @@ describe("MatrixClient room timelines", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
+        return httpBackend.stop();
     });
 
     describe("local echo events", function() {

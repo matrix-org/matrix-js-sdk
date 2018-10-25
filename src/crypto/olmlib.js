@@ -23,6 +23,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
+const logger = require("../logger");
 const utils = require("../utils");
 
 /**
@@ -70,7 +71,7 @@ module.exports.encryptMessageForDevice = async function(
         return;
     }
 
-    console.log(
+    logger.log(
         "Using sessionid " + sessionId + " for device " +
             recipientUserId + ":" + recipientDevice.deviceId,
     );
@@ -195,7 +196,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
             }
 
             if (!oneTimeKey) {
-                console.warn(
+                logger.warn(
                     "No one-time keys (alg=" + oneTimeKeyAlgorithm +
                         ") for device " + userId + ":" + deviceId,
                 );
@@ -224,7 +225,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
             deviceInfo.getFingerprint(),
         );
     } catch (e) {
-        console.error(
+        logger.error(
             "Unable to verify signature on one-time key for device " +
                 userId + ":" + deviceId + ":", e,
         );
@@ -238,12 +239,12 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
         );
     } catch (e) {
         // possibly a bad key
-        console.error("Error starting session with device " +
+        logger.error("Error starting session with device " +
                       userId + ":" + deviceId + ": " + e);
         return null;
     }
 
-    console.log("Started new sessionid " + sid +
+    logger.log("Started new sessionid " + sid +
                 " for device " + userId + ":" + deviceId);
     return sid;
 }

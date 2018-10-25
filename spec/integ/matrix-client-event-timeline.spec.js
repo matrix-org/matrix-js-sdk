@@ -111,6 +111,7 @@ describe("getEventTimeline support", function() {
         if (client) {
             client.stopClient();
         }
+        return httpBackend.stop();
     });
 
     it("timeline support must be enabled to work", function(done) {
