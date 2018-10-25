@@ -25,6 +25,7 @@ const anotherjson = require('another-json');
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
+const logger = require("../logger");
 const utils = require("../utils");
 const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");
@@ -35,6 +36,10 @@ const DeviceList = require('./DeviceList').default;
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+
+export function isCryptoAvailable() {
+    return Boolean(global.Olm);
+}
 
 /**
  * Cryptography bits
@@ -62,7 +67,7 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  *
  * @param {RoomList} roomList An initialised RoomList object
  */
-function Crypto(baseApis, sessionStore, userId, deviceId,
+export default function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore, roomList) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -124,6 +129,8 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    await global.Olm.init();
+
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
     await this._cryptoStore.doTxn(
@@ -196,7 +203,7 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
         try {
             crypto._onRoomMembership(event, member, oldMembership);
         } catch (e) {
-             console.error("Error handling membership change:", e);
+             logger.error("Error handling membership change:", e);
         }
     });
 
@@ -381,7 +388,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         // create any more keys.
         return uploadLoop(keyCount);
     }).catch((e) => {
-        console.error("Error uploading one-time keys", e.stack || e);
+        logger.error("Error uploading one-time keys", e.stack || e);
     }).finally(() => {
         // reset _oneTimeKeyCount to prevent start uploading based on old data.
         // it will be set again on the next /sync-response
@@ -606,13 +613,13 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 
     const claimedKey = event.getClaimedEd25519Key();
     if (!claimedKey) {
-        console.warn("Event " + event.getId() + " claims no ed25519 key: " +
+        logger.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
         return null;
     }
 
     if (claimedKey !== device.getFingerprint()) {
-        console.warn(
+        logger.warn(
             "Event " + event.getId() + " claims ed25519 key " + claimedKey +
                 "but sender device has key " + device.getFingerprint());
         return null;
@@ -658,7 +665,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     const existingConfig = this._roomList.getRoomEncryption(roomId);
     if (existingConfig) {
         if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
-            console.error("Ignoring m.room.encryption event which requests " +
+            logger.error("Ignoring m.room.encryption event which requests " +
                           "a change of config in " + roomId);
             return;
         }
@@ -705,7 +712,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     }
 
     if (!this._lazyLoadMembers) {
-        console.log("Enabling encryption in " + roomId + "; " +
+        logger.log("Enabling encryption in " + roomId + "; " +
             "starting to track device lists for all users therein");
 
         await this.trackRoomDevices(roomId);
@@ -717,7 +724,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
             this._deviceList.refreshOutdatedDeviceLists();
         }
     } else {
-        console.log("Enabling encryption in " + roomId);
+        logger.log("Enabling encryption in " + roomId);
     }
 };
 
@@ -738,7 +745,7 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
         if (!room) {
             throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
         }
-        console.log(`Starting to track devices for room ${roomId} ...`);
+        logger.log(`Starting to track devices for room ${roomId} ...`);
         const members = await room.getEncryptionTargetMembers();
         members.forEach((m) => {
             this._deviceList.startTrackingDeviceList(m.userId);
@@ -834,7 +841,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
     return Promise.map(
         keys, (key) => {
             if (!key.room_id || !key.algorithm) {
-                console.warn("ignoring room key entry with missing fields", key);
+                logger.warn("ignoring room key entry with missing fields", key);
                 return null;
             }
 
@@ -963,7 +970,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
         requestBody, recipients,
     ).catch((e) => {
         // this normally means we couldn't talk to the store
-        console.error(
+        logger.error(
             'Error requesting key for event', e,
         );
     }).done();
@@ -980,7 +987,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
 Crypto.prototype.cancelRoomKeyRequest = function(requestBody, andResend) {
     this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody, andResend)
     .catch((e) => {
-        console.warn("Error clearing pending room key requests", e);
+        logger.warn("Error clearing pending room key requests", e);
     }).done();
 };
 
@@ -998,7 +1005,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
         // finished processing the sync, in onSyncCompleted.
         await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
-        console.error("Error configuring encryption in room " + roomId +
+        logger.error("Error configuring encryption in room " + roomId +
                       ":", e);
     }
 };
@@ -1014,7 +1021,7 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         // scratch, so mark everything as untracked. onCryptoEvent will
         // be called for all e2e rooms during the processing of the sync,
         // at which point we'll start tracking all the users of that room.
-        console.log("Initial sync performed - resetting device tracking state");
+        logger.log("Initial sync performed - resetting device tracking state");
         this._deviceList.stopTrackingAllDeviceLists();
         this._roomDeviceTrackingState = {};
     }
@@ -1132,7 +1139,7 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             });
         }
     } catch (e) {
-        console.error("Error handling toDeviceEvent:", e);
+        logger.error("Error handling toDeviceEvent:", e);
     }
 };
 
@@ -1146,7 +1153,7 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     const content = event.getContent();
 
     if (!content.room_id || !content.algorithm) {
-        console.error("key event is missing fields");
+        logger.error("key event is missing fields");
         return;
     }
 
@@ -1184,12 +1191,12 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
     // by calling _trackRoomDevices
     if (this._roomDeviceTrackingState[roomId]) {
         if (member.membership == 'join') {
-            console.log('Join event for ' + member.userId + ' in ' + roomId);
+            logger.log('Join event for ' + member.userId + ' in ' + roomId);
             // make sure we are tracking the deviceList for this user
             this._deviceList.startTrackingDeviceList(member.userId);
         } else if (member.membership == 'invite' &&
                  this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
-            console.log('Invite event for ' + member.userId + ' in ' + roomId);
+            logger.log('Invite event for ' + member.userId + ' in ' + roomId);
             this._deviceList.startTrackingDeviceList(member.userId);
         }
     }
@@ -1256,7 +1263,7 @@ Crypto.prototype._processReceivedRoomKeyRequests = async function() {
                 this._processReceivedRoomKeyRequestCancellation(cancellation),
         );
     } catch (e) {
-        console.error(`Error processing room key requsts: ${e}`);
+        logger.error(`Error processing room key requsts: ${e}`);
     } finally {
         this._processingRoomKeyRequests = false;
     }
@@ -1275,13 +1282,13 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     const roomId = body.room_id;
     const alg = body.algorithm;
 
-    console.log(`m.room_key_request from ${userId}:${deviceId}` +
+    logger.log(`m.room_key_request from ${userId}:${deviceId}` +
                 ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
     if (userId !== this._userId) {
         // TODO: determine if we sent this device the keys already: in
         // which case we can do so again.
-        console.log("Ignoring room key request from other user for now");
+        logger.log("Ignoring room key request from other user for now");
         return;
     }
 
@@ -1291,18 +1298,18 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     // if we don't have a decryptor for this room/alg, we don't have
     // the keys for the requested events, and can drop the requests.
     if (!this._roomDecryptors[roomId]) {
-        console.log(`room key request for unencrypted room ${roomId}`);
+        logger.log(`room key request for unencrypted room ${roomId}`);
         return;
     }
 
     const decryptor = this._roomDecryptors[roomId][alg];
     if (!decryptor) {
-        console.log(`room key request for unknown alg ${alg} in room ${roomId}`);
+        logger.log(`room key request for unknown alg ${alg} in room ${roomId}`);
         return;
     }
 
     if (!await decryptor.hasKeysForKeyRequest(req)) {
-        console.log(
+        logger.log(
             `room key request for unknown session ${roomId} / ` +
                 body.session_id,
         );
@@ -1316,7 +1323,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     // if the device is is verified already, share the keys
     const device = this._deviceList.getStoredDevice(userId, deviceId);
     if (device && device.isVerified()) {
-        console.log('device is already verified: sharing keys');
+        logger.log('device is already verified: sharing keys');
         req.share();
         return;
     }
@@ -1333,7 +1340,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
 Crypto.prototype._processReceivedRoomKeyRequestCancellation = async function(
     cancellation,
 ) {
-    console.log(
+    logger.log(
         `m.room_key_request cancellation for ${cancellation.userId}:` +
             `${cancellation.deviceId} (id ${cancellation.requestId})`,
     );
@@ -1518,6 +1525,3 @@ class IncomingRoomKeyRequestCancellation {
  * @event module:client~MatrixClient#"crypto.warning"
  * @param {string} type One of the strings listed above
  */
-
-/** */
-module.exports = Crypto;

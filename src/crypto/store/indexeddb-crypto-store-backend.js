@@ -16,6 +16,8 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
+
+import logger from '../../logger';
 import utils from '../../utils';
 
 export const VERSION = 6;
@@ -38,7 +40,7 @@ export class Backend {
         // attempts to delete the database will block (and subsequent
         // attempts to re-create it will also block).
         db.onversionchange = (ev) => {
-            console.log(`versionchange for indexeddb ${this._dbName}: closing`);
+            logger.log(`versionchange for indexeddb ${this._dbName}: closing`);
             db.close();
         };
     }
@@ -64,7 +66,7 @@ export class Backend {
         this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
             if (existing) {
                 // this entry matches the request - return it.
-                console.log(
+                logger.log(
                     `already have key request outstanding for ` +
                         `${requestBody.room_id} / ${requestBody.session_id}: ` +
                         `not sending another`,
@@ -75,7 +77,7 @@ export class Backend {
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            console.log(
+            logger.log(
                 `enqueueing key request for ${requestBody.room_id} / ` +
                     requestBody.session_id,
             );
@@ -226,7 +228,7 @@ export class Backend {
             }
             const data = cursor.value;
             if (data.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${data.state}`,
                 );
@@ -264,7 +266,7 @@ export class Backend {
             }
             const data = cursor.value;
             if (data.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot delete room key request in state ${data.state} `
                         + `(expected ${expectedState})`,
                 );
@@ -400,7 +402,7 @@ export class Backend {
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction
                 ev.preventDefault();
-                console.log(
+                logger.log(
                     "Ignoring duplicate inbound group session: " +
                     senderCurve25519Key + " / " + sessionId,
                 );
@@ -471,7 +473,7 @@ export class Backend {
 }
 
 export function upgradeDatabase(db, oldVersion) {
-    console.log(
+    logger.log(
         `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
             + ` to ${VERSION}`,
     );

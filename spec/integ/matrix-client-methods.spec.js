@@ -41,6 +41,7 @@ describe("MatrixClient", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     describe("uploadContent", function() {
