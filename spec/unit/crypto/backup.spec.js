@@ -441,6 +441,10 @@ describe("MegolmBackup", function() {
             return client.initCrypto();
         });
 
+        afterEach(function() {
+            client.stopClient();
+        });
+
         it('can restore from backup', function() {
             client._http.authedRequest = function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
