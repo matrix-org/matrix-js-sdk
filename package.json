@@ -74,7 +74,7 @@
     "istanbul": "^0.4.5",
     "jsdoc": "^3.5.5",
     "lolex": "^1.5.2",
-    "matrix-mock-request": "^1.2.0",
+    "matrix-mock-request": "^1.2.2",
     "mocha": "^5.2.0",
     "mocha-jenkins-reporter": "^0.4.0",
     "rimraf": "^2.5.4",
