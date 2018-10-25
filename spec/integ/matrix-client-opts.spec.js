@@ -64,6 +64,7 @@ describe("MatrixClient opts", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     describe("without opts.store", function() {

@@ -105,6 +105,7 @@ TestClient.prototype.start = function() {
  */
 TestClient.prototype.stop = function() {
     this.client.stopClient();
+    return this.httpBackend.stop();
 };
 
 /**

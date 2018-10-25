@@ -296,7 +296,7 @@ describe("megolm", function() {
     });
 
     afterEach(function() {
-        aliceTestClient.stop();
+        return aliceTestClient.stop();
     });
 
     it("Alice receives a megolm message", function() {
