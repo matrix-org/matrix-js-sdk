@@ -13,19 +13,15 @@ import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
-
-// Crypto and OlmDevice won't import unless we have global.Olm
-let OlmDevice;
-let Crypto;
-if (global.Olm) {
-    OlmDevice = require('../../../../lib/crypto/OlmDevice');
-    Crypto = require('../../../../lib/crypto');
-}
+import OlmDevice from '../../../../lib/crypto/OlmDevice';
+import Crypto from '../../../../lib/crypto';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';
+
+const Olm = global.Olm;
 
 describe("MegolmDecryption", function() {
     if (!global.Olm) {
@@ -69,7 +65,8 @@ describe("MegolmDecryption", function() {
 
     describe('receives some keys:', function() {
         let groupSession;
-        beforeEach(function() {
+        beforeEach(async function() {
+            await Olm.init();
             groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -98,7 +95,7 @@ describe("MegolmDecryption", function() {
                 },
             };
 
-            return event.attemptDecryption(mockCrypto).then(() => {
+            await event.attemptDecryption(mockCrypto).then(() => {
                 megolmDecryption.onRoomKeyEvent(event);
             });
         });

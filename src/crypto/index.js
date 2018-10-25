@@ -37,6 +37,10 @@ const DeviceList = require('./DeviceList').default;
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
+export function isCryptoAvailable() {
+    return Boolean(global.Olm);
+}
+
 /**
  * Cryptography bits
  *
@@ -63,7 +67,7 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  *
  * @param {RoomList} roomList An initialised RoomList object
  */
-function Crypto(baseApis, sessionStore, userId, deviceId,
+export default function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore, roomList) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -125,6 +129,8 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    await global.Olm.init();
+
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
     await this._cryptoStore.doTxn(
@@ -1519,6 +1525,3 @@ class IncomingRoomKeyRequestCancellation {
  * @event module:client~MatrixClient#"crypto.warning"
  * @param {string} type One of the strings listed above
  */
-
-/** */
-module.exports = Crypto;
