@@ -20,7 +20,7 @@ import Promise from 'bluebird';
 import logger from '../../logger';
 import utils from '../../utils';
 
-export const VERSION = 6;
+export const VERSION = 7;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
