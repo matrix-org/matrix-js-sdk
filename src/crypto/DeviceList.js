@@ -146,6 +146,12 @@ export default class DeviceList {
         }
     }
 
+    stop() {
+        if (this._saveTimer !== null) {
+            clearTimeout(this._saveTimer);
+        }
+    }
+
     /**
      * Save the device tracking state to storage, if any changes are
      * pending other than updating the sync token

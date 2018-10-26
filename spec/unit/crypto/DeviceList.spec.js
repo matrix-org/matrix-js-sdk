@@ -59,14 +59,23 @@ describe('DeviceList', function() {
     let downloadSpy;
     let sessionStore;
     let cryptoStore;
+    let deviceLists = [];
 
     beforeEach(function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+
+        deviceLists = [];
 
         downloadSpy = expect.createSpy();
         const mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
         cryptoStore = new MemoryCryptoStore();
+    });
+
+    afterEach(function() {
+        for (const dl of deviceLists) {
+            dl.stop();
+        }
     });
 
     function createTestDeviceList() {
@@ -76,7 +85,9 @@ describe('DeviceList', function() {
         const mockOlm = {
             verifySignature: function(key, message, signature) {},
         };
-        return new DeviceList(baseApis, cryptoStore, sessionStore, mockOlm);
+        const dl = new DeviceList(baseApis, cryptoStore, sessionStore, mockOlm);
+        deviceLists.push(dl);
+        return dl;
     }
 
     it("should successfully download and store device keys", function() {
