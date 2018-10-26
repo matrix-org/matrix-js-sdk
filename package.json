@@ -58,6 +58,7 @@
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
     "content-type": "^1.0.2",
+    "loglevel": "1.6.1",
     "request": "^2.53.0"
   },
   "devDependencies": {
@@ -74,7 +75,6 @@
     "expect": "^1.20.2",
     "istanbul": "^0.4.5",
     "jsdoc": "^3.5.5",
-    "loglevel": "1.6.1",
     "lolex": "^1.5.2",
     "matrix-mock-request": "^1.2.2",
     "mocha": "^5.2.0",
