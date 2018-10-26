@@ -122,6 +122,7 @@ describe("MegolmBackup", function() {
 
     describe("backup", function() {
         let mockBaseApis;
+        let realSetTimeout;
 
         beforeEach(function() {
             mockBaseApis = {};
@@ -135,6 +136,18 @@ describe("MegolmBackup", function() {
             });
 
             megolmDecryption.olmlib = mockOlmLib;
+
+            // clobber the setTimeout function to run 100x faster.
+            // ideally we would use lolex, but we have no oportunity
+            // to tick the clock between the first try and the retry.
+            realSetTimeout = global.setTimeout;
+            global.setTimeout = function(f, n) {
+                return realSetTimeout(f, n/100);
+            };
+        });
+
+        afterEach(function() {
+            global.setTimeout = realSetTimeout;
         });
 
         it('automatically calls the key back up', function() {
@@ -175,7 +188,6 @@ describe("MegolmBackup", function() {
         });
 
         it('sends backups to the server', function() {
-            this.timeout(12000); // eslint-disable-line no-invalid-this
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -281,7 +293,6 @@ describe("MegolmBackup", function() {
         });
 
         it('retries when a backup fails', function() {
-            this.timeout(12000); // eslint-disable-line no-invalid-this
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
