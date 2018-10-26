@@ -437,7 +437,7 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Unmark sessions as needing to be backed up.
-     * @param {[object]} sessions The sessions that need to be backed up.
+     * @param {Array<object>} sessions The sessions that need to be backed up.
      * @returns {Promise} resolves when the sessions are unmarked
      */
     unmarkSessionsNeedingBackup(sessions) {
@@ -448,7 +448,7 @@ export default class IndexedDBCryptoStore {
 
     /**
      * Mark sessions as needing to be backed up.
-     * @param {[object]} sessions The sessions that need to be backed up.
+     * @param {Array<object>} sessions The sessions that need to be backed up.
      * @param {*} txn An active transaction. See doTxn(). (optional)
      * @returns {Promise} resolves when the sessions are marked
      */
