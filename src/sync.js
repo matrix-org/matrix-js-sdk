@@ -516,7 +516,7 @@ SyncApi.prototype.sync = function() {
             console.warn("InvalidStoreError: store is not usable: stopping sync.");
             return;
         }
-        if (this.opts.lazyLoadMembers && this._crypto) {
+        if (this.opts.lazyLoadMembers && this.opts.crypto) {
             this.opts.crypto.enableLazyLoading();
         }
         await this.client._storeClientOptions();
