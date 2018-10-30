@@ -839,8 +839,6 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
     this.emit('keyBackupStatus', true);
-
-    this._crypto._maybeSendKeyBackup();
 };
 
 /**

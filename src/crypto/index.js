@@ -970,16 +970,21 @@ Crypto.prototype.importRoomKeys = function(keys) {
     );
 };
 
-Crypto.prototype._maybeSendKeyBackup = async function() {
+Crypto.prototype._maybeSendKeyBackup = async function(delay, retry) {
+    if (retry === undefined) retry = true;
+
     if (!this._sendingBackups) {
         this._sendingBackups = true;
         try {
-            // wait between 0 and 10 seconds, to avoid backup requests from
-            // different clients hitting the server all at the same time when a
-            // new key is sent
-            await new Promise((resolve, reject) => {
-                setTimeout(resolve, Math.random() * 10000);
-            });
+            if (delay === undefined) {
+                // by default, wait between 0 and 10 seconds, to avoid backup
+                // requests from different clients hitting the server all at
+                // the same time when a new key is sent
+                delay = Math.random() * 10000;
+            }
+            if (delay > 0) {
+                await Promise.delay(delay);
+            }
             let numFailures = 0; // number of consecutive failures
             while (1) {
                 if (!this.backupKey) {
@@ -1034,10 +1039,11 @@ Crypto.prototype._maybeSendKeyBackup = async function() {
                     console.log("send failed", err);
                     if (err.httpStatus === 400
                         || err.httpStatus === 403
-                        || err.httpStatus === 401) {
+                        || err.httpStatus === 401
+                        || !retry) {
                         // retrying probably won't help much, so we should give up
                         // FIXME: disable backups?
-                        return;
+                        throw err;
                     }
                 }
                 if (numFailures) {
@@ -1076,7 +1082,7 @@ Crypto.prototype.backupGroupSession = async function(
 Crypto.prototype.backupAllGroupSessions = async function(version) {
     await this._cryptoStore.doTxn(
         'readwrite',
-        [IndexedDBCryptoStore.STORE_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
+        [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
         (txn) => {
             this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
                 if (session !== null) {
@@ -1086,7 +1092,7 @@ Crypto.prototype.backupAllGroupSessions = async function(version) {
         },
     );
 
-    await this._maybeSendKeyBackup();
+    await this._maybeSendKeyBackup(0, false);
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
