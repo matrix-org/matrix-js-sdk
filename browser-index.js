@@ -2,7 +2,7 @@ var matrixcs = require("./lib/matrix");
 const request = require('browser-request');
 const queryString = require('query-string');
 
-matrixcs.request((opts, fn) => {
+matrixcs.request(function(opts, fn) {
     // We manually fix the query string for browser-request because
     // it doesn't correctly handle cases like ?via=one&via=two. Instead
     // we mimic `request`'s query string interface to make it all work
