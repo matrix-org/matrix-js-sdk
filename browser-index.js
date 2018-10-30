@@ -1,6 +1,6 @@
 var matrixcs = require("./lib/matrix");
 const request = require('browser-request');
-const queryString = require('query-string');
+const queryString = require('qs');
 
 matrixcs.request(function(opts, fn) {
     // We manually fix the query string for browser-request because
