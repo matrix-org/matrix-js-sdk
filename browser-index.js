@@ -1,5 +1,7 @@
 var matrixcs = require("./lib/matrix");
-matrixcs.request(require("request"));
+var request = require("browser-request");
+request.enableConstructionOfQueryString = true; // note: this is long so we hopefully don't collide
+matrixcs.request(request);
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.

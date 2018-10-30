@@ -59,6 +59,7 @@
     "content-type": "^1.0.2",
     "loglevel": "1.6.1",
     "memfs": "^2.10.1",
+    "query-string": "^6.2.0",
     "request": "^2.88.0"
   },
   "devDependencies": {

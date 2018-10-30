@@ -19,6 +19,7 @@ limitations under the License.
  * @module http-api
  */
 import Promise from 'bluebird';
+const queryString = require('query-string');
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
@@ -746,6 +747,9 @@ module.exports.MatrixHttpApi.prototype = {
         const reqPromise = defer.promise;
 
         try {
+            if (this.opts.request.enableConstructionOfQueryString) {
+                queryParams = queryString.stringify(queryParams, opts.qsStringifyOptions);
+            }
             req = this.opts.request(
                 {
                     uri: uri,
