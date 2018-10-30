@@ -1082,7 +1082,10 @@ Crypto.prototype.backupGroupSession = async function(
 Crypto.prototype.backupAllGroupSessions = async function(version) {
     await this._cryptoStore.doTxn(
         'readwrite',
-        [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS, IndexedDBCryptoStore.STORE_BACKUP],
+        [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_BACKUP,
+        ],
         (txn) => {
             this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
                 if (session !== null) {

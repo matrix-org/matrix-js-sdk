@@ -142,9 +142,9 @@ export default class DeviceList {
                             if (!userDevices.hasOwnProperty(device)) {
                                 continue;
                             }
-                            const identityKey = userDevices[device].keys['curve25519:'+device];
-                            if (identityKey !== undefined) {
-                                this._userByIdentityKey[identityKey] = user;
+                            const idKey = userDevices[device].keys['curve25519:'+device];
+                            if (idKey !== undefined) {
+                                this._userByIdentityKey[idKey] = user;
                             }
                         }
                     }
