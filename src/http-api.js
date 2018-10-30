@@ -747,7 +747,7 @@ module.exports.MatrixHttpApi.prototype = {
         const reqPromise = defer.promise;
 
         try {
-            if (this.opts.request.enableConstructionOfQueryString) {
+            if (global && global.enableConstructionOfQueryString) {
                 queryParams = queryString.stringify(queryParams, opts.qsStringifyOptions);
             }
             req = this.opts.request(
