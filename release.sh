@@ -260,9 +260,10 @@ if [ -z "$skip_jsdoc" ]; then
     echo "generating jsdocs"
     npm run gendoc
 
-    echo "copying jsdocs to gh-pages branch"
+    echo "copying jsdocs and examples to gh-pages branch"
     git checkout gh-pages
     git pull
+    cp -ar "examples/" .
     cp -a ".jsdoc/matrix-js-sdk/$release" .
     perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
         "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' \
