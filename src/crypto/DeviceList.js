@@ -142,7 +142,10 @@ export default class DeviceList {
                             if (!userDevices.hasOwnProperty(device)) {
                                 continue;
                             }
-                            this._userByIdentityKey[userDevices[device].senderKey] = user;
+                            const identityKey = userDevices[device].keys['curve25519:'+device];
+                            if (identityKey !== undefined) {
+                                this._userByIdentityKey[identityKey] = user;
+                            }
                         }
                     }
                 });
@@ -442,12 +445,22 @@ export default class DeviceList {
      * @param {Object} devs New device info for user
      */
     storeDevicesForUser(u, devs) {
-        this._devices[u] = devs;
-        for (const device in devs) {
-            if (!devs.hasOwnProperty(device)) {
-                continue;
+        // remove previous devices from _userByIdentityKey
+        if (this._devices[u] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[u])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
             }
-            this._userByIdentityKey[devs[device].senderKey] = u;
+        }
+
+        this._devices[u] = devs;
+
+        // add enw ones
+        for (const [deviceId, dev] of Object.entries(devs)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = u;
         }
         this._dirty = true;
     }
@@ -565,12 +578,22 @@ export default class DeviceList {
      * @param {Object} devices deviceId->{object} the new devices
      */
     _setRawStoredDevicesForUser(userId, devices) {
-        this._devices[userId] = devices;
-        for (const device in devices) {
-            if (!devices.hasOwnProperty(device)) {
-                continue;
+        // remove old devices from _userByIdentityKey
+        if (this._devices[userId] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[userId])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
             }
-            this._userByIdentityKey[devices[device].senderKey] = userId;
+        }
+
+        this._devices[userId] = devices;
+
+        // add new devices into _userByIdentityKey
+        for (const [deviceId, dev] of Object.entries(devices)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = userId;
         }
     }
 
