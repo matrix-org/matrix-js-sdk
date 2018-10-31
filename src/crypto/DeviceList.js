@@ -443,7 +443,7 @@ export default class DeviceList {
 
         this._devices[u] = devs;
 
-        // add enw ones
+        // add new ones
         for (const [deviceId, dev] of Object.entries(devs)) {
             const identityKey = dev.keys['curve25519:'+deviceId];
 
