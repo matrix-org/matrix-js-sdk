@@ -982,9 +982,7 @@ Crypto.prototype._maybeSendKeyBackup = async function(delay, retry) {
                 // the same time when a new key is sent
                 delay = Math.random() * 10000;
             }
-            if (delay > 0) {
-                await Promise.delay(delay);
-            }
+            await Promise.delay(delay);
             let numFailures = 0; // number of consecutive failures
             while (1) {
                 if (!this.backupKey) {
