@@ -17,7 +17,7 @@ limitations under the License.
 import bs58 from 'bs58';
 
 // picked arbitrarily but to try & avoid clashing with any bitcoin ones
-// (also base58 encoded, albeit with a lot of hashing)
+// (which are also base58 encoded, but bitcoin's involve a lot more hashing)
 const OLM_RECOVERY_KEY_PREFIX = [0x8B, 0x01];
 
 export function encodeRecoveryKey(key) {
