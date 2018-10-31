@@ -175,6 +175,7 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
 
         for (const session in sessionsNeedingBackup) {
             if (Object.prototype.hasOwnProperty.call(sessionsNeedingBackup, session)) {
+                // see getAllEndToEndInboundGroupSessions for the magic number explanations
                 const senderKey = session.substr(0, 43);
                 const sessionId = session.substr(44);
                 this.getEndToEndInboundGroupSession(
