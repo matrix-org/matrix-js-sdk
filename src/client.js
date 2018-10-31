@@ -897,7 +897,7 @@ MatrixClient.prototype.createKeyBackupVersion = function(info) {
 
     const data = {
         algorithm: info.algorithm,
-        auth_data: info.auth_data, // FIXME: should this be cloned?
+        auth_data: info.auth_data,
     };
     return this._crypto._signObject(data.auth_data).then(() => {
         return this._http.authedRequest(
