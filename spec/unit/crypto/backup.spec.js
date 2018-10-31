@@ -262,7 +262,8 @@ describe("MegolmBackup", function() {
                         client._http.authedRequest = function(
                             callback, method, path, queryParams, data, opts,
                         ) {
-                            expect(++numCalls <= 1);
+                            ++numCalls;
+                            expect(numCalls <= 1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
@@ -285,10 +286,9 @@ describe("MegolmBackup", function() {
                             groupSession.session_id(),
                             groupSession.session_key(),
                         );
-                    })
-                        .then(() => {
-                            expect(numCalls).toBe(1);
-                        });
+                    }).then(() => {
+                        expect(numCalls).toBe(1);
+                    });
                 });
         });
 
@@ -367,7 +367,8 @@ describe("MegolmBackup", function() {
                         client._http.authedRequest = function(
                             callback, method, path, queryParams, data, opts,
                         ) {
-                            expect(++numCalls <= 2);
+                            ++numCalls;
+                            expect(numCalls <= 2);
                             if (numCalls >= 3) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
@@ -396,10 +397,9 @@ describe("MegolmBackup", function() {
                             groupSession.session_id(),
                             groupSession.session_key(),
                         );
-                    })
-                        .then(() => {
-                            expect(numCalls).toBe(2);
-                        });
+                    }).then(() => {
+                        expect(numCalls).toBe(2);
+                    });
                 });
         });
     });
