@@ -206,7 +206,7 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
         backupInfo = await this._baseApis.getKeyBackupVersion();
     } catch (e) {
         console.log("Error checking for active key backup", e);
-        if (Number.isFinite(e.httpStatus) && e.httpStatus / 100 === 4) {
+        if (e.httpStatus / 100 === 4) {
             // well that's told us. we won't try again.
             this._checkedForBackup = true;
         }
