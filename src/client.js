@@ -838,7 +838,7 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupKey = new global.Olm.PkEncryption();
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
-    this.emit('keyBackupStatus', true);
+    this.emit('crypto.keyBackupStatus', true);
 };
 
 /**
@@ -853,7 +853,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
     if (this._crypto.backupKey) this._crypto.backupKey.free();
     this._crypto.backupKey = null;
 
-    this.emit('keyBackupStatus', false);
+    this.emit('crypto.keyBackupStatus', false);
 };
 
 /**
@@ -4065,10 +4065,10 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
 
 /**
  * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
- * @event module:client~MatrixClient#"keyBackupStatus"
+ * @event module:client~MatrixClient#"crypto.keyBackupStatus"
  * @param {bool} enabled true if key backup has been enabled, otherwise false
  * @example
- * matrixClient.on("keyBackupStatus", function(enabled){
+ * matrixClient.on("crypto.keyBackupStatus", function(enabled){
  *   if (enabled) {
  *     [...]
  *   }
