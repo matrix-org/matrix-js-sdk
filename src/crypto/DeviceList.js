@@ -377,22 +377,15 @@ export default class DeviceList {
     /**
      * Find a device by curve25519 identity key
      *
-     * @param {string} userId     owner of the device (optional)
      * @param {string} algorithm  encryption algorithm
      * @param {string} senderKey  curve25519 key to match
      *
      * @return {module:crypto/deviceinfo?}
      */
-    getDeviceByIdentityKey(userId, algorithm, senderKey) {
-        if (arguments.length === 2) {
-            // if userId is omitted, shift the other arguments, and look up the
-            // userid
-            senderKey = algorithm;
-            algorithm = userId;
-            userId = this._userByIdentityKey[senderKey];
-            if (!userId) {
-                return null;
-            }
+    getDeviceByIdentityKey(algorithm, senderKey) {
+        const userId = this._userByIdentityKey[senderKey];
+        if (!userId) {
+            return null;
         }
 
         if (

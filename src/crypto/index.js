@@ -713,7 +713,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     // identity key of the device which set up the Megolm session.
 
     const device = this._deviceList.getDeviceByIdentityKey(
-        event.getSender(), algorithm, senderKey,
+        algorithm, senderKey,
     );
 
     if (device === null) {
