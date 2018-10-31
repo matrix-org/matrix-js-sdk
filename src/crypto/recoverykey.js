@@ -32,7 +32,6 @@ export function encodeRecoveryKey(key) {
     buf[buf.length - 1] = parity;
     const base58key = bs58.encode(buf);
 
-
     return base58key.match(/.{1,4}/g).join(" ");
 }
 
