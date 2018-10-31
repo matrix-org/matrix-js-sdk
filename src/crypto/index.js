@@ -1011,7 +1011,7 @@ Crypto.prototype._maybeSendKeyBackup = async function(delay, retry) {
                     const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
 
                     const forwardedCount =
-                          (sessionData.forwardingCurve25519KeyChain || []).length;
+                          (sessionData.forwarding_curve25519_key_chain || []).length;
 
                     const device = this._deviceList.getDeviceByIdentityKey(
                         olmlib.MEGOLM_ALGORITHM, session.senderKey,
