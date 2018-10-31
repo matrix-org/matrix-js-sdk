@@ -81,17 +81,6 @@ function OlmDevice(sessionStore, cryptoStore) {
     this.deviceEd25519Key = null;
     this._maxOneTimeKeys = null;
 
-    // track which of our other devices (if any) have cross-signed this device
-    // XXX: this should probably have a single source of truth in the /devices
-    // API store or whatever we use to track our self-signed devices.
-    this.crossSelfSigs = [];
-
-    // track whether we have already suggested to the user that they should
-    // restore their keys from backup or by cross-signing the device.
-    // We use this to avoid repeatedly emitting the suggestion event.
-    // XXX: persist this somewhere!
-    this.suggestedKeyRestore = false;
-
     // we don't bother stashing outboundgroupsessions in the sessionstore -
     // instead we keep them here.
     this._outboundGroupSessionStore = {};
