@@ -850,7 +850,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         this._retryDecryption(senderKey, sessionId);
     }).then(() => {
         if (this._crypto.backupInfo) {
-            // don't wait for it to complete
+            // don't wait for the keys to be backed up for the server
             this._crypto.backupGroupSession(
                 content.room_id, senderKey, forwardingKeyChain,
                 content.session_id, content.session_key, keysClaimed,
