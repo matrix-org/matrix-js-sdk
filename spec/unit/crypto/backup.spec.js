@@ -77,6 +77,34 @@ const KEY_BACKUP_DATA = {
     },
 };
 
+function makeTestClient(sessionStore, cryptoStore) {
+    const scheduler = [
+        "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+        "setProcessFunction",
+    ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
+    const store = [
+        "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
+        "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
+        "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
+        "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
+    ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
+    store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+    store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+    store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
+    return new MatrixClient({
+        baseUrl: "https://my.home.server",
+        idBaseUrl: "https://identity.server",
+        accessToken: "my.access.token",
+        request: function() {}, // NOP
+        store: store,
+        scheduler: scheduler,
+        userId: "@alice:bar",
+        deviceId: "device",
+        sessionStore: sessionStore,
+        cryptoStore: cryptoStore,
+    });
+};
+
 describe("MegolmBackup", function() {
     if (!global.Olm) {
         console.warn('Not running megolm backup unit tests: libolm not present');
@@ -193,31 +221,7 @@ describe("MegolmBackup", function() {
             const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
-            const scheduler = [
-                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-                "setProcessFunction",
-            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
-            const store = [
-                "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
-                "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
-                "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
-            store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
-            store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
-            store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
-            const client = new MatrixClient({
-                baseUrl: "https://my.home.server",
-                idBaseUrl: "https://identity.server",
-                accessToken: "my.access.token",
-                request: function() {}, // NOP
-                store: store,
-                scheduler: scheduler,
-                userId: "@alice:bar",
-                deviceId: "device",
-                sessionStore: sessionStore,
-                cryptoStore: cryptoStore,
-            });
+            const client = makeTestClient(sessionStore, cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -408,31 +412,7 @@ describe("MegolmBackup", function() {
         let client;
 
         beforeEach(function() {
-            const scheduler = [
-                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-                "setProcessFunction",
-            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
-            const store = [
-                "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-                "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
-                "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
-                "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
-            store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
-            store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
-            store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
-            client = new MatrixClient({
-                baseUrl: "https://my.home.server",
-                idBaseUrl: "https://identity.server",
-                accessToken: "my.access.token",
-                request: function() {}, // NOP
-                store: store,
-                scheduler: scheduler,
-                userId: "@alice:bar",
-                deviceId: "device",
-                sessionStore: sessionStore,
-                cryptoStore: cryptoStore,
-            });
+            client = makeTestClient(sessionStore, cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
