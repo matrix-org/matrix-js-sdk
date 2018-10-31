@@ -103,7 +103,7 @@ function makeTestClient(sessionStore, cryptoStore) {
         sessionStore: sessionStore,
         cryptoStore: cryptoStore,
     });
-};
+}
 
 describe("MegolmBackup", function() {
     if (!global.Olm) {
