@@ -133,15 +133,9 @@ export default class DeviceList {
                         this._syncToken = deviceData ? deviceData.syncToken : null;
                     }
                     this._userByIdentityKey = {};
-                    for (const user in this._devices) {
-                        if (!this._devices.hasOwnProperty(user)) {
-                            continue;
-                        }
+                    for (const user of Object.keys(this._devices)) {
                         const userDevices = this._devices[user];
-                        for (const device in userDevices) {
-                            if (!userDevices.hasOwnProperty(device)) {
-                                continue;
-                            }
+                        for (const device of Object.keys(userDevices)) {
                             const idKey = userDevices[device].keys['curve25519:'+device];
                             if (idKey !== undefined) {
                                 this._userByIdentityKey[idKey] = user;
