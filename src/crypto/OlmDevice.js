@@ -509,6 +509,8 @@ OlmDevice.prototype.createInboundSession = async function(
                     this._storeAccount(txn, account);
 
                     const payloadString = session.decrypt(messageType, ciphertext);
+                    // this counts as an received message
+                    session.set_last_received_message_ts(Date.now());
 
                     this._saveSession(theirDeviceIdentityKey, session, txn);
 
