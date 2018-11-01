@@ -558,13 +558,20 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  * @return {Promise<?string>}  session id, or null if no established session
  */
 OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
-    const sessionIds = await this.getSessionIdsForDevice(theirDeviceIdentityKey);
-    if (sessionIds.length === 0) {
+    const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey);
+    if (sessionInfos.length === 0) {
         return null;
     }
-    // Use the session with the lowest ID.
-    sessionIds.sort();
-    return sessionIds[0];
+    // Use the session that has most recently received a message
+    sessionInfos.sort((a, b) => {
+        if (a.lastReceivedMessageTs !== b.lastReceivedMessageTs) {
+            return a.lastReceivedMessageTs - b.lastReceivedMessageTs;
+        } else {
+            if (a.sessionId === b.sessionId) return 0;
+            return a.sessionId < b.sessionId ? -1 : 1;
+        }
+    });
+    return sessionInfos[sessionInfos.length - 1].sessionId;
 };
 
 /**
@@ -589,6 +596,7 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) 
                 for (const sessionId of sessionIds) {
                     this._unpickleSession(sessions[sessionId], (session) => {
                         info.push({
+                            lastReceivedMessageTs: session.last_received_message_ts(),
                             hasReceivedMessage: session.has_received_message(),
                             sessionId: sessionId,
                         });
@@ -649,6 +657,7 @@ OlmDevice.prototype.decryptMessage = async function(
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (session) => {
                 payloadString = session.decrypt(messageType, ciphertext);
+                session.set_last_received_message_ts(Date.now());
                 this._saveSession(theirDeviceIdentityKey, session, txn);
             });
         },
