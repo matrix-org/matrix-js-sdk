@@ -43,7 +43,9 @@ async function setupSession(initiator, opponent) {
     const keys = await opponent.getOneTimeKeys();
     const firstKey = Object.values(keys['curve25519'])[0];
 
-    const sid = await initiator.createOutboundSession(opponent.deviceCurve25519Key, firstKey);
+    const sid = await initiator.createOutboundSession(
+        opponent.deviceCurve25519Key, firstKey,
+    );
     return sid;
 }
 
@@ -68,7 +70,7 @@ describe("OlmDecryption", function() {
     });
 
     describe('olm', function() {
-        it("session reverted to a previous state can no longer decrypt messages", async function() {
+        it("can decrypt messages", async function() {
             const sid = await setupSession(aliceOlmDevice, bobOlmDevice);
             //console.log("alice id key: " + aliceOlmDevice.deviceCurve25519Key);
             //console.log("bob id key: " + bobOlmDevice.deviceCurve25519Key);
@@ -84,7 +86,9 @@ describe("OlmDecryption", function() {
                 ciphertext.type,
                 ciphertext.body,
             );
-            expect(result.payload).toEqual("The olm or proteus is an aquatic salamander in the family Proteidae");
+            expect(result.payload).toEqual(
+                "The olm or proteus is an aquatic salamander in the family Proteidae",
+            );
         });
     });
 });
