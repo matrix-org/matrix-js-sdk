@@ -927,6 +927,14 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     );
 };
 
+/**
+ * @return {module:client.Promise} Resolves: A list of the user's current rooms
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRooms = function() {
+    const path = utils.encodeUri("/joined_rooms");
+    return this._http.authedRequest(undefined, "GET", path);
+};
 
 // Room Directory operations
 // =========================
