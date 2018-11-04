@@ -277,7 +277,21 @@ MatrixBaseApis.prototype.loginWithPassword = function(user, password, callback) 
     return this.login("m.login.password", {
         user: user,
         password: password,
-    }, callback);
+    }, (error, response) => {
+        if (response && response.access_token) {
+            this._http.opts.accessToken = response.access_token;
+        }
+
+        if (response && response.user_id) {
+            this.credentials = {
+                userId: response.user_id,
+            };
+        }
+
+        if(callback) {
+            callback(error, response);
+        }
+    });
 };
 
 /**
