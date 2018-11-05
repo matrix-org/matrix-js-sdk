@@ -927,6 +927,28 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     );
 };
 
+/**
+ * @return {module:client.Promise} Resolves: A list of the user's current rooms
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRooms = function() {
+    const path = utils.encodeUri("/joined_rooms");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * Retrieve membership info. for a room.
+ * @param {string} roomId ID of the room to get membership for
+ * @return {module:client.Promise} Resolves: A list of currently joined users
+ *                                 and their profile data.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRoomMembers = function(roomId) {
+    const path = utils.encodeUri("/rooms/$roomId/joined_members", {
+        $roomId: roomId,
+    });
+    return this._http.authedRequest(undefined, "GET", path);
+};
 
 // Room Directory operations
 // =========================
