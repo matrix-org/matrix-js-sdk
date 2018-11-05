@@ -4,7 +4,7 @@ Changes in [0.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.
 
 BREAKING CHANGE
 ----------------
- * `MatrixClient::login` now sets client `access_token` and `user_id` following successful login.
+ * `MatrixClient::login` now sets client `access_token` and `user_id` following successful login with username and password.
 
 Changes in [0.12.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.1) (2018-10-29)
 ==================================================================================================
