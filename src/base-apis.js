@@ -262,7 +262,19 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
     utils.extend(login_data, data);
 
     return this._http.authedRequest(
-        callback, "POST", "/login", undefined, login_data,
+        (error, response) => {
+            if (loginType === "m.login.password" && response &&
+                response.access_token && response.user_id) {
+                this._http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+
+            if (callback) {
+                callback(error, response);
+            }
+        }, "POST", "/login", undefined, login_data,
     );
 };
 
@@ -277,21 +289,7 @@ MatrixBaseApis.prototype.loginWithPassword = function(user, password, callback) 
     return this.login("m.login.password", {
         user: user,
         password: password,
-    }, (error, response) => {
-        if (response && response.access_token) {
-            this._http.opts.accessToken = response.access_token;
-        }
-
-        if (response && response.user_id) {
-            this.credentials = {
-                userId: response.user_id,
-            };
-        }
-
-        if (callback) {
-            callback(error, response);
-        }
-    });
+    }, callback);
 };
 
 /**
