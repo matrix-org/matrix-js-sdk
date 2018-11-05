@@ -288,7 +288,7 @@ MatrixBaseApis.prototype.loginWithPassword = function(user, password, callback) 
             };
         }
 
-        if(callback) {
+        if (callback) {
             callback(error, response);
         }
     });
