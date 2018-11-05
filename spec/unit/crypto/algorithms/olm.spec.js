@@ -33,8 +33,6 @@ function makeOlmDevice() {
     const sessionStore = new WebStorageSessionStore(mockStorage);
     const cryptoStore = new MemoryCryptoStore(mockStorage);
     const olmDevice = new OlmDevice(sessionStore, cryptoStore);
-    // expose for tests
-    olmDevice.__cryptoStore = cryptoStore;
     return olmDevice;
 }
 
@@ -72,8 +70,6 @@ describe("OlmDecryption", function() {
     describe('olm', function() {
         it("can decrypt messages", async function() {
             const sid = await setupSession(aliceOlmDevice, bobOlmDevice);
-            //console.log("alice id key: " + aliceOlmDevice.deviceCurve25519Key);
-            //console.log("bob id key: " + bobOlmDevice.deviceCurve25519Key);
 
             const ciphertext = await aliceOlmDevice.encryptMessage(
                 bobOlmDevice.deviceCurve25519Key,
