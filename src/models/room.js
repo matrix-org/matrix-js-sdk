@@ -999,6 +999,10 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     this._txnToEvent[txnId] = event;
 
     if (this._opts.pendingEventOrdering == "detached") {
+        if (this._pendingEventList.some(e => e.status === EventStatus.NOT_SENT)) {
+            console.warn("Setting new event's status as " + EventStatus.NOT_SENT + " due to other similar messages");
+            event.status = EventStatus.NOT_SENT;
+        }
         this._pendingEventList.push(event);
     } else {
         for (let i = 0; i < this._timelineSets.length; i++) {
