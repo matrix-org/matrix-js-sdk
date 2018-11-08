@@ -206,6 +206,42 @@ export class Backend {
         return promiseifyTxn(txn).then(() => result);
     }
 
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        let stateIndex = 0;
+        const results = [];
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (cursor) {
+                const keyReq = cursor.value;
+                if (keyReq.recipients.includes({userId, deviceId})) {
+                    results.push(keyReq);
+                }
+                cursor.continue();
+            } else {
+                // try the next state in the list
+                stateIndex++;
+                if (stateIndex >= wantedStates.length) {
+                    // no matches
+                    return;
+                }
+
+                const wantedState = wantedStates[stateIndex];
+                const cursorReq = ev.target.source.openCursor(wantedState);
+                cursorReq.onsuccess = onsuccess;
+            }
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const wantedState = wantedStates[stateIndex];
+        const cursorReq = store.index("state").openCursor(wantedState);
+        cursorReq.onsuccess = onsuccess;
+
+        return promiseifyTxn(txn).then(() => results);
+    }
+
     /**
      * Look for an existing room key request by id and state, and update it if
      * found

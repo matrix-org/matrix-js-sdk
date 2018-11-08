@@ -461,6 +461,12 @@ OlmDevice.prototype.createOutboundSession = async function(
                     session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
                     newSessionId = session.session_id();
                     this._storeAccount(txn, account);
+                    // Pretend we've received a message at this point, otherwise
+                    // if we try to send a message to the device, it won't use
+                    // this session (storing the creation time separately would
+                    // make the pickle longer and would not be useful otherwise).
+                    session.set_last_received_message_ts(Date.now());
+
                     this._saveSession(theirIdentityKey, session, txn);
                 } finally {
                     session.free();
@@ -725,7 +731,7 @@ OlmDevice.prototype._saveOutboundGroupSession = function(session) {
  */
 OlmDevice.prototype._getOutboundGroupSession = function(sessionId, func) {
     const pickled = this._outboundGroupSessionStore[sessionId];
-    if (pickled === null) {
+    if (pickled === undefined) {
         throw new Error("Unknown outbound group session " + sessionId);
     }
 
@@ -1059,6 +1065,8 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
  * @param {string} roomId    room in which the message was received
  * @param {string} senderKey base64-encoded curve25519 key of the sender
  * @param {string} sessionId session identifier
+ * @param {integer} chainIndex The chain index at which to export the session.
+ *     If omitted, export at the first index we know about.
  *
  * @returns {Promise<{chain_index: number, key: string,
  *        forwarding_curve25519_key_chain: Array<string>,
@@ -1066,9 +1074,12 @@ OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, se
  *    }>}
  *    details of the session key. The key is a base64-encoded megolm key in
  *    export format.
+ *
+ * @throws Error If the given chain index could not be obtained from the known
+ *     index (ie. the given chain index is before the first we have).
  */
 OlmDevice.prototype.getInboundGroupSessionKey = async function(
-    roomId, senderKey, sessionId,
+    roomId, senderKey, sessionId, chainIndex,
 ) {
     let result;
     await this._cryptoStore.doTxn(
@@ -1079,14 +1090,19 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
                         result = null;
                         return;
                     }
-                    const messageIndex = session.first_known_index();
+
+                    if (chainIndex === undefined) {
+                        chainIndex = session.first_known_index();
+                    }
+
+                    const exportedSession = session.export_session(chainIndex);
 
                     const claimedKeys = sessionData.keysClaimed || {};
                     const senderEd25519Key = claimedKeys.ed25519 || null;
 
                     result = {
-                        "chain_index": messageIndex,
-                        "key": session.export_session(messageIndex),
+                        "chain_index": chainIndex,
+                        "key": exportedSession,
                         "forwarding_curve25519_key_chain":
                             sessionData.forwardingCurve25519KeyChain || [],
                         "sender_claimed_ed25519_key": senderEd25519Key,

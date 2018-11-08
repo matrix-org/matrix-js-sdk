@@ -144,6 +144,11 @@ function MegolmEncryption(params) {
     // room).
     this._setupPromise = Promise.resolve();
 
+    // Map of outbound sessions by sessions ID. Used if we need a particular
+    // session (the session we're currently using to send is always obtained
+    // using _setupPromise).
+    this._outboundSessions = {};
+
     // default rotation periods
     this._sessionRotationPeriodMsgs = 100;
     this._sessionRotationPeriodMs = 7 * 24 * 3600 * 1000;
@@ -195,6 +200,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         if (!session) {
             logger.log(`Starting new megolm session for room ${self._roomId}`);
             session = await self._prepareNewSession();
+            self._outboundSessions[session.sessionId] = session;
         }
 
         // now check if we need to share with any devices
@@ -409,8 +415,87 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
 };
 
 /**
- * @private
+ * Re-shares a megolm session key with devices if the key has already been
+ * sent to them.
  *
+ * @param {string} senderKey The key of the originating device for the session
+ * @param {string} sessionId ID of the outbound session to share
+ * @param {string} userId ID of the user who owns the target device
+ * @param {module:crypto/deviceinfo} device The target device
+ */
+MegolmEncryption.prototype.reshareKeyWithDevice = async function(
+    senderKey, sessionId, userId, device,
+) {
+    const obSessionInfo = this._outboundSessions[sessionId];
+    if (!obSessionInfo) {
+        logger.debug("Session ID " + sessionId + " not found: not re-sharing keys");
+        return;
+    }
+
+    // The chain index of the key we previously sent this device
+    const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
+
+    // get the key from the inbound session: the outbound one will already
+    // have been ratcheted to the next chain index.
+    const key = await this._olmDevice.getInboundGroupSessionKey(
+        this._roomId, senderKey, sessionId, sentChainIndex,
+    );
+
+    if (!key) {
+        logger.warn(
+            "No outbound session key found for " + sessionId + ": not re-sharing keys",
+        );
+        return;
+    }
+
+    await olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, {
+            [userId]: {
+                [device.deviceId]: device,
+            },
+        },
+    );
+
+    const payload = {
+        type: "m.forwarded_room_key",
+        content: {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: this._roomId,
+            session_id: sessionId,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            sender_key: senderKey,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            forwarding_curve25519_key_chain: key.forwarding_curve25519_key_chain,
+        },
+    };
+
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    await olmlib.encryptMessageForDevice(
+        encryptedContent.ciphertext,
+        this._userId,
+        this._deviceId,
+        this._olmDevice,
+        userId,
+        device,
+        payload,
+    ),
+
+    await this._baseApis.sendToDevice("m.room.encrypted", {
+        [userId]: {
+            [device.deviceId]: encryptedContent,
+        },
+    });
+    logger.debug(
+        `Re-shared key for session ${sessionId}  with {userId}:{device.deviceId}`,
+    );
+};
+
+/**
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
