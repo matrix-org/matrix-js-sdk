@@ -1186,6 +1186,13 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         room.addPendingEvent(localEvent, txnId);
     }
 
+    // addPendingEvent can change the state to NOT_SENT if it believes
+    // that there's other events that have failed. We won't bother to
+    // try sending the event if the state has changed as such.
+    if (localEvent.status === EventStatus.NOT_SENT) {
+        return Promise.reject(new Error("Event blocked by other events not yet sent"));
+    }
+
     return _sendEvent(this, room, localEvent, callback);
 };
 
