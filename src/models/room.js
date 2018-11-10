@@ -188,6 +188,10 @@ function Room(roomId, client, myUserId, opts) {
     } else {
         this._membersPromise = null;
     }
+
+    this._threads = {
+        // thread id: timelineSet
+    }
 }
 
 utils.inherits(Room, EventEmitter);
@@ -892,6 +896,68 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
     }
 };
 
+Room.prototype._handleThreadEvent = function(event, duplicateStrategy) {
+
+    function synthesizeThreadMarker(kind, id) {
+        const fakeMarker = {
+            event_id: '$' + Math.ceil(Math.random() * 1000000000) + ':fake.example.com',
+            content: {
+                thread_id: id,
+            },
+            type: `m.thread.${kind}`,
+            room_id: event.getRoomId(),
+        };
+        return new MatrixEvent(fakeMarker);
+    }
+
+    const createTimelineSet = (id) => {
+        let threadTimelineSet = this._threads[id];
+        if (!threadTimelineSet) {
+            //threadId option unused for now
+            const opts = {threadId: id};
+            this._threads[id] = threadTimelineSet = new EventTimelineSet(this, opts);
+        }
+        return threadTimelineSet;
+    }
+
+    const content = event.getContent();
+    if (!content) {
+        return event;
+    }
+    const isMsg = content.msgtype === 'm.text';
+    if (!isMsg) {
+        return event;
+    }
+    const body = content.body;
+    const prefix = "m.thread/";
+    if (!body || body.indexOf(prefix) !== 0) {
+        return event;
+    }
+    const idEndIndex = body.substr(prefix.length).indexOf("/");
+    if (idEndIndex === -1) {
+        return event;
+    }
+    const id = body.substr(prefix.length, idEndIndex);
+    const msg = body.substr(prefix.length + idEndIndex + 1);
+
+    if (msg === 'start') {
+        createTimelineSet(id);
+        return synthesizeThreadMarker(msg, id);
+    }
+    if (msg === 'end') {
+        return synthesizeThreadMarker(msg, id);
+    }
+    const threadTimelineSet = createTimelineSet(id);
+    // add to timeline thread timeline
+    content.body = msg;
+    this._addLiveEvent(event, duplicateStrategy, threadTimelineSet);
+    return undefined;
+};
+
+Room.prototype.getThreadTimelineSet = function(threadId) {
+    return this._threads[threadId];
+};
+
 /**
  * Add an event to the end of this room's live timelines. Will fire
  * "Room.timeline".
@@ -901,7 +967,7 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @fires module:client~MatrixClient#event:"Room.timeline"
  * @private
  */
-Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
+Room.prototype._addLiveEvent = function(event, duplicateStrategy, threadTimelineSet) {
     let i;
     if (event.getType() === "m.room.redaction") {
         const redactId = event.event.redacts;
@@ -936,8 +1002,12 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     }
 
     // add to our timeline sets
-    for (i = 0; i < this._timelineSets.length; i++) {
-        this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
+    if (threadTimelineSet) {
+        threadTimelineSet.addLiveEvent(event, duplicateStrategy);
+    } else {
+        for (i = 0; i < this._timelineSets.length; i++) {
+            this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
+        }
     }
 
     // synthesize and inject implicit read receipts
@@ -1166,7 +1236,6 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     this.emit("Room.localEchoUpdated", event, this, event.getId(), oldStatus);
 };
 
-
 /**
  * Add some events to this room. This can include state events, message
  * events and typing notifications. These events are treated as "live" so
@@ -1217,7 +1286,10 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
         else {
             // TODO: We should have a filter to say "only add state event
             // types X Y Z to the timeline".
-            this._addLiveEvent(events[i], duplicateStrategy);
+            const mappedEvent = this._handleThreadEvent(events[i], duplicateStrategy);
+            if (mappedEvent) {
+                this._addLiveEvent(mappedEvent, duplicateStrategy);
+            }
         }
     }
 };

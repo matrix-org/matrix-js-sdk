@@ -82,6 +82,39 @@ function TimelineWindow(client, timelineSet, opts) {
     this._windowLimit = opts.windowLimit || 1000;
 }
 
+TimelineWindow.prototype._getKey = function() {
+    const startTLIndex = this._timelineSet._timelines.indexOf(this._start.timeline);
+    const endTLIndex = this._timelineSet._timelines.indexOf(this._end.timeline);
+    return `${startTLIndex}-${this._start.index}:${endTLIndex}-${this._end.index}`;
+}
+
+TimelineWindow.prototype.precedingThreadWindow = function() {
+    if (this._start.cappedByThread) {
+        const tlw = new TimelineWindow(this._client, this._timelineSet, {windowLimit: this._windowLimit});
+        const end = this._start.clone();
+        end.retreat(1); //skip thread marker
+        const start = end.clone();
+        start.retreat(DEFAULT_PAGINATE_LOOP_LIMIT);
+        tlw._start = start;
+        tlw._end = end;
+        return tlw;
+    }
+}
+
+TimelineWindow.prototype.succeedingThreadWindow = function() {
+    if (this._end.cappedByThread) {
+        const tlw = new TimelineWindow(this._client, this._timelineSet, {windowLimit: this._windowLimit});
+        const end = this._end.clone();
+        end.advance(1); //skip thread marker
+        const start = end.clone();
+        start.advance(DEFAULT_PAGINATE_LOOP_LIMIT);
+        tlw._start = start;
+        tlw._end = end;
+        return tlw;
+    }
+}
+
+
 /**
  * Initialise the window to point at a given event, or the live timeline
  *
@@ -124,6 +157,7 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
         self._start = new TimelineIndex(timeline, startIndex - timeline.getBaseIndex());
         self._end = new TimelineIndex(timeline, endIndex - timeline.getBaseIndex());
         self._eventCount = endIndex - startIndex;
+        self.key = self._getKey();
     };
 
     // We avoid delaying the resolution of the promise by a reactor tick if
@@ -244,6 +278,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     // try moving the cap
     const count = (direction == EventTimeline.BACKWARDS) ?
         tl.retreat(size) : tl.advance(size);
+
 
     if (count) {
         this._eventCount += count;
@@ -442,6 +477,17 @@ TimelineIndex.prototype.advance = function(delta) {
         // timeline. We cap delta to this quantity.
         cappedDelta = Math.max(delta, this.minIndex() - this.index);
         if (cappedDelta < 0) {
+            const newEvents = this.timeline.getEvents()
+                .slice(this.index + cappedDelta, this.index);
+            const threadMarkerIndex = newEvents.reverse().findIndex(e => e.getType().indexOf("m.thread."));
+            if (threadMarkerIndex !== -1) {
+                cappedDelta = -threadMarkerIndex;
+                this.cappedByThread = true;
+                const threadMarker = newEvents[threadMarkerIndex];
+                if (threadMarker.getType() === "m.thread.end") {
+                    this.adjacentThreadId = threadMarker.getContent().thread_id;
+                }
+            }
             this.index += cappedDelta;
             return cappedDelta;
         }
@@ -453,6 +499,17 @@ TimelineIndex.prototype.advance = function(delta) {
         // timeline. We cap delta to this quantity.
         cappedDelta = Math.min(delta, this.maxIndex() - this.index);
         if (cappedDelta > 0) {
+            const newEvents = this.timeline.getEvents()
+                .slice(this.index, this.index + cappedDelta);
+            const threadMarkerIndex = newEvents.findIndex(e => e.getType().indexOf("m.thread."));
+            if (threadMarkerIndex !== -1) {
+                cappedDelta = threadMarkerIndex;
+                this.cappedByThread = true;
+                const threadMarker = newEvents[threadMarkerIndex];
+                if (threadMarker.getType() === "m.thread.start") {
+                    this.adjacentThreadId = threadMarker.getContent().thread_id;
+                }
+            }
             this.index += cappedDelta;
             return cappedDelta;
         }
@@ -489,6 +546,11 @@ TimelineIndex.prototype.advance = function(delta) {
 TimelineIndex.prototype.retreat = function(delta) {
     return this.advance(delta * -1) * -1;
 };
+
+TimelineIndex.prototype.clone = function() {
+    return new TimelineIndex(this.timeline, this.index);
+};
+
 
 /**
  * The TimelineWindow class.
