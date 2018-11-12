@@ -284,7 +284,10 @@ export default class IndexedDBCryptoStore {
      * @param {string} sessionId The ID of the session to retrieve
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(object)} func Called with A map from sessionId
-     *     to Base64 end-to-end session.
+     *     to session information object with 'session' key being the
+     *     Base64 end-to-end session and lastReceivedMessageTs being the
+     *     timestamp in milliseconds at which the session last received
+     *     a message.
      */
     getEndToEndSession(deviceKey, sessionId, txn, func) {
         this._backendPromise.value().getEndToEndSession(deviceKey, sessionId, txn, func);
@@ -296,7 +299,10 @@ export default class IndexedDBCryptoStore {
      * @param {string} deviceKey The public key of the other device.
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(object)} func Called with A map from sessionId
-     *     to Base64 end-to-end session.
+     *     to session information object with 'session' key being the
+     *     Base64 end-to-end session and lastReceivedMessageTs being the
+     *     timestamp in milliseconds at which the session last received
+     *     a message.
      */
     getEndToEndSessions(deviceKey, txn, func) {
         this._backendPromise.value().getEndToEndSessions(deviceKey, txn, func);
@@ -306,12 +312,12 @@ export default class IndexedDBCryptoStore {
      * Store a session between the logged-in user and another device
      * @param {string} deviceKey The public key of the other device.
      * @param {string} sessionId The ID for this end-to-end session.
-     * @param {string} session Base64 encoded end-to-end session.
+     * @param {string} sessionInfo Session information object
      * @param {*} txn An active transaction. See doTxn().
      */
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         this._backendPromise.value().storeEndToEndSession(
-            deviceKey, sessionId, session, txn,
+            deviceKey, sessionId, sessionInfo, txn,
         );
     }
 

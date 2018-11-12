@@ -234,13 +234,13 @@ export default class MemoryCryptoStore {
         func(this._sessions[deviceKey] || {});
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         let deviceSessions = this._sessions[deviceKey];
         if (deviceSessions === undefined) {
             deviceSessions = {};
             this._sessions[deviceKey] = deviceSessions;
         }
-        deviceSessions[sessionId] = session;
+        deviceSessions[sessionId] = sessionInfo;
     }
 
     // Inbound Group Sessions
