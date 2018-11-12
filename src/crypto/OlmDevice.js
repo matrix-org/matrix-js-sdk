@@ -295,8 +295,8 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
  */
 OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
     this._cryptoStore.getEndToEndSession(
-        deviceKey, sessionId, txn, (pickledSession) => {
-            this._unpickleSession(pickledSession, func);
+        deviceKey, sessionId, txn, (sessionInfo) => {
+            this._unpickleSession(sessionInfo, func);
         },
     );
 };
@@ -306,15 +306,17 @@ OlmDevice.prototype._getSession = function(deviceKey, sessionId, txn, func) {
  * function with it. The session object is destroyed once the function
  * returns.
  *
- * @param {string} pickledSession
+ * @param {object} sessionInfo
  * @param {function} func
  * @private
  */
-OlmDevice.prototype._unpickleSession = function(pickledSession, func) {
+OlmDevice.prototype._unpickleSession = function(sessionInfo, func) {
     const session = new global.Olm.Session();
     try {
-        session.unpickle(this._pickleKey, pickledSession);
-        func(session);
+        session.unpickle(this._pickleKey, sessionInfo.session);
+        const unpickledSessInfo = Object.assign({}, sessionInfo, {session});
+
+        func(unpickledSessInfo);
     } finally {
         session.free();
     }
@@ -324,14 +326,17 @@ OlmDevice.prototype._unpickleSession = function(pickledSession, func) {
  * store our OlmSession in the session store
  *
  * @param {string} deviceKey
- * @param {OlmSession} session
+ * @param {object} sessionInfo {session: OlmSession, lastReceivedMessageTs: int}
  * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
  * @private
  */
-OlmDevice.prototype._saveSession = function(deviceKey, session, txn) {
-    const pickledSession = session.pickle(this._pickleKey);
+OlmDevice.prototype._saveSession = function(deviceKey, sessionInfo, txn) {
+    const sessionId = sessionInfo.session.session_id();
+    const pickledSessionInfo = Object.assign(sessionInfo, {
+        session: sessionInfo.session.pickle(this._pickleKey),
+    });
     this._cryptoStore.storeEndToEndSession(
-        deviceKey, session.session_id(), pickledSession, txn,
+        deviceKey, sessionId, pickledSessionInfo, txn,
     );
 };
 
@@ -461,13 +466,15 @@ OlmDevice.prototype.createOutboundSession = async function(
                     session.create_outbound(account, theirIdentityKey, theirOneTimeKey);
                     newSessionId = session.session_id();
                     this._storeAccount(txn, account);
-                    // Pretend we've received a message at this point, otherwise
-                    // if we try to send a message to the device, it won't use
-                    // this session (storing the creation time separately would
-                    // make the pickle longer and would not be useful otherwise).
-                    session.set_last_received_message_ts(Date.now());
-
-                    this._saveSession(theirIdentityKey, session, txn);
+                    const sessionInfo = {
+                        session,
+                        // Pretend we've received a message at this point, otherwise
+                        // if we try to send a message to the device, it won't use
+                        // this session (storing the creation time separately would
+                        // make the pickle longer and would not be useful otherwise).
+                        lastReceivedMessageTs: Date.now(),
+                    };
+                    this._saveSession(theirIdentityKey, sessionInfo, txn);
                 } finally {
                     session.free();
                 }
@@ -515,10 +522,14 @@ OlmDevice.prototype.createInboundSession = async function(
                     this._storeAccount(txn, account);
 
                     const payloadString = session.decrypt(messageType, ciphertext);
-                    // this counts as an received message
-                    session.set_last_received_message_ts(Date.now());
 
-                    this._saveSession(theirDeviceIdentityKey, session, txn);
+                    const sessionInfo = {
+                        session,
+                        // this counts as an received message: set last received message time
+                        // to now
+                        lastReceivedMessageTs: Date.now(),
+                    };
+                    this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
 
                     result = {
                         payload: payloadString,
@@ -602,10 +613,10 @@ OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) 
             this._cryptoStore.getEndToEndSessions(deviceIdentityKey, txn, (sessions) => {
                 const sessionIds = Object.keys(sessions).sort();
                 for (const sessionId of sessionIds) {
-                    this._unpickleSession(sessions[sessionId], (session) => {
+                    this._unpickleSession(sessions[sessionId], (sessInfo) => {
                         info.push({
-                            lastReceivedMessageTs: session.last_received_message_ts(),
-                            hasReceivedMessage: session.has_received_message(),
+                            lastReceivedMessageTs: sessInfo.lastReceivedMessageTs,
+                            hasReceivedMessage: sessInfo.session.has_received_message(),
                             sessionId: sessionId,
                         });
                     });
@@ -636,9 +647,9 @@ OlmDevice.prototype.encryptMessage = async function(
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
         (txn) => {
-            this._getSession(theirDeviceIdentityKey, sessionId, txn, (session) => {
-                res = session.encrypt(payloadString);
-                this._saveSession(theirDeviceIdentityKey, session, txn);
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                res = sessionInfo.session.encrypt(payloadString);
+                this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
     );
@@ -663,10 +674,10 @@ OlmDevice.prototype.decryptMessage = async function(
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
         (txn) => {
-            this._getSession(theirDeviceIdentityKey, sessionId, txn, (session) => {
-                payloadString = session.decrypt(messageType, ciphertext);
-                session.set_last_received_message_ts(Date.now());
-                this._saveSession(theirDeviceIdentityKey, session, txn);
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                payloadString = sessionInfo.session.decrypt(messageType, ciphertext);
+                sessionInfo.lastReceivedMessageTs = Date.now();
+                this._saveSession(theirDeviceIdentityKey, sessionInfo, txn);
             });
         },
     );
@@ -696,8 +707,8 @@ OlmDevice.prototype.matchesSession = async function(
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
         (txn) => {
-            this._getSession(theirDeviceIdentityKey, sessionId, txn, (session) => {
-                matches = session.matches_inbound(ciphertext);
+            this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
+                matches = sessionInfo.session.matches_inbound(ciphertext);
             });
         },
     );

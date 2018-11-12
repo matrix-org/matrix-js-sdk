@@ -350,7 +350,10 @@ export class Backend {
         getReq.onsuccess = function() {
             const cursor = getReq.result;
             if (cursor) {
-                results[cursor.value.sessionId] = cursor.value.session;
+                results[cursor.value.sessionId] = {
+                    session: cursor.value.session,
+                    lastReceivedMessagets: cursor.value.lastReceivedMessageTs,
+                };
                 cursor.continue();
             } else {
                 try {
@@ -368,7 +371,10 @@ export class Backend {
         getReq.onsuccess = function() {
             try {
                 if (getReq.result) {
-                    func(getReq.result.session);
+                    func({
+                        session: getReq.result.session,
+                        lastReceivedMessagets: getReq.result.lastReceivedMessageTs,
+                    });
                 } else {
                     func(null);
                 }
@@ -378,9 +384,14 @@ export class Backend {
         };
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const objectStore = txn.objectStore("sessions");
-        objectStore.put({deviceKey, sessionId, session});
+        objectStore.put({
+            deviceKey,
+            sessionId,
+            session: sessionInfo.session,
+            lastReceivedMessageTs: sessionInfo.lastReceivedMessageTs,
+        });
     }
 
     // Inbound group sessions
