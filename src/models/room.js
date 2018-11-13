@@ -896,7 +896,22 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
     }
 };
 
-Room.prototype._handleThreadEvent = function(event, duplicateStrategy) {
+Room.prototype._createThreadTimelineSet = function(id) {
+    let threadTimelineSet = this._threads[id];
+    if (!threadTimelineSet) {
+        //thread option unused for now
+        const opts = {thread: id};
+        this._threads[id] = threadTimelineSet = new EventTimelineSet(this, opts);
+        this.reEmitter.reEmit(threadTimelineSet,
+            ["Room.timeline", "Room.timelineReset"]);
+        const threadLiveTimeline = threadTimelineSet.getLiveTimeline();
+        threadLiveTimeline._startState = this.currentState.clone();
+        threadLiveTimeline._endState = this.currentState.clone();
+    }
+    return threadTimelineSet;
+};
+
+Room.prototype._handleThreadEvent = function(event, toStartOfTimeline, duplicateStrategy) {
 
     function synthesizeThreadMarker(kind, id) {
         const fakeMarker = {
@@ -910,16 +925,9 @@ Room.prototype._handleThreadEvent = function(event, duplicateStrategy) {
         return new MatrixEvent(fakeMarker);
     }
 
-    const createTimelineSet = (id) => {
-        let threadTimelineSet = this._threads[id];
-        if (!threadTimelineSet) {
-            //threadId option unused for now
-            const opts = {threadId: id};
-            this._threads[id] = threadTimelineSet = new EventTimelineSet(this, opts);
-        }
-        return threadTimelineSet;
+    if (event.getType() !== "m.room.message") {
+        return event;
     }
-
     const content = event.getContent();
     if (!content) {
         return event;
@@ -930,7 +938,7 @@ Room.prototype._handleThreadEvent = function(event, duplicateStrategy) {
     }
     const body = content.body;
     const prefix = "m.thread/";
-    if (!body || body.indexOf(prefix) !== 0) {
+    if (!body || !body.startsWith(prefix)) {
         return event;
     }
     const idEndIndex = body.substr(prefix.length).indexOf("/");
@@ -941,16 +949,20 @@ Room.prototype._handleThreadEvent = function(event, duplicateStrategy) {
     const msg = body.substr(prefix.length + idEndIndex + 1);
 
     if (msg === 'start') {
-        createTimelineSet(id);
+        this._createThreadTimelineSet(id);
+        return synthesizeThreadMarker(msg, id);
+    } else if (msg === 'end') {
         return synthesizeThreadMarker(msg, id);
     }
-    if (msg === 'end') {
-        return synthesizeThreadMarker(msg, id);
-    }
-    const threadTimelineSet = createTimelineSet(id);
+    const threadTimelineSet = this._createThreadTimelineSet(id);
     // add to timeline thread timeline
     content.body = msg;
-    this._addLiveEvent(event, duplicateStrategy, threadTimelineSet);
+    console.log("thread message", id, msg);
+    threadTimelineSet.addEventToTimeline(
+        event,
+        threadTimelineSet.getLiveTimeline(),
+        toStartOfTimeline
+    );
     return undefined;
 };
 
@@ -967,7 +979,7 @@ Room.prototype.getThreadTimelineSet = function(threadId) {
  * @fires module:client~MatrixClient#event:"Room.timeline"
  * @private
  */
-Room.prototype._addLiveEvent = function(event, duplicateStrategy, threadTimelineSet) {
+Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     let i;
     if (event.getType() === "m.room.redaction") {
         const redactId = event.event.redacts;
@@ -1002,12 +1014,8 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy, threadTimeline
     }
 
     // add to our timeline sets
-    if (threadTimelineSet) {
-        threadTimelineSet.addLiveEvent(event, duplicateStrategy);
-    } else {
-        for (i = 0; i < this._timelineSets.length; i++) {
-            this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
-        }
+    for (i = 0; i < this._timelineSets.length; i++) {
+        this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
     }
 
     // synthesize and inject implicit read receipts
@@ -1286,7 +1294,7 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
         else {
             // TODO: We should have a filter to say "only add state event
             // types X Y Z to the timeline".
-            const mappedEvent = this._handleThreadEvent(events[i], duplicateStrategy);
+            const mappedEvent = this._handleThreadEvent(events[i], false, duplicateStrategy);
             if (mappedEvent) {
                 this._addLiveEvent(mappedEvent, duplicateStrategy);
             }

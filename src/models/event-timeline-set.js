@@ -359,6 +359,11 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // paginating with the same token, we might as well use the new pagination
     // token in the hope that we eventually work our way out of the mess.
 
+
+    // this is not called in a loop because _handleThreadEvent eventually calls addEventToTimeline, not addEventsToTimeline
+    events = events.map(event => this.room._handleThreadEvent(event, toStartOfTimeline)).filter(e => !!e);
+
+
     let didUpdate = false;
     let lastEventWasNew = false;
     for (let i = 0; i < events.length; i++) {
