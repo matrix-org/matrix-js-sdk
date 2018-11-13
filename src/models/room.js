@@ -956,7 +956,7 @@ Room.prototype._handleThreadEvent = function(event, toStartOfTimeline, duplicate
     }
     const threadTimelineSet = this._createThreadTimelineSet(id);
     // add to timeline thread timeline
-    content.body = msg;
+    // content.body = msg;
     console.log("thread message", id, msg);
     threadTimelineSet.addEventToTimeline(
         event,

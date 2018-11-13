@@ -122,7 +122,7 @@ TimelineWindow.prototype.loadAsThread = function() {
     this._start = new TimelineIndex(timeline, - timeline.getBaseIndex());
     this._end = new TimelineIndex(timeline, timeline.getEvents().length - timeline.getBaseIndex());
     this._eventCount = timeline.getEvents().length;
-    this._setKey();
+    // this._setKey();
 }
 
 
