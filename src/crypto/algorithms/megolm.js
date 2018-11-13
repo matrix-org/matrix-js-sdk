@@ -433,7 +433,15 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
     }
 
     // The chain index of the key we previously sent this device
+    if (obSessionInfo.sharedWithDevices[userId] === undefined) {
+        logger.debug("Session ID " + sessionId + " never shared with user " + userId);
+        return;
+    }
     const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
+    if (sentChainIndex === undefined) {
+        logger.debug("Session ID " + sessionId + " never shared with device " + userId + ":" + device.deviceId);
+        return;
+    }
 
     // get the key from the inbound session: the outbound one will already
     // have been ratcheted to the next chain index.

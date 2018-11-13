@@ -1196,7 +1196,7 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     // We send this first such that, as long as the toDevice messages arrive in the
     // same order we sent them, the other end will get this first, set up the new session,
     // then get the keyshare request and send the key over this new session (because it
-    // it the session it has most recently received a message on).
+    // is the session it has most recently received a message on).
     const encryptedContent = {
         algorithm: olmlib.OLM_ALGORITHM,
         sender_key: this._olmDevice.deviceCurve25519Key,
