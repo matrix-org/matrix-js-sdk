@@ -300,10 +300,10 @@ EventTimeline.prototype.setNeighbouringTimeline = function(neighbour, direction)
 EventTimeline.prototype.addEvent = function(event, atStart) {
     const stateContext = atStart ? this._startState : this._endState;
 
-    // only call setEventMetadata on the unfiltered timelineSets
+    // only call setEventMetadata on the unfiltered timelineSets or thread timelineSets
     const timelineSet = this.getTimelineSet();
     if (timelineSet.room &&
-        timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+        (timelineSet.room.getUnfilteredTimelineSet() === timelineSet || timelineSet._thread)) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
 
         // modify state

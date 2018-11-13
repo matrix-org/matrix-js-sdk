@@ -70,6 +70,7 @@ function EventTimelineSet(room, opts) {
     this._eventIdToTimeline = {};
 
     this._filter = opts.filter || null;
+    this._thread = opts.thread;
 }
 utils.inherits(EventTimelineSet, EventEmitter);
 
