@@ -589,7 +589,7 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
 
         const minSessInfo = sessionInfos[idxOfMin];
         const minLastReceived = minSessInfo.lastReceivedMessageTs === undefined ?
-            0 : thisSessInfo.lastReceivedMessageTs;
+            0 : minSessInfo.lastReceivedMessageTs;
         if (
             thisLastReceived < minLastReceived || (
                 thisLastReceived === minLastReceived &&
