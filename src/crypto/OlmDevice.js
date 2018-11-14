@@ -581,25 +581,25 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
         return null;
     }
     // Use the session that has most recently received a message
-    let idxOfMin = 0;
+    let idxOfBest = 0;
     for (let i = 1; i < sessionInfos.length; i++) {
         const thisSessInfo = sessionInfos[i];
         const thisLastReceived = thisSessInfo.lastReceivedMessageTs === undefined ?
             0 : thisSessInfo.lastReceivedMessageTs;
 
-        const minSessInfo = sessionInfos[idxOfMin];
-        const minLastReceived = minSessInfo.lastReceivedMessageTs === undefined ?
-            0 : minSessInfo.lastReceivedMessageTs;
+        const bestSessInfo = sessionInfos[idxOfBest];
+        const bestLastReceived = bestSessInfo.lastReceivedMessageTs === undefined ?
+            0 : bestSessInfo.lastReceivedMessageTs;
         if (
-            thisLastReceived < minLastReceived || (
-                thisLastReceived === minLastReceived &&
-                thisSessInfo.sessionId < minSessInfo.sessionId
+            thisLastReceived > bestLastReceived || (
+                thisLastReceived === bestLastReceived &&
+                thisSessInfo.sessionId < bestSessInfo.sessionId
             )
         ) {
-            idxOfMin = i;
+            idxOfBest = i;
         }
     }
-    return sessionInfos[idxOfMin].sessionId;
+    return sessionInfos[idxOfBest].sessionId;
 };
 
 /**
