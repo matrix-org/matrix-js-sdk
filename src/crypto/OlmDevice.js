@@ -584,10 +584,15 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
     let idxOfMin = 0;
     for (let i = 1; i < sessionInfos.length; i++) {
         const thisSessInfo = sessionInfos[i];
+        const thisLastReceived = thisSessInfo.lastReceivedMessageTs === undefined ?
+            0 : thisSessInfo.lastReceivedMessageTs;
+
         const minSessInfo = sessionInfos[idxOfMin];
+        const minLastReceived = minSessInfo.lastReceivedMessageTs === undefined ?
+            0 : thisSessInfo.lastReceivedMessageTs;
         if (
-            thisSessInfo.lastReceivedMessageTs < minSessInfo.lastReceiveMessageTs || (
-                thisSessInfo.lastReceivedMessageTs === minSessInfo.lastReceiveMessageTs &&
+            thisLastReceived < minLastReceived || (
+                thisLastReceived === minLastReceived &&
                 thisSessInfo.sessionId < minSessInfo.sessionId
             )
         ) {
