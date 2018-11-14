@@ -1,3 +1,10 @@
+Changes in [0.13.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.13.1) (2018-11-14)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.13.0...v0.13.1)
+
+ * Add function to get currently joined rooms.
+   [\#779](https://github.com/matrix-org/matrix-js-sdk/pull/779)
+
 Changes in [0.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.13.0) (2018-11-15)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.1...v0.13.0)
