@@ -352,7 +352,7 @@ export class Backend {
             if (cursor) {
                 results[cursor.value.sessionId] = {
                     session: cursor.value.session,
-                    lastReceivedMessagets: cursor.value.lastReceivedMessageTs,
+                    lastReceivedMessageTs: cursor.value.lastReceivedMessageTs,
                 };
                 cursor.continue();
             } else {
@@ -373,7 +373,7 @@ export class Backend {
                 if (getReq.result) {
                     func({
                         session: getReq.result.session,
-                        lastReceivedMessagets: getReq.result.lastReceivedMessageTs,
+                        lastReceivedMessageTs: getReq.result.lastReceivedMessageTs,
                     });
                 } else {
                     func(null);

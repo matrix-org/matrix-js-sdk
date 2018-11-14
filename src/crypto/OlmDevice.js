@@ -470,8 +470,7 @@ OlmDevice.prototype.createOutboundSession = async function(
                         session,
                         // Pretend we've received a message at this point, otherwise
                         // if we try to send a message to the device, it won't use
-                        // this session (storing the creation time separately would
-                        // make the pickle longer and would not be useful otherwise).
+                        // this session
                         lastReceivedMessageTs: Date.now(),
                     };
                     this._saveSession(theirIdentityKey, sessionInfo, txn);
@@ -525,7 +524,7 @@ OlmDevice.prototype.createInboundSession = async function(
 
                     const sessionInfo = {
                         session,
-                        // this counts as an received message: set last received message time
+                        // this counts as a received message: set last received message time
                         // to now
                         lastReceivedMessageTs: Date.now(),
                     };
@@ -582,15 +581,20 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
         return null;
     }
     // Use the session that has most recently received a message
-    sessionInfos.sort((a, b) => {
-        if (a.lastReceivedMessageTs !== b.lastReceivedMessageTs) {
-            return a.lastReceivedMessageTs - b.lastReceivedMessageTs;
-        } else {
-            if (a.sessionId === b.sessionId) return 0;
-            return a.sessionId < b.sessionId ? -1 : 1;
+    let idxOfMin = 0;
+    for (let i = 1; i < sessionInfos.length; i++) {
+        const thisSessInfo = sessionInfos[i];
+        const minSessInfo = sessionInfos[idxOfMin];
+        if (
+            thisSessInfo.lastReceivedMessageTs < minSessInfo.lastReceiveMessageTs || (
+                thisSessInfo.lastReceivedMessageTs === minSessInfo.lastReceiveMessageTs &&
+                thisSessInfo.sessionId < minSessInfo.sessionId
+            )
+        ) {
+            idxOfMin = i;
         }
-    });
-    return sessionInfos[sessionInfos.length - 1].sessionId;
+    }
+    return sessionInfos[idxOfMin].sessionId;
 };
 
 /**
