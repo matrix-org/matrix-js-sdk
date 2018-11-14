@@ -499,7 +499,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
         },
     });
     logger.debug(
-        `Re-shared key for session ${sessionId}  with {userId}:{device.deviceId}`,
+        `Re-shared key for session ${sessionId}  with ${userId}:${device.deviceId}`,
     );
 };
 

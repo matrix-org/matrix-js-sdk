@@ -41,6 +41,8 @@ export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
 
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
+
 /**
  * Cryptography bits
  *
@@ -120,6 +122,15 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // has happened for a given room. This is delayed
     // to avoid loading room members as long as possible.
     this._roomDeviceTrackingState = {};
+
+    // The timestamp of the last time we forced establishment
+    // of a new session for each device, in milliseconds.
+    // {
+    //     userId: {
+    //         deviceId: 1234567890000,
+    //     },
+    // }
+    this._lastNewSessionForced = {};
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -1179,6 +1190,19 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     if (sender === undefined || deviceKey === undefined || deviceKey === undefined) {
         return;
     }
+
+    // check when we last forced a new session with this device: if we've already done so
+    // recently, don't do it again.
+    this._lastNewSessionForced[sender] = this._lastNewSessionForced[sender] || {};
+    const lastNewSessionForced = this._lastNewSessionForced[sender][deviceKey] || 0;
+    if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
+        logger.debug(
+            "New session already forced with device " + sender + ":" + deviceKey +
+            " at " + lastNewSessionForced + ": not forcing another",
+        );
+        return;
+    }
+    this._lastNewSessionForced[sender][deviceKey] = Date.now();
 
     // establish a new olm session with this device since we're failing to decrypt messages
     // on a current session.
