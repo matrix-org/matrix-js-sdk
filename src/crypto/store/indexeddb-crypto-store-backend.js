@@ -206,6 +206,42 @@ export class Backend {
         return promiseifyTxn(txn).then(() => result);
     }
 
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        let stateIndex = 0;
+        const results = [];
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (cursor) {
+                const keyReq = cursor.value;
+                if (keyReq.recipients.includes({userId, deviceId})) {
+                    results.push(keyReq);
+                }
+                cursor.continue();
+            } else {
+                // try the next state in the list
+                stateIndex++;
+                if (stateIndex >= wantedStates.length) {
+                    // no matches
+                    return;
+                }
+
+                const wantedState = wantedStates[stateIndex];
+                const cursorReq = ev.target.source.openCursor(wantedState);
+                cursorReq.onsuccess = onsuccess;
+            }
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const wantedState = wantedStates[stateIndex];
+        const cursorReq = store.index("state").openCursor(wantedState);
+        cursorReq.onsuccess = onsuccess;
+
+        return promiseifyTxn(txn).then(() => results);
+    }
+
     /**
      * Look for an existing room key request by id and state, and update it if
      * found
@@ -314,7 +350,10 @@ export class Backend {
         getReq.onsuccess = function() {
             const cursor = getReq.result;
             if (cursor) {
-                results[cursor.value.sessionId] = cursor.value.session;
+                results[cursor.value.sessionId] = {
+                    session: cursor.value.session,
+                    lastReceivedMessageTs: cursor.value.lastReceivedMessageTs,
+                };
                 cursor.continue();
             } else {
                 try {
@@ -332,7 +371,10 @@ export class Backend {
         getReq.onsuccess = function() {
             try {
                 if (getReq.result) {
-                    func(getReq.result.session);
+                    func({
+                        session: getReq.result.session,
+                        lastReceivedMessageTs: getReq.result.lastReceivedMessageTs,
+                    });
                 } else {
                     func(null);
                 }
@@ -342,9 +384,14 @@ export class Backend {
         };
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const objectStore = txn.objectStore("sessions");
-        objectStore.put({deviceKey, sessionId, session});
+        objectStore.put({
+            deviceKey,
+            sessionId,
+            session: sessionInfo.session,
+            lastReceivedMessageTs: sessionInfo.lastReceivedMessageTs,
+        });
     }
 
     // Inbound group sessions

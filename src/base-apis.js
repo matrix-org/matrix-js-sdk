@@ -262,7 +262,19 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
     utils.extend(login_data, data);
 
     return this._http.authedRequest(
-        callback, "POST", "/login", undefined, login_data,
+        (error, response) => {
+            if (loginType === "m.login.password" && response &&
+                response.access_token && response.user_id) {
+                this._http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+
+            if (callback) {
+                callback(error, response);
+            }
+        }, "POST", "/login", undefined, login_data,
     );
 };
 
@@ -927,6 +939,28 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     );
 };
 
+/**
+ * @return {module:client.Promise} Resolves: A list of the user's current rooms
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRooms = function() {
+    const path = utils.encodeUri("/joined_rooms");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * Retrieve membership info. for a room.
+ * @param {string} roomId ID of the room to get membership for
+ * @return {module:client.Promise} Resolves: A list of currently joined users
+ *                                 and their profile data.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRoomMembers = function(roomId) {
+    const path = utils.encodeUri("/rooms/$roomId/joined_members", {
+        $roomId: roomId,
+    });
+    return this._http.authedRequest(undefined, "GET", path);
+};
 
 // Room Directory operations
 // =========================

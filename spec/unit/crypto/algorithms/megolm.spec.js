@@ -18,6 +18,7 @@ import Crypto from '../../../../lib/crypto';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
+const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -34,8 +35,10 @@ describe("MegolmDecryption", function() {
     let mockCrypto;
     let mockBaseApis;
 
-    beforeEach(function() {
+    beforeEach(async function() {
         testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+
+        await Olm.init();
 
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockBaseApis = {};
@@ -66,7 +69,6 @@ describe("MegolmDecryption", function() {
     describe('receives some keys:', function() {
         let groupSession;
         beforeEach(async function() {
-            await Olm.init();
             groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
 
@@ -262,6 +264,93 @@ describe("MegolmDecryption", function() {
                 return megolmDecryption.decryptEvent(event);
                 // test is successful if no exception is thrown
             });
+        });
+
+        it("re-uses sessions for sequential messages", async function() {
+            const mockStorage = new MockStorageApi();
+            const sessionStore = new WebStorageSessionStore(mockStorage);
+            const cryptoStore = new MemoryCryptoStore(mockStorage);
+
+            const olmDevice = new OlmDevice(sessionStore, cryptoStore);
+            olmDevice.verifySignature = expect.createSpy();
+            await olmDevice.init();
+
+            mockBaseApis.claimOneTimeKeys = expect.createSpy().andReturn(Promise.resolve({
+                one_time_keys: {
+                    '@alice:home.server': {
+                        aliceDevice: {
+                            'signed_curve25519:flooble': {
+                                key: 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI',
+                                signatures: {
+                                    '@alice:home.server': {
+                                        'ed25519:aliceDevice': 'totally valid',
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }));
+            mockBaseApis.sendToDevice = expect.createSpy().andReturn(Promise.resolve());
+
+            mockCrypto.downloadKeys.andReturn(Promise.resolve({
+                '@alice:home.server': {
+                    aliceDevice: {
+                        deviceId: 'aliceDevice',
+                        isBlocked: expect.createSpy().andReturn(false),
+                        isUnverified: expect.createSpy().andReturn(false),
+                        getIdentityKey: expect.createSpy().andReturn(
+                            'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE',
+                        ),
+                        getFingerprint: expect.createSpy().andReturn(''),
+                    },
+                },
+            }));
+
+            const megolmEncryption = new MegolmEncryption({
+                userId: '@user:id',
+                crypto: mockCrypto,
+                olmDevice: olmDevice,
+                baseApis: mockBaseApis,
+                roomId: ROOM_ID,
+                config: {
+                    rotation_period_ms: 9999999999999,
+                },
+            });
+            const mockRoom = {
+                getEncryptionTargetMembers: expect.createSpy().andReturn(
+                    [{userId: "@alice:home.server"}],
+                ),
+                getBlacklistUnverifiedDevices: expect.createSpy().andReturn(false),
+            };
+            const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                body: "Some text",
+            });
+            expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
+
+            // this should have claimed a key for alice as it's starting a new session
+            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalled(
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+            );
+            expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
+                ['@alice:home.server'], false,
+            );
+            expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
+            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalled(
+                [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
+            );
+
+            mockBaseApis.claimOneTimeKeys.reset();
+
+            const ct2 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
+                body: "Some more text",
+            });
+
+            // this should *not* have claimed a key as it should be using the same session
+            expect(mockBaseApis.claimOneTimeKeys).toNotHaveBeenCalled();
+
+            // likewise they should show the same session ID
+            expect(ct2.session_id).toEqual(ct1.session_id);
         });
     });
 });

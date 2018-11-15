@@ -121,14 +121,17 @@ module.exports.encryptMessageForDevice = async function(
  * @param {module:base-apis~MatrixBaseApis} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
- *    map from userid to list of devices
+ *    map from userid to list of devices to ensure sessions for
+ *
+ * @param {bolean} force If true, establish a new session even if one already exists.
+ *     Optional.
  *
  * @return {module:client.Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 module.exports.ensureOlmSessionsForDevices = async function(
-    olmDevice, baseApis, devicesByUser,
+    olmDevice, baseApis, devicesByUser, force,
 ) {
     const devicesWithoutSession = [
         // [userId, deviceId], ...
@@ -146,7 +149,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
             const sessionId = await olmDevice.getSessionIdForDevice(key);
-            if (sessionId === null) {
+            if (sessionId === null || force) {
                 devicesWithoutSession.push([userId, deviceId]);
             }
             result[userId][deviceId] = {
@@ -182,7 +185,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
-            if (result[userId][deviceId].sessionId) {
+            if (result[userId][deviceId].sessionId && !force) {
                 // we already have a result for this device
                 continue;
             }

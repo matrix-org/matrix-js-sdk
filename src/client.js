@@ -1246,6 +1246,8 @@ MatrixClient.prototype.isUserIgnored = function(userId) {
  * </strong> Default: true.
  * @param {boolean} opts.inviteSignUrl If the caller has a keypair 3pid invite,
  *                                     the signing URL is passed in this parameter.
+ * @param {string[]} opts.viaServers The server names to try and join through in
+ *                                   addition to those that are automatically chosen.
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: Room object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -1274,6 +1276,13 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         );
     }
 
+    const queryString = {};
+    if (opts.viaServers) {
+        queryString["server_name"] = opts.viaServers;
+    }
+
+    const reqOpts = {qsStringifyOptions: {arrayFormat: 'repeat'}};
+
     const defer = Promise.defer();
 
     const self = this;
@@ -1284,7 +1293,8 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         }
 
         const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
-        return self._http.authedRequest(undefined, "POST", path, undefined, data);
+        return self._http.authedRequest(
+            undefined, "POST", path, queryString, data, reqOpts);
     }).then(function(res) {
         const roomId = res.room_id;
         const syncApi = new SyncApi(self, self._clientOpts);
@@ -1502,6 +1512,13 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
     // add this event immediately to the local store as 'sending'.
     if (room) {
         room.addPendingEvent(localEvent, txnId);
+    }
+
+    // addPendingEvent can change the state to NOT_SENT if it believes
+    // that there's other events that have failed. We won't bother to
+    // try sending the event if the state has changed as such.
+    if (localEvent.status === EventStatus.NOT_SENT) {
+        return Promise.reject(new Error("Event blocked by other events not yet sent"));
     }
 
     return _sendEvent(this, room, localEvent, callback);
