@@ -244,6 +244,21 @@ export default class OutgoingRoomKeyRequestManager {
         });
     }
 
+    /**
+     * Look for room key requests by target device and state
+     *
+     * @param {string} userId Target user ID
+     * @param {string} deviceId Target device ID
+     *
+     * @return {Promise} resolves to a list of all the
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     */
+    getOutgoingSentRoomKeyRequest(userId, deviceId) {
+        return this._cryptoStore.getOutgoingRoomKeyRequestsByTarget(
+            userId, deviceId, [ROOM_KEY_REQUEST_STATES.SENT],
+        );
+    }
+
     // start the background timer to send queued requests, if the timer isn't
     // already running
     _startTimer() {

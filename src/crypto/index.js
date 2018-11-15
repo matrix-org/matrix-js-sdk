@@ -41,6 +41,8 @@ export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
 
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
+
 /**
  * Cryptography bits
  *
@@ -120,6 +122,15 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // has happened for a given room. This is delayed
     // to avoid loading room members as long as possible.
     this._roomDeviceTrackingState = {};
+
+    // The timestamp of the last time we forced establishment
+    // of a new session for each device, in milliseconds.
+    // {
+    //     userId: {
+    //         deviceId: 1234567890000,
+    //     },
+    // }
+    this._lastNewSessionForced = {};
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -1133,6 +1144,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onRoomKeyEvent(event);
         } else if (event.getType() == "m.room_key_request") {
             this._onRoomKeyRequestEvent(event);
+        } else if (event.getContent().msgtype === "m.bad.encrypted") {
+            this._onToDeviceBadEncrypted(event);
         } else if (event.isBeingDecrypted()) {
             // once the event has been decrypted, try again
             event.once('Event.decrypted', (ev) => {
@@ -1160,6 +1173,87 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+/**
+ * Handle a toDevice event that couldn't be decrypted
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event undecryptable event
+ */
+Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
+    const content = event.getWireContent();
+    const sender = event.getSender();
+    const algorithm = content.algorithm;
+    const deviceKey = content.sender_key;
+
+    if (sender === undefined || deviceKey === undefined || deviceKey === undefined) {
+        return;
+    }
+
+    // check when we last forced a new session with this device: if we've already done so
+    // recently, don't do it again.
+    this._lastNewSessionForced[sender] = this._lastNewSessionForced[sender] || {};
+    const lastNewSessionForced = this._lastNewSessionForced[sender][deviceKey] || 0;
+    if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
+        logger.debug(
+            "New session already forced with device " + sender + ":" + deviceKey +
+            " at " + lastNewSessionForced + ": not forcing another",
+        );
+        return;
+    }
+    this._lastNewSessionForced[sender][deviceKey] = Date.now();
+
+    // establish a new olm session with this device since we're failing to decrypt messages
+    // on a current session.
+    // Note that an undecryptable message from another device could easily be spoofed -
+    // is there anything we can do to mitigate this?
+    const device = this._deviceList.getDeviceByIdentityKey(sender, algorithm, deviceKey);
+    const devicesByUser = {};
+    devicesByUser[sender] = [device];
+    await olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, devicesByUser, true,
+    );
+
+    // Now send a blank message on that session so the other side knows about it.
+    // (The keyshare request is sent in the clear so that won't do)
+    // We send this first such that, as long as the toDevice messages arrive in the
+    // same order we sent them, the other end will get this first, set up the new session,
+    // then get the keyshare request and send the key over this new session (because it
+    // is the session it has most recently received a message on).
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    await olmlib.encryptMessageForDevice(
+        encryptedContent.ciphertext,
+        this._userId,
+        this._deviceId,
+        this._olmDevice,
+        sender,
+        device,
+        {type: "m.dummy"},
+    );
+
+    await this._baseApis.sendToDevice("m.room.encrypted", {
+        [sender]: {
+            [device.deviceId]: encryptedContent,
+        },
+    });
+
+
+    // Most of the time this probably won't be necessary since we'll have queued up a key request when
+    // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
+    // it. This won't always be the case though so we need to re-send any that have already been sent
+    // to avoid races.
+    const requestsToResend =
+        await this._outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(
+            sender, device.deviceId,
+        );
+    for (const keyReq of requestsToResend) {
+        this.cancelRoomKeyRequest(keyReq.requestBody, true);
+    }
 };
 
 /**
@@ -1287,9 +1381,27 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
                 ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
     if (userId !== this._userId) {
-        // TODO: determine if we sent this device the keys already: in
-        // which case we can do so again.
-        logger.log("Ignoring room key request from other user for now");
+        if (!this._roomEncryptors[roomId]) {
+            logger.debug(`room key request for unencrypted room ${roomId}`);
+            return;
+        }
+        const encryptor = this._roomEncryptors[roomId];
+        const device = this._deviceList.getStoredDevice(userId, deviceId);
+        if (!device) {
+            logger.debug(`Ignoring keyshare for unknown device ${userId}:${deviceId}`);
+            return;
+        }
+
+        try {
+            await encryptor.reshareKeyWithDevice(
+                body.sender_key, body.session_id, userId, device,
+            );
+        } catch (e) {
+            logger.warn(
+                "Failed to re-share keys for session " + body.session_id +
+                " with device " + userId + ":" + device.deviceId, e,
+            );
+        }
         return;
     }
 

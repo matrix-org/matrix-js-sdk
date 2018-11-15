@@ -208,6 +208,24 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
+     * Look for room key requests by target device and state
+     *
+     * @param {string} userId Target user ID
+     * @param {string} deviceId Target device ID
+     * @param {Array<Number>} wantedStates list of acceptable states
+     *
+     * @return {Promise} resolves to a list of all the
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     */
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequestsByTarget(
+                userId, deviceId, wantedStates,
+            );
+        });
+    }
+
+    /**
      * Look for an existing room key request by id and state, and update it if
      * found
      *
