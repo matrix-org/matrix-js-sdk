@@ -439,7 +439,10 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
     }
     const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
     if (sentChainIndex === undefined) {
-        logger.debug("Session ID " + sessionId + " never shared with device " + userId + ":" + device.deviceId);
+        logger.debug(
+            "Session ID " + sessionId + " never shared with device " +
+            userId + ":" + device.deviceId,
+        );
         return;
     }
 
