@@ -67,7 +67,21 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     _getEndToEndSessions(deviceKey, txn, func) {
-        return getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+        const sessions = getJsonItem(this.store, keyEndToEndSessions(deviceKey));
+        const fixedSessions = {};
+
+        // fix up any old sessions to be objects rather than just the base64 pickle
+        for (const [sid, val] of Object.entries(sessions || {})) {
+            if (typeof val === 'string') {
+                fixedSessions[sid] = {
+                    session: val,
+                };
+            } else {
+                fixedSessions[sid] = val;
+            }
+        }
+
+        return fixedSessions;
     }
 
     getEndToEndSession(deviceKey, sessionId, txn, func) {
@@ -79,9 +93,9 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(this._getEndToEndSessions(deviceKey) || {});
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const sessions = this._getEndToEndSessions(deviceKey) || {};
-        sessions[sessionId] = session;
+        sessions[sessionId] = sessionInfo;
         setJsonItem(
             this.store, keyEndToEndSessions(deviceKey), sessions,
         );
