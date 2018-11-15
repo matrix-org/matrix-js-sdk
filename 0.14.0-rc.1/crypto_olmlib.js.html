@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: crypto/olmlib.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: crypto/olmlib.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2016 OpenMarket Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+/**
+ * @module olmlib
+ *
+ * Utilities common to olm encryption algorithms
+ */
+
+import Promise from 'bluebird';
+const anotherjson = require('another-json');
+
+const logger = require("../logger");
+const utils = require("../utils");
+
+/**
+ * matrix algorithm tag for olm
+ */
+module.exports.OLM_ALGORITHM = "m.olm.v1.curve25519-aes-sha2";
+
+/**
+ * matrix algorithm tag for megolm
+ */
+module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
+
+/**
+ * Encrypt an event payload for an Olm device
+ *
+ * @param {Object&lt;string, string>} resultsObject  The `ciphertext` property
+ *   of the m.room.encrypted event to which to add our result
+ *
+ * @param {string} ourUserId
+ * @param {string} ourDeviceId
+ * @param {module:crypto/OlmDevice} olmDevice olm.js wrapper
+ * @param {string} recipientUserId
+ * @param {module:crypto/deviceinfo} recipientDevice
+ * @param {object} payloadFields fields to include in the encrypted payload
+ *
+ * Returns a promise which resolves (to undefined) when the payload
+ *    has been encrypted into `resultsObject`
+ */
+module.exports.encryptMessageForDevice = async function (resultsObject, ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice, payloadFields) {
+    const deviceKey = recipientDevice.getIdentityKey();
+    const sessionId = await olmDevice.getSessionIdForDevice(deviceKey);
+    if (sessionId === null) {
+        // If we don't have a session for a device then
+        // we can't encrypt a message for it.
+        return;
+    }
+
+    logger.log("Using sessionid " + sessionId + " for device " + recipientUserId + ":" + recipientDevice.deviceId);
+
+    const payload = {
+        sender: ourUserId,
+        sender_device: ourDeviceId,
+
+        // Include the Ed25519 key so that the recipient knows what
+        // device this message came from.
+        // We don't need to include the curve25519 key since the
+        // recipient will already know this from the olm headers.
+        // When combined with the device keys retrieved from the
+        // homeserver signed by the ed25519 key this proves that
+        // the curve25519 key and the ed25519 key are owned by
+        // the same device.
+        keys: {
+            "ed25519": olmDevice.deviceEd25519Key
+        },
+
+        // include the recipient device details in the payload,
+        // to avoid unknown key attacks, per
+        // https://github.com/vector-im/vector-web/issues/2483
+        recipient: recipientUserId,
+        recipient_keys: {
+            "ed25519": recipientDevice.getFingerprint()
+        }
+    };
+
+    // TODO: technically, a bunch of that stuff only needs to be included for
+    // pre-key messages: after that, both sides know exactly which devices are
+    // involved in the session. If we're looking to reduce data transfer in the
+    // future, we could elide them for subsequent messages.
+
+    utils.extend(payload, payloadFields);
+
+    resultsObject[deviceKey] = await olmDevice.encryptMessage(deviceKey, sessionId, JSON.stringify(payload));
+};
+
+/**
+ * Try to make sure we have established olm sessions for the given devices.
+ *
+ * @param {module:crypto/OlmDevice} olmDevice
+ *
+ * @param {module:base-apis~MatrixBaseApis} baseApis
+ *
+ * @param {object&lt;string, module:crypto/deviceinfo[]>} devicesByUser
+ *    map from userid to list of devices
+ *
+ * @return {module:client.Promise} resolves once the sessions are complete, to
+ *    an Object mapping from userId to deviceId to
+ *    {@link module:crypto~OlmSessionResult}
+ */
+module.exports.ensureOlmSessionsForDevices = async function (olmDevice, baseApis, devicesByUser) {
+    const devicesWithoutSession = [
+        // [userId, deviceId], ...
+    ];
+    const result = {};
+
+    for (const userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
+        result[userId] = {};
+        const devices = devicesByUser[userId];
+        for (let j = 0; j &lt; devices.length; j++) {
+            const deviceInfo = devices[j];
+            const deviceId = deviceInfo.deviceId;
+            const key = deviceInfo.getIdentityKey();
+            const sessionId = await olmDevice.getSessionIdForDevice(key);
+            if (sessionId === null) {
+                devicesWithoutSession.push([userId, deviceId]);
+            }
+            result[userId][deviceId] = {
+                device: deviceInfo,
+                sessionId: sessionId
+            };
+        }
+    }
+
+    if (devicesWithoutSession.length === 0) {
+        return result;
+    }
+
+    // TODO: this has a race condition - if we try to send another message
+    // while we are claiming a key, we will end up claiming two and setting up
+    // two sessions.
+    //
+    // That should eventually resolve itself, but it's poor form.
+
+    const oneTimeKeyAlgorithm = "signed_curve25519";
+    const res = await baseApis.claimOneTimeKeys(devicesWithoutSession, oneTimeKeyAlgorithm);
+
+    const otk_res = res.one_time_keys || {};
+    const promises = [];
+    for (const userId in devicesByUser) {
+        if (!devicesByUser.hasOwnProperty(userId)) {
+            continue;
+        }
+        const userRes = otk_res[userId] || {};
+        const devices = devicesByUser[userId];
+        for (let j = 0; j &lt; devices.length; j++) {
+            const deviceInfo = devices[j];
+            const deviceId = deviceInfo.deviceId;
+            if (result[userId][deviceId].sessionId) {
+                // we already have a result for this device
+                continue;
+            }
+
+            const deviceRes = userRes[deviceId] || {};
+            let oneTimeKey = null;
+            for (const keyId in deviceRes) {
+                if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
+                    oneTimeKey = deviceRes[keyId];
+                }
+            }
+
+            if (!oneTimeKey) {
+                logger.warn("No one-time keys (alg=" + oneTimeKeyAlgorithm + ") for device " + userId + ":" + deviceId);
+                continue;
+            }
+
+            promises.push(_verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo).then(sid => {
+                result[userId][deviceId].sessionId = sid;
+            }));
+        }
+    }
+
+    await Promise.all(promises);
+    return result;
+};
+
+async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
+    const deviceId = deviceInfo.deviceId;
+    try {
+        await _verifySignature(olmDevice, oneTimeKey, userId, deviceId, deviceInfo.getFingerprint());
+    } catch (e) {
+        logger.error("Unable to verify signature on one-time key for device " + userId + ":" + deviceId + ":", e);
+        return null;
+    }
+
+    let sid;
+    try {
+        sid = await olmDevice.createOutboundSession(deviceInfo.getIdentityKey(), oneTimeKey.key);
+    } catch (e) {
+        // possibly a bad key
+        logger.error("Error starting session with device " + userId + ":" + deviceId + ": " + e);
+        return null;
+    }
+
+    logger.log("Started new sessionid " + sid + " for device " + userId + ":" + deviceId);
+    return sid;
+}
+
+/**
+ * Verify the signature on an object
+ *
+ * @param {module:crypto/OlmDevice} olmDevice olm wrapper to use for verify op
+ *
+ * @param {Object} obj object to check signature on. Note that this will be
+ * stripped of its 'signatures' and 'unsigned' properties.
+ *
+ * @param {string} signingUserId  ID of the user whose signature should be checked
+ *
+ * @param {string} signingDeviceId  ID of the device whose signature should be checked
+ *
+ * @param {string} signingKey   base64-ed ed25519 public key
+ *
+ * Returns a promise which resolves (to undefined) if the the signature is good,
+ * or rejects with an Error if it is bad.
+ */
+const _verifySignature = module.exports.verifySignature = async function (olmDevice, obj, signingUserId, signingDeviceId, signingKey) {
+    const signKeyId = "ed25519:" + signingDeviceId;
+    const signatures = obj.signatures || {};
+    const userSigs = signatures[signingUserId] || {};
+    const signature = userSigs[signKeyId];
+    if (!signature) {
+        throw Error("No signature");
+    }
+
+    // prepare the canonical json: remove unsigned and signatures, and stringify with
+    // anotherjson
+    delete obj.unsigned;
+    delete obj.signatures;
+    const json = anotherjson.stringify(obj);
+
+    olmDevice.verifySignature(signingKey, json, signature);
+};</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto_.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_store_base_.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-reemit.html">reemit</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="Backend.html">Backend</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto_.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MatrixInMemoryStore.html">MatrixInMemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator-SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Global</h3><ul><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentHelpers">ContentHelpers</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#Group">Group</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#InvalidStoreError">InvalidStoreError</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallAudioOutput">setMatrixCallAudioOutput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Thu Nov 15 2018 15:12:37 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
