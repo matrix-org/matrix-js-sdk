@@ -1459,7 +1459,7 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     // on a current session.
     // Note that an undecryptable message from another device could easily be spoofed -
     // is there anything we can do to mitigate this?
-    const device = this._deviceList.getDeviceByIdentityKey(sender, algorithm, deviceKey);
+    const device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
     const devicesByUser = {};
     devicesByUser[sender] = [device];
     await olmlib.ensureOlmSessionsForDevices(
