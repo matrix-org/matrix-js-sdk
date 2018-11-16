@@ -1512,6 +1512,42 @@ Room.prototype.maySendMessage = function() {
         this.currentState.maySendEvent('m.room.message', this.myUserId);
 };
 
+Room.prototype.getThreadTimelineSet = function(threadId) {
+    if (!this._threads) {
+        this._threads = {};
+    }
+    let thread = this._threads[threadId];
+    if (!thread) {
+        thread = new EventTimelineSet(this, {threadId: threadId});
+        const liveTimeline = thread.getLiveTimeline();
+        liveTimeline._startState = this.currentState.clone();
+        liveTimeline._endState = this.currentState.clone();
+        const createMessage = (sender, index) => {
+            return new MatrixEvent({
+                "content": {
+                    "body": `message ${index} in thread ${threadId}`,
+                    "msgtype": "m.text",
+                },
+                "event_id": `$${Math.ceil(Math.random() * 100000000)}:chat.example.com`,
+                "origin_server_ts": Date.now() - (3600 * 1000) + (60 * 1000 * i), //-1h + x min
+                "sender": sender.userId,
+                "type": "m.room.message",
+                "room_id": this.roomId,
+            });
+        };
+
+        const members = this.getJoinedMembers();
+        const events = [];
+        for (var i = 0; i < 100; i++) {
+            const member = members[Math.floor(i / 3) % members.length];
+            liveTimeline.addEvent(createMessage(member, i), false);
+        }
+        this._threads[threadId] = thread;
+        this.emit("Room.thread", threadId, thread);
+    }
+    return thread;
+}
+
 /**
  * This is an internal method. Calculates the name of the room from the current
  * room state.
