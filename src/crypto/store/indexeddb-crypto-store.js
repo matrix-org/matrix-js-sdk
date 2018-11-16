@@ -21,6 +21,7 @@ import logger from '../../logger';
 import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
+import {InvalidCryptoStoreError} from '../../errors';
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -107,16 +108,25 @@ export default class IndexedDBCryptoStore {
                 },
             );
         }).catch((e) => {
+            if (e.name === 'VersionError') {
+                logger.warn("Crypto DB is too new for us to use!", e);
+                // don't fall back to a different store: the user has crypto data
+                // in this db so we should use it or nothing at all.
+                throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
+            }
             logger.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to localStorage store: ${e}`,
             );
-            return new LocalStorageCryptoStore(global.localStorage);
-        }).catch((e) => {
-            logger.warn(
-                `unable to open localStorage: falling back to in-memory store: ${e}`,
-            );
-            return new MemoryCryptoStore();
+
+            try {
+                return new LocalStorageCryptoStore(global.localStorage);
+            } catch (e) {
+                logger.warn(
+                    `unable to open localStorage: falling back to in-memory store: ${e}`,
+                );
+                return new MemoryCryptoStore();
+            }
         });
 
         return this._backendPromise;
