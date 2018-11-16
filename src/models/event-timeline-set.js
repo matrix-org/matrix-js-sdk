@@ -68,7 +68,7 @@ function EventTimelineSet(room, opts) {
     // just a list - *not* ordered.
     this._timelines = [this._liveTimeline];
     this._eventIdToTimeline = {};
-    this._threadId = opts.threadId;
+    this.threadId = opts.threadId;
     this._filter = opts.filter || null;
 }
 utils.inherits(EventTimelineSet, EventEmitter);

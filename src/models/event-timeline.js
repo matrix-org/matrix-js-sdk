@@ -302,7 +302,7 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
 
     // only call setEventMetadata on the unfiltered timelineSets
     const timelineSet = this.getTimelineSet();
-    if (timelineSet._threadId ||  (timelineSet.room &&
+    if (timelineSet.threadId ||  (timelineSet.room &&
         timelineSet.room.getUnfilteredTimelineSet() === timelineSet)) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
 
