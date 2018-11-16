@@ -1610,7 +1610,7 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
 function memberNamesToRoomName(names, count = (names.length + 1)) {
     const countWithoutMe = count - 1;
     if (!names.length) {
-       return count <= 1 ? "Empty room" : null;
+       return "Empty room";
     } else if (names.length === 1 && countWithoutMe <= 1) {
         return names[0];
     } else if (names.length === 2 && countWithoutMe <= 2) {
