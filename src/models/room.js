@@ -1512,16 +1512,24 @@ Room.prototype.maySendMessage = function() {
         this.currentState.maySendEvent('m.room.message', this.myUserId);
 };
 
-Room.prototype.getThreadTimelineSet = function(threadId) {
+Room.prototype.getThreadTimelineSet = function(id) {
     if (!this._threads) {
         this._threads = {};
     }
+
+    const parts = id.split(":");
+    const threadId = parts[0];
+    const size = parts[1] ? parseInt(parts[1], 10) : 100;
+
     let thread = this._threads[threadId];
     if (!thread) {
+        // TODO: wire up this timelineSet with the room reemitter
         thread = new EventTimelineSet(this, {threadId: threadId});
         const liveTimeline = thread.getLiveTimeline();
         liveTimeline._startState = this.currentState.clone();
         liveTimeline._endState = this.currentState.clone();
+        this.reEmitter.reEmit(thread, ["Room.timeline", "Room.timelineReset"]);
+
         const createMessage = (sender, index) => {
             return new MatrixEvent({
                 "content": {
@@ -1538,7 +1546,7 @@ Room.prototype.getThreadTimelineSet = function(threadId) {
 
         const members = this.getJoinedMembers();
         const events = [];
-        for (var i = 0; i < 100; i++) {
+        for (var i = 0; i < size; i++) {
             const member = members[Math.floor(i / 3) % members.length];
             liveTimeline.addEvent(createMessage(member, i), false);
         }
