@@ -322,7 +322,7 @@ MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
  */
 MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType) {
     if (loginType === undefined) {
-        loginType = "cas";
+        loginType = "sso";
     }
     return this._http.getUrl("/login/"+loginType+"/redirect", {
         "redirectUrl": redirectUrl,
