@@ -188,6 +188,10 @@ function Room(roomId, client, myUserId, opts) {
     } else {
         this._membersPromise = null;
     }
+
+    this._threads = {
+        // thread id => timeline set
+    };
 }
 
 utils.inherits(Room, EventEmitter);
@@ -205,6 +209,23 @@ Room.prototype.getVersion = function() {
     const ver = createEvent.getContent()['room_version'];
     if (ver === undefined) return '1';
     return ver;
+};
+
+Room.prototype._handleThreadEvent = function(event) {
+    if (event.getType() !== 'org.matrix.new_thread') {
+        return;
+    }
+    const threadId = event.getContent().thread_id;
+
+    if (!this._threads[threadId]) {
+        const timelineSet = new EventTimelineSet(this, {threadId: threadId});
+        this.reEmitter.reEmit(timelineSet, ["Room.timeline", "Room.timelineReset"]);
+        this._threads[threadId] = timelineSet;
+    }
+};
+
+Room.prototype.getThreadTimelineSet = function(threadId) {
+    return this._threads[threadId];
 };
 
 /**

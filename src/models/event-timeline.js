@@ -158,6 +158,10 @@ EventTimeline.prototype.getRoomId = function() {
     return this._roomId;
 };
 
+EventTimeline.prototype.getThreadId = function() {
+    return this._eventTimelineSet.threadId;
+};
+
 /**
  * Get the filter for this timeline's timelineSet (if any)
  * @return {Filter} filter
@@ -337,6 +341,8 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
     if (atStart) {
         this._baseIndex++;
     }
+
+    this._eventTimelineSet.room._handleThreadEvent(event);
 };
 
 /**
