@@ -310,9 +310,23 @@ MatrixBaseApis.prototype.loginWithSAML2 = function(relayState, callback) {
  * @return {string} The HS URL to hit to begin the CAS login process.
  */
 MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
-    return this._http.getUrl("/login/cas/redirect", {
+    return this.getSsoLoginUrl(redirectUrl, "cas");
+};
+
+/**
+ * @param {string} redirectUrl The URL to redirect to after the HS
+ *     authenticates with the SSO.
+ * @param {string} loginType The type of SSO login we are doing (sso or cas).
+ *     Defaults to 'sso'.
+ * @return {string} The HS URL to hit to begin the SSO login process.
+ */
+MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType) {
+    if (loginType === undefined) {
+        loginType = "sso";
+    }
+    return this._http.getUrl("/login/"+loginType+"/redirect", {
         "redirectUrl": redirectUrl,
-    }, httpApi.PREFIX_UNSTABLE);
+    }, httpApi.PREFIX_R0);
 };
 
 /**
