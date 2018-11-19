@@ -1,3 +1,53 @@
+Changes in [0.14.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.0) (2018-11-19)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0-rc.1...v0.14.0)
+
+ * No changes since rc.1
+
+Changes in [0.14.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.0-rc.1) (2018-11-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.13.1...v0.14.0-rc.1)
+
+BREAKING CHANGE
+----------------
+ 
+ * js-sdk now uses Olm 3.0. Apps using Olm must update to 3.0 to
+   continue using Olm with the js-sdk. The js-sdk will call Olm's
+   init() method when the client is started.
+
+All Changes
+-----------
+
+ * Prevent messages from being sent if other messages have failed to send
+   [\#781](https://github.com/matrix-org/matrix-js-sdk/pull/781)
+ * A unit test for olm
+   [\#777](https://github.com/matrix-org/matrix-js-sdk/pull/777)
+ * Set access_token and user_id after login in with username and password.
+   [\#778](https://github.com/matrix-org/matrix-js-sdk/pull/778)
+ * Add function to get currently joined rooms.
+   [\#779](https://github.com/matrix-org/matrix-js-sdk/pull/779)
+ * Remove the request-only stuff we don't need anymore
+   [\#775](https://github.com/matrix-org/matrix-js-sdk/pull/775)
+ * Manually construct query strings for browser-request instances
+   [\#770](https://github.com/matrix-org/matrix-js-sdk/pull/770)
+ * Fix: correctly check for crypto being present
+   [\#769](https://github.com/matrix-org/matrix-js-sdk/pull/769)
+ * Update babel-eslint to 8.1.1
+   [\#768](https://github.com/matrix-org/matrix-js-sdk/pull/768)
+ * Support `request` in the browser and support supplying servers to try in
+   joinRoom()
+   [\#764](https://github.com/matrix-org/matrix-js-sdk/pull/764)
+ * loglevel should be a normal dependency
+   [\#767](https://github.com/matrix-org/matrix-js-sdk/pull/767)
+ * Stop devicelist when client is stopped
+   [\#766](https://github.com/matrix-org/matrix-js-sdk/pull/766)
+ * Update to WebAssembly-powered Olm
+   [\#743](https://github.com/matrix-org/matrix-js-sdk/pull/743)
+ * Logging lib. Fixes #332
+   [\#763](https://github.com/matrix-org/matrix-js-sdk/pull/763)
+ * Use new stop() method on matrix-mock-request
+   [\#765](https://github.com/matrix-org/matrix-js-sdk/pull/765)
+
 Changes in [0.13.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.13.1) (2018-11-14)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.13.0...v0.13.1)
