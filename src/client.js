@@ -875,9 +875,8 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
 
     const decryption = new global.Olm.PkDecryption();
     try {
-        let privateKey;
         let publicKey;
-        let authData = {};
+        const authData = {};
         if (password) {
             const keyInfo = await keyForNewBackup(password);
             publicKey = decryption.init_with_private_key(keyInfo.key);
