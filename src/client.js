@@ -1013,7 +1013,7 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
 ) {
     const backupInfo = await this.getKeyBackupVersion();
 
-    const privKey = keyForExistingBackup(backupInfo, password);
+    const privKey = await keyForExistingBackup(backupInfo, password);
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, version,
     );
@@ -1041,7 +1041,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
 
     const decryption = new global.Olm.PkDecryption();
     try {
-        decryption.init_with_private_key(privkey);
+        decryption.init_with_private_key(privKey);
     } catch(e) {
         decryption.free();
         throw e;

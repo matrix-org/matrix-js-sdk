@@ -33,8 +33,8 @@ export async function keyForExistingBackup(backupData, password) {
     }
 
     return await deriveKey(
-        password, backupData.private_key_salt,
-        backupData.private_key_iterations,
+        password, backupData.auth_data.private_key_salt,
+        backupData.auth_data.private_key_iterations,
     );
 }
 
