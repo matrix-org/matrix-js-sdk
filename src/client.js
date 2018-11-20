@@ -50,6 +50,7 @@ import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
 import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
+import { randomString } from './randomstring';
 
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
@@ -3862,14 +3863,7 @@ MatrixClient.prototype.getEventMapper = function() {
  * @return {string} A new client secret
  */
 MatrixClient.prototype.generateClientSecret = function() {
-    let ret = "";
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-    for (let i = 0; i < 32; i++) {
-        ret += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-
-    return ret;
+    return randomString(32);
 };
 
 /** */
