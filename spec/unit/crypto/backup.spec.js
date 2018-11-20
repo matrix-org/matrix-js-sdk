@@ -435,7 +435,7 @@ describe("MegolmBackup", function() {
             client._http.authedRequest = function() {
                 return Promise.resolve(KEY_BACKUP_DATA);
             };
-            return client.restoreKeyBackups(
+            return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                 ROOM_ID,
                 SESSION_ID,
@@ -458,7 +458,7 @@ describe("MegolmBackup", function() {
                     },
                 });
             };
-            return client.restoreKeyBackups(
+            return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
