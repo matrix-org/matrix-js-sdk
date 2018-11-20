@@ -71,6 +71,7 @@ function EventTimelineSet(room, opts) {
 
     this._filter = opts.filter || null;
     this.threadId = opts.threadId;
+    this._threadNeedsInitialRequest = !!this.threadId;
 }
 utils.inherits(EventTimelineSet, EventEmitter);
 

@@ -162,6 +162,20 @@ EventTimeline.prototype.getThreadId = function() {
     return this._eventTimelineSet.threadId;
 };
 
+EventTimeline.prototype.clearThreadNeedsInitialRequest = function() {
+    const value = this._eventTimelineSet._threadNeedsInitialRequest;
+    this._eventTimelineSet._threadNeedsInitialRequest = false;
+    return value;
+}
+
+EventTimeline.prototype.restoreThreadNeedsInitialRequest = function(oldValue) {
+    this._eventTimelineSet._threadNeedsInitialRequest = oldValue;
+}
+
+EventTimeline.prototype.threadNeedsInitialRequest = function() {
+    return this._eventTimelineSet._threadNeedsInitialRequest;
+}
+
 /**
  * Get the filter for this timeline's timelineSet (if any)
  * @return {Filter} filter

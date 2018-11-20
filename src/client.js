@@ -2210,7 +2210,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
     const dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
 
     const token = eventTimeline.getPaginationToken(dir);
-    if (!token) {
+    if (!token  && !eventTimeline.threadNeedsInitialRequest()) {
         // no token - no results.
         return Promise.resolve(false);
     }
@@ -2273,6 +2273,8 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
+        const wasInitialThreadRequest = eventTimeline.clearThreadNeedsInitialRequest();
+
         promise = this._createMessagesRequest(
             eventTimeline.getRoomId(),
             eventTimeline.getThreadId(),
@@ -2298,6 +2300,9 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
                 eventTimeline.setPaginationToken(null, dir);
             }
             return res.end != res.start;
+        }).catch(function(err) {
+            eventTimeline.restoreThreadNeedsInitialRequest(wasInitialThreadRequest);
+            throw err;
         }).finally(function() {
             eventTimeline._paginationRequests[dir] = null;
         });
