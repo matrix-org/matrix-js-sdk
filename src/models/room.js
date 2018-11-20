@@ -220,6 +220,8 @@ Room.prototype._handleThreadEvent = function(event) {
     if (!this._threads[threadId]) {
         const timelineSet = new EventTimelineSet(this, {threadId: threadId});
         this.reEmitter.reEmit(timelineSet, ["Room.timeline", "Room.timelineReset"]);
+        timelineSet.getLiveTimeline()._startState = this.currentState.clone();
+        timelineSet.getLiveTimeline()._endState = this.currentState.clone();
         this._threads[threadId] = timelineSet;
     }
 };
