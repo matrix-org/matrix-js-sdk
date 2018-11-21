@@ -866,7 +866,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
  *
- * @returns {object} Object that can be passed to createKeyBackupVersion and
+ * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
  *     additionally has a 'recovery_key' member with the user-facing recovery key string.
  */
 MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
