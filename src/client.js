@@ -49,6 +49,8 @@ import RoomList from './crypto/RoomList';
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
 import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
+import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
+import { randomString } from './randomstring';
 
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
@@ -860,22 +862,36 @@ MatrixClient.prototype.disableKeyBackup = function() {
  * Set up the data required to create a new backup version.  The backup version
  * will not be created and enabled until createKeyBackupVersion is called.
  *
- * @returns {object} Object that can be passed to createKeyBackupVersion and
+ * @param {string} password Passphrase string that can be entered by the user
+ *     when restoring the backup as an alternative to entering the recovery key.
+ *     Optional.
+ *
+ * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
  *     additionally has a 'recovery_key' member with the user-facing recovery key string.
  */
-MatrixClient.prototype.prepareKeyBackupVersion = function() {
+MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
     const decryption = new global.Olm.PkDecryption();
     try {
-        const publicKey = decryption.generate_key();
+        let publicKey;
+        const authData = {};
+        if (password) {
+            const keyInfo = await keyForNewBackup(password);
+            publicKey = decryption.init_with_private_key(keyInfo.key);
+            authData.private_key_salt = keyInfo.salt;
+            authData.private_key_iterations = keyInfo.iterations;
+        } else {
+            publicKey = decryption.generate_key();
+        }
+
+        authData.public_key = publicKey;
+
         return {
             algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-            auth_data: {
-                public_key: publicKey,
-            },
+            auth_data: authData,
             recovery_key: encodeRecoveryKey(decryption.get_private_key()),
         };
     } finally {
@@ -992,8 +1008,28 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     }
 };
 
-MatrixClient.prototype.restoreKeyBackups = function(
+MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
+    password, targetRoomId, targetSessionId, version,
+) {
+    const backupInfo = await this.getKeyBackupVersion();
+
+    const privKey = await keyForExistingBackup(backupInfo, password);
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, version,
+    );
+};
+
+MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
     recoveryKey, targetRoomId, targetSessionId, version,
+) {
+    const privKey = decodeRecoveryKey(recoveryKey);
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, version,
+    );
+};
+
+MatrixClient.prototype._restoreKeyBackup = function(
+    privKey, targetRoomId, targetSessionId, version,
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1003,11 +1039,9 @@ MatrixClient.prototype.restoreKeyBackups = function(
 
     const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
 
-    // FIXME: see the FIXME in createKeyBackupVersion
-    const privkey = decodeRecoveryKey(recoveryKey);
     const decryption = new global.Olm.PkDecryption();
     try {
-        decryption.init_with_private_key(privkey);
+        decryption.init_with_private_key(privKey);
     } catch(e) {
         decryption.free();
         throw e;
@@ -3829,14 +3863,7 @@ MatrixClient.prototype.getEventMapper = function() {
  * @return {string} A new client secret
  */
 MatrixClient.prototype.generateClientSecret = function() {
-    let ret = "";
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-    for (let i = 0; i < 32; i++) {
-        ret += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-
-    return ret;
+    return randomString(32);
 };
 
 /** */
