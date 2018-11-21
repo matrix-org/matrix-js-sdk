@@ -1156,6 +1156,7 @@ OlmDevice.prototype.exportInboundGroupSession = function(
             "session_id": sessionId,
             "session_key": session.export_session(messageIndex),
             "forwarding_curve25519_key_chain": session.forwardingCurve25519KeyChain || [],
+            "first_known_index": session.first_known_index(),
         };
     });
 };

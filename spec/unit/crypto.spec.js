@@ -69,6 +69,7 @@ describe("Crypto", function() {
 
             mockBaseApis = {
                 sendToDevice: expect.createSpy(),
+                getKeyBackupVersion: expect.createSpy(),
             };
             mockRoomList = {};
 
@@ -111,9 +112,7 @@ describe("Crypto", function() {
                 getSender: expect.createSpy().andReturn('@bob:home.server'),
             });
 
-            console.log("waiting");
             await prom;
-            console.log("done");
         });
     });
 });

@@ -72,6 +72,9 @@ export default class DeviceList {
         // }
         this._devices = {};
 
+        // map of identity keys to the user who owns it
+        this._userByIdentityKey = {};
+
         // which users we are tracking device status for.
         // userId -> TRACKING_STATUS_*
         this._deviceTrackingStatus = {}; // loaded from storage in load()
@@ -128,6 +131,16 @@ export default class DeviceList {
                         this._deviceTrackingStatus = deviceData ?
                             deviceData.trackingStatus : {};
                         this._syncToken = deviceData ? deviceData.syncToken : null;
+                    }
+                    this._userByIdentityKey = {};
+                    for (const user of Object.keys(this._devices)) {
+                        const userDevices = this._devices[user];
+                        for (const device of Object.keys(userDevices)) {
+                            const idKey = userDevices[device].keys['curve25519:'+device];
+                            if (idKey !== undefined) {
+                                this._userByIdentityKey[idKey] = user;
+                            }
+                        }
                     }
                 });
             },
@@ -364,13 +377,17 @@ export default class DeviceList {
     /**
      * Find a device by curve25519 identity key
      *
-     * @param {string} userId     owner of the device
      * @param {string} algorithm  encryption algorithm
      * @param {string} senderKey  curve25519 key to match
      *
      * @return {module:crypto/deviceinfo?}
      */
-    getDeviceByIdentityKey(userId, algorithm, senderKey) {
+    getDeviceByIdentityKey(algorithm, senderKey) {
+        const userId = this._userByIdentityKey[senderKey];
+        if (!userId) {
+            return null;
+        }
+
         if (
             algorithm !== olmlib.OLM_ALGORITHM &&
             algorithm !== olmlib.MEGOLM_ALGORITHM
@@ -415,7 +432,23 @@ export default class DeviceList {
      * @param {Object} devs New device info for user
      */
     storeDevicesForUser(u, devs) {
+        // remove previous devices from _userByIdentityKey
+        if (this._devices[u] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[u])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
+            }
+        }
+
         this._devices[u] = devs;
+
+        // add new ones
+        for (const [deviceId, dev] of Object.entries(devs)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = u;
+        }
         this._dirty = true;
     }
 
@@ -532,7 +565,23 @@ export default class DeviceList {
      * @param {Object} devices deviceId->{object} the new devices
      */
     _setRawStoredDevicesForUser(userId, devices) {
+        // remove old devices from _userByIdentityKey
+        if (this._devices[userId] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[userId])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
+            }
+        }
+
         this._devices[userId] = devices;
+
+        // add new devices into _userByIdentityKey
+        for (const [deviceId, dev] of Object.entries(devices)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = userId;
+        }
     }
 
     /**
