@@ -5,7 +5,7 @@ set -x
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-nvm use 6 || exit $?
+nvm use 10 || exit $?
 npm install || exit $?
 
 RC=0
