@@ -1,3 +1,9 @@
+Changes in [0.14.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.1) (2018-11-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0...v0.14.1)
+
+ * Warning when crypto DB is too new to use.
+
 Changes in [0.14.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.0) (2018-11-19)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0-rc.1...v0.14.0)
