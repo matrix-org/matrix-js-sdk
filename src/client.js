@@ -2385,6 +2385,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     Promise.delay(timeToWaitMs).then(function() {
         return self._createMessagesRequest(
             room.roomId,
+            null,
             room.oldState.paginationToken,
             limit,
             'b');
@@ -2511,7 +2512,7 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
  * @return {Promise}
  */
 MatrixClient.prototype._createMessagesRequest =
-function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+function(roomId, threadId, fromToken, limit, dir, timelineFilter = undefined) {
     const path = utils.encodeUri(
         "/rooms/$roomId/messages", {$roomId: roomId},
     );
@@ -2524,16 +2525,15 @@ function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
         dir: dir,
     };
 
-    let filter = null;
+    let filter = {thread_id: threadId ? threadId : 0};
     if (this._clientOpts.lazyLoadMembers) {
         // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
         // so the timelineFilter doesn't get written into it below
-        filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
+        Object.assign(filter, Filter.LAZY_LOADING_MESSAGES_FILTER);
     }
     if (timelineFilter) {
         // XXX: it's horrific that /messages' filter parameter doesn't match
         // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-        filter = filter || {};
         Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
     }
     if (filter) {
@@ -2572,7 +2572,7 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
     const dir = backwards ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS;
 
     const token = eventTimeline.getPaginationToken(dir);
-    if (!token) {
+    if (!token  && !eventTimeline.threadNeedsInitialRequest()) {
         // no token - no results.
         return Promise.resolve(false);
     }
@@ -2635,8 +2635,11 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
+        const wasInitialThreadRequest = eventTimeline.clearThreadNeedsInitialRequest();
+
         promise = this._createMessagesRequest(
             eventTimeline.getRoomId(),
+            eventTimeline.getThreadId(),
             token,
             opts.limit,
             dir,
@@ -2659,6 +2662,9 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
                 eventTimeline.setPaginationToken(null, dir);
             }
             return res.end != res.start;
+        }).catch(function(err) {
+            eventTimeline.restoreThreadNeedsInitialRequest(wasInitialThreadRequest);
+            throw err;
         }).finally(function() {
             eventTimeline._paginationRequests[dir] = null;
         });

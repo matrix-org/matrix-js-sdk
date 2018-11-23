@@ -158,6 +158,24 @@ EventTimeline.prototype.getRoomId = function() {
     return this._roomId;
 };
 
+EventTimeline.prototype.getThreadId = function() {
+    return this._eventTimelineSet.threadId;
+};
+
+EventTimeline.prototype.clearThreadNeedsInitialRequest = function() {
+    const value = this._eventTimelineSet._threadNeedsInitialRequest;
+    this._eventTimelineSet._threadNeedsInitialRequest = false;
+    return value;
+}
+
+EventTimeline.prototype.restoreThreadNeedsInitialRequest = function(oldValue) {
+    this._eventTimelineSet._threadNeedsInitialRequest = oldValue;
+}
+
+EventTimeline.prototype.threadNeedsInitialRequest = function() {
+    return this._eventTimelineSet._threadNeedsInitialRequest;
+}
+
 /**
  * Get the filter for this timeline's timelineSet (if any)
  * @return {Filter} filter
@@ -303,7 +321,7 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
     // only call setEventMetadata on the unfiltered timelineSets
     const timelineSet = this.getTimelineSet();
     if (timelineSet.room &&
-        timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
+        timelineSet.room.getUnfilteredTimelineSet() === timelineSet || timelineSet.threadId) {
         EventTimeline.setEventMetadata(event, stateContext, atStart);
 
         // modify state
@@ -337,6 +355,8 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
     if (atStart) {
         this._baseIndex++;
     }
+
+    this._eventTimelineSet.room._handleThreadEvent(event);
 };
 
 /**

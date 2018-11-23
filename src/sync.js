@@ -795,6 +795,7 @@ SyncApi.prototype._getSyncParams = function(syncOptions, syncToken) {
     }
 
     const qps = {
+        exclude_threaded: true,
         filter: filterId,
         timeout: pollTimeout,
     };
