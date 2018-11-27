@@ -505,10 +505,10 @@ MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
     );
 };
 
-MatrixBaseApis.prototype.tsToEventId = function(roomId, ts) {
+MatrixBaseApis.prototype.tsToEventId = function(roomId, ts, threadId) {
     const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {$roomId: roomId});
     return this._http.authedRequest(
-        undefined, "GET", path, {ts}, undefined,
+        undefined, "GET", path, {ts, thread_id: threadId}, undefined,
     );
 };
 
