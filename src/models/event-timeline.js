@@ -377,6 +377,33 @@ EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline
         );
     }
     if (event.isState()) {
+        if (event.getType() === "org.matrix.server_presence") {
+            const otherPresenceEvents = stateContext.getStateEvents("org.matrix.server_presence");
+            const presenceState = event.getContent().state;
+            const presenceServer = event.getStateKey();
+            if (presenceState === "disconnected") {
+                const hasAnyOtherDisconnected = otherPresenceEvents.some((e) => {
+                    const isDisconnected = e.getContent().state === "disconnected";
+                    const isSameServer = e.getStateKey() === presenceServer;
+                    return isDisconnected && !isSameServer;
+                });
+                if (!hasAnyOtherDisconnected) {
+                    console.log("marked event as first_disconnected");
+                    event.getContent().first_disconnected = true;
+                }
+            } else if (presenceState === "connected") {
+                const hasAnyOtherConnected = otherPresenceEvents.some((e) => {
+                    const isConnected = e.getContent().state === "connected";
+                    const isSameServer = e.getStateKey() === presenceServer;
+                    return isConnected && !isSameServer;
+                });
+                if (!hasAnyOtherConnected) {
+                    console.log("marked event as last_connected");
+                    event.getContent().last_connected = true;
+                }
+            }
+        }
+
         // room state has no concept of 'old' or 'current', but we want the
         // room state to regress back to previous values if toStartOfTimeline
         // is set, which means inspecting prev_content if it exists. This
