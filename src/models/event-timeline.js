@@ -377,8 +377,10 @@ EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline
         );
     }
     if (event.isState()) {
+        /*
         if (event.getType() === "org.matrix.server_presence") {
             const otherPresenceEvents = stateContext.getStateEvents("org.matrix.server_presence");
+            console.log("IIIIIIIII inspecting server presence event", event, otherPresenceEvents);
             const presenceState = event.getContent().state;
             const presenceServer = event.getStateKey();
             if (presenceState === "disconnected") {
@@ -403,7 +405,7 @@ EventTimeline.setEventMetadata = function(event, stateContext, toStartOfTimeline
                 }
             }
         }
-
+        */
         // room state has no concept of 'old' or 'current', but we want the
         // room state to regress back to previous values if toStartOfTimeline
         // is set, which means inspecting prev_content if it exists. This
