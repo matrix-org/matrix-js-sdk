@@ -2446,10 +2446,19 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         },
     );
 
-    let params = undefined;
-    if (this._clientOpts.lazyLoadMembers) {
-        params = {filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER)};
+    const filter = {};
+    let params = {filter: filter};
+    if (timelineSet.threadId) {
+        // context API doesn't take filters :(
+        //filter.thread_id = timelineSet.threadId;
+        // ...so do this instead which will stop us getting events from
+        // different threads (hopefully):
+        params.limit = 1;
     }
+    if (this._clientOpts.lazyLoadMembers) {
+        Object.assign(filter, Filter.LAZY_LOADING_MESSAGES_FILTER);
+    }
+
 
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
