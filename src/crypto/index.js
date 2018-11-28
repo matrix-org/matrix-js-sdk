@@ -1453,18 +1453,25 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
         );
         return;
     }
-    this._lastNewSessionForced[sender][deviceKey] = Date.now();
 
     // establish a new olm session with this device since we're failing to decrypt messages
     // on a current session.
     // Note that an undecryptable message from another device could easily be spoofed -
     // is there anything we can do to mitigate this?
     const device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
+    if (!device) {
+        logger.info(
+            "Couldn't find device for identity key " + deviceKey +
+            ": not re-establishing session",
+        );
+    }
     const devicesByUser = {};
     devicesByUser[sender] = [device];
     await olmlib.ensureOlmSessionsForDevices(
         this._olmDevice, this._baseApis, devicesByUser, true,
     );
+
+    this._lastNewSessionForced[sender][deviceKey] = Date.now();
 
     // Now send a blank message on that session so the other side knows about it.
     // (The keyshare request is sent in the clear so that won't do)
