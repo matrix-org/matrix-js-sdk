@@ -218,7 +218,8 @@ Room.prototype._handleThreadEvent = function(event) {
     const threadId = event.getContent().thread_id;
 
     if (!this._threads[threadId]) {
-        const timelineSet = new EventTimelineSet(this, {threadId: threadId});
+        const opts = Object.assign({threadId: threadId}, this._opts);
+        const timelineSet = new EventTimelineSet(this, opts);
         this.reEmitter.reEmit(timelineSet, ["Room.timeline", "Room.timelineReset"]);
         timelineSet.getLiveTimeline()._startState = this.currentState.clone();
         timelineSet.getLiveTimeline()._endState = this.currentState.clone();
