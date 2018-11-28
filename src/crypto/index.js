@@ -1464,6 +1464,7 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "Couldn't find device for identity key " + deviceKey +
             ": not re-establishing session",
         );
+        return;
     }
     const devicesByUser = {};
     devicesByUser[sender] = [device];
