@@ -679,6 +679,21 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
 };
 
 /**
+ * Get the trust status of a device.
+ *
+ * @param {string} userId The user owning the device to be checked.
+ * @param {string} deviceId The device to be checked.
+ *
+ * @return {integer} The trust status of the device.
+ */
+MatrixClient.prototype.getDeviceTrust = async function(userId, deviceId) {
+    if (!this._crypto) {
+        return null;
+    }
+    return await this._crypto.getDeviceTrust(userId, deviceId);
+};
+
+/**
  * Cancel a room key request for this event if one is ongoing and resend the
  * request.
  * @param  {MatrixEvent} event event of which to cancel and resend the room

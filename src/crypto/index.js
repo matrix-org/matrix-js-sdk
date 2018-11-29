@@ -87,6 +87,11 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._checkedForBackup = false; // Have we checked the server for a backup we can use?
     this._sendingBackups = false; // Are we currently sending backups?
 
+    // cache of trust status of devices (indexed by user, then by device)
+    this._trustedDevices = new Map();
+    // whether the trusted device cache is up to date
+    this._trustedDevicesUpToDate = new Set();
+
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
         baseApis, cryptoStore, sessionStore, this._olmDevice,
@@ -1190,6 +1195,212 @@ Crypto.prototype.decryptEvent = function(event) {
     const content = event.getWireContent();
     const alg = this._getRoomDecryptor(event.getRoomId(), content.algorithm);
     return alg.decryptEvent(event);
+};
+
+/**
+ * Get the trust status of a device.
+ *
+ * @param {string} userId The user owning the device to be checked.
+ * @param {string} deviceId The device to be checked.
+ *
+ * @return {integer} The trust status of the device.
+ */
+Crypto.prototype.getDeviceTrust = async function(userId, deviceId) {
+    const olmDevice = this._olmDevice;
+    // Some utility functions
+    // basic checks on an attestation
+    function attestationValid(att, userId, dev) {
+        if (att.user_id !== userId || att.device_id !== dev.deviceId) {
+            return false;
+        }
+        const keyId = "ed25519:" + dev.deviceId;
+        if (!(keyId in att.keys) || att.keys[keyId] !== dev.keys[keyId]) {
+            return false;
+        }
+        return true;
+    }
+
+    // possibly add an edge to the attestation graph
+    function addEdge(edges, att, userId, dev) {
+        if (userId in att.signatures) {
+            for (const sigId in att.signatures[userId]) { // eslint-disable-line guard-for-in
+                const pos = sigId.indexOf(":");
+                if (pos < 0) { // this makes the hasOwnProperty check unnecessary
+                    continue;
+                }
+                const deviceId = sigId.substr(pos + 1);
+                if (!edges.has(deviceId)) {
+                    edges.set(deviceId, new Map());
+                }
+                const v = edges.get(deviceId);
+                if (!v.has(att.device_id)) {
+                    v.set(att.device_id, []);
+                }
+                v.get(att.device_id).push(att);
+            }
+        }
+    }
+
+    // check if the list of attestations indicate that the device should be trusted
+    async function attestationsOK(
+        attestations, fromUserId, fromDeviceId, forUserId, forDeviceId, devices,
+    ) {
+        let verified = false;
+        for (const att of attestations) {
+            try {
+                await olmlib.verifySignature(
+                    olmDevice,
+                    Object.assign({}, att),
+                    fromUserId, fromDeviceId,
+                    devices.get(fromUserId).get(fromDeviceId)
+                        .keys["ed25519:" + fromDeviceId],
+                );
+            } catch (e) {
+                continue;
+            }
+            if (att.state === "verified") {
+                verified = true;
+            } else if (att.state === "revoked") {
+                // FIXME: need to figure out exactly how revocations work
+                verified = false;
+                break;
+            }
+        }
+        return verified;
+    }
+
+    // traverse the attestations graph for the given user, starting from the
+    // trusted devices.  Will modify the trusted device map by adding the
+    // devices that can be reached by following the edges.
+    async function traverseAttestations(edges, trustedDevices, userId, devices, value) {
+        const stack = [...trustedDevices.keys()];
+        while (stack.length) {
+            const attester = stack.pop();
+            for (const [attestee, attestations] of (edges.get(attester) || [])) {
+                if (!trustedDevices.has(attestee)
+                    && await attestationsOK(
+                        attestations, userId, attester, userId, attestee, devices,
+                    )) {
+                    trustedDevices.set(attestee, value);
+                    stack.push(attestee);
+                }
+            }
+        }
+    }
+
+    // FIXME: refresh devices
+
+    /* We traverse the attestation graph in three phases. The first phase
+     * determines which of our own devices are trusted.  The second phase
+     * determines what devices owned by the target user have been verified by
+     * our own trusted devices.  The third phase determines what other devices
+     * own by the target user are trusted.
+     *
+     * The results are cached.  Since the results from the first phase are the
+     * same and affect checking the trusted status of all users, the first
+     * phase only needs to be done once (until we need to recalculate things
+     * due to new attestations).
+     */
+    const deviceMap = new Map();
+    if (!this._trustedDevicesUpToDate.has(this._userId)) {
+        // this part implements the first phase of traversal
+        // build the attestation graph for our own devices
+        const devices = this._deviceList.getStoredDevicesForUser(this._userId);
+        const ourDeviceMap = new Map();
+        deviceMap.set(this._userId, ourDeviceMap);
+        const trustedDevices = new Map([[this._deviceId, DeviceVerification.VERIFIED]]);
+        const edges = new Map(); // a map of attester -> attestee -> [attestations]
+        for (const dev of devices) {
+            ourDeviceMap.set(dev.deviceId, dev);
+            if (dev.verified > 0) {
+                // verified devices are automatically trusted
+                trustedDevices.set(dev.deviceId, DeviceVerification.VERIFIED);
+            } else if (dev.unsigned.attestations) {
+                // otherwise, build up a graph using the attestations to see if
+                // this device is trusted
+                for (const att of dev.unsigned.attestations) {
+                    if (attestationValid(att, this._userId, dev)) {
+                        addEdge(edges, att, this._userId, dev);
+                    }
+                }
+            }
+        }
+
+        // and traverse the graph
+        await traverseAttestations(
+            edges, trustedDevices,
+            this._userId, deviceMap,
+            DeviceVerification.TRUSTED_BY_US,
+        );
+
+        // If we rebuilt our own trusted devices, then all other trusted
+        // devices need to be recalculated, so blow the caches away and start
+        // from scratch.
+        this._trustedDevices = new Map([[this._userId, trustedDevices]]);
+        this._trustedDevicesUpToDate = new Set([this._userId]);
+    }
+    if (userId !== this._userId && !this._trustedDevicesUpToDate.has(userId)) {
+        // this part implements the second and third phases of traversal
+        // build the attestation graph for the target user's devices
+        const devices = this._deviceList.getStoredDevicesForUser(userId);
+        const theirDeviceMap = new Map();
+        deviceMap.set(userId, theirDeviceMap);
+        const ownEdges = new Map(); // a map of attester -> attestee -> [attestations]
+        const fromUsEdges = new Map(); // a map of attester -> attestee -> [attestations]
+        const trustedDevices = new Map();
+        for (const dev of devices) {
+            theirDeviceMap.set(dev.deviceId, dev);
+            if (dev.verified > 0) {
+                // verified devices are automatically trusted
+                trustedDevices.set(dev.deviceId, DeviceVerification.VERIFIED);
+            } else if (dev.unsigned.attestations) {
+                for (const att of dev.unsigned.attestations) {
+                    if (attestationValid(att, userId, dev)) {
+                        addEdge(fromUsEdges, att, this._userId, dev);
+                        addEdge(ownEdges, att, userId, dev);
+                    }
+                }
+            }
+        }
+
+        // make sure that we have access to our own devices to check signatures
+        if (!deviceMap.has(this._userId)) {
+            const ourDevices = this._deviceList.getStoredDevicesForUser(this._userId);
+            const ourDeviceMap = new Map();
+            deviceMap.set(this._userId, ourDeviceMap);
+            for (const dev of ourDevices) {
+                ourDeviceMap.set(dev.deviceId, dev);
+            }
+        }
+
+        // second phase: which of the target user's devices are trusted
+        // directly by our trusted devices?
+        for (const dev of this._trustedDevices.get(this._userId).keys()) {
+            if (fromUsEdges.has(dev)) {
+                for (const [attestee, attestations] of (fromUsEdges.get(dev) || [])) {
+                    if (!trustedDevices.has(attestee)
+                        && await attestationsOK(
+                            attestations, this._userId, dev, userId, attestee,
+                            deviceMap,
+                        )) {
+                        trustedDevices.set(attestee, DeviceVerification.TRUSTED_BY_US);
+                    }
+                }
+            }
+        }
+
+        // third phase: find the rest of the target user's trusted devices
+        await traverseAttestations(
+            ownEdges, trustedDevices,
+            userId, deviceMap,
+            DeviceVerification.TRUSTED_BY_THEM,
+        );
+
+        this._trustedDevices.set(userId, trustedDevices);
+        this._trustedDevicesUpToDate.add(userId);
+    }
+    const rv = this._trustedDevices.get(userId).get(deviceId);
+    return rv === undefined ? DeviceVerification.UNVERIFIED : rv;
 };
 
 /**

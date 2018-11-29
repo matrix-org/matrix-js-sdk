@@ -161,6 +161,9 @@ DeviceInfo.DeviceVerification = {
     VERIFIED: 1,
     UNVERIFIED: 0,
     BLOCKED: -1,
+    // the following status codes are only used by cross-signing
+    TRUSTED_BY_US: 2,
+    TRUSTED_BY_THEM: 3,
 };
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
