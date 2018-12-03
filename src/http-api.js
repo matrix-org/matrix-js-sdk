@@ -19,6 +19,8 @@ limitations under the License.
  * @module http-api
  */
 import Promise from 'bluebird';
+import borc from "borc";
+import queryString from 'qs';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
@@ -86,6 +88,7 @@ module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
     this.opts = opts;
     this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
     this.uploads = [];
+    this.supportsCbor = true; // XXX: Validate this somewhere.
 };
 
 module.exports.MatrixHttpApi.prototype = {
@@ -701,18 +704,20 @@ module.exports.MatrixHttpApi.prototype = {
 
         if (json) {
             if (data) {
+                headers['Content-Type'] = 'application/json';
                 data = JSON.stringify(data);
-                headers['content-type'] = 'application/json';
+                if (this.supportsCbor) {
+                    // To remove undefined values, we cheekily use stringify.
+                    data = borc.encode(JSON.parse(data));
+                    headers['Content-Type'] = 'application/cbor';
+                }
             }
 
-            if (!headers['accept']) {
-                headers['accept'] = 'application/json';
-            }
-
-            if (bodyParser === undefined) {
-                bodyParser = function(rawBody) {
-                    return JSON.parse(rawBody);
-                };
+            if (!headers['Accept']) {
+                headers['Accept'] = 'application/json';
+                if (this.supportsCbor) {
+                    headers['Accept'] = `application/cbor, application/jsonq=0.9`;
+                }
             }
         }
 
@@ -744,63 +749,128 @@ module.exports.MatrixHttpApi.prototype = {
         resetTimeout();
 
         const reqPromise = defer.promise;
-
-        try {
-            req = this.opts.request(
-                {
-                    uri: uri,
-                    method: method,
-                    withCredentials: false,
-                    qs: queryParams,
-                    qsStringifyOptions: opts.qsStringifyOptions,
-                    useQuerystring: true,
-                    body: data,
-                    json: false,
-                    timeout: localTimeoutMs,
-                    headers: headers || {},
-                    _matrix_opts: this.opts,
-                },
-                function(err, response, body) {
-                    if (localTimeoutMs) {
-                        callbacks.clearTimeout(timeoutId);
-                        if (timedOut) {
-                            return; // already rejected promise
-                        }
-                    }
-
-                    const handlerFn = requestCallback(
-                        defer, callback, self.opts.onlyData,
-                        bodyParser,
-                    );
-                    handlerFn(err, response, body);
-                },
-            );
-            if (req) {
-                // This will only work in a browser, where opts.request is the
-                // `browser-request` import. Currently `request` does not support progress
-                // updates - see https://github.com/request/request/pull/2346.
-                // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
-                if ('onprogress' in req) {
-                    req.onprogress = (e) => {
-                        // Prevent the timeout from rejecting the deferred promise if progress is
-                        // seen with the request
-                        resetTimeout();
-                    };
+        const qs = queryString.stringify(queryParams || {}, opts.qsStringifyOptions);
+        let res;
+        const controller = new AbortController();
+        const signal = controller.signal;
+        fetch(qs ? `${uri}?${qs}`: uri, {
+            method,
+            headers: headers || [],
+            body: data,
+            mode: "cors",
+            credentials: "omit",
+            signal,
+        }).then((_res) => {
+            res = _res;
+            if (localTimeoutMs) {
+                callbacks.clearTimeout(timeoutId);
+                if (timedOut) {
+                    return; // already rejected promise
                 }
-
-                // FIXME: This is EVIL, but I can't think of a better way to expose
-                // abort() operations on underlying HTTP requests :(
-                if (req.abort) reqPromise.abort = req.abort.bind(req);
             }
-        } catch (ex) {
-            defer.reject(ex);
-            if (callback) {
-                callback(ex);
+            if (this.supportsCbor) {
+                return res.arrayBuffer().then((buffer) => {
+                    return borc.decode(new Uint8Array(buffer));
+                }).then((cborObj) => {
+                    return convertCborToObject(cborObj);
+                });
             }
-        }
+            return res.json();
+        }).then((body) => {
+            const handlerFn = requestCallback(
+                defer, callback, self.opts.onlyData,
+            );
+            handlerFn(null, res, body);
+        }).catch((ex) => {
+            const handlerFn = requestCallback(
+                defer, callback, self.opts.onlyData,
+            );
+            handlerFn(ex, null, null);
+        });
+        reqPromise.abort = () => {
+            controller.abort();
+        };
+            // req = this.opts.request(
+            //     {
+            //         uri: uri,
+            //         method: method,
+            //         withCredentials: false,
+            //         qs: queryParams,
+            //         qsStringifyOptions: opts.qsStringifyOptions,
+            //         useQuerystring: true,
+            //         encoding: this.supportsCbor ? null : undefined,
+            //         body: data,
+            //         json: false,
+            //         timeout: localTimeoutMs,
+            //         headers: headers || {},
+            //         _matrix_opts: this.opts,
+            //     },
+            //     function(err, response, body) {
+            //         if (localTimeoutMs) {
+            //             callbacks.clearTimeout(timeoutId);
+            //             if (timedOut) {
+            //                 return; // already rejected promise
+            //             }
+            //         }
+            //
+            //         const handlerFn = requestCallback(
+            //             defer, callback, self.opts.onlyData,
+            //             bodyParser,
+            //         );
+            //         handlerFn(err, response, body);
+            //     },
+            // );
+            // if (req) {
+            //     // This will only work in a browser, where opts.request is the
+            //     // `browser-request` import. Currently `request` does not support progress
+            //     // updates - see https://github.com/request/request/pull/2346.
+            //     // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
+            //     if ('onprogress' in req) {
+            //         req.onprogress = (e) => {
+            //             // Prevent the timeout from rejecting the deferred promise if progress is
+            //             // seen with the request
+            //             resetTimeout();
+            //         };
+            //     }
+            //
+            //     // FIXME: This is EVIL, but I can't think of a better way to expose
+            //     // abort() operations on underlying HTTP requests :(
+            //     if (req.abort) reqPromise.abort = req.abort.bind(req);
+            // }
         return reqPromise;
     },
 };
+
+const convertCborToObject = function(currObject) {
+    const isMap = currObject instanceof Map;
+    const isObject = currObject instanceof Object;
+    const isArray = currObject instanceof Array;
+
+    if (!isMap && isObject) {
+        Object.keys(currObject).forEach((key) => {
+            currObject[key] = convertCborToObject(currObject[key]);
+        });
+        return currObject;
+    }
+
+    if (!isMap && !isArray) {
+        return currObject;
+    }
+
+    let obj = isArray ? [] : {};
+    currObject.forEach((value, key) => {
+        // Will be a uint8array
+        if (!isArray) {
+             key = key.toString();
+        }
+        // We don't use Uint8Array in CS, but cbor makes strings into these.
+        if (value instanceof Uint8Array) {
+            value = value.toString();
+        }
+        obj[key] = convertCborToObject(value);
+    });
+    return obj;
+}
 
 /*
  * Returns a callback that can be invoked by an HTTP request on completion,
@@ -825,7 +895,7 @@ const requestCallback = function(
     return function(err, response, body) {
         if (!err) {
             try {
-                if (response.statusCode >= 400) {
+                if (response.status >= 400) {
                     err = parseErrorResponse(response, body);
                 } else if (bodyParser) {
                     body = bodyParser(body);
