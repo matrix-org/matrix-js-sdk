@@ -767,7 +767,7 @@ MatrixClient.prototype.getGroups = function() {
  * @return {module:client.Promise} Resolves with an object containing the config.
  */
 MatrixClient.prototype.getMediaConfig = function(callback) {
-    return this._http.requestWithPrefix(
+    return this._http.authedRequestWithPrefix(
         callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
     );
 };
