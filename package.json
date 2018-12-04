@@ -60,7 +60,8 @@
     "content-type": "^1.0.2",
     "loglevel": "1.6.1",
     "qs": "^6.5.2",
-    "request": "^2.88.0"
+    "request": "^2.88.0",
+    "whatwg-url": "^7.0.0"
   },
   "devDependencies": {
     "babel-cli": "^6.18.0",

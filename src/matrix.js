@@ -67,6 +67,8 @@ module.exports.Filter = require("./filter");
 module.exports.TimelineWindow = require("./timeline-window").TimelineWindow;
 /** The {@link module:interactive-auth} class. */
 module.exports.InteractiveAuth = require("./interactive-auth");
+/** The {@link module:auto-discovery|AutoDiscovery} class. */
+module.exports.AutoDiscovery = require("./autodiscovery").AutoDiscovery;
 
 
 module.exports.MemoryCryptoStore =
