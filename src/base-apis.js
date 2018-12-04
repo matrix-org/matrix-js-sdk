@@ -258,6 +258,10 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
         type: loginType,
     };
 
+    if (this.deviceId) {
+        login_data.device_id = this.deviceId;
+    }
+
     // merge data into login_data
     utils.extend(login_data, data);
 
