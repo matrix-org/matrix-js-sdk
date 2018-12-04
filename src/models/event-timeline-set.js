@@ -119,6 +119,33 @@ EventTimelineSet.prototype.getPendingEvents = function() {
 EventTimelineSet.prototype.getLiveTimeline = function() {
     return this._liveTimeline;
 };
+// assumes the event is not in an unfill gap, excluding both events
+// fromEventId may be unknown locally
+EventTimelineSet.prototype.getEventCountBetween = function(fromEventId, toEventId) {
+    let timeline = this.eventIdToTimeline(toEventId);
+    let countFrom = timeline.getEvents().findIndex((e) => e.getId() === toEventId);
+    let isExact = true;
+    let count = 0;
+    while(timeline) {
+        const events = timeline.getEvents();
+        const index = events.findIndex((e) => e.getId() === fromEventId);
+        if (index === -1) {
+            // multiple timelines mean a gap, so we can't tell exactly
+            // how many events until the gap is filled,
+            // but return an "at least" count instead
+            isExact = false;
+            count += countFrom;
+            timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+            countFrom = timeline.getEvents().length;
+        } else {
+            // +1 to not include the searched event itself
+            count += (countFrom - (index + 1));
+            break;
+        }
+    }
+    console.log("EventTimelineSet::getEventCountSince", fromEventId, isExact, count);
+    return {isExact, count};
+};
 
 /**
  * Return the timeline (if any) this event is in.
