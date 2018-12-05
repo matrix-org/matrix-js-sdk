@@ -623,6 +623,33 @@ async function _setDeviceVerification(
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
 
+/** Send signed attestations to the server.
+ *
+ * @param {Array<Object>} devices Array of devices to attest to.  Each object
+ * must have a user_id and a device_id property, indicating the device owner
+ * and the device ID to attest.  It may also have a state property, which
+ * should be either "verified" or "revoked", indicating the state of the
+ * attestation.  If the state property is not present, it will default to
+ * "verified".
+ *
+ * @returns {Promise}
+ */
+MatrixClient.prototype.sendAttestations = async function(devices) {
+    const attestations = await Promise.all(devices.map(async (x) => {
+        const ret = await this._crypto.createAttestation(x.userId, x.deviceId, x.state)
+        if (ret === undefined) {
+            throw new Error("Could not find device");
+        }
+        return ret;
+    }));
+    const data = {
+        attestations: attestations,
+    };
+    return await this._http.authedRequest(
+        undefined, "POST", "/keys/upload", undefined, data,
+    );
+};
+
 /**
  * Set the global override for whether the client should ever send encrypted
  * messages to unverified devices.  This provides the default for rooms which

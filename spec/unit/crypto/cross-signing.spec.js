@@ -491,6 +491,13 @@ describe("MegolmBackup", function() {
         mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
         cryptoStore = new MemoryCryptoStore(mockStorage);
+        cryptoStore.storeAccount(
+            null,
+            "I5VCUCJVWaYMtSFyX4s6s5S3zPk9qeOl2Sek/VdS35n0qWfy4EMfdTwxd3b0AzHd6Eo"
+                + "85i99TLOQ4UQxmhBevo01NL3byHi1ZGXFGbRd9+1qaUL5QZVHLOoVnj4IaOGl"
+                + "10gW8rdYb2Ab/1A49TNtZHsoGBDAndry3B+IQJjfc81Hfcjj/vkVU0iMhAYwC"
+                + "Nw+p45oJC1luuOw2Gm+kmqvthczioe22V0+xWZIsthHfQqY9aGKpiHovA",
+        );
 
         const scheduler = [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
@@ -521,8 +528,17 @@ describe("MegolmBackup", function() {
         await client.initCrypto();
 
         client._crypto._deviceList = {
+            downloadKeys: function() { },
             getStoredDevicesForUser: function(userId) {
                 return DEVICES[userId] || [];
+            },
+            getStoredDevice: function(userId, deviceId) {
+                for (const dev of DEVICES[userId] || []) {
+                    if (dev.deviceId === deviceId) {
+                        return dev;
+                    }
+                }
+                return undefined;
             },
         };
     });
@@ -547,5 +563,48 @@ describe("MegolmBackup", function() {
             .toBe(DeviceVerification.TRUSTED_BY_THEM);
         expect(await client.getDeviceTrust("@bob:example.com", "EFGHIJK"))
             .toBe(DeviceVerification.UNVERIFIED);
+    });
+
+    it("should send attestations", async function() {
+        client._http.authedRequest = expect.createSpy().andCall(function(
+            callback, method, path, queryParams, data, opts,
+        ) {
+            expect(path).toBe("/keys/upload");
+            expect(method).toBe("POST");
+            expect(data.attestations).toExist();
+            expect(data.attestations[0]).toEqual({
+                "device_id": "CDEFGHI",
+                "keys": {
+                    "ed25519:CDEFGHI": "+2nFvlv9nOst82iMJSesw1WO5ttnJBnG6Ca2rKBkuhs",
+                },
+                "signatures": {
+                    "@alice:example.com": {
+                        "ed25519:ABCDEFG": "xvRZHYgvxEwIfzQpJ4m7IrN+Wne0M+Iqqsipwgu"
+                            + "8jxEUlLDxFFZKegdmix4pGQfdmHbZA9ROiauxBqkSiw+rCA",
+                    },
+                },
+                "state": "verified",
+                "user_id": "@bob:example.com",
+            });
+        });
+
+        await client.sendAttestations([
+            {
+                userId: "@bob:example.com",
+                deviceId: "CDEFGHI",
+            },
+        ]);
+        expect(client._http.authedRequest).toHaveBeenCalled();
+    });
+
+    it("should refuse to send an attestation for an untrusted device", async function() {
+        const spy = expect.createSpy();
+        await (client.sendAttestations([
+            {
+                userId: "@alice:example.com",
+                deviceId: "VWXYZAB",
+            },
+        ]).then(() => {}, spy));
+        expect(spy).toHaveBeenCalled();
     });
 });

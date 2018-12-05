@@ -672,6 +672,41 @@ Crypto.prototype.setDeviceVerification = async function(
 
 
 /**
+ * Create an attestation for the given device.
+ *
+ * @param {string} userId The owner of the device.
+ * @param {string} deviceId The device to attest.
+ * @param {string} state The attestation state -- either "verified" or
+ * "revoked".  Defaults to "verified".
+ *
+ * @return {object} The signed attestation, or undefined if the device is not
+ * known.
+ */
+Crypto.prototype.createAttestation = async function(userId, deviceId, state) {
+    const dev = this._deviceList.getStoredDevice(userId, deviceId);
+    if (!dev) {
+        return undefined;
+    }
+    state = state || "verified";
+    // can only make an attestation if the device is verified
+    if (state === "verified" && await this.getDeviceTrust(userId, deviceId) <= 0) {
+        throw new Error("Device must be trusted before making an attestation.");
+    }
+    const keyId = "ed25519:" + deviceId;
+    const attestation = {
+        user_id: userId,
+        device_id: deviceId,
+        keys: {
+            [keyId]: dev.keys[keyId],
+        },
+        state: state,
+    };
+    await this._signObject(attestation);
+    return attestation;
+};
+
+
+/**
  * Get information on the active olm sessions with a user
  * <p>
  * Returns a map from device id to an object with keys 'deviceIdKey' (the
