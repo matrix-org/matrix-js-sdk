@@ -1288,7 +1288,12 @@ Crypto.prototype.getDeviceTrust = async function(userId, deviceId) {
         }
     }
 
-    // FIXME: refresh devices
+    // refresh devices
+    if (userId === this._userId) {
+        this._deviceList.downloadKeys([userId]);
+    } else {
+        this._deviceList.downloadKeys([userId, this._userId]);
+    }
 
     /* We traverse the attestation graph in three phases. The first phase
      * determines which of our own devices are trusted.  The second phase
