@@ -637,7 +637,7 @@ async function _setDeviceVerification(
  */
 MatrixClient.prototype.sendAttestations = async function(devices) {
     const attestations = await Promise.all(devices.map(async (x) => {
-        const ret = await this._crypto.createAttestation(x.userId, x.deviceId, x.state)
+        const ret = await this._crypto.createAttestation(x.userId, x.deviceId, x.state);
         if (ret === undefined) {
             throw new Error("Could not find device");
         }
