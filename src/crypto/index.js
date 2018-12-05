@@ -96,6 +96,13 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceList = new DeviceList(
         baseApis, cryptoStore, sessionStore, this._olmDevice,
     );
+    this._deviceList.on("crypto.devicesUpdated", (users) => {
+        // mark trusted device cache as dirty after downloading keys
+        users.forEach((u) => {
+            this._trustedDevicesUpToDate.delete(u);
+        });
+        this.emit("crypto.devicesUpdated", users);
+    });
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -662,6 +669,7 @@ Crypto.prototype.setDeviceVerification = async function(
     }
 
     if (dev.verified !== verificationStatus || dev.known !== knownStatus) {
+        this._trustedDevicesUpToDate.delete(userId);
         dev.verified = verificationStatus;
         dev.known = knownStatus;
         this._deviceList.storeDevicesForUser(userId, devices);

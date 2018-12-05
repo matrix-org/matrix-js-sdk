@@ -23,6 +23,7 @@ limitations under the License.
  */
 
 import Promise from 'bluebird';
+import {EventEmitter} from 'events';
 
 import logger from '../logger';
 import DeviceInfo from './deviceinfo';
@@ -60,8 +61,9 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
 /**
  * @alias module:crypto/DeviceList
  */
-export default class DeviceList {
+export default class DeviceList extends EventEmitter {
     constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
+        super();
         this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
 
@@ -647,6 +649,7 @@ export default class DeviceList {
                 }
             });
             this.saveIfDirty();
+            this.emit("crypto.devicesUpdated", users);
         };
 
         return prom;
