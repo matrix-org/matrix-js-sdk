@@ -688,7 +688,7 @@ module.exports.globToRegexp = function(glob, extended) {
     pat = pat.replace(/\\\*/g, '.*');
     pat = pat.replace(/\?/g, '.');
     if (extended) {
-        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function (match, p1, p2, offset, string) {
+        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
             const first = p1 && '^' || '';
             const second = p2.replace(/\\\-/, '-');
             return '[' + first + second + ']';
