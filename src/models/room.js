@@ -584,6 +584,7 @@ Room.prototype.getUnreadNotificationCount = function(type) {
  */
 Room.prototype.setUnreadNotificationCount = function(type, count) {
     this._notificationCounts[type] = count;
+    this.emit("Room.notificationCounts", this, type, count);
 };
 
 Room.prototype.setSummary = function(summary) {
