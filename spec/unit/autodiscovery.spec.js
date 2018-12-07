@@ -27,9 +27,12 @@ import MockHttpBackend from "matrix-mock-request";
 
 
 describe("AutoDiscovery", function() {
+
+    let httpBackend = null;
+
     beforeEach(function () {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
-        this.httpBackend = new MockHttpBackend();
+        httpBackend = new MockHttpBackend();
         sdk.request(this.httpBackend.requestFn);
     });
 
@@ -62,10 +65,10 @@ describe("AutoDiscovery", function() {
     });
 
     it("should return PROMPT when .well-known 404s", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(404, {});
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(404, {});
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "PROMPT",
@@ -84,34 +87,11 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known returns a 500 error", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(500, {});
+    it("should return FAIL_PROMPT when .well-known returns a 500 error", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(500, {});
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
-                const expected = {
-                    "m.homeserver": {
-                        state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
-                        base_url: null,
-                    },
-                    "m.identity_server": {
-                        state: "PROMPT",
-                        error: null,
-                        base_url: null,
-                    },
-                };
-
-                expect(conf).toEqual(expected);
-            }),
-        ]);
-    });
-
-    it("should return FAIL_PROMPT when .well-known returns a 400 error", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(400, {});
-        return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
@@ -130,11 +110,11 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known returns an empty body", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "");
+    it("should return FAIL_PROMPT when .well-known returns a 400 error", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(400, {});
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
@@ -153,11 +133,11 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known returns not-JSON", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "abc");
+    it("should return FAIL_PROMPT when .well-known returns an empty body", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "");
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
@@ -176,15 +156,39 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known does not have a base_url for m.homeserver (empty string)", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+    it("should return FAIL_PROMPT when .well-known returns not-JSON", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "abc");
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "FAIL_PROMPT",
+                        error: "Invalid homeserver discovery response",
+                        base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
+        "m.homeserver (empty string)", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
@@ -203,13 +207,14 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known does not have a base_url for m.homeserver (no property)", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+    it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
+        "m.homeserver (no property)", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {},
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
@@ -228,15 +233,16 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when .well-known has an invalid base_url for m.homeserver (disallowed scheme)", function () {
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+    it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
+        "m.homeserver (disallowed scheme)", function() {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "mxc://example.org",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -255,16 +261,17 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when .well-known has an invalid base_url for m.homeserver (verification failure: 404)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").respond(404, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+    it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
+        "m.homeserver (verification failure: 404)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").respond(404, {});
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "https://example.org",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -283,16 +290,17 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when .well-known has an invalid base_url for m.homeserver (verification failure: 500)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").respond(500, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+    it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
+        "m.homeserver (verification failure: 500)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").respond(500, {});
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "https://example.org",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -311,18 +319,19 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when .well-known has an invalid base_url for m.homeserver (verification failure: 200 but wrong content)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
+    it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
+        "m.homeserver (verification failure: 200 but wrong content)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
             not_matrix_versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "https://example.org",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -341,20 +350,21 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return SUCCESS when .well-known has a verifiably accurate base_url for m.homeserver", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
+    it("should return SUCCESS when .well-known has a verifiably accurate base_url for " +
+        "m.homeserver", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.opts.uri).toEqual("https://example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 base_url: "https://example.org",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "SUCCESS",
@@ -373,21 +383,21 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return SUCCESS with the right homeserver URL", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
+    it("should return SUCCESS with the right homeserver URL", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
             expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "SUCCESS",
@@ -406,13 +416,15 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when the identity server configuration is wrong (missing base_url)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return FAIL_ERROR when the identity server configuration is wrong " +
+        "(missing base_url)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -422,8 +434,8 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -444,13 +456,15 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when the identity server configuration is wrong (empty base_url)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return FAIL_ERROR when the identity server configuration is wrong " +
+        "(empty base_url)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -460,8 +474,8 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -482,14 +496,16 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when the identity server configuration is wrong (validation error: 404)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return FAIL_ERROR when the identity server configuration is wrong " +
+        "(validation error: 404)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/_matrix/identity/api/v1").respond(404, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/_matrix/identity/api/v1").respond(404, {});
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -499,8 +515,8 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
@@ -521,14 +537,16 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when the identity server configuration is wrong (validation error: 500)", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return FAIL_ERROR when the identity server configuration is wrong " +
+        "(validation error: 500)", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/_matrix/identity/api/v1").respond(500, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/_matrix/identity/api/v1").respond(500, {});
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -538,14 +556,14 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
                         error: "Invalid identity server discovery response",
 
-                        // We still expect the base_url to be here for debugging purposes.
+                        // We still expect the base_url to be here for debugging purposes
                         base_url: "https://chat.example.org",
                     },
                     "m.identity_server": {
@@ -560,16 +578,19 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return SUCCESS when the identity server configuration is verifiably accurate", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return SUCCESS when the identity server configuration is " +
+        "verifiably accurate", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/_matrix/identity/api/v1").check(req => {
-            expect(req.opts.uri).toEqual("https://identity.example.org/_matrix/identity/api/v1");
+        httpBackend.when("GET", "/_matrix/identity/api/v1").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://identity.example.org/_matrix/identity/api/v1");
         }).respond(200, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -579,8 +600,8 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "SUCCESS",
@@ -599,16 +620,19 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return SUCCESS and preserve non-standard keys from the .well-known response", function () {
-        this.httpBackend.when("GET", "/_matrix/client/versions").check(req => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+    it("should return SUCCESS and preserve non-standard keys from the " +
+        ".well-known response", function() {
+        httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
-        this.httpBackend.when("GET", "/_matrix/identity/api/v1").check(req => {
-            expect(req.opts.uri).toEqual("https://identity.example.org/_matrix/identity/api/v1");
+        httpBackend.when("GET", "/_matrix/identity/api/v1").check((req) => {
+            expect(req.opts.uri)
+                .toEqual("https://identity.example.org/_matrix/identity/api/v1");
         }).respond(200, {});
-        this.httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
                 // Note: we also expect this test to trim the trailing slash
                 base_url: "https://chat.example.org/",
@@ -621,8 +645,8 @@ describe("AutoDiscovery", function() {
             },
         });
         return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(conf => {
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
                 const expected = {
                     "m.homeserver": {
                         state: "SUCCESS",
