@@ -27,16 +27,15 @@ import MockHttpBackend from "matrix-mock-request";
 
 
 describe("AutoDiscovery", function() {
-
     let httpBackend = null;
 
-    beforeEach(function () {
+    beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new MockHttpBackend();
-        sdk.request(this.httpBackend.requestFn);
+        sdk.request(httpBackend.requestFn);
     });
 
-    it("should throw an error when no domain is specified", function () {
+    it("should throw an error when no domain is specified", function() {
         return Promise.all([
             AutoDiscovery.findClientConfig(/* no args */).then(() => {
                 throw new Error("Expected a failure, not success with no args");
@@ -64,7 +63,7 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return PROMPT when .well-known 404s", function () {
+    it("should return PROMPT when .well-known 404s", function() {
         httpBackend.when("GET", "/.well-known/matrix/client").respond(404, {});
         return Promise.all([
             httpBackend.flushAllExpected(),
@@ -385,7 +384,8 @@ describe("AutoDiscovery", function() {
 
     it("should return SUCCESS with the right homeserver URL", function() {
         httpBackend.when("GET", "/_matrix/client/versions").check((req) => {
-            expect(req.opts.uri).toEqual("https://chat.example.org/_matrix/client/versions");
+            expect(req.opts.uri)
+                .toEqual("https://chat.example.org/_matrix/client/versions");
         }).respond(200, {
             versions: ["r0.0.1"],
         });
