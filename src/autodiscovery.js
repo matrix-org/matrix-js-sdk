@@ -187,7 +187,7 @@ export class AutoDiscovery {
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
         const wellknown = await this._fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`
+            `https://${domain}/.well-known/matrix/client`,
         );
         if (!wellknown || wellknown.action !== "SUCCESS"
             || !wellknown.raw["m.homeserver"]
@@ -210,7 +210,7 @@ export class AutoDiscovery {
         // Step 2: Make sure the homeserver URL is valid *looking*. We'll make
         // sure it points to a homeserver in Step 3.
         const hsUrl = this._sanitizeWellKnownUrl(
-            wellknown.raw["m.homeserver"]["base_url"]
+            wellknown.raw["m.homeserver"]["base_url"],
         );
         if (!hsUrl) {
             logger.error("Invalid base_url for m.homeserver");
@@ -219,7 +219,7 @@ export class AutoDiscovery {
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
         const hsVersions = await this._fetchWellKnownObject(
-            `${hsUrl}/_matrix/client/versions`
+            `${hsUrl}/_matrix/client/versions`,
         );
         if (!hsVersions || !hsVersions.raw["versions"]) {
             logger.error("Invalid /versions response");
@@ -260,7 +260,7 @@ export class AutoDiscovery {
             // Step 5a: Make sure the URL is valid *looking*. We'll make sure it
             // points to an identity server in Step 5b.
             isUrl = this._sanitizeWellKnownUrl(
-                wellknown.raw["m.identity_server"]["base_url"]
+                wellknown.raw["m.identity_server"]["base_url"],
             );
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
@@ -270,7 +270,7 @@ export class AutoDiscovery {
             // Step 5b: Verify there is an identity server listening on the provided
             // URL.
             const isResponse = await this._fetchWellKnownObject(
-                `${isUrl}/_matrix/identity/api/v1`
+                `${isUrl}/_matrix/identity/api/v1`,
             );
             if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
                 logger.error("Invalid /api/v1 response");
@@ -340,7 +340,7 @@ export class AutoDiscovery {
      *   reason: Relatively human readable description of what went wrong.
      *   error: The actual Error, if one exists.
      * @param {string} url The URL to fetch a JSON object from.
-     * @return {Promise<{raw:*,action:"SUCCESS"|"IGNORE"|"FAIL_PROMPT",reason:string,error:Error}>} Resolves to the returned state.
+     * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
     static async _fetchWellKnownObject(url) {
