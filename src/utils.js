@@ -672,3 +672,27 @@ module.exports.removeHiddenChars = function(str) {
     return str.normalize('NFD').replace(removeHiddenCharsRegex, '');
 };
 const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
+
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+module.exports.escapeRegExp = escapeRegExp;
+
+module.exports.globToRegexp = function(glob, extended) {
+    extended = typeof(extended) === 'boolean' ? extended : true;
+    // From
+    // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
+    // Because micromatch is about 130KB with dependencies,
+    // and minimatch is not much better.
+    let pat = escapeRegExp(glob);
+    pat = pat.replace(/\\\*/g, '.*');
+    pat = pat.replace(/\?/g, '.');
+    if (extended) {
+        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
+            const first = p1 && '^' || '';
+            const second = p2.replace(/\\\-/, '-');
+            return '[' + first + second + ']';
+        });
+    }
+    return pat;
+};
