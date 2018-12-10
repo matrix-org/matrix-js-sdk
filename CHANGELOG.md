@@ -1,3 +1,38 @@
+Changes in [0.14.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.2) (2018-12-10)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.2-rc.1...v0.14.2)
+
+ * No changes since rc.1
+
+Changes in [0.14.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.2-rc.1) (2018-12-06)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.1...v0.14.2-rc.1)
+
+ * fix some assertions in e2e backup unit test
+   [\#794](https://github.com/matrix-org/matrix-js-sdk/pull/794)
+ * Config should be called with auth
+   [\#798](https://github.com/matrix-org/matrix-js-sdk/pull/798)
+ * Don't re-establish sessions with unknown devices
+   [\#792](https://github.com/matrix-org/matrix-js-sdk/pull/792)
+ * e2e key backups
+   [\#684](https://github.com/matrix-org/matrix-js-sdk/pull/684)
+ * WIP: online incremental megolm backups
+   [\#595](https://github.com/matrix-org/matrix-js-sdk/pull/595)
+ * Support for e2e key backups
+   [\#736](https://github.com/matrix-org/matrix-js-sdk/pull/736)
+ * Passphrase Support for e2e backups
+   [\#786](https://github.com/matrix-org/matrix-js-sdk/pull/786)
+ * Add 'getSsoLoginUrl' function
+   [\#783](https://github.com/matrix-org/matrix-js-sdk/pull/783)
+ * Fix: don't set the room name to null when heroes are missing.
+   [\#784](https://github.com/matrix-org/matrix-js-sdk/pull/784)
+ * Handle crypto db version upgrades
+   [\#785](https://github.com/matrix-org/matrix-js-sdk/pull/785)
+ * Restart broken Olm sessions
+   [\#780](https://github.com/matrix-org/matrix-js-sdk/pull/780)
+ * Use the last olm session that got a message
+   [\#776](https://github.com/matrix-org/matrix-js-sdk/pull/776)
+
 Changes in [0.14.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.1) (2018-11-22)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0...v0.14.1)
