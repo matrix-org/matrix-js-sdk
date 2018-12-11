@@ -14,7 +14,7 @@
     "start:watch": "babel -s -w --skip-initial-build -d lib src",
     "start:init": "babel -s -d lib src",
     "clean": "rimraf lib dist",
-    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map \"filename='dist/browser-matrix.min.js.map',content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
+    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
     "dist": "npm run build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 102 src spec",
@@ -60,8 +60,7 @@
     "content-type": "^1.0.2",
     "loglevel": "1.6.1",
     "qs": "^6.5.2",
-    "request": "^2.88.0",
-    "whatwg-url": "^7.0.0"
+    "request": "^2.88.0"
   },
   "devDependencies": {
     "babel-cli": "^6.18.0",
@@ -84,7 +83,7 @@
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
-    "uglify-es": "^3.3.9",
+    "uglify-js": "^2.8.26",
     "watchify": "^3.11.0"
   },
   "browserify": {

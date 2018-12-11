@@ -18,7 +18,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 const logger = require("./logger");
-import { parseURL } from "whatwg-url";
+import { URL as NodeURL } from "url";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -310,13 +310,26 @@ export class AutoDiscovery {
         if (!url) return false;
 
         try {
-            const parsed = parseURL(url);
-            if (!parsed || !parsed.host) return false;
-            if (parsed.scheme !== "http" && parsed.scheme !== "https") return false;
+            // We have to try and parse the URL using the NodeJS URL
+            // library if we're on NodeJS and use the browser's URL
+            // library when we're in a browser. To accomplish this, we
+            // try the NodeJS version first and fall back to the browser.
+            let parsed = null;
+            try {
+                if (NodeURL) parsed = new NodeURL(url);
+                else parsed = new URL(url);
+            } catch (e) {
+                parsed = new URL(url);
+            }
+
+            console.log(url);
+            console.log(parsed);
+            if (!parsed || !parsed.hostname) return false;
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
 
             const port = parsed.port ? `:${parsed.port}` : "";
-            const path = parsed.path ? parsed.path.join("/") : "";
-            let saferUrl = `${parsed.scheme}://${parsed.host}${port}${path}`;
+            const path = parsed.pathname ? parsed.pathname : "";
+            let saferUrl = `${parsed.protocol}//${parsed.hostname}${port}${path}`;
             if (saferUrl.endsWith("/")) {
                 saferUrl = saferUrl.substring(0, saferUrl.length - 1);
             }
