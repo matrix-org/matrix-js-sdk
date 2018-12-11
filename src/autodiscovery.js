@@ -322,8 +322,6 @@ export class AutoDiscovery {
                 parsed = new URL(url);
             }
 
-            console.log(url);
-            console.log(parsed);
             if (!parsed || !parsed.hostname) return false;
             if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
 
