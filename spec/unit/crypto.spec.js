@@ -70,6 +70,7 @@ describe("Crypto", function() {
             mockBaseApis = {
                 sendToDevice: expect.createSpy(),
                 getKeyBackupVersion: expect.createSpy(),
+                isGuest: expect.createSpy(),
             };
             mockRoomList = {};
 

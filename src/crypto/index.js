@@ -212,6 +212,11 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype._checkAndStartKeyBackup = async function() {
     console.log("Checking key backup status...");
+    if (this._baseApis.isGuest()) {
+        console.log("Skipping key backup check since user is guest");
+        this._checkedForBackup = true;
+        return;
+    }
     let backupInfo;
     try {
         backupInfo = await this._baseApis.getKeyBackupVersion();
