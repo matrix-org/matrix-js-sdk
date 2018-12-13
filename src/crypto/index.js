@@ -1128,7 +1128,7 @@ Crypto.prototype.backupAllGroupSessions = async function(version) {
 
     let numKeysBackedUp;
     do {
-        numKeysBackedUp = this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
+        numKeysBackedUp = await this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
     } while (numKeysBackedUp > 0);
 };
 
