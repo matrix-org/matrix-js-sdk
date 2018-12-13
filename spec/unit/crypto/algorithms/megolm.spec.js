@@ -1,8 +1,4 @@
-try {
-    global.Olm = require('olm');
-} catch (e) {
-    console.warn("unable to run megolm tests: libolm not available");
-}
+import '../../../olm-loader';
 
 import expect from 'expect';
 import Promise from 'bluebird';

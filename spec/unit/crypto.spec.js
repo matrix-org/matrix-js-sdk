@@ -1,4 +1,7 @@
 import 'source-map-support/register';
+
+import '../olm-loader';
+
 import Crypto from '../../lib/crypto';
 import expect from 'expect';
 
