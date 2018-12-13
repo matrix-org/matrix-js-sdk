@@ -1023,6 +1023,7 @@ Crypto.prototype._scheduleKeyBackupSend = async function() {
                     ) {
                         // Backup version has changed or this backup version
                         // has been deleted
+                        this.emit("crypto.keyBackupFailed", err.data.errcode);
                         throw err;
                     }
                 }
