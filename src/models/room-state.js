@@ -155,6 +155,16 @@ RoomState.prototype.getMembers = function() {
 };
 
 /**
+ * Get all RoomMembers in this room, excluding the user IDs provided.
+ * @param {Array<string>} excludedIds The user IDs to exclude.
+ * @return {Array<RoomMember>} A list of RoomMembers.
+ */
+RoomState.prototype.getMembersExcept = function(excludedIds) {
+    return utils.values(this.members)
+        .filter((m) => !excludedIds.includes(m.userId));
+};
+
+/**
  * Get a room member by their user ID.
  * @param {string} userId The room member's user ID.
  * @return {RoomMember} The member or null if they do not exist.
