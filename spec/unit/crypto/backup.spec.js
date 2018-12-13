@@ -13,11 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-try {
-    global.Olm = require('olm');
-} catch (e) {
-    console.warn("unable to run megolm backup tests: libolm not available");
-}
+
+import '../../olm-loader';
 
 import expect from 'expect';
 import Promise from 'bluebird';
