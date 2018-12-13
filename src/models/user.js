@@ -39,7 +39,7 @@ limitations under the License.
  *                when a user was last active.
  * @prop {Boolean} currentlyActive Whether we should consider lastActiveAgo to be
  *               an approximation and that the user should be seen as active 'now'
- * @prop {string} statusMessage The status message for the user, if known. This is
+ * @prop {string} _unstable_statusMessage The status message for the user, if known. This is
  *                different from the presenceStatusMsg in that this is not tied to
  *                the user's presence, and should be represented differently.
  * @prop {Object} events The events describing this user.
