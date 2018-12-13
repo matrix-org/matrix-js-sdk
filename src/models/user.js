@@ -49,7 +49,7 @@ function User(userId) {
     this.userId = userId;
     this.presence = "offline";
     this.presenceStatusMsg = null;
-    this.statusMessage = "";
+    this._unstable_statusMessage = "";
     this.displayName = userId;
     this.rawDisplayName = userId;
     this.avatarUrl = null;
@@ -187,9 +187,9 @@ User.prototype.getLastActiveTs = function() {
  * Manually set the user's status message.
  * @param {MatrixEvent} event The <code>im.vector.user_status</code> event.
  */
-User.prototype.updateStatusMessage = function(event) {
-    if (!event.getContent()) this.statusMessage = "";
-    else this.statusMessage = event.getContent()["status"];
+User.prototype._unstable_updateStatusMessage = function(event) {
+    if (!event.getContent()) this._unstable_statusMessage = "";
+    else this._unstable_statusMessage = event.getContent()["status"];
     this._updateModifiedTime();
 };
 

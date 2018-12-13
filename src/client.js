@@ -2269,7 +2269,7 @@ MatrixClient.prototype.mxcUrlToHttp =
  * @return {module:client.Promise} Resolves: to nothing
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.setStatusMessage = function(newMessage) {
+MatrixClient.prototype._unstable_setStatusMessage = function(newMessage) {
     return Promise.all(this.getRooms().map((room) => {
         const isJoined = room.getMyMembership() === "join";
         const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;

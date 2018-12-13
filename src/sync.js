@@ -1175,10 +1175,10 @@ SyncApi.prototype._processSyncResponse = async function(
             if (e.isState() && e.getType() === "im.vector.user_status") {
                 let user = client.store.getUser(e.getStateKey());
                 if (user) {
-                    user.updateStatusMessage(e);
+                    user._unstable_updateStatusMessage(e);
                 } else {
                     user = createNewUser(client, e.getStateKey());
-                    user.updateStatusMessage(e);
+                    user._unstable_updateStatusMessage(e);
                     client.store.storeUser(user);
                 }
             }
