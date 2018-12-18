@@ -24,6 +24,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../logger';
 import DeviceInfo from './deviceinfo';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -71,6 +72,9 @@ export default class DeviceList {
         // }
         this._devices = {};
 
+        // map of identity keys to the user who owns it
+        this._userByIdentityKey = {};
+
         // which users we are tracking device status for.
         // userId -> TRACKING_STATUS_*
         this._deviceTrackingStatus = {}; // loaded from storage in load()
@@ -110,7 +114,7 @@ export default class DeviceList {
             'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
                     if (deviceData === null) {
-                        console.log("Migrating e2e device data...");
+                        logger.log("Migrating e2e device data...");
                         this._devices = this._sessionStore.getAllEndToEndDevices() || {};
                         this._deviceTrackingStatus = (
                             this._sessionStore.getEndToEndDeviceTrackingStatus() || {}
@@ -128,6 +132,16 @@ export default class DeviceList {
                             deviceData.trackingStatus : {};
                         this._syncToken = deviceData ? deviceData.syncToken : null;
                     }
+                    this._userByIdentityKey = {};
+                    for (const user of Object.keys(this._devices)) {
+                        const userDevices = this._devices[user];
+                        for (const device of Object.keys(userDevices)) {
+                            const idKey = userDevices[device].keys['curve25519:'+device];
+                            if (idKey !== undefined) {
+                                this._userByIdentityKey[idKey] = user;
+                            }
+                        }
+                    }
                 });
             },
         );
@@ -142,6 +156,12 @@ export default class DeviceList {
             if (this._deviceTrackingStatus[u] == TRACKING_STATUS_DOWNLOAD_IN_PROGRESS) {
                 this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
             }
+        }
+    }
+
+    stop() {
+        if (this._saveTimer !== null) {
+            clearTimeout(this._saveTimer);
         }
     }
 
@@ -190,7 +210,7 @@ export default class DeviceList {
             const resolveSavePromise = this._resolveSavePromise;
             this._savePromiseTime = targetTime;
             this._saveTimer = setTimeout(() => {
-                console.log('Saving device tracking data at token ' + this._syncToken);
+                logger.log('Saving device tracking data at token ' + this._syncToken);
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
                 // actually already happened. Likewise for the dirty flag.
@@ -258,7 +278,7 @@ export default class DeviceList {
             if (this._keyDownloadsInProgressByUser[u]) {
                 // already a key download in progress/queued for this user; its results
                 // will be good enough for us.
-                console.log(
+                logger.log(
                     `downloadKeys: already have a download in progress for ` +
                     `${u}: awaiting its result`,
                 );
@@ -269,13 +289,13 @@ export default class DeviceList {
         });
 
         if (usersToDownload.length != 0) {
-            console.log("downloadKeys: downloading for", usersToDownload);
+            logger.log("downloadKeys: downloading for", usersToDownload);
             const downloadPromise = this._doKeyDownload(usersToDownload);
             promises.push(downloadPromise);
         }
 
         if (promises.length === 0) {
-            console.log("downloadKeys: already have all necessary keys");
+            logger.log("downloadKeys: already have all necessary keys");
         }
 
         return Promise.all(promises).then(() => {
@@ -357,13 +377,17 @@ export default class DeviceList {
     /**
      * Find a device by curve25519 identity key
      *
-     * @param {string} userId     owner of the device
      * @param {string} algorithm  encryption algorithm
      * @param {string} senderKey  curve25519 key to match
      *
      * @return {module:crypto/deviceinfo?}
      */
-    getDeviceByIdentityKey(userId, algorithm, senderKey) {
+    getDeviceByIdentityKey(algorithm, senderKey) {
+        const userId = this._userByIdentityKey[senderKey];
+        if (!userId) {
+            return null;
+        }
+
         if (
             algorithm !== olmlib.OLM_ALGORITHM &&
             algorithm !== olmlib.MEGOLM_ALGORITHM
@@ -408,7 +432,23 @@ export default class DeviceList {
      * @param {Object} devs New device info for user
      */
     storeDevicesForUser(u, devs) {
+        // remove previous devices from _userByIdentityKey
+        if (this._devices[u] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[u])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
+            }
+        }
+
         this._devices[u] = devs;
+
+        // add new ones
+        for (const [deviceId, dev] of Object.entries(devs)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = u;
+        }
         this._dirty = true;
     }
 
@@ -433,7 +473,7 @@ export default class DeviceList {
             throw new Error('userId must be a string; was '+userId);
         }
         if (!this._deviceTrackingStatus[userId]) {
-            console.log('Now tracking device list for ' + userId);
+            logger.log('Now tracking device list for ' + userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
         }
         // we don't yet persist the tracking status, since there may be a lot
@@ -452,7 +492,7 @@ export default class DeviceList {
      */
     stopTrackingDeviceList(userId) {
         if (this._deviceTrackingStatus[userId]) {
-            console.log('No longer tracking device list for ' + userId);
+            logger.log('No longer tracking device list for ' + userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_NOT_TRACKED;
 
             // we don't yet persist the tracking status, since there may be a lot
@@ -487,7 +527,7 @@ export default class DeviceList {
      */
     invalidateUserDeviceList(userId) {
         if (this._deviceTrackingStatus[userId]) {
-            console.log("Marking device list outdated for", userId);
+            logger.log("Marking device list outdated for", userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
 
             // we don't yet persist the tracking status, since there may be a lot
@@ -525,7 +565,23 @@ export default class DeviceList {
      * @param {Object} devices deviceId->{object} the new devices
      */
     _setRawStoredDevicesForUser(userId, devices) {
+        // remove old devices from _userByIdentityKey
+        if (this._devices[userId] !== undefined) {
+            for (const [deviceId, dev] of Object.entries(this._devices[userId])) {
+                const identityKey = dev.keys['curve25519:'+deviceId];
+
+                delete this._userByIdentityKey[identityKey];
+            }
+        }
+
         this._devices[userId] = devices;
+
+        // add new devices into _userByIdentityKey
+        for (const [deviceId, dev] of Object.entries(devices)) {
+            const identityKey = dev.keys['curve25519:'+deviceId];
+
+            this._userByIdentityKey[identityKey] = userId;
+        }
     }
 
     /**
@@ -550,7 +606,7 @@ export default class DeviceList {
         ).then(() => {
             finished(true);
         }, (e) => {
-            console.error(
+            logger.error(
                 'Error downloading keys for ' + users + ":", e,
             );
             finished(false);
@@ -573,7 +629,7 @@ export default class DeviceList {
                 // since we started this request. If that happens, we should
                 // ignore the completion of the first one.
                 if (this._keyDownloadsInProgressByUser[u] !== prom) {
-                    console.log('Another update in the queue for', u,
+                    logger.log('Another update in the queue for', u,
                                 '- not marking up-to-date');
                     return;
                 }
@@ -584,7 +640,7 @@ export default class DeviceList {
                         // we didn't get any new invalidations since this download started:
                         // this user's device list is now up to date.
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_UP_TO_DATE;
-                        console.log("Device list for", u, "now up to date");
+                        logger.log("Device list for", u, "now up to date");
                     } else {
                         this._deviceTrackingStatus[u] = TRACKING_STATUS_PENDING_DOWNLOAD;
                     }
@@ -659,7 +715,7 @@ class DeviceListUpdateSerialiser {
 
         if (this._downloadInProgress) {
             // just queue up these users
-            console.log('Queued key download for', users);
+            logger.log('Queued key download for', users);
             return this._queuedQueryDeferred.promise;
         }
 
@@ -679,7 +735,7 @@ class DeviceListUpdateSerialiser {
         const deferred = this._queuedQueryDeferred;
         this._queuedQueryDeferred = null;
 
-        console.log('Starting key download for', downloadUsers);
+        logger.log('Starting key download for', downloadUsers);
         this._downloadInProgress = true;
 
         const opts = {};
@@ -706,7 +762,7 @@ class DeviceListUpdateSerialiser {
 
             return prom;
         }).done(() => {
-            console.log('Completed key download for ' + downloadUsers);
+            logger.log('Completed key download for ' + downloadUsers);
 
             this._downloadInProgress = false;
             deferred.resolve();
@@ -716,7 +772,7 @@ class DeviceListUpdateSerialiser {
                 this._doQueuedQueries();
             }
         }, (e) => {
-            console.warn('Error downloading keys for ' + downloadUsers + ':', e);
+            logger.warn('Error downloading keys for ' + downloadUsers + ':', e);
             this._downloadInProgress = false;
             deferred.reject(e);
         });
@@ -725,7 +781,7 @@ class DeviceListUpdateSerialiser {
     }
 
     async _processQueryResponseForUser(userId, response) {
-        console.log('got keys for ' + userId + ':', response);
+        logger.log('got keys for ' + userId + ':', response);
 
         // map from deviceid -> deviceinfo for this user
         const userStore = {};
@@ -763,7 +819,7 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         }
 
         if (!(deviceId in userResult)) {
-            console.log("Device " + userId + ":" + deviceId +
+            logger.log("Device " + userId + ":" + deviceId +
                 " has been removed");
             delete userStore[deviceId];
             updated = true;
@@ -780,12 +836,12 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         // check that the user_id and device_id in the response object are
         // correct
         if (deviceResult.user_id !== userId) {
-            console.warn("Mismatched user_id " + deviceResult.user_id +
+            logger.warn("Mismatched user_id " + deviceResult.user_id +
                " in keys from " + userId + ":" + deviceId);
             continue;
         }
         if (deviceResult.device_id !== deviceId) {
-            console.warn("Mismatched device_id " + deviceResult.device_id +
+            logger.warn("Mismatched device_id " + deviceResult.device_id +
                " in keys from " + userId + ":" + deviceId);
             continue;
         }
@@ -815,7 +871,7 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     const signKeyId = "ed25519:" + deviceId;
     const signKey = deviceResult.keys[signKeyId];
     if (!signKey) {
-        console.warn("Device " + userId + ":" + deviceId +
+        logger.warn("Device " + userId + ":" + deviceId +
             " has no ed25519 key");
         return false;
     }
@@ -825,7 +881,7 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     try {
         await olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
     } catch (e) {
-        console.warn("Unable to verify signature on device " +
+        logger.warn("Unable to verify signature on device " +
             userId + ":" + deviceId + ":" + e);
         return false;
     }
@@ -842,7 +898,7 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
             // best off sticking with the original keys.
             //
             // Should we warn the user about it somehow?
-            console.warn("Ed25519 key for device " + userId + ":" +
+            logger.warn("Ed25519 key for device " + userId + ":" +
                deviceId + " has changed");
             return false;
         }

@@ -16,6 +16,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../logger';
 import utils from '../utils';
 
 /**
@@ -108,7 +109,7 @@ export default class OutgoingRoomKeyRequestManager {
      * Called when the client is stopped. Stops any running background processes.
      */
     stop() {
-        console.log('stopping OutgoingRoomKeyRequestManager');
+        logger.log('stopping OutgoingRoomKeyRequestManager');
         // stop the timer on the next run
         this._clientRunning = false;
     }
@@ -173,7 +174,7 @@ export default class OutgoingRoomKeyRequestManager {
                     // may have seen it, so we still need to send a cancellation
                     // in that case :/
 
-                    console.log(
+                    logger.log(
                         'deleting unnecessary room key request for ' +
                         stringifyRequestBody(requestBody),
                     );
@@ -201,7 +202,7 @@ export default class OutgoingRoomKeyRequestManager {
                             // the request cancelled. There is no point in
                             // sending another cancellation since the other tab
                             // will do it.
-                            console.log(
+                            logger.log(
                                 'Tried to cancel room key request for ' +
                                 stringifyRequestBody(requestBody) +
                                 ' but it was already cancelled in another tab',
@@ -222,7 +223,7 @@ export default class OutgoingRoomKeyRequestManager {
                             updatedReq,
                             andResend,
                         ).catch((e) => {
-                            console.error(
+                            logger.error(
                                 "Error sending room key request cancellation;"
                                 + " will retry later.", e,
                             );
@@ -243,6 +244,21 @@ export default class OutgoingRoomKeyRequestManager {
         });
     }
 
+    /**
+     * Look for room key requests by target device and state
+     *
+     * @param {string} userId Target user ID
+     * @param {string} deviceId Target device ID
+     *
+     * @return {Promise} resolves to a list of all the
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     */
+    getOutgoingSentRoomKeyRequest(userId, deviceId) {
+        return this._cryptoStore.getOutgoingRoomKeyRequestsByTarget(
+            userId, deviceId, [ROOM_KEY_REQUEST_STATES.SENT],
+        );
+    }
+
     // start the background timer to send queued requests, if the timer isn't
     // already running
     _startTimer() {
@@ -261,7 +277,7 @@ export default class OutgoingRoomKeyRequestManager {
             }).catch((e) => {
                 // this should only happen if there is an indexeddb error,
                 // in which case we're a bit stuffed anyway.
-                console.warn(
+                logger.warn(
                     `error in OutgoingRoomKeyRequestManager: ${e}`,
                 );
             }).done();
@@ -282,7 +298,7 @@ export default class OutgoingRoomKeyRequestManager {
             return Promise.resolve();
         }
 
-        console.log("Looking for queued outgoing room key requests");
+        logger.log("Looking for queued outgoing room key requests");
 
         return this._cryptoStore.getOutgoingRoomKeyRequestByState([
             ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
@@ -290,7 +306,7 @@ export default class OutgoingRoomKeyRequestManager {
             ROOM_KEY_REQUEST_STATES.UNSENT,
         ]).then((req) => {
             if (!req) {
-                console.log("No more outgoing room key requests");
+                logger.log("No more outgoing room key requests");
                 this._sendOutgoingRoomKeyRequestsTimer = null;
                 return;
             }
@@ -312,7 +328,7 @@ export default class OutgoingRoomKeyRequestManager {
                 // go around the loop again
                 return this._sendOutgoingRoomKeyRequests();
             }).catch((e) => {
-                console.error("Error sending room key request; will retry later.", e);
+                logger.error("Error sending room key request; will retry later.", e);
                 this._sendOutgoingRoomKeyRequestsTimer = null;
                 this._startTimer();
             }).done();
@@ -321,7 +337,7 @@ export default class OutgoingRoomKeyRequestManager {
 
     // given a RoomKeyRequest, send it and update the request record
     _sendOutgoingRoomKeyRequest(req) {
-        console.log(
+        logger.log(
             `Requesting keys for ${stringifyRequestBody(req.requestBody)}` +
             ` from ${stringifyRecipientList(req.recipients)}` +
             `(id ${req.requestId})`,
@@ -347,7 +363,7 @@ export default class OutgoingRoomKeyRequestManager {
     // Given a RoomKeyRequest, cancel it and delete the request record unless
     // andResend is set, in which case transition to UNSENT.
     _sendOutgoingRoomKeyRequestCancellation(req, andResend) {
-        console.log(
+        logger.log(
             `Sending cancellation for key request for ` +
             `${stringifyRequestBody(req.requestBody)} to ` +
             `${stringifyRecipientList(req.recipients)} ` +

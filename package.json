@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.10.6",
+  "version": "0.14.2",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,9 @@
     "test": "npm run test:build && npm run test:run",
     "check": "npm run test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel --no-babelrc -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
-    "start": "babel -s -w -d lib src",
+    "start": "npm run start:init && npm run start:watch",
+    "start:watch": "babel -s -w --skip-initial-build -d lib src",
+    "start:init": "babel -s -d lib src",
     "clean": "rimraf lib dist",
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
     "dist": "npm run build",
@@ -19,6 +21,7 @@
     "prepublish": "npm run clean && npm run build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
+    "type": "git",
     "url": "https://github.com/matrix-org/matrix-js-sdk"
   },
   "keywords": [
@@ -53,17 +56,20 @@
     "babel-runtime": "^6.26.0",
     "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
+    "bs58": "^4.0.1",
     "content-type": "^1.0.2",
-    "request": "^2.53.0",
+    "loglevel": "1.6.1",
+    "qs": "^6.5.2",
+    "request": "^2.88.0",
     "unhomoglyph": "^1.0.2"
   },
   "devDependencies": {
     "babel-cli": "^6.18.0",
-    "babel-eslint": "^7.1.1",
+    "babel-eslint": "^8.1.1",
     "babel-plugin-transform-async-to-bluebird": "^1.1.1",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-es2015": "^6.18.0",
-    "browserify": "^14.0.0",
+    "browserify": "^16.2.3",
     "browserify-shim": "^3.8.13",
     "eslint": "^3.13.1",
     "eslint-config-google": "^0.7.1",
@@ -72,14 +78,14 @@
     "istanbul": "^0.4.5",
     "jsdoc": "^3.5.5",
     "lolex": "^1.5.2",
-    "matrix-mock-request": "^1.2.0",
-    "mocha": "^3.2.0",
-    "mocha-jenkins-reporter": "^0.3.6",
+    "matrix-mock-request": "^1.2.2",
+    "mocha": "^5.2.0",
+    "mocha-jenkins-reporter": "^0.4.0",
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
     "uglify-js": "^2.8.26",
-    "watchify": "^3.2.1"
+    "watchify": "^3.11.0"
   },
   "browserify": {
     "transform": [

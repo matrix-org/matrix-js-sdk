@@ -64,6 +64,7 @@ describe("MatrixClient opts", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     describe("without opts.store", function() {
@@ -94,7 +95,7 @@ describe("MatrixClient opts", function() {
             httpBackend.flush("/txn1", 1);
         });
 
-        it("should be able to sync / get new events", function(done) {
+        it("should be able to sync / get new events", async function() {
             const expectedEventTypes = [ // from /initialSync
                 "m.room.message", "m.room.name", "m.room.member", "m.room.member",
                 "m.room.create",
@@ -110,20 +111,16 @@ describe("MatrixClient opts", function() {
             httpBackend.when("GET", "/pushrules").respond(200, {});
             httpBackend.when("POST", "/filter").respond(200, { filter_id: "foo" });
             httpBackend.when("GET", "/sync").respond(200, syncData);
-            client.startClient();
-            httpBackend.flush("/pushrules", 1).then(function() {
-                return httpBackend.flush("/filter", 1);
-            }).then(function() {
-                return Promise.all([
-                    httpBackend.flush("/sync", 1),
-                    utils.syncPromise(client),
-                ]);
-            }).done(function() {
-                expect(expectedEventTypes.length).toEqual(
-                    0, "Expected to see event types: " + expectedEventTypes,
-                );
-                done();
-            });
+            await client.startClient();
+            await httpBackend.flush("/pushrules", 1);
+            await httpBackend.flush("/filter", 1);
+            await Promise.all([
+                httpBackend.flush("/sync", 1),
+                utils.syncPromise(client),
+            ]);
+            expect(expectedEventTypes.length).toEqual(
+                0, "Expected to see event types: " + expectedEventTypes,
+            );
         });
     });
 

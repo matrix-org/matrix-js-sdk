@@ -17,9 +17,11 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../../logger';
 import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
+import {InvalidCryptoStoreError} from '../../errors';
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -64,7 +66,7 @@ export default class IndexedDBCryptoStore {
                 return;
             }
 
-            console.log(`connecting to indexeddb ${this._dbName}`);
+            logger.log(`connecting to indexeddb ${this._dbName}`);
 
             const req = this._indexedDB.open(
                 this._dbName, IndexedDBCryptoStoreBackend.VERSION,
@@ -77,7 +79,7 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onblocked = () => {
-                console.log(
+                logger.log(
                     `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
@@ -89,20 +91,42 @@ export default class IndexedDBCryptoStore {
             req.onsuccess = (r) => {
                 const db = r.target.result;
 
-                console.log(`connected to indexeddb ${this._dbName}`);
+                logger.log(`connected to indexeddb ${this._dbName}`);
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
+        }).then((backend) => {
+            // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
+            // Try a dummy query which will fail if the browser doesn't support compund keys, so
+            // we can fall back to a different backend.
+            return backend.doTxn(
+                'readonly',
+                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                (txn) => {
+                    backend.getEndToEndInboundGroupSession('', '', txn, () => {});
+                }).then(() => {
+                    return backend;
+                },
+            );
         }).catch((e) => {
-            console.warn(
+            if (e.name === 'VersionError') {
+                logger.warn("Crypto DB is too new for us to use!", e);
+                // don't fall back to a different store: the user has crypto data
+                // in this db so we should use it or nothing at all.
+                throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
+            }
+            logger.warn(
                 `unable to connect to indexeddb ${this._dbName}` +
                     `: falling back to localStorage store: ${e}`,
             );
-            return new LocalStorageCryptoStore(global.localStorage);
-        }).catch((e) => {
-            console.warn(
-                `unable to open localStorage: falling back to in-memory store: ${e}`,
-            );
-            return new MemoryCryptoStore();
+
+            try {
+                return new LocalStorageCryptoStore(global.localStorage);
+            } catch (e) {
+                logger.warn(
+                    `unable to open localStorage: falling back to in-memory store: ${e}`,
+                );
+                return new MemoryCryptoStore();
+            }
         });
 
         return this._backendPromise;
@@ -120,11 +144,11 @@ export default class IndexedDBCryptoStore {
                 return;
             }
 
-            console.log(`Removing indexeddb instance: ${this._dbName}`);
+            logger.log(`Removing indexeddb instance: ${this._dbName}`);
             const req = this._indexedDB.deleteDatabase(this._dbName);
 
             req.onblocked = () => {
-                console.log(
+                logger.log(
                     `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
@@ -134,14 +158,14 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onsuccess = () => {
-                console.log(`Removed indexeddb instance: ${this._dbName}`);
+                logger.log(`Removed indexeddb instance: ${this._dbName}`);
                 resolve();
             };
         }).catch((e) => {
             // in firefox, with indexedDB disabled, this fails with a
             // DOMError. We treat this as non-fatal, so that people can
             // still use the app.
-            console.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
+            logger.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
         });
     }
 
@@ -190,6 +214,24 @@ export default class IndexedDBCryptoStore {
     getOutgoingRoomKeyRequestByState(wantedStates) {
         return this._connect().then((backend) => {
             return backend.getOutgoingRoomKeyRequestByState(wantedStates);
+        });
+    }
+
+    /**
+     * Look for room key requests by target device and state
+     *
+     * @param {string} userId Target user ID
+     * @param {string} deviceId Target device ID
+     * @param {Array<Number>} wantedStates list of acceptable states
+     *
+     * @return {Promise} resolves to a list of all the
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     */
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        return this._connect().then((backend) => {
+            return backend.getOutgoingRoomKeyRequestsByTarget(
+                userId, deviceId, wantedStates,
+            );
         });
     }
 
@@ -270,7 +312,10 @@ export default class IndexedDBCryptoStore {
      * @param {string} sessionId The ID of the session to retrieve
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(object)} func Called with A map from sessionId
-     *     to Base64 end-to-end session.
+     *     to session information object with 'session' key being the
+     *     Base64 end-to-end session and lastReceivedMessageTs being the
+     *     timestamp in milliseconds at which the session last received
+     *     a message.
      */
     getEndToEndSession(deviceKey, sessionId, txn, func) {
         this._backendPromise.value().getEndToEndSession(deviceKey, sessionId, txn, func);
@@ -282,7 +327,10 @@ export default class IndexedDBCryptoStore {
      * @param {string} deviceKey The public key of the other device.
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(object)} func Called with A map from sessionId
-     *     to Base64 end-to-end session.
+     *     to session information object with 'session' key being the
+     *     Base64 end-to-end session and lastReceivedMessageTs being the
+     *     timestamp in milliseconds at which the session last received
+     *     a message.
      */
     getEndToEndSessions(deviceKey, txn, func) {
         this._backendPromise.value().getEndToEndSessions(deviceKey, txn, func);
@@ -292,12 +340,12 @@ export default class IndexedDBCryptoStore {
      * Store a session between the logged-in user and another device
      * @param {string} deviceKey The public key of the other device.
      * @param {string} sessionId The ID for this end-to-end session.
-     * @param {string} session Base64 encoded end-to-end session.
+     * @param {string} sessionInfo Session information object
      * @param {*} txn An active transaction. See doTxn().
      */
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         this._backendPromise.value().storeEndToEndSession(
-            deviceKey, sessionId, session, txn,
+            deviceKey, sessionId, sessionInfo, txn,
         );
     }
 
@@ -407,6 +455,43 @@ export default class IndexedDBCryptoStore {
         this._backendPromise.value().getEndToEndRooms(txn, func);
     }
 
+    // session backups
+
+    /**
+     * Get the inbound group sessions that need to be backed up.
+     * @param {integer} limit The maximum number of sessions to retrieve.  0
+     * for no limit.
+     * @returns {Promise} resolves to an array of inbound group sessions
+     */
+    getSessionsNeedingBackup(limit) {
+        return this._connect().then((backend) => {
+            return backend.getSessionsNeedingBackup(limit);
+        });
+    }
+
+    /**
+     * Unmark sessions as needing to be backed up.
+     * @param {Array<object>} sessions The sessions that need to be backed up.
+     * @returns {Promise} resolves when the sessions are unmarked
+     */
+    unmarkSessionsNeedingBackup(sessions) {
+        return this._connect().then((backend) => {
+            return backend.unmarkSessionsNeedingBackup(sessions);
+        });
+    }
+
+    /**
+     * Mark sessions as needing to be backed up.
+     * @param {Array<object>} sessions The sessions that need to be backed up.
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} resolves when the sessions are marked
+     */
+    markSessionsNeedingBackup(sessions, txn) {
+        return this._connect().then((backend) => {
+            return backend.markSessionsNeedingBackup(sessions, txn);
+        });
+    }
+
     /**
      * Perform a transaction on the crypto store. Any store methods
      * that require a transaction (txn) object to be passed in may
@@ -440,3 +525,4 @@ IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
+IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

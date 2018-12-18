@@ -1,3 +1,329 @@
+Changes in [0.14.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.2) (2018-12-10)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.2-rc.1...v0.14.2)
+
+ * No changes since rc.1
+
+Changes in [0.14.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.2-rc.1) (2018-12-06)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.1...v0.14.2-rc.1)
+
+ * fix some assertions in e2e backup unit test
+   [\#794](https://github.com/matrix-org/matrix-js-sdk/pull/794)
+ * Config should be called with auth
+   [\#798](https://github.com/matrix-org/matrix-js-sdk/pull/798)
+ * Don't re-establish sessions with unknown devices
+   [\#792](https://github.com/matrix-org/matrix-js-sdk/pull/792)
+ * e2e key backups
+   [\#684](https://github.com/matrix-org/matrix-js-sdk/pull/684)
+ * WIP: online incremental megolm backups
+   [\#595](https://github.com/matrix-org/matrix-js-sdk/pull/595)
+ * Support for e2e key backups
+   [\#736](https://github.com/matrix-org/matrix-js-sdk/pull/736)
+ * Passphrase Support for e2e backups
+   [\#786](https://github.com/matrix-org/matrix-js-sdk/pull/786)
+ * Add 'getSsoLoginUrl' function
+   [\#783](https://github.com/matrix-org/matrix-js-sdk/pull/783)
+ * Fix: don't set the room name to null when heroes are missing.
+   [\#784](https://github.com/matrix-org/matrix-js-sdk/pull/784)
+ * Handle crypto db version upgrades
+   [\#785](https://github.com/matrix-org/matrix-js-sdk/pull/785)
+ * Restart broken Olm sessions
+   [\#780](https://github.com/matrix-org/matrix-js-sdk/pull/780)
+ * Use the last olm session that got a message
+   [\#776](https://github.com/matrix-org/matrix-js-sdk/pull/776)
+
+Changes in [0.14.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.1) (2018-11-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0...v0.14.1)
+
+ * Warning when crypto DB is too new to use.
+
+Changes in [0.14.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.0) (2018-11-19)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.0-rc.1...v0.14.0)
+
+ * No changes since rc.1
+
+Changes in [0.14.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.0-rc.1) (2018-11-15)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.13.1...v0.14.0-rc.1)
+
+BREAKING CHANGE
+----------------
+ 
+ * js-sdk now uses Olm 3.0. Apps using Olm must update to 3.0 to
+   continue using Olm with the js-sdk. The js-sdk will call Olm's
+   init() method when the client is started.
+
+All Changes
+-----------
+
+ * Prevent messages from being sent if other messages have failed to send
+   [\#781](https://github.com/matrix-org/matrix-js-sdk/pull/781)
+ * A unit test for olm
+   [\#777](https://github.com/matrix-org/matrix-js-sdk/pull/777)
+ * Set access_token and user_id after login in with username and password.
+   [\#778](https://github.com/matrix-org/matrix-js-sdk/pull/778)
+ * Add function to get currently joined rooms.
+   [\#779](https://github.com/matrix-org/matrix-js-sdk/pull/779)
+ * Remove the request-only stuff we don't need anymore
+   [\#775](https://github.com/matrix-org/matrix-js-sdk/pull/775)
+ * Manually construct query strings for browser-request instances
+   [\#770](https://github.com/matrix-org/matrix-js-sdk/pull/770)
+ * Fix: correctly check for crypto being present
+   [\#769](https://github.com/matrix-org/matrix-js-sdk/pull/769)
+ * Update babel-eslint to 8.1.1
+   [\#768](https://github.com/matrix-org/matrix-js-sdk/pull/768)
+ * Support `request` in the browser and support supplying servers to try in
+   joinRoom()
+   [\#764](https://github.com/matrix-org/matrix-js-sdk/pull/764)
+ * loglevel should be a normal dependency
+   [\#767](https://github.com/matrix-org/matrix-js-sdk/pull/767)
+ * Stop devicelist when client is stopped
+   [\#766](https://github.com/matrix-org/matrix-js-sdk/pull/766)
+ * Update to WebAssembly-powered Olm
+   [\#743](https://github.com/matrix-org/matrix-js-sdk/pull/743)
+ * Logging lib. Fixes #332
+   [\#763](https://github.com/matrix-org/matrix-js-sdk/pull/763)
+ * Use new stop() method on matrix-mock-request
+   [\#765](https://github.com/matrix-org/matrix-js-sdk/pull/765)
+
+Changes in [0.13.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.13.1) (2018-11-14)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.13.0...v0.13.1)
+
+ * Add function to get currently joined rooms.
+   [\#779](https://github.com/matrix-org/matrix-js-sdk/pull/779)
+
+Changes in [0.13.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.13.0) (2018-11-15)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.1...v0.13.0)
+
+BREAKING CHANGE
+----------------
+ * `MatrixClient::login` now sets client `access_token` and `user_id` following successful login with username and password.
+
+Changes in [0.12.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.1) (2018-10-29)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.1-rc.1...v0.12.1)
+
+ * No changes since rc.1
+
+Changes in [0.12.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.1-rc.1) (2018-10-24)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.0...v0.12.1-rc.1)
+
+ * Add repository type to package.json to make it valid
+   [\#762](https://github.com/matrix-org/matrix-js-sdk/pull/762)
+ * Add getMediaConfig()
+   [\#761](https://github.com/matrix-org/matrix-js-sdk/pull/761)
+ * add new examples, to be expanded into a post
+   [\#739](https://github.com/matrix-org/matrix-js-sdk/pull/739)
+
+Changes in [0.12.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0) (2018-10-16)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.12.0-rc.1...v0.12.0)
+
+ * No changes since rc.1
+
+Changes in [0.12.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.12.0-rc.1) (2018-10-11)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1...v0.12.0-rc.1)
+
+BREAKING CHANGES
+----------------
+ * If js-sdk finds data in the store that is incompatible with the options currently being used,
+   it will emit sync state ERROR with an error of type InvalidStoreError. It will also stop trying
+   to sync in this situation: the app must stop the client and then either clear the store or
+   change the options (in this case, enable or disable lazy loading of members) and then start
+   the client again.
+
+All Changes
+-----------
+
+ * never replace /sync'ed memberships with OOB ones
+   [\#760](https://github.com/matrix-org/matrix-js-sdk/pull/760)
+ * Don't fail to start up if lazy load check fails
+   [\#759](https://github.com/matrix-org/matrix-js-sdk/pull/759)
+ * Make e2e work on Edge
+   [\#754](https://github.com/matrix-org/matrix-js-sdk/pull/754)
+ * throw error with same name and message over idb worker boundary
+   [\#758](https://github.com/matrix-org/matrix-js-sdk/pull/758)
+ * Default to a room version of 1 when there is no room create event
+   [\#755](https://github.com/matrix-org/matrix-js-sdk/pull/755)
+ * Silence bluebird warnings
+   [\#757](https://github.com/matrix-org/matrix-js-sdk/pull/757)
+ * allow non-ff merge from release branch into master
+   [\#750](https://github.com/matrix-org/matrix-js-sdk/pull/750)
+ * Reject with the actual error on indexeddb error
+   [\#751](https://github.com/matrix-org/matrix-js-sdk/pull/751)
+ * Update mocha to v5
+   [\#744](https://github.com/matrix-org/matrix-js-sdk/pull/744)
+ * disable lazy loading for guests as they cant create filters
+   [\#748](https://github.com/matrix-org/matrix-js-sdk/pull/748)
+ * Revert "Add getMediaLimits to client"
+   [\#745](https://github.com/matrix-org/matrix-js-sdk/pull/745)
+
+Changes in [0.11.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1) (2018-10-01)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.1-rc.1...v0.11.1)
+
+ * No changes since rc.1
+
+Changes in [0.11.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.1-rc.1) (2018-09-27)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.0...v0.11.1-rc.1)
+
+ * make usage of hub compatible with latest version (2.5)
+   [\#747](https://github.com/matrix-org/matrix-js-sdk/pull/747)
+ * Detect when lazy loading has been toggled in client.startClient
+   [\#746](https://github.com/matrix-org/matrix-js-sdk/pull/746)
+ * Add getMediaLimits to client
+   [\#644](https://github.com/matrix-org/matrix-js-sdk/pull/644)
+ * Split npm start into an init and watch script
+   [\#742](https://github.com/matrix-org/matrix-js-sdk/pull/742)
+ * Revert "room name should only take canonical alias into account"
+   [\#738](https://github.com/matrix-org/matrix-js-sdk/pull/738)
+ * fix display name disambiguation with LL
+   [\#737](https://github.com/matrix-org/matrix-js-sdk/pull/737)
+ * Introduce Room.myMembership event
+   [\#735](https://github.com/matrix-org/matrix-js-sdk/pull/735)
+ * room name should only take canonical alias into account
+   [\#733](https://github.com/matrix-org/matrix-js-sdk/pull/733)
+ * state events from context response were not wrapped in a MatrixEvent
+   [\#732](https://github.com/matrix-org/matrix-js-sdk/pull/732)
+ * Reduce amount of promises created when inserting members
+   [\#724](https://github.com/matrix-org/matrix-js-sdk/pull/724)
+ * dont wait for LL members to be stored to resolve the members
+   [\#726](https://github.com/matrix-org/matrix-js-sdk/pull/726)
+ * RoomState.members emitted with wrong argument order for OOB members
+   [\#728](https://github.com/matrix-org/matrix-js-sdk/pull/728)
+
+Changes in [0.11.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0) (2018-09-10)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.11.0-rc.1...v0.11.0)
+
+BREAKING CHANGES
+----------------
+ * v0.11.0-rc.1 introduced some breaking changes - see the respective release notes.
+
+No changes since rc.1
+
+Changes in [0.11.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.11.0-rc.1) (2018-09-07)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9...v0.11.0-rc.1)
+
+ * Support for lazy loading members. This should improve performance for
+   users who joined big rooms a lot. Pass to `lazyLoadMembers = true` option when calling `startClient`.
+
+BREAKING CHANGES
+----------------
+
+ * `MatrixClient::startClient` now returns a Promise. No method should be called on the client before that promise resolves. Before this method didn't return anything.
+ * A new `CATCHUP` sync state, emitted by `MatrixClient#"sync"` and returned by `MatrixClient::getSyncState()`, when doing initial sync after the `ERROR` state. See `MatrixClient` documentation for details.
+ * `RoomState::maySendEvent('m.room.message', userId)` & `RoomState::maySendMessage(userId)` do not check the membership of the user anymore, only the power level. To check if the syncing user is allowed to write in a room, use `Room::maySendMessage()` as `RoomState` is not always aware of the syncing user's membership anymore, in case lazy loading of members is enabled.
+
+All Changes
+-----------
+
+ * Only emit CATCHUP if recovering from conn error
+   [\#727](https://github.com/matrix-org/matrix-js-sdk/pull/727)
+ * Fix docstring for sync data.error
+   [\#725](https://github.com/matrix-org/matrix-js-sdk/pull/725)
+ * Re-apply "Don't rely on members to query if syncing user can post to room"
+   [\#723](https://github.com/matrix-org/matrix-js-sdk/pull/723)
+ * Revert "Don't rely on members to query if syncing user can post to room"
+   [\#721](https://github.com/matrix-org/matrix-js-sdk/pull/721)
+ * Don't rely on members to query if syncing user can post to room
+   [\#717](https://github.com/matrix-org/matrix-js-sdk/pull/717)
+ * Fixes for room.guessDMUserId
+   [\#719](https://github.com/matrix-org/matrix-js-sdk/pull/719)
+ * Fix filepanel also filtering main timeline with LL turned on.
+   [\#716](https://github.com/matrix-org/matrix-js-sdk/pull/716)
+ * Remove lazy loaded members when leaving room
+   [\#711](https://github.com/matrix-org/matrix-js-sdk/pull/711)
+ * Fix: show spinner again while recovering from connection error
+   [\#702](https://github.com/matrix-org/matrix-js-sdk/pull/702)
+ * Add method to query LL state in client
+   [\#714](https://github.com/matrix-org/matrix-js-sdk/pull/714)
+ * Fix: also load invited members when lazy loading members
+   [\#707](https://github.com/matrix-org/matrix-js-sdk/pull/707)
+ * Pass through function to discard megolm session
+   [\#704](https://github.com/matrix-org/matrix-js-sdk/pull/704)
+
+Changes in [0.10.9](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9) (2018-09-03)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.2...v0.10.9)
+
+ * No changes since rc.2
+
+Changes in [0.10.9-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.2) (2018-08-31)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.9-rc.1...v0.10.9-rc.2)
+
+ * Fix for "otherMember.getAvatarUrl is not a function"
+   [\#708](https://github.com/matrix-org/matrix-js-sdk/pull/708)
+
+Changes in [0.10.9-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.9-rc.1) (2018-08-30)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.8...v0.10.9-rc.1)
+
+ * Fix DM avatar
+   [\#706](https://github.com/matrix-org/matrix-js-sdk/pull/706)
+ * Lazy loading: avoid loading members at initial sync for e2e rooms
+   [\#699](https://github.com/matrix-org/matrix-js-sdk/pull/699)
+ * Improve setRoomEncryption guard against multiple m.room.encryption st…
+   [\#700](https://github.com/matrix-org/matrix-js-sdk/pull/700)
+ * Revert "Lazy loading: don't block on setting up room crypto"
+   [\#698](https://github.com/matrix-org/matrix-js-sdk/pull/698)
+ * Lazy loading: don't block on setting up room crypto
+   [\#696](https://github.com/matrix-org/matrix-js-sdk/pull/696)
+ * Add getVisibleRooms()
+   [\#695](https://github.com/matrix-org/matrix-js-sdk/pull/695)
+ * Add wrapper around getJoinedMemberCount()
+   [\#697](https://github.com/matrix-org/matrix-js-sdk/pull/697)
+ * Api to fetch events via /room/.../event/..
+   [\#694](https://github.com/matrix-org/matrix-js-sdk/pull/694)
+ * Support for room upgrades
+   [\#693](https://github.com/matrix-org/matrix-js-sdk/pull/693)
+ * Lazy loading of room members
+   [\#691](https://github.com/matrix-org/matrix-js-sdk/pull/691)
+
+Changes in [0.10.8](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.8) (2018-08-20)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.8-rc.1...v0.10.8)
+
+ * No changes since rc.1
+
+Changes in [0.10.8-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.8-rc.1) (2018-08-16)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7...v0.10.8-rc.1)
+
+ * Add getVersion to Room
+   [\#689](https://github.com/matrix-org/matrix-js-sdk/pull/689)
+ * Add getSyncStateData()
+   [\#680](https://github.com/matrix-org/matrix-js-sdk/pull/680)
+ * Send sync error to listener
+   [\#679](https://github.com/matrix-org/matrix-js-sdk/pull/679)
+ * make sure room.tags is always a valid object to avoid crashes
+   [\#675](https://github.com/matrix-org/matrix-js-sdk/pull/675)
+ * Fix infinite spinner upon joining a room
+   [\#673](https://github.com/matrix-org/matrix-js-sdk/pull/673)
+
+Changes in [0.10.7](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7) (2018-07-30)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.7-rc.1...v0.10.7)
+
+ * No changes since rc.1
+
+Changes in [0.10.7-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.7-rc.1) (2018-07-24)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6...v0.10.7-rc.1)
+
+ * encrypt for invited users if history visibility allows.
+   [\#666](https://github.com/matrix-org/matrix-js-sdk/pull/666)
+
 Changes in [0.10.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.10.6) (2018-07-09)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.10.6-rc.1...v0.10.6)

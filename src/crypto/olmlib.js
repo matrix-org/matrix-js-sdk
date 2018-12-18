@@ -23,6 +23,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
+const logger = require("../logger");
 const utils = require("../utils");
 
 /**
@@ -34,6 +35,11 @@ module.exports.OLM_ALGORITHM = "m.olm.v1.curve25519-aes-sha2";
  * matrix algorithm tag for megolm
  */
 module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
+
+/**
+ * matrix algorithm tag for megolm backups
+ */
+module.exports.MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
 
 
 /**
@@ -65,7 +71,7 @@ module.exports.encryptMessageForDevice = async function(
         return;
     }
 
-    console.log(
+    logger.log(
         "Using sessionid " + sessionId + " for device " +
             recipientUserId + ":" + recipientDevice.deviceId,
     );
@@ -115,14 +121,17 @@ module.exports.encryptMessageForDevice = async function(
  * @param {module:base-apis~MatrixBaseApis} baseApis
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
- *    map from userid to list of devices
+ *    map from userid to list of devices to ensure sessions for
+ *
+ * @param {bolean} force If true, establish a new session even if one already exists.
+ *     Optional.
  *
  * @return {module:client.Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
 module.exports.ensureOlmSessionsForDevices = async function(
-    olmDevice, baseApis, devicesByUser,
+    olmDevice, baseApis, devicesByUser, force,
 ) {
     const devicesWithoutSession = [
         // [userId, deviceId], ...
@@ -140,7 +149,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
             const sessionId = await olmDevice.getSessionIdForDevice(key);
-            if (sessionId === null) {
+            if (sessionId === null || force) {
                 devicesWithoutSession.push([userId, deviceId]);
             }
             result[userId][deviceId] = {
@@ -176,7 +185,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
         for (let j = 0; j < devices.length; j++) {
             const deviceInfo = devices[j];
             const deviceId = deviceInfo.deviceId;
-            if (result[userId][deviceId].sessionId) {
+            if (result[userId][deviceId].sessionId && !force) {
                 // we already have a result for this device
                 continue;
             }
@@ -190,7 +199,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
             }
 
             if (!oneTimeKey) {
-                console.warn(
+                logger.warn(
                     "No one-time keys (alg=" + oneTimeKeyAlgorithm +
                         ") for device " + userId + ":" + deviceId,
                 );
@@ -219,7 +228,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
             deviceInfo.getFingerprint(),
         );
     } catch (e) {
-        console.error(
+        logger.error(
             "Unable to verify signature on one-time key for device " +
                 userId + ":" + deviceId + ":", e,
         );
@@ -233,12 +242,12 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
         );
     } catch (e) {
         // possibly a bad key
-        console.error("Error starting session with device " +
+        logger.error("Error starting session with device " +
                       userId + ":" + deviceId + ": " + e);
         return null;
     }
 
-    console.log("Started new sessionid " + sid +
+    logger.log("Started new sessionid " + sid +
                 " for device " + userId + ":" + deviceId);
     return sid;
 }

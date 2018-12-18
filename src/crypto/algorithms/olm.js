@@ -22,6 +22,7 @@ limitations under the License.
  */
 import Promise from 'bluebird';
 
+const logger = require("../../logger");
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const DeviceInfo = require("../deviceinfo");
@@ -83,60 +84,62 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
  *
  * @return {module:client.Promise} Promise which resolves to the new event body
  */
-OlmEncryption.prototype.encryptMessage = function(room, eventType, content) {
+OlmEncryption.prototype.encryptMessage = async function(room, eventType, content) {
     // pick the list of recipients based on the membership list.
     //
     // TODO: there is a race condition here! What if a new user turns up
     // just as you are sending a secret message?
 
-    const users = utils.map(room.getEncryptionTargetMembers(), function(u) {
+    const members = await room.getEncryptionTargetMembers();
+
+    const users = utils.map(members, function(u) {
         return u.userId;
     });
 
     const self = this;
-    return this._ensureSession(users).then(function() {
-        const payloadFields = {
-            room_id: room.roomId,
-            type: eventType,
-            content: content,
-        };
+    await this._ensureSession(users);
 
-        const encryptedContent = {
-            algorithm: olmlib.OLM_ALGORITHM,
-            sender_key: self._olmDevice.deviceCurve25519Key,
-            ciphertext: {},
-        };
+    const payloadFields = {
+        room_id: room.roomId,
+        type: eventType,
+        content: content,
+    };
 
-        const promises = [];
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: self._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
-            const devices = self._crypto.getStoredDevicesForUser(userId);
+    const promises = [];
 
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
-                const key = deviceInfo.getIdentityKey();
-                if (key == self._olmDevice.deviceCurve25519Key) {
-                    // don't bother sending to ourself
-                    continue;
-                }
-                if (deviceInfo.verified == DeviceVerification.BLOCKED) {
-                    // don't bother setting up sessions with blocked users
-                    continue;
-                }
+    for (let i = 0; i < users.length; ++i) {
+        const userId = users[i];
+        const devices = self._crypto.getStoredDevicesForUser(userId);
 
-                promises.push(
-                    olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        self._userId, self._deviceId, self._olmDevice,
-                        userId, deviceInfo, payloadFields,
-                    ),
-                );
+        for (let j = 0; j < devices.length; ++j) {
+            const deviceInfo = devices[j];
+            const key = deviceInfo.getIdentityKey();
+            if (key == self._olmDevice.deviceCurve25519Key) {
+                // don't bother sending to ourself
+                continue;
             }
-        }
+            if (deviceInfo.verified == DeviceVerification.BLOCKED) {
+                // don't bother setting up sessions with blocked users
+                continue;
+            }
 
-        return Promise.all(promises).return(encryptedContent);
-    });
+            promises.push(
+                olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    self._userId, self._deviceId, self._olmDevice,
+                    userId, deviceInfo, payloadFields,
+                ),
+            );
+        }
+    }
+
+    return await Promise.all(promises).return(encryptedContent);
 };
 
 /**
@@ -271,7 +274,7 @@ OlmDecryption.prototype._decryptMessage = async function(
             const payload = await this._olmDevice.decryptMessage(
                 theirDeviceIdentityKey, sessionId, message.type, message.body,
             );
-            console.log(
+            logger.log(
                 "Decrypted Olm message from " + theirDeviceIdentityKey +
                     " with session " + sessionId,
             );
@@ -326,7 +329,7 @@ OlmDecryption.prototype._decryptMessage = async function(
         );
     }
 
-    console.log(
+    logger.log(
         "created new inbound Olm session ID " +
             res.session_id + " with " + theirDeviceIdentityKey,
     );

@@ -25,6 +25,7 @@ const anotherjson = require('another-json');
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
+const logger = require("../logger");
 const utils = require("../utils");
 const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");
@@ -35,6 +36,12 @@ const DeviceList = require('./DeviceList').default;
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+
+export function isCryptoAvailable() {
+    return Boolean(global.Olm);
+}
+
+const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
  * Cryptography bits
@@ -62,7 +69,7 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  *
  * @param {RoomList} roomList An initialised RoomList object
  */
-function Crypto(baseApis, sessionStore, userId, deviceId,
+export default function Crypto(baseApis, sessionStore, userId, deviceId,
                 clientStore, cryptoStore, roomList) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -71,6 +78,14 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
+
+    // track whether this device's megolm keys are being backed up incrementally
+    // to the server or not.
+    // XXX: this should probably have a single source of truth from OlmAccount
+    this.backupInfo = null; // The info dict from /room_keys/version
+    this.backupKey = null; // The encryption key object
+    this._checkedForBackup = false; // Have we checked the server for a backup we can use?
+    this._sendingBackups = false; // Are we currently sending backups?
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
@@ -106,6 +121,24 @@ function Crypto(baseApis, sessionStore, userId, deviceId,
     this._receivedRoomKeyRequestCancellations = [];
     // true if we are currently processing received room key requests
     this._processingRoomKeyRequests = false;
+    // controls whether device tracking is delayed
+    // until calling encryptEvent or trackRoomDevices,
+    // or done immediately upon enabling room encryption.
+    this._lazyLoadMembers = false;
+    // in case _lazyLoadMembers is true,
+    // track if an initial tracking of all the room members
+    // has happened for a given room. This is delayed
+    // to avoid loading room members as long as possible.
+    this._roomDeviceTrackingState = {};
+
+    // The timestamp of the last time we forced establishment
+    // of a new session for each device, in milliseconds.
+    // {
+    //     userId: {
+    //         deviceId: 1234567890000,
+    //     },
+    // }
+    this._lastNewSessionForced = {};
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -115,6 +148,8 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
+    await global.Olm.init();
+
     const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
     let cryptoStoreHasAccount;
     await this._cryptoStore.doTxn(
@@ -165,6 +200,126 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+
+    this._checkAndStartKeyBackup();
+};
+
+/**
+ * Check the server for an active key backup and
+ * if one is present and has a valid signature from
+ * one of the user's verified devices, start backing up
+ * to it.
+ */
+Crypto.prototype._checkAndStartKeyBackup = async function() {
+    console.log("Checking key backup status...");
+    if (this._baseApis.isGuest()) {
+        console.log("Skipping key backup check since user is guest");
+        this._checkedForBackup = true;
+        return;
+    }
+    let backupInfo;
+    try {
+        backupInfo = await this._baseApis.getKeyBackupVersion();
+    } catch (e) {
+        console.log("Error checking for active key backup", e);
+        if (e.httpStatus / 100 === 4) {
+            // well that's told us. we won't try again.
+            this._checkedForBackup = true;
+        }
+        return;
+    }
+    this._checkedForBackup = true;
+
+    const trustInfo = await this.isKeyBackupTrusted(backupInfo);
+
+    if (trustInfo.usable && !this.backupInfo) {
+        console.log("Found usable key backup: enabling key backups");
+        this._baseApis.enableKeyBackup(backupInfo);
+    } else if (!trustInfo.usable && this.backupInfo) {
+        console.log("No usable key backup: disabling key backup");
+        this._baseApis.disableKeyBackup();
+    } else if (!trustInfo.usable && !this.backupInfo) {
+        console.log("No usable key backup: not enabling key backup");
+    }
+};
+
+/**
+ * Forces a re-check of the key backup and enables/disables it
+ * as appropriate
+ *
+ * @param {object} backupInfo Backup info from /room_keys/version endpoint
+ */
+Crypto.prototype.checkKeyBackup = async function(backupInfo) {
+    this._checkedForBackup = false;
+    await this._checkAndStartKeyBackup();
+};
+
+/**
+ * @param {object} backupInfo key backup info dict from /room_keys/version
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
+    const ret = {
+        usable: false,
+        sigs: [],
+    };
+
+    if (
+        !backupInfo ||
+        !backupInfo.algorithm ||
+        !backupInfo.auth_data ||
+        !backupInfo.auth_data.public_key ||
+        !backupInfo.auth_data.signatures
+    ) {
+        console.log("Key backup is absent or missing required data");
+        return ret;
+    }
+
+    const mySigs = backupInfo.auth_data.signatures[this._userId];
+    if (!mySigs || mySigs.length === 0) {
+        console.log("Ignoring key backup because it lacks any signatures from this user");
+        return ret;
+    }
+
+    for (const keyId of Object.keys(mySigs)) {
+        const device = this._deviceList.getStoredDevice(
+            this._userId, keyId.split(':')[1], // XXX: is this how we're supposed to get the device ID?
+        );
+        if (!device) {
+            console.log("Ignoring signature from unknown key " + keyId);
+            continue;
+        }
+        const sigInfo = { device };
+        try {
+            await olmlib.verifySignature(
+                this._olmDevice,
+                backupInfo.auth_data,
+                this._userId,
+                device.deviceId,
+                device.getFingerprint(),
+            );
+            sigInfo.valid = true;
+        } catch (e) {
+            console.log("Bad signature from device " + device.deviceId, e);
+            sigInfo.valid = false;
+        }
+        ret.sigs.push(sigInfo);
+    }
+
+    ret.usable = ret.sigs.some((s) => s.valid && s.device.isVerified());
+    return ret;
+};
+
+/**
+ */
+Crypto.prototype.enableLazyLoading = function() {
+    this._lazyLoadMembers = true;
 };
 
 /**
@@ -181,7 +336,7 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
         try {
             crypto._onRoomMembership(event, member, oldMembership);
         } catch (e) {
-             console.error("Error handling membership change:", e);
+             logger.error("Error handling membership change:", e);
         }
     });
 
@@ -199,6 +354,7 @@ Crypto.prototype.start = function() {
 /** Stop background processes related to crypto */
 Crypto.prototype.stop = function() {
     this._outgoingRoomKeyRequestManager.stop();
+    this._deviceList.stop();
 };
 
 /**
@@ -366,7 +522,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         // create any more keys.
         return uploadLoop(keyCount);
     }).catch((e) => {
-        console.error("Error uploading one-time keys", e.stack || e);
+        logger.error("Error uploading one-time keys", e.stack || e);
     }).finally(() => {
         // reset _oneTimeKeyCount to prevent start uploading based on old data.
         // it will be set again on the next /sync-response
@@ -573,7 +729,7 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
     // identity key of the device which set up the Megolm session.
 
     const device = this._deviceList.getDeviceByIdentityKey(
-        event.getSender(), algorithm, senderKey,
+        algorithm, senderKey,
     );
 
     if (device === null) {
@@ -591,19 +747,36 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
 
     const claimedKey = event.getClaimedEd25519Key();
     if (!claimedKey) {
-        console.warn("Event " + event.getId() + " claims no ed25519 key: " +
+        logger.warn("Event " + event.getId() + " claims no ed25519 key: " +
                      "cannot verify sending device");
         return null;
     }
 
     if (claimedKey !== device.getFingerprint()) {
-        console.warn(
+        logger.warn(
             "Event " + event.getId() + " claims ed25519 key " + claimedKey +
                 "but sender device has key " + device.getFingerprint());
         return null;
     }
 
     return device;
+};
+
+/**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * @param {string} roomId The ID of the room to discard the session for
+ *
+ * This should not normally be necessary.
+ */
+Crypto.prototype.forceDiscardSession = function(roomId) {
+    const alg = this._roomEncryptors[roomId];
+    if (alg === undefined) throw new Error("Room not encrypted");
+    if (alg.forceDiscardSession === undefined) {
+        throw new Error("Room encryption algorithm doesn't support session discarding");
+    }
+    alg.forceDiscardSession();
 };
 
 /**
@@ -614,24 +787,48 @@ Crypto.prototype.getEventSenderDeviceInfo = function(event) {
  * @param {object} config The encryption config for the room.
  *
  * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
- *   users in the room (for now)
+ *   users in the room (for now). In case lazy loading is enabled,
+ *   the device query is always inhibited as the members are not tracked.
  */
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
-    // if we already have encryption in this room, we should ignore this event
-    // (for now at least. maybe we should alert the user somehow?)
+    // if state is being replayed from storage, we might already have a configuration
+    // for this room as they are persisted as well.
+    // We just need to make sure the algorithm is initialized in this case.
+    // However, if the new config is different,
+    // we should bail out as room encryption can't be changed once set.
     const existingConfig = this._roomList.getRoomEncryption(roomId);
-    if (existingConfig && JSON.stringify(existingConfig) != JSON.stringify(config)) {
-        console.error("Ignoring m.room.encryption event which requests " +
-                      "a change of config in " + roomId);
+    if (existingConfig) {
+        if (JSON.stringify(existingConfig) != JSON.stringify(config)) {
+            logger.error("Ignoring m.room.encryption event which requests " +
+                          "a change of config in " + roomId);
+            return;
+        }
+    }
+    // if we already have encryption in this room, we should ignore this event,
+    // as it would reset the encryption algorithm.
+    // This is at least expected to be called twice, as sync calls onCryptoEvent
+    // for both the timeline and state sections in the /sync response,
+    // the encryption event would appear in both.
+    // If it's called more than twice though,
+    // it signals a bug on client or server.
+    const existingAlg = this._roomEncryptors[roomId];
+    if (existingAlg) {
         return;
+    }
+
+    // _roomList.getRoomEncryption will not race with _roomList.setRoomEncryption
+    // because it first stores in memory. We should await the promise only
+    // after all the in-memory state (_roomEncryptors and _roomList) has been updated
+    // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
+    let storeConfigPromise = null;
+    if(!existingConfig) {
+        storeConfigPromise = this._roomList.setRoomEncryption(roomId, config);
     }
 
     const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
     if (!AlgClass) {
         throw new Error("Unable to encrypt with " + config.algorithm);
     }
-
-    await this._roomList.setRoomEncryption(roomId, config);
 
     const alg = new AlgClass({
         userId: this._userId,
@@ -644,23 +841,58 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     });
     this._roomEncryptors[roomId] = alg;
 
-    // make sure we are tracking the device lists for all users in this room.
-    console.log("Enabling encryption in " + roomId + "; " +
-                "starting to track device lists for all users therein");
-    const room = this._clientStore.getRoom(roomId);
-    if (!room) {
-        throw new Error(`Unable to enable encryption in unknown room ${roomId}`);
+    if (storeConfigPromise) {
+        await storeConfigPromise;
     }
 
-    const members = room.getEncryptionTargetMembers();
-    members.forEach((m) => {
-        this._deviceList.startTrackingDeviceList(m.userId);
-    });
-    if (!inhibitDeviceQuery) {
-        this._deviceList.refreshOutdatedDeviceLists();
+    if (!this._lazyLoadMembers) {
+        logger.log("Enabling encryption in " + roomId + "; " +
+            "starting to track device lists for all users therein");
+
+        await this.trackRoomDevices(roomId);
+        // TODO: this flag is only not used from MatrixClient::setRoomEncryption
+        // which is never used (inside riot at least)
+        // but didn't want to remove it as it technically would
+        // be a breaking change.
+        if(!this.inhibitDeviceQuery) {
+            this._deviceList.refreshOutdatedDeviceLists();
+        }
+    } else {
+        logger.log("Enabling encryption in " + roomId);
     }
 };
 
+
+/**
+ * Make sure we are tracking the device lists for all users in this room.
+ *
+ * @param {string} roomId The room ID to start tracking devices in.
+ * @returns {Promise} when all devices for the room have been fetched and marked to track
+ */
+Crypto.prototype.trackRoomDevices = function(roomId) {
+    const trackMembers = async () => {
+        // not an encrypted room
+        if (!this._roomEncryptors[roomId]) {
+            return;
+        }
+        const room = this._clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
+        }
+        logger.log(`Starting to track devices for room ${roomId} ...`);
+        const members = await room.getEncryptionTargetMembers();
+        members.forEach((m) => {
+            this._deviceList.startTrackingDeviceList(m.userId);
+        });
+    };
+
+    let promise = this._roomDeviceTrackingState[roomId];
+    if (!promise) {
+        promise = trackMembers();
+        this._roomDeviceTrackingState[roomId] = promise;
+    }
+    return promise;
+};
 
 /**
  * @typedef {Object} module:crypto~OlmSessionResult
@@ -724,6 +956,7 @@ Crypto.prototype.exportRoomKeys = async function() {
                 const sess = this._olmDevice.exportInboundGroupSession(
                     s.senderKey, s.sessionId, s.sessionData,
                 );
+                delete sess.first_known_index;
                 sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                 exportedSessions.push(sess);
             });
@@ -743,7 +976,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
     return Promise.map(
         keys, (key) => {
             if (!key.room_id || !key.algorithm) {
-                console.warn("ignoring room key entry with missing fields", key);
+                logger.warn("ignoring room key entry with missing fields", key);
                 return null;
             }
 
@@ -753,6 +986,133 @@ Crypto.prototype.importRoomKeys = function(keys) {
     );
 };
 
+Crypto.prototype._maybeSendKeyBackup = async function(delay, retry) {
+    if (retry === undefined) retry = true;
+
+    if (!this._sendingBackups) {
+        this._sendingBackups = true;
+        try {
+            if (delay === undefined) {
+                // by default, wait between 0 and 10 seconds, to avoid backup
+                // requests from different clients hitting the server all at
+                // the same time when a new key is sent
+                delay = Math.random() * 10000;
+            }
+            await Promise.delay(delay);
+            let numFailures = 0; // number of consecutive failures
+            while (1) {
+                if (!this.backupKey) {
+                    return;
+                }
+                // FIXME: figure out what limit is reasonable
+                const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
+                if (!sessions.length) {
+                    return;
+                }
+                const data = {};
+                for (const session of sessions) {
+                    const roomId = session.sessionData.room_id;
+                    if (data[roomId] === undefined) {
+                        data[roomId] = {sessions: {}};
+                    }
+
+                    const sessionData = await this._olmDevice.exportInboundGroupSession(
+                        session.senderKey, session.sessionId, session.sessionData,
+                    );
+                    sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
+                    delete sessionData.session_id;
+                    delete sessionData.room_id;
+                    const firstKnownIndex = sessionData.first_known_index;
+                    delete sessionData.first_known_index;
+                    const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
+
+                    const forwardedCount =
+                          (sessionData.forwarding_curve25519_key_chain || []).length;
+
+                    const device = this._deviceList.getDeviceByIdentityKey(
+                        olmlib.MEGOLM_ALGORITHM, session.senderKey,
+                    );
+
+                    data[roomId]['sessions'][session.sessionId] = {
+                        first_message_index: firstKnownIndex,
+                        forwarded_count: forwardedCount,
+                        is_verified: !!(device && device.isVerified()),
+                        session_data: encrypted,
+                    };
+                }
+
+                try {
+                    await this._baseApis.sendKeyBackup(
+                        undefined, undefined, this.backupInfo.version,
+                        {rooms: data},
+                    );
+                    numFailures = 0;
+                    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
+                } catch (err) {
+                    numFailures++;
+                    console.log("send failed", err);
+                    if (err.httpStatus === 400
+                        || err.httpStatus === 403
+                        || err.httpStatus === 401
+                        || !retry) {
+                        // retrying probably won't help much, so we should give up
+                        // FIXME: disable backups?
+                        throw err;
+                    }
+                }
+                if (numFailures) {
+                    // exponential backoff if we have failures
+                    await new Promise((resolve, reject) => {
+                        setTimeout(
+                            resolve,
+                            1000 * Math.pow(2, Math.min(numFailures - 1, 4)),
+                        );
+                    });
+                }
+            }
+        } finally {
+            this._sendingBackups = false;
+        }
+    }
+};
+
+Crypto.prototype.backupGroupSession = async function(
+    roomId, senderKey, forwardingCurve25519KeyChain,
+    sessionId, sessionKey, keysClaimed,
+    exportFormat,
+) {
+    if (!this.backupInfo) {
+        throw new Error("Key backups are not enabled");
+    }
+
+    await this._cryptoStore.markSessionsNeedingBackup([{
+        senderKey: senderKey,
+        sessionId: sessionId,
+    }]);
+
+    await this._maybeSendKeyBackup();
+};
+
+Crypto.prototype.backupAllGroupSessions = async function(version) {
+    await this._cryptoStore.doTxn(
+        'readwrite',
+        [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_BACKUP,
+        ],
+        (txn) => {
+            this._cryptoStore.getAllEndToEndInboundGroupSessions(txn, (session) => {
+                if (session !== null) {
+                    this._cryptoStore.markSessionsNeedingBackup([session], txn);
+                }
+            });
+        },
+    );
+
+    await this._maybeSendKeyBackup(0, false);
+};
+
+/* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
 /**
  * Encrypt an event according to the configuration of the room.
  *
@@ -763,7 +1123,8 @@ Crypto.prototype.importRoomKeys = function(keys) {
  * @return {module:client.Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
-Crypto.prototype.encryptEvent = function(event, room) {
+/* eslint-enable valid-jsdoc */
+Crypto.prototype.encryptEvent = async function(event, room) {
     if (!room) {
         throw new Error("Cannot send encrypted messages in unknown rooms");
     }
@@ -781,6 +1142,12 @@ Crypto.prototype.encryptEvent = function(event, room) {
         );
     }
 
+    if (!this._roomDeviceTrackingState[roomId]) {
+        this.trackRoomDevices(roomId);
+    }
+    // wait for all the room devices to be loaded
+    await this._roomDeviceTrackingState[roomId];
+
     let content = event.getContent();
     // If event has an m.relates_to then we need
     // to put this on the wrapping event instead
@@ -791,20 +1158,19 @@ Crypto.prototype.encryptEvent = function(event, room) {
         delete content['m.relates_to'];
     }
 
-    return alg.encryptMessage(
-        room, event.getType(), content,
-    ).then((encryptedContent) => {
-        if (mRelatesTo) {
-            encryptedContent['m.relates_to'] = mRelatesTo;
-        }
+    const encryptedContent = await alg.encryptMessage(
+        room, event.getType(), content);
 
-        event.makeEncrypted(
-            "m.room.encrypted",
-            encryptedContent,
-            this._olmDevice.deviceCurve25519Key,
-            this._olmDevice.deviceEd25519Key,
-        );
-    });
+    if (mRelatesTo) {
+        encryptedContent['m.relates_to'] = mRelatesTo;
+    }
+
+    event.makeEncrypted(
+        "m.room.encrypted",
+        encryptedContent,
+        this._olmDevice.deviceCurve25519Key,
+        this._olmDevice.deviceEd25519Key,
+    );
 };
 
 /**
@@ -852,7 +1218,7 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
     // If we didn't make this assumption, we'd have to use the /keys/changes API
     // to get key changes between the sync token in the device list and the 'old'
     // sync token used here to make sure we didn't miss any.
-    this._evalDeviceListChanges(syncDeviceLists);
+    await this._evalDeviceListChanges(syncDeviceLists);
 };
 
 /**
@@ -866,7 +1232,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
         requestBody, recipients,
     ).catch((e) => {
         // this normally means we couldn't talk to the store
-        console.error(
+        logger.error(
             'Error requesting key for event', e,
         );
     }).done();
@@ -883,7 +1249,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
 Crypto.prototype.cancelRoomKeyRequest = function(requestBody, andResend) {
     this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody, andResend)
     .catch((e) => {
-        console.warn("Error clearing pending room key requests", e);
+        logger.warn("Error clearing pending room key requests", e);
     }).done();
 };
 
@@ -901,7 +1267,7 @@ Crypto.prototype.onCryptoEvent = async function(event) {
         // finished processing the sync, in onSyncCompleted.
         await this.setRoomEncryption(roomId, content, true);
     } catch (e) {
-        console.error("Error configuring encryption in room " + roomId +
+        logger.error("Error configuring encryption in room " + roomId +
                       ":", e);
     }
 };
@@ -917,8 +1283,9 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         // scratch, so mark everything as untracked. onCryptoEvent will
         // be called for all e2e rooms during the processing of the sync,
         // at which point we'll start tracking all the users of that room.
-        console.log("Initial sync performed - resetting device tracking state");
+        logger.log("Initial sync performed - resetting device tracking state");
         this._deviceList.stopTrackingAllDeviceLists();
+        this._roomDeviceTrackingState = {};
     }
 };
 
@@ -964,11 +1331,12 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
         });
     }
 
-    if (deviceLists.left && Array.isArray(deviceLists.left)) {
+    if (deviceLists.left && Array.isArray(deviceLists.left) &&
+        deviceLists.left.length) {
         // Check we really don't share any rooms with these users
         // any more: the server isn't required to give us the
         // exact correct set.
-        const e2eUserIds = new Set(this._getE2eUsers());
+        const e2eUserIds = new Set(await this._getTrackedE2eUsers());
 
         deviceLists.left.forEach((u) => {
             if (!e2eUserIds.has(u)) {
@@ -980,13 +1348,14 @@ Crypto.prototype._evalDeviceListChanges = async function(deviceLists) {
 
 /**
  * Get a list of all the IDs of users we share an e2e room with
+ * for which we are tracking devices already
  *
  * @returns {string[]} List of user IDs
  */
-Crypto.prototype._getE2eUsers = function() {
+Crypto.prototype._getTrackedE2eUsers = async function() {
     const e2eUserIds = [];
-    for (const room of this._getE2eRooms()) {
-        const members = room.getEncryptionTargetMembers();
+    for (const room of this._getTrackedE2eRooms()) {
+        const members = await room.getEncryptionTargetMembers();
         for (const member of members) {
             e2eUserIds.push(member.userId);
         }
@@ -995,27 +1364,25 @@ Crypto.prototype._getE2eUsers = function() {
 };
 
 /**
- * Get a list of the e2e-enabled rooms we are members of
+ * Get a list of the e2e-enabled rooms we are members of,
+ * and for which we are already tracking the devices
  *
  * @returns {module:models.Room[]}
  */
-Crypto.prototype._getE2eRooms = function() {
+Crypto.prototype._getTrackedE2eRooms = function() {
     return this._clientStore.getRooms().filter((room) => {
         // check for rooms with encryption enabled
         const alg = this._roomEncryptors[room.roomId];
         if (!alg) {
             return false;
         }
-
-        // ignore any rooms which we have left
-        const me = room.getMember(this._userId);
-        if (!me || (
-            me.membership !== "join" && me.membership !== "invite"
-        )) {
+        if (!this._roomDeviceTrackingState[room.roomId]) {
             return false;
         }
 
-        return true;
+        // ignore any rooms which we have left
+        const myMembership = room.getMyMembership();
+        return myMembership === "join" || myMembership === "invite";
     });
 };
 
@@ -1027,6 +1394,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onRoomKeyEvent(event);
         } else if (event.getType() == "m.room_key_request") {
             this._onRoomKeyRequestEvent(event);
+        } else if (event.getContent().msgtype === "m.bad.encrypted") {
+            this._onToDeviceBadEncrypted(event);
         } else if (event.isBeingDecrypted()) {
             // once the event has been decrypted, try again
             event.once('Event.decrypted', (ev) => {
@@ -1034,7 +1403,7 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             });
         }
     } catch (e) {
-        console.error("Error handling toDeviceEvent:", e);
+        logger.error("Error handling toDeviceEvent:", e);
     }
 };
 
@@ -1048,12 +1417,107 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     const content = event.getContent();
 
     if (!content.room_id || !content.algorithm) {
-        console.error("key event is missing fields");
+        logger.error("key event is missing fields");
         return;
+    }
+
+    if (!this._checkedForBackup) {
+        // don't bother awaiting on this - the important thing is that we retry if we
+        // haven't managed to check before
+        this._checkAndStartKeyBackup();
     }
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+/**
+ * Handle a toDevice event that couldn't be decrypted
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event undecryptable event
+ */
+Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
+    const content = event.getWireContent();
+    const sender = event.getSender();
+    const algorithm = content.algorithm;
+    const deviceKey = content.sender_key;
+
+    if (sender === undefined || deviceKey === undefined || deviceKey === undefined) {
+        return;
+    }
+
+    // check when we last forced a new session with this device: if we've already done so
+    // recently, don't do it again.
+    this._lastNewSessionForced[sender] = this._lastNewSessionForced[sender] || {};
+    const lastNewSessionForced = this._lastNewSessionForced[sender][deviceKey] || 0;
+    if (lastNewSessionForced + MIN_FORCE_SESSION_INTERVAL_MS > Date.now()) {
+        logger.debug(
+            "New session already forced with device " + sender + ":" + deviceKey +
+            " at " + lastNewSessionForced + ": not forcing another",
+        );
+        return;
+    }
+
+    // establish a new olm session with this device since we're failing to decrypt messages
+    // on a current session.
+    // Note that an undecryptable message from another device could easily be spoofed -
+    // is there anything we can do to mitigate this?
+    const device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
+    if (!device) {
+        logger.info(
+            "Couldn't find device for identity key " + deviceKey +
+            ": not re-establishing session",
+        );
+        return;
+    }
+    const devicesByUser = {};
+    devicesByUser[sender] = [device];
+    await olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, devicesByUser, true,
+    );
+
+    this._lastNewSessionForced[sender][deviceKey] = Date.now();
+
+    // Now send a blank message on that session so the other side knows about it.
+    // (The keyshare request is sent in the clear so that won't do)
+    // We send this first such that, as long as the toDevice messages arrive in the
+    // same order we sent them, the other end will get this first, set up the new session,
+    // then get the keyshare request and send the key over this new session (because it
+    // is the session it has most recently received a message on).
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    await olmlib.encryptMessageForDevice(
+        encryptedContent.ciphertext,
+        this._userId,
+        this._deviceId,
+        this._olmDevice,
+        sender,
+        device,
+        {type: "m.dummy"},
+    );
+
+    await this._baseApis.sendToDevice("m.room.encrypted", {
+        [sender]: {
+            [device.deviceId]: encryptedContent,
+        },
+    });
+
+
+    // Most of the time this probably won't be necessary since we'll have queued up a key request when
+    // we failed to decrypt the message and will be waiting a bit for the key to arrive before sending
+    // it. This won't always be the case though so we need to re-send any that have already been sent
+    // to avoid races.
+    const requestsToResend =
+        await this._outgoingRoomKeyRequestManager.getOutgoingSentRoomKeyRequest(
+            sender, device.deviceId,
+        );
+    for (const keyReq of requestsToResend) {
+        this.cancelRoomKeyRequest(keyReq.requestBody, true);
+    }
 };
 
 /**
@@ -1080,15 +1544,20 @@ Crypto.prototype._onRoomMembership = function(event, member, oldMembership) {
         // not encrypting in this room
         return;
     }
-
-    if (member.membership == 'join') {
-        console.log('Join event for ' + member.userId + ' in ' + roomId);
-        // make sure we are tracking the deviceList for this user
-        this._deviceList.startTrackingDeviceList(member.userId);
-    } else if (member.membership == 'invite' &&
-             this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
-        console.log('Invite event for ' + member.userId + ' in ' + roomId);
-        this._deviceList.startTrackingDeviceList(member.userId);
+    // only mark users in this room as tracked if we already started tracking in this room
+    // this way we don't start device queries after sync on behalf of this room which we won't use
+    // the result of anyway, as we'll need to do a query again once all the members are fetched
+    // by calling _trackRoomDevices
+    if (this._roomDeviceTrackingState[roomId]) {
+        if (member.membership == 'join') {
+            logger.log('Join event for ' + member.userId + ' in ' + roomId);
+            // make sure we are tracking the deviceList for this user
+            this._deviceList.startTrackingDeviceList(member.userId);
+        } else if (member.membership == 'invite' &&
+                 this._clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
+            logger.log('Invite event for ' + member.userId + ' in ' + roomId);
+            this._deviceList.startTrackingDeviceList(member.userId);
+        }
     }
 
     alg.onRoomMembership(event, member, oldMembership);
@@ -1153,7 +1622,7 @@ Crypto.prototype._processReceivedRoomKeyRequests = async function() {
                 this._processReceivedRoomKeyRequestCancellation(cancellation),
         );
     } catch (e) {
-        console.error(`Error processing room key requsts: ${e}`);
+        logger.error(`Error processing room key requsts: ${e}`);
     } finally {
         this._processingRoomKeyRequests = false;
     }
@@ -1172,13 +1641,31 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     const roomId = body.room_id;
     const alg = body.algorithm;
 
-    console.log(`m.room_key_request from ${userId}:${deviceId}` +
+    logger.log(`m.room_key_request from ${userId}:${deviceId}` +
                 ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
     if (userId !== this._userId) {
-        // TODO: determine if we sent this device the keys already: in
-        // which case we can do so again.
-        console.log("Ignoring room key request from other user for now");
+        if (!this._roomEncryptors[roomId]) {
+            logger.debug(`room key request for unencrypted room ${roomId}`);
+            return;
+        }
+        const encryptor = this._roomEncryptors[roomId];
+        const device = this._deviceList.getStoredDevice(userId, deviceId);
+        if (!device) {
+            logger.debug(`Ignoring keyshare for unknown device ${userId}:${deviceId}`);
+            return;
+        }
+
+        try {
+            await encryptor.reshareKeyWithDevice(
+                body.sender_key, body.session_id, userId, device,
+            );
+        } catch (e) {
+            logger.warn(
+                "Failed to re-share keys for session " + body.session_id +
+                " with device " + userId + ":" + device.deviceId, e,
+            );
+        }
         return;
     }
 
@@ -1188,18 +1675,18 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     // if we don't have a decryptor for this room/alg, we don't have
     // the keys for the requested events, and can drop the requests.
     if (!this._roomDecryptors[roomId]) {
-        console.log(`room key request for unencrypted room ${roomId}`);
+        logger.log(`room key request for unencrypted room ${roomId}`);
         return;
     }
 
     const decryptor = this._roomDecryptors[roomId][alg];
     if (!decryptor) {
-        console.log(`room key request for unknown alg ${alg} in room ${roomId}`);
+        logger.log(`room key request for unknown alg ${alg} in room ${roomId}`);
         return;
     }
 
     if (!await decryptor.hasKeysForKeyRequest(req)) {
-        console.log(
+        logger.log(
             `room key request for unknown session ${roomId} / ` +
                 body.session_id,
         );
@@ -1213,7 +1700,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
     // if the device is is verified already, share the keys
     const device = this._deviceList.getStoredDevice(userId, deviceId);
     if (device && device.isVerified()) {
-        console.log('device is already verified: sharing keys');
+        logger.log('device is already verified: sharing keys');
         req.share();
         return;
     }
@@ -1230,7 +1717,7 @@ Crypto.prototype._processReceivedRoomKeyRequest = async function(req) {
 Crypto.prototype._processReceivedRoomKeyRequestCancellation = async function(
     cancellation,
 ) {
-    console.log(
+    logger.log(
         `m.room_key_request cancellation for ${cancellation.userId}:` +
             `${cancellation.deviceId} (id ${cancellation.requestId})`,
     );
@@ -1415,6 +1902,3 @@ class IncomingRoomKeyRequestCancellation {
  * @event module:client~MatrixClient#"crypto.warning"
  * @param {string} type One of the strings listed above
  */
-
-/** */
-module.exports = Crypto;

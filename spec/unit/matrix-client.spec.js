@@ -139,6 +139,9 @@ describe("MatrixClient", function() {
         store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
         store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
         store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
+        store.getClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
+        store.storeClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
+        store.isNewlyCreated = expect.createSpy().andReturn(Promise.resolve(true));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -182,7 +185,7 @@ describe("MatrixClient", function() {
         });
     });
 
-    it("should not POST /filter if a matching filter already exists", function(done) {
+    it("should not POST /filter if a matching filter already exists", async function() {
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
@@ -191,15 +194,19 @@ describe("MatrixClient", function() {
         const filter = new sdk.Filter(0, filterId);
         filter.setDefinition({"room": {"timeline": {"limit": 8}}});
         store.getFilter.andReturn(filter);
-        client.startClient();
-
-        client.on("sync", function syncListener(state) {
-            if (state === "SYNCING") {
-                expect(httpLookups.length).toEqual(0);
-                client.removeListener("sync", syncListener);
-                done();
-            }
+        const syncPromise = new Promise((resolve, reject) => {
+            client.on("sync", function syncListener(state) {
+                if (state === "SYNCING") {
+                    expect(httpLookups.length).toEqual(0);
+                    client.removeListener("sync", syncListener);
+                    resolve();
+                } else if (state === "ERROR") {
+                    reject(new Error("sync error"));
+                }
+            });
         });
+        await client.startClient();
+        await syncPromise;
     });
 
     describe("getSyncState", function() {
@@ -207,15 +214,18 @@ describe("MatrixClient", function() {
             expect(client.getSyncState()).toBe(null);
         });
 
-        it("should return the same sync state as emitted sync events", function(done) {
-            client.on("sync", function syncListener(state) {
-                expect(state).toEqual(client.getSyncState());
-                if (state === "SYNCING") {
-                    client.removeListener("sync", syncListener);
-                    done();
-                }
+        it("should return the same sync state as emitted sync events", async function() {
+            const syncingPromise = new Promise((resolve) => {
+                client.on("sync", function syncListener(state) {
+                    expect(state).toEqual(client.getSyncState());
+                    if (state === "SYNCING") {
+                        client.removeListener("sync", syncListener);
+                        resolve();
+                    }
+                });
             });
-            client.startClient();
+            await client.startClient();
+            await syncingPromise;
         });
     });
 
@@ -258,8 +268,8 @@ describe("MatrixClient", function() {
     });
 
     describe("retryImmediately", function() {
-        it("should return false if there is no request waiting", function() {
-            client.startClient();
+        it("should return false if there is no request waiting", async function() {
+            await client.startClient();
             expect(client.retryImmediately()).toBe(false);
         });
 
@@ -380,7 +390,7 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        it("should transition ERROR -> PREPARED after /sync if prev failed",
+        it("should transition ERROR -> CATCHUP after /sync if prev failed",
         function(done) {
             const expectedStates = [];
             acceptKeepalives = false;
@@ -403,7 +413,7 @@ describe("MatrixClient", function() {
 
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            expectedStates.push(["PREPARED", "ERROR"]);
+            expectedStates.push(["CATCHUP", "ERROR"]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });

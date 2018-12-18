@@ -17,6 +17,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+import logger from '../../logger';
 import utils from '../../utils';
 
 /**
@@ -41,6 +42,8 @@ export default class MemoryCryptoStore {
         this._deviceData = null;
         // roomId -> Opaque roomInfo object
         this._rooms = {};
+        // Set of {senderCurve25519Key+'/'+sessionId}
+        this._sessionsNeedingBackup = {};
     }
 
     /**
@@ -71,7 +74,7 @@ export default class MemoryCryptoStore {
 
             if (existing) {
                 // this entry matches the request - return it.
-                console.log(
+                logger.log(
                     `already have key request outstanding for ` +
                     `${requestBody.room_id} / ${requestBody.session_id}: ` +
                     `not sending another`,
@@ -81,7 +84,7 @@ export default class MemoryCryptoStore {
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            console.log(
+            logger.log(
                 `enqueueing key request for ${requestBody.room_id} / ` +
                 requestBody.session_id,
             );
@@ -144,6 +147,19 @@ export default class MemoryCryptoStore {
         return Promise.resolve(null);
     }
 
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        const results = [];
+
+        for (const req of this._outgoingRoomKeyRequests) {
+            for (const state of wantedStates) {
+                if (req.state === state && req.recipients.includes({userId, deviceId})) {
+                    results.push(req);
+                }
+            }
+        }
+        return Promise.resolve(results);
+    }
+
     /**
      * Look for an existing room key request by id and state, and update it if
      * found
@@ -163,7 +179,7 @@ export default class MemoryCryptoStore {
             }
 
             if (req.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${req.state}`,
                 );
@@ -194,7 +210,7 @@ export default class MemoryCryptoStore {
             }
 
             if (req.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot delete room key request in state ${req.state} `
                     + `(expected ${expectedState})`,
                 );
@@ -233,13 +249,13 @@ export default class MemoryCryptoStore {
         func(this._sessions[deviceKey] || {});
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         let deviceSessions = this._sessions[deviceKey];
         if (deviceSessions === undefined) {
             deviceSessions = {};
             this._sessions[deviceKey] = deviceSessions;
         }
-        deviceSessions[sessionId] = session;
+        deviceSessions[sessionId] = sessionInfo;
     }
 
     // Inbound Group Sessions
@@ -294,6 +310,41 @@ export default class MemoryCryptoStore {
     getEndToEndRooms(txn, func) {
         func(this._rooms);
     }
+
+    getSessionsNeedingBackup(limit) {
+        const sessions = [];
+        for (const session in this._sessionsNeedingBackup) {
+            if (this._inboundGroupSessions[session]) {
+                sessions.push({
+                    senderKey: session.substr(0, 43),
+                    sessionId: session.substr(44),
+                    sessionData: this._inboundGroupSessions[session],
+                });
+                if (limit && session.length >= limit) {
+                    break;
+                }
+            }
+        }
+        return Promise.resolve(sessions);
+    }
+
+    unmarkSessionsNeedingBackup(sessions) {
+        for (const session of sessions) {
+            const sessionKey = session.senderKey + '/' + session.sessionId;
+            delete this._sessionsNeedingBackup[sessionKey];
+        }
+        return Promise.resolve();
+    }
+
+    markSessionsNeedingBackup(sessions) {
+        for (const session of sessions) {
+            const sessionKey = session.senderKey + '/' + session.sessionId;
+            this._sessionsNeedingBackup[sessionKey] = true;
+        }
+        return Promise.resolve();
+    }
+
+    // Session key backups
 
     doTxn(mode, stores, func) {
         return Promise.resolve(func(null));

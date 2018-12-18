@@ -11,7 +11,17 @@
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
-hub --version > /dev/null || (echo "hub is required: please install it"; kill $$)
+if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
+    HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
+    HUB_VERSION_MINOR=${BASH_REMATCH[2]}
+    if [[ $HUB_VERSION_MAJOR -lt 2 ]] || [[ $HUB_VERSION_MAJOR -eq 2 && $HUB_VERSION_MINOR -lt 5 ]]; then
+        echo "hub version 2.5 is required, you have $HUB_VERSION_MAJOR.$HUB_VERSION_MINOR installed"
+        exit
+    fi
+else
+    echo "hub is required: please install it"
+    exit
+fi
 
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
@@ -45,7 +55,8 @@ fi
 skip_changelog=
 skip_jsdoc=
 changelog_file="CHANGELOG.md"
-while getopts hc:xz f; do
+expected_npm_user="matrixdotorg"
+while getopts hc:u:xz f; do
     case $f in
         h)
             help
@@ -60,6 +71,9 @@ while getopts hc:xz f; do
         z)
             skip_jsdoc=1
             ;;
+        u)
+            expected_npm_user="$OPTARG"
+            ;;
     esac
 done
 shift `expr $OPTIND - 1`
@@ -72,6 +86,12 @@ fi
 if [ -z "$skip_changelog" ]; then
     # update_changelog doesn't have a --version flag
     update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
+fi
+
+actual_npm_user=`npm whoami`;
+if [ $expected_npm_user != $actual_npm_user ]; then
+    echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
+    exit 1
 fi
 
 # ignore leading v on release
@@ -245,7 +265,7 @@ release_text=`mktemp`
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags $assets -f "${release_text}" "$tag"
+hub release create $hubflags $assets -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
@@ -281,7 +301,7 @@ fi
 echo "updating master branch"
 git checkout master
 git pull
-git merge --ff-only "$rel_branch"
+git merge "$rel_branch"
 
 # push master  and docs (if generated) to github
 git push origin master

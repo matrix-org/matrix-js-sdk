@@ -296,7 +296,7 @@ describe("megolm", function() {
     });
 
     afterEach(function() {
-        aliceTestClient.stop();
+        return aliceTestClient.stop();
     });
 
     it("Alice receives a megolm message", function() {
@@ -817,8 +817,14 @@ describe("megolm", function() {
                 };
             });
 
+            // Grab the event that we'll need to resend
+            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const pendingEvents = room.getPendingEvents();
+            expect(pendingEvents.length).toEqual(1);
+            const unsentEvent = pendingEvents[0];
+
             return Promise.all([
-                aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
+                aliceTestClient.client.resendEvent(unsentEvent, room),
 
                 // the crypto stuff can take a while, so give the requests a whole second.
                 aliceTestClient.httpBackend.flushAllExpected({

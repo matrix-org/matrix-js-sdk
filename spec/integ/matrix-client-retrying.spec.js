@@ -36,6 +36,7 @@ describe("MatrixClient retrying", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     xit("should retry according to MatrixScheduler.retryFn", function() {

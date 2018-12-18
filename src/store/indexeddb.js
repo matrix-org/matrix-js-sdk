@@ -146,6 +146,11 @@ IndexedDBStore.prototype.getSavedSync = function() {
     return this.backend.getSavedSync();
 };
 
+/** @return {Promise<bool>} whether or not the database was newly created in this session. */
+IndexedDBStore.prototype.isNewlyCreated = function() {
+    return this.backend.isNewlyCreated();
+};
+
 /**
  * @return {Promise} If there is a saved sync, the nextBatch token
  * for this sync, otherwise null.
@@ -217,6 +222,41 @@ IndexedDBStore.prototype._reallySave = function() {
 
 IndexedDBStore.prototype.setSyncData = function(syncData) {
     return this.backend.setSyncData(syncData);
+};
+
+/**
+ * Returns the out-of-band membership events for this room that
+ * were previously loaded.
+ * @param {string} roomId
+ * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+ * @returns {null} in case the members for this room haven't been stored yet
+ */
+IndexedDBStore.prototype.getOutOfBandMembers = function(roomId) {
+    return this.backend.getOutOfBandMembers(roomId);
+};
+
+/**
+ * Stores the out-of-band membership events for this room. Note that
+ * it still makes sense to store an empty array as the OOB status for the room is
+ * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+ * @param {string} roomId
+ * @param {event[]} membershipEvents the membership events to store
+ * @returns {Promise} when all members have been stored
+ */
+IndexedDBStore.prototype.setOutOfBandMembers = function(roomId, membershipEvents) {
+    return this.backend.setOutOfBandMembers(roomId, membershipEvents);
+};
+
+IndexedDBStore.prototype.clearOutOfBandMembers = function(roomId) {
+    return this.backend.clearOutOfBandMembers(roomId);
+};
+
+IndexedDBStore.prototype.getClientOptions = function() {
+    return this.backend.getClientOptions();
+};
+
+IndexedDBStore.prototype.storeClientOptions = function(options) {
+    return this.backend.storeClientOptions(options);
 };
 
 module.exports.IndexedDBStore = IndexedDBStore;

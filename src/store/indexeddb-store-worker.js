@@ -67,6 +67,9 @@ class IndexedDBStoreWorker {
             case 'connect':
                 prom = this.backend.connect();
                 break;
+            case 'isNewlyCreated':
+                prom = this.backend.isNewlyCreated();
+                break;
             case 'clearDatabase':
                 prom = this.backend.clearDatabase().then((result) => {
                     // This returns special classes which can't be cloned
@@ -92,10 +95,25 @@ class IndexedDBStoreWorker {
             case 'getNextBatchToken':
                 prom = this.backend.getNextBatchToken();
                 break;
+            case 'getOutOfBandMembers':
+                prom = this.backend.getOutOfBandMembers(msg.args[0]);
+                break;
+            case 'clearOutOfBandMembers':
+                prom = this.backend.clearOutOfBandMembers(msg.args[0]);
+                break;
+            case 'setOutOfBandMembers':
+                prom = this.backend.setOutOfBandMembers(msg.args[0], msg.args[1]);
+                break;
+            case 'getClientOptions':
+                prom = this.backend.getClientOptions();
+                break;
+            case 'storeClientOptions':
+                prom = this.backend.storeClientOptions(msg.args[0]);
+                break;
         }
 
         if (prom === undefined) {
-            postMessage({
+            this.postMessage({
                 command: 'cmd_fail',
                 seq: msg.seq,
                 // Can't be an Error because they're not structured cloneable
@@ -117,7 +135,10 @@ class IndexedDBStoreWorker {
                 command: 'cmd_fail',
                 seq: msg.seq,
                 // Just send a string because Error objects aren't cloneable
-                error: "Error running command",
+                error: {
+                    message: err.message,
+                    name: err.name,
+                },
             });
         });
     }

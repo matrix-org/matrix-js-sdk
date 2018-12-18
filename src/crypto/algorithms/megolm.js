@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2018 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +24,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 
+const logger = require("../../logger");
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const base = require("./base");
@@ -64,7 +66,7 @@ OutboundSessionInfo.prototype.needsRotation = function(
     if (this.useCount >= rotationPeriodMsgs ||
         sessionLifetime >= rotationPeriodMs
        ) {
-        console.log(
+        logger.log(
             "Rotating megolm session after " + this.useCount +
                 " messages, " + sessionLifetime + "ms",
         );
@@ -102,7 +104,7 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
         }
 
         if (!devicesInRoom.hasOwnProperty(userId)) {
-            console.log("Starting new session because we shared with " + userId);
+            logger.log("Starting new session because we shared with " + userId);
             return true;
         }
 
@@ -112,7 +114,7 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
             }
 
             if (!devicesInRoom[userId].hasOwnProperty(deviceId)) {
-                console.log(
+                logger.log(
                     "Starting new session because we shared with " +
                         userId + ":" + deviceId,
                 );
@@ -141,6 +143,11 @@ function MegolmEncryption(params) {
     // with an OutboundSessionInfo (or undefined, for the first message in the
     // room).
     this._setupPromise = Promise.resolve();
+
+    // Map of outbound sessions by sessions ID. Used if we need a particular
+    // session (the session we're currently using to send is always obtained
+    // using _setupPromise).
+    this._outboundSessions = {};
 
     // default rotation periods
     this._sessionRotationPeriodMsgs = 100;
@@ -181,7 +188,7 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         if (session && session.needsRotation(self._sessionRotationPeriodMsgs,
                                              self._sessionRotationPeriodMs)
            ) {
-            console.log("Starting new megolm session because we need to rotate.");
+            logger.log("Starting new megolm session because we need to rotate.");
             session = null;
         }
 
@@ -191,8 +198,9 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         }
 
         if (!session) {
-            console.log(`Starting new megolm session for room ${self._roomId}`);
+            logger.log(`Starting new megolm session for room ${self._roomId}`);
             session = await self._prepareNewSession();
+            self._outboundSessions[session.sessionId] = session;
         }
 
         // now check if we need to share with any devices
@@ -262,6 +270,18 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
         key.key, {ed25519: this._olmDevice.deviceEd25519Key},
     );
 
+    if (this._crypto.backupInfo) {
+        // don't wait for it to complete
+        this._crypto.backupGroupSession(
+            this._roomId, this._olmDevice.deviceCurve25519Key, [],
+            sessionId, key.key,
+        ).catch((e) => {
+            // This throws if the upload failed, but this is fine
+            // since it will have written it to the db and will retry.
+            console.log("Failed to back up group session", e);
+        });
+    }
+
     return new OutboundSessionInfo(sessionId);
 };
 
@@ -318,7 +338,7 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
                 continue;
             }
 
-            console.log(
+            logger.log(
                 "share keys with device " + userId + ":" + deviceId,
             );
 
@@ -407,8 +427,98 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
 };
 
 /**
- * @private
+ * Re-shares a megolm session key with devices if the key has already been
+ * sent to them.
  *
+ * @param {string} senderKey The key of the originating device for the session
+ * @param {string} sessionId ID of the outbound session to share
+ * @param {string} userId ID of the user who owns the target device
+ * @param {module:crypto/deviceinfo} device The target device
+ */
+MegolmEncryption.prototype.reshareKeyWithDevice = async function(
+    senderKey, sessionId, userId, device,
+) {
+    const obSessionInfo = this._outboundSessions[sessionId];
+    if (!obSessionInfo) {
+        logger.debug("Session ID " + sessionId + " not found: not re-sharing keys");
+        return;
+    }
+
+    // The chain index of the key we previously sent this device
+    if (obSessionInfo.sharedWithDevices[userId] === undefined) {
+        logger.debug("Session ID " + sessionId + " never shared with user " + userId);
+        return;
+    }
+    const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
+    if (sentChainIndex === undefined) {
+        logger.debug(
+            "Session ID " + sessionId + " never shared with device " +
+            userId + ":" + device.deviceId,
+        );
+        return;
+    }
+
+    // get the key from the inbound session: the outbound one will already
+    // have been ratcheted to the next chain index.
+    const key = await this._olmDevice.getInboundGroupSessionKey(
+        this._roomId, senderKey, sessionId, sentChainIndex,
+    );
+
+    if (!key) {
+        logger.warn(
+            "No outbound session key found for " + sessionId + ": not re-sharing keys",
+        );
+        return;
+    }
+
+    await olmlib.ensureOlmSessionsForDevices(
+        this._olmDevice, this._baseApis, {
+            [userId]: {
+                [device.deviceId]: device,
+            },
+        },
+    );
+
+    const payload = {
+        type: "m.forwarded_room_key",
+        content: {
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: this._roomId,
+            session_id: sessionId,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            sender_key: senderKey,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            forwarding_curve25519_key_chain: key.forwarding_curve25519_key_chain,
+        },
+    };
+
+    const encryptedContent = {
+        algorithm: olmlib.OLM_ALGORITHM,
+        sender_key: this._olmDevice.deviceCurve25519Key,
+        ciphertext: {},
+    };
+    await olmlib.encryptMessageForDevice(
+        encryptedContent.ciphertext,
+        this._userId,
+        this._deviceId,
+        this._olmDevice,
+        userId,
+        device,
+        payload,
+    ),
+
+    await this._baseApis.sendToDevice("m.room.encrypted", {
+        [userId]: {
+            [device.deviceId]: encryptedContent,
+        },
+    });
+    logger.debug(
+        `Re-shared key for session ${sessionId}  with ${userId}:${device.deviceId}`,
+    );
+};
+
+/**
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
@@ -440,10 +550,10 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
             await this._encryptAndSendKeysToDevices(
                 session, key.chain_index, userDeviceMaps[i], payload,
             );
-            console.log(`Completed megolm keyshare in ${this._roomId} `
+            logger.log(`Completed megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length})`);
         } catch (e) {
-            console.log(`megolm keyshare in ${this._roomId} `
+            logger.log(`megolm keyshare in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
             throw e;
@@ -462,7 +572,7 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
  */
 MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
     const self = this;
-    console.log(`Starting to encrypt event for ${this._roomId}`);
+    logger.log(`Starting to encrypt event for ${this._roomId}`);
 
     return this._getDevicesInRoom(room).then(function(devicesInRoom) {
         // check if any of these devices are not yet known to the user.
@@ -488,12 +598,24 @@ MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
             session_id: session.sessionId,
              // Include our device ID so that recipients can send us a
              // m.new_device message if they don't have our session key.
+             // XXX: Do we still need this now that m.new_device messages
+             // no longer exist since #483?
             device_id: self._deviceId,
         };
 
         session.useCount++;
         return encryptedContent;
     });
+};
+
+/**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * This should not normally be necessary.
+ */
+MegolmEncryption.prototype.forceDiscardSession = function() {
+    this._setupPromise = this._setupPromise.then(() => null);
 };
 
 /**
@@ -535,8 +657,9 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  * @return {module:client.Promise} Promise which resolves to a map
  *     from userId to deviceId to deviceInfo
  */
-MegolmEncryption.prototype._getDevicesInRoom = function(room) {
-    const roomMembers = utils.map(room.getEncryptionTargetMembers(), function(u) {
+MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
+    const members = await room.getEncryptionTargetMembers();
+    const roomMembers = utils.map(members, function(u) {
         return u.userId;
     });
 
@@ -549,35 +672,31 @@ MegolmEncryption.prototype._getDevicesInRoom = function(room) {
     // We are happy to use a cached version here: we assume that if we already
     // have a list of the user's devices, then we already share an e2e room
     // with them, which means that they will have announced any new devices via
-    // an m.new_device.
-    //
-    // XXX: what if the cache is stale, and the user left the room we had in
-    // common and then added new devices before joining this one? --Matthew
-    //
-    // yup, see https://github.com/vector-im/riot-web/issues/2305 --richvdh
-    return this._crypto.downloadKeys(roomMembers, false).then((devices) => {
-        // remove any blocked devices
-        for (const userId in devices) {
-            if (!devices.hasOwnProperty(userId)) {
+    // device_lists in their /sync response.  This cache should then be maintained
+    // using all the device_lists changes and left fields.
+    // See https://github.com/vector-im/riot-web/issues/2305 for details.
+    const devices = await this._crypto.downloadKeys(roomMembers, false);
+    // remove any blocked devices
+    for (const userId in devices) {
+        if (!devices.hasOwnProperty(userId)) {
+            continue;
+        }
+
+        const userDevices = devices[userId];
+        for (const deviceId in userDevices) {
+            if (!userDevices.hasOwnProperty(deviceId)) {
                 continue;
             }
 
-            const userDevices = devices[userId];
-            for (const deviceId in userDevices) {
-                if (!userDevices.hasOwnProperty(deviceId)) {
-                    continue;
-                }
-
-                if (userDevices[deviceId].isBlocked() ||
-                    (userDevices[deviceId].isUnverified() && isBlacklisting)
-                   ) {
-                    delete userDevices[deviceId];
-                }
+            if (userDevices[deviceId].isBlocked() ||
+                (userDevices[deviceId].isUnverified() && isBlacklisting)
+               ) {
+                delete userDevices[deviceId];
             }
         }
+    }
 
-        return devices;
-    });
+    return devices;
 };
 
 /**
@@ -772,12 +891,12 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         !sessionId ||
         !content.session_key
        ) {
-        console.error("key event is missing fields");
+        logger.error("key event is missing fields");
         return;
     }
 
     if (!senderKey) {
-        console.error("key event has no sender key (not encrypted?)");
+        logger.error("key event has no sender key (not encrypted?)");
         return;
     }
 
@@ -794,13 +913,13 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
         senderKey = content.sender_key;
         if (!senderKey) {
-            console.error("forwarded_room_key event is missing sender_key field");
+            logger.error("forwarded_room_key event is missing sender_key field");
             return;
         }
 
         const ed25519Key = content.sender_claimed_ed25519_key;
         if (!ed25519Key) {
-            console.error(
+            logger.error(
                 `forwarded_room_key_event is missing sender_claimed_ed25519_key field`,
             );
             return;
@@ -813,8 +932,8 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         keysClaimed = event.getKeysClaimed();
     }
 
-    console.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
-    this._olmDevice.addInboundGroupSession(
+    logger.log(`Adding key for megolm session ${senderKey}|${sessionId}`);
+    return this._olmDevice.addInboundGroupSession(
         content.room_id, senderKey, forwardingKeyChain, sessionId,
         content.session_key, keysClaimed,
         exportFormat,
@@ -829,8 +948,21 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
         // have another go at decrypting events sent with this session.
         this._retryDecryption(senderKey, sessionId);
+    }).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for the keys to be backed up for the server
+            this._crypto.backupGroupSession(
+                content.room_id, senderKey, forwardingKeyChain,
+                content.session_id, content.session_key, keysClaimed,
+                exportFormat,
+            ).catch((e) => {
+                // This throws if the upload failed, but this is fine
+                // since it will have written it to the db and will retry.
+                console.log("Failed to back up group session", e);
+            });
+        }
     }).catch((e) => {
-        console.error(`Error handling m.room_key_event: ${e}`);
+        logger.error(`Error handling m.room_key_event: ${e}`);
     });
 };
 
@@ -872,7 +1004,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             return null;
         }
 
-        console.log(
+        logger.log(
             "sharing keys for session " + body.sender_key + "|"
             + body.session_id + " with device "
             + userId + ":" + deviceId,
@@ -946,6 +1078,22 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
         session.sender_claimed_keys,
         true,
     ).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for it to complete
+            this._crypto.backupGroupSession(
+                session.room_id,
+                session.sender_key,
+                session.forwarding_curve25519_key_chain,
+                session.session_id,
+                session.session_key,
+                session.sender_claimed_keys,
+                true,
+            ).catch((e) => {
+                // This throws if the upload failed, but this is fine
+                // since it will have written it to the db and will retry.
+                console.log("Failed to back up group session", e);
+            });
+        }
         // have another go at decrypting events sent with this session.
         this._retryDecryption(session.sender_key, session.session_id);
     });

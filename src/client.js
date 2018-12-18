@@ -41,18 +41,46 @@ const SyncApi = require("./sync");
 const MatrixBaseApis = require("./base-apis");
 const MatrixError = httpApi.MatrixError;
 const ContentHelpers = require("./content-helpers");
+const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 
-const SCROLLBACK_DELAY_MS = 3000;
-let CRYPTO_ENABLED = false;
+import Crypto from './crypto';
+import { isCryptoAvailable } from './crypto';
+import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
+import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
+import { randomString } from './randomstring';
 
-try {
-    var Crypto = require("./crypto");
-    CRYPTO_ENABLED = true;
-} catch (e) {
-    console.warn("Unable to load crypto module: crypto will be disabled: " + e);
+// Disable warnings for now: we use deprecated bluebird functions
+// and need to migrate, but they spam the console with warnings.
+Promise.config({warnings: false});
+
+
+const SCROLLBACK_DELAY_MS = 3000;
+const CRYPTO_ENABLED = isCryptoAvailable();
+
+function keysFromRecoverySession(sessions, decryptionKey, roomId) {
+    const keys = [];
+    for (const [sessionId, sessionData] of Object.entries(sessions)) {
+        try {
+            const decrypted = keyFromRecoverySession(sessionData, decryptionKey);
+            decrypted.session_id = sessionId;
+            decrypted.room_id = roomId;
+            keys.push(decrypted);
+        } catch (e) {
+            console.log("Failed to decrypt session from backup");
+        }
+    }
+    return keys;
+}
+
+function keyFromRecoverySession(session, decryptionKey) {
+    return JSON.parse(decryptionKey.decrypt(
+        session.session_data.ephemeral,
+        session.session_data.mac,
+        session.session_data.ciphertext,
+    ));
 }
 
 /**
@@ -128,6 +156,8 @@ function MatrixClient(opts) {
 
     MatrixBaseApis.call(this, opts);
 
+    this.olmVersion = null; // Populated after initCrypto is done
+
     this.reEmitter = new ReEmitter(this);
 
     this.store = opts.store || new StubStore();
@@ -180,10 +210,6 @@ function MatrixClient(opts) {
 
     this._forceTURN = opts.forceTURN || false;
 
-    if (CRYPTO_ENABLED) {
-        this.olmVersion = Crypto.getOlmVersion();
-    }
-
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
     // we don't want to start sending unencrypted events to them.
@@ -191,6 +217,8 @@ function MatrixClient(opts) {
 
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
+
+    this._serverSupportsLazyLoading = null;
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -288,6 +316,21 @@ MatrixClient.prototype.getSyncState = function() {
 };
 
 /**
+ * Returns the additional data object associated with
+ * the current sync state, or null if there is no
+ * such data.
+ * Sync errors, if available, are put in the 'error' key of
+ * this object.
+ * @return {?Object}
+ */
+MatrixClient.prototype.getSyncStateData = function() {
+    if (!this._syncApi) {
+        return null;
+    }
+    return this._syncApi.getSyncStateData();
+};
+
+/**
  * Return whether the client is configured for a guest account.
  * @return {boolean} True if this is a guest access_token (or no token is supplied).
  */
@@ -356,6 +399,13 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
  * successfully initialised.
  */
 MatrixClient.prototype.initCrypto = async function() {
+    if (!isCryptoAvailable()) {
+        throw new Error(
+            `End-to-end encryption not supported in this js-sdk build: did ` +
+                `you remember to load the olm library?`,
+        );
+    }
+
     if (this._crypto) {
         console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
         return;
@@ -372,13 +422,6 @@ MatrixClient.prototype.initCrypto = async function() {
 
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
     await this._roomList.init();
-
-    if (!CRYPTO_ENABLED) {
-        throw new Error(
-            `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
-        );
-    }
 
     const userId = this.getUserId();
     if (userId === null) {
@@ -410,6 +453,9 @@ MatrixClient.prototype.initCrypto = async function() {
     ]);
 
     await crypto.init();
+
+    this.olmVersion = Crypto.getOlmVersion();
+
 
     // if crypto initialisation was successful, tell it to attach its event
     // handlers.
@@ -514,7 +560,15 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
     if (verified === undefined) {
         verified = true;
     }
-    return _setDeviceVerification(this, userId, deviceId, verified, null);
+    const prom = _setDeviceVerification(this, userId, deviceId, verified, null);
+
+    // if one of the user's own devices is being marked as verified / unverified,
+    // check the key backup status, since whether or not we use this depends on
+    // whether it has a signature from a verified device
+    if (userId == this.credentials.userId) {
+        this._crypto.checkKeyBackup();
+    }
+    return prom;
 };
 
 /**
@@ -674,6 +728,21 @@ MatrixClient.prototype.isRoomEncrypted = function(roomId) {
 };
 
 /**
+ * Forces the current outbound group session to be discarded such
+ * that another one will be created next time an event is sent.
+ *
+ * @param {string} roomId The ID of the room to discard the session for
+ *
+ * This should not normally be necessary.
+ */
+MatrixClient.prototype.forceDiscardSession = function(roomId) {
+    if (!this._crypto) {
+        throw new Error("End-to-End encryption disabled");
+    }
+    this._crypto.forceDiscardSession(roomId);
+};
+
+/**
  * Get a list containing all of the room keys
  *
  * This should be encrypted before returning it to the user.
@@ -703,6 +772,333 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
     return this._crypto.importRoomKeys(keys);
 };
 
+/**
+ * Get information about the current key backup.
+ * @returns {Promise} Information object from API or null
+ */
+MatrixClient.prototype.getKeyBackupVersion = function() {
+    return this._http.authedRequest(
+        undefined, "GET", "/room_keys/version",
+    ).then((res) => {
+        if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
+            const err = "Unknown backup algorithm: " + res.algorithm;
+            return Promise.reject(err);
+        } else if (!(typeof res.auth_data === "object")
+                   || !res.auth_data.public_key) {
+            const err = "Invalid backup data returned";
+            return Promise.reject(err);
+        } else {
+            return res;
+        }
+    }).catch((e) => {
+        if (e.errcode === 'M_NOT_FOUND') {
+            return null;
+        } else {
+            throw e;
+        }
+    });
+};
+
+/**
+ * @param {object} info key backup info dict from getKeyBackupVersion()
+ * @return {object} {
+ *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
+ *     sigs: [
+ *         valid: [bool],
+ *         device: [DeviceInfo],
+ *     ]
+ * }
+ */
+MatrixClient.prototype.isKeyBackupTrusted = function(info) {
+    return this._crypto.isKeyBackupTrusted(info);
+};
+
+/**
+ * @returns {bool} true if the client is configured to back up keys to
+ *     the server, otherwise false.
+ */
+MatrixClient.prototype.getKeyBackupEnabled = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return Boolean(this._crypto.backupKey);
+};
+
+/**
+ * Enable backing up of keys, using data previously returned from
+ * getKeyBackupVersion.
+ *
+ * @param {object} info Backup information object as returned by getKeyBackupVersion
+ */
+MatrixClient.prototype.enableKeyBackup = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupInfo = info;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
+    this._crypto.backupKey = new global.Olm.PkEncryption();
+    this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
+
+    this.emit('crypto.keyBackupStatus', true);
+};
+
+/**
+ * Disable backing up of keys.
+ */
+MatrixClient.prototype.disableKeyBackup = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    this._crypto.backupInfo = null;
+    if (this._crypto.backupKey) this._crypto.backupKey.free();
+    this._crypto.backupKey = null;
+
+    this.emit('crypto.keyBackupStatus', false);
+};
+
+/**
+ * Set up the data required to create a new backup version.  The backup version
+ * will not be created and enabled until createKeyBackupVersion is called.
+ *
+ * @param {string} password Passphrase string that can be entered by the user
+ *     when restoring the backup as an alternative to entering the recovery key.
+ *     Optional.
+ *
+ * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
+ *     additionally has a 'recovery_key' member with the user-facing recovery key string.
+ */
+MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        let publicKey;
+        const authData = {};
+        if (password) {
+            const keyInfo = await keyForNewBackup(password);
+            publicKey = decryption.init_with_private_key(keyInfo.key);
+            authData.private_key_salt = keyInfo.salt;
+            authData.private_key_iterations = keyInfo.iterations;
+        } else {
+            publicKey = decryption.generate_key();
+        }
+
+        authData.public_key = publicKey;
+
+        return {
+            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+            auth_data: authData,
+            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
+        };
+    } finally {
+        decryption.free();
+    }
+};
+
+/**
+ * Create a new key backup version and enable it, using the information return
+ * from prepareKeyBackupVersion.
+ *
+ * @param {object} info Info object from prepareKeyBackupVersion
+ * @returns {Promise<object>} Object with 'version' param indicating the version created
+ */
+MatrixClient.prototype.createKeyBackupVersion = function(info) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const data = {
+        algorithm: info.algorithm,
+        auth_data: info.auth_data,
+    };
+    return this._crypto._signObject(data.auth_data).then(() => {
+        return this._http.authedRequest(
+            undefined, "POST", "/room_keys/version", undefined, data,
+        );
+    }).then((res) => {
+        this.enableKeyBackup({
+            algorithm: info.algorithm,
+            auth_data: info.auth_data,
+            version: res.version,
+        });
+        return res;
+    });
+};
+
+MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    // If we're currently backing up to this backup... stop.
+    // (We start using it automatically in createKeyBackupVersion
+    // so this is symmetrical).
+    if (this._crypto.backupInfo && this._crypto.backupInfo.version === version) {
+        this.disableKeyBackup();
+    }
+
+    const path = utils.encodeUri("/room_keys/version/$version", {
+        $version: version,
+    });
+
+    return this._http.authedRequest(
+        undefined, "DELETE", path, undefined, undefined,
+    );
+};
+
+MatrixClient.prototype._makeKeyBackupPath = function(roomId, sessionId, version) {
+    let path;
+    if (sessionId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
+            $roomId: roomId,
+            $sessionId: sessionId,
+        });
+    } else if (roomId !== undefined) {
+        path = utils.encodeUri("/room_keys/keys/$roomId", {
+            $roomId: roomId,
+        });
+    } else {
+        path = "/room_keys/keys";
+    }
+    const queryData = version === undefined ? undefined : { version: version };
+    return {
+        path: path,
+        queryData: queryData,
+    };
+};
+
+/**
+ * Back up session keys to the homeserver.
+ * @param {string} roomId ID of the room that the keys are for Optional.
+ * @param {string} sessionId ID of the session that the keys are for Optional.
+ * @param {integer} version backup version Optional.
+ * @param {object} data Object keys to send
+ * @return {module:client.Promise} a promise that will resolve when the keys
+ * are uploaded
+ */
+MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "PUT", path.path, path.queryData, data,
+    );
+};
+
+MatrixClient.prototype.backupAllGroupSessions = function(version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    return this._crypto.backupAllGroupSessions(version);
+};
+
+MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
+    try {
+        decodeRecoveryKey(recoveryKey);
+        return true;
+    } catch (e) {
+        return false;
+    }
+};
+
+MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
+    password, targetRoomId, targetSessionId, version,
+) {
+    const backupInfo = await this.getKeyBackupVersion();
+
+    const privKey = await keyForExistingBackup(backupInfo, password);
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, version,
+    );
+};
+
+MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
+    recoveryKey, targetRoomId, targetSessionId, version,
+) {
+    const privKey = decodeRecoveryKey(recoveryKey);
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, version,
+    );
+};
+
+MatrixClient.prototype._restoreKeyBackup = function(
+    privKey, targetRoomId, targetSessionId, version,
+) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    let totalKeyCount = 0;
+    let keys = [];
+
+    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
+
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        decryption.init_with_private_key(privKey);
+    } catch(e) {
+        decryption.free();
+        throw e;
+    }
+
+    return this._http.authedRequest(
+        undefined, "GET", path.path, path.queryData,
+    ).then((res) => {
+        if (res.rooms) {
+            for (const [roomId, roomData] of Object.entries(res.rooms)) {
+                if (!roomData.sessions) continue;
+
+                totalKeyCount += Object.keys(roomData.sessions).length;
+                const roomKeys = keysFromRecoverySession(
+                    roomData.sessions, decryption, roomId, roomKeys,
+                );
+                for (const k of roomKeys) {
+                    k.room_id = roomId;
+                    keys.push(k);
+                }
+            }
+        } else if (res.sessions) {
+            totalKeyCount = Object.keys(res.sessions).length;
+            keys = keysFromRecoverySession(
+                res.sessions, decryption, targetRoomId, keys,
+            );
+        } else {
+            totalKeyCount = 1;
+            try {
+                const key = keyFromRecoverySession(res, decryption);
+                key.room_id = targetRoomId;
+                key.session_id = targetSessionId;
+                keys.push(key);
+            } catch (e) {
+                console.log("Failed to decrypt session from backup");
+            }
+        }
+
+        return this.importRoomKeys(keys);
+    }).then(() => {
+        return {total: totalKeyCount, imported: keys.length};
+    }).finally(() => {
+        decryption.free();
+    });
+};
+
+MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, version) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    const path = this._makeKeyBackupPath(roomId, sessionId, version);
+    return this._http.authedRequest(
+        undefined, "DELETE", path.path, path.queryData,
+    );
+};
+
 // Group ops
 // =========
 // Operations on groups that come down the sync stream (ie. ones the
@@ -727,6 +1123,17 @@ MatrixClient.prototype.getGroups = function() {
     return this.store.getGroups();
 };
 
+/**
+ * Get the config for the media repository.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves with an object containing the config.
+ */
+MatrixClient.prototype.getMediaConfig = function(callback) {
+    return this._http.authedRequestWithPrefix(
+        callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
+    );
+};
+
 // Room ops
 // ========
 
@@ -748,6 +1155,37 @@ MatrixClient.prototype.getRoom = function(roomId) {
  */
 MatrixClient.prototype.getRooms = function() {
     return this.store.getRooms();
+};
+
+/**
+ * Retrieve all rooms that should be displayed to the user
+ * This is essentially getRooms() with some rooms filtered out, eg. old versions
+ * of rooms that have been replaced or (in future) other rooms that have been
+ * marked at the protocol level as not to be displayed to the user.
+ * @return {Room[]} A list of rooms, or an empty list if there is no data store.
+ */
+MatrixClient.prototype.getVisibleRooms = function() {
+    const allRooms = this.store.getRooms();
+
+    const replacedRooms = new Set();
+    for (const r of allRooms) {
+        const createEvent = r.currentState.getStateEvents('m.room.create', '');
+        // invites are included in this list and we don't know their create events yet
+        if (createEvent) {
+            const predecessor = createEvent.getContent()['predecessor'];
+            if (predecessor && predecessor['room_id']) {
+                replacedRooms.add(predecessor['room_id']);
+            }
+        }
+    }
+
+    return allRooms.filter((r) => {
+        const tombstone = r.currentState.getStateEvents('m.room.tombstone', '');
+        if (tombstone && replacedRooms.has(r.roomId)) {
+            return false;
+        }
+        return true;
+    });
 };
 
 /**
@@ -842,6 +1280,8 @@ MatrixClient.prototype.isUserIgnored = function(userId) {
  * </strong> Default: true.
  * @param {boolean} opts.inviteSignUrl If the caller has a keypair 3pid invite,
  *                                     the signing URL is passed in this parameter.
+ * @param {string[]} opts.viaServers The server names to try and join through in
+ *                                   addition to those that are automatically chosen.
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: Room object.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
@@ -870,6 +1310,13 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         );
     }
 
+    const queryString = {};
+    if (opts.viaServers) {
+        queryString["server_name"] = opts.viaServers;
+    }
+
+    const reqOpts = {qsStringifyOptions: {arrayFormat: 'repeat'}};
+
     const defer = Promise.defer();
 
     const self = this;
@@ -880,7 +1327,8 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
         }
 
         const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
-        return self._http.authedRequest(undefined, "POST", path, undefined, data);
+        return self._http.authedRequest(
+            undefined, "POST", path, queryString, data, reqOpts);
     }).then(function(res) {
         const roomId = res.room_id;
         const syncApi = new SyncApi(self, self._clientOpts);
@@ -1098,6 +1546,13 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
     // add this event immediately to the local store as 'sending'.
     if (room) {
         room.addPendingEvent(localEvent, txnId);
+    }
+
+    // addPendingEvent can change the state to NOT_SENT if it believes
+    // that there's other events that have failed. We won't bother to
+    // try sending the event if the state has changed as such.
+    if (localEvent.status === EventStatus.NOT_SENT) {
+        return Promise.reject(new Error("Event blocked by other events not yet sent"));
     }
 
     return _sendEvent(this, room, localEvent, callback);
@@ -1808,6 +2263,27 @@ MatrixClient.prototype.mxcUrlToHttp =
 };
 
 /**
+ * Sets a new status message for the user. The message may be null/falsey
+ * to clear the message.
+ * @param {string} newMessage The new message to set.
+ * @return {module:client.Promise} Resolves: to nothing
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype._unstable_setStatusMessage = function(newMessage) {
+    return Promise.all(this.getRooms().map((room) => {
+        const isJoined = room.getMyMembership() === "join";
+        const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
+        if (isJoined && looksLikeDm) {
+            return this.sendStateEvent(room.roomId, "im.vector.user_status", {
+                status: newMessage,
+            }, this.getUserId());
+        } else {
+            return Promise.resolve();
+        }
+    }));
+};
+
+/**
  * @param {Object} opts Options to apply
  * @param {string} opts.presence One of "online", "offline" or "unavailable"
  * @param {string} opts.status_msg The status message to attach.
@@ -1919,14 +2395,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: room.roomId},
-    );
-    const params = {
-        from: room.oldState.paginationToken,
-        limit: limit,
-        dir: 'b',
-    };
     const defer = Promise.defer();
     info = {
         promise: defer.promise,
@@ -1936,9 +2404,17 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
     Promise.delay(timeToWaitMs).then(function() {
-        return self._http.authedRequest(callback, "GET", path, params);
+        return self._createMessagesRequest(
+            room.roomId,
+            room.oldState.paginationToken,
+            limit,
+            'b');
     }).done(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+        if (res.state) {
+            const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+            room.currentState.setUnknownStateEvents(stateEvents);
+        }
         room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
         room.oldState.paginationToken = res.end;
         if (res.chunk.length === 0) {
@@ -1955,73 +2431,6 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     });
     this._ongoingScrollbacks[room.roomId] = info;
     return defer.promise;
-};
-
-/**
- * Take an EventContext, and back/forward-fill results.
- *
- * @param {module:models/event-context.EventContext} eventContext  context
- *    object to be updated
- * @param {Object}  opts
- * @param {boolean} opts.backwards  true to fill backwards, false to go forwards
- * @param {boolean} opts.limit      number of events to request
- *
- * @return {module:client.Promise} Resolves: updated EventContext object
- * @return {Error} Rejects: with an error response.
- */
-MatrixClient.prototype.paginateEventContext = function(eventContext, opts) {
-    // TODO: we should implement a backoff (as per scrollback()) to deal more
-    // nicely with HTTP errors.
-    opts = opts || {};
-    const backwards = opts.backwards || false;
-
-    const token = eventContext.getPaginateToken(backwards);
-    if (!token) {
-        // no more results.
-        return Promise.reject(new Error("No paginate token"));
-    }
-
-    const dir = backwards ? 'b' : 'f';
-    const pendingRequest = eventContext._paginateRequests[dir];
-
-    if (pendingRequest) {
-        // already a request in progress - return the existing promise
-        return pendingRequest;
-    }
-
-    const path = utils.encodeUri(
-        "/rooms/$roomId/messages", {$roomId: eventContext.getEvent().getRoomId()},
-    );
-    const params = {
-        from: token,
-        limit: ('limit' in opts) ? opts.limit : 30,
-        dir: dir,
-    };
-
-    const self = this;
-    const promise =
-        self._http.authedRequest(undefined, "GET", path, params,
-    ).then(function(res) {
-        let token = res.end;
-        if (res.chunk.length === 0) {
-            token = null;
-        } else {
-            const matrixEvents = utils.map(res.chunk, self.getEventMapper());
-            if (backwards) {
-                // eventContext expects the events in timeline order, but
-                // back-pagination returns them in reverse order.
-                matrixEvents.reverse();
-            }
-            eventContext.addEvents(matrixEvents, backwards);
-        }
-        eventContext.setPaginateToken(token, backwards);
-        return eventContext;
-    }).finally(function() {
-        eventContext._paginateRequests[dir] = null;
-    });
-    eventContext._paginateRequests[dir] = promise;
-
-    return promise;
 };
 
 /**
@@ -2057,11 +2466,16 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
         },
     );
 
+    let params = undefined;
+    if (this._clientOpts.lazyLoadMembers) {
+        params = {filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER)};
+    }
+
     // TODO: we should implement a backoff (as per scrollback()) to deal more
     // nicely with HTTP errors.
     const self = this;
     const promise =
-        self._http.authedRequest(undefined, "GET", path,
+        self._http.authedRequest(undefined, "GET", path, params,
     ).then(function(res) {
         if (!res.event) {
             throw new Error("'event' not in '/context' result - homeserver too old?");
@@ -2088,6 +2502,9 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
             timeline.initialiseState(utils.map(res.state,
                                                self.getEventMapper()));
             timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+        } else {
+            const stateEvents = utils.map(res.state, self.getEventMapper());
+            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(stateEvents);
         }
         timelineSet.addEventsToTimeline(matrixEvents, true, timeline, res.start);
 
@@ -2102,6 +2519,49 @@ MatrixClient.prototype.getEventTimeline = function(timelineSet, eventId) {
     return promise;
 };
 
+/**
+ * Makes a request to /messages with the appropriate lazy loading filter set.
+ * XXX: if we do get rid of scrollback (as it's not used at the moment),
+ * we could inline this method again in paginateEventTimeline as that would
+ * then be the only call-site
+ * @param {string} roomId
+ * @param {string} fromToken
+ * @param {number} limit the maximum amount of events the retrieve
+ * @param {string} dir 'f' or 'b'
+ * @param {Filter} timelineFilter the timeline filter to pass
+ * @return {Promise}
+ */
+MatrixClient.prototype._createMessagesRequest =
+function(roomId, fromToken, limit, dir, timelineFilter = undefined) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/messages", {$roomId: roomId},
+    );
+    if (limit === undefined) {
+        limit = 30;
+    }
+    const params = {
+        from: fromToken,
+        limit: limit,
+        dir: dir,
+    };
+
+    let filter = null;
+    if (this._clientOpts.lazyLoadMembers) {
+        // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
+        // so the timelineFilter doesn't get written into it below
+        filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
+    }
+    if (timelineFilter) {
+        // XXX: it's horrific that /messages' filter parameter doesn't match
+        // /sync's one - see https://matrix.org/jira/browse/SPEC-451
+        filter = filter || {};
+        Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent());
+    }
+    if (filter) {
+        params.filter = JSON.stringify(filter);
+    }
+    return this._http.authedRequest(undefined, "GET", path, params);
+};
 
 /**
  * Take an EventTimeline, and back/forward-fill results.
@@ -2196,25 +2656,18 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             throw new Error("Unknown room " + eventTimeline.getRoomId());
         }
 
-        path = utils.encodeUri(
-            "/rooms/$roomId/messages", {$roomId: eventTimeline.getRoomId()},
-        );
-        params = {
-            from: token,
-            limit: ('limit' in opts) ? opts.limit : 30,
-            dir: dir,
-        };
-
-        const filter = eventTimeline.getFilter();
-        if (filter) {
-            // XXX: it's horrific that /messages' filter parameter doesn't match
-            // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            params.filter = JSON.stringify(filter.getRoomTimelineFilterComponent());
-        }
-
-        promise =
-            this._http.authedRequest(undefined, "GET", path, params,
-        ).then(function(res) {
+        promise = this._createMessagesRequest(
+            eventTimeline.getRoomId(),
+            token,
+            opts.limit,
+            dir,
+            eventTimeline.getFilter());
+        promise.then(function(res) {
+            if (res.state) {
+                const roomState = eventTimeline.getState(dir);
+                const stateEvents = utils.map(res.state, self.getEventMapper());
+                roomState.setUnknownStateEvents(stateEvents);
+            }
             const token = res.end;
             const matrixEvents = utils.map(res.chunk, self.getEventMapper());
             eventTimeline.getTimelineSet()
@@ -3019,8 +3472,11 @@ MatrixClient.prototype.getTurnServers = function() {
  *
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
+ * @param {Boolean=} opts.lazyLoadMembers True to not load all membership events during
+ * initial sync but fetch them when needed by calling `loadOutOfBandMembers`
+ * This will override the filter option at this moment.
  */
-MatrixClient.prototype.startClient = function(opts) {
+MatrixClient.prototype.startClient = async function(opts) {
     if (this.clientRunning) {
         // client is already running.
         return;
@@ -3058,9 +3514,27 @@ MatrixClient.prototype.startClient = function(opts) {
         return this._canResetTimelineCallback(roomId);
     };
     this._clientOpts = opts;
-
     this._syncApi = new SyncApi(this, opts);
     this._syncApi.sync();
+};
+
+/**
+ * store client options with boolean/string/numeric values
+ * to know in the next session what flags the sync data was
+ * created with (e.g. lazy loading)
+ * @param {object} opts the complete set of client options
+ * @return {Promise} for store operation */
+MatrixClient.prototype._storeClientOptions = function() {
+    const primTypes = ["boolean", "string", "number"];
+    const serializableOpts = Object.entries(this._clientOpts)
+        .filter(([key, value]) => {
+            return primTypes.includes(typeof value);
+        })
+        .reduce((obj, [key, value]) => {
+            obj[key] = value;
+            return obj;
+        }, {});
+    return this.store.storeClientOptions(serializableOpts);
 };
 
 /**
@@ -3083,6 +3557,36 @@ MatrixClient.prototype.stopClient = function() {
         this._peekSync.stopPeeking();
     }
     global.clearTimeout(this._checkTurnServersTimeoutID);
+};
+
+/*
+ * Query the server to see if it support members lazy loading
+ * @return {Promise<boolean>} true if server supports lazy loading
+ */
+MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
+    if (this._serverSupportsLazyLoading === null) {
+        const response = await this._http.request(
+            undefined, // callback
+            "GET", "/_matrix/client/versions",
+            undefined, // queryParams
+            undefined, // data
+            {
+                prefix: '',
+            },
+        );
+        const unstableFeatures = response["unstable_features"];
+        this._serverSupportsLazyLoading =
+            unstableFeatures && unstableFeatures["m.lazy_load_members"];
+    }
+    return this._serverSupportsLazyLoading;
+};
+
+/*
+ * Get if lazy loading members is being used.
+ * @return {boolean} Whether or not members are lazy loaded by this client
+ */
+MatrixClient.prototype.hasLazyLoadMembersEnabled = function() {
+    return !!this._clientOpts.lazyLoadMembers;
 };
 
 /*
@@ -3380,14 +3884,7 @@ MatrixClient.prototype.getEventMapper = function() {
  * @return {string} A new client secret
  */
 MatrixClient.prototype.generateClientSecret = function() {
-    let ret = "";
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-    for (let i = 0; i < 32; i++) {
-        ret += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-
-    return ret;
+    return randomString(32);
 };
 
 /** */
@@ -3430,6 +3927,12 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
  * previous API.</i></li>
  *
+ * <li>CATCHUP: The client has detected the connection to the server might be
+ * available again and will now try to do a sync again. As this sync might take
+ * a long time (depending how long ago was last synced, and general server
+ * performance) the client is put in this mode so the UI can reflect trying
+ * to catch up with the server after losing connection.</li>
+ *
  * <li>SYNCING : The client is currently polling for new events from the server.
  * This will be called <i>after</i> processing latest events from a sync.</li>
  *
@@ -3453,11 +3956,11 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *                                          +---->STOPPED
  *                                          |
  *              +----->PREPARED -------> SYNCING <--+
- *              |        ^                |  ^      |
- *              |        |                |  |      |
- *              |        |                V  |      |
- *   null ------+        |  +--------RECONNECTING   |
- *              |        |  V                       |
+ *              |                        ^  |  ^    |
+ *              |      CATCHUP ----------+  |  |    |
+ *              |        ^                  V  |    |
+ *   null ------+        |  +------- RECONNECTING   |
+ *              |        V  V                       |
  *              +------->ERROR ---------------------+
  *
  * NB: 'null' will never be emitted by this event.
@@ -3507,7 +4010,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *
  * @param {?Object} data Data about this transition.
  *
- * @param {MatrixError} data.err The matrix error if <code>state=ERROR</code>.
+ * @param {MatrixError} data.error The matrix error if <code>state=ERROR</code>.
  *
  * @param {String} data.oldSyncToken The 'since' token passed to /sync.
  *    <code>null</code> for the first successful sync since this client was
@@ -3625,6 +4128,24 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * });
  */
 
+/**
+ * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
+ * @event module:client~MatrixClient#"crypto.keyBackupStatus"
+ * @param {bool} enabled true if key backup has been enabled, otherwise false
+ * @example
+ * matrixClient.on("crypto.keyBackupStatus", function(enabled){
+ *   if (enabled) {
+ *     [...]
+ *   }
+ * });
+ */
+
+/**
+ * Fires when we want to suggest to the user that they restore their megolm keys
+ * from backup or by cross-signing the device.
+ *
+ * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
 
 // EventEmitter JSDocs
 

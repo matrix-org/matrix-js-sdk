@@ -41,6 +41,7 @@ describe("MatrixClient", function() {
 
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
+        return httpBackend.stop();
     });
 
     describe("uploadContent", function() {
@@ -159,7 +160,7 @@ describe("MatrixClient", function() {
     describe("joinRoom", function() {
         it("should no-op if you've already joined a room", function() {
             const roomId = "!foo:bar";
-            const room = new Room(roomId);
+            const room = new Room(roomId, userId);
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true,

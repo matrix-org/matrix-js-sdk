@@ -262,7 +262,19 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
     utils.extend(login_data, data);
 
     return this._http.authedRequest(
-        callback, "POST", "/login", undefined, login_data,
+        (error, response) => {
+            if (loginType === "m.login.password" && response &&
+                response.access_token && response.user_id) {
+                this._http.opts.accessToken = response.access_token;
+                this.credentials = {
+                    userId: response.user_id,
+                };
+            }
+
+            if (callback) {
+                callback(error, response);
+            }
+        }, "POST", "/login", undefined, login_data,
     );
 };
 
@@ -298,9 +310,23 @@ MatrixBaseApis.prototype.loginWithSAML2 = function(relayState, callback) {
  * @return {string} The HS URL to hit to begin the CAS login process.
  */
 MatrixBaseApis.prototype.getCasLoginUrl = function(redirectUrl) {
-    return this._http.getUrl("/login/cas/redirect", {
+    return this.getSsoLoginUrl(redirectUrl, "cas");
+};
+
+/**
+ * @param {string} redirectUrl The URL to redirect to after the HS
+ *     authenticates with the SSO.
+ * @param {string} loginType The type of SSO login we are doing (sso or cas).
+ *     Defaults to 'sso'.
+ * @return {string} The HS URL to hit to begin the SSO login process.
+ */
+MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType) {
+    if (loginType === undefined) {
+        loginType = "sso";
+    }
+    return this._http.getUrl("/login/"+loginType+"/redirect", {
         "redirectUrl": redirectUrl,
-    }, httpApi.PREFIX_UNSTABLE);
+    }, httpApi.PREFIX_R0);
 };
 
 /**
@@ -416,6 +442,69 @@ MatrixBaseApis.prototype.roomState = function(roomId, callback) {
     const path = utils.encodeUri("/rooms/$roomId/state", {$roomId: roomId});
     return this._http.authedRequest(callback, "GET", path);
 };
+
+/**
+ * Get an event in a room by its event id.
+ * @param {string} roomId
+ * @param {string} eventId
+ * @param {module:client.callback} callback Optional.
+ *
+ * @return {Promise} Resolves to an object containing the event.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.fetchRoomEvent = function(roomId, eventId, callback) {
+    const path = utils.encodeUri(
+        "/rooms/$roomId/event/$eventId", {
+            $roomId: roomId,
+            $eventId: eventId,
+        },
+    );
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
+ * @param {string} roomId
+ * @param {string} includeMembership the membership type to include in the response
+ * @param {string} excludeMembership the membership type to exclude from the response
+ * @param {string} atEventId the id of the event for which moment in the timeline the members should be returned for
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: dictionary of userid to profile information
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.members =
+function(roomId, includeMembership, excludeMembership, atEventId, callback) {
+    const queryParams = {};
+    if (includeMembership) {
+        queryParams.membership = includeMembership;
+    }
+    if (excludeMembership) {
+        queryParams.not_membership = excludeMembership;
+    }
+    if (atEventId) {
+        queryParams.at = atEventId;
+    }
+
+    const queryString = utils.encodeParams(queryParams);
+
+    const path = utils.encodeUri("/rooms/$roomId/members?" + queryString,
+        {$roomId: roomId});
+    return this._http.authedRequest(callback, "GET", path);
+};
+
+/**
+ * Upgrades a room to a new protocol version
+ * @param {string} roomId
+ * @param {string} newVersion The target version to upgrade to
+ * @return {module:client.Promise} Resolves: Object with key 'replacement_room'
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.upgradeRoom = function(roomId, newVersion) {
+    const path = utils.encodeUri("/rooms/$roomId/upgrade", {$roomId: roomId});
+    return this._http.authedRequest(
+        undefined, "POST", path, undefined, {new_version: newVersion},
+    );
+};
+
 
 /**
  * @param {string} groupId
@@ -864,6 +953,28 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     );
 };
 
+/**
+ * @return {module:client.Promise} Resolves: A list of the user's current rooms
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRooms = function() {
+    const path = utils.encodeUri("/joined_rooms");
+    return this._http.authedRequest(undefined, "GET", path);
+};
+
+/**
+ * Retrieve membership info. for a room.
+ * @param {string} roomId ID of the room to get membership for
+ * @return {module:client.Promise} Resolves: A list of currently joined users
+ *                                 and their profile data.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getJoinedRoomMembers = function(roomId) {
+    const path = utils.encodeUri("/rooms/$roomId/joined_members", {
+        $roomId: roomId,
+    });
+    return this._http.authedRequest(undefined, "GET", path);
+};
 
 // Room Directory operations
 // =========================
@@ -1722,12 +1833,31 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
  * Get information on how a specific place on a third party protocol
  * may be reached.
  * @param {string} protocol The protocol given in getThirdpartyProtocols()
- * @param {object} params Protocol-specific parameters, as given in th
+ * @param {object} params Protocol-specific parameters, as given in the
  *                        response to getThirdpartyProtocols()
  * @return {module:client.Promise} Resolves to the result object
  */
 MatrixBaseApis.prototype.getThirdpartyLocation = function(protocol, params) {
     const path = utils.encodeUri("/thirdparty/location/$protocol", {
+        $protocol: protocol,
+    });
+
+    return this._http.authedRequestWithPrefix(
+        undefined, "GET", path, params, undefined,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
+
+/**
+ * Get information on how a specific user on a third party protocol
+ * may be reached.
+ * @param {string} protocol The protocol given in getThirdpartyProtocols()
+ * @param {object} params Protocol-specific parameters, as given in the
+ *                        response to getThirdpartyProtocols()
+ * @return {module:client.Promise} Resolves to the result object
+ */
+MatrixBaseApis.prototype.getThirdpartyUser = function(protocol, params) {
+    const path = utils.encodeUri("/thirdparty/user/$protocol", {
         $protocol: protocol,
     });
 

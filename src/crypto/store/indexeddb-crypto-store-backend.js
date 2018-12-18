@@ -16,9 +16,11 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
+
+import logger from '../../logger';
 import utils from '../../utils';
 
-export const VERSION = 6;
+export const VERSION = 7;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -38,7 +40,7 @@ export class Backend {
         // attempts to delete the database will block (and subsequent
         // attempts to re-create it will also block).
         db.onversionchange = (ev) => {
-            console.log(`versionchange for indexeddb ${this._dbName}: closing`);
+            logger.log(`versionchange for indexeddb ${this._dbName}: closing`);
             db.close();
         };
     }
@@ -64,7 +66,7 @@ export class Backend {
         this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
             if (existing) {
                 // this entry matches the request - return it.
-                console.log(
+                logger.log(
                     `already have key request outstanding for ` +
                         `${requestBody.room_id} / ${requestBody.session_id}: ` +
                         `not sending another`,
@@ -75,7 +77,7 @@ export class Backend {
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            console.log(
+            logger.log(
                 `enqueueing key request for ${requestBody.room_id} / ` +
                     requestBody.session_id,
             );
@@ -204,6 +206,42 @@ export class Backend {
         return promiseifyTxn(txn).then(() => result);
     }
 
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        let stateIndex = 0;
+        const results = [];
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (cursor) {
+                const keyReq = cursor.value;
+                if (keyReq.recipients.includes({userId, deviceId})) {
+                    results.push(keyReq);
+                }
+                cursor.continue();
+            } else {
+                // try the next state in the list
+                stateIndex++;
+                if (stateIndex >= wantedStates.length) {
+                    // no matches
+                    return;
+                }
+
+                const wantedState = wantedStates[stateIndex];
+                const cursorReq = ev.target.source.openCursor(wantedState);
+                cursorReq.onsuccess = onsuccess;
+            }
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const wantedState = wantedStates[stateIndex];
+        const cursorReq = store.index("state").openCursor(wantedState);
+        cursorReq.onsuccess = onsuccess;
+
+        return promiseifyTxn(txn).then(() => results);
+    }
+
     /**
      * Look for an existing room key request by id and state, and update it if
      * found
@@ -226,7 +264,7 @@ export class Backend {
             }
             const data = cursor.value;
             if (data.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
                     `as it was already updated to ${data.state}`,
                 );
@@ -264,7 +302,7 @@ export class Backend {
             }
             const data = cursor.value;
             if (data.state != expectedState) {
-                console.warn(
+                logger.warn(
                     `Cannot delete room key request in state ${data.state} `
                         + `(expected ${expectedState})`,
                 );
@@ -312,7 +350,10 @@ export class Backend {
         getReq.onsuccess = function() {
             const cursor = getReq.result;
             if (cursor) {
-                results[cursor.value.sessionId] = cursor.value.session;
+                results[cursor.value.sessionId] = {
+                    session: cursor.value.session,
+                    lastReceivedMessageTs: cursor.value.lastReceivedMessageTs,
+                };
                 cursor.continue();
             } else {
                 try {
@@ -330,7 +371,10 @@ export class Backend {
         getReq.onsuccess = function() {
             try {
                 if (getReq.result) {
-                    func(getReq.result.session);
+                    func({
+                        session: getReq.result.session,
+                        lastReceivedMessageTs: getReq.result.lastReceivedMessageTs,
+                    });
                 } else {
                     func(null);
                 }
@@ -340,9 +384,14 @@ export class Backend {
         };
     }
 
-    storeEndToEndSession(deviceKey, sessionId, session, txn) {
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const objectStore = txn.objectStore("sessions");
-        objectStore.put({deviceKey, sessionId, session});
+        objectStore.put({
+            deviceKey,
+            sessionId,
+            session: sessionInfo.session,
+            lastReceivedMessageTs: sessionInfo.lastReceivedMessageTs,
+        });
     }
 
     // Inbound group sessions
@@ -400,7 +449,7 @@ export class Backend {
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction
                 ev.preventDefault();
-                console.log(
+                logger.log(
                     "Ignoring duplicate inbound group session: " +
                     senderCurve25519Key + " / " + sessionId,
                 );
@@ -460,6 +509,71 @@ export class Backend {
         };
     }
 
+    // session backups
+
+    getSessionsNeedingBackup(limit) {
+        return new Promise((resolve, reject) => {
+            const sessions = [];
+
+            const txn = this._db.transaction(
+                ["sessions_needing_backup", "inbound_group_sessions"],
+                "readonly",
+            );
+            txn.onerror = reject;
+            txn.oncomplete = function() {
+                resolve(sessions);
+            };
+            const objectStore = txn.objectStore("sessions_needing_backup");
+            const sessionStore = txn.objectStore("inbound_group_sessions");
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function() {
+                const cursor = getReq.result;
+                if (cursor) {
+                    const sessionGetReq = sessionStore.get(cursor.key);
+                    sessionGetReq.onsuccess = function() {
+                        sessions.push({
+                            senderKey: sessionGetReq.result.senderCurve25519Key,
+                            sessionId: sessionGetReq.result.sessionId,
+                            sessionData: sessionGetReq.result.session,
+                        });
+                    };
+                    if (!limit || sessions.length < limit) {
+                        cursor.continue();
+                    }
+                }
+            };
+        });
+    }
+
+    unmarkSessionsNeedingBackup(sessions) {
+        const txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map((session) => {
+            return new Promise((resolve, reject) => {
+                const req = objectStore.delete([session.senderKey, session.sessionId]);
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+    }
+
+    markSessionsNeedingBackup(sessions, txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map((session) => {
+            return new Promise((resolve, reject) => {
+                const req = objectStore.put({
+                    senderCurve25519Key: session.senderKey,
+                    sessionId: session.sessionId,
+                });
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+    }
+
     doTxn(mode, stores, func) {
         const txn = this._db.transaction(stores, mode);
         const promise = promiseifyTxn(txn);
@@ -471,7 +585,7 @@ export class Backend {
 }
 
 export function upgradeDatabase(db, oldVersion) {
-    console.log(
+    logger.log(
         `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
             + ` to ${VERSION}`,
     );
@@ -497,6 +611,11 @@ export function upgradeDatabase(db, oldVersion) {
     }
     if (oldVersion < 6) {
         db.createObjectStore("rooms");
+    }
+    if (oldVersion < 7) {
+        db.createObjectStore("sessions_needing_backup", {
+            keyPath: ["senderCurve25519Key", "sessionId"],
+        });
     }
     // Expand as needed.
 }
