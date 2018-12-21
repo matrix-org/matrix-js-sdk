@@ -94,6 +94,17 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(this._getEndToEndSessions(deviceKey) || {});
     }
 
+    getAllEndToEndSessions(txn, func) {
+        for (let i = 0; i < this.store.length; ++i) {
+            if (this.store.key(i).startsWith(keyEndToEndSessions(''))) {
+                const deviceKey = this.store.key(i).split('/')[1];
+                for (const sess of Object.values(this._getEndToEndSessions(deviceKey)) {
+                    func(sess);
+                }
+            }
+        }
+    }
+
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const sessions = this._getEndToEndSessions(deviceKey) || {};
         sessions[sessionId] = sessionInfo;
