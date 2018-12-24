@@ -49,7 +49,6 @@ export default class VerificationBase extends EventEmitter {
         this.startEvent = startEvent;
         this.request = request;
         this._parent = parent;
-        this._eventHandlers = {};
         this._done = false;
         this._promise = new Promise((resolve, reject) => {
             this._resolve = (...args) => {
@@ -70,23 +69,32 @@ export default class VerificationBase extends EventEmitter {
         });
     }
 
-    _expectEvents(map) {
-        this._eventHandlers = map || {};
-    }
-
-    /** Wrapper around _expectEvents, for when only one event type is expected
-     */
-    _expectEvent(type, handler) {
-        return this._expectEvents({[type]: handler});
+    _waitForEvent(type) {
+        if (this._done) {
+            return Promise.reject(new Error("Verification is already done"));
+        }
+        this._expectedEvent = type;
+        return new Promise((resolve, reject) => {
+            this._resolveEvent = resolve;
+            this._rejectEvent = reject;
+        });
     }
 
     handleEvent(e) {
-        const handler = this._eventHandlers[e.getType()];
-        if (!handler) {
-            this._eventHandlers = {};
-            return this.cancel(new Error("Unexpected message"));
+        if (e.getType() === this._expectedEvent) {
+            this._expectedEvent = undefined;
+            this._rejectEvent = undefined;
+            this._resolveEvent(e);
+        } else {
+            this._expectedEvent = undefined;
+            const exception = new Error("Unexected message");
+            if (this._rejectEvent) {
+                const reject = this._rejectEvent;
+                this._rejectEvent = undefined;
+                reject(exception);
+            }
+            this.cancel(exception);
         }
-        return handler.call(this, e);
     }
 
     done() {
@@ -102,6 +110,11 @@ export default class VerificationBase extends EventEmitter {
     }
 
     verify() {
+        if (this._doVerification && !this._started) {
+            this._started = true;
+            Promise.resolve(this._doVerification())
+                .then(this.done.bind(this), this.cancel.bind(this));
+        }
         return this._promise;
     }
 }

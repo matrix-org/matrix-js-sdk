@@ -88,11 +88,11 @@ describe("SAS verification", function() {
                                 if (map["@alice:example.com"]
                                     && map["@alice:example.com"]["ABCDEFG"]) {
                                     console.log("bob sends to alice:", type, map["@alice:example.com"]["ABCDEFG"]);
-                                    alice.handleEvent(new MatrixEvent({
+                                    setTimeout(() => alice.handleEvent(new MatrixEvent({
                                         sender: "@bob:example.com",
                                         type: type,
                                         content: map["@alice:example.com"]["ABCDEFG"],
-                                    }));
+                                    })), 0);
                                 }
                             },
                             getStoredDevice: () => {
@@ -102,7 +102,7 @@ describe("SAS verification", function() {
                         }, "@alice:example.com", "ABCDEFG", "transaction", event);
                         bobResolve();
                     } else {
-                        bob.handleEvent(event);
+                        setTimeout(() => bob.handleEvent(event), 0);
                     }
                 }
             },

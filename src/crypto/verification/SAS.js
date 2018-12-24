@@ -45,19 +45,13 @@ export class SASSend extends Base {
         return EVENTS;
     }
 
-    async verify() {
-        if (this._started) {
-            return this._promise;
-        }
-        this._started = true;
-
+    async _doVerification() {
         await global.Olm.init();
-        olmutil = new global.Olm.Utility();
+        olmutil = olmutil || new global.Olm.Utility();
 
         // FIXME: make sure key is downloaded
-        this.device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
+        const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
-        this._expectEvent("m.key.verification.accept", this._handleAccept);
         this._sendToDevice("m.key.verification.start", {
             method: 'm.key.verification.sas',
             from_device: this._baseApis.deviceId,
@@ -66,11 +60,10 @@ export class SASSend extends Base {
             message_authentication_codes: ["hmac-sha256"],
             short_authentication_string: ["hex"],
         });
-        await this._promise;
-    }
 
-    _handleAccept(e) {
-        const content = e.getContent();
+
+        let e = await this._waitForEvent("m.key.verification.accept");
+        let content = e.getContent();
         if (!(content.key_agreement_protocol === "curve25519"
               && content.hash === "sha256"
               && content.message_authentication_code === "hmac-sha256"
@@ -79,7 +72,7 @@ export class SASSend extends Base {
               && content.short_authentication_string[0] === "hex")) {
             return this.cancel(new Error("Unknown method"));
         }
-        this._parameters = {
+        const parameters = {
             hash: content.hash,
             mac: content.message_authentication_code,
             sas: content.short_authentication_string,
@@ -87,59 +80,45 @@ export class SASSend extends Base {
         if (typeof content.commitment !== "string") {
             return this.cancel(new Error("Malformed event"));
         }
-        this._hash_commitment = content.commitment;
-        this._key = "abcdefg";
-        this._expectEvent("m.key.verification.key", this._handleKey);
+        const hashCommitment = content.commitment;
+        const ourKey = "abcdefg";
         this._sendToDevice("m.key.verification.key", {
-            key: this._key,
+            key: ourKey,
         });
-    }
 
-    // FIXME: make sure event is properly formed
-    async _handleKey(e) {
-        const content = e.getContent();
-        if (olmutil.sha256(content.key) !== this._hash_commitment) {
+
+        e = await this._waitForEvent("m.key.verification.key");
+        // FIXME: make sure event is properly formed
+        content = e.getContent();
+        if (olmutil.sha256(content.key) !== hashCommitment) {
             console.log("commitment mismatch");
             return this.cancel(new Error("Commitment mismatch"));
         }
-        this._other_key = content.key;
-        this._expectEvent("m.key.verification.mac", this._handleMac);
+        const theirKey = content.key;
+
         const sas = "hijklmn";
-        this.emit("show_sas", {
-            sas,
-            confirm: this._sasMatch.bind(this),
+        const verifySAS = new Promise((resolve, reject) => {
+            this.emit("show_sas", {
+                sas,
+                confirm: () => {
+                    const mac = {["ed25519:" + this._baseApis.deviceId]: "opqrstu"};
+                    this._sendToDevice("m.key.verification.mac", { mac });
+                    resolve();
+                },
+                cancel: reject,
+            });
         });
+
+
+        [e] = await Promise.all([
+            this._waitForEvent("m.key.verification.mac"),
+            verifySAS,
+        ]);
+        content = e.getContent();
+        return this._verifyMACs(ourKey, theirKey, device, content.mac);
     }
 
-    _sasMatch() {
-        if (this._done) {
-            return;
-        }
-        const mac = {["ed25519:" + this._baseApis.deviceId]: "opqrstu"};
-        this._sendToDevice("m.key.verification.mac", { mac });
-        if (this._other_mac) {
-            return this._verifyMACs(this._other_mac);
-        } else {
-            // haven't received the MAC from the other side yet.  Remember that
-            // the SAS matches, and wait.
-            this._match = true;
-        }
-    }
-
-    _handleMac(e) {
-        const content = e.getContent();
-        this._expectEvent(); // don't expect anything else
-        if (this._match) {
-            return this._verifyMACs(content.mac);
-        } else {
-            // user has not said whether the SAS matches yet.  Remember the MAC
-            // and wait.
-            this._other_mac = content.mac;
-        }
-    }
-
-    async _verifyMACs(mac) {
-        const device = this.device;
+    async _verifyMACs(ourKey, theirKey, device, mac) {
         for (const [keyId, keyMAC] of Object.entries(mac)) {
             if (keyMAC !== "opqrstu") {
                 return this.cancel(new Error("Keys did not match"));
@@ -166,23 +145,18 @@ export class SASReceive extends Base {
         return EVENTS;
     }
 
-    async verify() {
-        if (this._started) {
-            return this._promise;
-        }
-        this._started = true;
-
+    async _doVerification() {
         if (!this.startEvent) {
             this.cancel(new Error(
                 "SASReceive must only be created in response to an event",
             ));
-            return await this._promise;
+            return;
         }
 
         await global.Olm.init();
-        olmutil = new global.Olm.Utility();
+        olmutil = olmutil || new global.Olm.Utility();
 
-        const content = this.startEvent.getContent();
+        let content = this.startEvent.getContent();
         if (!(content.key_agreement_protocols instanceof Array
               && content.key_agreement_protocols.includes("curve25519")
               && content.hashes instanceof Array
@@ -196,38 +170,50 @@ export class SASReceive extends Base {
         }
 
         // FIXME: make sure key is downloaded
-        this.device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
+        const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
-        this._expectEvent("m.key.verification.key", this._handleKey);
-        this._key = "abcdefg";
+        const ourKey = "abcdefg";
         this._sendToDevice("m.key.verification.accept", {
             key_agreement_protocol: "curve25519",
             hash: "sha256",
             message_authentication_code: "hmac-sha256",
             short_authentication_string: ["hex"],
-            commitment: olmutil.sha256(this._key),
+            commitment: olmutil.sha256(ourKey),
         });
-        await this._promise;
-    }
 
-    // FIXME: make sure event is properly formed
-    _handleKey(e) {
-        const content = e.getContent();
-        this._other_key = content.key;
-        this._expectEvent("m.key.verification.mac", this._handleMac);
+
+        let e = await this._waitForEvent("m.key.verification.key");
+        // FIXME: make sure event is properly formed
+        content = e.getContent();
+        const theirKey = content.key;
         this._sendToDevice("m.key.verification.key", {
-            key: this._key,
+            key: ourKey,
         });
+
         const sas = "hijklmn";
-        this.emit("show_sas", {
-            sas,
-            confirm: this._sasMatch.bind(this),
+        const verifySAS = new Promise((resolve, reject) => {
+            this.emit("show_sas", {
+                sas,
+                confirm: () => {
+                    const mac = {["ed25519:" + this._baseApis.deviceId]: "opqrstu"};
+                    this._sendToDevice("m.key.verification.mac", { mac });
+                    resolve();
+                },
+                cancel: reject,
+            });
         });
+
+
+        [e] = await Promise.all([
+            this._waitForEvent("m.key.verification.mac"),
+            verifySAS,
+        ]);
+        content = e.getContent();
+
+        return this._verifyMACs(ourKey, theirKey, device, content.mac);
     }
 }
 
-SASReceive.prototype._handleMac = SASSend.prototype._handleMac;
-SASReceive.prototype._sasMatch = SASSend.prototype._sasMatch;
 SASReceive.prototype._verifyMACs = SASSend.prototype._verifyMACs;
 
 SASReceive.NAME = "m.sas.v1";
