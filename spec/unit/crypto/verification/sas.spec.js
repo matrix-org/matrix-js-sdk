@@ -96,9 +96,19 @@ describe("SAS verification", function() {
                                 }
                             },
                             getStoredDevice: () => {
-                                return new DeviceInfo({}, "ABCDEFG");
+                                return DeviceInfo.fromStorage(
+                                    {
+                                        keys: {
+                                            "ed25519:ABCDEFG": "alice+base64+ed25519+key",
+                                        },
+                                    },
+                                    "ABCDEFG",
+                                );
                             },
                             setDeviceVerified: expect.createSpy(),
+                            getDeviceEd25519Key: () => {
+                                return "bob+base64+ed25519+key";
+                            },
                         }, "@alice:example.com", "ABCDEFG", "transaction", event);
                         bobResolve();
                     } else {
@@ -107,9 +117,19 @@ describe("SAS verification", function() {
                 }
             },
             getStoredDevice: () => {
-                return new DeviceInfo({}, "HIJKLMN");
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:HIJKLMN": "bob+base64+ed25519+key",
+                        },
+                    },
+                    "HIJKLMN",
+                );
             },
             setDeviceVerified: expect.createSpy(),
+            getDeviceEd25519Key: () => {
+                return "alice+base64+ed25519+key";
+            },
         }, "@bob:example.com", "HIJKLMN", "transaction");
         let aliceSasEvent;
         let bobSasEvent;
@@ -124,6 +144,8 @@ describe("SAS verification", function() {
                 bob.cancel(new Error("Mismatch SAS"));
             }
         });
+        // start the verification, but don't await on it yet.  We will await on
+        // it after Bob is all set up
         alice.verify();
         await bobPromise;
         bob.on("show_sas", (e) => {
@@ -137,8 +159,7 @@ describe("SAS verification", function() {
                 bob.cancel(new Error("Mismatch SAS"));
             }
         });
-        await bob.verify();
-        await alice.verify();
+        await Promise.all([alice.verify(), bob.verify()]);
         expect(alice._baseApis.setDeviceVerified)
             .toHaveBeenCalledWith("@bob:example.com", "HIJKLMN");
         expect(bob._baseApis.setDeviceVerified)

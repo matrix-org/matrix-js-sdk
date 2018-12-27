@@ -81,46 +81,56 @@ export class SASSend extends Base {
             return this.cancel(new Error("Malformed event"));
         }
         const hashCommitment = content.commitment;
-        const ourKey = "abcdefg";
-        this._sendToDevice("m.key.verification.key", {
-            key: ourKey,
-        });
-
-
-        e = await this._waitForEvent("m.key.verification.key");
-        // FIXME: make sure event is properly formed
-        content = e.getContent();
-        if (olmutil.sha256(content.key) !== hashCommitment) {
-            console.log("commitment mismatch");
-            return this.cancel(new Error("Commitment mismatch"));
-        }
-        const theirKey = content.key;
-
-        const sas = "hijklmn";
-        const verifySAS = new Promise((resolve, reject) => {
-            this.emit("show_sas", {
-                sas,
-                confirm: () => {
-                    const mac = {["ed25519:" + this._baseApis.deviceId]: "opqrstu"};
-                    this._sendToDevice("m.key.verification.mac", { mac });
-                    resolve();
-                },
-                cancel: reject,
+        const olmSAS = new global.Olm.SAS();
+        try {
+            this._sendToDevice("m.key.verification.key", {
+                key: olmSAS.get_pubkey(),
             });
-        });
 
 
-        [e] = await Promise.all([
-            this._waitForEvent("m.key.verification.mac"),
-            verifySAS,
-        ]);
-        content = e.getContent();
-        return this._verifyMACs(ourKey, theirKey, device, content.mac);
+            e = await this._waitForEvent("m.key.verification.key");
+            // FIXME: make sure event is properly formed
+            content = e.getContent();
+            if (olmutil.sha256(content.key) !== hashCommitment) {
+                return this.cancel(new Error("Commitment mismatch"));
+            }
+            olmSAS.set_their_key(content.key);
+
+            const sas = olmSAS.generate_bytes(5).reduce((acc, elem) => {
+                return acc + elem.toString(16);
+            }, "");
+            const verifySAS = new Promise((resolve, reject) => {
+                const keyId = `ed25519:${this._baseApis.deviceId}`;
+                const keyMac = olmSAS.calculate_mac(this._baseApis.getDeviceEd25519Key());
+                this.emit("show_sas", {
+                    sas,
+                    confirm: () => {
+                        const mac = {[keyId]: keyMac};
+                        this._sendToDevice("m.key.verification.mac", { mac });
+                        resolve();
+                    },
+                    // FIXME: cancel should call this.cancel()
+                    cancel: reject,
+                });
+            });
+
+
+            [e] = await Promise.all([
+                this._waitForEvent("m.key.verification.mac"),
+                verifySAS,
+            ]);
+            content = e.getContent();
+            return this._verifyMACs(olmSAS, device, content.mac);
+        } finally {
+            olmSAS.free();
+        }
     }
 
-    async _verifyMACs(ourKey, theirKey, device, mac) {
+    async _verifyMACs(olmSAS, device, mac) {
         for (const [keyId, keyMAC] of Object.entries(mac)) {
-            if (keyMAC !== "opqrstu") {
+            if (!device.keys[keyId]) {
+                return this.cancel(new Error("Unknown key"));
+            } if (keyMAC !== olmSAS.calculate_mac(device.keys[keyId])) {
                 return this.cancel(new Error("Keys did not match"));
             }
         }
@@ -172,45 +182,53 @@ export class SASReceive extends Base {
         // FIXME: make sure key is downloaded
         const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
-        const ourKey = "abcdefg";
-        this._sendToDevice("m.key.verification.accept", {
-            key_agreement_protocol: "curve25519",
-            hash: "sha256",
-            message_authentication_code: "hmac-sha256",
-            short_authentication_string: ["hex"],
-            commitment: olmutil.sha256(ourKey),
-        });
-
-
-        let e = await this._waitForEvent("m.key.verification.key");
-        // FIXME: make sure event is properly formed
-        content = e.getContent();
-        const theirKey = content.key;
-        this._sendToDevice("m.key.verification.key", {
-            key: ourKey,
-        });
-
-        const sas = "hijklmn";
-        const verifySAS = new Promise((resolve, reject) => {
-            this.emit("show_sas", {
-                sas,
-                confirm: () => {
-                    const mac = {["ed25519:" + this._baseApis.deviceId]: "opqrstu"};
-                    this._sendToDevice("m.key.verification.mac", { mac });
-                    resolve();
-                },
-                cancel: reject,
+        const olmSAS = new global.Olm.SAS();
+        try {
+            this._sendToDevice("m.key.verification.accept", {
+                key_agreement_protocol: "curve25519",
+                hash: "sha256",
+                message_authentication_code: "hmac-sha256",
+                short_authentication_string: ["hex"],
+                commitment: olmutil.sha256(olmSAS.get_pubkey()),
             });
-        });
 
 
-        [e] = await Promise.all([
-            this._waitForEvent("m.key.verification.mac"),
-            verifySAS,
-        ]);
-        content = e.getContent();
+            let e = await this._waitForEvent("m.key.verification.key");
+            // FIXME: make sure event is properly formed
+            content = e.getContent();
+            olmSAS.set_their_key(content.key);
+            this._sendToDevice("m.key.verification.key", {
+                key: olmSAS.get_pubkey(),
+            });
 
-        return this._verifyMACs(ourKey, theirKey, device, content.mac);
+            const sas = olmSAS.generate_bytes(5).reduce((acc, elem) => {
+                return acc + elem.toString(16);
+            }, "");
+            const verifySAS = new Promise((resolve, reject) => {
+                const keyId = `ed25519:${this._baseApis.deviceId}`;
+                const keyMac = olmSAS.calculate_mac(this._baseApis.getDeviceEd25519Key());
+                this.emit("show_sas", {
+                    sas,
+                    confirm: () => {
+                        const mac = {[keyId]: keyMac};
+                        this._sendToDevice("m.key.verification.mac", { mac });
+                        resolve();
+                    },
+                    cancel: reject,
+                });
+            });
+
+
+            [e] = await Promise.all([
+                this._waitForEvent("m.key.verification.mac"),
+                verifySAS,
+            ]);
+            content = e.getContent();
+
+            return this._verifyMACs(olmSAS, device, content.mac);
+        } finally {
+            olmSAS.free();
+        }
     }
 }
 
