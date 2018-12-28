@@ -98,10 +98,10 @@ describe("QR code verification", function() {
                     qrCode.cancel(new Error("Incorrect user"));
                 }
             });
-            await new Promise((resolve, reject) => {
-                qrCode.verify().then(resolve, reject);
-                qrCode.code(QR_CODE_URL);
+            qrCode.on("scan", ({done}) => {
+                done(QR_CODE_URL);
             });
+            await qrCode.verify();
             expect(client.getStoredDevice)
                 .toHaveBeenCalledWith("@alice:example.com", "ABCDEFG");
             expect(client.setDeviceVerified)
@@ -114,11 +114,11 @@ describe("QR code verification", function() {
                 setDeviceVerified: expect.createSpy(),
             };
             const qrCode = new ScanQRCode(client, "@bob:example.com", "ABCDEFG");
-            const spy = expect.createSpy();
-            await new Promise((resolve, reject) => {
-                qrCode.verify().then(resolve, spy.andCall(resolve));
-                qrCode.code(QR_CODE_URL);
+            qrCode.on("scan", ({done}) => {
+                done(QR_CODE_URL);
             });
+            const spy = expect.createSpy();
+            await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
             expect(client.getStoredDevice).toNotHaveBeenCalled();
             expect(client.setDeviceVerified).toNotHaveBeenCalled();
@@ -143,11 +143,11 @@ describe("QR code verification", function() {
                 setDeviceVerified: expect.createSpy(),
             };
             const qrCode = new ScanQRCode(client, "@alice:example.com", "ABCDEFG");
-            const spy = expect.createSpy();
-            await new Promise((resolve, reject) => {
-                qrCode.verify().then(resolve, spy.andCall(resolve));
-                qrCode.code(QR_CODE_URL);
+            qrCode.on("scan", ({done}) => {
+                done(QR_CODE_URL);
             });
+            const spy = expect.createSpy();
+            await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
             expect(client.getStoredDevice).toHaveBeenCalled();
             expect(client.setDeviceVerified).toNotHaveBeenCalled();

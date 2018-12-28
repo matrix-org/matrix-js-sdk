@@ -34,12 +34,7 @@ export class ShowQRCode extends Base {
         return new ShowQRCode(...args);
     }
 
-    verify() {
-        if (this._started) {
-            return this._promise;
-        }
-        this._started = true;
-
+    _doVerification() {
         if (!this._done) {
             const url = "https://matrix.to/#/" + this._baseApis.userId
                   + "?device=" + encodeURIComponent(this._baseApis.deviceId)
@@ -50,7 +45,6 @@ export class ShowQRCode extends Base {
                 url: url,
             });
         }
-        return this._promise;
     }
 }
 
@@ -64,70 +58,60 @@ export class ScanQRCode extends Base {
         return new ScanQRCode(...args);
     }
 
-    async code(code) {
+    async _doVerification() {
+        const code = await new Promise((resolve, reject) => {
+            this.emit("scan", {
+                done: resolve,
+                cancel: reject,
+            });
+        });
+
         const match = code.match(MATRIXTO_REGEXP);
-        let userId;
         let deviceId;
         const keys = {};
-        if (match) {
-            userId = match[1];
-            const params = match[2].split("&").map(
-                (x) => x.split("=", 2).map(decodeURIComponent),
-            );
-            let action;
-            for (const [name, value] of params) {
-                if (name === "device") {
-                    deviceId = value;
-                } else if (name === "action") {
-                    action = value;
-                } else {
-                    const keyMatch = name.match(KEY_REGEXP);
-                    if (keyMatch) {
-                        keys[keyMatch[1]] = value;
-                    }
+        if (!match) {
+            throw new Error("Invalid value for QR code");
+        }
+        const userId = match[1];
+        const params = match[2].split("&").map(
+            (x) => x.split("=", 2).map(decodeURIComponent),
+        );
+        let action;
+        for (const [name, value] of params) {
+            if (name === "device") {
+                deviceId = value;
+            } else if (name === "action") {
+                action = value;
+            } else {
+                const keyMatch = name.match(KEY_REGEXP);
+                if (keyMatch) {
+                    keys[keyMatch[1]] = value;
                 }
             }
-            if (!deviceId || action !== "verify" || Object.keys(keys).length === 0) {
-                this.cancel(new Error("Invalid value for QR code"));
-                return;
-            }
-        } else {
-            this.cancel(new Error("Invalid value for QR code"));
-            return;
         }
+        if (!deviceId || action !== "verify" || Object.keys(keys).length === 0) {
+            throw new Error("Invalid value for QR code");
+        }
+
         if (!this.userId) {
-            const callback = () => {
-                return this._verifyKey(userId, keys);
-            };
-            this.emit("confirm_user_id", {
-                userId: userId,
-                confirm: callback,
+            await new Promise((resolve, reject) => {
+                this.emit("confirm_user_id", {
+                    userId: userId,
+                    confirm: resolve,
+                    cancel: () => reject(new Error("Incorrect user")),
+                });
             });
         } else if (this.userId !== userId) {
-            this.cancel(new Error(
+            throw new Error(
                 `User ID mismatch: expected ${this.userId}, but got ${userId}`,
-            ));
-        } else {
-            return await this._verifyKey(userId, keys);
+            );
         }
-    }
 
-    async _verifyKey(userId, keys) {
-        for (const [keyId, key] of Object.entries(keys)) {
-            const deviceId = keyId.split(':', 2)[1];
-            // FIXME: make sure key is downloaded
-            const device = await this._baseApis.getStoredDevice(userId, deviceId);
-            if (!device) {
-                return this.cancel(new Error(`Could not find device ${deviceId}`));
-            } else if (device.keys[keyId] !== key) {
-                return this.cancel(new Error("Keys did not match"));
+        await this._verifyKeys(userId, keys, (keyId, device, key) => {
+            if (device.keys[keyId] !== key) {
+                throw new Error("Keys did not match");
             }
-        }
-        for (const keyId of Object.keys(keys)) {
-            const deviceId = keyId.split(':', 2)[1];
-            await this._baseApis.setDeviceVerified(userId, deviceId);
-        }
-        this.done();
+        });
     }
 }
 

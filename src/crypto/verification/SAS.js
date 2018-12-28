@@ -73,7 +73,7 @@ export class SASSend extends Base {
               && content.short_authentication_string instanceof Array
               && content.short_authentication_string.length === 1
               && content.short_authentication_string[0] === "hex")) {
-            return this.cancel(new Error("Unknown method"));
+            throw new Error("Unknown method");
         }
         const parameters = {
             hash: content.hash,
@@ -81,7 +81,7 @@ export class SASSend extends Base {
             sas: content.short_authentication_string,
         };
         if (typeof content.commitment !== "string") {
-            return this.cancel(new Error("Malformed event"));
+            throw new Error("Malformed event");
         }
         const hashCommitment = content.commitment;
         const olmSAS = new global.Olm.SAS();
@@ -96,7 +96,7 @@ export class SASSend extends Base {
             content = e.getContent();
             const commitmentStr = content.key + anotherjson.stringify(initialMessage);
             if (olmutil.sha256(commitmentStr) !== hashCommitment) {
-                return this.cancel(new Error("Commitment mismatch"));
+                throw new Error("Commitment mismatch");
             }
             olmSAS.set_their_key(content.key);
 
@@ -121,7 +121,6 @@ export class SASSend extends Base {
                         this._sendToDevice("m.key.verification.mac", { mac });
                         resolve();
                     },
-                    // FIXME: cancel should call this.cancel()
                     cancel: reject,
                 });
             });
@@ -132,22 +131,14 @@ export class SASSend extends Base {
                 verifySAS,
             ]);
             content = e.getContent();
-            return this._verifyMACs(olmSAS, device, macInfo, content.mac);
+            await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
+                if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
+                    throw new Error("Keys did not match");
+                }
+            });
         } finally {
             olmSAS.free();
         }
-    }
-
-    async _verifyMACs(olmSAS, device, macInfo, mac) {
-        for (const [keyId, keyMAC] of Object.entries(mac)) {
-            if (!device.keys[keyId]) {
-                return this.cancel(new Error("Unknown key"));
-            } if (keyMAC !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
-                return this.cancel(new Error("Keys did not match"));
-            }
-        }
-        await this._baseApis.setDeviceVerified(this.userId, this.deviceId);
-        this.done();
     }
 }
 
@@ -169,10 +160,9 @@ export class SASReceive extends Base {
 
     async _doVerification() {
         if (!this.startEvent) {
-            this.cancel(new Error(
+            throw new Error(
                 "SASReceive must only be created in response to an event",
-            ));
-            return;
+            );
         }
 
         await global.Olm.init();
@@ -187,8 +177,7 @@ export class SASReceive extends Base {
               && content.message_authentication_codes.includes("hmac-sha256")
               && content.short_authentication_string instanceof Array
               && content.short_authentication_string.includes("hex"))) {
-            this.cancel(new Error("Unknown method"));
-            return await this._promise;
+            throw new Error("Unknown method");
         }
 
         // FIXME: make sure key is downloaded
@@ -246,13 +235,15 @@ export class SASReceive extends Base {
             ]);
             content = e.getContent();
 
-            return this._verifyMACs(olmSAS, device, macInfo, content.mac);
+            await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
+                if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
+                    throw new Error("Keys did not match");
+                }
+            });
         } finally {
             olmSAS.free();
         }
     }
 }
-
-SASReceive.prototype._verifyMACs = SASSend.prototype._verifyMACs;
 
 SASReceive.NAME = "m.sas.v1";

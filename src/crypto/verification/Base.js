@@ -117,4 +117,21 @@ export default class VerificationBase extends EventEmitter {
         }
         return this._promise;
     }
+
+    async _verifyKeys(userId, keys, verifier) {
+        for (const [keyId, keyInfo] of Object.entries(keys)) {
+            const deviceId = keyId.split(':', 2)[1];
+            const device = await this._baseApis.getStoredDevice(userId, deviceId);
+            if (!device) {
+                throw new Error(`Could not find device ${deviceId}`);
+            } else {
+                await verifier(keyId, device, keyInfo);
+            }
+        }
+        for (const keyId of Object.keys(keys)) {
+            const deviceId = keyId.split(':', 2)[1];
+            await this._baseApis.setDeviceVerified(userId, deviceId);
+        }
+        this.done();
+    }
 }
