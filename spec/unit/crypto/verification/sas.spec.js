@@ -140,8 +140,8 @@ describe("SAS verification", function() {
                 e.confirm();
                 bobSasEvent.confirm();
             } else {
-                alice.cancel(new Error("Mismatched SAS"));
-                bob.cancel(new Error("Mismatch SAS"));
+                e.mismatch();
+                bobSasEvent.mismatch();
             }
         });
         // start the verification, but don't await on it yet.  We will await on
@@ -155,8 +155,8 @@ describe("SAS verification", function() {
                 e.confirm();
                 aliceSasEvent.confirm();
             } else {
-                alice.cancel(new Error("Mismatched SAS"));
-                bob.cancel(new Error("Mismatch SAS"));
+                e.mismatch();
+                aliceSasEvent.mismatch();
             }
         });
         await Promise.all([alice.verify(), bob.verify()]);
@@ -164,5 +164,103 @@ describe("SAS verification", function() {
             .toHaveBeenCalledWith("@bob:example.com", "HIJKLMN");
         expect(bob._baseApis.setDeviceVerified)
             .toHaveBeenCalledWith("@alice:example.com", "ABCDEFG");
+    });
+
+    it("should send a cancellation message on error", async function() {
+        let bob;
+        let bobResolve;
+        const bobPromise = new Promise((resolve, reject) => {
+            bobResolve = resolve;
+        });
+        const alice = new SASSend({
+            userId: "@alice:example.com",
+            deviceId: "ABCDEFG",
+            sendToDevice: function(type, map) {
+                if (map["@bob:example.com"] && map["@bob:example.com"]["HIJKLMN"]) {
+                    const event = new MatrixEvent({
+                        sender: "@alice:example.com",
+                        type: type,
+                        content: map["@bob:example.com"]["HIJKLMN"],
+                    });
+                    if (type === "m.key.verification.start") {
+                        expect(bob).toNotExist();
+                        bob = new SASReceive({
+                            userId: "@bob:example.com",
+                            deviceId: "HIJKLMN",
+                            sendToDevice: function(type, map) {
+                                if (map["@alice:example.com"]
+                                    && map["@alice:example.com"]["ABCDEFG"]) {
+                                    setTimeout(() => alice.handleEvent(new MatrixEvent({
+                                        sender: "@bob:example.com",
+                                        type: type,
+                                        content: map["@alice:example.com"]["ABCDEFG"],
+                                    })), 0);
+                                }
+                            },
+                            getStoredDevice: () => {
+                                return DeviceInfo.fromStorage(
+                                    {
+                                        keys: {
+                                            "ed25519:ABCDEFG": "alice+base64+ed25519+key",
+                                        },
+                                    },
+                                    "ABCDEFG",
+                                );
+                            },
+                            setDeviceVerified: expect.createSpy(),
+                            getDeviceEd25519Key: () => {
+                                return "bob+base64+ed25519+key";
+                            },
+                        }, "@alice:example.com", "ABCDEFG", "transaction", event);
+                        bobResolve();
+                    } else {
+                        setTimeout(() => bob.handleEvent(event), 0);
+                    }
+                }
+            },
+            getStoredDevice: () => {
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:HIJKLMN": "bob+base64+ed25519+key",
+                        },
+                    },
+                    "HIJKLMN",
+                );
+            },
+            setDeviceVerified: expect.createSpy(),
+            getDeviceEd25519Key: () => {
+                return "alice+base64+ed25519+key";
+            },
+        }, "@bob:example.com", "HIJKLMN", "transaction");
+        let aliceSasEvent;
+        let bobSasEvent;
+        alice.on("show_sas", (e) => {
+            if (!bobSasEvent) {
+                aliceSasEvent = e;
+            } else {
+                bobSasEvent.mismatch();
+            }
+        });
+        // start the verification, but don't await on it yet.  We will await on
+        // it after Bob is all set up
+        alice.verify();
+        await bobPromise;
+        bob.on("show_sas", (e) => {
+            if (!aliceSasEvent) {
+                bobSasEvent = e;
+            } else {
+                e.mismatch();
+            }
+        });
+        const aliceSpy = expect.createSpy();
+        const bobSpy = expect.createSpy();
+        await Promise.all([alice.verify().catch(aliceSpy), bob.verify().catch(bobSpy)]);
+        expect(aliceSpy).toHaveBeenCalled();
+        expect(bobSpy).toHaveBeenCalled();
+        expect(alice._baseApis.setDeviceVerified)
+            .toNotHaveBeenCalled();
+        expect(bob._baseApis.setDeviceVerified)
+            .toNotHaveBeenCalled();
     });
 });

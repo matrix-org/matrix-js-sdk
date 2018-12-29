@@ -23,6 +23,13 @@ limitations under the License.
 import Base from "./Base";
 import logger from '../../logger';
 import anotherjson from 'another-json';
+import {
+    errorFactory,
+    newUserCancelledError,
+    newUnknownMethodError,
+    newKeyMismatchError,
+    newInvalidMessageError,
+} from './Error';
 
 const EVENTS = [
     "m.key.verification.accept",
@@ -31,6 +38,14 @@ const EVENTS = [
 ];
 
 let olmutil;
+
+const newMismatchedSASError = errorFactory(
+    "m.mismatched_sas", "Mismatched short authentication string",
+);
+
+const newMismatchedCommitmentError = errorFactory(
+    "m.mismatched_commitment", "Mismatched commitment",
+);
 
 /**
  * @class crypto/SAS/SASSend
@@ -73,7 +88,7 @@ export class SASSend extends Base {
               && content.short_authentication_string instanceof Array
               && content.short_authentication_string.length === 1
               && content.short_authentication_string[0] === "hex")) {
-            throw new Error("Unknown method");
+            throw newUnknownMethodError();
         }
         const parameters = {
             hash: content.hash,
@@ -81,7 +96,7 @@ export class SASSend extends Base {
             sas: content.short_authentication_string,
         };
         if (typeof content.commitment !== "string") {
-            throw new Error("Malformed event");
+            throw newInvalidMessageError();
         }
         const hashCommitment = content.commitment;
         const olmSAS = new global.Olm.SAS();
@@ -96,7 +111,7 @@ export class SASSend extends Base {
             content = e.getContent();
             const commitmentStr = content.key + anotherjson.stringify(initialMessage);
             if (olmutil.sha256(commitmentStr) !== hashCommitment) {
-                throw new Error("Commitment mismatch");
+                throw newMismatchedCommitmentError();
             }
             olmSAS.set_their_key(content.key);
 
@@ -121,7 +136,8 @@ export class SASSend extends Base {
                         this._sendToDevice("m.key.verification.mac", { mac });
                         resolve();
                     },
-                    cancel: reject,
+                    cancel: () => reject(newUserCancelledError()),
+                    mismatch: () => reject(newMismatchedSASError()),
                 });
             });
 
@@ -133,7 +149,7 @@ export class SASSend extends Base {
             content = e.getContent();
             await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
                 if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
-                    throw new Error("Keys did not match");
+                    throw newKeyMismatchError();
                 }
             });
         } finally {
@@ -177,7 +193,7 @@ export class SASReceive extends Base {
               && content.message_authentication_codes.includes("hmac-sha256")
               && content.short_authentication_string instanceof Array
               && content.short_authentication_string.includes("hex"))) {
-            throw new Error("Unknown method");
+            throw newUnknownMethodError();
         }
 
         // FIXME: make sure key is downloaded
@@ -224,7 +240,8 @@ export class SASReceive extends Base {
                         this._sendToDevice("m.key.verification.mac", { mac });
                         resolve();
                     },
-                    cancel: reject,
+                    cancel: () => reject(newUserCancelledError()),
+                    mismatch: () => reject(newMismatchedSASError()),
                 });
             });
 
@@ -237,7 +254,7 @@ export class SASReceive extends Base {
 
             await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
                 if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
-                    throw new Error("Keys did not match");
+                    throw newKeyMismatchError();
                 }
             });
         } finally {

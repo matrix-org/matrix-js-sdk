@@ -20,6 +20,7 @@ limitations under the License.
  * Base class for verification methods.
  */
 
+import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 
 export default class VerificationBase extends EventEmitter {
@@ -105,6 +106,35 @@ export default class VerificationBase extends EventEmitter {
 
     cancel(e) {
         if (!this._done) {
+            if (this.userId && this.deviceId && this.transactionId) {
+                // send a cancellation to the other user (if it wasn't
+                // cancelled by the other user)
+                if (e instanceof MatrixEvent) {
+                    const sender = e.getSender();
+                    if (sender !== this.userId) {
+                        const content = e.getContent();
+                        if (e.getType() === "m.key.verification.cancel") {
+                            content.code = content.code || "m.unknown";
+                            content.reason = content.reason || content.body
+                                || "Unknown reason";
+                            content.transaction_id = this.transactionId;
+                            this._sendToDevice("m.key.verification.cancel", content);
+                        } else {
+                            this._sendToDevice("m.key.verification.cancel", {
+                                code: "m.unknown",
+                                reason: content.body || "Unknown reason",
+                                transaction_id: this.transactionId,
+                            });
+                        }
+                    }
+                } else {
+                    this._sendToDevice("m.key.verification.cancel", {
+                        code: "m.unknown",
+                        reason: e.toString(),
+                        transaction_id: this.transactionId,
+                    });
+                }
+            }
             this._reject(e);
         }
     }

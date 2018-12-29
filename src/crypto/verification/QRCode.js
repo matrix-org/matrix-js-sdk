@@ -22,9 +22,17 @@ limitations under the License.
 
 import Base from "./Base";
 import logger from '../../logger';
+import {
+    errorFactory,
+    newUserCancelledError,
+    newKeyMismatchError,
+    newUserMismatchError,
+} from './Error';
 
 const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
 const KEY_REGEXP = /^key_([^:]+:.+)$/;
+
+const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 
 /**
  * @class crypto/QRCode/ShowQRCode
@@ -62,7 +70,7 @@ export class ScanQRCode extends Base {
         const code = await new Promise((resolve, reject) => {
             this.emit("scan", {
                 done: resolve,
-                cancel: reject,
+                cancel: () => reject(newUserCancelledError()),
             });
         });
 
@@ -70,7 +78,7 @@ export class ScanQRCode extends Base {
         let deviceId;
         const keys = {};
         if (!match) {
-            throw new Error("Invalid value for QR code");
+            throw newQRCodeError();
         }
         const userId = match[1];
         const params = match[2].split("&").map(
@@ -90,7 +98,7 @@ export class ScanQRCode extends Base {
             }
         }
         if (!deviceId || action !== "verify" || Object.keys(keys).length === 0) {
-            throw new Error("Invalid value for QR code");
+            throw newQRCodeError();
         }
 
         if (!this.userId) {
@@ -98,18 +106,19 @@ export class ScanQRCode extends Base {
                 this.emit("confirm_user_id", {
                     userId: userId,
                     confirm: resolve,
-                    cancel: () => reject(new Error("Incorrect user")),
+                    cancel: () => reject(newUserMismatchError()),
                 });
             });
         } else if (this.userId !== userId) {
-            throw new Error(
-                `User ID mismatch: expected ${this.userId}, but got ${userId}`,
-            );
+            throw newUserMismatchError({
+                expected: this.userId,
+                actual: userId,
+            });
         }
 
         await this._verifyKeys(userId, keys, (keyId, device, key) => {
             if (device.keys[keyId] !== key) {
-                throw new Error("Keys did not match");
+                throw newKeyMismatchError();
             }
         });
     }
