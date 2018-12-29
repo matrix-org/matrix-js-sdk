@@ -113,3 +113,8 @@ include the line in your commit or pull request comment::
 can't be accepted. Git makes this trivial - just use the -s flag when you do
 ``git commit``, having first set ``user.name`` and ``user.email`` git configs
 (which you should have done anyway :)
+
+If you forgot to sign off your commits before making your pull request and are on git 2.17+ 
+you can mass signoff using rebase::
+
+    git rebase --signoff origin/develop
