@@ -298,6 +298,12 @@ function calculateDisplayName(selfUserId, displayName, roomState) {
         return selfUserId;
     }
 
+    // First check if the displayname is something we consider truthy
+    // after stripping it of zero width characters and padding spaces
+    if (!utils.removeHiddenChars(displayName)) {
+        return selfUserId;
+    }
+
     if (!roomState) {
         return displayName;
     }
