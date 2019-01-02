@@ -75,6 +75,8 @@ function RoomState(roomId, oobMemberFlags = undefined) {
         // userId: RoomMember
     };
     this._updateModifiedTime();
+
+    // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
     this._displayNameToUserIds = {};
     this._userIdsToDisplayNames = {};
     this._tokenToInvite = {}; // 3pid invite state_key to m.room.member invite
@@ -529,12 +531,12 @@ RoomState.prototype.getLastModifiedTime = function() {
 };
 
 /**
- * Get user IDs with the specified display name.
+ * Get user IDs with the specified or similar display names.
  * @param {string} displayName The display name to get user IDs from.
  * @return {string[]} An array of user IDs or an empty array.
  */
 RoomState.prototype.getUserIdsWithDisplayName = function(displayName) {
-    return this._displayNameToUserIds[displayName] || [];
+    return this._displayNameToUserIds[utils.removeHiddenChars(displayName)] || [];
 };
 
 /**
