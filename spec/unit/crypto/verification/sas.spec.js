@@ -32,7 +32,7 @@ import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import Crypto from '../../../../lib/crypto';
 import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
-import {SASSend, SASReceive} from '../../../../lib/crypto/verification/SAS';
+import {SASSend, SASRespond} from '../../../../lib/crypto/verification/SAS';
 
 const Olm = global.Olm;
 
@@ -50,7 +50,7 @@ describe("SAS verification", function() {
     });
 
     it("should error on an unexpected event", async function() {
-        const sas = new SASReceive({}, "@alice:example.com", "ABCDEFG");
+        const sas = new SASRespond({}, "@alice:example.com", "ABCDEFG");
         sas.handleEvent(new MatrixEvent({
             sender: "@alice:example.com",
             type: "es.inquisition",
@@ -81,7 +81,7 @@ describe("SAS verification", function() {
                     console.log("alice sends to bob:", type, map["@bob:example.com"]["HIJKLMN"]);
                     if (type === "m.key.verification.start") {
                         expect(bob).toNotExist();
-                        bob = new SASReceive({
+                        bob = new SASRespond({
                             userId: "@bob:example.com",
                             deviceId: "HIJKLMN",
                             sendToDevice: function(type, map) {
@@ -184,7 +184,7 @@ describe("SAS verification", function() {
                     });
                     if (type === "m.key.verification.start") {
                         expect(bob).toNotExist();
-                        bob = new SASReceive({
+                        bob = new SASRespond({
                             userId: "@bob:example.com",
                             deviceId: "HIJKLMN",
                             sendToDevice: function(type, map) {

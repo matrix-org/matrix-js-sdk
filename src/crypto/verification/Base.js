@@ -64,6 +64,9 @@ export default class VerificationBase extends EventEmitter {
     }
 
     _sendToDevice(type, content) {
+        if (this._done) {
+            return Promise.reject(new Error("Verification is already done"));
+        }
         content.transaction_id = this.transactionId;
         return this._baseApis.sendToDevice(type, {
             [this.userId]: { [this.deviceId]: content },
@@ -82,7 +85,9 @@ export default class VerificationBase extends EventEmitter {
     }
 
     handleEvent(e) {
-        if (e.getType() === this._expectedEvent) {
+        if (this._done) {
+            return;
+        } else if (e.getType() === this._expectedEvent) {
             this._expectedEvent = undefined;
             this._rejectEvent = undefined;
             this._resolveEvent(e);
@@ -162,6 +167,5 @@ export default class VerificationBase extends EventEmitter {
             const deviceId = keyId.split(':', 2)[1];
             await this._baseApis.setDeviceVerified(userId, deviceId);
         }
-        this.done();
     }
 }

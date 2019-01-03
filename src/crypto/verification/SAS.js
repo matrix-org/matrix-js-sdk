@@ -69,7 +69,7 @@ export class SASSend extends Base {
         const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
         const initialMessage = {
-            method: 'm.key.verification.sas',
+            method: SASRespond.NAME,
             from_device: this._baseApis.deviceId,
             key_agreement_protocols: ["curve25519"],
             hashes: ["sha256"],
@@ -120,7 +120,7 @@ export class SASSend extends Base {
                   + this.userId + this.deviceId
                   + this.transactionId;
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
-                return acc + elem.toString(16);
+                return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
             const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
                   + this._baseApis.userId + this._baseApis.deviceId
@@ -161,11 +161,11 @@ export class SASSend extends Base {
 SASSend.NAME = "org.matrix._internal.sas";
 
 /**
- * @class crypto/SAS/SASReceive
+ * @class crypto/SAS/SASRespond
  *
  * Used by the responder of an SAS verification.
  */
-export class SASReceive extends Base {
+export class SASRespond extends Base {
     static factory(...args) {
         return new SASSend(...args);
     }
@@ -177,7 +177,7 @@ export class SASReceive extends Base {
     async _doVerification() {
         if (!this.startEvent) {
             throw new Error(
-                "SASReceive must only be created in response to an event",
+                "SASRespond must only be created in response to an event",
             );
         }
 
@@ -224,7 +224,7 @@ export class SASReceive extends Base {
                   + this._baseApis.userId + this._baseApis.deviceId
                   + this.transactionId;
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
-                return acc + elem.toString(16);
+                return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
             const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
                   + this.userId + this.deviceId
@@ -263,4 +263,4 @@ export class SASReceive extends Base {
     }
 }
 
-SASReceive.NAME = "m.sas.v1";
+SASRespond.NAME = "m.sas.v1";
