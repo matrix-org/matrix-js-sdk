@@ -337,6 +337,17 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
+     * Retrieve all end-to-end sessions
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(object)} func Called one for each session with
+     *     an object with, deviceKey, lastReceivedMessageTs, sessionId
+     *     and session keys.
+     */
+    getAllEndToEndSessions(txn, func) {
+        this._backendPromise.value().getAllEndToEndSessions(txn, func);
+    }
+
+    /**
      * Store a session between the logged-in user and another device
      * @param {string} deviceKey The public key of the other device.
      * @param {string} sessionId The ID for this end-to-end session.

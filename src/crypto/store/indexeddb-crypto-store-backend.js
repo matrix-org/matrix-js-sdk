@@ -384,6 +384,24 @@ export class Backend {
         };
     }
 
+    getAllEndToEndSessions(txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function() {
+            const cursor = getReq.result;
+            if (cursor) {
+                func(cursor.value);
+                cursor.continue();
+            } else {
+                try {
+                    func(null);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         const objectStore = txn.objectStore("sessions");
         objectStore.put({

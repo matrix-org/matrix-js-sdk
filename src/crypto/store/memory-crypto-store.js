@@ -249,6 +249,14 @@ export default class MemoryCryptoStore {
         func(this._sessions[deviceKey] || {});
     }
 
+    getAllEndToEndSessions(txn, func) {
+        for (const deviceSessions of Object.values(this._sessions)) {
+            for (const sess of Object.values(deviceSessions)) {
+                func(sess);
+            }
+        }
+    }
+
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
         let deviceSessions = this._sessions[deviceKey];
         if (deviceSessions === undefined) {
