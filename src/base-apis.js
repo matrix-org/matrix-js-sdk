@@ -1833,12 +1833,31 @@ MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
  * Get information on how a specific place on a third party protocol
  * may be reached.
  * @param {string} protocol The protocol given in getThirdpartyProtocols()
- * @param {object} params Protocol-specific parameters, as given in th
+ * @param {object} params Protocol-specific parameters, as given in the
  *                        response to getThirdpartyProtocols()
  * @return {module:client.Promise} Resolves to the result object
  */
 MatrixBaseApis.prototype.getThirdpartyLocation = function(protocol, params) {
     const path = utils.encodeUri("/thirdparty/location/$protocol", {
+        $protocol: protocol,
+    });
+
+    return this._http.authedRequestWithPrefix(
+        undefined, "GET", path, params, undefined,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
+
+/**
+ * Get information on how a specific user on a third party protocol
+ * may be reached.
+ * @param {string} protocol The protocol given in getThirdpartyProtocols()
+ * @param {object} params Protocol-specific parameters, as given in the
+ *                        response to getThirdpartyProtocols()
+ * @return {module:client.Promise} Resolves to the result object
+ */
+MatrixBaseApis.prototype.getThirdpartyUser = function(protocol, params) {
+    const path = utils.encodeUri("/thirdparty/user/$protocol", {
         $protocol: protocol,
     });
 

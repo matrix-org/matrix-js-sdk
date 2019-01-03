@@ -39,6 +39,9 @@ limitations under the License.
  *                when a user was last active.
  * @prop {Boolean} currentlyActive Whether we should consider lastActiveAgo to be
  *               an approximation and that the user should be seen as active 'now'
+ * @prop {string} _unstable_statusMessage The status message for the user, if known. This is
+ *                different from the presenceStatusMsg in that this is not tied to
+ *                the user's presence, and should be represented differently.
  * @prop {Object} events The events describing this user.
  * @prop {MatrixEvent} events.presence The m.presence event for this user.
  */
@@ -46,6 +49,7 @@ function User(userId) {
     this.userId = userId;
     this.presence = "offline";
     this.presenceStatusMsg = null;
+    this._unstable_statusMessage = "";
     this.displayName = userId;
     this.rawDisplayName = userId;
     this.avatarUrl = null;
@@ -177,6 +181,16 @@ User.prototype.getLastModifiedTime = function() {
  */
 User.prototype.getLastActiveTs = function() {
     return this.lastPresenceTs - this.lastActiveAgo;
+};
+
+/**
+ * Manually set the user's status message.
+ * @param {MatrixEvent} event The <code>im.vector.user_status</code> event.
+ */
+User.prototype._unstable_updateStatusMessage = function(event) {
+    if (!event.getContent()) this._unstable_statusMessage = "";
+    else this._unstable_statusMessage = event.getContent()["status"];
+    this._updateModifiedTime();
 };
 
 /**

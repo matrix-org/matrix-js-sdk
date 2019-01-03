@@ -1172,6 +1172,16 @@ SyncApi.prototype._processSyncResponse = async function(
             if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
                 await self.opts.crypto.onCryptoEvent(e);
             }
+            if (e.isState() && e.getType() === "im.vector.user_status") {
+                let user = client.store.getUser(e.getStateKey());
+                if (user) {
+                    user._unstable_updateStatusMessage(e);
+                } else {
+                    user = createNewUser(client, e.getStateKey());
+                    user._unstable_updateStatusMessage(e);
+                    client.store.storeUser(user);
+                }
+            }
         }
 
         await Promise.mapSeries(stateEvents, processRoomEvent);

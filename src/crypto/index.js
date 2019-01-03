@@ -42,6 +42,7 @@ export function isCryptoAvailable() {
 }
 
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
+const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
 /**
  * Cryptography bits
@@ -986,94 +987,109 @@ Crypto.prototype.importRoomKeys = function(keys) {
     );
 };
 
-Crypto.prototype._maybeSendKeyBackup = async function(delay, retry) {
-    if (retry === undefined) retry = true;
+/**
+ * Schedules sending all keys waiting to be sent to the backup, if not already
+ * scheduled. Retries if necessary.
+ */
+Crypto.prototype._scheduleKeyBackupSend = async function() {
+    if (this._sendingBackups) return;
 
-    if (!this._sendingBackups) {
-        this._sendingBackups = true;
-        try {
-            if (delay === undefined) {
-                // by default, wait between 0 and 10 seconds, to avoid backup
-                // requests from different clients hitting the server all at
-                // the same time when a new key is sent
-                delay = Math.random() * 10000;
+    try {
+        // wait between 0 and 10 seconds, to avoid backup
+        // requests from different clients hitting the server all at
+        // the same time when a new key is sent
+        const delay = Math.random() * 10000;
+        await Promise.delay(delay);
+        let numFailures = 0; // number of consecutive failures
+        while (1) {
+            if (!this.backupKey) {
+                return;
             }
-            await Promise.delay(delay);
-            let numFailures = 0; // number of consecutive failures
-            while (1) {
-                if (!this.backupKey) {
+            try {
+                const numBackedUp =
+                    await this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
+                if (numBackedUp === 0) {
+                    // no sessions left needing backup: we're done
                     return;
                 }
-                // FIXME: figure out what limit is reasonable
-                const sessions = await this._cryptoStore.getSessionsNeedingBackup(10);
-                if (!sessions.length) {
-                    return;
-                }
-                const data = {};
-                for (const session of sessions) {
-                    const roomId = session.sessionData.room_id;
-                    if (data[roomId] === undefined) {
-                        data[roomId] = {sessions: {}};
-                    }
-
-                    const sessionData = await this._olmDevice.exportInboundGroupSession(
-                        session.senderKey, session.sessionId, session.sessionData,
-                    );
-                    sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
-                    delete sessionData.session_id;
-                    delete sessionData.room_id;
-                    const firstKnownIndex = sessionData.first_known_index;
-                    delete sessionData.first_known_index;
-                    const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
-
-                    const forwardedCount =
-                          (sessionData.forwarding_curve25519_key_chain || []).length;
-
-                    const device = this._deviceList.getDeviceByIdentityKey(
-                        olmlib.MEGOLM_ALGORITHM, session.senderKey,
-                    );
-
-                    data[roomId]['sessions'][session.sessionId] = {
-                        first_message_index: firstKnownIndex,
-                        forwarded_count: forwardedCount,
-                        is_verified: !!(device && device.isVerified()),
-                        session_data: encrypted,
-                    };
-                }
-
-                try {
-                    await this._baseApis.sendKeyBackup(
-                        undefined, undefined, this.backupInfo.version,
-                        {rooms: data},
-                    );
-                    numFailures = 0;
-                    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
-                } catch (err) {
-                    numFailures++;
-                    console.log("send failed", err);
-                    if (err.httpStatus === 400
-                        || err.httpStatus === 403
-                        || err.httpStatus === 401
-                        || !retry) {
-                        // retrying probably won't help much, so we should give up
-                        // FIXME: disable backups?
+                numFailures = 0;
+            } catch (err) {
+                numFailures++;
+                console.log("Key backup request failed", err);
+                if (err.data) {
+                    if (
+                        err.data.errcode == 'M_NOT_FOUND' ||
+                        err.data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
+                    ) {
+                        // Backup version has changed or this backup version
+                        // has been deleted
+                        this.emit("crypto.keyBackupFailed", err.data.errcode);
                         throw err;
                     }
                 }
-                if (numFailures) {
-                    // exponential backoff if we have failures
-                    await new Promise((resolve, reject) => {
-                        setTimeout(
-                            resolve,
-                            1000 * Math.pow(2, Math.min(numFailures - 1, 4)),
-                        );
-                    });
-                }
             }
-        } finally {
-            this._sendingBackups = false;
+            if (numFailures) {
+                // exponential backoff if we have failures
+                await Promise.delay(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+            }
         }
+    } finally {
+        this._sendingBackups = false;
     }
+};
+
+/**
+ * Take some e2e keys waiting to be backed up and send them
+ * to the backup.
+ *
+ * @param {integer} limit Maximum number of keys to back up
+ * @returns {integer} Number of sessions backed up
+ */
+Crypto.prototype._backupPendingKeys = async function(limit) {
+    const sessions = await this._cryptoStore.getSessionsNeedingBackup(limit);
+    if (!sessions.length) {
+        return 0;
+    }
+
+    const data = {};
+    for (const session of sessions) {
+        const roomId = session.sessionData.room_id;
+        if (data[roomId] === undefined) {
+            data[roomId] = {sessions: {}};
+        }
+
+        const sessionData = await this._olmDevice.exportInboundGroupSession(
+            session.senderKey, session.sessionId, session.sessionData,
+        );
+        sessionData.algorithm = olmlib.MEGOLM_ALGORITHM;
+        delete sessionData.session_id;
+        delete sessionData.room_id;
+        const firstKnownIndex = sessionData.first_known_index;
+        delete sessionData.first_known_index;
+        const encrypted = this.backupKey.encrypt(JSON.stringify(sessionData));
+
+        const forwardedCount =
+              (sessionData.forwarding_curve25519_key_chain || []).length;
+
+        const device = this._deviceList.getDeviceByIdentityKey(
+            olmlib.MEGOLM_ALGORITHM, session.senderKey,
+        );
+
+        data[roomId]['sessions'][session.sessionId] = {
+            first_message_index: firstKnownIndex,
+            forwarded_count: forwardedCount,
+            is_verified: !!(device && device.isVerified()),
+            session_data: encrypted,
+        };
+    }
+
+    await this._baseApis.sendKeyBackup(
+        undefined, undefined, this.backupInfo.version,
+        {rooms: data},
+    );
+    await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
+
+    return sessions.length;
 };
 
 Crypto.prototype.backupGroupSession = async function(
@@ -1090,7 +1106,9 @@ Crypto.prototype.backupGroupSession = async function(
         sessionId: sessionId,
     }]);
 
-    await this._maybeSendKeyBackup();
+    // don't wait for this to complete: it will delay so
+    // happens in the background
+    this._scheduleKeyBackupSend();
 };
 
 Crypto.prototype.backupAllGroupSessions = async function(version) {
@@ -1109,7 +1127,10 @@ Crypto.prototype.backupAllGroupSessions = async function(version) {
         },
     );
 
-    await this._maybeSendKeyBackup(0, false);
+    let numKeysBackedUp;
+    do {
+        numKeysBackedUp = await this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
+    } while (numKeysBackedUp > 0);
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307

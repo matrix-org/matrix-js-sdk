@@ -447,6 +447,7 @@ MatrixClient.prototype.initCrypto = async function() {
     );
 
     this.reEmitter.reEmit(crypto, [
+        "crypto.keyBackupFailed",
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
@@ -2260,6 +2261,27 @@ MatrixClient.prototype.mxcUrlToHttp =
     return contentRepo.getHttpUriForMxc(
         this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks,
     );
+};
+
+/**
+ * Sets a new status message for the user. The message may be null/falsey
+ * to clear the message.
+ * @param {string} newMessage The new message to set.
+ * @return {module:client.Promise} Resolves: to nothing
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype._unstable_setStatusMessage = function(newMessage) {
+    return Promise.all(this.getRooms().map((room) => {
+        const isJoined = room.getMyMembership() === "join";
+        const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
+        if (isJoined && looksLikeDm) {
+            return this.sendStateEvent(room.roomId, "im.vector.user_status", {
+                status: newMessage,
+            }, this.getUserId());
+        } else {
+            return Promise.resolve();
+        }
+    }));
 };
 
 /**

@@ -1167,7 +1167,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
         this.removeEvent(oldEventId);
     }
 
-    this.emit("Room.localEchoUpdated", event, this, event.getId(), oldStatus);
+    this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
 
 
