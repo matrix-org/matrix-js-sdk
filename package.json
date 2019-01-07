@@ -84,9 +84,7 @@
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
     "uglify-es": "^3.3.9",
-    "watchify": "^3.11.0",
-    "webpack": "^4.28.3",
-    "webpack-cli": "^3.2.1"
+    "watchify": "^3.11.0"
   },
   "browserify": {
     "transform": [
