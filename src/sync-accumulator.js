@@ -34,7 +34,6 @@ import utils from "./utils";
  * rather than asking the server to do an initial sync on startup.
  */
 class SyncAccumulator {
-
     /**
      * @param {Object} opts
      * @param {Number=} opts.maxTimelineEntries The ideal maximum number of

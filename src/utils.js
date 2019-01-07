@@ -330,7 +330,7 @@ const deepCompare = module.exports.deepCompare = function(x, y) {
         }
 
         // finally, compare each of x's keys with y
-        for (p in y) {
+        for (p in y) { // eslint-disable-line guard-for-in
             if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             }
@@ -693,7 +693,7 @@ module.exports.globToRegexp = function(glob, extended) {
     if (extended) {
         pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
             const first = p1 && '^' || '';
-            const second = p2.replace(/\\\-/, '-');
+            const second = p2.replace(/\\-/, '-');
             return '[' + first + second + ']';
         });
     }

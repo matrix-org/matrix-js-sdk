@@ -1,7 +1,6 @@
 module.exports = {
-    parser: "babel-eslint",
     parserOptions: {
-        ecmaVersion: 6,
+        ecmaVersion: 2017,
         sourceType: "module",
         ecmaFeatures: {
         }
@@ -67,5 +66,11 @@ module.exports = {
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
+        "no-multi-spaces": ["error", { "ignoreEOLComments": true }],
+        "space-before-function-paren": ["error", {
+            "anonymous": "never",
+            "named": "never",
+            "asyncArrow": "always",
+        }],
     }
 }
