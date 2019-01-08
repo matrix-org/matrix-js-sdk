@@ -44,7 +44,7 @@ export class ShowQRCode extends Base {
 
     _doVerification() {
         if (!this._done) {
-            const url = "https://matrix.to/#/" + this._baseApis.userId
+            const url = "https://matrix.to/#/" + this._baseApis.getUserId()
                   + "?device=" + encodeURIComponent(this._baseApis.deviceId)
                   + "&action=verify&key_ed25519%3A"
                   + encodeURIComponent(this._baseApis.deviceId) + "="

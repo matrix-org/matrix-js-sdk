@@ -1,5 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 try {
     global.Olm = require('olm');
 } catch (e) {
-    console.warn("unable to run megolm backup tests: libolm not available");
+    console.warn("unable to run device verification tests: libolm not available");
 }
 
 import expect from 'expect';
@@ -41,7 +41,7 @@ const MatrixEvent = sdk.MatrixEvent;
 
 describe("QR code verification", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        console.warn('Not running device verification tests: libolm not present');
         return;
     }
 
@@ -52,7 +52,7 @@ describe("QR code verification", function() {
     describe("showing", function() {
         it("should emit an event to show a QR code", async function() {
             const qrCode = new ShowQRCode({
-                userId: "@alice:example.com",
+                getUserId: () => "@alice:example.com",
                 deviceId: "ABCDEFG",
                 getDeviceEd25519Key: function() {
                     return "device+ed25519+key";
