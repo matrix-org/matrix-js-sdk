@@ -52,7 +52,7 @@ const newMismatchedCommitmentError = errorFactory(
  *
  * Used by the initiator of an SAS verification.
  */
-export class SASSend extends Base {
+export default class SAS extends Base {
     static factory(...args) {
         return new SASSend(...args);
     }
@@ -65,17 +65,25 @@ export class SASSend extends Base {
         await global.Olm.init();
         olmutil = olmutil || new global.Olm.Utility();
 
+        if (this.startEvent) {
+            return await this._doRespondVerification();
+        } else {
+            return await this._doSendVerification();
+        }
+    }
+
+    async _doSendVerification() {
         // FIXME: make sure key is downloaded
         const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
         const initialMessage = {
-            method: SASRespond.NAME,
+            method: SAS.NAME,
             from_device: this._baseApis.deviceId,
             key_agreement_protocols: ["curve25519"],
             hashes: ["sha256"],
             message_authentication_codes: ["hmac-sha256"],
             short_authentication_string: ["hex"],
-            transaction: this.transactionId,
+            transaction_id: this.transactionId,
         };
         this._sendToDevice("m.key.verification.start", initialMessage);
 
@@ -116,14 +124,14 @@ export class SASSend extends Base {
             olmSAS.set_their_key(content.key);
 
             const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
-                  + this._baseApis.userId + this._baseApis.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.userId + this.deviceId
                   + this.transactionId;
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
                 return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
             const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
-                  + this._baseApis.userId + this._baseApis.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.userId + this.deviceId
                   + this.transactionId;
             const verifySAS = new Promise((resolve, reject) => {
@@ -156,34 +164,8 @@ export class SASSend extends Base {
             olmSAS.free();
         }
     }
-}
 
-SASSend.NAME = "org.matrix._internal.sas";
-
-/**
- * @class crypto/SAS/SASRespond
- *
- * Used by the responder of an SAS verification.
- */
-export class SASRespond extends Base {
-    static factory(...args) {
-        return new SASSend(...args);
-    }
-
-    get events() {
-        return EVENTS;
-    }
-
-    async _doVerification() {
-        if (!this.startEvent) {
-            throw new Error(
-                "SASRespond must only be created in response to an event",
-            );
-        }
-
-        await global.Olm.init();
-        olmutil = olmutil || new global.Olm.Utility();
-
+    async _doRespondVerification() {
         let content = this.startEvent.getContent();
         if (!(content.key_agreement_protocols instanceof Array
               && content.key_agreement_protocols.includes("curve25519")
@@ -221,14 +203,14 @@ export class SASRespond extends Base {
 
             const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
                   + this.userId + this.deviceId
-                  + this._baseApis.userId + this._baseApis.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.transactionId;
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
                 return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
             const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
                   + this.userId + this.deviceId
-                  + this._baseApis.userId + this._baseApis.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.transactionId;
             const verifySAS = new Promise((resolve, reject) => {
                 const keyId = `ed25519:${this._baseApis.deviceId}`;
@@ -263,4 +245,4 @@ export class SASRespond extends Base {
     }
 }
 
-SASRespond.NAME = "m.sas.v1";
+SAS.NAME = "m.sas.v1";

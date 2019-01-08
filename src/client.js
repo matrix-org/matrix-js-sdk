@@ -1,7 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -142,6 +142,9 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
  *    crypto store implementation.
+ *
+ * @param {Array} opts.verificationMethods Optional. The verification methods that
+ * the application can handle.
  */
 function MatrixClient(opts) {
     // Allow trailing slash in HS url
@@ -207,6 +210,7 @@ function MatrixClient(opts) {
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
+    this._verificationMethods = opts.verificationMethods;
 
     this._forceTURN = opts.forceTURN || false;
 
@@ -444,6 +448,7 @@ MatrixClient.prototype.initCrypto = async function() {
         this.store,
         this._cryptoStore,
         this._roomList,
+        this._verificationMethods,
     );
 
     this.reEmitter.reEmit(crypto, [
@@ -622,6 +627,43 @@ async function _setDeviceVerification(
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
+
+/**
+ * Request a key verification from another user.
+ *
+ * @param {string} userId the user to request verification with
+ * @param {Array} devices array of device IDs to send requests to.  Defaults to
+ *    all devices owned by the user
+ * @param {Array} methods array of verification methods to use.  Defaults to
+ *    all known methods
+ *
+ * @returns {Promise<Verifier>} resolves to a verifier when the request is
+ *    accepted by the other user
+ */
+MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.requestVerification(userId, devices);
+};
+
+/**
+ * Begin a key verification.
+ *
+ * @param {string} method the verification method to use
+ * @param {string} userId the user to verify keys with
+ * @param {string} deviceId the device to verify
+ *
+ * @returns {Verifier} a verification object
+ */
+MatrixClient.prototype.beginKeyVerification = function(
+    method, userId, deviceId,
+) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.beginKeyVerification(method, userId, deviceId);
+};
 
 /**
  * Set the global override for whether the client should ever send encrypted

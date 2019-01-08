@@ -1,7 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,9 +33,30 @@ const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
+import { randomString } from '../randomstring';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+
+import {ShowQRCode, ScanQRCode} from './verification/QRCode';
+import SAS from './verification/SAS';
+import {
+    newUserCancelledError,
+    newUnexpectedMessageError,
+    newUnknownMethodError,
+} from './verification/Error';
+
+const defaultVerificationMethods = {
+    [ScanQRCode.NAME]: ScanQRCode,
+    [ShowQRCode.NAME]: ShowQRCode,
+    [SAS.NAME]: SAS,
+};
+
+export const verificationMethods = {
+    QR_CODE_SCAN: ScanQRCode.NAME,
+    QR_CODE_SHOW: ShowQRCode.NAME,
+    SAS: SAS.NAME,
+};
 
 export function isCryptoAvailable() {
     return Boolean(global.Olm);
@@ -68,9 +89,13 @@ const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
  *    storage for the crypto layer.
  *
  * @param {RoomList} roomList An initialised RoomList object
+ *
+ * @param {Array} verificationMethods Array of verification methods to use.
+ *    Each element can either be a string from MatrixClient.verificationMethods
+ *    or a class that implements a verification method.
  */
 export default function Crypto(baseApis, sessionStore, userId, deviceId,
-                clientStore, cryptoStore, roomList) {
+    clientStore, cryptoStore, roomList, verificationMethods) {
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
@@ -78,6 +103,19 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
+    this._verificationMethods = {};
+    if (verificationMethods) {
+        for (const method of verificationMethods) {
+            if (typeof method === "string") {
+                if (defaultVerificationMethods[method]) {
+                    this._verificationMethods[method]
+                        = defaultVerificationMethods[method];
+                }
+            } else if (method.NAME) {
+                this._verificationMethods[method.NAME] = method;
+            }
+        }
+    }
 
     // track whether this device's megolm keys are being backed up incrementally
     // to the server or not.
@@ -139,6 +177,8 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     //     },
     // }
     this._lastNewSessionForced = {};
+
+    this._verificationTransactions = {};
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -663,6 +703,78 @@ Crypto.prototype.setDeviceVerification = async function(
         this._deviceList.saveIfDirty();
     }
     return DeviceInfo.fromStorage(dev, deviceId);
+};
+
+
+Crypto.prototype.requestVerification = function(userId, methods, devices) {
+    if (!methods) {
+        methods = Object.keys(this._verificationMethods);
+    }
+    if (!devices) {
+        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
+    }
+    if (!this._verificationTransactions[userId]) {
+        this._verificationTransactions[userId] = {};
+    }
+
+    const transactionId = randomString(32);
+
+    const promise = new Promise((resolve, reject) => {
+        this._verificationTransactions[userId][transactionId] = {
+            request: {
+                methods: methods,
+                devices: devices,
+                resolve: resolve,
+                reject: reject,
+            },
+        };
+    });
+
+    const message = {
+        transaction_id: transactionId,
+        from_device: this._baseApis.deviceId,
+        methods: methods,
+        timestamp: Date.now(),
+    };
+    const msgMap = devices.reduce((acc, deviceId) => {
+        acc[deviceId] = message;
+        return acc;
+    }, {});
+    this._baseApis.sendToDevice("m.key.verification.request", {[userId]: msgMap});
+
+    return promise;
+};
+
+Crypto.prototype.beginKeyVerification = function(
+    method, userId, deviceId, transactionId,
+) {
+    this._verificationTransactions[userId] = this._verificationTransactions[userId] || {};
+    transactionId = transactionId || randomString(32);
+    if (method instanceof Array) {
+        if (method.length !== 2
+            || !(method[0] in this._verificationMethods)
+            || !(method[1] in this._verificationMethods)) {
+            throw newUnknownMethodError();
+        }
+        /*
+        return new TwoPartVerification(
+            this._verificationMethods[method[0]],
+            this._verificationMethods[method[1]],
+            userId, deviceId, transactionId,
+        );
+        */
+    } else if (method in this._verificationMethods) {
+        const verifier = new this._verificationMethods[method](
+            this._baseApis, userId, deviceId, transactionId,
+        );
+        if (!this._verificationTransactions[userId][transactionId]) {
+            this._verificationTransactions[userId][transactionId] = {};
+        }
+        this._verificationTransactions[userId][transactionId].verifier = verifier;
+        return verifier;
+    } else {
+        throw newUnknownMethodError();
+    }
 };
 
 
@@ -1389,6 +1501,12 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onRoomKeyEvent(event);
         } else if (event.getType() == "m.room_key_request") {
             this._onRoomKeyRequestEvent(event);
+        } else if (event.getType() === "m.key.verification.request") {
+            this._onKeyVerificationRequest(event);
+        } else if (event.getType() === "m.key.verification.start") {
+            this._onKeyVerificationStart(event);
+        } else if (event.getContent().transaction_id) {
+            this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
             this._onToDeviceBadEncrypted(event);
         } else if (event.isBeingDecrypted()) {
@@ -1424,6 +1542,233 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+Crypto.prototype._onKeyVerificationRequest = function(event) {
+    const content = event.getContent();
+    if (!("from_device" in content) || typeof content.from_device !== "string"
+        || !("transaction_id" in content) || typeof content.from_device !== "string"
+        || !("methods" in content) || !(content.methods instanceof Array)
+        || !("timestamp" in content) || typeof content.timestamp !== "number") {
+        logger.warn("received invalid verification request from " + event.getSender());
+        // ignore event if malformed
+        return;
+    }
+    const now = Date.now();
+    if (now < content.timestamp - (5 * 60 * 1000)
+        || now > content.timestamp + (10 * 60 * 1000)) {
+        // ignore if event is too far in the past or too far in the future
+        logger.log("received verification that is too old or from the future");
+        return;
+    }
+    const sender = event.getSender();
+    if (this._verificationTransactions.hasOwnProperty(sender)) {
+        if (this._transactions[sender].hasOwnProperty(content.transaction_id)) {
+            // transaction already exists: cancel it and drop the existing
+            // request because someone has gotten confused
+            const err = newUnexpectedMessageError({
+                transaction_id: content.transaction_id,
+            });
+            if (this._transactions[sender][content.transaction_id].verifier) {
+                this._transactions[sender][content.transaction_id].verifier
+                    .cancel(err);
+            } else {
+                this._transactions[sender][content.transaction_id].reject(err);
+                this.sendToDevice("m.key.verification.cancel", {
+                    [sender]: {
+                        [content.from_device]: err.getContent(),
+                    },
+                });
+            }
+            delete this._transactions[sender][content.transaction_id];
+            return;
+        }
+    } else {
+        this._verificationTransactions[sender] = {};
+    }
+
+    const methods = [];
+    for (const method of content.methods) {
+        if (typeof method !== "string") {
+            continue;
+        }
+        if (this._verificationMethods[method]) {
+            methods.push(method);
+        }
+    }
+    if (methods.length === 0) {
+        this._baseApis.emit("crypto.verification.request.unknown", event.getSender());
+    } else {
+        const request = {
+            event: event,
+            methods: methods,
+            beginKeyVerification: (method) => {
+                const verifier = this.beginKeyVerification(
+                    method,
+                    sender,
+                    content.from_device,
+                    content.transaction_id,
+                );
+                this._verificationTransactions[sender][content.transaction_id].verifier
+                    = verifier;
+                return verifier;
+            },
+            cancel: () => {
+                this._baseApis.sendToDevice("m.key.verification.cancel", {
+                    [sender]: {
+                        [content.from_device]: newUserCancelledError({
+                            transaction_id: content.transaction_id,
+                        }).getContent(),
+                    },
+                });
+            },
+        };
+        this._verificationTransactions[sender][content.transaction_id] = {
+            request: request,
+        };
+        this._baseApis.emit("crypto.verification.request", request);
+    }
+};
+
+Crypto.prototype._onKeyVerificationStart = function(event) {
+    const sender = event.getSender();
+    const content = event.getContent();
+    const transactionId = content.transaction_id;
+    const deviceId = content.from_device;
+    if (!transactionId || !deviceId) {
+        // invalid request, and we don't have enough information to send a
+        // cancellation, so just ignore it
+        return;
+    }
+    let handler = this._verificationTransactions[sender]
+          && this._verificationTransactions[sender][transactionId];
+    if (!(content.method in this._verificationMethods)) {
+        const err = newUnknownMethodError({
+            transaction_id: content.transactionId,
+        });
+        if (handler.verifier) {
+            handler.verifier.cancel(err);
+        } else if (handler.request) {
+            handler.request.cancel(err);
+        }
+        this.sendToDevice(
+            "m.key.verification.cancel", {
+                [sender]: {
+                    [deviceId]: err.getContent(),
+                },
+            },
+        );
+        return;
+    } else if (content.next_method) {
+        if (!(content.next_method in this._verificationMethods)) {
+            const err = newUnknownMethodError({
+                transaction_id: content.transactionId,
+            });
+            if (handler.verifier) {
+                handler.verifier.cancel(err);
+            } else if (handler.request) {
+                handler.request.cancel(err);
+            }
+            this.sendToDevice(
+                "m.key.verification.cancel", {
+                    [sender]: {
+                        [deviceId]: err.getContent(),
+                    },
+                },
+            );
+            return;
+        } else {
+            /* TODO:
+            const verification = new TwoPartVerification(
+                this._verificationMethods[content.method],
+                this._verificationMethods[content.next_method],
+                userId, deviceId,
+            );
+            this.emit(verification.event_type, verification);
+            this.emit(verification.first.event_type, verification);*/
+        }
+    } else {
+        const verifier = new this._verificationMethods[content.method](
+            this._baseApis, sender, deviceId, content.transaction_id,
+            event, handler && handler.request,
+        );
+        if (!handler) {
+            if (!this._verificationTransactions[sender]) {
+                this._verificationTransactions[sender] = {};
+            }
+            handler = this._verificationTransactions[sender][transactionId] = {
+                verifier: verifier,
+            };
+        } else {
+            if (!handler.verifier) {
+                handler.verifier = verifier;
+                if (handler.request) {
+                    if (!handler.request.devices.includes(deviceId)) {
+                        // didn't send a request to that device, so it
+                        // shouldn't have responded
+                        this.sendToDevice(
+                            "m.key.verification.cancel", {
+                                [sender]: {
+                                    [deviceId]: newUnexpectedMessageError().getContent(),
+                                },
+                            },
+                        );
+                        return;
+                    }
+                    if (!handler.request.methods.includes(content.method)) {
+                        this.sendToDevice(
+                            "m.key.verification.cancel", {
+                                [sender]: {
+                                    [deviceId]: newUnknownMethodError().getContent(),
+                                },
+                            },
+                        );
+                        return;
+                    }
+                    const message = {
+                        transaction_id: transactionId,
+                        code: "m.accepted",
+                        reason: "Verification request accepted by another device",
+                    };
+                    const msgMap = handler.request.devices.reduce((acc, devId) => {
+                        if (devId !== deviceId) {
+                            acc[devId] = message;
+                        }
+                        return acc;
+                    }, {});
+                    this._baseApis.sendToDevice("m.key.verification.cancel", {
+                        [sender]: msgMap,
+                    });
+                    handler.request.resolve(verifier);
+                }
+            } else {
+                // FIXME: make sure we're in a two-part verification, and the start matches the second part
+            }
+        }
+        this._baseApis.emit("crypto.verification.start", verifier);
+    }
+};
+
+Crypto.prototype._onKeyVerificationMessage = function(event) {
+    const sender = event.getSender();
+    const transactionId = event.getContent().transaction_id;
+    const handler = this._verificationTransactions[sender]
+          && this._verificationTransactions[sender][transactionId];
+    if (!handler) {
+        return;
+    } else if (event.getType() === "m.key.verification.cancel") {
+        if (handler.verifier) {
+            handler.verifier.cancel(event);
+        } else {
+            handler.request.cancel(event);
+        }
+    } else if (handler.verifier) {
+        const verifier = handler.verifier;
+        if (verifier.events
+            && verifier.events.includes(event.getType())) {
+            verifier.handleEvent(event);
+        }
+    }
 };
 
 /**
