@@ -246,11 +246,9 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
 
 /**
  * Forces a re-check of the key backup and enables/disables it
- * as appropriate
- *
- * @param {object} backupInfo Backup info from /room_keys/version endpoint
+ * as appropriate.
  */
-Crypto.prototype.checkKeyBackup = async function(backupInfo) {
+Crypto.prototype.checkKeyBackup = async function() {
     this._checkedForBackup = false;
     await this._checkAndStartKeyBackup();
 };
@@ -1021,6 +1019,9 @@ Crypto.prototype._scheduleKeyBackupSend = async function() {
                         err.data.errcode == 'M_NOT_FOUND' ||
                         err.data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
                     ) {
+                        // Re-check key backup status on error, so we can be
+                        // sure to present the current situation when asked.
+                        await this.checkKeyBackup();
                         // Backup version has changed or this backup version
                         // has been deleted
                         this.emit("crypto.keyBackupFailed", err.data.errcode);
