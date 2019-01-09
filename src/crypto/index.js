@@ -989,7 +989,7 @@ Crypto.prototype.importRoomKeys = function(keys) {
  * Schedules sending all keys waiting to be sent to the backup, if not already
  * scheduled. Retries if necessary.
  */
-Crypto.prototype._scheduleKeyBackupSend = async function() {
+Crypto.prototype.scheduleKeyBackupSend = async function() {
     if (this._sendingBackups) return;
 
     try {
@@ -1115,7 +1115,7 @@ Crypto.prototype.backupGroupSession = async function(
 
     // don't wait for this to complete: it will delay so
     // happens in the background
-    this._scheduleKeyBackupSend();
+    this.scheduleKeyBackupSend();
 };
 
 Crypto.prototype.backupAllGroupSessions = async function(version) {
