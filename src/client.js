@@ -843,6 +843,10 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
     this.emit('crypto.keyBackupStatus', true);
+
+    // There may be keys left over from a partially completed backup, so
+    // schedule a send to check.
+    this._crypto.scheduleKeyBackupSend();
 };
 
 /**
