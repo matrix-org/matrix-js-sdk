@@ -563,8 +563,22 @@ export class Backend {
         });
     }
 
-    unmarkSessionsNeedingBackup(sessions) {
-        const txn = this._db.transaction("sessions_needing_backup", "readwrite");
+    countSessionsNeedingBackup(txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readonly");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return new Promise((resolve, reject) => {
+            const req = objectStore.count();
+            req.onerror = reject;
+            req.onsuccess = () => resolve(req.result);
+        });
+    }
+
+    unmarkSessionsNeedingBackup(sessions, txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        }
         const objectStore = txn.objectStore("sessions_needing_backup");
         return Promise.all(sessions.map((session) => {
             return new Promise((resolve, reject) => {

@@ -336,6 +336,10 @@ export default class MemoryCryptoStore {
         return Promise.resolve(sessions);
     }
 
+    countSessionsNeedingBackup() {
+        return Promise.resolve(Object.keys(this._sessionsNeedingBackup).length);
+    }
+
     unmarkSessionsNeedingBackup(sessions) {
         for (const session of sessions) {
             const sessionKey = session.senderKey + '/' + session.sessionId;
