@@ -130,18 +130,11 @@ export default class SAS extends Base {
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
                 return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
-            const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
-                  + this._baseApis.getUserId() + this._baseApis.deviceId
-                  + this.userId + this.deviceId
-                  + this.transactionId;
             const verifySAS = new Promise((resolve, reject) => {
-                const keyId = `ed25519:${this._baseApis.deviceId}`;
-                const keyMac = olmSAS.calculate_mac(macInfo, this._baseApis.getDeviceEd25519Key());
                 this.emit("show_sas", {
                     sas,
                     confirm: () => {
-                        const mac = {[keyId]: keyMac};
-                        this._sendToDevice("m.key.verification.mac", { mac });
+                        this._sendMAC(olmSAS);
                         resolve();
                     },
                     cancel: () => reject(newUserCancelledError()),
@@ -155,11 +148,7 @@ export default class SAS extends Base {
                 verifySAS,
             ]);
             content = e.getContent();
-            await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
-                if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
-                    throw newKeyMismatchError();
-                }
-            });
+            await this._checkMAC(olmSAS, content);
         } finally {
             olmSAS.free();
         }
@@ -208,18 +197,11 @@ export default class SAS extends Base {
             const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
                 return acc + ('0' + elem.toString(16)).slice(-2);
             }, "");
-            const macInfo = "MATRIX_KEY_VERIFICATION_MAC"
-                  + this.userId + this.deviceId
-                  + this._baseApis.getUserId() + this._baseApis.deviceId
-                  + this.transactionId;
             const verifySAS = new Promise((resolve, reject) => {
-                const keyId = `ed25519:${this._baseApis.deviceId}`;
-                const keyMac = olmSAS.calculate_mac(macInfo, this._baseApis.getDeviceEd25519Key());
                 this.emit("show_sas", {
                     sas,
                     confirm: () => {
-                        const mac = {[keyId]: keyMac};
-                        this._sendToDevice("m.key.verification.mac", { mac });
+                        this._sendMAC(olmSAS);
                         resolve();
                     },
                     cancel: () => reject(newUserCancelledError()),
@@ -233,15 +215,52 @@ export default class SAS extends Base {
                 verifySAS,
             ]);
             content = e.getContent();
-
-            await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
-                if (keyInfo !== olmSAS.calculate_mac(macInfo, device.keys[keyId])) {
-                    throw newKeyMismatchError();
-                }
-            });
+            await this._checkMAC(olmSAS, content);
         } finally {
             olmSAS.free();
         }
+    }
+
+    _sendMAC(olmSAS) {
+        const keyId = `ed25519:${this._baseApis.deviceId}`;
+        const mac = {};
+        const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
+              + this._baseApis.getUserId() + this._baseApis.deviceId
+              + this.userId + this.deviceId
+              + this.transactionId;
+
+        mac[keyId] = olmSAS.calculate_mac(
+            this._baseApis.getDeviceEd25519Key(),
+            baseInfo + keyId,
+        );
+        const keys = olmSAS.calculate_mac(
+            keyId,
+            baseInfo + "KEY_IDS",
+        );
+        this._sendToDevice("m.key.verification.mac", { mac, keys });
+    }
+
+    async _checkMAC(olmSAS, content) {
+        const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
+              + this.userId + this.deviceId
+              + this._baseApis.getUserId() + this._baseApis.deviceId
+              + this.transactionId;
+
+        if (content.keys !== olmSAS.calculate_mac(
+            Object.keys(content.mac).sort().join(","),
+            baseInfo + "KEY_IDS",
+        )) {
+            throw newKeyMismatchError();
+        }
+
+        await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
+            if (keyInfo !== olmSAS.calculate_mac(
+                device.keys[keyId],
+                baseInfo + keyId,
+            )) {
+                throw newKeyMismatchError();
+            }
+        });
     }
 }
 
