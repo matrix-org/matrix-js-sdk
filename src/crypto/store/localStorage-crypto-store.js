@@ -221,6 +221,12 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         return Promise.resolve(sessions);
     }
 
+    countSessionsNeedingBackup() {
+        const sessionsNeedingBackup
+              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        return Promise.resolve(Object.keys(sessionsNeedingBackup).length);
+    }
+
     unmarkSessionsNeedingBackup(sessions) {
         const sessionsNeedingBackup
               = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};

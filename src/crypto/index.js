@@ -1052,6 +1052,9 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         return 0;
     }
 
+    let remaining = await this._cryptoStore.countSessionsNeedingBackup();
+    this.emit("crypto.keyBackupSessionsRemaining", remaining);
+
     const data = {};
     for (const session of sessions) {
         const roomId = session.sessionData.room_id;
@@ -1088,7 +1091,10 @@ Crypto.prototype._backupPendingKeys = async function(limit) {
         undefined, undefined, this.backupInfo.version,
         {rooms: data},
     );
+
     await this._cryptoStore.unmarkSessionsNeedingBackup(sessions);
+    remaining = await this._cryptoStore.countSessionsNeedingBackup();
+    this.emit("crypto.keyBackupSessionsRemaining", remaining);
 
     return sessions.length;
 };
@@ -1127,6 +1133,9 @@ Crypto.prototype.backupAllGroupSessions = async function(version) {
             });
         },
     );
+
+    const remaining = await this._cryptoStore.countSessionsNeedingBackup();
+    this.emit("crypto.keyBackupSessionsRemaining", remaining);
 
     let numKeysBackedUp;
     do {
