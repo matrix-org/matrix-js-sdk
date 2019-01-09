@@ -97,7 +97,6 @@ class DiscoveredClientConfig { // eslint-disable-line no-unused-vars
  * for users to log in to.
  */
 export class AutoDiscovery {
-
     // Dev note: the constants defined here are related to but not
     // exactly the same as those in the spec. This is to hopefully
     // translate the meaning of the states in the spec, but also
