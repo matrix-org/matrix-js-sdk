@@ -3491,7 +3491,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     if (this._crypto) {
-        this._crypto.uploadDeviceKeys().done();
+        this._crypto.uploadDeviceKeys();
         this._crypto.start();
     }
 
