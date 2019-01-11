@@ -53,10 +53,6 @@ const newMismatchedCommitmentError = errorFactory(
  * Used by the initiator of an SAS verification.
  */
 export default class SAS extends Base {
-    static factory(...args) {
-        return new SASSend(...args);
-    }
-
     get events() {
         return EVENTS;
     }
@@ -98,11 +94,6 @@ export default class SAS extends Base {
               && content.short_authentication_string[0] === "hex")) {
             throw newUnknownMethodError();
         }
-        const parameters = {
-            hash: content.hash,
-            mac: content.message_authentication_code,
-            sas: content.short_authentication_string,
-        };
         if (typeof content.commitment !== "string") {
             throw newInvalidMessageError();
         }

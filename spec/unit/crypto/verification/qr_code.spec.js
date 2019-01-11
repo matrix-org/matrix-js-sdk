@@ -22,22 +22,11 @@ try {
 
 import expect from 'expect';
 
-import sdk from '../../../..';
-import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
-import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../../../MockStorageApi';
-import testUtils from '../../../test-utils';
-
-import OlmDevice from '../../../../lib/crypto/OlmDevice';
-import Crypto from '../../../../lib/crypto';
 import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 import {ShowQRCode, ScanQRCode} from '../../../../lib/crypto/verification/QRCode';
 
 const Olm = global.Olm;
-
-const MatrixClient = sdk.MatrixClient;
-const MatrixEvent = sdk.MatrixEvent;
 
 describe("QR code verification", function() {
     if (!global.Olm) {

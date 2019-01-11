@@ -38,10 +38,6 @@ const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
  * @class crypto/QRCode/ShowQRCode
  */
 export class ShowQRCode extends Base {
-    static factory(...args) {
-        return new ShowQRCode(...args);
-    }
-
     _doVerification() {
         if (!this._done) {
             const url = "https://matrix.to/#/" + this._baseApis.getUserId()
