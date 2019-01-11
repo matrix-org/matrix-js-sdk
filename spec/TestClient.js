@@ -1,7 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-sto
  *     session store. If undefined, we will create a MockStorageApi.
  */
 export default function TestClient(
-    userId, deviceId, accessToken, sessionStoreBackend,
+    userId, deviceId, accessToken, sessionStoreBackend, options,
 ) {
     this.userId = userId;
     this.deviceId = deviceId;
@@ -50,19 +50,22 @@ export default function TestClient(
     }
     const sessionStore = new sdk.WebStorageSessionStore(sessionStoreBackend);
 
-    // expose this so the tests can get to it
-    this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
-
     this.httpBackend = new MockHttpBackend();
-    this.client = sdk.createClient({
+
+    options = Object.assign({
         baseUrl: "http://" + userId + ".test.server",
         userId: userId,
         accessToken: accessToken,
         deviceId: deviceId,
         sessionStore: sessionStore,
-        cryptoStore: this.cryptoStore,
         request: this.httpBackend.requestFn,
-    });
+    }, options);
+    if (!options.cryptoStore) {
+        // expose this so the tests can get to it
+        this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
+        options.cryptoStore = this.cryptoStore;
+    }
+    this.client = sdk.createClient(options);
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};
