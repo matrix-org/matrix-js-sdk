@@ -103,16 +103,21 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
-    this._verificationMethods = {};
+    this._verificationMethods = new Map();
     if (verificationMethods) {
         for (const method of verificationMethods) {
             if (typeof method === "string") {
                 if (defaultVerificationMethods[method]) {
-                    this._verificationMethods[method]
-                        = defaultVerificationMethods[method];
+                    this._verificationMethods.set(
+                        method,
+                        defaultVerificationMethods[method],
+                    );
                 }
             } else if (method.NAME) {
-                this._verificationMethods[method.NAME] = method;
+                this._verificationMethods.set(
+                    method.NAME,
+                    method,
+                );
             }
         }
     }
@@ -178,7 +183,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // }
     this._lastNewSessionForced = {};
 
-    this._verificationTransactions = {};
+    this._verificationTransactions = new Map();
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -708,26 +713,27 @@ Crypto.prototype.setDeviceVerification = async function(
 
 Crypto.prototype.requestVerification = function(userId, methods, devices) {
     if (!methods) {
-        methods = Object.keys(this._verificationMethods);
+        // .keys() returns an iterator, so we need to explicitly turn it into an array
+        methods = [...this._verificationMethods.keys()];
     }
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
-    if (!this._verificationTransactions[userId]) {
-        this._verificationTransactions[userId] = {};
+    if (!this._verificationTransactions.has(userId)) {
+        this._verificationTransactions.set(userId, new Map);
     }
 
     const transactionId = randomString(32);
 
     const promise = new Promise((resolve, reject) => {
-        this._verificationTransactions[userId][transactionId] = {
+        this._verificationTransactions.get(userId).set(transactionId, {
             request: {
                 methods: methods,
                 devices: devices,
                 resolve: resolve,
                 reject: reject,
             },
-        };
+        });
     });
 
     const message = {
@@ -736,10 +742,10 @@ Crypto.prototype.requestVerification = function(userId, methods, devices) {
         methods: methods,
         timestamp: Date.now(),
     };
-    const msgMap = devices.reduce((acc, deviceId) => {
-        acc[deviceId] = message;
-        return acc;
-    }, {});
+    const msgMap = {};
+    for (const deviceId of devices) {
+        msgMap[deviceId] = message;
+    }
     this._baseApis.sendToDevice("m.key.verification.request", {[userId]: msgMap});
 
     return promise;
@@ -748,12 +754,14 @@ Crypto.prototype.requestVerification = function(userId, methods, devices) {
 Crypto.prototype.beginKeyVerification = function(
     method, userId, deviceId, transactionId,
 ) {
-    this._verificationTransactions[userId] = this._verificationTransactions[userId] || {};
+    if (!this._verificationTransactions.has(userId)) {
+        this._verificationTransactions.set(userId, new Map());
+    }
     transactionId = transactionId || randomString(32);
     if (method instanceof Array) {
         if (method.length !== 2
-            || !(method[0] in this._verificationMethods)
-            || !(method[1] in this._verificationMethods)) {
+            || !this._verificationMethods.has(method[0])
+            || !this._verificationMethods.has(method[1])) {
             throw newUnknownMethodError();
         }
         /*
@@ -763,14 +771,14 @@ Crypto.prototype.beginKeyVerification = function(
             userId, deviceId, transactionId,
         );
         */
-    } else if (method in this._verificationMethods) {
-        const verifier = new this._verificationMethods[method](
+    } else if (this._verificationMethods.has(method)) {
+        const verifier = new (this._verificationMethods.get(method))(
             this._baseApis, userId, deviceId, transactionId,
         );
-        if (!this._verificationTransactions[userId][transactionId]) {
-            this._verificationTransactions[userId][transactionId] = {};
+        if (!this._verificationTransactions.get(userId).has(transactionId)) {
+            this._verificationTransactions.get(userId).set(transactionId, {});
         }
-        this._verificationTransactions[userId][transactionId].verifier = verifier;
+        this._verificationTransactions.get(userId).get(transactionId).verifier = verifier;
         return verifier;
     } else {
         throw newUnknownMethodError();
@@ -1562,29 +1570,30 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         return;
     }
     const sender = event.getSender();
-    if (this._verificationTransactions.hasOwnProperty(sender)) {
-        if (this._transactions[sender].hasOwnProperty(content.transaction_id)) {
+    if (this._verificationTransactions.has(sender)) {
+        if (this._verificationTransactions.get(sender).has(content.transaction_id)) {
             // transaction already exists: cancel it and drop the existing
             // request because someone has gotten confused
             const err = newUnexpectedMessageError({
                 transaction_id: content.transaction_id,
             });
-            if (this._transactions[sender][content.transaction_id].verifier) {
-                this._transactions[sender][content.transaction_id].verifier
-                    .cancel(err);
+            if (this._verificationTransactions.get(sender).get(content.transaction_id)
+                .verifier) {
+                this._verificationTransactions.get(sender).get(content.transaction_id)
+                    .verifier.cancel(err);
             } else {
-                this._transactions[sender][content.transaction_id].reject(err);
+                this._verificationTransactions.get(sender).get(content.transaction_id).reject(err);
                 this.sendToDevice("m.key.verification.cancel", {
                     [sender]: {
                         [content.from_device]: err.getContent(),
                     },
                 });
             }
-            delete this._transactions[sender][content.transaction_id];
+            this._verificationTransactions.get(sender).delete(content.transaction_id);
             return;
         }
     } else {
-        this._verificationTransactions[sender] = {};
+        this._verificationTransactions.set(sender, new Map());
     }
 
     const methods = [];
@@ -1592,7 +1601,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         if (typeof method !== "string") {
             continue;
         }
-        if (this._verificationMethods[method]) {
+        if (this._verificationMethods.has(method)) {
             methods.push(method);
         }
     }
@@ -1609,8 +1618,8 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
                     content.from_device,
                     content.transaction_id,
                 );
-                this._verificationTransactions[sender][content.transaction_id].verifier
-                    = verifier;
+                this._verificationTransactions.get(sender).get(content.transaction_id)
+                    .verifier = verifier;
                 return verifier;
             },
             cancel: () => {
@@ -1623,9 +1632,9 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
                 });
             },
         };
-        this._verificationTransactions[sender][content.transaction_id] = {
+        this._verificationTransactions.get(sender).set(content.transaction_id, {
             request: request,
-        };
+        });
         this._baseApis.emit("crypto.verification.request", request);
     }
 };
@@ -1640,9 +1649,9 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
         // cancellation, so just ignore it
         return;
     }
-    let handler = this._verificationTransactions[sender]
-          && this._verificationTransactions[sender][transactionId];
-    if (!(content.method in this._verificationMethods)) {
+    let handler = this._verificationTransactions.has(sender)
+        && this._verificationTransactions.get(sender).get(transactionId);
+    if (!this._verificationMethods.has(content.method)) {
         const err = newUnknownMethodError({
             transaction_id: content.transactionId,
         });
@@ -1660,7 +1669,7 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
         );
         return;
     } else if (content.next_method) {
-        if (!(content.next_method in this._verificationMethods)) {
+        if (!this._verificationMethods.has(content.next_method)) {
             const err = newUnknownMethodError({
                 transaction_id: content.transactionId,
             });
@@ -1688,17 +1697,17 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
             this.emit(verification.first.event_type, verification);*/
         }
     } else {
-        const verifier = new this._verificationMethods[content.method](
+        const verifier = new (this._verificationMethods.get(content.method))(
             this._baseApis, sender, deviceId, content.transaction_id,
             event, handler && handler.request,
         );
         if (!handler) {
-            if (!this._verificationTransactions[sender]) {
-                this._verificationTransactions[sender] = {};
+            if (!this._verificationTransactions.has(sender)) {
+                this._verificationTransactions.set(sender, new Map());
             }
-            handler = this._verificationTransactions[sender][transactionId] = {
+            handler = this._verificationTransactions.get(sender).set(transactionId, {
                 verifier: verifier,
-            };
+            });
         } else {
             if (!handler.verifier) {
                 handler.verifier = verifier;
@@ -1730,12 +1739,12 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
                         code: "m.accepted",
                         reason: "Verification request accepted by another device",
                     };
-                    const msgMap = handler.request.devices.reduce((acc, devId) => {
+                    const msgMap = {};
+                    for (const devId of handler.request.devices) {
                         if (devId !== deviceId) {
-                            acc[devId] = message;
+                            msgMap[devId] = message;
                         }
-                        return acc;
-                    }, {});
+                    }
                     this._baseApis.sendToDevice("m.key.verification.cancel", {
                         [sender]: msgMap,
                     });
@@ -1752,8 +1761,8 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
 Crypto.prototype._onKeyVerificationMessage = function(event) {
     const sender = event.getSender();
     const transactionId = event.getContent().transaction_id;
-    const handler = this._verificationTransactions[sender]
-          && this._verificationTransactions[sender][transactionId];
+    const handler = this._verificationTransactions.has(sender)
+          && this._verificationTransactions.get(sender).get(transactionId);
     if (!handler) {
         return;
     } else if (event.getType() === "m.key.verification.cancel") {
