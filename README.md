@@ -297,7 +297,7 @@ The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
 [libolm](http://matrix.org/git/olm). It is left up to the application to make
 libolm available, via the ``Olm`` global.
 
-It is also necessry to call ``matrixClient.initCrypto()`` after creating a new
+It is also necessary to call ``matrixClient.initCrypto()`` after creating a new
 ``MatrixClient`` (but **before** calling ``matrixClient.startClient()``) to
 initialise the crypto layer.
 
