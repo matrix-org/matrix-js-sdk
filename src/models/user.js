@@ -186,11 +186,13 @@ User.prototype.getLastActiveTs = function() {
 /**
  * Manually set the user's status message.
  * @param {MatrixEvent} event The <code>im.vector.user_status</code> event.
+ * @fires module:client~MatrixClient#event:"User._unstable_statusMessage"
  */
 User.prototype._unstable_updateStatusMessage = function(event) {
     if (!event.getContent()) this._unstable_statusMessage = "";
     else this._unstable_statusMessage = event.getContent()["status"];
     this._updateModifiedTime();
+    this.emit("User._unstable_statusMessage", this);
 };
 
 /**
