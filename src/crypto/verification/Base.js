@@ -51,16 +51,7 @@ export default class VerificationBase extends EventEmitter {
         this.request = request;
         this._parent = parent;
         this._done = false;
-        this._promise = new Promise((resolve, reject) => {
-            this._resolve = (...args) => {
-                this._done = true;
-                resolve(...args);
-            };
-            this._reject = (...args) => {
-                this._done = true;
-                reject(...args);
-            };
-        });
+        this._promise = null;
     }
 
     _sendToDevice(type, content) {
@@ -93,7 +84,7 @@ export default class VerificationBase extends EventEmitter {
             this._resolveEvent(e);
         } else {
             this._expectedEvent = undefined;
-            const exception = new Error("Unexected message");
+            const exception = new Error("Unexected message: expecting "+this._expectedEvent+" but got "+e.getType());
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -140,11 +131,30 @@ export default class VerificationBase extends EventEmitter {
                     });
                 }
             }
-            this._reject(e);
+            if (this._promise !== null) {
+                this._reject(e);
+            } else {
+                this._promise = Promise.reject(e);
+            }
+            // Also emit a 'cancel' event that the app can listen for to detect cancellation
+            // before calling verify()
+            this.emit('cancel', e);
         }
     }
 
     verify() {
+        if (this._promise) return this._promise;
+
+        this._promise = new Promise((resolve, reject) => {
+            this._resolve = (...args) => {
+                this._done = true;
+                resolve(...args);
+            };
+            this._reject = (...args) => {
+                this._done = true;
+                reject(...args);
+            };
+        });
         if (this._doVerification && !this._started) {
             this._started = true;
             Promise.resolve(this._doVerification())
