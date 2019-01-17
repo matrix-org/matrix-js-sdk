@@ -994,6 +994,8 @@ Crypto.prototype.importRoomKeys = function(keys) {
 Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
     if (this._sendingBackups) return;
 
+    this._sendingBackups = true;
+
     try {
         // wait between 0 and `maxDelay` seconds, to avoid backup
         // requests from different clients hitting the server all at
