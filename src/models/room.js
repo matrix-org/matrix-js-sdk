@@ -32,6 +32,7 @@ const EventTimelineSet = require("./event-timeline-set");
 import ReEmitter from '../ReEmitter';
 
 const LATEST_ROOM_VERSION = '1';
+const SAFE_ROOM_VERSIONS = ['1', '2'];
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -215,8 +216,13 @@ Room.prototype.getVersion = function() {
 Room.prototype.shouldUpgradeToVersion = function() {
     // This almost certainly won't be the way this actually works - this
     // is essentially a stub method.
-    if (this.getVersion() === LATEST_ROOM_VERSION) return null;
-    return LATEST_ROOM_VERSION;
+    // Something like https://github.com/matrix-org/matrix-doc/pull/1804
+    // would solve this problem for us.
+    if (!SAFE_ROOM_VERSIONS.includes(this.getVersion())) {
+        return LATEST_ROOM_VERSION;
+    }
+
+    return null;
 };
 
 /**
