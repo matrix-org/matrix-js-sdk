@@ -258,8 +258,9 @@ Crypto.prototype.checkKeyBackup = async function() {
  * @return {object} {
  *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
  *     sigs: [
- *         valid: [bool],
- *         device: [DeviceInfo],
+ *         valid: [bool || null], // true: valid, false: invalid, null: cannot attempt validation
+ *         deviceId: [string],
+ *         device: [DeviceInfo || null],
  *     ]
  * }
  */
