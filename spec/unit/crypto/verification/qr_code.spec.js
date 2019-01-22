@@ -60,7 +60,8 @@ describe("QR code verification", function() {
     });
 
     describe("scanning", function() {
-        const QR_CODE_URL = "https://matrix.to/#/@alice:example.com?device=ABCDEFG&action=verify&key_ed25519%3AABCDEFG=device%2Bed25519%2Bkey";
+        const QR_CODE_URL = "https://matrix.to/#/@alice:example.com?device=ABCDEFG"
+              + "&action=verify&key_ed25519%3AABCDEFG=device%2Bed25519%2Bkey";
         it("should verify when a QR code is sent", async function() {
             const device = DeviceInfo.fromStorage(
                 {

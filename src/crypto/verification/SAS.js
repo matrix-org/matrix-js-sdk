@@ -15,13 +15,12 @@ limitations under the License.
 */
 
 /**
- * @module crypto/SAS
+ * @module crypto/verification/SAS
  *
- * Key verification request.
+ * Used for Short Authentication String (SAS) verification.
  */
 
 import Base from "./Base";
-import logger from '../../logger';
 import anotherjson from 'another-json';
 import {
     errorFactory,
@@ -48,9 +47,7 @@ const newMismatchedCommitmentError = errorFactory(
 );
 
 /**
- * @class crypto/SAS/SASSend
- *
- * Used by the initiator of an SAS verification.
+ * @alias module:crypto/verification/SAS
  */
 export default class SAS extends Base {
     get events() {

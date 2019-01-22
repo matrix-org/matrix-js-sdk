@@ -52,6 +52,9 @@ const defaultVerificationMethods = {
     [SAS.NAME]: SAS,
 };
 
+/**
+ * verification method names
+ */
 export const verificationMethods = {
     QR_CODE_SCAN: ScanQRCode.NAME,
     QR_CODE_SHOW: ShowQRCode.NAME,
@@ -1592,6 +1595,12 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     alg.onRoomKeyEvent(event);
 };
 
+/**
+ * Handle a key verification request event.
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event verification request event
+ */
 Crypto.prototype._onKeyVerificationRequest = function(event) {
     const content = event.getContent();
     if (!("from_device" in content) || typeof content.from_device !== "string"
@@ -1602,6 +1611,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         // ignore event if malformed
         return;
     }
+
     const now = Date.now();
     if (now < content.timestamp - (5 * 60 * 1000)
         || now > content.timestamp + (10 * 60 * 1000)) {
@@ -1609,6 +1619,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         logger.log("received verification that is too old or from the future");
         return;
     }
+
     const sender = event.getSender();
     if (this._verificationTransactions.has(sender)) {
         if (this._verificationTransactions.get(sender).has(content.transaction_id)) {
@@ -1622,7 +1633,8 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
                 this._verificationTransactions.get(sender).get(content.transaction_id)
                     .verifier.cancel(err);
             } else {
-                this._verificationTransactions.get(sender).get(content.transaction_id).reject(err);
+                this._verificationTransactions.get(sender).get(content.transaction_id)
+                    .reject(err);
                 this.sendToDevice("m.key.verification.cancel", {
                     [sender]: {
                         [content.from_device]: err.getContent(),
@@ -1636,6 +1648,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         this._verificationTransactions.set(sender, new Map());
     }
 
+    // determine what requested methods we support
     const methods = [];
     for (const method of content.methods) {
         if (typeof method !== "string") {
@@ -1646,8 +1659,22 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         }
     }
     if (methods.length === 0) {
-        this._baseApis.emit("crypto.verification.request.unknown", event.getSender());
+        this._baseApis.emit(
+            "crypto.verification.request.unknown",
+            event.getSender(),
+            () => {
+                this.sendToDevice("m.key.verification.cancel", {
+                    [sender]: {
+                        [content.from_device]: newUserCancelledError({
+                            transaction_id: content.transaction_id,
+                        }).getContent(),
+                    },
+                });
+            },
+        );
     } else {
+        // notify the application that of the verification request, so it can
+        // decide what to do with it
         const request = {
             event: event,
             methods: methods,
@@ -1679,6 +1706,12 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
     }
 };
 
+/**
+ * Handle a key verification start event.
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event verification start event
+ */
 Crypto.prototype._onKeyVerificationStart = function(event) {
     const sender = event.getSender();
     const content = event.getContent();
@@ -1689,12 +1722,12 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
         // cancellation, so just ignore it
         return;
     }
+
     let handler = this._verificationTransactions.has(sender)
         && this._verificationTransactions.get(sender).get(transactionId);
-    if (!this._verificationMethods.has(content.method)) {
-        const err = newUnknownMethodError({
-            transaction_id: content.transactionId,
-        });
+    // if the verification start message is invalid, send a cancel message to
+    // the other side, and also send a cancellation event
+    const cancel = (err) => {
         if (handler.verifier) {
             handler.verifier.cancel(err);
         } else if (handler.request) {
@@ -1707,24 +1740,17 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
                 },
             },
         );
+    };
+    if (!this._verificationMethods.has(content.method)) {
+        cancel(newUnknownMethodError({
+            transaction_id: content.transactionId,
+        }));
         return;
     } else if (content.next_method) {
         if (!this._verificationMethods.has(content.next_method)) {
-            const err = newUnknownMethodError({
+            cancel(newUnknownMethodError({
                 transaction_id: content.transactionId,
-            });
-            if (handler.verifier) {
-                handler.verifier.cancel(err);
-            } else if (handler.request) {
-                handler.request.cancel(err);
-            }
-            this.sendToDevice(
-                "m.key.verification.cancel", {
-                    [sender]: {
-                        [deviceId]: err.getContent(),
-                    },
-                },
-            );
+            }));
             return;
         } else {
             /* TODO:
@@ -1752,28 +1778,27 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
             if (!handler.verifier) {
                 handler.verifier = verifier;
                 if (handler.request) {
+                    // the verification start was sent as a response to a
+                    // verification request
+
                     if (!handler.request.devices.includes(deviceId)) {
                         // didn't send a request to that device, so it
                         // shouldn't have responded
-                        this.sendToDevice(
-                            "m.key.verification.cancel", {
-                                [sender]: {
-                                    [deviceId]: newUnexpectedMessageError().getContent(),
-                                },
-                            },
-                        );
+                        cancel(newUnexpectedMessageError({
+                            transaction_id: content.transactionId,
+                        }));
                         return;
                     }
                     if (!handler.request.methods.includes(content.method)) {
-                        this.sendToDevice(
-                            "m.key.verification.cancel", {
-                                [sender]: {
-                                    [deviceId]: newUnknownMethodError().getContent(),
-                                },
-                            },
-                        );
+                        // verification method wasn't one that was requested
+                        cancel(newUnknownMethodError({
+                            transaction_id: content.transactionId,
+                        }));
                         return;
                     }
+
+                    // send cancellation messages to all the other devices that
+                    // the request was sent to
                     const message = {
                         transaction_id: transactionId,
                         code: "m.accepted",
@@ -1788,6 +1813,7 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
                     this._baseApis.sendToDevice("m.key.verification.cancel", {
                         [sender]: msgMap,
                     });
+
                     handler.request.resolve(verifier);
                 }
             } else {
@@ -1798,6 +1824,12 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
     }
 };
 
+/**
+ * Handle a general key verification event.
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event verification start event
+ */
 Crypto.prototype._onKeyVerificationMessage = function(event) {
     const sender = event.getSender();
     const transactionId = event.getContent().transaction_id;

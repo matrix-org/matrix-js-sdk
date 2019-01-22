@@ -18,11 +18,20 @@ limitations under the License.
  * @module crypto/verification/Base
  *
  * Base class for verification methods.
+ *
+ * Once a verifier object is created, the verification can be started by
+ * calling the verify() method, which will return a promise that will resolve
+ * when the verification is completed, or reject if it could not complete.
+ *
+ * Subclasses must have a NAME class property.
  */
 
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 
+/**
+ * @alias module:crypto/verification/Base
+ */
 export default class VerificationBase extends EventEmitter {
     /**
      * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
@@ -84,7 +93,10 @@ export default class VerificationBase extends EventEmitter {
             this._resolveEvent(e);
         } else {
             this._expectedEvent = undefined;
-            const exception = new Error("Unexected message: expecting "+this._expectedEvent+" but got "+e.getType());
+            const exception = new Error(
+                "Unexpected message: expecting " + this._expectedEvent
+                    + " but got " + e.getType(),
+            );
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -142,6 +154,12 @@ export default class VerificationBase extends EventEmitter {
         }
     }
 
+    /**
+     * Begin the key verification
+     *
+     * @returns {Promise} Promise which resolves when the verification has
+     *     completed.
+     */
     verify() {
         if (this._promise) return this._promise;
 

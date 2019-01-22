@@ -143,8 +143,10 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
  *    crypto store implementation.
  *
- * @param {Array} opts.verificationMethods Optional. The verification methods that
- * the application can handle.
+ * @param {Array} opts.verificationMethods Optional. The verification method
+ * that the application can handle.  Each element should be an item from {@link
+ * module:crypto~verificationMethods verificationMethods}, or a class that
+ * implements the {$link module:crypto/verification/Base verifier interface}.
  */
 function MatrixClient(opts) {
     // Allow trailing slash in HS url
@@ -4197,6 +4199,34 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * from backup or by cross-signing the device.
  *
  * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
+
+/**
+ * Fires when a key verification is requested.
+ * @event module:client~MatrixClient#"crypto.verification.request"
+ * @param {object} data
+ * @param {MatrixEvent} data.event the original verification request message
+ * @param {Array} data.methods the verification methods that can be used
+ * @param {Function} data.beginKeyVerification a function to call if a key
+ *     verification should be performed.  The function takes one argument: the
+ *     name of the key verification method (taken from data.methods) to use.
+ * @param {Function} data.cancel a function to call if the key verification is
+ *     rejected.
+ */
+
+/**
+ * Fires when a key verification is requested with an unknown method.
+ * @event module:client~MatrixClient#"crypto.verification.request.unknown"
+ * @param {string} userId the user ID who requested the key verification
+ * @param {Function} cancel a function that will send a cancellation message to
+ *     reject the key verification.
+ */
+
+/**
+ * Fires when a key verification started message is received.
+ * @event module:client~MatrixClient#"crypto.verification.start"
+ * @param {module:crypto/verification/Base} a verifier object to perform the
+ *     key verification
  */
 
 // EventEmitter JSDocs

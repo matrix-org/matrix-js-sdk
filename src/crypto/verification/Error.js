@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 /**
- * @module crypto/Error
+ * @module crypto/verification/Error
  *
  * Error messages.
  */

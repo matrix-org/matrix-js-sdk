@@ -15,13 +15,12 @@ limitations under the License.
 */
 
 /**
- * @module crypto/QRCode
+ * @module crypto/verification/QRCode
  *
  * QR code key verification.
  */
 
 import Base from "./Base";
-import logger from '../../logger';
 import {
     errorFactory,
     newUserCancelledError,
@@ -35,7 +34,7 @@ const KEY_REGEXP = /^key_([^:]+:.+)$/;
 const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 
 /**
- * @class crypto/QRCode/ShowQRCode
+ * @class module:crypto/verification/QRCode~ShowQRCode
  */
 export class ShowQRCode extends Base {
     _doVerification() {
@@ -55,7 +54,7 @@ export class ShowQRCode extends Base {
 ShowQRCode.NAME = "m.qr_code.show.v1";
 
 /**
- * @class crypto/QRCode/ScanQRCode
+ * @class module:crypto/verification/QRCode~ScanQRCode
  */
 export class ScanQRCode extends Base {
     static factory(...args) {
