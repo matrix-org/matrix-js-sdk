@@ -59,7 +59,7 @@ export default class SAS extends Base {
         olmutil = olmutil || new global.Olm.Utility();
 
         // make sure user's keys are downloaded
-        await this._baseApis.downloadKeys(this.userId);
+        await this._baseApis.downloadKeys([this.userId]);
 
         if (this.startEvent) {
             return await this._doRespondVerification();

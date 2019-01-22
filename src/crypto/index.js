@@ -1730,7 +1730,7 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
     const cancel = (err) => {
         if (handler.verifier) {
             handler.verifier.cancel(err);
-        } else if (handler.request) {
+        } else if (handler.request && handler.request.cancel) {
             handler.request.cancel(err);
         }
         this.sendToDevice(
@@ -1838,9 +1838,10 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     if (!handler) {
         return;
     } else if (event.getType() === "m.key.verification.cancel") {
+        console.log(event);
         if (handler.verifier) {
             handler.verifier.cancel(event);
-        } else {
+        } else if (handler.request && handler.request.cancel) {
             handler.request.cancel(event);
         }
     } else if (handler.verifier) {

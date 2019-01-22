@@ -59,6 +59,12 @@ describe("verification request", function() {
                 },
             };
         };
+        alice.downloadKeys = () => {
+            return Promise.resolve();
+        };
+        bob.downloadKeys = () => {
+            return Promise.resolve();
+        };
         bob.on("crypto.verification.request", (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();
