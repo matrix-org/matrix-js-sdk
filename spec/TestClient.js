@@ -38,6 +38,7 @@ import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-sto
  *
  * @param {WebStorage=} sessionStoreBackend a web storage object to use for the
  *     session store. If undefined, we will create a MockStorageApi.
+ * @param {object} options additional options to pass to the client
  */
 export default function TestClient(
     userId, deviceId, accessToken, sessionStoreBackend, options,
