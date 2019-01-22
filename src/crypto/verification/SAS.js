@@ -61,6 +61,9 @@ export default class SAS extends Base {
         await global.Olm.init();
         olmutil = olmutil || new global.Olm.Utility();
 
+        // make sure user's keys are downloaded
+        await this._baseApis.downloadKeys(this.userId);
+
         if (this.startEvent) {
             return await this._doRespondVerification();
         } else {
@@ -69,9 +72,6 @@ export default class SAS extends Base {
     }
 
     async _doSendVerification() {
-        // FIXME: make sure key is downloaded
-        const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
-
         const initialMessage = {
             method: SAS.NAME,
             from_device: this._baseApis.deviceId,
@@ -157,9 +157,6 @@ export default class SAS extends Base {
               && content.short_authentication_string.includes("hex"))) {
             throw newUnknownMethodError();
         }
-
-        // FIXME: make sure key is downloaded
-        const device = await this._baseApis.getStoredDevice(this.userId, this.deviceId);
 
         const olmSAS = new global.Olm.SAS();
         try {

@@ -83,6 +83,9 @@ describe("SAS verification", function() {
                 "Dynabook",
             );
         };
+        alice.downloadKeys = () => {
+            return Promise.resolve();
+        };
 
         bob.setDeviceVerified = expect.createSpy();
         bob.getStoredDevice = () => {
@@ -97,6 +100,9 @@ describe("SAS verification", function() {
         };
         bob.getDeviceEd25519Key = () => {
             return "bob+base64+ed25519+key";
+        };
+        bob.downloadKeys = () => {
+            return Promise.resolve();
         };
 
         let aliceSasEvent;
@@ -154,7 +160,13 @@ describe("SAS verification", function() {
             },
         );
         alice.setDeviceVerified = expect.createSpy();
+        alice.downloadKeys = () => {
+            return Promise.resolve();
+        };
         bob.setDeviceVerified = expect.createSpy();
+        bob.downloadKeys = () => {
+            return Promise.resolve();
+        };
 
         const bobPromise = new Promise((resolve, reject) => {
             bob.on("crypto.verification.start", (verifier) => {
