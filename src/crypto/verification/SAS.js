@@ -15,9 +15,8 @@ limitations under the License.
 */
 
 /**
+ * Short Authentication String (SAS) verification.
  * @module crypto/verification/SAS
- *
- * Used for Short Authentication String (SAS) verification.
  */
 
 import Base from "./Base";
@@ -48,6 +47,7 @@ const newMismatchedCommitmentError = errorFactory(
 
 /**
  * @alias module:crypto/verification/SAS
+ * @extends {module:crypto/verification/Base}
  */
 export default class SAS extends Base {
     get events() {

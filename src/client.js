@@ -143,7 +143,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
  *    crypto store implementation.
  *
- * @param {Array} opts.verificationMethods Optional. The verification method
+ * @param {Array} [opts.verificationMethods] Optional. The verification method
  * that the application can handle.  Each element should be an item from {@link
  * module:crypto~verificationMethods verificationMethods}, or a class that
  * implements the {$link module:crypto/verification/Base verifier interface}.
@@ -641,8 +641,8 @@ async function _setDeviceVerification(
  * @param {Array} methods array of verification methods to use.  Defaults to
  *    all known methods
  *
- * @returns {Promise<Verifier>} resolves to a verifier when the request is
- *    accepted by the other user
+ * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
+ *    when the request is accepted by the other user
  */
 MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
     if (this._crypto === null) {
@@ -658,7 +658,7 @@ MatrixClient.prototype.requestVerification = function(userId, devices, methods) 
  * @param {string} userId the user to verify keys with
  * @param {string} deviceId the device to verify
  *
- * @returns {Verifier} a verification object
+ * @returns {module:crypto/verification/Base} a verification object
  */
 MatrixClient.prototype.beginKeyVerification = function(
     method, userId, deviceId,
@@ -4225,8 +4225,8 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
 /**
  * Fires when a key verification started message is received.
  * @event module:client~MatrixClient#"crypto.verification.start"
- * @param {module:crypto/verification/Base} a verifier object to perform the
- *     key verification
+ * @param {module:crypto/verification/Base} verifier a verifier object to
+ *     perform the key verification
  */
 
 // EventEmitter JSDocs

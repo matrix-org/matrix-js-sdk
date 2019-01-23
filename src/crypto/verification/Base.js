@@ -15,25 +15,26 @@ limitations under the License.
 */
 
 /**
- * @module crypto/verification/Base
- *
  * Base class for verification methods.
- *
- * Once a verifier object is created, the verification can be started by
- * calling the verify() method, which will return a promise that will resolve
- * when the verification is completed, or reject if it could not complete.
- *
- * Subclasses must have a NAME class property.
+ * @module crypto/verification/Base
  */
 
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 
-/**
- * @alias module:crypto/verification/Base
- */
 export default class VerificationBase extends EventEmitter {
     /**
+     * Base class for verification methods.
+     *
+     * <p>Once a verifier object is created, the verification can be started by
+     * calling the verify() method, which will return a promise that will
+     * resolve when the verification is completed, or reject if it could not
+     * complete.</p>
+     *
+     * <p>Subclasses must have a NAME class property.</p>
+     *
+     * @class
+     *
      * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
      *
      * @param {string} userId the user ID that is being verified
