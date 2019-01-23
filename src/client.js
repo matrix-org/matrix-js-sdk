@@ -1,7 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -142,6 +142,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
  *    crypto store implementation.
+ *
+ * @param {Array} [opts.verificationMethods] Optional. The verification method
+ * that the application can handle.  Each element should be an item from {@link
+ * module:crypto~verificationMethods verificationMethods}, or a class that
+ * implements the {$link module:crypto/verification/Base verifier interface}.
  */
 function MatrixClient(opts) {
     // Allow trailing slash in HS url
@@ -207,6 +212,7 @@ function MatrixClient(opts) {
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
+    this._verificationMethods = opts.verificationMethods;
 
     this._forceTURN = opts.forceTURN || false;
 
@@ -444,6 +450,7 @@ MatrixClient.prototype.initCrypto = async function() {
         this.store,
         this._cryptoStore,
         this._roomList,
+        this._verificationMethods,
     );
 
     this.reEmitter.reEmit(crypto, [
@@ -624,6 +631,43 @@ async function _setDeviceVerification(
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
+
+/**
+ * Request a key verification from another user.
+ *
+ * @param {string} userId the user to request verification with
+ * @param {Array} devices array of device IDs to send requests to.  Defaults to
+ *    all devices owned by the user
+ * @param {Array} methods array of verification methods to use.  Defaults to
+ *    all known methods
+ *
+ * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
+ *    when the request is accepted by the other user
+ */
+MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.requestVerification(userId, devices);
+};
+
+/**
+ * Begin a key verification.
+ *
+ * @param {string} method the verification method to use
+ * @param {string} userId the user to verify keys with
+ * @param {string} deviceId the device to verify
+ *
+ * @returns {module:crypto/verification/Base} a verification object
+ */
+MatrixClient.prototype.beginKeyVerification = function(
+    method, userId, deviceId,
+) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.beginKeyVerification(method, userId, deviceId);
+};
 
 /**
  * Set the global override for whether the client should ever send encrypted
@@ -4160,6 +4204,34 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * from backup or by cross-signing the device.
  *
  * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
+
+/**
+ * Fires when a key verification is requested.
+ * @event module:client~MatrixClient#"crypto.verification.request"
+ * @param {object} data
+ * @param {MatrixEvent} data.event the original verification request message
+ * @param {Array} data.methods the verification methods that can be used
+ * @param {Function} data.beginKeyVerification a function to call if a key
+ *     verification should be performed.  The function takes one argument: the
+ *     name of the key verification method (taken from data.methods) to use.
+ * @param {Function} data.cancel a function to call if the key verification is
+ *     rejected.
+ */
+
+/**
+ * Fires when a key verification is requested with an unknown method.
+ * @event module:client~MatrixClient#"crypto.verification.request.unknown"
+ * @param {string} userId the user ID who requested the key verification
+ * @param {Function} cancel a function that will send a cancellation message to
+ *     reject the key verification.
+ */
+
+/**
+ * Fires when a key verification started message is received.
+ * @event module:client~MatrixClient#"crypto.verification.start"
+ * @param {module:crypto/verification/Base} verifier a verifier object to
+ *     perform the key verification
  */
 
 // EventEmitter JSDocs
