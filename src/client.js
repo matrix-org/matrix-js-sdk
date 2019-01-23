@@ -2324,16 +2324,21 @@ MatrixClient.prototype.mxcUrlToHttp =
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype._unstable_setStatusMessage = function(newMessage) {
+    const type = "im.vector.user_status";
     return Promise.all(this.getRooms().map((room) => {
         const isJoined = room.getMyMembership() === "join";
         const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
-        if (isJoined && looksLikeDm) {
-            return this.sendStateEvent(room.roomId, "im.vector.user_status", {
-                status: newMessage,
-            }, this.getUserId());
-        } else {
+        if (!isJoined || !looksLikeDm) {
             return Promise.resolve();
         }
+        // Check power level separately as it's a bit more expensive.
+        const maySend = room.currentState.mayClientSendStateEvent(type, this);
+        if (!maySend) {
+            return Promise.resolve();
+        }
+        return this.sendStateEvent(room.roomId, type, {
+            status: newMessage,
+        }, this.getUserId());
     }));
 };
 

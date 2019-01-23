@@ -306,8 +306,9 @@ Crypto.prototype.checkKeyBackup = async function() {
  * @return {object} {
  *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
  *     sigs: [
- *         valid: [bool],
- *         device: [DeviceInfo],
+ *         valid: [bool || null], // true: valid, false: invalid, null: cannot attempt validation
+ *         deviceId: [string],
+ *         device: [DeviceInfo || null],
  *     ]
  * }
  */
@@ -335,26 +336,28 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     }
 
     for (const keyId of Object.keys(mySigs)) {
+        const sigInfo = { deviceId: keyId.split(':')[1] }; // XXX: is this how we're supposed to get the device ID?
         const device = this._deviceList.getStoredDevice(
-            this._userId, keyId.split(':')[1], // XXX: is this how we're supposed to get the device ID?
+            this._userId, sigInfo.deviceId,
         );
-        if (!device) {
+        if (device) {
+            sigInfo.device = device;
+            try {
+                await olmlib.verifySignature(
+                    this._olmDevice,
+                    backupInfo.auth_data,
+                    this._userId,
+                    device.deviceId,
+                    device.getFingerprint(),
+                );
+                sigInfo.valid = true;
+            } catch (e) {
+                console.log("Bad signature from device " + device.deviceId, e);
+                sigInfo.valid = false;
+            }
+        } else {
+            sigInfo.valid = null; // Can't determine validity because we don't have the signing device
             console.log("Ignoring signature from unknown key " + keyId);
-            continue;
-        }
-        const sigInfo = { device };
-        try {
-            await olmlib.verifySignature(
-                this._olmDevice,
-                backupInfo.auth_data,
-                this._userId,
-                device.deviceId,
-                device.getFingerprint(),
-            );
-            sigInfo.valid = true;
-        } catch (e) {
-            console.log("Bad signature from device " + device.deviceId, e);
-            sigInfo.valid = false;
         }
         ret.sigs.push(sigInfo);
     }
@@ -1116,6 +1119,8 @@ Crypto.prototype.importRoomKeys = function(keys) {
  */
 Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
     if (this._sendingBackups) return;
+
+    this._sendingBackups = true;
 
     try {
         // wait between 0 and `maxDelay` seconds, to avoid backup
