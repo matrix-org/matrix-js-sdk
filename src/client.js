@@ -59,6 +59,7 @@ Promise.config({warnings: false});
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
+const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -225,6 +226,8 @@ function MatrixClient(opts) {
     this._pushProcessor = new PushProcessor(this);
 
     this._serverSupportsLazyLoading = null;
+
+    this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -390,6 +393,32 @@ MatrixClient.prototype.getNotifTimelineSet = function() {
  */
 MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
     this._notifTimelineSet = notifTimelineSet;
+};
+
+/**
+ * Gets the capabilities of the homeserver. Always returns an object of
+ * capability keys and their options, which may be empty.
+ * @return {module:client.Promise} Resolves to the capabilities of the homeserver
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getCapabilities = function() {
+    if (this._cachedCapabilities) {
+        const now = new Date().getTime();
+        if (now - this._cachedCapabilities.lastUpdated <= CAPABILITIES_CACHE_MS) {
+            return Promise.resolve(this._cachedCapabilities.capabilities);
+        }
+    }
+    return this._http.authedRequest(
+        undefined, "GET", "/capabilities",
+    ).then((r) => {
+        if (!r) r = {};
+        const capabilities = r["capabilities"] || {};
+        this._cachedCapabilities = {
+            capabilities: capabilities,
+            lastUpdated: new Date().getTime(),
+        };
+        return capabilities;
+    });
 };
 
 // Crypto bits
