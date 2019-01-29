@@ -408,9 +408,11 @@ MatrixClient.prototype.getCapabilities = function() {
             return Promise.resolve(this._cachedCapabilities.capabilities);
         }
     }
+
+    // We swallow errors because we need a default object anyhow
     return this._http.authedRequest(
         undefined, "GET", "/capabilities",
-    ).then((r) => {
+    ).catch(() => null).then((r) => {
         if (!r) r = {};
         const capabilities = r["capabilities"] || {};
         this._cachedCapabilities = {
