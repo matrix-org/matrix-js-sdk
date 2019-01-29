@@ -31,6 +31,12 @@ const EventTimelineSet = require("./event-timeline-set");
 
 import ReEmitter from '../ReEmitter';
 
+// These constants are used as sane defaults when the homeserver doesn't support
+// the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
+// the same as the common default room version whereas SAFE_ROOM_VERSIONS are the
+// room versions which are considered okay for people to run without being asked
+// to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
+// return an m.room_versions capability.
 const KNOWN_SAFE_ROOM_VERSION = '1';
 const SAFE_ROOM_VERSIONS = ['1', '2'];
 
