@@ -51,6 +51,7 @@ import { isCryptoAvailable } from './crypto';
 import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
 import { randomString } from './randomstring';
+import { pkSign } from './crypto/PkSigning';
 
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
@@ -955,8 +956,14 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    const decryption = new global.Olm.PkDecryption();
+    let decryption, encryption, signing;
     try {
+        decryption = new global.Olm.PkDecryption();
+        encryption = new global.Olm.PkEncryption();
+        if (global.Olm.PkSigning) {
+            signing = new global.Olm.PkSigning();
+        }
+
         let publicKey;
         const authData = {};
         if (password) {
@@ -969,14 +976,37 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
         }
 
         authData.public_key = publicKey;
+        encryption.set_recipient_key(publicKey);
 
-        return {
+        const returnInfo = {
             algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
             auth_data: authData,
             recovery_key: encodeRecoveryKey(decryption.get_private_key()),
         };
+
+        if (signing) {
+            const ssk_seed = signing.generate_seed();
+            // put the encrypted version of the seed in the auth data to upload
+            // XXX: our encryption really should support encrypting binary data.
+            authData.self_signing_key = encryption.encrypt(Buffer.from(ssk_seed).toString('base64'));
+            // and the unencrypted one in the returndata so we can use it later
+            returnInfo.ssk_seed = ssk_seed
+            // also keep the public part there
+            returnInfo.ssk_public = signing.init_with_seed(ssk_seed);
+            signing.free();
+
+            const usk_seed = signing.generate_seed();
+            authData.user_signing_key = encryption.encrypt(Buffer.from(usk_seed).toString('base64'));
+            returnInfo.usk_seed = usk_seed;
+            returnInfo.usk_public = signing.init_with_seed(usk_seed);
+            signing.free();
+        }
+
+        return returnInfo;
     } finally {
-        decryption.free();
+        if (decryption) decryption.free();
+        if (encryption) encryption.free();
+        if (signing) signing.free();
     }
 };
 
@@ -987,7 +1017,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
  * @param {object} info Info object from prepareKeyBackupVersion
  * @returns {Promise<object>} Object with 'version' param indicating the version created
  */
-MatrixClient.prototype.createKeyBackupVersion = function(info) {
+MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -996,7 +1026,33 @@ MatrixClient.prototype.createKeyBackupVersion = function(info) {
         algorithm: info.algorithm,
         auth_data: info.auth_data,
     };
-    return this._crypto._signObject(data.auth_data).then(() => {
+
+    const uskInfo = {
+        user_id: this.credentials.userId,
+        usage: ['user_signing'],
+        keys: {
+            ['ed25519:' + info.usk_public]: info.usk_public,
+        },
+    };
+
+    pkSign(uskInfo, info.ssk_seed, this.credentials.userId);
+
+    const keys = {
+        self_signing_key: {
+            user_id: this.credentials.userId,
+            usage: ['self_signing'],
+            keys: {
+                ['ed25519:' + info.ssk_public]: info.ssk_public,
+            },
+            replaces: replacesSsk,
+        },
+        user_signing_key: uskInfo,
+        auth,
+    };
+
+    return this.uploadDeviceSigningKeys(keys).then(() => {
+        return this._crypto._signObject(data.auth_data);
+    }).then(() => {
         return this._http.authedRequest(
             undefined, "POST", "/room_keys/version", undefined, data,
         );

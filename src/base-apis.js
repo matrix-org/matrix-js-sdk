@@ -1685,6 +1685,12 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
     );
 };
 
+MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(keys) {
+    return this._http.authedRequestWithPrefix(
+        undefined, "POST", "/keys/device_signing/upload", undefined, keys,
+        httpApi.PREFIX_UNSTABLE,
+    );
+};
 
 // Identity Server Operations
 // ==========================
