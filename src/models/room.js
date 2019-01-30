@@ -31,7 +31,14 @@ const EventTimelineSet = require("./event-timeline-set");
 
 import ReEmitter from '../ReEmitter';
 
-const LATEST_ROOM_VERSION = '1';
+// These constants are used as sane defaults when the homeserver doesn't support
+// the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
+// the same as the common default room version whereas SAFE_ROOM_VERSIONS are the
+// room versions which are considered okay for people to run without being asked
+// to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
+// return an m.room_versions capability.
+const KNOWN_SAFE_ROOM_VERSION = '1';
+const SAFE_ROOM_VERSIONS = ['1', '2'];
 
 function synthesizeReceipt(userId, event, receiptType) {
     // console.log("synthesizing receipt for "+event.getId());
@@ -211,12 +218,74 @@ Room.prototype.getVersion = function() {
  * Determines whether this room needs to be upgraded to a new version
  * @returns {string?} What version the room should be upgraded to, or null if
  *     the room does not require upgrading at this time.
+ * @deprecated Use #getRecommendedVersion() instead
  */
 Room.prototype.shouldUpgradeToVersion = function() {
-    // This almost certainly won't be the way this actually works - this
-    // is essentially a stub method.
-    if (this.getVersion() === LATEST_ROOM_VERSION) return null;
-    return LATEST_ROOM_VERSION;
+    // TODO: Remove this function.
+    // This makes assumptions about which versions are safe, and can easily
+    // be wrong. Instead, people are encouraged to use getRecommendedVersion
+    // which determines a safer value. This function doesn't use that function
+    // because this is not async-capable, and to avoid breaking the contract
+    // we're deprecating this.
+
+    if (!SAFE_ROOM_VERSIONS.includes(this.getVersion())) {
+        return KNOWN_SAFE_ROOM_VERSION;
+    }
+
+    return null;
+};
+
+/**
+ * Determines the recommended room version for the room. This returns an
+ * object with 3 properties: <code>version</code> as the new version the
+ * room should be upgraded to (may be the same as the current version);
+ * <code>needsUpgrade</code> to indicate if the room actually can be
+ * upgraded (ie: does the current version not match?); and <code>urgent</code>
+ * to indicate if the new version patches a vulnerability in a previous
+ * version.
+ * @returns {Promise<{version: string, needsUpgrade: bool, urgent: bool}>}
+ * Resolves to the version the room should be upgraded to.
+ */
+Room.prototype.getRecommendedVersion = async function() {
+    const capabilities = await this._client.getCapabilities();
+    let versionCap = capabilities["m.room_versions"];
+    if (!versionCap) {
+        versionCap = {
+            default: KNOWN_SAFE_ROOM_VERSION,
+            available: {},
+        };
+        for (const safeVer of SAFE_ROOM_VERSIONS) {
+            versionCap.available[safeVer] = "stable";
+        }
+    }
+
+    const currentVersion = this.getVersion();
+
+    const result = {
+        version: currentVersion,
+        needsUpgrade: false,
+        urgent: false,
+    };
+
+    // If the room is on the default version then nothing needs to change
+    if (currentVersion === versionCap.default) return Promise.resolve(result);
+
+    const stableVersions = Object.keys(versionCap.available)
+        .filter((v) => versionCap.available[v] === 'stable');
+
+    // Check if the room is on an unstable version. We determine urgency based
+    // off the version being in the Matrix spec namespace or not (if the version
+    // is in the current namespace and unstable, the room is probably vulnerable).
+    if (!stableVersions.includes(currentVersion)) {
+        result.version = versionCap.default;
+        result.needsUpgrade = true;
+        result.urgent = !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
+        return Promise.resolve(result);
+    }
+
+    // The room is on a stable, but non-default, version by this point.
+    // No upgrade needed.
+    return Promise.resolve(result);
 };
 
 /**

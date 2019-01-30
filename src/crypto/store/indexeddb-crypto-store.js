@@ -481,13 +481,25 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
+     * Count the inbound group sessions that need to be backed up.
+     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @returns {Promise} resolves to the number of sessions
+     */
+    countSessionsNeedingBackup(txn) {
+        return this._connect().then((backend) => {
+            return backend.countSessionsNeedingBackup(txn);
+        });
+    }
+
+    /**
      * Unmark sessions as needing to be backed up.
      * @param {Array<object>} sessions The sessions that need to be backed up.
+     * @param {*} txn An active transaction. See doTxn(). (optional)
      * @returns {Promise} resolves when the sessions are unmarked
      */
-    unmarkSessionsNeedingBackup(sessions) {
+    unmarkSessionsNeedingBackup(sessions, txn) {
         return this._connect().then((backend) => {
-            return backend.unmarkSessionsNeedingBackup(sessions);
+            return backend.unmarkSessionsNeedingBackup(sessions, txn);
         });
     }
 

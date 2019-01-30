@@ -1,7 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018-2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ Promise.config({warnings: false});
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
+const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -142,6 +143,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
  *    crypto store implementation.
+ *
+ * @param {Array} [opts.verificationMethods] Optional. The verification method
+ * that the application can handle.  Each element should be an item from {@link
+ * module:crypto~verificationMethods verificationMethods}, or a class that
+ * implements the {$link module:crypto/verification/Base verifier interface}.
  */
 function MatrixClient(opts) {
     // Allow trailing slash in HS url
@@ -207,6 +213,7 @@ function MatrixClient(opts) {
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
+    this._verificationMethods = opts.verificationMethods;
 
     this._forceTURN = opts.forceTURN || false;
 
@@ -219,6 +226,8 @@ function MatrixClient(opts) {
     this._pushProcessor = new PushProcessor(this);
 
     this._serverSupportsLazyLoading = null;
+
+    this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
@@ -386,6 +395,34 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
     this._notifTimelineSet = notifTimelineSet;
 };
 
+/**
+ * Gets the capabilities of the homeserver. Always returns an object of
+ * capability keys and their options, which may be empty.
+ * @return {module:client.Promise} Resolves to the capabilities of the homeserver
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getCapabilities = function() {
+    if (this._cachedCapabilities) {
+        const now = new Date().getTime();
+        if (now - this._cachedCapabilities.lastUpdated <= CAPABILITIES_CACHE_MS) {
+            return Promise.resolve(this._cachedCapabilities.capabilities);
+        }
+    }
+
+    // We swallow errors because we need a default object anyhow
+    return this._http.authedRequest(
+        undefined, "GET", "/capabilities",
+    ).catch(() => null).then((r) => {
+        if (!r) r = {};
+        const capabilities = r["capabilities"] || {};
+        this._cachedCapabilities = {
+            capabilities: capabilities,
+            lastUpdated: new Date().getTime(),
+        };
+        return capabilities;
+    });
+};
+
 // Crypto bits
 // ===========
 
@@ -444,10 +481,12 @@ MatrixClient.prototype.initCrypto = async function() {
         this.store,
         this._cryptoStore,
         this._roomList,
+        this._verificationMethods,
     );
 
     this.reEmitter.reEmit(crypto, [
         "crypto.keyBackupFailed",
+        "crypto.keyBackupSessionsRemaining",
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
@@ -623,6 +662,43 @@ async function _setDeviceVerification(
     );
     client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
+
+/**
+ * Request a key verification from another user.
+ *
+ * @param {string} userId the user to request verification with
+ * @param {Array} devices array of device IDs to send requests to.  Defaults to
+ *    all devices owned by the user
+ * @param {Array} methods array of verification methods to use.  Defaults to
+ *    all known methods
+ *
+ * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
+ *    when the request is accepted by the other user
+ */
+MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.requestVerification(userId, devices);
+};
+
+/**
+ * Begin a key verification.
+ *
+ * @param {string} method the verification method to use
+ * @param {string} userId the user to verify keys with
+ * @param {string} deviceId the device to verify
+ *
+ * @returns {module:crypto/verification/Base} a verification object
+ */
+MatrixClient.prototype.beginKeyVerification = function(
+    method, userId, deviceId,
+) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.beginKeyVerification(method, userId, deviceId);
+};
 
 /**
  * Set the global override for whether the client should ever send encrypted
@@ -842,6 +918,10 @@ MatrixClient.prototype.enableKeyBackup = function(info) {
     this._crypto.backupKey.set_recipient_key(info.auth_data.public_key);
 
     this.emit('crypto.keyBackupStatus', true);
+
+    // There may be keys left over from a partially completed backup, so
+    // schedule a send to check.
+    this._crypto.scheduleKeyBackupSend();
 };
 
 /**
@@ -992,12 +1072,16 @@ MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data
     );
 };
 
-MatrixClient.prototype.backupAllGroupSessions = function(version) {
+/**
+ * Marks all group sessions as needing to be backed up and schedules them to
+ * upload in the background as soon as possible.
+ */
+MatrixClient.prototype.scheduleAllGroupSessionsForBackup = async function() {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    return this._crypto.backupAllGroupSessions(version);
+    await this._crypto.scheduleAllGroupSessionsForBackup();
 };
 
 MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
@@ -2271,16 +2355,21 @@ MatrixClient.prototype.mxcUrlToHttp =
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype._unstable_setStatusMessage = function(newMessage) {
+    const type = "im.vector.user_status";
     return Promise.all(this.getRooms().map((room) => {
         const isJoined = room.getMyMembership() === "join";
         const looksLikeDm = room.getInvitedAndJoinedMemberCount() === 2;
-        if (isJoined && looksLikeDm) {
-            return this.sendStateEvent(room.roomId, "im.vector.user_status", {
-                status: newMessage,
-            }, this.getUserId());
-        } else {
+        if (!isJoined || !looksLikeDm) {
             return Promise.resolve();
         }
+        // Check power level separately as it's a bit more expensive.
+        const maySend = room.currentState.mayClientSendStateEvent(type, this);
+        if (!maySend) {
+            return Promise.resolve();
+        }
+        return this.sendStateEvent(room.roomId, type, {
+            status: newMessage,
+        }, this.getUserId());
     }));
 };
 
@@ -4146,6 +4235,34 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * from backup or by cross-signing the device.
  *
  * @event module:client~MatrixClient#"crypto.suggestKeyRestore"
+ */
+
+/**
+ * Fires when a key verification is requested.
+ * @event module:client~MatrixClient#"crypto.verification.request"
+ * @param {object} data
+ * @param {MatrixEvent} data.event the original verification request message
+ * @param {Array} data.methods the verification methods that can be used
+ * @param {Function} data.beginKeyVerification a function to call if a key
+ *     verification should be performed.  The function takes one argument: the
+ *     name of the key verification method (taken from data.methods) to use.
+ * @param {Function} data.cancel a function to call if the key verification is
+ *     rejected.
+ */
+
+/**
+ * Fires when a key verification is requested with an unknown method.
+ * @event module:client~MatrixClient#"crypto.verification.request.unknown"
+ * @param {string} userId the user ID who requested the key verification
+ * @param {Function} cancel a function that will send a cancellation message to
+ *     reject the key verification.
+ */
+
+/**
+ * Fires when a key verification started message is received.
+ * @event module:client~MatrixClient#"crypto.verification.start"
+ * @param {module:crypto/verification/Base} verifier a verifier object to
+ *     perform the key verification
  */
 
 // EventEmitter JSDocs
