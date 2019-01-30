@@ -1,3 +1,37 @@
+Changes in [0.14.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.3) (2019-01-22)
+==================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.3-rc.1...v0.14.3)
+
+ * No changes since rc.1
+
+Changes in [0.14.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.3-rc.1) (2019-01-17)
+============================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.2...v0.14.3-rc.1)
+
+ * Merge develop into experimental
+   [\#815](https://github.com/matrix-org/matrix-js-sdk/pull/815)
+ * Add a getAllEndToEndSessions to crypto store
+   [\#812](https://github.com/matrix-org/matrix-js-sdk/pull/812)
+ * T3chguy/fix displayname logic
+   [\#668](https://github.com/matrix-org/matrix-js-sdk/pull/668)
+ * Contributing: Note that rebase lets you mass signoff commits
+   [\#814](https://github.com/matrix-org/matrix-js-sdk/pull/814)
+ * take into account homoglyphs when calculating similar display names
+   [\#672](https://github.com/matrix-org/matrix-js-sdk/pull/672)
+ * Emit for key backup failures
+   [\#809](https://github.com/matrix-org/matrix-js-sdk/pull/809)
+ * emit oldEventId on "updatePendingEvent"
+   [\#646](https://github.com/matrix-org/matrix-js-sdk/pull/646)
+ * Add getThirdpartyUser to base api
+   [\#589](https://github.com/matrix-org/matrix-js-sdk/pull/589)
+ * Support custom status messages
+   [\#805](https://github.com/matrix-org/matrix-js-sdk/pull/805)
+ * Extra checks to avoid release script blowing up mid-process.
+   [\#749](https://github.com/matrix-org/matrix-js-sdk/pull/749)
+ * Move glob regex utilities out of the pushprocessor and into a more generic
+   place
+   [\#800](https://github.com/matrix-org/matrix-js-sdk/pull/800)
+
 Changes in [0.14.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.2) (2018-12-10)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.2-rc.1...v0.14.2)
