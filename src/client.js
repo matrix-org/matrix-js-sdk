@@ -53,6 +53,8 @@ import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password'
 import { randomString } from './randomstring';
 import { pkSign } from './crypto/PkSigning';
 
+import IndexedDBCryptoStore from './crypto/store/indexeddb-crypto-store';
+
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
 Promise.config({warnings: false});
@@ -982,24 +984,40 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
             algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
             auth_data: authData,
             recovery_key: encodeRecoveryKey(decryption.get_private_key()),
+            accountKeys: null,
         };
 
         if (signing) {
-            const ssk_seed = signing.generate_seed();
+            await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+                this._cryptoStore.getAccountKeys(txn, keys => {
+                    returnInfo.accountKeys = keys;
+                });
+            });
+
+            if (!returnInfo.accountKeys) {
+                const ssk_seed = signing.generate_seed();
+                const usk_seed = signing.generate_seed();
+
+                returnInfo.accountKeys = {
+                    self_signing_key_seed: Buffer.from(ssk_seed).toString('base64'),
+                    user_signing_key_seed: Buffer.from(usk_seed).toString('base64'),
+                }
+            }
+
             // put the encrypted version of the seed in the auth data to upload
             // XXX: our encryption really should support encrypting binary data.
-            authData.self_signing_key = encryption.encrypt(Buffer.from(ssk_seed).toString('base64'));
-            // and the unencrypted one in the returndata so we can use it later
-            returnInfo.ssk_seed = ssk_seed
+            authData.self_signing_key_seed = encryption.encrypt(returnInfo.accountKeys.self_signing_key_seed);
             // also keep the public part there
-            returnInfo.ssk_public = signing.init_with_seed(ssk_seed);
+            returnInfo.ssk_public = signing.init_with_seed(Buffer.from(returnInfo.accountKeys.self_signing_key_seed, 'base64'));
             signing.free();
 
-            const usk_seed = signing.generate_seed();
-            authData.user_signing_key = encryption.encrypt(Buffer.from(usk_seed).toString('base64'));
-            returnInfo.usk_seed = usk_seed;
-            returnInfo.usk_public = signing.init_with_seed(usk_seed);
+            // same for the USK
+            authData.user_signing_key_seed = encryption.encrypt(returnInfo.accountKeys.user_signing_key_seed);
+            returnInfo.usk_public = signing.init_with_seed(Buffer.from(returnInfo.accountKeys.user_signing_key_seed, 'base64'));
             signing.free();
+
+            // we don't save these keys back to the store yet: we'll do that when (if) we
+            // actually create the backup
         }
 
         return returnInfo;
@@ -1035,7 +1053,8 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
         },
     };
 
-    pkSign(uskInfo, info.ssk_seed, this.credentials.userId);
+    // sign the USK with the SSK
+    pkSign(uskInfo, Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'), this.credentials.userId);
 
     const keys = {
         self_signing_key: {
@@ -1050,7 +1069,11 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
         auth,
     };
 
-    return this.uploadDeviceSigningKeys(keys).then(() => {
+    return this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        this._cryptoStore.storeAccountKeys(txn, info.accountKeys);
+    }).then(() => {
+        return this.uploadDeviceSigningKeys(keys);
+    }).then(() => {
         return this._crypto._signObject(data.auth_data);
     }).then(() => {
         return this._http.authedRequest(
@@ -1150,27 +1173,25 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
 };
 
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
-    password, targetRoomId, targetSessionId, version,
+    password, targetRoomId, targetSessionId, backupInfo,
 ) {
-    const backupInfo = await this.getKeyBackupVersion();
-
     const privKey = await keyForExistingBackup(backupInfo, password);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, version,
+        privKey, targetRoomId, targetSessionId, backupInfo,
     );
 };
 
 MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
-    recoveryKey, targetRoomId, targetSessionId, version,
+    recoveryKey, targetRoomId, targetSessionId, backupInfo,
 ) {
     const privKey = decodeRecoveryKey(recoveryKey);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, version,
+        privKey, targetRoomId, targetSessionId, backupInfo,
     );
 };
 
-MatrixClient.prototype._restoreKeyBackup = function(
-    privKey, targetRoomId, targetSessionId, version,
+MatrixClient.prototype._restoreKeyBackup = async function(
+    privKey, targetRoomId, targetSessionId, backupInfo,
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1178,11 +1199,39 @@ MatrixClient.prototype._restoreKeyBackup = function(
     let totalKeyCount = 0;
     let keys = [];
 
-    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
+    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
 
     const decryption = new global.Olm.PkDecryption();
     try {
         decryption.init_with_private_key(privKey);
+
+        // decrypt the account keys from the backup info if there are any
+        // fetch the old ones first so we don't lose info if only one of them is in the backup
+        let accountKeys;
+        await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys || {};
+            });
+        });
+
+        if (backupInfo.auth_data.self_signing_key_seed) {
+            accountKeys.self_signing_key_seed = decryption.decrypt(
+                backupInfo.auth_data.self_signing_key_seed.ephemeral,
+                backupInfo.auth_data.self_signing_key_seed.mac,
+                backupInfo.auth_data.self_signing_key_seed.ciphertext,
+            );
+        }
+        if (backupInfo.auth_data.user_signing_key_seed) {
+            accountKeys.user_signing_key_seed = decryption.decrypt(
+                backupInfo.auth_data.user_signing_key_seed.ephemeral,
+                backupInfo.auth_data.user_signing_key_seed.mac,
+                backupInfo.auth_data.user_signing_key_seed.ciphertext,
+            );
+        }
+
+        await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.storeAccountKeys(txn, accountKeys);
+        });
     } catch(e) {
         decryption.free();
         throw e;

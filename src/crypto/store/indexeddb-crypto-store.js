@@ -283,7 +283,7 @@ export default class IndexedDBCryptoStore {
         this._backendPromise.value().getAccount(txn, func);
     }
 
-    /*
+    /**
      * Write the account pickle to the store.
      * This requires an active transaction. See doTxn().
      *
@@ -292,6 +292,28 @@ export default class IndexedDBCryptoStore {
      */
     storeAccount(txn, newData) {
         this._backendPromise.value().storeAccount(txn, newData);
+    }
+
+    /**
+     * Get the account keys fort cross-signing (eg. self-signing key,
+     * user signing key).
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(string)} func Called with the account keys object:
+     *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
+     */
+    getAccountKeys(txn, func) {
+        this._backendPromise.value().getAccountKeys(txn, func);
+    }
+
+    /**
+     * Write the account keys back to the store
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {string} keys Account keys object as getAccountKeys()
+     */
+    storeAccountKeys(txn, keys) {
+        this._backendPromise.value().storeAccountKeys(txn, keys);
     }
 
     // Olm sessions

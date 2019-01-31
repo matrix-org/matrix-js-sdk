@@ -332,6 +332,23 @@ export class Backend {
         objectStore.put(newData, "-");
     }
 
+    getAccountKeys(txn, func) {
+        const objectStore = txn.objectStore("account");
+        const getReq = objectStore.get("keys");
+        getReq.onsuccess = function() {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeAccountKeys(txn, keys) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(keys, "keys");
+    }
+
     // Olm Sessions
 
     countEndToEndSessions(txn, func) {

@@ -31,6 +31,7 @@ import MemoryCryptoStore from './memory-crypto-store.js';
 
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
+const KEY_END_TO_END_ACCOUNT_KEYS = E2E_PREFIX + "account_keys";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
@@ -271,6 +272,17 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     storeAccount(txn, newData) {
         setJsonItem(
             this.store, KEY_END_TO_END_ACCOUNT, newData,
+        );
+    }
+
+    getAccountKeys(txn, func) {
+        const keys = getJsonItem(this.store, KEY_END_TO_END_ACCOUNT_KEYS);
+        func(keys);
+    }
+
+    storeAccountKeys(txn, keys) {
+        setJsonItem(
+            this.store, KEY_END_TO_END_ACCOUNT_KEYS, keys,
         );
     }
 
