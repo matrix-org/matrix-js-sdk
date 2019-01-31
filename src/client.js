@@ -1070,8 +1070,10 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
     };
 
     return this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        // store the newly generated account keys
         this._cryptoStore.storeAccountKeys(txn, info.accountKeys);
     }).then(() => {
+        // upload the public part of the account keys
         return this.uploadDeviceSigningKeys(keys);
     }).then(() => {
         return this._crypto._signObject(data.auth_data);
@@ -1086,6 +1088,9 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
             version: res.version,
         });
         return res;
+    }).then(() => {
+        // upload signatures between the SSK & this device
+        return this._crypto.uploadDeviceKeySignatures();
     });
 };
 
@@ -1199,8 +1204,6 @@ MatrixClient.prototype._restoreKeyBackup = async function(
     let totalKeyCount = 0;
     let keys = [];
 
-    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
-
     const decryption = new global.Olm.PkDecryption();
     try {
         decryption.init_with_private_key(privKey);
@@ -1237,9 +1240,14 @@ MatrixClient.prototype._restoreKeyBackup = async function(
         throw e;
     }
 
-    return this._http.authedRequest(
-        undefined, "GET", path.path, path.queryData,
-    ).then((res) => {
+    // start by signing this device from the SSK now we have it
+    return this._crypto.uploadDeviceKeySignatures().then(() => {
+        // Now fetch the encrypted keys
+        const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
+        return this._http.authedRequest(
+            undefined, "GET", path.path, path.queryData,
+        );
+    }).then((res) => {
         if (res.rooms) {
             for (const [roomId, roomData] of Object.entries(res.rooms)) {
                 if (!roomData.sessions) continue;

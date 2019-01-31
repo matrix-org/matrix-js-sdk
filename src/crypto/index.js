@@ -46,6 +46,8 @@ import {
     newUnknownMethodError,
 } from './verification/Error';
 
+import { pkSign } from './PkSigning';
+
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
     [ShowQRCode.NAME]: ShowQRCode,
@@ -457,8 +459,20 @@ Crypto.prototype.uploadDeviceKeys = function() {
         user_id: userId,
     };
 
+    let accountKeys;
     return crypto._signObject(deviceKeys).then(() => {
-        crypto._baseApis.uploadKeysRequest({
+        return this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys;
+            });
+        });
+    }).then(() => {
+        if (accountKeys && accountKeys.self_signing_key_seed) {
+            // if we have an SSK, sign the key with the SSK too
+            pkSign(deviceKeys, Buffer.from(accountKeys.self_signing_key_seed, 'base64'), userId);
+        }
+
+        return crypto._baseApis.uploadKeysRequest({
             device_keys: deviceKeys,
         }, {
             // for now, we set the device id explicitly, as we may not be using the
@@ -466,6 +480,45 @@ Crypto.prototype.uploadDeviceKeys = function() {
             device_id: deviceId,
         });
     });
+};
+
+/**
+ * If a self-signing key is available, uploads the signature of this device from
+ * the self-signing key
+ *
+ * @return {bool} Promise: True if signatures were uploaded or otherwise false
+ *     (eg. if no account keys were available)
+ */
+Crypto.prototype.uploadDeviceKeySignatures = async function() {
+    const crypto = this;
+    const userId = crypto._userId;
+    const deviceId = crypto._deviceId;
+
+    const thisDeviceKey = {
+        algorithms: crypto._supportedAlgorithms,
+        device_id: deviceId,
+        keys: crypto._deviceKeys,
+        user_id: userId,
+    };
+    let accountKeys;
+    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        this._cryptoStore.getAccountKeys(txn, keys => {
+            accountKeys = keys;
+        });
+    });
+    if (!accountKeys || !accountKeys.self_signing_key_seed) return false;
+
+    // Sign this device with the SSK
+    pkSign(thisDeviceKey, Buffer.from(accountKeys.self_signing_key_seed, 'base64'), userId);
+
+    const content = {
+        [userId]: {
+            [deviceId]: thisDeviceKey,
+        },
+    };
+
+    await crypto._baseApis.uploadKeySignatures(content);
+    return true
 };
 
 /**

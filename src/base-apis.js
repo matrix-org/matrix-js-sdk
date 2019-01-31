@@ -1594,6 +1594,12 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     );
 };
 
+MatrixBaseApis.prototype.uploadKeySignatures = function(content) {
+    return this._http.authedRequestWithPrefix(
+        undefined, "POST", '/keys/signatures/upload', undefined, content, httpApi.PREFIX_UNSTABLE,
+    );
+};
+
 /**
  * Download device keys
  *
