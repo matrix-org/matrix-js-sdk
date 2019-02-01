@@ -257,6 +257,9 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+    // make sure we are keeping track of our own devices
+    // (this is important for key backups & things)
+    this._deviceList.startTrackingDeviceList(this._userId);
 
     this._checkAndStartKeyBackup();
 };
