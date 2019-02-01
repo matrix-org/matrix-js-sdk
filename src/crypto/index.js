@@ -268,7 +268,7 @@ Crypto.prototype._onDeviceListUserSskUpdated = async function(userId) {
     if (userId === this._userId) {
         this.checkOwnSskTrust();
     }
-}
+};
 
 /*
  * Check the copy of our SSK that we have in the device list and see if it
@@ -303,7 +303,7 @@ Crypto.prototype.checkOwnSskTrust = async function() {
     let localPubkey;
     try {
         signing = new global.Olm.PkSigning();
-        localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'))
+        localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'));
     } finally {
         if (signing) signing.free();
         signing = null;
@@ -467,7 +467,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             s.valid && (
                 (s.device && s.device.isVerified()) || (s.self_signing_key && s.self_signing_key.isVerified())
             )
-        )
+        );
     });
     return ret;
 };
@@ -622,7 +622,7 @@ Crypto.prototype.uploadDeviceKeySignatures = async function() {
     };
 
     await crypto._baseApis.uploadKeySignatures(content);
-    return true
+    return true;
 };
 
 /**
@@ -829,7 +829,7 @@ Crypto.prototype.setSskVerification = async function(userId, verified) {
         throw new Error("No self-signing key found for user " + userId);
     }
     ssk.verified = verified;
-    this._deviceList.storeSskForUser(userId, ssk)
+    this._deviceList.storeSskForUser(userId, ssk);
     this._deviceList.saveIfDirty();
 };
 

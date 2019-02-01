@@ -788,7 +788,9 @@ class DeviceListUpdateSerialiser {
             let prom = Promise.resolve();
             for (const userId of downloadUsers) {
                 prom = prom.delay(5).then(() => {
-                    return this._processQueryResponseForUser(userId, dk[userId], ssks[userId]);
+                    return this._processQueryResponseForUser(
+                        userId, dk[userId], ssks[userId],
+                    );
                 });
             }
 
@@ -812,9 +814,9 @@ class DeviceListUpdateSerialiser {
         return deferred.promise;
     }
 
-    async _processQueryResponseForUser(userId, dk_response, ssk_response) {
-        logger.log('got device keys for ' + userId + ':', dk_response);
-        logger.log('got self-signing keys for ' + userId + ':', ssk_response);
+    async _processQueryResponseForUser(userId, dkResponse, sskResponse) {
+        logger.log('got device keys for ' + userId + ':', dkResponse);
+        logger.log('got self-signing keys for ' + userId + ':', sskResponse);
 
         {
             // map from deviceid -> deviceinfo for this user
@@ -828,7 +830,7 @@ class DeviceListUpdateSerialiser {
             }
 
             await _updateStoredDeviceKeysForUser(
-                this._olmDevice, userId, userStore, dk_response || {},
+                this._olmDevice, userId, userStore, dkResponse || {},
             );
 
             // put the updates into the object that will be returned as our results
@@ -845,7 +847,7 @@ class DeviceListUpdateSerialiser {
             const ssk = this._deviceList.getRawStoredSskForUser(userId) || {};
 
             const updated = await _updateStoredSelfSigningKeyForUser(
-                this._olmDevice, userId, ssk, ssk_response || {},
+                this._olmDevice, userId, ssk, sskResponse || {},
             );
 
             this._deviceList.setRawStoredSskForUser(userId, ssk);

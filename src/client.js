@@ -958,7 +958,9 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    let decryption, encryption, signing;
+    let decryption;
+    let encryption;
+    let signing;
     try {
         decryption = new global.Olm.PkDecryption();
         encryption = new global.Olm.PkEncryption();
@@ -988,32 +990,43 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
         };
 
         if (signing) {
-            await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-                this._cryptoStore.getAccountKeys(txn, keys => {
-                    returnInfo.accountKeys = keys;
-                });
-            });
+            await this._cryptoStore.doTxn(
+                'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    this._cryptoStore.getAccountKeys(txn, (keys) => {
+                        returnInfo.accountKeys = keys;
+                    });
+                },
+            );
 
             if (!returnInfo.accountKeys) {
-                const ssk_seed = signing.generate_seed();
-                const usk_seed = signing.generate_seed();
+                const sskSeed = signing.generate_seed();
+                const uskSeed = signing.generate_seed();
 
                 returnInfo.accountKeys = {
-                    self_signing_key_seed: Buffer.from(ssk_seed).toString('base64'),
-                    user_signing_key_seed: Buffer.from(usk_seed).toString('base64'),
-                }
+                    self_signing_key_seed: Buffer.from(sskSeed).toString('base64'),
+                    user_signing_key_seed: Buffer.from(uskSeed).toString('base64'),
+                };
             }
 
             // put the encrypted version of the seed in the auth data to upload
             // XXX: our encryption really should support encrypting binary data.
-            authData.self_signing_key_seed = encryption.encrypt(returnInfo.accountKeys.self_signing_key_seed);
+            authData.self_signing_key_seed = encryption.encrypt(
+                returnInfo.accountKeys.self_signing_key_seed,
+            );
             // also keep the public part there
-            returnInfo.ssk_public = signing.init_with_seed(Buffer.from(returnInfo.accountKeys.self_signing_key_seed, 'base64'));
+            returnInfo.ssk_public = signing.init_with_seed(
+                Buffer.from(returnInfo.accountKeys.self_signing_key_seed, 'base64'),
+            );
             signing.free();
 
             // same for the USK
-            authData.user_signing_key_seed = encryption.encrypt(returnInfo.accountKeys.user_signing_key_seed);
-            returnInfo.usk_public = signing.init_with_seed(Buffer.from(returnInfo.accountKeys.user_signing_key_seed, 'base64'));
+            authData.user_signing_key_seed = encryption.encrypt(
+                returnInfo.accountKeys.user_signing_key_seed,
+            );
+            returnInfo.usk_public = signing.init_with_seed(
+                Buffer.from(returnInfo.accountKeys.user_signing_key_seed, 'base64'),
+            );
             signing.free();
 
             // we don't save these keys back to the store yet: we'll do that when (if) we
@@ -1033,6 +1046,8 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
  * from prepareKeyBackupVersion.
  *
  * @param {object} info Info object from prepareKeyBackupVersion
+ * @param {object} auth Auth object for UI auth
+ * @param {string} replacesSsk If the SSK is being replaced, the ID of the old key
  * @returns {Promise<object>} Object with 'version' param indicating the version created
  */
 MatrixClient.prototype.createKeyBackupVersion = async function(info, auth, replacesSsk) {
@@ -1054,7 +1069,11 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info, auth, repla
     };
 
     // sign the USK with the SSK
-    pkSign(uskInfo, Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'), this.credentials.userId);
+    pkSign(
+        uskInfo,
+        Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'),
+        this.credentials.userId,
+    );
 
     // Now sig the backup auth data. Do it as this device first because crypto._signObject
     // is dumb and bluntly replaces the whole signatures block...
@@ -1062,7 +1081,11 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info, auth, repla
     await this._crypto._signObject(data.auth_data);
 
     // now also sign the auth data with the SSK
-    pkSign(data.auth_data, Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'), this.credentials.userId);
+    pkSign(
+        data.auth_data,
+        Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'),
+        this.credentials.userId,
+    );
 
     const keys = {
         self_signing_key: {
@@ -1077,10 +1100,13 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info, auth, repla
         auth,
     };
 
-    return this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        // store the newly generated account keys
-        this._cryptoStore.storeAccountKeys(txn, info.accountKeys);
-    }).then(() => {
+    return this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            // store the newly generated account keys
+            this._cryptoStore.storeAccountKeys(txn, info.accountKeys);
+        },
+    ).then(() => {
         // re-check the SSK in the device store if necessary
         return this._crypto.checkOwnSskTrust();
     }).then(() => {
@@ -1220,11 +1246,14 @@ MatrixClient.prototype._restoreKeyBackup = async function(
         // decrypt the account keys from the backup info if there are any
         // fetch the old ones first so we don't lose info if only one of them is in the backup
         let accountKeys;
-        await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.getAccountKeys(txn, keys => {
-                accountKeys = keys || {};
-            });
-        });
+        await this._cryptoStore.doTxn(
+            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.getAccountKeys(txn, (keys) => {
+                    accountKeys = keys || {};
+                });
+            },
+        );
 
         if (backupInfo.auth_data.self_signing_key_seed) {
             accountKeys.self_signing_key_seed = decryption.decrypt(
@@ -1241,9 +1270,12 @@ MatrixClient.prototype._restoreKeyBackup = async function(
             );
         }
 
-        await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.storeAccountKeys(txn, accountKeys);
-        });
+        await this._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.storeAccountKeys(txn, accountKeys);
+            },
+        );
 
         await this._crypto.checkOwnSskTrust();
     } catch(e) {
@@ -1254,7 +1286,9 @@ MatrixClient.prototype._restoreKeyBackup = async function(
     // start by signing this device from the SSK now we have it
     return this._crypto.uploadDeviceKeySignatures().then(() => {
         // Now fetch the encrypted keys
-        const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, backupInfo.version);
+        const path = this._makeKeyBackupPath(
+            targetRoomId, targetSessionId, backupInfo.version,
+        );
         return this._http.authedRequest(
             undefined, "GET", path.path, path.queryData,
         );
