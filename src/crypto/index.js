@@ -31,6 +31,7 @@ const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");
 const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
+import SskInfo from './sskinfo';
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
@@ -102,6 +103,8 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  */
 export default function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
+    this._onDeviceListUserSskUpdated = this._onDeviceListUserSskUpdated.bind(this);
+
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
@@ -140,6 +143,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceList = new DeviceList(
         baseApis, cryptoStore, sessionStore, this._olmDevice,
     );
+    // XXX: This isn't removed at any point, but then none of the event listeners
+    // this class sets seem to be removed at any point... :/
+    this._deviceList.on('userSskUpdated', this._onDeviceListUserSskUpdated);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -253,6 +259,59 @@ Crypto.prototype.init = async function() {
     }
 
     this._checkAndStartKeyBackup();
+};
+
+/*
+ * Event handler for DeviceList's userNewDevices event
+ */
+Crypto.prototype._onDeviceListUserSskUpdated = async function(userId) {
+    if (userId === this._userId) {
+        // If we see an update to our own SSK, check it against the SSK we have and,
+        // if it matches, mark it as verified
+
+        // First, get the pubkey of the one we can see
+        const seenSsk = this._deviceList.getStoredSskForUser(userId);
+        if (!seenSsk) {
+            logger.error("Got SSK update event for user " + userId + " but no new SSK found!");
+            return;
+        }
+        const seenPubkey = seenSsk.getFingerprint();
+
+        // Now dig out the account keys and get the pubkey of the one in there
+        let accountKeys = null;
+        await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys;
+            });
+        });
+        if (!accountKeys || !accountKeys.self_signing_key_seed) {
+            logger.info("Ignoring new self-signing key for us because we have no private part stored");
+            return;
+        }
+        let signing;
+        let localPubkey;
+        try {
+            signing = new global.Olm.PkSigning();
+            localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'))
+        } finally {
+            if (signing) signing.free();
+            signing = null;
+        }
+        if (!localPubkey) {
+            logger.error("Unable to compute public key for stored SSK seed");
+        }
+
+        // Finally, are they the same?
+        if (seenPubkey === localPubkey) {
+            logger.info("Published self-signing key matches local copy: marking as verified");
+            this.setSskVerification(userId, SskInfo.SskVerification.VERIFIED);
+        } else {
+            logger.info(
+                "Published self-signing key DOES NOT match local copy! Local: " +
+                localPubkey + ", published: " + seenPubkey,
+            );
+        }
+    }
 };
 
 /**
@@ -717,6 +776,16 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
  */
 Crypto.prototype.saveDeviceList = function(delay) {
     return this._deviceList.saveIfDirty(delay);
+};
+
+Crypto.prototype.setSskVerification = async function(userId, verified) {
+    const ssk = this._deviceList.getRawStoredSskForUser(userId);
+    if (!ssk) {
+        throw new Error("No self-signing key found for user " + userId);
+    }
+    ssk.verified = verified;
+    this._deviceList.storeSskForUser(userId, ssk)
+    this._deviceList.saveIfDirty();
 };
 
 /**

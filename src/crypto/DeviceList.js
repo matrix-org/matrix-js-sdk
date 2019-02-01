@@ -23,9 +23,11 @@ limitations under the License.
  */
 
 import Promise from 'bluebird';
+import {EventEmitter} from 'events';
 
 import logger from '../logger';
 import DeviceInfo from './deviceinfo';
+import SskInfo from './sskinfo';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
@@ -60,8 +62,10 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
 /**
  * @alias module:crypto/DeviceList
  */
-export default class DeviceList {
+export default class DeviceList extends EventEmitter {
     constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
+        super();
+
         this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
 
@@ -71,6 +75,11 @@ export default class DeviceList {
         //     }
         // }
         this._devices = {};
+
+        // userId -> {
+        //     [key info]
+        // }
+        this._ssks = {};
 
         // map of identity keys to the user who owns it
         this._userByIdentityKey = {};
@@ -122,12 +131,14 @@ export default class DeviceList {
                         this._syncToken = this._sessionStore.getEndToEndDeviceSyncToken();
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
+                            self_signing_keys: this._ssks,
                             trackingStatus: this._deviceTrackingStatus,
                             syncToken: this._syncToken,
                         }, txn);
                         shouldDeleteSessionStore = true;
                     } else {
                         this._devices = deviceData ? deviceData.devices : {},
+                        this._ssks = deviceData ? deviceData.self_signing_keys || {} : {};
                         this._deviceTrackingStatus = deviceData ?
                             deviceData.trackingStatus : {};
                         this._syncToken = deviceData ? deviceData.syncToken : null;
@@ -224,6 +235,7 @@ export default class DeviceList {
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
+                            self_signing_keys: this._ssks,
                             trackingStatus: this._deviceTrackingStatus,
                             syncToken: this._syncToken,
                         }, txn);
@@ -355,6 +367,21 @@ export default class DeviceList {
      */
     getRawStoredDevicesForUser(userId) {
         return this._devices[userId];
+    }
+
+    getRawStoredSskForUser(userId) {
+        return this._ssks[userId];
+    }
+
+    getStoredSskForUser(userId) {
+        if (!this._ssks[userId]) return null;
+
+        return SskInfo.fromStorage(this._ssks[userId]);
+    }
+
+    storeSskForUser(userId, ssk) {
+        this._ssks[userId] = ssk;
+        this._dirty = true;
     }
 
     /**
@@ -584,6 +611,10 @@ export default class DeviceList {
         }
     }
 
+    setRawStoredSskForUser(userId, ssk) {
+        this._ssks[userId] = ssk;
+    }
+
     /**
      * Fire off download update requests for the given users, and update the
      * device list tracking status for them, and the
@@ -747,6 +778,7 @@ class DeviceListUpdateSerialiser {
             downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
+            const ssks = res.self_signing_keys || {};
 
             // do each user in a separate promise, to avoid wedging the CPU
             // (https://github.com/vector-im/riot-web/issues/3158)
@@ -756,7 +788,7 @@ class DeviceListUpdateSerialiser {
             let prom = Promise.resolve();
             for (const userId of downloadUsers) {
                 prom = prom.delay(5).then(() => {
-                    return this._processQueryResponseForUser(userId, dk[userId]);
+                    return this._processQueryResponseForUser(userId, dk[userId], ssks[userId]);
                 });
             }
 
@@ -780,30 +812,48 @@ class DeviceListUpdateSerialiser {
         return deferred.promise;
     }
 
-    async _processQueryResponseForUser(userId, response) {
-        logger.log('got keys for ' + userId + ':', response);
+    async _processQueryResponseForUser(userId, dk_response, ssk_response) {
+        logger.log('got device keys for ' + userId + ':', dk_response);
+        logger.log('got self-signing keys for ' + userId + ':', ssk_response);
 
-        // map from deviceid -> deviceinfo for this user
-        const userStore = {};
-        const devs = this._deviceList.getRawStoredDevicesForUser(userId);
-        if (devs) {
-            Object.keys(devs).forEach((deviceId) => {
-                const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
-                userStore[deviceId] = d;
+        {
+            // map from deviceid -> deviceinfo for this user
+            const userStore = {};
+            const devs = this._deviceList.getRawStoredDevicesForUser(userId);
+            if (devs) {
+                Object.keys(devs).forEach((deviceId) => {
+                    const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
+                    userStore[deviceId] = d;
+                });
+            }
+
+            await _updateStoredDeviceKeysForUser(
+                this._olmDevice, userId, userStore, dk_response || {},
+            );
+
+            // put the updates into the object that will be returned as our results
+            const storage = {};
+            Object.keys(userStore).forEach((deviceId) => {
+                storage[deviceId] = userStore[deviceId].toStorage();
             });
+
+            this._deviceList._setRawStoredDevicesForUser(userId, storage);
         }
 
-        await _updateStoredDeviceKeysForUser(
-            this._olmDevice, userId, userStore, response || {},
-        );
+        // now do the same for the self-signing key
+        {
+            const ssk = this._deviceList.getRawStoredSskForUser(userId) || {};
 
-        // put the updates into thr object that will be returned as our results
-        const storage = {};
-        Object.keys(userStore).forEach((deviceId) => {
-            storage[deviceId] = userStore[deviceId].toStorage();
-        });
+            const updated = await _updateStoredSelfSigningKeyForUser(
+                this._olmDevice, userId, ssk, ssk_response || {},
+            );
 
-        this._deviceList._setRawStoredDevicesForUser(userId, storage);
+            this._deviceList.setRawStoredSskForUser(userId, ssk);
+
+            // NB. Unlike most events in the js-sdk, this one is internal to the
+            // js-sdk and is not re-emitted
+            if (updated) this._deviceList.emit('userSskUpdated', userId);
+        }
     }
 }
 
@@ -849,6 +899,49 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         if (await _storeDeviceKeys(_olmDevice, userStore, deviceResult)) {
             updated = true;
         }
+    }
+
+    return updated;
+}
+
+async function _updateStoredSelfSigningKeyForUser(
+    _olmDevice, userId, userStore, userResult,
+) {
+    let updated = false;
+
+    if (userResult.user_id !== userId) {
+        logger.warn("Mismatched user_id " + userResult.user_id +
+           " in self-signing key from " + userId);
+        return;
+    }
+    if (!userResult || !userResult.usage.includes('self_signing')) {
+        logger.warn("Self-signing key for " + userId + " does not include 'self_signing' usage: ignoring");
+        return;
+    }
+    const keyCount = Object.keys(userResult.keys).length;
+    if (keyCount !== 1) {
+        logger.warn(
+            "Self-signing key block for " + userId + " has " + keyCount + " keys: expected exactly 1. Ignoring.",
+        );
+        return;
+    }
+    let oldKeyId = null;
+    let oldKey = null;
+    if (userStore.keys && Object.keys(userStore.keys).length > 0) {
+        oldKeyId = Object.keys(userStore.keys)[0];
+        oldKey = userStore.keys[oldKeyId];
+    }
+    const newKeyId = Object.keys(userResult.keys)[0];
+    const newKey = userResult.keys[newKeyId];
+    if (oldKeyId !== newKeyId || oldKey !== newKey) {
+        updated = true;
+        logger.info("New self-signing key detected for " + userId + ": " + newKeyId + ", was previously " + oldKeyId);
+
+        userStore.user_id = userResult.user_id;
+        userStore.usage = userResult.usage;
+        userStore.keys = userResult.keys;
+        // reset verification status since its now a new key
+        userStore.verified = SskInfo.SskVerification.UNVERIFIED;
     }
 
     return updated;
