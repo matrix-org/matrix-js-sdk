@@ -283,9 +283,10 @@ const _verifySignature = module.exports.verifySignature = async function(
 
     // prepare the canonical json: remove unsigned and signatures, and stringify with
     // anotherjson
-    delete obj.unsigned;
-    delete obj.signatures;
-    const json = anotherjson.stringify(obj);
+    const mangledObj = Object.assign({}, obj);
+    delete mangledObj.unsigned;
+    delete mangledObj.signatures;
+    const json = anotherjson.stringify(mangledObj);
 
     olmDevice.verifySignature(
         signingKey, json, signature,

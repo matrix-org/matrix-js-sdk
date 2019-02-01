@@ -62,6 +62,10 @@ export default class SskInfo {
         return res;
     }
 
+    getKeyId() {
+        return Object.keys(this.keys)[0];
+    }
+
     getFingerprint() {
         return Object.values(this.keys)[0];
     }

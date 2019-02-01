@@ -266,51 +266,63 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype._onDeviceListUserSskUpdated = async function(userId) {
     if (userId === this._userId) {
-        // If we see an update to our own SSK, check it against the SSK we have and,
-        // if it matches, mark it as verified
+        this.checkOwnSskTrust();
+    }
+}
 
-        // First, get the pubkey of the one we can see
-        const seenSsk = this._deviceList.getStoredSskForUser(userId);
-        if (!seenSsk) {
-            logger.error("Got SSK update event for user " + userId + " but no new SSK found!");
-            return;
-        }
-        const seenPubkey = seenSsk.getFingerprint();
+/*
+ * Check the copy of our SSK that we have in the device list and see if it
+ * matches our private part. If it does, mark it as trusted.
+ */
+Crypto.prototype.checkOwnSskTrust = async function() {
+    const userId = this._userId;
 
-        // Now dig out the account keys and get the pubkey of the one in there
-        let accountKeys = null;
-        await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.getAccountKeys(txn, keys => {
-                accountKeys = keys;
-            });
+    // If we see an update to our own SSK, check it against the SSK we have and,
+    // if it matches, mark it as verified
+
+    // First, get the pubkey of the one we can see
+    const seenSsk = this._deviceList.getStoredSskForUser(userId);
+    if (!seenSsk) {
+        logger.error("Got SSK update event for user " + userId + " but no new SSK found!");
+        return;
+    }
+    const seenPubkey = seenSsk.getFingerprint();
+
+    // Now dig out the account keys and get the pubkey of the one in there
+    let accountKeys = null;
+    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+        this._cryptoStore.getAccountKeys(txn, keys => {
+            accountKeys = keys;
         });
-        if (!accountKeys || !accountKeys.self_signing_key_seed) {
-            logger.info("Ignoring new self-signing key for us because we have no private part stored");
-            return;
-        }
-        let signing;
-        let localPubkey;
-        try {
-            signing = new global.Olm.PkSigning();
-            localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'))
-        } finally {
-            if (signing) signing.free();
-            signing = null;
-        }
-        if (!localPubkey) {
-            logger.error("Unable to compute public key for stored SSK seed");
-        }
+    });
+    if (!accountKeys || !accountKeys.self_signing_key_seed) {
+        logger.info("Ignoring new self-signing key for us because we have no private part stored");
+        return;
+    }
+    let signing;
+    let localPubkey;
+    try {
+        signing = new global.Olm.PkSigning();
+        localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'))
+    } finally {
+        if (signing) signing.free();
+        signing = null;
+    }
+    if (!localPubkey) {
+        logger.error("Unable to compute public key for stored SSK seed");
+    }
 
-        // Finally, are they the same?
-        if (seenPubkey === localPubkey) {
-            logger.info("Published self-signing key matches local copy: marking as verified");
-            this.setSskVerification(userId, SskInfo.SskVerification.VERIFIED);
-        } else {
-            logger.info(
-                "Published self-signing key DOES NOT match local copy! Local: " +
-                localPubkey + ", published: " + seenPubkey,
-            );
-        }
+    // Finally, are they the same?
+    if (seenPubkey === localPubkey) {
+        logger.info("Published self-signing key matches local copy: marking as verified");
+        this.setSskVerification(userId, SskInfo.SskVerification.VERIFIED);
+        // Now we may be able to trust our key backup
+        await this.checkKeyBackup();
+    } else {
+        logger.info(
+            "Published self-signing key DOES NOT match local copy! Local: " +
+            localPubkey + ", published: " + seenPubkey,
+        );
     }
 };
 
@@ -397,7 +409,34 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     }
 
     for (const keyId of Object.keys(mySigs)) {
-        const sigInfo = { deviceId: keyId.split(':')[1] }; // XXX: is this how we're supposed to get the device ID?
+        const sigInfo = {};
+        // Could be an SSK but just say this is the device ID for backwards compat
+        sigInfo.deviceId = keyId.split(':')[1];
+
+        // first check to see if it's from our SSK
+        const ssk = this._deviceList.getStoredSskForUser(this._userId);
+        if (ssk && ssk.getKeyId() === keyId) {
+            sigInfo.self_signing_key = ssk;
+            try {
+                await olmlib.verifySignature(
+                    this._olmDevice,
+                    backupInfo.auth_data,
+                    this._userId,
+                    sigInfo.deviceId,
+                    ssk.getFingerprint(),
+                );
+                sigInfo.valid = true;
+            } catch (e) {
+                console.log("Bad signature from ssk " + ssk.getKeyId(), e);
+                sigInfo.valid = false;
+            }
+            ret.sigs.push(sigInfo);
+            continue;
+        }
+
+        // Now look for a sig from a device
+        // At some point this can probably go away and we'll just support
+        // it being signed by the SSK
         const device = this._deviceList.getStoredDevice(
             this._userId, sigInfo.deviceId,
         );
@@ -423,7 +462,13 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         ret.sigs.push(sigInfo);
     }
 
-    ret.usable = ret.sigs.some((s) => s.valid && s.device.isVerified());
+    ret.usable = ret.sigs.some((s) => {
+        return (
+            s.valid && (
+                (s.device && s.device.isVerified()) || (s.self_signing_key && s.self_signing_key.isVerified())
+            )
+        )
+    });
     return ret;
 };
 
@@ -2340,11 +2385,17 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
  * @param {Object} obj  Object to which we will add a 'signatures' property
  */
 Crypto.prototype._signObject = async function(obj) {
-    const sigs = {};
-    sigs[this._userId] = {};
+    const sigs = obj.signatures || {};
+    const unsigned = obj.unsigned;
+
+    delete obj.signatures;
+    delete obj.unsigned;
+
+    sigs[this._userId] = sigs[this._userId] || {};
     sigs[this._userId]["ed25519:" + this._deviceId] =
         await this._olmDevice.sign(anotherjson.stringify(obj));
     obj.signatures = sigs;
+    if (unsigned !== undefined) obj.unsigned = unsigned;
 };
 
 

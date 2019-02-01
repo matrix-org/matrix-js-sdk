@@ -1035,7 +1035,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
  * @param {object} info Info object from prepareKeyBackupVersion
  * @returns {Promise<object>} Object with 'version' param indicating the version created
  */
-MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk) {
+MatrixClient.prototype.createKeyBackupVersion = async function(info, auth, replacesSsk) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
@@ -1056,6 +1056,14 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
     // sign the USK with the SSK
     pkSign(uskInfo, Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'), this.credentials.userId);
 
+    // Now sig the backup auth data. Do it as this device first because crypto._signObject
+    // is dumb and bluntly replaces the whole signatures block...
+    // this can probably go away very soon in favour of just signing with the SSK.
+    await this._crypto._signObject(data.auth_data);
+
+    // now also sign the auth data with the SSK
+    pkSign(data.auth_data, Buffer.from(info.accountKeys.self_signing_key_seed, 'base64'), this.credentials.userId);
+
     const keys = {
         self_signing_key: {
             user_id: this.credentials.userId,
@@ -1073,10 +1081,11 @@ MatrixClient.prototype.createKeyBackupVersion = function(info, auth, replacesSsk
         // store the newly generated account keys
         this._cryptoStore.storeAccountKeys(txn, info.accountKeys);
     }).then(() => {
+        // re-check the SSK in the device store if necessary
+        return this._crypto.checkOwnSskTrust();
+    }).then(() => {
         // upload the public part of the account keys
         return this.uploadDeviceSigningKeys(keys);
-    }).then(() => {
-        return this._crypto._signObject(data.auth_data);
     }).then(() => {
         return this._http.authedRequest(
             undefined, "POST", "/room_keys/version", undefined, data,
@@ -1235,6 +1244,8 @@ MatrixClient.prototype._restoreKeyBackup = async function(
         await this._cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
             this._cryptoStore.storeAccountKeys(txn, accountKeys);
         });
+
+        await this._crypto.checkOwnSskTrust();
     } catch(e) {
         decryption.free();
         throw e;
