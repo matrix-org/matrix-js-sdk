@@ -590,6 +590,24 @@ Room.prototype._fixUpLegacyTimelineFields = function() {
 };
 
 /**
+ * Returns whether there are any devices in the room that are unverified
+ * @return {bool} the result
+ */
+Room.prototype.hasUnverifiedDevices = async function() {
+    if (!this._client.isRoomEncrypted(this.roomId)) {
+        return false;
+    }
+    const memberIds = Object.keys(this.currentState.members);
+    for (const userId of memberIds) {
+        const devices = await this._client.getStoredDevicesForUser(userId);
+        if (devices.some((device) => device.isUnverified())) {
+            return true;
+        }
+    }
+    return false;
+};
+
+/**
  * Return the timeline sets for this room.
  * @return {EventTimelineSet[]} array of timeline sets for this room
  */
