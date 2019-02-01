@@ -1618,6 +1618,8 @@ Crypto.prototype.onSyncWillProcess = async function(syncData) {
         // at which point we'll start tracking all the users of that room.
         logger.log("Initial sync performed - resetting device tracking state");
         this._deviceList.stopTrackingAllDeviceLists();
+        // we always track our own device list (for key backups etc)
+        this._deviceList.startTrackingDeviceList(this._userId);
         this._roomDeviceTrackingState = {};
     }
 };
