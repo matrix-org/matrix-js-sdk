@@ -15,6 +15,7 @@ limitations under the License.
 */
 "use strict";
 
+const olmlib = require("./olmlib");
 
 /**
  * @module crypto/deviceinfo
@@ -43,19 +44,30 @@ limitations under the License.
   * @property {Object} unsigned  additional data from the homeserver
   *
   * @param {string} deviceId id of the device
+  * @param {string} ownerUserId ID of the user who owns this device
+  * @param {Object} deviceList DeviceList - if supplied, isVerified can
+  *     attempt to establish trust via cross-signing
+  * @param {string} loggedinUserId ID of the logged-in user
+  * @param {Object} olmDevice OlmDevice to use for signature verification
   */
-function DeviceInfo(deviceId) {
+function DeviceInfo(deviceId, ownerUserId, deviceList, loggedinUserId, olmDevice) {
     // you can't change the deviceId
     Object.defineProperty(this, 'deviceId', {
         enumerable: true,
         value: deviceId,
     });
 
+    this._deviceList = deviceList;
+    this._ownerUserId = ownerUserId;
+    this._loggedinUserId = loggedinUserId;
+    this._olmDevice = olmDevice;
+
     this.algorithms = [];
     this.keys = {};
     this.verified = DeviceVerification.UNVERIFIED;
     this.known = false;
     this.unsigned = {};
+    this.signatures = null;
 }
 
 /**
@@ -66,8 +78,8 @@ function DeviceInfo(deviceId) {
  *
  * @return {module:crypto~DeviceInfo} new DeviceInfo
  */
-DeviceInfo.fromStorage = function(obj, deviceId) {
-    const res = new DeviceInfo(deviceId);
+DeviceInfo.fromStorage = function(obj, deviceId, ownerUserId, deviceList, loggedinUserId, olmDevice) {
+    const res = new DeviceInfo(deviceId, ownerUserId, deviceList, loggedinUserId, olmDevice);
     for (const prop in obj) {
         if (obj.hasOwnProperty(prop)) {
             res[prop] = obj[prop];
@@ -88,6 +100,17 @@ DeviceInfo.prototype.toStorage = function() {
         verified: this.verified,
         known: this.known,
         unsigned: this.unsigned,
+        signatures: this.signatures,
+    };
+};
+
+DeviceInfo.prototype.toDeviceObject = function() {
+    return {
+        algorithms: this.algorithms,
+        keys: this.keys,
+        signatures: this.signatures,
+        user_id: this._ownerUserId,
+        device_id: this.deviceId,
     };
 };
 
@@ -133,7 +156,38 @@ DeviceInfo.prototype.isBlocked = function() {
  * @return {Boolean} true if verified
  */
 DeviceInfo.prototype.isVerified = function() {
-    return this.verified == DeviceVerification.VERIFIED;
+    if (this.verified === DeviceVerification.VERIFIED) {
+        return true; // we've verified it ourselves
+    } else if (this.verified === DeviceVerification.UNVERIFIED && this.isTrustedFromSsk()) {
+        // If we haven't verified it directly, see if we can get a chain
+        // of trust to it via cross-signing
+        return DeviceVerification.VERIFIED;
+    } else {
+        return DeviceVerification.UNVERIFIED;
+    }
+};
+
+DeviceInfo.prototype.isTrustedFromSsk = function() {
+    // XXX this does signature verification in-line (ie. in the render method for react)
+    const mySsk = this._deviceList.getStoredSskForUser(this._loggedinUserId);
+    if (!mySsk) return false;
+    if (!mySsk.isVerified()) return false;
+
+    const sskPubkey = mySsk.getFingerprint();
+    const deviceObject = this.toDeviceObject();
+
+    try {
+        olmlib.verifySignature(
+            this._olmDevice,
+            deviceObject,
+            this._ownerUserId,
+            sskPubkey,
+            sskPubkey,
+        );
+        return true;
+    } catch (e) {
+    }
+    return false;
 };
 
 /**
@@ -142,7 +196,9 @@ DeviceInfo.prototype.isVerified = function() {
  * @return {Boolean} true if unverified
  */
 DeviceInfo.prototype.isUnverified = function() {
-    return this.verified == DeviceVerification.UNVERIFIED;
+    //return this.verified == DeviceVerification.UNVERIFIED;
+    // XXX: as with isVerified but is this right?
+    return !this.isVerified();
 };
 
 /**

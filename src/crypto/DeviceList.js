@@ -63,11 +63,13 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
  * @alias module:crypto/DeviceList
  */
 export default class DeviceList extends EventEmitter {
-    constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
+    constructor(baseApis, cryptoStore, sessionStore, olmDevice, userId) {
         super();
 
         this._cryptoStore = cryptoStore;
         this._sessionStore = sessionStore;
+        this._olmDevice = olmDevice;
+        this._userId = userId;
 
         // userId -> {
         //     deviceId -> {
@@ -351,7 +353,7 @@ export default class DeviceList extends EventEmitter {
         const res = [];
         for (const deviceId in devs) {
             if (devs.hasOwnProperty(deviceId)) {
-                res.push(DeviceInfo.fromStorage(devs[deviceId], deviceId));
+                res.push(DeviceInfo.fromStorage(devs[deviceId], deviceId, userId, this, this._userId, this._olmDevice));
             }
         }
         return res;
@@ -398,7 +400,7 @@ export default class DeviceList extends EventEmitter {
         if (!devs || !devs[deviceId]) {
             return undefined;
         }
-        return DeviceInfo.fromStorage(devs[deviceId], deviceId);
+        return DeviceInfo.fromStorage(devs[deviceId], deviceId, userId, this, this._userId, this._olmDevice);
     }
 
     /**
@@ -443,7 +445,7 @@ export default class DeviceList extends EventEmitter {
                 }
                 const deviceKey = device.keys[keyId];
                 if (deviceKey == senderKey) {
-                    return DeviceInfo.fromStorage(device, deviceId);
+                    return DeviceInfo.fromStorage(device, deviceId, userId, this, this._userId, this._olmDevice);
                 }
             }
         }
@@ -824,7 +826,7 @@ class DeviceListUpdateSerialiser {
             const devs = this._deviceList.getRawStoredDevicesForUser(userId);
             if (devs) {
                 Object.keys(devs).forEach((deviceId) => {
-                    const d = DeviceInfo.fromStorage(devs[deviceId], deviceId);
+                    const d = DeviceInfo.fromStorage(devs[deviceId], deviceId, userId, this, this._userId, this._olmDevice);
                     userStore[deviceId] = d;
                 });
             }
@@ -974,7 +976,7 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     const unsigned = deviceResult.unsigned || {};
 
     try {
-        await olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
+        olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
     } catch (e) {
         logger.warn("Unable to verify signature on device " +
             userId + ":" + deviceId + ":" + e);
@@ -1004,5 +1006,6 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     deviceStore.keys = deviceResult.keys || {};
     deviceStore.algorithms = deviceResult.algorithms || [];
     deviceStore.unsigned = unsigned;
+    deviceStore.signatures = deviceResult.signatures;
     return true;
 }

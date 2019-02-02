@@ -223,7 +223,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
 async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     const deviceId = deviceInfo.deviceId;
     try {
-        await _verifySignature(
+        _verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
             deviceInfo.getFingerprint(),
         );
@@ -267,10 +267,9 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
  *
  * @param {string} signingKey   base64-ed ed25519 public key
  *
- * Returns a promise which resolves (to undefined) if the the signature is good,
- * or rejects with an Error if it is bad.
+ * Returns undefined if the the signature is good, or throws an Error if it is bad.
  */
-const _verifySignature = module.exports.verifySignature = async function(
+const _verifySignature = module.exports.verifySignature = function(
     olmDevice, obj, signingUserId, signingDeviceId, signingKey,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;

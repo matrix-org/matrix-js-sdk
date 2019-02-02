@@ -141,7 +141,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
     this._deviceList = new DeviceList(
-        baseApis, cryptoStore, sessionStore, this._olmDevice,
+        baseApis, cryptoStore, sessionStore, this._olmDevice, this._userId,
     );
     // XXX: This isn't removed at any point, but then none of the event listeners
     // this class sets seem to be removed at any point... :/
@@ -887,7 +887,30 @@ Crypto.prototype.setDeviceVerification = async function(
         this._deviceList.storeDevicesForUser(userId, devices);
         this._deviceList.saveIfDirty();
     }
-    return DeviceInfo.fromStorage(dev, deviceId);
+
+    if (verified) {
+        let accountKeys;
+        await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys;
+            });
+        });
+
+        if (accountKeys && accountKeys.self_signing_key_seed) {
+            const deviceObject = DeviceInfo.fromStorage(dev, deviceId, userId).toDeviceObject();
+            // Sign this device with the SSK
+            pkSign(deviceObject, Buffer.from(accountKeys.self_signing_key_seed, 'base64'), this._userId);
+
+            const content = {
+                [userId]: {
+                    [deviceId]: deviceObject,
+                },
+            };
+            await this._baseApis.uploadKeySignatures(content);
+        }
+    }
+
+    return DeviceInfo.fromStorage(dev, deviceId, userId, this._deviceList, this._userId, this._olmDevice);
 };
 
 
