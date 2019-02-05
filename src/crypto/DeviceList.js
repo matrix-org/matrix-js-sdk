@@ -917,13 +917,17 @@ async function _updateStoredSelfSigningKeyForUser(
         return;
     }
     if (!userResult || !userResult.usage.includes('self_signing')) {
-        logger.warn("Self-signing key for " + userId + " does not include 'self_signing' usage: ignoring");
+        logger.warn(
+            "Self-signing key for " + userId +
+            " does not include 'self_signing' usage: ignoring",
+        );
         return;
     }
     const keyCount = Object.keys(userResult.keys).length;
     if (keyCount !== 1) {
         logger.warn(
-            "Self-signing key block for " + userId + " has " + keyCount + " keys: expected exactly 1. Ignoring.",
+            "Self-signing key block for " + userId + " has " +
+            keyCount + " keys: expected exactly 1. Ignoring.",
         );
         return;
     }
@@ -937,7 +941,10 @@ async function _updateStoredSelfSigningKeyForUser(
     const newKey = userResult.keys[newKeyId];
     if (oldKeyId !== newKeyId || oldKey !== newKey) {
         updated = true;
-        logger.info("New self-signing key detected for " + userId + ": " + newKeyId + ", was previously " + oldKeyId);
+        logger.info(
+            "New self-signing key detected for " + userId +
+            ": " + newKeyId + ", was previously " + oldKeyId,
+        );
 
         userStore.user_id = userResult.user_id;
         userStore.usage = userResult.usage;

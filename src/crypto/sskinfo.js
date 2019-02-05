@@ -72,9 +72,9 @@ export default class SskInfo {
 
     isVerified() {
         return this.verified == SskInfo.SskVerification.VERIFIED;
-    };
+    }
 
     isUnverified() {
         return this.verified == SskInfo.SskVerification.UNVERIFIED;
-    };
+    }
 }

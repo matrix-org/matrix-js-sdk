@@ -18,9 +18,9 @@ const anotherjson = require('another-json');
 
 /**
  * Higher level wrapper around olm.PkSigning that signs JSON objects
- * @param obj {Object} Object to sign
- * @param seed {Uint8Array} The private key seed (32 bytes)
- * @param userId {string} The user ID who owns the signing key
+ * @param {Object} obj Object to sign
+ * @param {Uint8Array} seed The private key seed (32 bytes)
+ * @param {string} userId The user ID who owns the signing key
  */
 export function pkSign(obj, seed, userId) {
     const signing = new global.Olm.PkSigning();

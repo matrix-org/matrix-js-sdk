@@ -286,27 +286,37 @@ Crypto.prototype.checkOwnSskTrust = async function() {
     // First, get the pubkey of the one we can see
     const seenSsk = this._deviceList.getStoredSskForUser(userId);
     if (!seenSsk) {
-        logger.error("Got SSK update event for user " + userId + " but no new SSK found!");
+        logger.error(
+            "Got SSK update event for user " + userId +
+            " but no new SSK found!",
+        );
         return;
     }
     const seenPubkey = seenSsk.getFingerprint();
 
     // Now dig out the account keys and get the pubkey of the one in there
     let accountKeys = null;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._cryptoStore.getAccountKeys(txn, keys => {
-            accountKeys = keys;
-        });
-    });
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys;
+            });
+        },
+    );
     if (!accountKeys || !accountKeys.self_signing_key_seed) {
-        logger.info("Ignoring new self-signing key for us because we have no private part stored");
+        logger.info(
+            "Ignoring new self-signing key for us because we have no private part stored",
+        );
         return;
     }
     let signing;
     let localPubkey;
     try {
         signing = new global.Olm.PkSigning();
-        localPubkey = signing.init_with_seed(Buffer.from(accountKeys.self_signing_key_seed, 'base64'));
+        localPubkey = signing.init_with_seed(
+            Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
+        );
     } finally {
         if (signing) signing.free();
         signing = null;
@@ -468,7 +478,8 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     ret.usable = ret.sigs.some((s) => {
         return (
             s.valid && (
-                (s.device && s.device.isVerified()) || (s.self_signing_key && s.self_signing_key.isVerified())
+                (s.device && s.device.isVerified()) ||
+                (s.self_signing_key && s.self_signing_key.isVerified())
             )
         );
     });
@@ -568,15 +579,22 @@ Crypto.prototype.uploadDeviceKeys = function() {
 
     let accountKeys;
     return crypto._signObject(deviceKeys).then(() => {
-        return this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.getAccountKeys(txn, keys => {
-                accountKeys = keys;
-            });
-        });
+        return this._cryptoStore.doTxn(
+            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.getAccountKeys(txn, keys => {
+                    accountKeys = keys;
+                });
+            },
+        );
     }).then(() => {
         if (accountKeys && accountKeys.self_signing_key_seed) {
             // if we have an SSK, sign the key with the SSK too
-            pkSign(deviceKeys, Buffer.from(accountKeys.self_signing_key_seed, 'base64'), userId);
+            pkSign(
+                deviceKeys,
+                Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
+                userId,
+            );
         }
 
         return crypto._baseApis.uploadKeysRequest({
@@ -608,15 +626,22 @@ Crypto.prototype.uploadDeviceKeySignatures = async function() {
         user_id: userId,
     };
     let accountKeys;
-    await this._cryptoStore.doTxn('readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        this._cryptoStore.getAccountKeys(txn, keys => {
-            accountKeys = keys;
-        });
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.getAccountKeys(txn, keys => {
+                accountKeys = keys;
+            },
+        );
     });
     if (!accountKeys || !accountKeys.self_signing_key_seed) return false;
 
     // Sign this device with the SSK
-    pkSign(thisDeviceKey, Buffer.from(accountKeys.self_signing_key_seed, 'base64'), userId);
+    pkSign(
+        thisDeviceKey,
+        Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
+        userId,
+    );
 
     const content = {
         [userId]: {
