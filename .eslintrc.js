@@ -1,6 +1,6 @@
 module.exports = {
+    parser: "babel-eslint", // now needed for class properties
     parserOptions: {
-        ecmaVersion: 2017,
         sourceType: "module",
         ecmaFeatures: {
         }
@@ -72,5 +72,6 @@ module.exports = {
             "named": "never",
             "asyncArrow": "always",
         }],
+        "arrow-parens": "off",
     }
 }
