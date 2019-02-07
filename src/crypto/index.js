@@ -373,7 +373,10 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         ret.sigs.push(sigInfo);
     }
 
-    ret.usable = ret.sigs.some((s) => s.valid && s.device.isVerified()) || ret.trusted_locally;
+    ret.usable = (
+        ret.sigs.some((s) => s.valid && s.device.isVerified()) ||
+        ret.trusted_locally
+    );
     return ret;
 };
 
