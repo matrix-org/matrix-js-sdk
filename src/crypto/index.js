@@ -295,7 +295,7 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
 Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
     // This should be redundant post cross-signing is a thing, so just
     // plonk it in localStorage for now.
-    global.localStorage.setItem("mx_trusted_backup_pubkey", trustedPubKey);
+    this._sessionStore.setLocalTrustedBackupPubKey(trustedPubKey);
     await this.checkKeyBackup();
 };
 
@@ -337,7 +337,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         return ret;
     }
 
-    const trustedPubkey = global.localStorage.getItem("mx_trusted_backup_pubkey");
+    const trustedPubkey = this._sessionStore.getLocalTrustedBackupPubKey();
 
     if (backupInfo.auth_data.public_key === trustedPubkey) {
         logger.info("Backup public key " + trustedPubkey + " is trusted locally");

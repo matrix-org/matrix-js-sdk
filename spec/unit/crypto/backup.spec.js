@@ -74,6 +74,14 @@ const KEY_BACKUP_DATA = {
     },
 };
 
+const BACKUP_INFO = {
+    algorithm: "m.megolm_backup.v1",
+    version: 1,
+    auth_data: {
+        public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+    },
+};
+
 function makeTestClient(sessionStore, cryptoStore) {
     const scheduler = [
         "getQueueForEvent", "queueEvent", "removeEventFromQueue",
@@ -124,13 +132,7 @@ describe("MegolmBackup", function() {
         mockCrypto.backupKey.set_recipient_key(
             "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
         );
-        mockCrypto.backupInfo = {
-            algorithm: "m.megolm_backup.v1",
-            version: 1,
-            auth_data: {
-                public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-            },
-        };
+        mockCrypto.backupInfo = BACKUP_INFO;
 
         mockStorage = new MockStorageApi();
         sessionStore = new WebStorageSessionStore(mockStorage);
@@ -436,6 +438,7 @@ describe("MegolmBackup", function() {
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                 ROOM_ID,
                 SESSION_ID,
+                BACKUP_INFO,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
