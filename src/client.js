@@ -1093,28 +1093,28 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     }
 };
 
-MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
-    password, targetRoomId, targetSessionId, version,
-) {
-    const backupInfo = await this.getKeyBackupVersion();
+MatrixClient.prototype.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
+MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
+    password, targetRoomId, targetSessionId, backupInfo,
+) {
     const privKey = await keyForExistingBackup(backupInfo, password);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, version,
+        privKey, targetRoomId, targetSessionId, backupInfo,
     );
 };
 
 MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
-    recoveryKey, targetRoomId, targetSessionId, version,
+    recoveryKey, targetRoomId, targetSessionId, backupInfo,
 ) {
     const privKey = decodeRecoveryKey(recoveryKey);
     return this._restoreKeyBackup(
-        privKey, targetRoomId, targetSessionId, version,
+        privKey, targetRoomId, targetSessionId, backupInfo,
     );
 };
 
 MatrixClient.prototype._restoreKeyBackup = function(
-    privKey, targetRoomId, targetSessionId, version,
+    privKey, targetRoomId, targetSessionId, backupInfo,
 ) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
@@ -1122,14 +1122,24 @@ MatrixClient.prototype._restoreKeyBackup = function(
     let totalKeyCount = 0;
     let keys = [];
 
-    const path = this._makeKeyBackupPath(targetRoomId, targetSessionId, version);
+    const path = this._makeKeyBackupPath(
+        targetRoomId, targetSessionId, backupInfo.version,
+    );
 
     const decryption = new global.Olm.PkDecryption();
+    let backupPubKey;
     try {
-        decryption.init_with_private_key(privKey);
+        backupPubKey = decryption.init_with_private_key(privKey);
     } catch(e) {
         decryption.free();
         throw e;
+    }
+
+    // If the pubkey computed from the private data we've been given
+    // doesn't match the one in the auth_data, the user has enetered
+    // a different recovery key / the wrong passphrase.
+    if (backupPubKey !== backupInfo.auth_data.public_key) {
+        return Promise.reject({errcode: this.RESTORE_BACKUP_ERROR_BAD_KEY});
     }
 
     return this._http.authedRequest(
@@ -1166,6 +1176,8 @@ MatrixClient.prototype._restoreKeyBackup = function(
         }
 
         return this.importRoomKeys(keys);
+    }).then(() => {
+        return this._crypto.setTrustedBackupPubKey(backupPubKey);
     }).then(() => {
         return {total: totalKeyCount, imported: keys.length};
     }).finally(() => {
