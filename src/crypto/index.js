@@ -1468,6 +1468,10 @@ Crypto.prototype.onSyncCompleted = async function(syncData) {
 
     // catch up on any new devices we got told about during the sync.
     this._deviceList.lastKnownSyncToken = nextSyncToken;
+
+    // we always track our own device list (for key backups etc)
+    this._deviceList.startTrackingDeviceList(this._userId);
+
     this._deviceList.refreshOutdatedDeviceLists();
 
     // we don't start uploading one-time keys until we've caught up with

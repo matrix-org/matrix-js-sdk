@@ -72,7 +72,11 @@ function expectAliQueryKeys() {
     bobKeys[bobDeviceId] = bobTestClient.deviceKeys;
     aliTestClient.httpBackend.when("POST", "/keys/query")
             .respond(200, function(path, content) {
-        expect(content.device_keys[bobUserId]).toEqual({});
+        expect(content.device_keys[bobUserId]).toEqual(
+            {},
+            "Expected Alice to key query for " + bobUserId + ", got " +
+            Object.keys(content.device_keys),
+        );
         const result = {};
         result[bobUserId] = bobKeys;
         return {device_keys: result};
@@ -96,7 +100,11 @@ function expectBobQueryKeys() {
     bobTestClient.httpBackend.when(
         "POST", "/keys/query",
     ).respond(200, function(path, content) {
-        expect(content.device_keys[aliUserId]).toEqual({});
+        expect(content.device_keys[aliUserId]).toEqual(
+            {},
+            "Expected Bob to key query for " + aliUserId + ", got " +
+            Object.keys(content.device_keys),
+        );
         const result = {};
         result[aliUserId] = aliKeys;
         return {device_keys: result};
@@ -544,6 +552,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali sends a message", function(done) {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -554,6 +563,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message", function() {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -564,6 +574,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives a message with a bogus sender", function() {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -617,6 +628,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Ali blocks Bob's device", function(done) {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -636,6 +648,7 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob receives two pre-key messages", function(done) {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -649,6 +662,8 @@ describe("MatrixClient crypto", function() {
     });
 
     it("Bob replies to the message", function() {
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
+        bobTestClient.expectKeyQuery({device_keys: {[bobUserId]: {}}});
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
@@ -659,13 +674,14 @@ describe("MatrixClient crypto", function() {
             .then(bobRecvMessage)
             .then(bobEnablesEncryption)
             .then(bobSendsReplyMessage).then(function(ciphertext) {
-                expect(ciphertext.type).toEqual(1);
+                expect(ciphertext.type).toEqual(1, "Unexpected cipghertext type.");
             }).then(aliRecvMessage);
     });
 
     it("Ali does a key query when encryption is enabled", function() {
         // enabling encryption in the room should make alice download devices
         // for both members.
+        aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
         return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -696,7 +712,6 @@ describe("MatrixClient crypto", function() {
             }).then(() => {
                 aliTestClient.expectKeyQuery({
                     device_keys: {
-                        [aliUserId]: {},
                         [bobUserId]: {},
                     },
                 });

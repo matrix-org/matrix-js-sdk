@@ -185,7 +185,11 @@ TestClient.prototype.expectKeyQuery = function(response) {
     this.httpBackend.when('POST', '/keys/query').respond(
         200, (path, content) => {
             Object.keys(response.device_keys).forEach((userId) => {
-                expect(content.device_keys[userId]).toEqual({});
+                expect(content.device_keys[userId]).toEqual(
+                    {},
+                    "Expected key query for " + userId + ", got " +
+                    Object.keys(content.device_keys),
+                );
             });
             return response;
         });
