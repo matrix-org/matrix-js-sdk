@@ -460,6 +460,7 @@ describe("MegolmBackup", function() {
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
+                null, null, BACKUP_INFO,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
