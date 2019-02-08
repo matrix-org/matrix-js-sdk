@@ -1093,7 +1093,7 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     }
 };
 
-MatrixClient.prototype.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
+MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     password, targetRoomId, targetSessionId, backupInfo,
@@ -1139,7 +1139,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
     // doesn't match the one in the auth_data, the user has enetered
     // a different recovery key / the wrong passphrase.
     if (backupPubKey !== backupInfo.auth_data.public_key) {
-        return Promise.reject({errcode: this.RESTORE_BACKUP_ERROR_BAD_KEY});
+        return Promise.reject({errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY});
     }
 
     return this._http.authedRequest(
