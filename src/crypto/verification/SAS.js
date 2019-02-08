@@ -98,7 +98,7 @@ const emojiMapping = [
     ["👓", "glasses"],    // 33
     ["🔧", "wrench"],     // 34
     ["🎅", "santa"],      // 35
-    ["🎅", "thumbs up"],  // 36
+    ["👍", "thumbs up"],  // 36
     ["☂", "umbrella"],    // 37
     ["⌛", "hourglass"],   // 38
     ["⏰", "clock"],      // 39
