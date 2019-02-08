@@ -111,14 +111,19 @@ describe("SAS verification", function() {
         const bobPromise = new Promise((resolve, reject) => {
             bob.on("crypto.verification.start", (verifier) => {
                 verifier.on("show_sas", (e) => {
-                    if (!aliceSasEvent) {
+                    if (!e.sas.emoji || !e.sas.decimal) {
+                        e.cancel();
+                    } else if (!aliceSasEvent) {
                         bobSasEvent = e;
-                    } else if (e.sas === aliceSasEvent.sas) {
-                        e.confirm();
-                        aliceSasEvent.confirm();
                     } else {
-                        e.mismatch();
-                        aliceSasEvent.mismatch();
+                        try {
+                            expect(e.sas).toEqual(aliceSasEvent.sas);
+                            e.confirm();
+                            aliceSasEvent.confirm();
+                        } catch (error) {
+                            e.mismatch();
+                            aliceSasEvent.mismatch();
+                        }
                     }
                 });
                 resolve(verifier);
@@ -129,14 +134,19 @@ describe("SAS verification", function() {
             verificationMethods.SAS, bob.getUserId(), bob.deviceId,
         );
         aliceVerifier.on("show_sas", (e) => {
-            if (!bobSasEvent) {
+            if (!e.sas.emoji || !e.sas.decimal) {
+                e.cancel();
+            } else if (!bobSasEvent) {
                 aliceSasEvent = e;
-            } else if (e.sas === bobSasEvent.sas) {
-                e.confirm();
-                bobSasEvent.confirm();
             } else {
-                e.mismatch();
-                bobSasEvent.mismatch();
+                try {
+                    expect(e.sas).toEqual(bobSasEvent.sas);
+                    e.confirm();
+                    bobSasEvent.confirm();
+                } catch (error) {
+                    e.mismatch();
+                    bobSasEvent.mismatch();
+                }
             }
         });
         await Promise.all([
