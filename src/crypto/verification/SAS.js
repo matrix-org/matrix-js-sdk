@@ -96,7 +96,7 @@ const emojiMapping = [
     ["🤖", "robot"],      // 31
     ["🎩", "hat"],        // 32
     ["👓", "glasses"],    // 33
-    ["🔧", "wrench"],     // 34
+    ["🔧", "spanner"],     // 34
     ["🎅", "santa"],      // 35
     ["👍", "thumbs up"],  // 36
     ["☂️", "umbrella"],    // 37
