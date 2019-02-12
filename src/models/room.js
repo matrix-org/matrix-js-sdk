@@ -599,9 +599,14 @@ Room.prototype.hasUnverifiedDevices = async function() {
     }
     const memberIds = Object.keys(this.currentState.members);
     for (const userId of memberIds) {
-        const devices = await this._client.getStoredDevicesForUser(userId);
-        if (devices.some((device) => device.isUnverified())) {
-            return true;
+        const membership = this.currentState.members[userId].membership;
+        // check for negative values rather than positive to be
+        // extra careful to not report false positives here
+        if (membership !== "leave") {
+            const devices = await this._client.getStoredDevicesForUser(userId);
+            if (devices.some((device) => device.isUnverified())) {
+                return true;
+            }
         }
     }
     return false;
