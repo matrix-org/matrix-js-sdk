@@ -850,6 +850,19 @@ MatrixClient.prototype.importRoomKeys = function(keys) {
 };
 
 /**
+ * Force a re-check of the local key backup status against
+ * what's on the server.
+ *
+ * @returns {Object} Object with backup info (as returned by
+ *     getKeyBackupVersion) in backupInfo and
+ *     trust information (as returned by isKeyBackupTrusted)
+ *     in trustInfo.
+ */
+MatrixClient.prototype.checkKeyBackup = function() {
+    return this._crypto.checkKeyBackup();
+};
+
+/**
  * Get information about the current key backup.
  * @returns {Promise} Information object from API or null
  */
