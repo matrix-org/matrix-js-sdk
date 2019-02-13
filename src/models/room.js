@@ -597,9 +597,9 @@ Room.prototype.hasUnverifiedDevices = async function() {
     if (!this._client.isRoomEncrypted(this.roomId)) {
         return false;
     }
-    const memberIds = Object.keys(this.currentState.members);
-    for (const userId of memberIds) {
-        const devices = await this._client.getStoredDevicesForUser(userId);
+    const e2eMembers = await this.getEncryptionTargetMembers();
+    for (const member of e2eMembers) {
+        const devices = await this._client.getStoredDevicesForUser(member.userId);
         if (devices.some((device) => device.isUnverified())) {
             return true;
         }
