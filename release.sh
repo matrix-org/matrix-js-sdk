@@ -155,8 +155,8 @@ echo "npm version"
 # manually commit the result.
 npm version --no-git-tag-version "$release"
 
-# commit package-lock.json if it exists and is versioned
-if [[ -f package-lock.json && -z `git status --porcelain --ignored package-lock.json` ]];
+# commit package-lock.json if it exists, is versioned, and is modified
+if [[ -f package-lock.json && `git status --porcelain package-lock.json | grep '^ M'` ]];
 then
     pkglock='package-lock.json'
 else
