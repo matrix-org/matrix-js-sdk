@@ -264,7 +264,7 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
     if (this._baseApis.isGuest()) {
         console.log("Skipping key backup check since user is guest");
         this._checkedForBackup = true;
-        return;
+        return null;
     }
     let backupInfo;
     try {
@@ -275,21 +275,38 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
             // well that's told us. we won't try again.
             this._checkedForBackup = true;
         }
-        return;
+        return null;
     }
     this._checkedForBackup = true;
 
     const trustInfo = await this.isKeyBackupTrusted(backupInfo);
 
     if (trustInfo.usable && !this.backupInfo) {
-        console.log("Found usable key backup: enabling key backups");
+        console.log(
+            "Found usable key backup v" + backupInfo.version +
+            ": enabling key backups",
+        );
         this._baseApis.enableKeyBackup(backupInfo);
     } else if (!trustInfo.usable && this.backupInfo) {
         console.log("No usable key backup: disabling key backup");
         this._baseApis.disableKeyBackup();
     } else if (!trustInfo.usable && !this.backupInfo) {
         console.log("No usable key backup: not enabling key backup");
+    } else if (trustInfo.usable && this.backupInfo) {
+        // may not be the same version: if not, we should switch
+        if (backupInfo.version !== this.backupInfo.version) {
+            console.log(
+                "On backup version " + this.backupInfo.version + " but found " +
+                "version " + backupInfo.version + ": switching.",
+            );
+            this._baseApis.disableKeyBackup();
+            this._baseApis.enableKeyBackup(backupInfo);
+        } else {
+            console.log("Backup version " + backupInfo.version + " still current");
+        }
     }
+
+    return {backupInfo, trustInfo};
 };
 
 Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
@@ -302,10 +319,16 @@ Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
 /**
  * Forces a re-check of the key backup and enables/disables it
  * as appropriate.
+ *
+ * @return {Object} Object with backup info (as returned by
+ *     getKeyBackupVersion) in backupInfo and
+ *     trust information (as returned by isKeyBackupTrusted)
+ *     in trustInfo.
  */
 Crypto.prototype.checkKeyBackup = async function() {
     this._checkedForBackup = false;
-    await this._checkAndStartKeyBackup();
+    const returnInfo = await this._checkAndStartKeyBackup();
+    return returnInfo;
 };
 
 /**
