@@ -1,3 +1,14 @@
+Changes in [1.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0-rc.2) (2019-02-14)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.1...v1.0.0-rc.2)
+
+ * Release script: commit package-lock.json
+   [\#839](https://github.com/matrix-org/matrix-js-sdk/pull/839)
+ * Add method to force re-check of key backup
+   [\#840](https://github.com/matrix-org/matrix-js-sdk/pull/840)
+ * Fix: dont check for unverified devices in left members
+   [\#838](https://github.com/matrix-org/matrix-js-sdk/pull/838)
+
 Changes in [1.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0-rc.1) (2019-02-08)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.3...v1.0.0-rc.1)
