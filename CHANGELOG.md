@@ -1,3 +1,10 @@
+Changes in [1.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0) (2019-02-14)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.2...v1.0.0)
+
+ * Try again to commit package-lock.json
+   [\#841](https://github.com/matrix-org/matrix-js-sdk/pull/841)
+
 Changes in [1.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0-rc.2) (2019-02-14)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.1...v1.0.0-rc.2)
