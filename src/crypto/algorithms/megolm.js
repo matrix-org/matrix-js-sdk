@@ -758,7 +758,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     } catch (e) {
         let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
 
-        if (e && e.message && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
+        if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
             this._requestKeysForEvent(event);
 
             errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
