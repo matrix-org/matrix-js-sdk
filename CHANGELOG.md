@@ -1,3 +1,10 @@
+Changes in [1.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1-rc.1) (2019-02-28)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0...v1.0.1-rc.1)
+
+ * Fix "e is undefined" masking the original error in MegolmDecryption
+   [\#847](https://github.com/matrix-org/matrix-js-sdk/pull/847)
+
 Changes in [1.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0) (2019-02-14)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.2...v1.0.0)
