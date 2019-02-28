@@ -938,17 +938,6 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         content.session_key, keysClaimed,
         exportFormat,
     ).then(() => {
-        // cancel any outstanding room key requests for this session
-        this._crypto.cancelRoomKeyRequest({
-            algorithm: content.algorithm,
-            room_id: content.room_id,
-            session_id: content.session_id,
-            sender_key: senderKey,
-        });
-
-        // have another go at decrypting events sent with this session.
-        this._retryDecryption(senderKey, sessionId);
-    }).then(() => {
         if (this._crypto.backupInfo) {
             // don't wait for the keys to be backed up for the server
             this._crypto.backupGroupSession(
@@ -961,6 +950,25 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
                 console.log("Failed to back up group session", e);
             });
         }
+    }).then(() => {
+        // have another go at decrypting events sent with this session.
+        this._retryDecryption(senderKey, sessionId)
+            .then((success) => {
+                // cancel any outstanding room key requests for this session.
+                // Only do this if we managed to decrypt every message in the
+                // session, because if we didn't, we leave the other key
+                // requests in the hopes that someone sends us a key that
+                // includes an earlier index.
+                if (success) {
+                    this._crypto.cancelRoomKeyRequest({
+                        algorithm: content.algorithm,
+                        room_id: content.room_id,
+                        session_id: content.session_id,
+                        sender_key: senderKey,
+                    });
+                }
+            });
+
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
@@ -1105,19 +1113,27 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
  * @private
  * @param {String} senderKey
  * @param {String} sessionId
+ *
+ * @return {Boolean} whether all messages were successfully decrypted
  */
-MegolmDecryption.prototype._retryDecryption = function(senderKey, sessionId) {
+MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionId) {
     const k = senderKey + "|" + sessionId;
     const pending = this._pendingEvents[k];
     if (!pending) {
-        return;
+        return true;
     }
 
     delete this._pendingEvents[k];
 
-    for (const ev of pending) {
-        ev.attemptDecryption(this._crypto);
-    }
+    await Promise.all([...pending].map(async (ev) => {
+        try {
+            await ev.attemptDecryption(this._crypto);
+        } catch (e) {
+            // don't die if something goes wrong
+        }
+    }));
+
+    return !this._pendingEvents[k];
 };
 
 base.registerAlgorithm(
