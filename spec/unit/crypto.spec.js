@@ -224,7 +224,9 @@ describe("Crypto", function() {
                     }
                 }));
 
-                const bobDecryptor = bobClient._crypto._getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
+                const bobDecryptor = bobClient._crypto._getRoomDecryptor(
+                    roomId, olmlib.MEGOLM_ALGORITHM,
+                );
 
                 let eventPromise = Promise.all(events.map((ev) => {
                     return awaitEvent(ev, "Event.decrypted");

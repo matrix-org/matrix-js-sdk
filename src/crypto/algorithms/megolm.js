@@ -968,7 +968,6 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
                     });
                 }
             });
-
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });

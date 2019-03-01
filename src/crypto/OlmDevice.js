@@ -932,7 +932,8 @@ OlmDevice.prototype.addInboundGroupSession = async function(
 
                         if (existingSession) {
                             logger.log(
-                                "Update for megolm session " + senderKey + "/" + sessionId,
+                                "Update for megolm session "
+                                    + senderKey + "/" + sessionId,
                             );
                             if (existingSession.first_known_index()
                                 <= session.first_known_index()) {
