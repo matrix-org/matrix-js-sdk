@@ -915,14 +915,6 @@ OlmDevice.prototype.addInboundGroupSession = async function(
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn,
                 (existingSession, existingSessionData) => {
-                    if (existingSession) {
-                        logger.log(
-                            "Update for megolm session " + senderKey + "/" + sessionId,
-                        );
-                        // for now we just ignore updates. TODO: implement something here
-                        return;
-                    }
-
                     // new session.
                     const session = new global.Olm.InboundGroupSession();
                     try {
@@ -938,6 +930,20 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             );
                         }
 
+                        if (existingSession) {
+                            logger.log(
+                                "Update for megolm session "
+                                    + senderKey + "/" + sessionId,
+                            );
+                            if (existingSession.first_known_index()
+                                <= session.first_known_index()) {
+                                // existing session has lower index (i.e. can
+                                // decrypt more), so keep it
+                                logger.log("Keeping existing session");
+                                return;
+                            }
+                        }
+
                         const sessionData = {
                             room_id: roomId,
                             session: session.pickle(this._pickleKey),
@@ -945,7 +951,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
                         };
 
-                        this._cryptoStore.addEndToEndInboundGroupSession(
+                        this._cryptoStore.storeEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
                         );
                     } finally {
