@@ -263,8 +263,7 @@ describe("Crypto", function() {
                 await bobDecryptor.onRoomKeyEvent(ksEvent);
                 await eventPromise;
                 expect(events[0].getContent().msgtype).toNotBe("m.bad.encrypted");
-                // the room key request should still be there, since we haven't
-                // decrypted everything
+                // the room key request should be gone since we've now decypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                     .toNotExist();
 
