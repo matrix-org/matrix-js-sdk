@@ -938,19 +938,6 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
         content.session_key, keysClaimed,
         exportFormat,
     ).then(() => {
-        if (this._crypto.backupInfo) {
-            // don't wait for the keys to be backed up for the server
-            this._crypto.backupGroupSession(
-                content.room_id, senderKey, forwardingKeyChain,
-                content.session_id, content.session_key, keysClaimed,
-                exportFormat,
-            ).catch((e) => {
-                // This throws if the upload failed, but this is fine
-                // since it will have written it to the db and will retry.
-                console.log("Failed to back up group session", e);
-            });
-        }
-    }).then(() => {
         // have another go at decrypting events sent with this session.
         this._retryDecryption(senderKey, sessionId)
             .then((success) => {
@@ -968,6 +955,19 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
                     });
                 }
             });
+    }).then(() => {
+        if (this._crypto.backupInfo) {
+            // don't wait for the keys to be backed up for the server
+            this._crypto.backupGroupSession(
+                content.room_id, senderKey, forwardingKeyChain,
+                content.session_id, content.session_key, keysClaimed,
+                exportFormat,
+            ).catch((e) => {
+                // This throws if the upload failed, but this is fine
+                // since it will have written it to the db and will retry.
+                console.log("Failed to back up group session", e);
+            });
+        }
     }).catch((e) => {
         logger.error(`Error handling m.room_key_event: ${e}`);
     });
