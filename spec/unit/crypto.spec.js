@@ -139,6 +139,11 @@ describe("Crypto", function() {
             await bobClient.initCrypto();
         });
 
+        afterEach(async function() {
+            aliceClient.stopClient();
+            bobClient.stopClient();
+        });
+
         it(
             "does not cancel keyshare requests if some messages are not decrypted",
             async function() {
@@ -266,9 +271,6 @@ describe("Crypto", function() {
                 // the room key request should be gone since we've now decypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                     .toNotExist();
-
-                aliceClient.stopClient();
-                bobClient.stopClient();
             },
         );
     });
