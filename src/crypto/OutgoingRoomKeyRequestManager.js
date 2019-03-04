@@ -124,35 +124,115 @@ export default class OutgoingRoomKeyRequestManager {
      *
      * @param {module:crypto~RoomKeyRequestBody} requestBody
      * @param {Array<{userId: string, deviceId: string}>} recipients
+     * @param {boolean} resend whether to resend the key request if there is
+     *    already one
      *
      * @returns {Promise} resolves when the request has been added to the
      *    pending list (or we have established that a similar request already
      *    exists)
      */
-    sendRoomKeyRequest(requestBody, recipients) {
-        return this._cryptoStore.getOrAddOutgoingRoomKeyRequest({
-            requestBody: requestBody,
-            recipients: recipients,
-            requestId: this._baseApis.makeTxnId(),
-            state: ROOM_KEY_REQUEST_STATES.UNSENT,
-        }).then((req) => {
-            if (req.state === ROOM_KEY_REQUEST_STATES.UNSENT) {
-                this._startTimer();
+    async sendRoomKeyRequest(requestBody, recipients, resend=false) {
+        const req = await this._cryptoStore.getOutgoingRoomKeyRequest(
+            requestBody,
+        );
+        if (!req) {
+            await this._cryptoStore.getOrAddOutgoingRoomKeyRequest({
+                requestBody: requestBody,
+                recipients: recipients,
+                requestId: this._baseApis.makeTxnId(),
+                state: ROOM_KEY_REQUEST_STATES.UNSENT,
+            });
+        } else {
+            switch (req.state) {
+            case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND:
+            case ROOM_KEY_REQUEST_STATES.UNSENT:
+                // nothing to do here, since we're going to send a request anyways
+                return;
+
+            case ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING: {
+                // existing request is about to be cancelled.  If we want to
+                // resend, then change the state so that it resends after
+                // cancelling.  Otherwise, just cancel the cancellation.
+                const state = resend ?
+                    ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND :
+                    ROOM_KEY_REQUEST_STATES.SENT;
+                await this._cryptoStore.updateOutgoingRoomKeyRequest(
+                    req.requestId, ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING, {
+                        state,
+                        cancellationTxnId: this._baseApis.makeTxnId(),
+                    },
+                );
+                break;
             }
-        });
+            case ROOM_KEY_REQUEST_STATES.SENT: {
+                // a request has already been sent.  If we don't want to
+                // resend, then do nothing.  If we do want to, then cancel the
+                // existing request and send a new one.
+                if (resend) {
+                    const state =
+                          ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILLRESEND;
+                    const updatedReq =
+                          await this._cryptoStore.updateOutgoingRoomKeyRequest(
+                              req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
+                                  state,
+                                  cancellationTxnId: this._baseApis.makeTxnId(),
+                              },
+                          );
+                    if (!updatedReq) {
+                        // updateOutgoingRoomKeyRequest couldn't find the request
+                        // in state ROOM_KEY_REQUEST_STATES.SENT, so we must have
+                        // raced with another tab to mark the request cancelled.
+                        // Try again, to make sure the request is resent.
+                        return await this.sendRoomKeyRequest(
+                            requestBody, recipients, resend,
+                        );
+                    }
+
+                    // We don't want to wait for the timer, so we send it
+                    // immediately. (We might actually end up racing with the timer,
+                    // but that's ok: even if we make the request twice, we'll do it
+                    // with the same transaction_id, so only one message will get
+                    // sent).
+                    //
+                    // (We also don't want to wait for the response from the server
+                    // here, as it will slow down processing of received keys if we
+                    // do.)
+                    try {
+                        await this._sendOutgoingRoomKeyRequestCancellation(
+                            updatedReq,
+                            true,
+                        );
+                    } catch (e) {
+                        logger.error(
+                            "Error sending room key request cancellation;"
+                                + " will retry later.", e,
+                        );
+                    }
+                    // The request has transitioned from
+                    // CANCELLATION_PENDING_AND_WILL_RESEND to UNSENT. We
+                    // still need to resend the request which is now UNSENT, so
+                    // start the timer if it isn't already started.
+                }
+                break;
+            }
+            default:
+                throw new Error('unhandled state: ' + req.state);
+            }
+        }
+        // some of the branches require the timer to be started.  Just start it
+        // all the time, because it doesn't hurt to start it.
+        this._startTimer();
     }
 
     /**
      * Cancel room key requests, if any match the given requestBody
      *
      * @param {module:crypto~RoomKeyRequestBody} requestBody
-     * @param {boolean} andResend if true, transition to UNSENT instead of
-     *                            deleting after sending cancellation.
      *
      * @returns {Promise} resolves when the request has been updated in our
      *    pending list.
      */
-    cancelRoomKeyRequest(requestBody, andResend=false) {
+    cancelRoomKeyRequest(requestBody) {
         return this._cryptoStore.getOutgoingRoomKeyRequest(
             requestBody,
         ).then((req) => {
@@ -183,15 +263,10 @@ export default class OutgoingRoomKeyRequestManager {
                     );
 
                 case ROOM_KEY_REQUEST_STATES.SENT: {
-                    // If `andResend` is set, transition to UNSENT once the
-                    // cancellation has successfully been sent.
-                    const state = andResend ?
-                        ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND :
-                        ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING;
                     // send a cancellation.
                     return this._cryptoStore.updateOutgoingRoomKeyRequest(
                         req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
-                            state,
+                            state: ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING,
                             cancellationTxnId: this._baseApis.makeTxnId(),
                         },
                     ).then((updatedReq) => {
@@ -221,19 +296,11 @@ export default class OutgoingRoomKeyRequestManager {
                         // do.)
                         this._sendOutgoingRoomKeyRequestCancellation(
                             updatedReq,
-                            andResend,
                         ).catch((e) => {
                             logger.error(
                                 "Error sending room key request cancellation;"
                                 + " will retry later.", e,
                             );
-                            this._startTimer();
-                        }).then(() => {
-                            if (!andResend) return;
-                            // The request has transitioned from
-                            // CANCELLATION_PENDING_AND_WILL_RESEND to UNSENT. We
-                            // still need to resend the request which is now UNSENT, so
-                            // start the timer if it isn't already started.
                             this._startTimer();
                         });
                     });

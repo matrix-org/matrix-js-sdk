@@ -273,5 +273,29 @@ describe("Crypto", function() {
                     .toNotExist();
             },
         );
+
+        it("creates a new keyshare request if we request a keyshare", async function() {
+            // make sure that cancelAndResend... creates a new keyshare request
+            // if there wasn't an already-existing one
+            const event = new MatrixEvent({
+                sender: "@bob:example.com",
+                room_id: "!someroom",
+                content: {
+                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    session_id: "sessionid",
+                    sender_key: "senderkey",
+                },
+            });
+            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+            const cryptoStore = aliceClient._cryptoStore;
+            const roomKeyRequestBody = {
+                algorithm: olmlib.MEGOLM_ALGORITHM,
+                room_id: "!someroom",
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            };
+            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
+                .toExist();
+        });
     });
 });
