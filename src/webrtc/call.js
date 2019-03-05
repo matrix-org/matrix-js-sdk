@@ -652,7 +652,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
         debuglog('User denied access to camera/microphone.' +
             ' Or possibly you are using an insecure domain. Receiving only.');
     } else {
-        debuglog('Failed to getUserMedia.');
+        debuglog('Failed to getUserMedia: ' + error.name);
         this._getUserMediaFailed(error);
         return;
     }
