@@ -815,19 +815,9 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
 };
 
 MegolmDecryption.prototype._requestKeysForEvent = function(event) {
-    const sender = event.getSender();
     const wireContent = event.getWireContent();
 
-    // send the request to all of our own devices, and the
-    // original sending device if it wasn't us.
-    const recipients = [{
-        userId: this._userId, deviceId: '*',
-    }];
-    if (sender != this._userId) {
-        recipients.push({
-            userId: sender, deviceId: wireContent.device_id,
-        });
-    }
+    const recipients = event.getKeyRequestRecipients(this._userId);
 
     this._crypto.requestRoomKey({
         room_id: event.getRoomId(),

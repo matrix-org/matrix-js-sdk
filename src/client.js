@@ -760,9 +760,10 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
  * request.
  * @param  {MatrixEvent} event event of which to cancel and resend the room
  *                            key request.
+ * @return {Promise} A promise that will resolve when the key request is queued
  */
 MatrixClient.prototype.cancelAndResendEventRoomKeyRequest = function(event) {
-    event.cancelAndResendKeyRequest(this._crypto);
+    return event.cancelAndResendKeyRequest(this._crypto, this.getUserId());
 };
 
 /**

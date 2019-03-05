@@ -139,6 +139,11 @@ describe("Crypto", function() {
             await bobClient.initCrypto();
         });
 
+        afterEach(async function() {
+            aliceClient.stopClient();
+            bobClient.stopClient();
+        });
+
         it(
             "does not cancel keyshare requests if some messages are not decrypted",
             async function() {
@@ -266,10 +271,31 @@ describe("Crypto", function() {
                 // the room key request should be gone since we've now decypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                     .toNotExist();
-
-                aliceClient.stopClient();
-                bobClient.stopClient();
             },
         );
+
+        it("creates a new keyshare request if we request a keyshare", async function() {
+            // make sure that cancelAndResend... creates a new keyshare request
+            // if there wasn't an already-existing one
+            const event = new MatrixEvent({
+                sender: "@bob:example.com",
+                room_id: "!someroom",
+                content: {
+                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    session_id: "sessionid",
+                    sender_key: "senderkey",
+                },
+            });
+            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+            const cryptoStore = aliceClient._cryptoStore;
+            const roomKeyRequestBody = {
+                algorithm: olmlib.MEGOLM_ALGORITHM,
+                room_id: "!someroom",
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            };
+            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
+                .toExist();
+        });
     });
 });

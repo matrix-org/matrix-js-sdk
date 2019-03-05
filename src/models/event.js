@@ -382,15 +382,41 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * Cancel any room key request for this event and resend another.
      *
      * @param {module:crypto} crypto crypto module
+     * @param {string} userId the user who received this event
+     *
+     * @returns {Promise} a promise that resolves when the request is queued
      */
-    cancelAndResendKeyRequest: function(crypto) {
+    cancelAndResendKeyRequest: function(crypto, userId) {
         const wireContent = this.getWireContent();
-        crypto.cancelRoomKeyRequest({
+        return crypto.requestRoomKey({
             algorithm: wireContent.algorithm,
             room_id: this.getRoomId(),
             session_id: wireContent.session_id,
             sender_key: wireContent.sender_key,
-        }, true);
+        }, this.getKeyRequestRecipients(userId), true);
+    },
+
+    /**
+     * Calculate the recipients for keyshare requests.
+     *
+     * @param {string} userId the user who received this event.
+     *
+     * @returns {Array} array of recipients
+     */
+    getKeyRequestRecipients: function(userId) {
+        // send the request to all of our own devices, and the
+        // original sending device if it wasn't us.
+        const wireContent = this.getWireContent();
+        const recipients = [{
+            userId, deviceId: '*',
+        }];
+        const sender = this.getSender();
+        if (sender !== userId) {
+            recipients.push({
+                userId: sender, deviceId: wireContent.device_id,
+            });
+        }
+        return recipients;
     },
 
     _decryptionLoop: async function(crypto) {

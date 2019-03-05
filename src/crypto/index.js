@@ -1426,10 +1426,14 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
  *
  * @param {module:crypto~RoomKeyRequestBody} requestBody
  * @param {Array<{userId: string, deviceId: string}>} recipients
+ * @param {boolean} resend whether to resend the key request if there is
+ *    already one
+ *
+ * @return {Promise} a promise that resolves when the key request is queued
  */
-Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
-    this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
-        requestBody, recipients,
+Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false) {
+    return this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(
+        requestBody, recipients, resend,
     ).catch((e) => {
         // this normally means we couldn't talk to the store
         logger.error(
@@ -1443,11 +1447,9 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients) {
  *
  * @param {module:crypto~RoomKeyRequestBody} requestBody
  *    parameters to match for cancellation
- * @param {boolean} andResend
- *    if true, resend the key request after cancelling.
  */
-Crypto.prototype.cancelRoomKeyRequest = function(requestBody, andResend) {
-    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody, andResend)
+Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
+    this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
     .catch((e) => {
         logger.warn("Error clearing pending room key requests", e);
     }).done();
@@ -1984,7 +1986,7 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             sender, device.deviceId,
         );
     for (const keyReq of requestsToResend) {
-        this.cancelRoomKeyRequest(keyReq.requestBody, true);
+        this.requestRoomKey(keyReq.requestBody, keyReq.recipients, true);
     }
 };
 
