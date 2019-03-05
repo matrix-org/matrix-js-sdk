@@ -1,3 +1,12 @@
+Changes in [1.0.1-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1-rc.2) (2019-03-05)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1-rc.1...v1.0.1-rc.2)
+
+ * dont swallow txn errors in crypto store
+   [\#853](https://github.com/matrix-org/matrix-js-sdk/pull/853)
+ * Don't swallow txn errors in crypto store
+   [\#849](https://github.com/matrix-org/matrix-js-sdk/pull/849)
+
 Changes in [1.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1-rc.1) (2019-02-28)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0...v1.0.1-rc.1)
