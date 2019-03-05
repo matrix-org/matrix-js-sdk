@@ -520,6 +520,17 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Gets the cleartext content for this event. If the event is not encrypted,
+     * or encryption has not been completed, this will return null.
+     *
+     * @returns {Object} The cleartext (decrypted) content for the event
+     */
+    getClearContent: function() {
+        const ev = this._clearEvent;
+        return ev && ev.content ? ev.content : null;
+    },
+
+    /**
      * Check if the event is encrypted.
      * @return {boolean} True if this event is encrypted.
      */

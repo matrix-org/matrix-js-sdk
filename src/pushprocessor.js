@@ -185,14 +185,8 @@ function PushProcessor(client) {
 
     const eventFulfillsDisplayNameCondition = function(cond, ev) {
         let content = ev.getContent();
-        // TODO: Don't use private variable access
-        if (ev.isEncrypted() && ev._clearEvent) {
-            // Sometimes the event content is nested for some reason, so unpack that.
-            if (ev._clearEvent.content) {
-                content = ev._clearEvent.content;
-            } else {
-                content = ev._clearEvent;
-            }
+        if (ev.isEncrypted() && ev.getClearContent()) {
+            content = ev.getClearContent();
         }
         if (!content || !content.body || typeof content.body != 'string') {
             return false;
