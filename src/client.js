@@ -2299,10 +2299,11 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
  * Obtain a dict of actions which should be performed for this event according
  * to the push rules for this user.  Caches the dict on the event.
  * @param {MatrixEvent} event The event to get push actions for.
+ * @param {boolean} ignoreCache True to skip the cache and recalculate the push rules.
  * @return {module:pushprocessor~PushAction} A dict of actions to perform.
  */
-MatrixClient.prototype.getPushActionsForEvent = function(event) {
-    if (!event.getPushActions()) {
+MatrixClient.prototype.getPushActionsForEvent = function(event, ignoreCache = false) {
+    if (!event.getPushActions() || ignoreCache) {
         event.setPushActions(this._pushProcessor.actionsForEvent(event));
     }
     return event.getPushActions();
