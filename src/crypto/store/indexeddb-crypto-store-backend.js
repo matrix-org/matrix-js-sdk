@@ -690,11 +690,12 @@ function promiseifyTxn(txn) {
             }
             resolve();
         };
-        txn.onerror = () => {
+        txn.onerror = (event) => {
             if (txn._mx_abortexception !== undefined) {
                 reject(txn._mx_abortexception);
+            } else {
+                reject(event.target.error);
             }
-            reject();
         };
         txn.onabort = () => reject(txn._mx_abortexception);
     });
