@@ -1430,6 +1430,7 @@ Room.prototype.getEventReadUpTo = function(userId, ignoreSynthesized) {
  * what is available to the room at the time of execution.
  * @param {String} userId The user ID to check the read state of.
  * @param {String} eventId The event ID to check if the user read.
+ * @returns {Boolean} True if the user has read the event, false otherwise.
  */
 Room.prototype.hasUserReadEvent = function(userId, eventId) {
     const readUpToId = this.getEventReadUpTo(userId, false);
