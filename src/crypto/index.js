@@ -1429,7 +1429,7 @@ Crypto.prototype.handleDeviceListChanges = async function(syncData, syncDeviceLi
  * @param {boolean} resend whether to resend the key request if there is
  *    already one
  *
- * @return {Promise} a  promise that resolves when the key request is queued
+ * @return {Promise} a promise that resolves when the key request is queued
  */
 Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false) {
     return this._outgoingRoomKeyRequestManager.sendRoomKeyRequest(

@@ -383,6 +383,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @param {module:crypto} crypto crypto module
      * @param {string} userId the user who received this event
+     *
+     * @returns {Promise} a promise that resolves when the request is queued
      */
     cancelAndResendKeyRequest: function(crypto, userId) {
         const wireContent = this.getWireContent();
