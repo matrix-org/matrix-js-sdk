@@ -2309,13 +2309,16 @@ MatrixClient.prototype.getPushActionsForEvent = function(event, ignoreCache = fa
         event.setPushActions(actions);
 
         // Ensure the unread counts are kept up to date if the event is encrypted
-        const oldHighlight = oldActions && oldActions.tweaks ? !!oldActions.tweaks.highlight : false;
-        const newHighlight = actions && actions.tweaks ? !!actions.tweaks.highlight : false;
+        const oldHighlight = oldActions && oldActions.tweaks
+            ? !!oldActions.tweaks.highlight : false;
+        const newHighlight = actions && actions.tweaks
+            ? !!actions.tweaks.highlight : false;
         if (oldHighlight !== newHighlight && event.isEncrypted()) {
             const room = this.getRoom(event.getRoomId());
             if (room) {
                 const current = room.getUnreadNotificationCount("highlight");
-                room.setUnreadNotificationCount("highlight", newHighlight ? current + 1 : current - 1);
+                const newCount = newHighlight ? current + 1 : current - 1;
+                room.setUnreadNotificationCount("highlight", newCount);
             }
         }
     }
