@@ -471,6 +471,14 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._retryDecryption = false;
             this._setClearData(res);
 
+            // Before we emit the event, clear the push actions so that they can be recalculated
+            // by relevant code. We do this because the clear event has now changed, making it
+            // so that existing rules can be re-run over the applicable properties. Stuff like
+            // highlighting when the user's name is mentioned rely on this happening. We also want
+            // to set the push actions before emitting so that any notification listeners don't
+            // pick up the wrong contents.
+            this.setPushActions(null);
+
             this.emit("Event.decrypted", this, err);
 
             return;
