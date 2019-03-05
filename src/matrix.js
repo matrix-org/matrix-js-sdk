@@ -88,21 +88,21 @@ module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCal
 
 
 /**
- * Set an audio output device to use for MatrixCalls
+ * Set a preferred audio output device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
 module.exports.setMatrixCallAudioOutput = require('./webrtc/call').setAudioOutput;
 /**
- * Set an audio input device to use for MatrixCalls
+ * Set a preferred audio input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
 module.exports.setMatrixCallAudioInput = require('./webrtc/call').setAudioInput;
 /**
- * Set a video input device to use for MatrixCalls
+ * Set a preferred video input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset

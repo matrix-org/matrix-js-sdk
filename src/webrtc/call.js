@@ -583,7 +583,7 @@ MatrixCall.prototype._maybeGotUserMediaForInvite = function(stream) {
             ' Or possibly you are using an insecure domain. Receiving only.');
         this.peerConn = _createPeerConnection(this);
     } else {
-        debuglog('Failed to getUserMedia.');
+        debuglog('Failed to getUserMedia: ' + error.name);
         this._getUserMediaFailed(error);
         return;
     }
@@ -1274,15 +1274,15 @@ const _getUserMediaVideoContraints = function(callType) {
         case 'voice':
             return {
                 audio: {
-                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                    deviceId: audioInput ? {ideal: audioInput} : undefined,
                 }, video: false,
             };
         case 'video':
             return {
                 audio: {
-                    deviceId: audioInput ? {exact: audioInput} : undefined,
+                    deviceId: audioInput ? {ideal: audioInput} : undefined,
                 }, video: {
-                    deviceId: videoInput ? {exact: videoInput} : undefined,
+                    deviceId: videoInput ? {ideal: videoInput} : undefined,
                     /* We want 640x360.  Chrome will give it only if we ask exactly,
                        FF refuses entirely if we ask exactly, so have to ask for ideal
                        instead */
