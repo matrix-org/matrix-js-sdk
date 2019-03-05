@@ -2304,7 +2304,20 @@ function _membershipChange(client, roomId, userId, membership, reason, callback)
  */
 MatrixClient.prototype.getPushActionsForEvent = function(event, ignoreCache = false) {
     if (!event.getPushActions() || ignoreCache) {
-        event.setPushActions(this._pushProcessor.actionsForEvent(event));
+        const oldActions = event.getPushActions();
+        const actions = this._pushProcessor.actionsForEvent(event);
+        event.setPushActions(actions);
+
+        // Ensure the unread counts are kept up to date if the event is encrypted
+        const oldHighlight = oldActions && oldActions.tweaks ? !!oldActions.tweaks.highlight : false;
+        const newHighlight = actions && actions.tweaks ? !!actions.tweaks.highlight : false;
+        if (oldHighlight !== newHighlight && event.isEncrypted()) {
+            const room = this.getRoom(event.getRoomId());
+            if (room) {
+                const current = room.getUnreadNotificationCount("highlight");
+                room.setUnreadNotificationCount("highlight", newHighlight ? current + 1 : current - 1);
+            }
+        }
     }
     return event.getPushActions();
 };
