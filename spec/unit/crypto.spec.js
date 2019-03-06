@@ -12,6 +12,7 @@ import TestClient from '../TestClient';
 import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
+import lolex from 'lolex';
 
 const EventEmitter = require("events").EventEmitter;
 
@@ -127,7 +128,6 @@ describe("Crypto", function() {
     describe('Key requests', function() {
         let aliceClient;
         let bobClient;
-        let realSetTimeout;
 
         beforeEach(async function() {
             aliceClient = (new TestClient(
@@ -138,15 +138,9 @@ describe("Crypto", function() {
             )).client;
             await aliceClient.initCrypto();
             await bobClient.initCrypto();
-            // clobber the setTimeout function to run 10x faster.
-            realSetTimeout = global.setTimeout;
-            global.setTimeout = function(f, n) {
-                return realSetTimeout(f, n/10);
-            };
         });
 
         afterEach(async function() {
-            global.setTimeout = realSetTimeout;
             aliceClient.stopClient();
             bobClient.stopClient();
         });
@@ -322,8 +316,12 @@ describe("Crypto", function() {
                 let func;
                 const promise = new Promise((resolve, reject) => {
                     func = function(...args) {
-                        global.setTimeout(() => resolve(args), 10);
-                        return Promise.resolve();
+                        resolve(args);
+                        return new Promise((resolve, reject) => {
+                            // give us some time to process the result before
+                            // continuing
+                            global.setTimeout(resolve, 1);
+                        });
                     };
                 });
                 return {func, promise};
@@ -331,23 +329,38 @@ describe("Crypto", function() {
 
             aliceClient.startClient();
 
-            let promise;
-            // make a room key request, and record the transaction ID for the
-            // sendToDevice call
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
-            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            let args = await promise;
-            const txnId = args[2];
+            const clock = lolex.install();
 
-            // cancel and resend the room key request
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
-            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            // the first call to sendToDevice will be the cancellation
-            args = await promise;
-            // the second call to sendToDevice will be the key request
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
-            args = await promise;
-            expect(args[2]).toNotBe(txnId);
+            try {
+                let promise;
+                // make a room key request, and record the transaction ID for the
+                // sendToDevice call
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+                clock.runToLast();
+                let args = await promise;
+                const txnId = args[2];
+                clock.runToLast();
+
+                // give the room key request manager time to update the state
+                // of the request
+                await Promise.resolve();
+
+                // cancel and resend the room key request
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+                clock.runToLast();
+                // the first call to sendToDevice will be the cancellation
+                args = await promise;
+                // the second call to sendToDevice will be the key request
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                clock.runToLast();
+                args = await promise;
+                clock.runToLast();
+                expect(args[2]).toNotBe(txnId);
+            } finally {
+                clock.uninstall();
+            }
         });
     });
 });
