@@ -497,6 +497,14 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._retryDecryption = false;
             this._setClearData(res);
 
+            // Before we emit the event, clear the push actions so that they can be recalculated
+            // by relevant code. We do this because the clear event has now changed, making it
+            // so that existing rules can be re-run over the applicable properties. Stuff like
+            // highlighting when the user's name is mentioned rely on this happening. We also want
+            // to set the push actions before emitting so that any notification listeners don't
+            // pick up the wrong contents.
+            this.setPushActions(null);
+
             this.emit("Event.decrypted", this, err);
 
             return;
@@ -535,6 +543,17 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             decryptionResult.claimedEd25519Key || null;
         this._forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
+    },
+
+    /**
+     * Gets the cleartext content for this event. If the event is not encrypted,
+     * or encryption has not been completed, this will return null.
+     *
+     * @returns {Object} The cleartext (decrypted) content for the event
+     */
+    getClearContent: function() {
+        const ev = this._clearEvent;
+        return ev && ev.content ? ev.content : null;
     },
 
     /**
