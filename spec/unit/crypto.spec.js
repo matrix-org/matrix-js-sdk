@@ -127,6 +127,7 @@ describe("Crypto", function() {
     describe('Key requests', function() {
         let aliceClient;
         let bobClient;
+        let realSetTimeout;
 
         beforeEach(async function() {
             aliceClient = (new TestClient(
@@ -137,9 +138,15 @@ describe("Crypto", function() {
             )).client;
             await aliceClient.initCrypto();
             await bobClient.initCrypto();
+            // clobber the setTimeout function to run 10x faster.
+            realSetTimeout = global.setTimeout;
+            global.setTimeout = function(f, n) {
+                return realSetTimeout(f, n/10);
+            };
         });
 
         afterEach(async function() {
+            global.setTimeout = realSetTimeout;
             aliceClient.stopClient();
             bobClient.stopClient();
         });
@@ -296,6 +303,51 @@ describe("Crypto", function() {
             };
             expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                 .toExist();
+        });
+
+        it("uses a new txnid for re-requesting keys", async function() {
+            const event = new MatrixEvent({
+                sender: "@bob:example.com",
+                room_id: "!someroom",
+                content: {
+                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    session_id: "sessionid",
+                    sender_key: "senderkey",
+                },
+            });
+            /* return a promise and a function. When the function is called,
+             * the promise will be resolved.
+             */
+            function awaitFunctionCall() {
+                let func;
+                const promise = new Promise((resolve, reject) => {
+                    func = function(...args) {
+                        global.setTimeout(() => resolve(args), 10);
+                        return Promise.resolve();
+                    };
+                });
+                return {func, promise};
+            }
+
+            aliceClient.startClient();
+
+            let promise;
+            // make a room key request, and record the transaction ID for the
+            // sendToDevice call
+            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+            let args = await promise;
+            const txnId = args[2];
+
+            // cancel and resend the room key request
+            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+            // the first call to sendToDevice will be the cancellation
+            args = await promise;
+            // the second call to sendToDevice will be the key request
+            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+            args = await promise;
+            expect(args[2]).toNotBe(txnId);
         });
     });
 });
