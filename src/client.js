@@ -245,6 +245,8 @@ function MatrixClient(opts) {
             ? !!actions.tweaks.highlight : false;
         if (oldHighlight !== newHighlight) {
             const room = this.getRoom(event.getRoomId());
+            // TODO: Handle mentions received while the client is offline
+            // See also https://github.com/vector-im/riot-web/issues/9069
             if (room && !room.hasUserReadEvent(this.getUserId(), event.getId())) {
                 const current = room.getUnreadNotificationCount("highlight");
                 const newCount = newHighlight ? current + 1 : current - 1;
