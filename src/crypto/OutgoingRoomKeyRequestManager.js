@@ -170,12 +170,15 @@ export default class OutgoingRoomKeyRequestManager {
                 // existing request and send a new one.
                 if (resend) {
                     const state =
-                          ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILLRESEND;
+                          ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND;
                     const updatedReq =
                           await this._cryptoStore.updateOutgoingRoomKeyRequest(
                               req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
                                   state,
                                   cancellationTxnId: this._baseApis.makeTxnId(),
+                                  // need to use a new transaction ID so that
+                                  // the request gets sent
+                                  requestTxnId: this._baseApis.makeTxnId(),
                               },
                           );
                     if (!updatedReq) {
@@ -347,7 +350,7 @@ export default class OutgoingRoomKeyRequestManager {
                 logger.warn(
                     `error in OutgoingRoomKeyRequestManager: ${e}`,
                 );
-            }).done();
+            });
         };
 
         this._sendOutgoingRoomKeyRequestsTimer = global.setTimeout(
@@ -398,7 +401,7 @@ export default class OutgoingRoomKeyRequestManager {
                 logger.error("Error sending room key request; will retry later.", e);
                 this._sendOutgoingRoomKeyRequestsTimer = null;
                 this._startTimer();
-            }).done();
+            });
         });
     }
 
@@ -418,7 +421,7 @@ export default class OutgoingRoomKeyRequestManager {
         };
 
         return this._sendMessageToDevices(
-            requestMessage, req.recipients, req.requestId,
+            requestMessage, req.recipients, req.requestTxnId || req.requestId,
         ).then(() => {
             return this._cryptoStore.updateOutgoingRoomKeyRequest(
                 req.requestId, ROOM_KEY_REQUEST_STATES.UNSENT,
