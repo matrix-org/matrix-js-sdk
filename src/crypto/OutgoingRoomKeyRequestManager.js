@@ -170,7 +170,7 @@ export default class OutgoingRoomKeyRequestManager {
                 // existing request and send a new one.
                 if (resend) {
                     const state =
-                          ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILLRESEND;
+                          ROOM_KEY_REQUEST_STATES.CANCELLATION_PENDING_AND_WILL_RESEND;
                     const updatedReq =
                           await this._cryptoStore.updateOutgoingRoomKeyRequest(
                               req.requestId, ROOM_KEY_REQUEST_STATES.SENT, {
