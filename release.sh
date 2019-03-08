@@ -6,7 +6,9 @@
 #   github-changelog-generator; install via:
 #     pip install git+https://github.com/matrix-org/github-changelog-generator.git
 #   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
-#   hub; install via brew (OSX) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
+#   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
+#   npm; typically installed by Node.js
+#   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
 
 set -e
 
@@ -22,6 +24,8 @@ else
     echo "hub is required: please install it"
     exit
 fi
+npm --version > /dev/null || (echo "npm is required: please install it"; kill $$)
+yarn --version > /dev/null || (echo "yarn is required: please install it"; kill $$)
 
 USAGE="$0 [-xz] [-c changelog_file] vX.Y.Z"
 
@@ -88,6 +92,8 @@ if [ -z "$skip_changelog" ]; then
     update_changelog -h > /dev/null || (echo "github-changelog-generator is required: please install it"; exit)
 fi
 
+# Login and publish continues to use `npm`, as it seems to have more clearly
+# defined options and semantics than `yarn` for writing to the registry.
 actual_npm_user=`npm whoami`;
 if [ $expected_npm_user != $actual_npm_user ]; then
     echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
@@ -147,18 +153,18 @@ cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_cha
 set -x
 
 # Bump package.json and build the dist
-echo "npm version"
-# npm version will automatically commit its modification
+echo "yarn version"
+# yarn version will automatically commit its modification
 # and make a release tag. We don't want it to create the tag
 # because it can only sign with the default key, but we can
 # only turn off both of these behaviours, so we have to
 # manually commit the result.
-npm version --no-git-tag-version "$release"
+yarn version --no-git-tag-version "$release"
 
-# commit package-lock.json if it exists, is versioned, and is modified
-if [[ -f package-lock.json && `git status --porcelain package-lock.json | grep '^ M'` ]];
+# commit yarn.lock if it exists, is versioned, and is modified
+if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
 then
-    pkglock='package-lock.json'
+    pkglock='yarn.lock'
 else
     pkglock=''
 fi
@@ -178,7 +184,7 @@ fi
 # assets.
 # We make a completely separate checkout to be sure
 # we're using released versions of the dependencies
-# (rather than whatever we're pulling in from npm link)
+# (rather than whatever we're pulling in from yarn link)
 assets=''
 dodist=0
 jq -e .scripts.dist package.json 2> /dev/null || dodist=$?
@@ -189,10 +195,10 @@ if [ $dodist -eq 0 ]; then
     pushd "$builddir"
     git clone "$projdir" .
     git checkout "$rel_branch"
-    npm install
+    yarn install
     # We haven't tagged yet, so tell the dist script what version
     # it's building
-    DIST_VERSION="$tag" npm run dist
+    DIST_VERSION="$tag" yarn dist
 
     popd
 
@@ -281,12 +287,13 @@ fi
 rm "${release_text}"
 rm "${latest_changes}"
 
-# publish to npmjs
+# Login and publish continues to use `npm`, as it seems to have more clearly
+# defined options and semantics than `yarn` for writing to the registry.
 npm publish
 
 if [ -z "$skip_jsdoc" ]; then
     echo "generating jsdocs"
-    npm run gendoc
+    yarn gendoc
 
     echo "copying jsdocs to gh-pages branch"
     git checkout gh-pages
@@ -311,7 +318,7 @@ git checkout master
 git pull
 git merge "$rel_branch"
 
-# push master  and docs (if generated) to github
+# push master and docs (if generated) to github
 git push origin master
 if [ -z "$skip_jsdoc" ]; then
     git push origin gh-pages

@@ -21,4 +21,4 @@ export PATH="$rootdir/node_modules/.bin:$PATH"
 
 # now run our checks
 cd "$tmpdir"
-npm run lint
+yarn lint
