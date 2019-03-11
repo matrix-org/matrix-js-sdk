@@ -21,7 +21,9 @@ Please check [the working browser example](examples/browser) for more informatio
 In Node.js
 ----------
 
-``npm install matrix-js-sdk``
+Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://yarnpkg.com/docs/install/) if you do not have it already.
+
+``yarn add matrix-js-sdk``
 
 ```javascript
   var sdk = require("matrix-js-sdk");
@@ -283,7 +285,7 @@ This SDK uses JSDoc3 style comments. You can manually build and
 host the API reference from the source files like this:
 
 ```
-  $ npm run gendoc
+  $ yarn gendoc
   $ cd .jsdoc
   $ python -m SimpleHTTPServer 8005
 ```
@@ -319,15 +321,15 @@ To provide the Olm library in a browser application:
  
 To provide the Olm library in a node.js application:
 
- * ``npm install https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``
+ * ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``
    (replace the URL with the latest version you want to use from
     https://matrix.org/packages/npm/olm/)
  * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
 
-If you want to package Olm as dependency for your node.js application, you
-can use ``npm install https://matrix.org/packages/npm/olm/olm-3.0.0.tgz
---save-optional`` (if your application also works without e2e crypto enabled)
-or ``--save`` (if it doesn't) to do so.
+If you want to package Olm as dependency for your node.js application, you can
+use ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``. If your
+application also works without e2e crypto enabled, add ``--optional`` to mark it
+as an optional dependency.
 
 
 Contributing
@@ -337,7 +339,7 @@ want to use this SDK, skip this section.*
 
 First, you need to pull in the right build tools:
 ```
- $ npm install
+ $ yarn install
 ```
 
 Building
@@ -345,20 +347,20 @@ Building
 
 To build a browser version from scratch when developing::
 ```
- $ npm run build
+ $ yarn build
 ```
 
 To constantly do builds when files are modified (using ``watchify``)::
 ```
- $ npm run watch
+ $ yarn watch
 ```
 
 To run tests (Jasmine)::
 ```
- $ npm test
+ $ yarn test
 ```
 
 To run linting:
 ```
- $ npm run lint
+ $ yarn lint
 ```

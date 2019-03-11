@@ -6,7 +6,7 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
 nvm use 10 || exit $?
-npm install || exit $?
+yarn install || exit $?
 
 RC=0
 
@@ -18,17 +18,19 @@ function fail {
 # don't use last time's test reports
 rm -rf reports coverage || exit $?
 
-npm test || fail "npm test finished with return code $?"
+yarn test || fail "yarn test finished with return code $?"
 
-npm run -s lint -- -f checkstyle > eslint.xml ||
+yarn -s lint -f checkstyle > eslint.xml ||
     fail "eslint finished with return code $?"
 
 # delete the old tarball, if it exists
 rm -f matrix-js-sdk-*.tgz
 
-npm pack ||
-    fail "npm pack finished with return code $?"
+# `yarn pack` doesn't seem to run scripts, however that seems okay here as we
+# just built as part of `install` above.
+yarn pack ||
+    fail "yarn pack finished with return code $?"
 
-npm run gendoc || fail "JSDoc failed with code $?"
+yarn gendoc || fail "JSDoc failed with code $?"
 
 exit $RC
