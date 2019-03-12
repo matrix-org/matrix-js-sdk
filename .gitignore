@@ -2,6 +2,7 @@
 /.jsdoc
 
 node_modules
+/.npmrc
 .lock-wscript
 build/Release
 coverage
