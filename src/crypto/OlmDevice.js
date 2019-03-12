@@ -1,6 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
-Copyright 2017 New Vector Ltd
+Copyright 2017, 2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,6 +102,10 @@ function OlmDevice(sessionStore, cryptoStore) {
     // Keys are strings of form "<senderKey>|<session_id>|<message_index>"
     // Values are objects of the form "{id: <event id>, timestamp: <ts>}"
     this._inboundGroupSessionMessageIndexes = {};
+
+    // Keep track of sessions that we're starting, so that we don't start
+    // multiple sessions for the same device at the same time.
+    this._sessionsInProgress = {};
 }
 
 /**
@@ -553,6 +557,15 @@ OlmDevice.prototype.createInboundSession = async function(
  * @return {Promise<string[]>}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
+    if (this._sessionsInProgress[theirDeviceIdentityKey]) {
+        console.log("waiting for session to be created");
+        try {
+            await this._sessionsInProgress[theirDeviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, just fall through and
+            // return an empty result
+        }
+    }
     let sessionIds;
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
@@ -573,10 +586,18 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
  * @return {Promise<?string>}  session id, or null if no established session
  */
-OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
-    const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey);
+OlmDevice.prototype.getSessionIdForDevice = async function(
+    theirDeviceIdentityKey, nowait,
+) {
+    const sessionInfos = await this.getSessionInfoForDevice(
+        theirDeviceIdentityKey, nowait,
+    );
+
     if (sessionInfos.length === 0) {
         return null;
     }
@@ -611,9 +632,21 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
  * message and is therefore past the pre-key stage), and 'sessionId'.
  *
  * @param {string} deviceIdentityKey Curve25519 identity key for the device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) {
+OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
+    if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
+        logger.log("waiting for session to be created");
+        try {
+            await this._sessionsInProgress[deviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, then just fall through and
+            // return an empty result
+        }
+    }
     const info = [];
 
     await this._cryptoStore.doTxn(
