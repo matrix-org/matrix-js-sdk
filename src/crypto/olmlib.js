@@ -202,7 +202,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
         );
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
-            resolver.reject(e);
+            resolver.resolve();
         }
         logger.log("failed to claim one-time keys", e, devicesWithoutSession);
         throw e;
@@ -237,7 +237,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
                 const msg = "No one-time keys (alg=" + oneTimeKeyAlgorithm +
                       ") for device " + userId + ":" + deviceId;
                 logger.warn(msg);
-                resolveSession[key].reject(new Error(msg));
+                resolveSession[key].resolve();
                 continue;
             }
 
@@ -248,7 +248,7 @@ module.exports.ensureOlmSessionsForDevices = async function(
                     resolveSession[key].resolve(sid);
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
-                    resolveSession[key].reject(e);
+                    resolveSession[key].resolve();
                     throw e;
                 }),
             );
