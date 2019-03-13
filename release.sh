@@ -159,7 +159,7 @@ echo "yarn version"
 # because it can only sign with the default key, but we can
 # only turn off both of these behaviours, so we have to
 # manually commit the result.
-yarn version --no-git-tag-version "$release"
+yarn version --no-git-tag-version --new-version "$release"
 
 # commit yarn.lock if it exists, is versioned, and is modified
 if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
