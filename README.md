@@ -21,6 +21,8 @@ Please check [the working browser example](examples/browser) for more informatio
 In Node.js
 ----------
 
+Ensure you have the latest LTS version of Node.js installed.
+
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://yarnpkg.com/docs/install/) if you do not have it already.
 
 ``yarn add matrix-js-sdk``
