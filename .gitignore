@@ -3,6 +3,7 @@
 
 node_modules
 /.npmrc
+/*.log
 .lock-wscript
 build/Release
 coverage
