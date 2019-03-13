@@ -1,3 +1,24 @@
+Changes in [1.0.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.2-rc.1) (2019-03-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1...v1.0.2-rc.1)
+
+ * Use modern Yarn version on Travis CI
+   [\#858](https://github.com/matrix-org/matrix-js-sdk/pull/858)
+ * Switch to `yarn` for dependency management
+   [\#856](https://github.com/matrix-org/matrix-js-sdk/pull/856)
+ * More key request fixes
+   [\#855](https://github.com/matrix-org/matrix-js-sdk/pull/855)
+ * Calculate encrypted notification counts
+   [\#851](https://github.com/matrix-org/matrix-js-sdk/pull/851)
+ * Update dependencies
+   [\#854](https://github.com/matrix-org/matrix-js-sdk/pull/854)
+ * make sure key requests get sent
+   [\#850](https://github.com/matrix-org/matrix-js-sdk/pull/850)
+ * Use 'ideal' rather than 'exact' for deviceid
+   [\#852](https://github.com/matrix-org/matrix-js-sdk/pull/852)
+ * handle partially-shared sessions better
+   [\#848](https://github.com/matrix-org/matrix-js-sdk/pull/848)
+
 Changes in [1.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1) (2019-03-06)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1-rc.2...v1.0.1)
