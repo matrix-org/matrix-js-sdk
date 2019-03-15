@@ -23,6 +23,12 @@ import {escapeRegExp, globToRegexp} from "./utils";
 
 const RULEKINDS_IN_ORDER = ['override', 'content', 'room', 'sender', 'underride'];
 
+// The default override rules to apply when calculating actions for an event. These
+// defaults apply under no other circumstances to avoid confusing the client with server
+// state.
+const DEFAULT_OVERRIDE_RULES = [
+];
+
 /**
  * Construct a Push Processor.
  * @constructor
@@ -312,6 +318,26 @@ function PushProcessor(client) {
         return actionObj;
     };
 
+    const applyRuleDefaults = function(clientRuleset) {
+        // Deep clone the object before we mutate it
+        const ruleset = JSON.parse(JSON.stringify(clientRuleset));
+
+        if (!clientRuleset['global']) clientRuleset['global'] = {};
+        if (!clientRuleset['global']['override']) clientRuleset['global']['override'] = [];
+
+        // Apply default overrides
+        const globalOverrides = clientRuleset['global']['override'];
+        for (const override of DEFAULT_OVERRIDE_RULES) {
+            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
+            if (!existingRule) {
+                console.warn(`Adding global override for ${override.rule_id} because is is missing`);
+                globalOverrides.push(override);
+            }
+        }
+
+        return ruleset;
+    };
+
     this.ruleMatchesEvent = function(rule, ev) {
         let ret = true;
         for (let i = 0; i < rule.conditions.length; ++i) {
@@ -331,7 +357,8 @@ function PushProcessor(client) {
      * @return {PushAction}
      */
     this.actionsForEvent = function(ev) {
-        return pushActionsForEventAndRulesets(ev, client.pushRules);
+        const rules = applyRuleDefaults(client.pushRules);
+        return pushActionsForEventAndRulesets(ev, rules);
     };
 
     /**
