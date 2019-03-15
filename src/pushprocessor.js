@@ -342,15 +342,22 @@ function PushProcessor(client) {
         // Deep clone the object before we mutate it
         const ruleset = JSON.parse(JSON.stringify(clientRuleset));
 
-        if (!clientRuleset['global']) clientRuleset['global'] = {};
-        if (!clientRuleset['global']['override']) clientRuleset['global']['override'] = [];
+        if (!clientRuleset['global']) {
+            clientRuleset['global'] = {};
+        }
+        if (!clientRuleset['global']['override']) {
+            clientRuleset['global']['override'] = [];
+        }
 
         // Apply default overrides
         const globalOverrides = clientRuleset['global']['override'];
         for (const override of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
+            const existingRule = globalOverrides
+                .find((r) => r.rule_id === override.rule_id);
+
             if (!existingRule) {
-                console.warn(`Adding global override for ${override.rule_id} because is is missing`);
+                const ruleId = override.rule_id;
+                console.warn(`Adding default global override for ${ruleId}`);
                 globalOverrides.push(override);
             }
         }
