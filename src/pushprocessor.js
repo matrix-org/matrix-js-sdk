@@ -27,6 +27,26 @@ const RULEKINDS_IN_ORDER = ['override', 'content', 'room', 'sender', 'underride'
 // defaults apply under no other circumstances to avoid confusing the client with server
 // state.
 const DEFAULT_OVERRIDE_RULES = [
+    {
+        // For homeservers which don't support MSC1930 yet
+        rule_id: ".m.rule.tombstone",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: "event_match",
+                key: "type",
+                pattern: "m.room.tombstone",
+            },
+        ],
+        actions: [
+            "notify",
+            {
+                set_tweak: "highlight",
+                value: true,
+            },
+        ],
+    },
 ];
 
 /**
