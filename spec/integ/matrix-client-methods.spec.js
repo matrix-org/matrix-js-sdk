@@ -4,7 +4,7 @@ const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const publicGlobals = require("../../lib/matrix");
 const Room = publicGlobals.Room;
-const MatrixInMemoryStore = publicGlobals.MatrixInMemoryStore;
+const MemoryStore = publicGlobals.MemoryStore;
 const Filter = publicGlobals.Filter;
 const utils = require("../test-utils");
 const MockStorageApi = require("../MockStorageApi");
@@ -23,7 +23,7 @@ describe("MatrixClient", function() {
     beforeEach(function() {
         utils.beforeEach(this); // eslint-disable-line no-invalid-this
         httpBackend = new HttpBackend();
-        store = new MatrixInMemoryStore();
+        store = new MemoryStore();
 
         const mockStorage = new MockStorageApi();
         sessionStore = new sdk.WebStorageSessionStore(mockStorage);
