@@ -27,6 +27,7 @@ module.exports.MemoryStore = require("./store/memory").MemoryStore;
 /**
  * The {@link module:store/memory.MemoryStore|MemoryStore} class was previously
  * exported as `MatrixInMemoryStore`, so this is preserved for SDK consumers.
+ * @deprecated Prefer `MemoryStore` going forward.
  */
 module.exports.MatrixInMemoryStore = module.exports.MemoryStore;
 /** The {@link module:store/indexeddb.IndexedDBStore|IndexedDBStore} class. */
