@@ -1,5 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
+Copyright 2018, 2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,40 +26,21 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
  * @alias module:crypto/RoomList
  */
 export default class RoomList {
-    constructor(cryptoStore, sessionStore) {
+    constructor(cryptoStore) {
         this._cryptoStore = cryptoStore;
-        this._sessionStore = sessionStore;
 
         // Object of roomId -> room e2e info object (body of the m.room.encryption event)
         this._roomEncryption = {};
     }
 
     async init() {
-        let removeSessionStoreRooms = false;
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
                 this._cryptoStore.getEndToEndRooms(txn, (result) => {
-                    if (result === null || Object.keys(result).length === 0) {
-                        // migrate from session store, if there's data there
-                        const sessStoreRooms = this._sessionStore.getAllEndToEndRooms();
-                        if (sessStoreRooms !== null) {
-                            for (const roomId of Object.keys(sessStoreRooms)) {
-                                this._cryptoStore.storeEndToEndRoom(
-                                    roomId, sessStoreRooms[roomId], txn,
-                                );
-                            }
-                        }
-                        this._roomEncryption = sessStoreRooms;
-                        removeSessionStoreRooms = true;
-                    } else {
-                        this._roomEncryption = result;
-                    }
+                    this._roomEncryption = result;
                 });
             },
         );
-        if (removeSessionStoreRooms) {
-            this._sessionStore.removeAllEndToEndRooms();
-        }
     }
 
     getRoomEncryption(roomId) {

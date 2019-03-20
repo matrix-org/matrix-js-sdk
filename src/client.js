@@ -220,7 +220,7 @@ function MatrixClient(opts) {
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
     // we don't want to start sending unencrypted events to them.
-    this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
+    this._roomList = new RoomList(this._cryptoStore);
 
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
