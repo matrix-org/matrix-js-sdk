@@ -237,7 +237,9 @@ module.exports.ensureOlmSessionsForDevices = async function(
                 const msg = "No one-time keys (alg=" + oneTimeKeyAlgorithm +
                       ") for device " + userId + ":" + deviceId;
                 logger.warn(msg);
-                resolveSession[key].resolve();
+                if (resolveSession[key]) {
+                    resolveSession[key].resolve();
+                }
                 continue;
             }
 
@@ -245,10 +247,14 @@ module.exports.ensureOlmSessionsForDevices = async function(
                 _verifyKeyAndStartSession(
                     olmDevice, oneTimeKey, userId, deviceInfo,
                 ).then((sid) => {
-                    resolveSession[key].resolve(sid);
+                    if (resolveSession[key]) {
+                        resolveSession[key].resolve(sid);
+                    }
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
-                    resolveSession[key].resolve();
+                    if (resolveSession[key]) {
+                        resolveSession[key].resolve();
+                    }
                     throw e;
                 }),
             );
