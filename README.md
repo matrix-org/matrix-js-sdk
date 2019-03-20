@@ -80,7 +80,7 @@ client.on("Room.timeline", function(event, room, toStartOfTimeline) {
 });
 ```
 
-By default, the `matrix-js-sdk` client uses the `MatrixInMemoryStore` to store events as they are received. For example to iterate through the currently stored timeline for a room:
+By default, the `matrix-js-sdk` client uses the `MemoryStore` to store events as they are received. For example to iterate through the currently stored timeline for a room:
 
 ```javascript
 Object.keys(client.store.rooms).forEach((roomId) => {

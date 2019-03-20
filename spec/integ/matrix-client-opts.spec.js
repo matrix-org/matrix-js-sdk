@@ -128,7 +128,7 @@ describe("MatrixClient opts", function() {
         beforeEach(function() {
             client = new MatrixClient({
                 request: httpBackend.requestFn,
-                store: new sdk.MatrixInMemoryStore(),
+                store: new sdk.MemoryStore(),
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
