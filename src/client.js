@@ -431,6 +431,7 @@ MatrixClient.prototype.getCapabilities = function() {
     if (this._cachedCapabilities) {
         const now = new Date().getTime();
         if (now - this._cachedCapabilities.lastUpdated <= CAPABILITIES_CACHE_MS) {
+            console.log("Returning cached capabilities");
             return Promise.resolve(this._cachedCapabilities.capabilities);
         }
     }
@@ -445,6 +446,8 @@ MatrixClient.prototype.getCapabilities = function() {
             capabilities: capabilities,
             lastUpdated: new Date().getTime(),
         };
+
+        console.log("Caching capabilities: ", capabilities);
         return capabilities;
     });
 };

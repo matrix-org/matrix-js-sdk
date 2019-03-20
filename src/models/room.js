@@ -260,6 +260,8 @@ Room.prototype.getRecommendedVersion = async function() {
     }
 
     const currentVersion = this.getVersion();
+    console.log(`[${this.roomId}] Current version: ${currentVersion}`);
+    console.log(`[${this.roomId}] Version capability: `, versionCap);
 
     const result = {
         version: currentVersion,
@@ -280,6 +282,11 @@ Room.prototype.getRecommendedVersion = async function() {
         result.version = versionCap.default;
         result.needsUpgrade = true;
         result.urgent = !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
+        if (result.urgent) {
+            console.warn(`URGENT upgrade required on ${this.roomId}`);
+        } else {
+            console.warn(`Non-urgent upgrade required on ${this.roomId}`);
+        }
         return Promise.resolve(result);
     }
 
