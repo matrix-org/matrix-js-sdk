@@ -111,6 +111,10 @@ const IndexedDBStore = function IndexedDBStore(opts) {
 };
 utils.inherits(IndexedDBStore, MemoryStore);
 
+IndexedDBStore.exists = function(indexedDB, dbName) {
+    return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
+};
+
 /**
  * @return {Promise} Resolved when loaded from indexed db.
   */
