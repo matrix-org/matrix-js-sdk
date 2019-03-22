@@ -17,7 +17,6 @@ limitations under the License.
 import '../../../olm-loader';
 
 import expect from 'expect';
-import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
@@ -28,9 +27,8 @@ import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 function makeOlmDevice() {
     const mockStorage = new MockStorageApi();
-    const sessionStore = new WebStorageSessionStore(mockStorage);
     const cryptoStore = new MemoryCryptoStore(mockStorage);
-    const olmDevice = new OlmDevice(sessionStore, cryptoStore);
+    const olmDevice = new OlmDevice(cryptoStore);
     return olmDevice;
 }
 

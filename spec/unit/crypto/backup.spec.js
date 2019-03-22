@@ -138,7 +138,7 @@ describe("MegolmBackup", function() {
         sessionStore = new WebStorageSessionStore(mockStorage);
         cryptoStore = new MemoryCryptoStore(mockStorage);
 
-        olmDevice = new OlmDevice(sessionStore, cryptoStore);
+        olmDevice = new OlmDevice(cryptoStore);
 
         // we stub out the olm encryption bits
         mockOlmLib = {};

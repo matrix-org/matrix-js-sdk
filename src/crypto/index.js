@@ -134,9 +134,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._checkedForBackup = false; // Have we checked the server for a backup we can use?
     this._sendingBackups = false; // Are we currently sending backups?
 
-    this._olmDevice = new OlmDevice(sessionStore, cryptoStore);
+    this._olmDevice = new OlmDevice(cryptoStore);
     this._deviceList = new DeviceList(
-        baseApis, cryptoStore, sessionStore, this._olmDevice,
+        baseApis, cryptoStore, this._olmDevice,
     );
 
     // the last time we did a check for the number of one-time-keys on the
@@ -198,25 +198,6 @@ utils.inherits(Crypto, EventEmitter);
  */
 Crypto.prototype.init = async function() {
     await global.Olm.init();
-
-    const sessionStoreHasAccount = Boolean(this._sessionStore.getEndToEndAccount());
-    let cryptoStoreHasAccount;
-    await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.getAccount(txn, (pickledAccount) => {
-                cryptoStoreHasAccount = Boolean(pickledAccount);
-            });
-        },
-    );
-    if (sessionStoreHasAccount && !cryptoStoreHasAccount) {
-        // we're about to migrate to the crypto store
-        this.emit("crypto.warning", 'CRYPTO_WARNING_ACCOUNT_MIGRATED');
-    } else if (sessionStoreHasAccount && cryptoStoreHasAccount) {
-        // There's an account in both stores: an old version of
-        // the code has been run against this store.
-        this.emit("crypto.warning", 'CRYPTO_WARNING_OLD_VERSION_DETECTED');
-    }
-
     await this._olmDevice.init();
     await this._deviceList.load();
 
@@ -235,7 +216,7 @@ Crypto.prototype.init = async function() {
     }
 
     if (!myDevices[this._deviceId]) {
-        // add our own deviceinfo to the sessionstore
+        // add our own deviceinfo to the cryptoStore
         const deviceInfo = {
             keys: this._deviceKeys,
             algorithms: this._supportedAlgorithms,
@@ -942,7 +923,7 @@ Crypto.prototype.forceDiscardSession = function(roomId) {
 };
 
 /**
- * Configure a room to use encryption (ie, save a flag in the sessionstore).
+ * Configure a room to use encryption (ie, save a flag in the cryptoStore).
  *
  * @param {string} roomId The room ID to enable encryption in.
  *
@@ -2357,17 +2338,6 @@ class IncomingRoomKeyRequestCancellation {
 /**
  * Fires when the app may wish to warn the user about something related
  * the end-to-end crypto.
- *
- * Comes with a type which is one of:
- * * CRYPTO_WARNING_ACCOUNT_MIGRATED: Account data has been migrated from an older
- *       version of the store in such a way that older clients will no longer be
- *       able to read it. The app may wish to warn the user against going back to
- *       an older version of the app.
- * * CRYPTO_WARNING_OLD_VERSION_DETECTED: js-sdk has detected that an older version
- *       of js-sdk has been run against the same store after a migration has been
- *       performed. This is likely have caused unexpected behaviour in the old
- *       version. For example, the old version and the new version may have two
- *       different identity keys.
  *
  * @event module:client~MatrixClient#"crypto.warning"
  * @param {string} type One of the strings listed above

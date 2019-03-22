@@ -106,17 +106,24 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {string} opts.userId The user ID for this user.
  *
- * @param {Object=} opts.store The data store to use. If not specified,
- * this client will not store any HTTP responses.
+ * @param {Object=} opts.store
+ *    The data store used for sync data from the homeserver. If not specified,
+ *    this client will not store any HTTP responses. The `createClient` helper
+ *    will create a default store if needed.
+ *
+ * @param {module:store/session/webstorage~WebStorageSessionStore} opts.sessionStore
+ *    A store to be used for end-to-end crypto session data. Most data has been
+ *    migrated out of here to `cryptoStore` instead. If not specified,
+ *    end-to-end crypto will be disabled. The `createClient` helper
+ *    _will not_ create this store at the moment.
+ *
+ * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
+ *    A store to be used for end-to-end crypto session data. If not specified,
+ *    end-to-end crypto will be disabled. The `createClient` helper will create
+ *    a default store if needed.
  *
  * @param {string=} opts.deviceId A unique identifier for this device; used for
  *    tracking things like crypto keys and access tokens.  If not specified,
- *    end-to-end crypto will be disabled.
- *
- * @param {Object=} opts.sessionStore A store to be used for end-to-end crypto
- *    session data. This should be a {@link
- *    module:store/session/webstorage~WebStorageSessionStore|WebStorageSessionStore},
- *    or an object implementing the same interface. If not specified,
  *    end-to-end crypto will be disabled.
  *
  * @param {Object} opts.scheduler Optional. The scheduler to use. If not
@@ -140,9 +147,6 @@ function keyFromRecoverySession(session, decryptionKey) {
  * disabled by default for compatibility with older clients - in particular to
  * maintain support for back-paginating the live timeline after a '/sync'
  * result with a gap.
- *
- * @param {module:crypto.store.base~CryptoStore} opts.cryptoStore
- *    crypto store implementation.
  *
  * @param {Array} [opts.verificationMethods] Optional. The verification method
  * that the application can handle.  Each element should be an item from {@link
@@ -220,7 +224,7 @@ function MatrixClient(opts) {
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
     // we don't want to start sending unencrypted events to them.
-    this._roomList = new RoomList(this._cryptoStore, this._sessionStore);
+    this._roomList = new RoomList(this._cryptoStore);
 
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
