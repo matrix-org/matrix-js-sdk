@@ -109,10 +109,14 @@ include the line in your commit or pull request comment::
 
     Signed-off-by: Your Name <your@email.example.org>
 
-...using your real name; unfortunately pseudonyms and anonymous contributions
-can't be accepted. Git makes this trivial - just use the -s flag when you do
-``git commit``, having first set ``user.name`` and ``user.email`` git configs
-(which you should have done anyway :)
+We accept contributions under a legally identifiable name, such as your name on
+government documentation or common-law names (names claimed by legitimate usage
+or repute). Unfortunately, we cannot accept anonymous contributions at this
+time.
+
+Git allows you to add this signoff automatically when using the ``-s`` flag to
+``git commit``, which uses the name and email set in your ``user.name`` and
+``user.email`` git configs.
 
 If you forgot to sign off your commits before making your pull request and are on git 2.17+ 
 you can mass signoff using rebase::
