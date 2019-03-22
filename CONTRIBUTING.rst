@@ -24,7 +24,7 @@ works. Develop is the unstable branch where all the development actually
 happens: the workflow is that contributors should fork the develop branch to
 make a 'feature' branch for a particular contribution, and then make a pull
 request to merge this back into the matrix.org 'official' develop branch. We
-use github's pull request workflow to review the contribution, and either ask
+use GitHub's pull request workflow to review the contribution, and either ask
 you to make any refinements needed or merge it and make them ourselves. The
 changes will then land on master when we next do a release.
 
@@ -60,8 +60,8 @@ Sign off
 ~~~~~~~~
 
 In order to have a concrete record that your contribution is intentional
-and you agree to license it under the same terms as the project's license, we've adopted the
-same lightweight approach that the Linux Kernel
+and you agree to license it under the same terms as the project's license, we've
+adopted the same lightweight approach that the Linux Kernel
 (https://www.kernel.org/doc/Documentation/SubmittingPatches), Docker
 (https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
 projects use: the DCO (Developer Certificate of Origin:
@@ -118,7 +118,7 @@ Git allows you to add this signoff automatically when using the ``-s`` flag to
 ``git commit``, which uses the name and email set in your ``user.name`` and
 ``user.email`` git configs.
 
-If you forgot to sign off your commits before making your pull request and are on git 2.17+ 
-you can mass signoff using rebase::
+If you forgot to sign off your commits before making your pull request and are
+on Git 2.17+ you can mass signoff using rebase::
 
     git rebase --signoff origin/develop
