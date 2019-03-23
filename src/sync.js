@@ -724,6 +724,9 @@ SyncApi.prototype._sync = async function(syncOptions) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
         console.error("Caught /sync error", e.stack || e);
+
+        // Emit the exception for client handling
+        this.client.emit("sync.unexpectedError", e);
     }
 
     // update this as it may have changed
