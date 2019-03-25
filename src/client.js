@@ -2131,6 +2131,80 @@ MatrixClient.prototype.sendTyping = function(roomId, isTyping, timeoutMs, callba
 };
 
 /**
+ * Determines the history of room upgrades for a given room, as far as the
+ * client can see. Returns an array of Rooms where the first entry is the
+ * oldest and the last entry is the newest (likely current) room. If the
+ * provided room is not found, this returns an empty list. This works in
+ * both directions, looking for older and newer rooms of the given room.
+ * @param {string} roomId The room ID to search from
+ * @param {boolean} verifyLinks If true, the function will only return rooms
+ * which can be proven to be linked. For example, rooms which have a create
+ * event pointing to an old room which the client is not aware of or doesn't
+ * have a matching tombstone would not be returned.
+ * @return {Room[]} An array of rooms representing the upgrade
+ * history.
+ */
+MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=false) {
+    let currentRoom = this.getRoom(roomId);
+    if (!currentRoom) return [];
+
+    const upgradeHistory = [currentRoom];
+
+    // Work backwards first, looking at create events.
+    let createEvent = currentRoom.currentState.getStateEvents("m.room.create", "");
+    while (createEvent) {
+        console.log(`Looking at ${createEvent.getId()}`);
+        const predecessor = createEvent.getContent()['predecessor'];
+        if (predecessor && predecessor['room_id']) {
+            console.log(`Looking at predecessor ${predecessor['room_id']}`);
+            const refRoom = this.getRoom(predecessor['room_id']);
+            if (!refRoom) break; // end of the chain
+
+            if (verifyLinks) {
+                const tombstone = refRoom.currentState
+                    .getStateEvents("m.room.tombstone", "");
+
+                if (!tombstone
+                    || tombstone.getContent()['replacement_room'] !== refRoom.roomId) {
+                    break;
+                }
+            }
+
+            // Insert at the front because we're working backwards from the currentRoom
+            upgradeHistory.splice(0, 0, refRoom);
+            createEvent = refRoom.currentState.getStateEvents("m.room.create", "");
+        } else {
+            // No further create events to look at
+            break;
+        }
+    }
+
+    // Work forwards next, looking at tombstone events
+    let tombstoneEvent = currentRoom.currentState.getStateEvents("m.room.tombstone", "");
+    while (tombstoneEvent) {
+        const refRoom = this.getRoom(tombstoneEvent.getContent()['replacement_room']);
+        if (!refRoom) break; // end of the chain
+
+        if (verifyLinks) {
+            createEvent = refRoom.currentState.getStateEvents("m.room.create", "");
+            if (!createEvent || !createEvent.getContent()['predecessor']) break;
+
+            const predecessor = createEvent.getContent()['predecessor'];
+            if (predecessor['room_id'] !== currentRoom.roomId) break;
+        }
+
+        // Push to the end because we're looking forwards
+        upgradeHistory.push(refRoom);
+
+        // Set the current room to the reference room so we know where we're at
+        currentRoom = refRoom;
+        tombstoneEvent = currentRoom.currentState.getStateEvents("m.room.tombstone", "");
+    }
+
+    return upgradeHistory;
+};
+
+/**
  * @param {string} roomId
  * @param {string} userId
  * @param {module:client.callback} callback Optional.
@@ -2195,6 +2269,50 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
 MatrixClient.prototype.leave = function(roomId, callback) {
     return _membershipChange(this, roomId, undefined, "leave", undefined,
         callback);
+};
+
+/**
+ * Leaves all rooms in the chain of room upgrades based on the given room. By
+ * default, this will leave all the previous and upgraded rooms, including the
+ * given room. To only leave the given room and any previous rooms, keeping the
+ * upgraded (modern) rooms untouched supply `false` to `includeFuture`.
+ * @param {string} roomId The room ID to start leaving at
+ * @param {boolean} includeFuture If true, the whole chain (past and future) of
+ * upgraded rooms will be left.
+ * @return {module:client.Promise} Resolves when completed with an object keyed
+ * by room ID and value of the error encountered when leaving or null.
+ */
+MatrixClient.prototype.leaveRoomChain = function(roomId, includeFuture=true) {
+    const upgradeHistory = this.getRoomUpgradeHistory(roomId);
+
+    let eligibleToLeave = upgradeHistory;
+    if (!includeFuture) {
+        eligibleToLeave = [];
+        for (const room of upgradeHistory) {
+            eligibleToLeave.push(room);
+            if (room.roomId === roomId) {
+                break;
+            }
+        }
+    }
+
+    const populationResults = {}; // {roomId: Error}
+    const promises = [];
+
+    const doLeave = (roomId) => {
+        return this.leave(roomId).then(() => {
+            populationResults[roomId] = null;
+        }).catch((err) => {
+            populationResults[roomId] = err;
+            return null; // suppress error
+        });
+    };
+
+    for (const room of eligibleToLeave) {
+        promises.push(doLeave(room.roomId));
+    }
+
+    return Promise.all(promises).then(() => populationResults);
 };
 
 /**
