@@ -39,8 +39,8 @@ export function exists(indexedDB, dbName) {
                 // The DB did not exist before, but has been created as part of this
                 // existence check. Delete it now to restore previous state. Delete can
                 // actually take a while to complete in some browsers, so don't wait for
-                // it. This won't block future open calls the might issue next to properly
-                // set up the DB.
+                // it. This won't block future open calls that a store might issue next to
+                // properly set up the DB.
                 indexedDB.deleteDatabase(dbName);
             }
             resolve(exists);
