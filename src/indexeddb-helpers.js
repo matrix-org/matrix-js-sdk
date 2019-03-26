@@ -28,13 +28,13 @@ export function exists(indexedDB, dbName) {
     return new Promise((resolve, reject) => {
         let exists = true;
         const req = indexedDB.open(dbName);
-        req.onupgradeneeded = function(ev) {
+        req.onupgradeneeded = () => {
             // Since we did not provide an explicit version when opening, this event
             // should only fire if the DB did not exist before at any version.
             exists = false;
         };
         req.onblocked = () => reject();
-        req.onsuccess = function() {
+        req.onsuccess = () => {
             if (!exists) {
                 // The DB did not exist before, but has been created as part of this
                 // existence check. Delete it now to restore previous state. Delete can
