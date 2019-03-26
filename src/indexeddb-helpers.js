@@ -35,6 +35,8 @@ export function exists(indexedDB, dbName) {
         };
         req.onblocked = () => reject();
         req.onsuccess = () => {
+            const db = req.result;
+            db.close();
             if (!exists) {
                 // The DB did not exist before, but has been created as part of this
                 // existence check. Delete it now to restore previous state. Delete can
