@@ -22,6 +22,7 @@ import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 import {InvalidCryptoStoreError} from '../../errors';
+import * as IndexedDBHelpers from "../../indexeddb-helpers";
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -46,6 +47,10 @@ export default class IndexedDBCryptoStore {
         this._indexedDB = indexedDB;
         this._dbName = dbName;
         this._backendPromise = null;
+    }
+
+    static exists(indexedDB, dbName) {
+        return IndexedDBHelpers.exists(indexedDB, dbName);
     }
 
     /**
