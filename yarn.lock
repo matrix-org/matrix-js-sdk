@@ -3117,10 +3117,10 @@ math-random@^1.0.1:
   resolved "https://registry.yarnpkg.com/math-random/-/math-random-1.0.1.tgz#8b3aac588b8a66e4975e3cdea67f7bb329601fac"
   integrity sha1-izqsWIuKZuSXXjzepn97sylgH6w=
 
-matrix-mock-request@^1.2.2:
-  version "1.2.2"
-  resolved "https://registry.yarnpkg.com/matrix-mock-request/-/matrix-mock-request-1.2.2.tgz#2710bec0e009bb1562d92cdd7f0b77d5946b2ebd"
-  integrity sha512-9u86m6rOsKekNkqUUkStWXNULrY9G+9ibwolfrmgqTmgR76EGCr9fovM+JPWn4U+TbrewvHMALpPw8OxRg0ExA==
+matrix-mock-request@^1.2.3:
+  version "1.2.3"
+  resolved "https://registry.yarnpkg.com/matrix-mock-request/-/matrix-mock-request-1.2.3.tgz#56b15d86e2601a9b48a854844396d18caab649c8"
+  integrity sha512-Tr7LDHweTW8Ql4C8XhGQFGMzuh+HmPjOcQqrHH1qfSesq0cwdPWanvdnllNjeHoAMcZ43HpMFMzFZfNW1/6HYg==
   dependencies:
     bluebird "^3.5.0"
     expect "^1.20.2"
