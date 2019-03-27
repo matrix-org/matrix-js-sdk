@@ -1,3 +1,30 @@
+Changes in [1.0.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3-rc.1) (2019-03-27)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.2...v1.0.3-rc.1)
+
+ * Add IndexedDB existence checks
+   [\#871](https://github.com/matrix-org/matrix-js-sdk/pull/871)
+ * Emit sync errors for capturing by clients
+   [\#869](https://github.com/matrix-org/matrix-js-sdk/pull/869)
+ * Add functions for getting room upgrade history and leaving those rooms
+   [\#868](https://github.com/matrix-org/matrix-js-sdk/pull/868)
+ * Clarify the meaning of 'real name' for contribution
+   [\#867](https://github.com/matrix-org/matrix-js-sdk/pull/867)
+ * Remove `sessionStore` to `cryptoStore` migration path
+   [\#865](https://github.com/matrix-org/matrix-js-sdk/pull/865)
+ * Add debugging for spurious room version warnings
+   [\#866](https://github.com/matrix-org/matrix-js-sdk/pull/866)
+ * Add investigation notes for browser storage
+   [\#864](https://github.com/matrix-org/matrix-js-sdk/pull/864)
+ * make sure resolve object is defined before calling it
+   [\#862](https://github.com/matrix-org/matrix-js-sdk/pull/862)
+ * Rename `MatrixInMemoryStore` to `MemoryStore`
+   [\#861](https://github.com/matrix-org/matrix-js-sdk/pull/861)
+ * Use Buildkite for CI
+   [\#859](https://github.com/matrix-org/matrix-js-sdk/pull/859)
+ * only create one session at a time per device
+   [\#857](https://github.com/matrix-org/matrix-js-sdk/pull/857)
+
 Changes in [1.0.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.2) (2019-03-18)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.2-rc.1...v1.0.2)
