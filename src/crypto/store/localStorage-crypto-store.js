@@ -57,6 +57,16 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         this.store = webStore;
     }
 
+    static exists(webStore) {
+        const length = webStore.length;
+        for (let i = 0; i < length; i++) {
+            if (webStore.key(i).startsWith(E2E_PREFIX)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Olm Sessions
 
     countEndToEndSessions(txn, func) {
