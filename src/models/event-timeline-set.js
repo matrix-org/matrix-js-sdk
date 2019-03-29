@@ -409,14 +409,18 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
                      " - joining timeline " + timeline + " to " +
                      existingTimeline);
 
-        if (direction === EventTimeline.BACKWARDS && existingTimeline === this._liveTimeline) {
+        // Variables to keep the line length limited below.
+        const existingIsLive = existingTimeline === this._liveTimeline;
+        const timelineIsLive = timeline === this._liveTimeline;
+
+        if (direction === EventTimeline.BACKWARDS && existingIsLive) {
             // The live timeline should never be spliced into a non-live position.
             console.warn("Refusing to splice live timeline as a backwards timeline");
         } else {
             timeline.setNeighbouringTimeline(existingTimeline, direction);
         }
 
-        if (inverseDirection === EventTimeline.BACKWARDS && timeline === this._liveTimeline) {
+        if (inverseDirection === EventTimeline.BACKWARDS && timelineIsLive) {
             // The live timeline should never be spliced into a non-live position.
             console.warn("Refusing to splice live timeline as a forwards timeline");
         } else {
