@@ -408,8 +408,21 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         console.info("Already have timeline for " + eventId +
                      " - joining timeline " + timeline + " to " +
                      existingTimeline);
-        timeline.setNeighbouringTimeline(existingTimeline, direction);
-        existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
+
+        if (direction === EventTimeline.BACKWARDS && existingTimeline === this._liveTimeline) {
+            // The live timeline should never be spliced into a non-live position.
+            console.warn("Refusing to splice live timeline as a backwards timeline");
+        } else {
+            timeline.setNeighbouringTimeline(existingTimeline, direction);
+        }
+
+        if (inverseDirection === EventTimeline.BACKWARDS && timeline === this._liveTimeline) {
+            // The live timeline should never be spliced into a non-live position.
+            console.warn("Refusing to splice live timeline as a forwards timeline");
+        } else {
+            existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
+        }
+
         timeline = existingTimeline;
         didUpdate = true;
     }
