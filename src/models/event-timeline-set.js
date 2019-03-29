@@ -415,14 +415,20 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
 
         if (direction === EventTimeline.BACKWARDS && existingIsLive) {
             // The live timeline should never be spliced into a non-live position.
-            console.warn("Refusing to splice live timeline as a backwards timeline");
+            console.warn(
+                "Refusing to set a preceding existingTimeLine on our " +
+                "timeline as the existingTimeLine is live",
+            );
         } else {
             timeline.setNeighbouringTimeline(existingTimeline, direction);
         }
 
         if (inverseDirection === EventTimeline.BACKWARDS && timelineIsLive) {
             // The live timeline should never be spliced into a non-live position.
-            console.warn("Refusing to splice live timeline as a forwards timeline");
+            console.warn(
+                "Refusing to set our preceding timeline on a existingTimeLine " +
+                "as our timeline is live",
+            );
         } else {
             existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
         }
