@@ -276,7 +276,7 @@ EventTimeline.prototype.getNeighbouringTimeline = function(direction) {
 EventTimeline.prototype.setNeighbouringTimeline = function(neighbour, direction) {
     if (this.getNeighbouringTimeline(direction)) {
         throw new Error("timeline already has a neighbouring timeline - " +
-                        "cannot reset neighbour");
+                        "cannot reset neighbour (direction: " + direction + ")");
     }
 
     if (direction == EventTimeline.BACKWARDS) {
