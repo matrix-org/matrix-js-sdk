@@ -1,3 +1,10 @@
+Changes in [1.0.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3) (2019-04-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.3-rc.1...v1.0.3)
+
+ * Add existence check to local storage based crypto store
+   [\#874](https://github.com/matrix-org/matrix-js-sdk/pull/874)
+
 Changes in [1.0.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3-rc.1) (2019-03-27)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.2...v1.0.3-rc.1)
