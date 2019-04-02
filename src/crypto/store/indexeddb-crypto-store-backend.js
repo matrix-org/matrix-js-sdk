@@ -705,6 +705,6 @@ function promiseifyTxn(txn) {
                 console.log("Error performing indexeddb txn", event);
                 reject(event.target.error);
             }
-        }
+        };
     });
 }
