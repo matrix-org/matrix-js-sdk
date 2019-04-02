@@ -1,4 +1,4 @@
-sentEvent/*
+/*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
@@ -1845,7 +1845,10 @@ function _sendEventHttpRequest(client, event) {
 
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
-    ).then((res) => {sentEvent
+    ).then((res) => {
+        console.log(
+            `Event sent to ${event.getRoomId()} with event id ${res.event_id}`,
+        );
         return res;
     });
 }
