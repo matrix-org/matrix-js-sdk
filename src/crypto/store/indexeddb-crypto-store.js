@@ -90,6 +90,7 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onerror = (ev) => {
+                console.log("Error connecting to indexeddb", ev);
                 reject(ev.target.error);
             };
 
@@ -159,6 +160,7 @@ export default class IndexedDBCryptoStore {
             };
 
             req.onerror = (ev) => {
+                console.log("Error deleting data from indexeddb", ev);
                 reject(ev.target.error);
             };
 
