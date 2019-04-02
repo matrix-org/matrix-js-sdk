@@ -1843,9 +1843,7 @@ function _sendEventHttpRequest(client, event) {
 
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
-    ).then((res) => {
-        return res;
-    });
+    );
 }
 
 /**
