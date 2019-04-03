@@ -58,105 +58,143 @@ describe("SAS verification", function() {
         expect(spy).toHaveBeenCalled();
     });
 
-    it("should verify a key", async function() {
-        const [alice, bob] = await makeTestClients(
-            [
-                {userId: "@alice:example.com", deviceId: "Osborne2"},
-                {userId: "@bob:example.com", deviceId: "Dynabook"},
-            ],
-            {
-                verificationMethods: [verificationMethods.SAS],
-            },
-        );
-
-        alice.setDeviceVerified = expect.createSpy();
-        alice.getDeviceEd25519Key = () => {
-            return "alice+base64+ed25519+key";
-        };
-        alice.getStoredDevice = () => {
-            return DeviceInfo.fromStorage(
-                {
-                    keys: {
-                        "ed25519:Dynabook": "bob+base64+ed25519+key",
-                    },
-                },
-                "Dynabook",
-            );
-        };
-        alice.downloadKeys = () => {
-            return Promise.resolve();
-        };
-
-        bob.setDeviceVerified = expect.createSpy();
-        bob.getStoredDevice = () => {
-            return DeviceInfo.fromStorage(
-                {
-                    keys: {
-                        "ed25519:Osborne2": "alice+base64+ed25519+key",
-                    },
-                },
-                "Osborne2",
-            );
-        };
-        bob.getDeviceEd25519Key = () => {
-            return "bob+base64+ed25519+key";
-        };
-        bob.downloadKeys = () => {
-            return Promise.resolve();
-        };
-
+    describe("verification", function() {
+        let alice;
+        let bob;
         let aliceSasEvent;
         let bobSasEvent;
+        let aliceVerifier;
+        let bobPromise;
 
-        const bobPromise = new Promise((resolve, reject) => {
-            bob.on("crypto.verification.start", (verifier) => {
-                verifier.on("show_sas", (e) => {
-                    if (!e.sas.emoji || !e.sas.decimal) {
-                        e.cancel();
-                    } else if (!aliceSasEvent) {
-                        bobSasEvent = e;
-                    } else {
-                        try {
-                            expect(e.sas).toEqual(aliceSasEvent.sas);
-                            e.confirm();
-                            aliceSasEvent.confirm();
-                        } catch (error) {
-                            e.mismatch();
-                            aliceSasEvent.mismatch();
+        beforeEach(async function() {
+            [alice, bob] = await makeTestClients(
+                [
+                    {userId: "@alice:example.com", deviceId: "Osborne2"},
+                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                ],
+                {
+                    verificationMethods: [verificationMethods.SAS],
+                },
+            );
+
+            alice.setDeviceVerified = expect.createSpy();
+            alice.getDeviceEd25519Key = () => {
+                return "alice+base64+ed25519+key";
+            };
+            alice.getStoredDevice = () => {
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:Dynabook": "bob+base64+ed25519+key",
+                        },
+                    },
+                    "Dynabook",
+                );
+            };
+            alice.downloadKeys = () => {
+                return Promise.resolve();
+            };
+
+            bob.setDeviceVerified = expect.createSpy();
+            bob.getStoredDevice = () => {
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:Osborne2": "alice+base64+ed25519+key",
+                        },
+                    },
+                    "Osborne2",
+                );
+            };
+            bob.getDeviceEd25519Key = () => {
+                return "bob+base64+ed25519+key";
+            };
+            bob.downloadKeys = () => {
+                return Promise.resolve();
+            };
+
+            aliceSasEvent = null;
+            bobSasEvent = null;
+
+            bobPromise = new Promise((resolve, reject) => {
+                bob.on("crypto.verification.start", (verifier) => {
+                    verifier.on("show_sas", (e) => {
+                        if (!e.sas.emoji || !e.sas.decimal) {
+                            e.cancel();
+                        } else if (!aliceSasEvent) {
+                            bobSasEvent = e;
+                        } else {
+                            try {
+                                expect(e.sas).toEqual(aliceSasEvent.sas);
+                                e.confirm();
+                                aliceSasEvent.confirm();
+                            } catch (error) {
+                                e.mismatch();
+                                aliceSasEvent.mismatch();
+                            }
                         }
-                    }
+                    });
+                    resolve(verifier);
                 });
-                resolve(verifier);
+            });
+
+            aliceVerifier = alice.beginKeyVerification(
+                verificationMethods.SAS, bob.getUserId(), bob.deviceId,
+            );
+            aliceVerifier.on("show_sas", (e) => {
+                if (!e.sas.emoji || !e.sas.decimal) {
+                    e.cancel();
+                } else if (!bobSasEvent) {
+                    aliceSasEvent = e;
+                } else {
+                    try {
+                        expect(e.sas).toEqual(bobSasEvent.sas);
+                        e.confirm();
+                        bobSasEvent.confirm();
+                    } catch (error) {
+                        e.mismatch();
+                        bobSasEvent.mismatch();
+                    }
+                }
             });
         });
 
-        const aliceVerifier = alice.beginKeyVerification(
-            verificationMethods.SAS, bob.getUserId(), bob.deviceId,
-        );
-        aliceVerifier.on("show_sas", (e) => {
-            if (!e.sas.emoji || !e.sas.decimal) {
-                e.cancel();
-            } else if (!bobSasEvent) {
-                aliceSasEvent = e;
-            } else {
-                try {
-                    expect(e.sas).toEqual(bobSasEvent.sas);
-                    e.confirm();
-                    bobSasEvent.confirm();
-                } catch (error) {
-                    e.mismatch();
-                    bobSasEvent.mismatch();
-                }
-            }
+        it("should verify a key", async function() {
+            await Promise.all([
+                aliceVerifier.verify(),
+                bobPromise.then((verifier) => verifier.verify()),
+            ]);
+            expect(alice.setDeviceVerified)
+                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
+            expect(bob.setDeviceVerified)
+                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
         });
-        await Promise.all([
-            aliceVerifier.verify(),
-            bobPromise.then((verifier) => verifier.verify()),
-        ]);
-        expect(alice.setDeviceVerified)
-            .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
-        expect(bob.setDeviceVerified)
-            .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+
+        it("should be able to verify using the old MAC", async function() {
+            // pretend that Alice can only understand the old (incorrect) MAC,
+            // and make sure that she can still verify with Bob
+            const origSendToDevice = alice.sendToDevice;
+            alice.sendToDevice = function(type, map) {
+                if (type === "m.key.verification.start") {
+                    // Note: this modifies not only the message that Bob
+                    // receives, but also the copy of the message that Alice
+                    // has, since it is the same object.  If this does not
+                    // happen, the verification will fail due to a hash
+                    // commitment mismatch.
+                    map[bob.getUserId()][bob.deviceId]
+                        .message_authentication_codes = ['hmac-sha256'];
+                }
+                return origSendToDevice.call(this, type, map);
+            };
+            await Promise.all([
+                aliceVerifier.verify(),
+                bobPromise.then((verifier) => verifier.verify()),
+            ]);
+            expect(alice.setDeviceVerified)
+                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
+            expect(bob.setDeviceVerified)
+                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+        });
     });
 
     it("should send a cancellation message on error", async function() {
