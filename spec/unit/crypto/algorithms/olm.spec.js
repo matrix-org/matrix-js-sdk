@@ -1,5 +1,5 @@
 /*
-Copyright 2018 New Vector Ltd
+Copyright 2018,2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,18 +17,18 @@ limitations under the License.
 import '../../../olm-loader';
 
 import expect from 'expect';
-import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
 
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
+import olmlib from '../../../../lib/crypto/olmlib';
+import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 function makeOlmDevice() {
     const mockStorage = new MockStorageApi();
-    const sessionStore = new WebStorageSessionStore(mockStorage);
     const cryptoStore = new MemoryCryptoStore(mockStorage);
-    const olmDevice = new OlmDevice(sessionStore, cryptoStore);
+    const olmDevice = new OlmDevice(cryptoStore);
     return olmDevice;
 }
 
@@ -81,6 +81,62 @@ describe("OlmDecryption", function() {
             expect(result.payload).toEqual(
                 "The olm or proteus is an aquatic salamander in the family Proteidae",
             );
+        });
+
+        it("creates only one session at a time", async function() {
+            // if we call ensureOlmSessionsForDevices multiple times, it should
+            // only try to create one session at a time, even if the server is
+            // slow
+            let count = 0;
+            const baseApis = {
+                claimOneTimeKeys: () => {
+                    // simulate a very slow server (.5 seconds to respond)
+                    count++;
+                    return new Promise((resolve, reject) => {
+                        setTimeout(reject, 500);
+                    });
+                },
+            };
+            const devicesByUser = {
+                "@bob:example.com": [
+                    DeviceInfo.fromStorage({
+                        keys: {
+                            "curve25519:ABCDEFG": "akey",
+                        },
+                    }, "ABCDEFG"),
+                ],
+            };
+            function alwaysSucceed(promise) {
+                // swallow any exception thrown by a promise, so that
+                // Promise.all doesn't abort
+                return promise.catch(() => {});
+            }
+
+            // start two tasks that try to ensure that there's an olm session
+            const promises = Promise.all([
+                alwaysSucceed(olmlib.ensureOlmSessionsForDevices(
+                    aliceOlmDevice, baseApis, devicesByUser,
+                )),
+                alwaysSucceed(olmlib.ensureOlmSessionsForDevices(
+                    aliceOlmDevice, baseApis, devicesByUser,
+                )),
+            ]);
+
+            await new Promise((resolve) => {
+                setTimeout(resolve, 200);
+            });
+
+            // after .2s, both tasks should have started, but one should be
+            // waiting on the other before trying to create a session, so
+            // claimOneTimeKeys should have only been called once
+            expect(count).toBe(1);
+
+            await promises;
+
+            // after waiting for both tasks to complete, the first task should
+            // have failed, so the second task should have tried to create a
+            // new session and will have called claimOneTimeKeys
+            expect(count).toBe(2);
         });
     });
 });

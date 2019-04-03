@@ -408,8 +408,31 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         console.info("Already have timeline for " + eventId +
                      " - joining timeline " + timeline + " to " +
                      existingTimeline);
-        timeline.setNeighbouringTimeline(existingTimeline, direction);
-        existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
+
+        // Variables to keep the line length limited below.
+        const existingIsLive = existingTimeline === this._liveTimeline;
+        const timelineIsLive = timeline === this._liveTimeline;
+
+        if (direction === EventTimeline.BACKWARDS && existingIsLive) {
+            // The live timeline should never be spliced into a non-live position.
+            console.warn(
+                "Refusing to set a preceding existingTimeLine on our " +
+                "timeline as the existingTimeLine is live (" + existingTimeline + ")",
+            );
+        } else {
+            timeline.setNeighbouringTimeline(existingTimeline, direction);
+        }
+
+        if (inverseDirection === EventTimeline.BACKWARDS && timelineIsLive) {
+            // The live timeline should never be spliced into a non-live position.
+            console.warn(
+                "Refusing to set our preceding timeline on a existingTimeLine " +
+                "as our timeline is live (" + timeline + ")",
+            );
+        } else {
+            existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
+        }
+
         timeline = existingTimeline;
         didUpdate = true;
     }

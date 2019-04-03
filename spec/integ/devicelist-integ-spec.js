@@ -101,6 +101,7 @@ describe("DeviceList management:", function() {
     });
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {
+        aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
         return aliceTestClient.start().then(function() {
             const syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
@@ -143,6 +144,7 @@ describe("DeviceList management:", function() {
     it("We should not get confused by out-of-order device query responses",
        () => {
            // https://github.com/vector-im/riot-web/issues/3126
+           aliceTestClient.expectKeyQuery({device_keys: {'@alice:localhost': {}}});
            return aliceTestClient.start().then(() => {
                aliceTestClient.httpBackend.when('GET', '/sync').respond(
                    200, getSyncResponse(['@bob:xyz', '@chris:abc']));

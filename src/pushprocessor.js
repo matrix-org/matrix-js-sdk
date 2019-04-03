@@ -184,7 +184,10 @@ function PushProcessor(client) {
     };
 
     const eventFulfillsDisplayNameCondition = function(cond, ev) {
-        const content = ev.getContent();
+        let content = ev.getContent();
+        if (ev.isEncrypted() && ev.getClearContent()) {
+            content = ev.getClearContent();
+        }
         if (!content || !content.body || typeof content.body != 'string') {
             return false;
         }

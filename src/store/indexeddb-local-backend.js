@@ -18,6 +18,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
+import * as IndexedDBHelpers from "../indexeddb-helpers";
 
 const VERSION = 3;
 
@@ -132,6 +133,10 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this._isNewlyCreated = false;
 };
 
+LocalIndexedDBStoreBackend.exists = function(indexedDB, dbName) {
+    dbName = "matrix-js-sdk:" + (dbName || "default");
+    return IndexedDBHelpers.exists(indexedDB, dbName);
+};
 
 LocalIndexedDBStoreBackend.prototype = {
     /**

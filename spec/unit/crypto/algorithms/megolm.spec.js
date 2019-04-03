@@ -5,7 +5,6 @@ import Promise from 'bluebird';
 
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
-import WebStorageSessionStore from '../../../../lib/store/session/webstorage';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
@@ -40,10 +39,9 @@ describe("MegolmDecryption", function() {
         mockBaseApis = {};
 
         const mockStorage = new MockStorageApi();
-        const sessionStore = new WebStorageSessionStore(mockStorage);
         const cryptoStore = new MemoryCryptoStore(mockStorage);
 
-        const olmDevice = new OlmDevice(sessionStore, cryptoStore);
+        const olmDevice = new OlmDevice(cryptoStore);
 
         megolmDecryption = new MegolmDecryption({
             userId: '@user:id',
@@ -264,10 +262,9 @@ describe("MegolmDecryption", function() {
 
         it("re-uses sessions for sequential messages", async function() {
             const mockStorage = new MockStorageApi();
-            const sessionStore = new WebStorageSessionStore(mockStorage);
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 
-            const olmDevice = new OlmDevice(sessionStore, cryptoStore);
+            const olmDevice = new OlmDevice(cryptoStore);
             olmDevice.verifySignature = expect.createSpy();
             await olmDevice.init();
 

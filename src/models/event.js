@@ -382,15 +382,41 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * Cancel any room key request for this event and resend another.
      *
      * @param {module:crypto} crypto crypto module
+     * @param {string} userId the user who received this event
+     *
+     * @returns {Promise} a promise that resolves when the request is queued
      */
-    cancelAndResendKeyRequest: function(crypto) {
+    cancelAndResendKeyRequest: function(crypto, userId) {
         const wireContent = this.getWireContent();
-        crypto.cancelRoomKeyRequest({
+        return crypto.requestRoomKey({
             algorithm: wireContent.algorithm,
             room_id: this.getRoomId(),
             session_id: wireContent.session_id,
             sender_key: wireContent.sender_key,
-        }, true);
+        }, this.getKeyRequestRecipients(userId), true);
+    },
+
+    /**
+     * Calculate the recipients for keyshare requests.
+     *
+     * @param {string} userId the user who received this event.
+     *
+     * @returns {Array} array of recipients
+     */
+    getKeyRequestRecipients: function(userId) {
+        // send the request to all of our own devices, and the
+        // original sending device if it wasn't us.
+        const wireContent = this.getWireContent();
+        const recipients = [{
+            userId, deviceId: '*',
+        }];
+        const sender = this.getSender();
+        if (sender !== userId) {
+            recipients.push({
+                userId: sender, deviceId: wireContent.device_id,
+            });
+        }
+        return recipients;
     },
 
     _decryptionLoop: async function(crypto) {
@@ -471,6 +497,14 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._retryDecryption = false;
             this._setClearData(res);
 
+            // Before we emit the event, clear the push actions so that they can be recalculated
+            // by relevant code. We do this because the clear event has now changed, making it
+            // so that existing rules can be re-run over the applicable properties. Stuff like
+            // highlighting when the user's name is mentioned rely on this happening. We also want
+            // to set the push actions before emitting so that any notification listeners don't
+            // pick up the wrong contents.
+            this.setPushActions(null);
+
             this.emit("Event.decrypted", this, err);
 
             return;
@@ -509,6 +543,17 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             decryptionResult.claimedEd25519Key || null;
         this._forwardingCurve25519KeyChain =
             decryptionResult.forwardingCurve25519KeyChain || [];
+    },
+
+    /**
+     * Gets the cleartext content for this event. If the event is not encrypted,
+     * or encryption has not been completed, this will return null.
+     *
+     * @returns {Object} The cleartext (decrypted) content for the event
+     */
+    getClearContent: function() {
+        const ev = this._clearEvent;
+        return ev && ev.content ? ev.content : null;
     },
 
     /**

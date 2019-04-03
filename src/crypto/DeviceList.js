@@ -1,6 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
-Copyright 2018 New Vector Ltd
+Copyright 2018, 2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,11 +63,10 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
  * @alias module:crypto/DeviceList
  */
 export default class DeviceList extends EventEmitter {
-    constructor(baseApis, cryptoStore, sessionStore, olmDevice) {
+    constructor(baseApis, cryptoStore, olmDevice) {
         super();
 
         this._cryptoStore = cryptoStore;
-        this._sessionStore = sessionStore;
 
         // userId -> {
         //     deviceId -> {
@@ -117,32 +116,14 @@ export default class DeviceList extends EventEmitter {
      * Load the device tracking state from storage
      */
     async load() {
-        let shouldDeleteSessionStore = false;
         await this._cryptoStore.doTxn(
-            // migrate from session store if there's data there and not here
-            'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
+            'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
-                    if (deviceData === null) {
-                        logger.log("Migrating e2e device data...");
-                        this._devices = this._sessionStore.getAllEndToEndDevices() || {};
-                        this._deviceTrackingStatus = (
-                            this._sessionStore.getEndToEndDeviceTrackingStatus() || {}
-                        );
-                        this._syncToken = this._sessionStore.getEndToEndDeviceSyncToken();
-                        this._cryptoStore.storeEndToEndDeviceData({
-                            devices: this._devices,
-                            self_signing_keys: this._ssks,
-                            trackingStatus: this._deviceTrackingStatus,
-                            syncToken: this._syncToken,
-                        }, txn);
-                        shouldDeleteSessionStore = true;
-                    } else {
-                        this._devices = deviceData ? deviceData.devices : {},
-                        this._ssks = deviceData ? deviceData.self_signing_keys || {} : {};
-                        this._deviceTrackingStatus = deviceData ?
-                            deviceData.trackingStatus : {};
-                        this._syncToken = deviceData ? deviceData.syncToken : null;
-                    }
+                    this._devices = deviceData ? deviceData.devices : {},
+                    this._ssks = deviceData ? deviceData.self_signing_keys || {} : {};
+                    this._deviceTrackingStatus = deviceData ?
+                        deviceData.trackingStatus : {};
+                    this._syncToken = deviceData ? deviceData.syncToken : null;
                     this._userByIdentityKey = {};
                     for (const user of Object.keys(this._devices)) {
                         const userDevices = this._devices[user];
@@ -156,11 +137,6 @@ export default class DeviceList extends EventEmitter {
                 });
             },
         );
-
-        if (shouldDeleteSessionStore) {
-            // migrated data is now safely persisted: remove from old store
-            this._sessionStore.removeEndToEndDeviceData();
-        }
 
         for (const u of Object.keys(this._deviceTrackingStatus)) {
             // if a download was in progress when we got shut down, it isn't any more.
@@ -502,10 +478,10 @@ export default class DeviceList extends EventEmitter {
         if (!this._deviceTrackingStatus[userId]) {
             logger.log('Now tracking device list for ' + userId);
             this._deviceTrackingStatus[userId] = TRACKING_STATUS_PENDING_DOWNLOAD;
+            // we don't yet persist the tracking status, since there may be a lot
+            // of calls; we save all data together once the sync is done
+            this._dirty = true;
         }
-        // we don't yet persist the tracking status, since there may be a lot
-        // of calls; we save all data together once the sync is done
-        this._dirty = true;
     }
 
     /**

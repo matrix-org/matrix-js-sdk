@@ -1,6 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
-Copyright 2017 New Vector Ltd
+Copyright 2017, 2019 New Vector Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,20 +59,17 @@ function checkPayloadLength(payloadString) {
  * Manages the olm cryptography functions. Each OlmDevice has a single
  * OlmAccount and a number of OlmSessions.
  *
- * Accounts and sessions are kept pickled in a sessionStore.
+ * Accounts and sessions are kept pickled in the cryptoStore.
  *
  * @constructor
  * @alias module:crypto/OlmDevice
  *
- * @param {Object} sessionStore A store to be used for data in end-to-end
- *    crypto. This is deprecated and being replaced by cryptoStore.
  * @param {Object} cryptoStore A store for crypto data
  *
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
  */
-function OlmDevice(sessionStore, cryptoStore) {
-    this._sessionStore = sessionStore;
+function OlmDevice(cryptoStore) {
     this._cryptoStore = cryptoStore;
     this._pickleKey = "DEFAULT_KEY";
 
@@ -81,7 +78,7 @@ function OlmDevice(sessionStore, cryptoStore) {
     this.deviceEd25519Key = null;
     this._maxOneTimeKeys = null;
 
-    // we don't bother stashing outboundgroupsessions in the sessionstore -
+    // we don't bother stashing outboundgroupsessions in the cryptoStore -
     // instead we keep them here.
     this._outboundGroupSessionStore = {};
 
@@ -102,6 +99,10 @@ function OlmDevice(sessionStore, cryptoStore) {
     // Keys are strings of form "<senderKey>|<session_id>|<message_index>"
     // Values are objects of the form "{id: <event id>, timestamp: <ts>}"
     this._inboundGroupSessionMessageIndexes = {};
+
+    // Keep track of sessions that we're starting, so that we don't start
+    // multiple sessions for the same device at the same time.
+    this._sessionsInProgress = {};
 }
 
 /**
@@ -114,14 +115,10 @@ function OlmDevice(sessionStore, cryptoStore) {
  * Reads the device keys from the OlmAccount object.
  */
 OlmDevice.prototype.init = async function() {
-    await this._migrateFromSessionStore();
-
     let e2eKeys;
     const account = new global.Olm.Account();
     try {
-        await _initialiseAccount(
-            this._sessionStore, this._cryptoStore, this._pickleKey, account,
-        );
+        await _initialiseAccount(this._cryptoStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -133,7 +130,7 @@ OlmDevice.prototype.init = async function() {
     this.deviceEd25519Key = e2eKeys.ed25519;
 };
 
-async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account) {
+async function _initialiseAccount(cryptoStore, pickleKey, account) {
     await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
         cryptoStore.getAccount(txn, (pickledAccount) => {
             if (pickledAccount !== null) {
@@ -152,95 +149,6 @@ async function _initialiseAccount(sessionStore, cryptoStore, pickleKey, account)
  */
 OlmDevice.getOlmVersion = function() {
     return global.Olm.get_library_version();
-};
-
-OlmDevice.prototype._migrateFromSessionStore = async function() {
-    // account
-    await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            this._cryptoStore.getAccount(txn, (pickledAccount) => {
-                if (pickledAccount === null) {
-                    // Migrate from sessionStore
-                    pickledAccount = this._sessionStore.getEndToEndAccount();
-                    if (pickledAccount !== null) {
-                        logger.log("Migrating account from session store");
-                        this._cryptoStore.storeAccount(txn, pickledAccount);
-                    }
-                }
-            });
-        },
-    );
-
-    // remove the old account now the transaction has completed. Either we've
-    // migrated it or decided not to, either way we want to blow away the old data.
-    this._sessionStore.removeEndToEndAccount();
-
-    // sessions
-    const sessions = this._sessionStore.getAllEndToEndSessions();
-    if (Object.keys(sessions).length > 0) {
-        await this._cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS], (txn) => {
-                // Don't migrate sessions from localstorage if we already have sessions
-                // in indexeddb, since this means we've already migrated and an old version
-                // has run against the same localstorage and created some spurious sessions.
-                this._cryptoStore.countEndToEndSessions(txn, (count) => {
-                    if (count) {
-                        logger.log("Crypto store already has sessions: not migrating");
-                        return;
-                    }
-                    let numSessions = 0;
-                    for (const deviceKey of Object.keys(sessions)) {
-                        for (const sessionId of Object.keys(sessions[deviceKey])) {
-                            numSessions++;
-                            this._cryptoStore.storeEndToEndSession(
-                                deviceKey, sessionId, sessions[deviceKey][sessionId], txn,
-                            );
-                        }
-                    }
-                    logger.log(
-                        "Migrating " + numSessions + " sessions from session store",
-                    );
-                });
-            },
-        );
-
-        this._sessionStore.removeAllEndToEndSessions();
-    }
-
-    // inbound group sessions
-    const ibGroupSessions = this._sessionStore.getAllEndToEndInboundGroupSessionKeys();
-    if (Object.keys(ibGroupSessions).length > 0) {
-        let numIbSessions = 0;
-        await this._cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
-                // We always migrate inbound group sessions, even if we already have some
-                // in the new store. They should be be safe to migrate.
-                for (const s of ibGroupSessions) {
-                    try {
-                        this._cryptoStore.addEndToEndInboundGroupSession(
-                            s.senderKey, s.sessionId,
-                            JSON.parse(
-                                this._sessionStore.getEndToEndInboundGroupSession(
-                                    s.senderKey, s.sessionId,
-                                ),
-                            ), txn,
-                        );
-                    } catch (e) {
-                        logger.warn(
-                            "Failed to migrate session " + s.senderKey + "/" +
-                            s.sessionId + ": " + e.stack || e,
-                        );
-                    }
-                    ++numIbSessions;
-                }
-                logger.log(
-                    "Migrated " + numIbSessions +
-                    " inbound group sessions from session store",
-                );
-            },
-        );
-        this._sessionStore.removeAllEndToEndInboundGroupSessions();
-    }
 };
 
 /**
@@ -553,6 +461,15 @@ OlmDevice.prototype.createInboundSession = async function(
  * @return {Promise<string[]>}  a list of known session ids for the device
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
+    if (this._sessionsInProgress[theirDeviceIdentityKey]) {
+        console.log("waiting for session to be created");
+        try {
+            await this._sessionsInProgress[theirDeviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, just fall through and
+            // return an empty result
+        }
+    }
     let sessionIds;
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
@@ -573,10 +490,18 @@ OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityK
  *
  * @param {string} theirDeviceIdentityKey Curve25519 identity key for the
  *     remote device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
  * @return {Promise<?string>}  session id, or null if no established session
  */
-OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKey) {
-    const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey);
+OlmDevice.prototype.getSessionIdForDevice = async function(
+    theirDeviceIdentityKey, nowait,
+) {
+    const sessionInfos = await this.getSessionInfoForDevice(
+        theirDeviceIdentityKey, nowait,
+    );
+
     if (sessionInfos.length === 0) {
         return null;
     }
@@ -611,9 +536,21 @@ OlmDevice.prototype.getSessionIdForDevice = async function(theirDeviceIdentityKe
  * message and is therefore past the pre-key stage), and 'sessionId'.
  *
  * @param {string} deviceIdentityKey Curve25519 identity key for the device
+ * @param {boolean} nowait Don't wait for an in-progress session to complete.
+ *     This should only be set to true of the calling function is the function
+ *     that marked the session as being in-progress.
  * @return {Array.<{sessionId: string, hasReceivedMessage: Boolean}>}
  */
-OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey) {
+OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
+    if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
+        logger.log("waiting for session to be created");
+        try {
+            await this._sessionsInProgress[deviceIdentityKey];
+        } catch (e) {
+            // if the session failed to be created, then just fall through and
+            // return an empty result
+        }
+    }
     const info = [];
 
     await this._cryptoStore.doTxn(
@@ -915,14 +852,6 @@ OlmDevice.prototype.addInboundGroupSession = async function(
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn,
                 (existingSession, existingSessionData) => {
-                    if (existingSession) {
-                        logger.log(
-                            "Update for megolm session " + senderKey + "/" + sessionId,
-                        );
-                        // for now we just ignore updates. TODO: implement something here
-                        return;
-                    }
-
                     // new session.
                     const session = new global.Olm.InboundGroupSession();
                     try {
@@ -938,6 +867,20 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             );
                         }
 
+                        if (existingSession) {
+                            logger.log(
+                                "Update for megolm session "
+                                    + senderKey + "/" + sessionId,
+                            );
+                            if (existingSession.first_known_index()
+                                <= session.first_known_index()) {
+                                // existing session has lower index (i.e. can
+                                // decrypt more), so keep it
+                                logger.log("Keeping existing session");
+                                return;
+                            }
+                        }
+
                         const sessionData = {
                             room_id: roomId,
                             session: session.pickle(this._pickleKey),
@@ -945,7 +888,7 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                             forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
                         };
 
-                        this._cryptoStore.addEndToEndInboundGroupSession(
+                        this._cryptoStore.storeEndToEndInboundGroupSession(
                             senderKey, sessionId, sessionData, txn,
                         );
                     } finally {

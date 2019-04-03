@@ -260,6 +260,8 @@ Room.prototype.getRecommendedVersion = async function() {
     }
 
     const currentVersion = this.getVersion();
+    console.log(`[${this.roomId}] Current version: ${currentVersion}`);
+    console.log(`[${this.roomId}] Version capability: `, versionCap);
 
     const result = {
         version: currentVersion,
@@ -280,6 +282,11 @@ Room.prototype.getRecommendedVersion = async function() {
         result.version = versionCap.default;
         result.needsUpgrade = true;
         result.urgent = !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
+        if (result.urgent) {
+            console.warn(`URGENT upgrade required on ${this.roomId}`);
+        } else {
+            console.warn(`Non-urgent upgrade required on ${this.roomId}`);
+        }
         return Promise.resolve(result);
     }
 
@@ -597,9 +604,9 @@ Room.prototype.hasUnverifiedDevices = async function() {
     if (!this._client.isRoomEncrypted(this.roomId)) {
         return false;
     }
-    const memberIds = Object.keys(this.currentState.members);
-    for (const userId of memberIds) {
-        const devices = await this._client.getStoredDevicesForUser(userId);
+    const e2eMembers = await this.getEncryptionTargetMembers();
+    for (const member of e2eMembers) {
+        const devices = await this._client.getStoredDevicesForUser(member.userId);
         if (devices.some((device) => device.isUnverified())) {
             return true;
         }
@@ -1422,6 +1429,40 @@ Room.prototype.getEventReadUpTo = function(userId, ignoreSynthesized) {
     }
 
     return receipts["m.read"][userId].eventId;
+};
+
+/**
+ * Determines if the given user has read a particular event ID with the known
+ * history of the room. This is not a definitive check as it relies only on
+ * what is available to the room at the time of execution.
+ * @param {String} userId The user ID to check the read state of.
+ * @param {String} eventId The event ID to check if the user read.
+ * @returns {Boolean} True if the user has read the event, false otherwise.
+ */
+Room.prototype.hasUserReadEvent = function(userId, eventId) {
+    const readUpToId = this.getEventReadUpTo(userId, false);
+    if (readUpToId === eventId) return true;
+
+    if (this.timeline.length
+        && this.timeline[this.timeline.length - 1].getSender()
+        && this.timeline[this.timeline.length - 1].getSender() === userId) {
+        // It doesn't matter where the event is in the timeline, the user has read
+        // it because they've sent the latest event.
+        return true;
+    }
+
+    for (let i = this.timeline.length - 1; i >= 0; --i) {
+        const ev = this.timeline[i];
+
+        // If we encounter the target event first, the user hasn't read it
+        // however if we encounter the readUpToId first then the user has read
+        // it. These rules apply because we're iterating bottom-up.
+        if (ev.getId() === eventId) return false;
+        if (ev.getId() === readUpToId) return true;
+    }
+
+    // We don't know if the user has read it, so assume not.
+    return false;
 };
 
 /**

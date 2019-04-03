@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
-import {MatrixInMemoryStore} from "./memory";
+import {MemoryStore} from "./memory";
 import utils from "../utils";
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
@@ -37,9 +37,9 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 
 /**
- * Construct a new Indexed Database store, which extends MatrixInMemoryStore.
+ * Construct a new Indexed Database store, which extends MemoryStore.
  *
- * This store functions like a MatrixInMemoryStore except it periodically persists
+ * This store functions like a MemoryStore except it periodically persists
  * the contents of the store to an IndexedDB backend.
  *
  * All data is still kept in-memory but can be loaded from disk by calling
@@ -62,7 +62,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * </pre>
  *
  * @constructor
- * @extends MatrixInMemoryStore
+ * @extends MemoryStore
  * @param {Object} opts Options object.
  * @param {Object} opts.indexedDB The Indexed DB interface e.g.
  * <code>window.indexedDB</code>
@@ -79,7 +79,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * database.
  */
 const IndexedDBStore = function IndexedDBStore(opts) {
-    MatrixInMemoryStore.call(this, opts);
+    MemoryStore.call(this, opts);
 
     if (!opts.indexedDB) {
         throw new Error('Missing required option: indexedDB');
@@ -109,7 +109,11 @@ const IndexedDBStore = function IndexedDBStore(opts) {
         // user_id : timestamp
     };
 };
-utils.inherits(IndexedDBStore, MatrixInMemoryStore);
+utils.inherits(IndexedDBStore, MemoryStore);
+
+IndexedDBStore.exists = function(indexedDB, dbName) {
+    return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
+};
 
 /**
  * @return {Promise} Resolved when loaded from indexed db.
@@ -164,7 +168,7 @@ IndexedDBStore.prototype.getSavedSyncToken = function() {
  * @return {Promise} Resolves if the data was deleted from the database.
  */
 IndexedDBStore.prototype.deleteAllData = function() {
-    MatrixInMemoryStore.prototype.deleteAllData.call(this);
+    MemoryStore.prototype.deleteAllData.call(this);
     return this.backend.clearDatabase().then(() => {
         console.log("Deleted indexeddb data.");
     }, (err) => {

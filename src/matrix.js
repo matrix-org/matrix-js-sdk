@@ -22,8 +22,14 @@ module.exports.ContentHelpers = require("./content-helpers");
 module.exports.MatrixEvent = require("./models/event").MatrixEvent;
 /** The {@link module:models/event.EventStatus|EventStatus} enum. */
 module.exports.EventStatus = require("./models/event").EventStatus;
-/** The {@link module:store/memory.MatrixInMemoryStore|MatrixInMemoryStore} class. */
-module.exports.MatrixInMemoryStore = require("./store/memory").MatrixInMemoryStore;
+/** The {@link module:store/memory.MemoryStore|MemoryStore} class. */
+module.exports.MemoryStore = require("./store/memory").MemoryStore;
+/**
+ * The {@link module:store/memory.MemoryStore|MemoryStore} class was previously
+ * exported as `MatrixInMemoryStore`, so this is preserved for SDK consumers.
+ * @deprecated Prefer `MemoryStore` going forward.
+ */
+module.exports.MatrixInMemoryStore = module.exports.MemoryStore;
 /** The {@link module:store/indexeddb.IndexedDBStore|IndexedDBStore} class. */
 module.exports.IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
 /** The {@link module:store/indexeddb.IndexedDBStoreBackend|IndexedDBStoreBackend} class. */
@@ -88,21 +94,21 @@ module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCal
 
 
 /**
- * Set an audio output device to use for MatrixCalls
+ * Set a preferred audio output device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
 module.exports.setMatrixCallAudioOutput = require('./webrtc/call').setAudioOutput;
 /**
- * Set an audio input device to use for MatrixCalls
+ * Set a preferred audio input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
 module.exports.setMatrixCallAudioInput = require('./webrtc/call').setAudioInput;
 /**
- * Set a video input device to use for MatrixCalls
+ * Set a preferred video input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
@@ -164,7 +170,7 @@ module.exports.setCryptoStoreFactory = function(fac) {
  * this is a string, it is assumed to be the base URL. These configuration
  * options will be passed directly to {@link module:client~MatrixClient}.
  * @param {Object} opts.store If not set, defaults to
- * {@link module:store/memory.MatrixInMemoryStore}.
+ * {@link module:store/memory.MemoryStore}.
  * @param {Object} opts.scheduler If not set, defaults to
  * {@link module:scheduler~MatrixScheduler}.
  * @param {requestFunction} opts.request If not set, defaults to the function
@@ -187,7 +193,7 @@ module.exports.createClient = function(opts) {
         };
     }
     opts.request = opts.request || request;
-    opts.store = opts.store || new module.exports.MatrixInMemoryStore({
+    opts.store = opts.store || new module.exports.MemoryStore({
       localStorage: global.localStorage,
     });
     opts.scheduler = opts.scheduler || new module.exports.MatrixScheduler();

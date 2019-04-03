@@ -707,12 +707,21 @@ function promiseifyTxn(txn) {
             }
             resolve();
         };
-        txn.onerror = () => {
+        txn.onerror = (event) => {
             if (txn._mx_abortexception !== undefined) {
                 reject(txn._mx_abortexception);
+            } else {
+                console.log("Error performing indexeddb txn", event);
+                reject(event.target.error);
             }
-            reject();
         };
-        txn.onabort = () => reject(txn._mx_abortexception);
+        txn.onabort = (event) => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            } else {
+                console.log("Error performing indexeddb txn", event);
+                reject(event.target.error);
+            }
+        };
     });
 }

@@ -1,3 +1,129 @@
+Changes in [1.0.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3) (2019-04-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.3-rc.1...v1.0.3)
+
+ * Add existence check to local storage based crypto store
+   [\#874](https://github.com/matrix-org/matrix-js-sdk/pull/874)
+
+Changes in [1.0.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3-rc.1) (2019-03-27)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.2...v1.0.3-rc.1)
+
+ * Add IndexedDB existence checks
+   [\#871](https://github.com/matrix-org/matrix-js-sdk/pull/871)
+ * Emit sync errors for capturing by clients
+   [\#869](https://github.com/matrix-org/matrix-js-sdk/pull/869)
+ * Add functions for getting room upgrade history and leaving those rooms
+   [\#868](https://github.com/matrix-org/matrix-js-sdk/pull/868)
+ * Clarify the meaning of 'real name' for contribution
+   [\#867](https://github.com/matrix-org/matrix-js-sdk/pull/867)
+ * Remove `sessionStore` to `cryptoStore` migration path
+   [\#865](https://github.com/matrix-org/matrix-js-sdk/pull/865)
+ * Add debugging for spurious room version warnings
+   [\#866](https://github.com/matrix-org/matrix-js-sdk/pull/866)
+ * Add investigation notes for browser storage
+   [\#864](https://github.com/matrix-org/matrix-js-sdk/pull/864)
+ * make sure resolve object is defined before calling it
+   [\#862](https://github.com/matrix-org/matrix-js-sdk/pull/862)
+ * Rename `MatrixInMemoryStore` to `MemoryStore`
+   [\#861](https://github.com/matrix-org/matrix-js-sdk/pull/861)
+ * Use Buildkite for CI
+   [\#859](https://github.com/matrix-org/matrix-js-sdk/pull/859)
+ * only create one session at a time per device
+   [\#857](https://github.com/matrix-org/matrix-js-sdk/pull/857)
+
+Changes in [1.0.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.2) (2019-03-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.2-rc.1...v1.0.2)
+
+ * No changes since rc.1
+
+Changes in [1.0.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.2-rc.1) (2019-03-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1...v1.0.2-rc.1)
+
+ * Use modern Yarn version on Travis CI
+   [\#858](https://github.com/matrix-org/matrix-js-sdk/pull/858)
+ * Switch to `yarn` for dependency management
+   [\#856](https://github.com/matrix-org/matrix-js-sdk/pull/856)
+ * More key request fixes
+   [\#855](https://github.com/matrix-org/matrix-js-sdk/pull/855)
+ * Calculate encrypted notification counts
+   [\#851](https://github.com/matrix-org/matrix-js-sdk/pull/851)
+ * Update dependencies
+   [\#854](https://github.com/matrix-org/matrix-js-sdk/pull/854)
+ * make sure key requests get sent
+   [\#850](https://github.com/matrix-org/matrix-js-sdk/pull/850)
+ * Use 'ideal' rather than 'exact' for deviceid
+   [\#852](https://github.com/matrix-org/matrix-js-sdk/pull/852)
+ * handle partially-shared sessions better
+   [\#848](https://github.com/matrix-org/matrix-js-sdk/pull/848)
+
+Changes in [1.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1) (2019-03-06)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1-rc.2...v1.0.1)
+
+ * No changes since rc.2
+
+Changes in [1.0.1-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1-rc.2) (2019-03-05)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.1-rc.1...v1.0.1-rc.2)
+
+ * dont swallow txn errors in crypto store
+   [\#853](https://github.com/matrix-org/matrix-js-sdk/pull/853)
+ * Don't swallow txn errors in crypto store
+   [\#849](https://github.com/matrix-org/matrix-js-sdk/pull/849)
+
+Changes in [1.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.1-rc.1) (2019-02-28)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0...v1.0.1-rc.1)
+
+ * Fix "e is undefined" masking the original error in MegolmDecryption
+   [\#847](https://github.com/matrix-org/matrix-js-sdk/pull/847)
+
+Changes in [1.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0) (2019-02-14)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.2...v1.0.0)
+
+ * Try again to commit package-lock.json
+   [\#841](https://github.com/matrix-org/matrix-js-sdk/pull/841)
+
+Changes in [1.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0-rc.2) (2019-02-14)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.0-rc.1...v1.0.0-rc.2)
+
+ * Release script: commit package-lock.json
+   [\#839](https://github.com/matrix-org/matrix-js-sdk/pull/839)
+ * Add method to force re-check of key backup
+   [\#840](https://github.com/matrix-org/matrix-js-sdk/pull/840)
+ * Fix: dont check for unverified devices in left members
+   [\#838](https://github.com/matrix-org/matrix-js-sdk/pull/838)
+
+Changes in [1.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.0-rc.1) (2019-02-08)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.3...v1.0.0-rc.1)
+
+ * change hex SAS verification to decimal and emoji
+   [\#837](https://github.com/matrix-org/matrix-js-sdk/pull/837)
+ * Trust on decrypt
+   [\#836](https://github.com/matrix-org/matrix-js-sdk/pull/836)
+ * Always track our own devices
+   [\#835](https://github.com/matrix-org/matrix-js-sdk/pull/835)
+ * Make linting rules more consistent
+   [\#834](https://github.com/matrix-org/matrix-js-sdk/pull/834)
+ * add method to room to check for unverified devices
+   [\#833](https://github.com/matrix-org/matrix-js-sdk/pull/833)
+ * Merge redesign into develop
+   [\#831](https://github.com/matrix-org/matrix-js-sdk/pull/831)
+ * Supporting infrastructure for educated decisions on when to upgrade rooms
+   [\#830](https://github.com/matrix-org/matrix-js-sdk/pull/830)
+ * Include signature info for unknown devices
+   [\#826](https://github.com/matrix-org/matrix-js-sdk/pull/826)
+ * Flag v2 rooms as "safe"
+   [\#828](https://github.com/matrix-org/matrix-js-sdk/pull/828)
+ * Update ESLint
+   [\#821](https://github.com/matrix-org/matrix-js-sdk/pull/821)
+
 Changes in [0.14.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v0.14.3) (2019-01-22)
 ==================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v0.14.3-rc.1...v0.14.3)

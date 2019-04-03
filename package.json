@@ -1,24 +1,24 @@
 {
   "name": "matrix-js-sdk",
-  "version": "0.14.3",
+  "version": "1.0.3",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
     "test:build": "babel -s -d specbuild spec",
     "test:run": "istanbul cover --report text --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" node_modules/mocha/bin/_mocha -- --recursive specbuild --colors --reporter mocha-jenkins-reporter --reporter-options junit_report_path=reports/test-results.xml",
     "test:watch": "mocha --watch --compilers js:babel-core/register --recursive spec --colors",
-    "test": "npm run test:build && npm run test:run",
-    "check": "npm run test:build && _mocha --recursive specbuild --colors",
+    "test": "yarn test:build && yarn test:run",
+    "check": "yarn test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel --no-babelrc -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
-    "start": "npm run start:init && npm run start:watch",
+    "start": "yarn start:init && yarn start:watch",
     "start:watch": "babel -s -w --skip-initial-build -d lib src",
     "start:init": "babel -s -d lib src",
     "clean": "rimraf lib dist",
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
-    "dist": "npm run build",
+    "dist": "yarn build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 101 src spec",
-    "prepublish": "npm run clean && npm run build && git rev-parse HEAD > git-revision.txt"
+    "prepare": "yarn clean && yarn build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
     "type": "git",
@@ -81,14 +81,15 @@
     "istanbul": "^0.4.5",
     "jsdoc": "^3.5.5",
     "lolex": "^1.5.2",
-    "matrix-mock-request": "^1.2.2",
+    "matrix-mock-request": "^1.2.3",
     "mocha": "^5.2.0",
     "mocha-jenkins-reporter": "^0.4.0",
+    "olm": "https://matrix.org/packages/npm/olm/olm-3.1.0-pre1.tgz",
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
     "uglify-js": "^2.8.26",
-    "watchify": "^3.11.0"
+    "watchify": "^3.11.1"
   },
   "browserify": {
     "transform": [

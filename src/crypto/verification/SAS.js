@@ -45,6 +45,115 @@ const newMismatchedCommitmentError = errorFactory(
     "m.mismatched_commitment", "Mismatched commitment",
 );
 
+function generateDecimalSas(sasBytes) {
+    /**
+     *      +--------+--------+--------+--------+--------+
+     *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
+     *      +--------+--------+--------+--------+--------+
+     * bits: 87654321 87654321 87654321 87654321 87654321
+     *       \____________/\_____________/\____________/
+     *         1st number    2nd number     3rd number
+     */
+    return [
+        (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
+        ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
+        ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
+    ];
+}
+
+const emojiMapping = [
+    ["🐶", "dog"],        //  0
+    ["🐱", "cat"],        //  1
+    ["🦁", "lion"],       //  2
+    ["🐎", "horse"],      //  3
+    ["🦄", "unicorn"],    //  4
+    ["🐷", "pig"],        //  5
+    ["🐘", "elephant"],   //  6
+    ["🐰", "rabbit"],     //  7
+    ["🐼", "panda"],      //  8
+    ["🐓", "rooster"],    //  9
+    ["🐧", "penguin"],    // 10
+    ["🐢", "turtle"],     // 11
+    ["🐟", "fish"],       // 12
+    ["🐙", "octopus"],    // 13
+    ["🦋", "butterfly"],  // 14
+    ["🌷", "flower"],     // 15
+    ["🌳", "tree"],       // 16
+    ["🌵", "cactus"],     // 17
+    ["🍄", "mushroom"],   // 18
+    ["🌏", "globe"],      // 19
+    ["🌙", "moon"],       // 20
+    ["☁️", "cloud"],       // 21
+    ["🔥", "fire"],       // 22
+    ["🍌", "banana"],     // 23
+    ["🍎", "apple"],      // 24
+    ["🍓", "strawberry"], // 25
+    ["🌽", "corn"],       // 26
+    ["🍕", "pizza"],      // 27
+    ["🎂", "cake"],       // 28
+    ["❤️", "heart"],      // 29
+    ["🙂", "smiley"],      // 30
+    ["🤖", "robot"],      // 31
+    ["🎩", "hat"],        // 32
+    ["👓", "glasses"],    // 33
+    ["🔧", "spanner"],     // 34
+    ["🎅", "santa"],      // 35
+    ["👍", "thumbs up"],  // 36
+    ["☂️", "umbrella"],    // 37
+    ["⌛", "hourglass"],   // 38
+    ["⏰", "clock"],      // 39
+    ["🎁", "gift"],       // 40
+    ["💡", "light bulb"], // 41
+    ["📕", "book"],       // 42
+    ["✏️", "pencil"],     // 43
+    ["📎", "paperclip"],  // 44
+    ["✂️", "scissors"],    // 45
+    ["🔒", "padlock"],    // 46
+    ["🔑", "key"],        // 47
+    ["🔨", "hammer"],     // 48
+    ["☎️", "telephone"],  // 49
+    ["🏁", "flag"],       // 50
+    ["🚂", "train"],      // 51
+    ["🚲", "bicycle"],    // 52
+    ["✈️", "aeroplane"],   // 53
+    ["🚀", "rocket"],     // 54
+    ["🏆", "trophy"],     // 55
+    ["⚽", "ball"],       // 56
+    ["🎸", "guitar"],     // 57
+    ["🎺", "trumpet"],    // 58
+    ["🔔", "bell"],       // 59
+    ["⚓️", "anchor"],     // 60
+    ["🎧", "headphones"], // 61
+    ["📁", "folder"],     // 62
+    ["📌", "pin"],        // 63
+];
+
+function generateEmojiSas(sasBytes) {
+    const emojis = [
+        // just like base64 encoding
+        sasBytes[0] >> 2,
+        (sasBytes[0] & 0x3) << 4 | sasBytes[1] >> 4,
+        (sasBytes[1] & 0xf) << 2 | sasBytes[2] >> 6,
+        sasBytes[2] & 0x3f,
+        sasBytes[3] >> 2,
+        (sasBytes[3] & 0x3) << 4 | sasBytes[4] >> 4,
+        (sasBytes[4] & 0xf) << 2 | sasBytes[5] >> 6,
+    ];
+
+    return emojis.map((num) => emojiMapping[num]);
+}
+
+function generateSas(sasBytes, methods) {
+    const sas = {};
+    if (methods.includes("decimal")) {
+        sas["decimal"] = generateDecimalSas(sasBytes);
+    }
+    if (methods.includes("emoji")) {
+        sas["emoji"] = generateEmojiSas(sasBytes);
+    }
+    return sas;
+}
+
 /**
  * @alias module:crypto/verification/SAS
  * @extends {module:crypto/verification/Base}
@@ -75,7 +184,8 @@ export default class SAS extends Base {
             key_agreement_protocols: ["curve25519"],
             hashes: ["sha256"],
             message_authentication_codes: ["hmac-sha256"],
-            short_authentication_string: ["hex"],
+            // FIXME: allow app to specify what SAS methods can be used
+            short_authentication_string: ["decimal", "emoji"],
             transaction_id: this.transactionId,
         };
         this._sendToDevice("m.key.verification.start", initialMessage);
@@ -87,14 +197,15 @@ export default class SAS extends Base {
               && content.hash === "sha256"
               && content.message_authentication_code === "hmac-sha256"
               && content.short_authentication_string instanceof Array
-              && content.short_authentication_string.length === 1
-              && content.short_authentication_string[0] === "hex")) {
+              && (content.short_authentication_string.includes("decimal")
+                  || content.short_authentication_string.includes("emoji")))) {
             throw newUnknownMethodError();
         }
         if (typeof content.commitment !== "string") {
             throw newInvalidMessageError();
         }
         const hashCommitment = content.commitment;
+        const sasMethods = content.short_authentication_string;
         const olmSAS = new global.Olm.SAS();
         try {
             this._sendToDevice("m.key.verification.key", {
@@ -115,12 +226,10 @@ export default class SAS extends Base {
                   + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.userId + this.deviceId
                   + this.transactionId;
-            const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
-                return acc + ('0' + elem.toString(16)).slice(-2);
-            }, "");
+            const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
             const verifySAS = new Promise((resolve, reject) => {
                 this.emit("show_sas", {
-                    sas,
+                    sas: generateSas(sasBytes, sasMethods),
                     confirm: () => {
                         this._sendMAC(olmSAS);
                         resolve();
@@ -151,18 +260,27 @@ export default class SAS extends Base {
               && content.message_authentication_codes instanceof Array
               && content.message_authentication_codes.includes("hmac-sha256")
               && content.short_authentication_string instanceof Array
-              && content.short_authentication_string.includes("hex"))) {
+              && (content.short_authentication_string.includes("decimal")
+                  || content.short_authentication_string.includes("emoji")))) {
             throw newUnknownMethodError();
         }
 
         const olmSAS = new global.Olm.SAS();
+        const sasMethods = [];
+        // FIXME: allow app to specify what SAS methods can be used
+        if (content.short_authentication_string.includes("decimal")) {
+            sasMethods.push("decimal");
+        }
+        if (content.short_authentication_string.includes("emoji")) {
+            sasMethods.push("emoji");
+        }
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
             this._sendToDevice("m.key.verification.accept", {
                 key_agreement_protocol: "curve25519",
                 hash: "sha256",
                 message_authentication_code: "hmac-sha256",
-                short_authentication_string: ["hex"],
+                short_authentication_string: sasMethods,
                 commitment: olmutil.sha256(commitmentStr),
             });
 
@@ -179,12 +297,10 @@ export default class SAS extends Base {
                   + this.userId + this.deviceId
                   + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.transactionId;
-            const sas = olmSAS.generate_bytes(sasInfo, 5).reduce((acc, elem) => {
-                return acc + ('0' + elem.toString(16)).slice(-2);
-            }, "");
+            const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
             const verifySAS = new Promise((resolve, reject) => {
                 this.emit("show_sas", {
-                    sas,
+                    sas: generateSas(sasBytes, sasMethods),
                     confirm: () => {
                         this._sendMAC(olmSAS);
                         resolve();
