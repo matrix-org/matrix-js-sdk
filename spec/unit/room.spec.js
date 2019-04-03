@@ -1318,6 +1318,9 @@ describe("Room", function() {
                     // events should already be MatrixEvents
                     return function(event) {return event;};
                 },
+                isCryptoEnabled() {
+                    return true;
+                },
                 isRoomEncrypted: function() {
                     return false;
                 },
