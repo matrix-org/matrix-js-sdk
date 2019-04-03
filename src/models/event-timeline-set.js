@@ -413,25 +413,30 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         const existingIsLive = existingTimeline === this._liveTimeline;
         const timelineIsLive = timeline === this._liveTimeline;
 
-        if (direction === EventTimeline.BACKWARDS && existingIsLive) {
+        const backwardsIsLive = direction === EventTimeline.BACKWARDS && existingIsLive;
+        const forwardsIsLive = direction === EventTimeline.FORWARDS && timelineIsLive;
+
+        if (backwardsIsLive || forwardsIsLive) {
             // The live timeline should never be spliced into a non-live position.
-            console.warn(
-                "Refusing to set a preceding existingTimeLine on our " +
-                "timeline as the existingTimeLine is live (" + existingTimeline + ")",
-            );
-        } else {
-            timeline.setNeighbouringTimeline(existingTimeline, direction);
+            // We use independent logging to better discover the problem at a glance.
+            console.warn({backwardsIsLive, forwardsIsLive}); // debugging
+            if (backwardsIsLive) {
+                console.warn(
+                    "Refusing to set a preceding existingTimeLine on our " +
+                    "timeline as the existingTimeLine is live (" + existingTimeline + ")",
+                );
+            }
+            if (forwardsIsLive) {
+                console.warn(
+                    "Refusing to set our preceding timeline on a existingTimeLine " +
+                    "as our timeline is live (" + timeline + ")",
+                );
+            }
+            continue; // abort splicing - try next event
         }
 
-        if (inverseDirection === EventTimeline.BACKWARDS && timelineIsLive) {
-            // The live timeline should never be spliced into a non-live position.
-            console.warn(
-                "Refusing to set our preceding timeline on a existingTimeLine " +
-                "as our timeline is live (" + timeline + ")",
-            );
-        } else {
-            existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
-        }
+        timeline.setNeighbouringTimeline(existingTimeline, direction);
+        existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
 
         timeline = existingTimeline;
         didUpdate = true;
