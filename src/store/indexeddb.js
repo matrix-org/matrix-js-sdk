@@ -20,6 +20,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import {MemoryStore} from "./memory";
 import utils from "../utils";
+import {EventEmitter} from 'events';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
 import User from "../models/user";
@@ -112,6 +113,7 @@ const IndexedDBStore = function IndexedDBStore(opts) {
     };
 };
 utils.inherits(IndexedDBStore, MemoryStore);
+utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
 
 IndexedDBStore.exists = function(indexedDB, dbName) {
     return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
@@ -286,6 +288,7 @@ function degradable(func, fallback) {
             return await func.call(this, ...args);
         } catch (e) {
             console.error("IndexedDBStore failure, degrading to MemoryStore", e);
+            this.emit("degraded", e);
             try {
                 // We try to delete IndexedDB after degrading since this store is only a
                 // cache (the app will still function correctly without the data).
