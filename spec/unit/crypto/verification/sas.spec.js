@@ -160,10 +160,25 @@ describe("SAS verification", function() {
         });
 
         it("should verify a key", async function() {
+            let macMethod;
+            const origSendToDevice = alice.sendToDevice;
+            bob.sendToDevice = function(type, map) {
+                if (type === "m.key.verification.accept") {
+                    macMethod = map[alice.getUserId()][alice.deviceId]
+                        .message_authentication_code;
+                }
+                return origSendToDevice.call(this, type, map);
+            };
+
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
             ]);
+
+            // make sure that it uses the preferred method
+            expect(macMethod).toBe("hkdf-hmac-sha256");
+
+            // make sure Alice and Bob verified each other
             expect(alice.setDeviceVerified)
                 .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
             expect(bob.setDeviceVerified)
@@ -173,6 +188,7 @@ describe("SAS verification", function() {
         it("should be able to verify using the old MAC", async function() {
             // pretend that Alice can only understand the old (incorrect) MAC,
             // and make sure that she can still verify with Bob
+            let macMethod;
             const origSendToDevice = alice.sendToDevice;
             alice.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.start") {
@@ -186,10 +202,21 @@ describe("SAS verification", function() {
                 }
                 return origSendToDevice.call(this, type, map);
             };
+            bob.sendToDevice = function(type, map) {
+                if (type === "m.key.verification.accept") {
+                    macMethod = map[alice.getUserId()][alice.deviceId]
+                        .message_authentication_code;
+                }
+                return origSendToDevice.call(this, type, map);
+            };
+
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
             ]);
+
+            expect(macMethod).toBe("hmac-sha256");
+
             expect(alice.setDeviceVerified)
                 .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
             expect(bob.setDeviceVerified)

@@ -281,12 +281,18 @@ export default class SAS extends Base {
 
     async _doRespondVerification() {
         let content = this.startEvent.getContent();
+        // Note: we intersect using our pre-made lists, rather than the sets,
+        // so that the result will be in our order of preference.  Then
+        // fetching the first element from the array will give our preferred
+        // method out of the ones offered by the other party.
         const keyAgreement
-              = intersection(content.key_agreement_protocols, KEY_AGREEMENT_SET)[0];
+              = intersection(
+                  KEY_AGREEMENT_LIST, new Set(content.key_agreement_protocols),
+              )[0];
         const hashMethod
-              = intersection(content.hashes, HASHES_SET)[0];
+              = intersection(HASHES_LIST, new Set(content.hashes))[0];
         const macMethod
-              = intersection(content.message_authentication_codes, MAC_SET)[0];
+              = intersection(MAC_LIST, new Set(content.message_authentication_codes))[0];
         // FIXME: allow app to specify what SAS methods can be used
         const sasMethods
               = intersection(content.short_authentication_string, SAS_SET);
