@@ -300,6 +300,13 @@ function degradable(func, fallback) {
             } catch (e) {
                 console.warn("IndexedDBStore delete after degrading failed", e);
             }
+            // Degrade the store from being an instance of `IndexedDBStore` to instead be
+            // an instance of `MemoryStore` so that future API calls use the memory path
+            // directly and skip IndexedDB entirely. This should be safe as
+            // `IndexedDBStore` already extends from `MemoryStore`, so we are making the
+            // store become its parent type in a way. The mutator methods of
+            // `IndexedDBStore` also maintain the state that `MemoryStore` uses (many are
+            // not overridden at all).
             Object.setPrototypeOf(this, MemoryStore.prototype);
             if (fallback) {
                 return await MemoryStore.prototype[fallback].call(this, ...args);
