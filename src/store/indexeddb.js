@@ -253,10 +253,12 @@ IndexedDBStore.prototype.setOutOfBandMembers = degradable(function(
     roomId,
     membershipEvents,
 ) {
+    MemoryStore.prototype.setOutOfBandMembers.call(this, roomId, membershipEvents);
     return this.backend.setOutOfBandMembers(roomId, membershipEvents);
 }, "setOutOfBandMembers");
 
 IndexedDBStore.prototype.clearOutOfBandMembers = degradable(function(roomId) {
+    MemoryStore.prototype.clearOutOfBandMembers.call(this);
     return this.backend.clearOutOfBandMembers(roomId);
 }, "clearOutOfBandMembers");
 
@@ -265,6 +267,7 @@ IndexedDBStore.prototype.getClientOptions = degradable(function() {
 }, "getClientOptions");
 
 IndexedDBStore.prototype.storeClientOptions = degradable(function(options) {
+    MemoryStore.prototype.storeClientOptions.call(this, options);
     return this.backend.storeClientOptions(options);
 }, "storeClientOptions");
 
