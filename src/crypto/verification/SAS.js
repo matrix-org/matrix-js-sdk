@@ -159,7 +159,7 @@ function generateSas(sasBytes, methods) {
 }
 
 const macMethods = {
-    "hmac-sha256-bits": "calculate_mac",
+    "hkdf-hmac-sha256": "calculate_mac",
     "hmac-sha256": "calculate_mac_long_kdf",
 };
 
@@ -169,7 +169,7 @@ const macMethods = {
  */
 const KEY_AGREEMENT_LIST = ["curve25519"];
 const HASHES_LIST = ["sha256"];
-const MAC_LIST = ["hmac-sha256-bits", "hmac-sha256"];
+const MAC_LIST = ["hkdf-hmac-sha256", "hmac-sha256"];
 const SAS_LIST = Object.keys(sasGenerators);
 
 const KEY_AGREEMENT_SET = new Set(KEY_AGREEMENT_LIST);
