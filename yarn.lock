@@ -3520,9 +3520,9 @@ object.pick@^1.3.0:
   dependencies:
     isobject "^3.0.1"
 
-"olm@https://matrix.org/packages/npm/olm/olm-3.1.0-pre1.tgz":
-  version "3.1.0-pre1"
-  resolved "https://matrix.org/packages/npm/olm/olm-3.1.0-pre1.tgz#54f14fa901ff5c81db516b3b2adb294b91726eaa"
+"olm@https://matrix.org/packages/npm/olm/olm-3.1.0-pre3.tgz":
+  version "3.1.0-pre3"
+  resolved "https://matrix.org/packages/npm/olm/olm-3.1.0-pre3.tgz#525aa8191b4b6fcb07a3aa6815687780b99be411"
 
 once@1.x, once@^1.3.0:
   version "1.4.0"
