@@ -446,6 +446,14 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // new information, we update the pagination token for whatever
     // timeline we ended up on.
     if (lastEventWasNew || !didUpdate) {
+        if (direction === EventTimeline.FORWARDS && timeline === this._liveTimeline) {
+            console.warn({lastEventWasNew, didUpdate}); // for debugging
+            console.warn(
+                `Refusing to set forwards pagination token of live timeline ` +
+                `${timeline} to ${paginationToken}`,
+            );
+            return;
+        }
         timeline.setPaginationToken(paginationToken, direction);
     }
 };
