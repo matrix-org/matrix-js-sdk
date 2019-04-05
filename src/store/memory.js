@@ -385,6 +385,7 @@ module.exports.MemoryStore.prototype = {
         };
         return Promise.resolve();
     },
+
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
@@ -395,6 +396,7 @@ module.exports.MemoryStore.prototype = {
     getOutOfBandMembers: function(roomId) {
         return Promise.resolve(this._oobMembers[roomId] || null);
     },
+
     /**
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
@@ -405,6 +407,11 @@ module.exports.MemoryStore.prototype = {
      */
     setOutOfBandMembers: function(roomId, membershipEvents) {
         this._oobMembers[roomId] = membershipEvents;
+        return Promise.resolve();
+    },
+
+    clearOutOfBandMembers: function() {
+        this._oobMembers = {};
         return Promise.resolve();
     },
 
