@@ -1,3 +1,23 @@
+/**
+ * @param {string} roomId
+ * @param {string} eventId
+ * @param {string=} txnId     transaction id. One will be made up if not
+ *    supplied.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.redactEvent = function(
+    roomId, eventId, txnId, callback,
+) {
+    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId/$tnxId", {
+        $roomId: roomId,
+        $eventId: eventId,
+        $txnId: txnId ? txnId : this.makeTxnId(),
+    });
+
+    return this._http.authedRequest(callback, "PUT", path, undefined, {});
+};
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
@@ -891,17 +911,24 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
 /**
  * @param {string} roomId
  * @param {string} eventId
+ * @param {string=} txnId     transaction id. One will be made up if not
+ *    supplied.
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.redactEvent = function(roomId, eventId, callback) {
-    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId", {
+MatrixBaseApis.prototype.redactEvent = function(
+    roomId, eventId, txnId, callback,
+) {
+    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId/$tnxId", {
         $roomId: roomId,
         $eventId: eventId,
+        $txnId: txnId ? txnId : this.makeTxnId(),
     });
-    return this._http.authedRequest(callback, "POST", path, undefined, {});
+
+    return this._http.authedRequest(callback, "PUT", path, undefined, {});
 };
+
 
 /**
  * @param {string} roomId
