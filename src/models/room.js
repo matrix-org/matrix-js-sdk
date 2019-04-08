@@ -598,6 +598,11 @@ Room.prototype._fixUpLegacyTimelineFields = function() {
 
 /**
  * Returns whether there are any devices in the room that are unverified
+ *
+ * Note: Callers should first check if crypto is enabled on this device. If it is
+ * disabled, then we aren't tracking room devices at all, so we can't answer this, and an
+ * error will be thrown.
+ *
  * @return {bool} the result
  */
 Room.prototype.hasUnverifiedDevices = async function() {
