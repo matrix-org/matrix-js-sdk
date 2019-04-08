@@ -1,3 +1,9 @@
+Changes in [1.0.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.4) (2019-04-08)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.3...v1.0.4)
+
+ * Hotfix: more logging and potential fixes for timeline corruption issue, see ticket https://github.com/vector-im/riot-web/issues/8593.
+
 Changes in [1.0.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.3) (2019-04-01)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.3-rc.1...v1.0.3)
@@ -211,7 +217,7 @@ Changes in [0.14.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
 
 BREAKING CHANGE
 ----------------
- 
+
  * js-sdk now uses Olm 3.0. Apps using Olm must update to 3.0 to
    continue using Olm with the js-sdk. The js-sdk will call Olm's
    init() method when the client is started.
