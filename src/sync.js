@@ -472,13 +472,16 @@ SyncApi.prototype.sync = function() {
 
     async function getPushRules() {
         try {
+            debuglog("Getting push rules...");
             const result = await client.getPushRules();
             debuglog("Got push rules");
 
             client.pushRules = result;
         } catch (err) {
+            console.error("Getting push rules failed", err);
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying push rules...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getPushRules();
             return;
@@ -487,22 +490,27 @@ SyncApi.prototype.sync = function() {
     }
 
     const checkLazyLoadStatus = async () => {
+        debuglog("Checking lazy load status...");
         if (this.opts.lazyLoadMembers && client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
+            debuglog("Checking server lazy load support...");
             const supported = await client.doesServerSupportLazyLoading();
             if (supported) {
+                debuglog("Creating and storing lazy load sync filter...");
                 this.opts.filter = await client.createFilter(
                     Filter.LAZY_LOADING_SYNC_FILTER,
                 );
+                debuglog("Created and stored lazy load sync filter");
             } else {
-                console.log("LL: lazy loading requested but not supported " +
+                debuglog("LL: lazy loading requested but not supported " +
                     "by server, so disabling");
                 this.opts.lazyLoadMembers = false;
             }
         }
         // need to vape the store when enabling LL and wasn't enabled before
+        debuglog("Checking whether lazy loading has changed in store...");
         const shouldClear = await this._wasLazyLoadingToggled(this.opts.lazyLoadMembers);
         if (shouldClear) {
             this._storeIsInvalid = true;
@@ -519,12 +527,15 @@ SyncApi.prototype.sync = function() {
         if (this.opts.lazyLoadMembers && this.opts.crypto) {
             this.opts.crypto.enableLazyLoading();
         }
+        debuglog("Storing client options...");
         await this.client._storeClientOptions();
+        debuglog("Stored client options");
 
         getFilter(); // Now get the filter and start syncing
     };
 
     async function getFilter() {
+        debuglog("Getting filter...");
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -539,8 +550,10 @@ SyncApi.prototype.sync = function() {
                 getFilterName(client.credentials.userId), filter,
             );
         } catch (err) {
+            console.error("Getting filter failed", err);
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying filter...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getFilter();
             return;
@@ -554,11 +567,12 @@ SyncApi.prototype.sync = function() {
         if (self._currentSyncRequest === null) {
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
-            console.log("Sending first sync request...");
+            debuglog("Sending first sync request...");
             self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
         }
 
         // Now wait for the saved sync to finish...
+        debuglog("Waiting for saved sync before starting sync processing...");
         await savedSyncPromise;
         self._sync({ filterId });
     }
@@ -570,13 +584,19 @@ SyncApi.prototype.sync = function() {
         // Pull the saved sync token out first, before the worker starts sending
         // all the sync data which could take a while. This will let us send our
         // first incremental sync request before we've processed our saved data.
+        debuglog("Getting saved sync token...");
         savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
+            debuglog("Got saved sync token");
             savedSyncToken = tok;
+            debuglog("Getting saved sync...");
             return client.store.getSavedSync();
         }).then((savedSync) => {
+            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
             if (savedSync) {
                 return self._syncFromCache(savedSync);
             }
+        }).catch(err => {
+            console.error("Getting saved sync failed", err);
         });
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
@@ -666,6 +686,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
  * @param {boolean} syncOptions.hasSyncedBefore
  */
 SyncApi.prototype._sync = async function(syncOptions) {
+    debuglog("Starting sync request processing...");
     const client = this.client;
 
     if (!this._running) {
@@ -704,7 +725,9 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // Reset after a successful sync
     this._failedSyncCount = 0;
 
+    debuglog("Storing sync data...");
     await client.store.setSyncData(data);
+    debuglog("Sync data stored");
 
     const syncEventData = {
         oldSyncToken: syncToken,
@@ -719,6 +742,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     try {
+        debuglog("Processing sync response...");
         await this._processSyncResponse(syncEventData, data);
     } catch(e) {
         // log the exception with stack if we have it, else fall back
