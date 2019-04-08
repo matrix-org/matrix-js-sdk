@@ -1076,9 +1076,17 @@ SyncApi.prototype._processSyncResponse = async function(
             room.setUnreadNotificationCount(
                 'total', joinObj.unread_notifications.notification_count,
             );
-            room.setUnreadNotificationCount(
-                'highlight', joinObj.unread_notifications.highlight_count,
-            );
+
+            // We track unread notifications ourselves in encrypted rooms, so don't
+            // bother setting it here. We trust our calculations better than the
+            // server's for this case, and therefore will assume that our non-zero
+            // count is accurate.
+            if (client.isRoomEncrypted(room.roomId)
+                && room.getUnreadNotificationCount('highlight') <= 0) {
+                room.setUnreadNotificationCount(
+                    'highlight', joinObj.unread_notifications.highlight_count,
+                );
+            }
         }
 
         room.updateMyMembership("join");

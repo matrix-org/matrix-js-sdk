@@ -242,19 +242,32 @@ function MatrixClient(opts) {
         const actions = this._pushProcessor.actionsForEvent(event);
         event.setPushActions(actions); // Might as well while we're here
 
+        const room = this.getRoom(event.getRoomId());
+        if (!room) return;
+
+        const currentCount = room.getUnreadNotificationCount("highlight");
+
         // Ensure the unread counts are kept up to date if the event is encrypted
+        // We also want to make sure that the notification count goes up if we already
+        // have encrypted events to avoid other code from resetting 'highlight' to zero.
         const oldHighlight = oldActions && oldActions.tweaks
             ? !!oldActions.tweaks.highlight : false;
         const newHighlight = actions && actions.tweaks
             ? !!actions.tweaks.highlight : false;
-        if (oldHighlight !== newHighlight) {
-            const room = this.getRoom(event.getRoomId());
+        if (oldHighlight !== newHighlight || currentCount > 0) {
             // TODO: Handle mentions received while the client is offline
             // See also https://github.com/vector-im/riot-web/issues/9069
-            if (room && !room.hasUserReadEvent(this.getUserId(), event.getId())) {
-                const current = room.getUnreadNotificationCount("highlight");
-                const newCount = newHighlight ? current + 1 : current - 1;
+            if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
+                let newCount = currentCount;
+                if (newHighlight && !oldHighlight) newCount++;
+                if (!newHighlight && oldHighlight) newCount--;
                 room.setUnreadNotificationCount("highlight", newCount);
+
+                // Fix 'Mentions Only' rooms from not having the right badge count
+                const totalCount = room.getUnreadNotificationCount('total');
+                if (totalCount < newCount) {
+                    room.setUnreadNotificationCount('total', newCount);
+                }
             }
         }
     });
