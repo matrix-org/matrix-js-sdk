@@ -445,9 +445,10 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixClient.prototype.getCapabilities = function() {
+    const now = new Date().getTime();
+
     if (this._cachedCapabilities) {
-        const now = new Date().getTime();
-        if (now - this._cachedCapabilities.lastUpdated <= CAPABILITIES_CACHE_MS) {
+        if (now < this._cachedCapabilities.expiration) {
             console.log("Returning cached capabilities");
             return Promise.resolve(this._cachedCapabilities.capabilities);
         }
@@ -459,9 +460,16 @@ MatrixClient.prototype.getCapabilities = function() {
     ).catch(() => null).then((r) => {
         if (!r) r = {};
         const capabilities = r["capabilities"] || {};
+
+        // If the capabilities missed the cache, cache it for a shorter amount
+        // of time to try and refresh them later.
+        const cacheMs = Object.keys(capabilities).length
+            ? CAPABILITIES_CACHE_MS
+            : 60000 + (Math.random() * 5000);
+
         this._cachedCapabilities = {
             capabilities: capabilities,
-            lastUpdated: new Date().getTime(),
+            expiration: now + cacheMs,
         };
 
         console.log("Caching capabilities: ", capabilities);
