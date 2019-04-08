@@ -1105,8 +1105,8 @@ SyncApi.prototype._processSyncResponse = async function(
             // bother setting it here. We trust our calculations better than the
             // server's for this case, and therefore will assume that our non-zero
             // count is accurate.
-            if (client.isRoomEncrypted(room.roomId)
-                && room.getUnreadNotificationCount('highlight') <= 0) {
+            const encrypted = client.isRoomEncrypted(room.roomId);
+            if (!encrypted || (encrypted && room.getUnreadNotificationCount('highlight') <= 0)) {
                 room.setUnreadNotificationCount(
                     'highlight', joinObj.unread_notifications.highlight_count,
                 );
