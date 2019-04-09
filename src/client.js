@@ -457,7 +457,10 @@ MatrixClient.prototype.getCapabilities = function() {
     // We swallow errors because we need a default object anyhow
     return this._http.authedRequest(
         undefined, "GET", "/capabilities",
-    ).catch(() => null).then((r) => {
+    ).catch((e) => {
+        console.error(e);
+        return null; // otherwise consume the error
+    }).then((r) => {
         if (!r) r = {};
         const capabilities = r["capabilities"] || {};
 
