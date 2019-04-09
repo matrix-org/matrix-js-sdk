@@ -499,9 +499,16 @@ SyncApi.prototype.sync = function() {
             const supported = await client.doesServerSupportLazyLoading();
             if (supported) {
                 debuglog("Creating and storing lazy load sync filter...");
-                this.opts.filter = await client.createFilter(
-                    Filter.LAZY_LOADING_SYNC_FILTER,
-                );
+                try {
+                    this.opts.filter = await client.createFilter(
+                        Filter.LAZY_LOADING_SYNC_FILTER,
+                    );
+                } catch (err) {
+                    console.error(
+                        "Creating and storing lazy load sync filter failed",
+                        err,
+                    );
+                }
                 debuglog("Created and stored lazy load sync filter");
             } else {
                 debuglog("LL: lazy loading requested but not supported " +
@@ -528,7 +535,11 @@ SyncApi.prototype.sync = function() {
             this.opts.crypto.enableLazyLoading();
         }
         debuglog("Storing client options...");
-        await this.client._storeClientOptions();
+        try {
+            await this.client._storeClientOptions();
+        } catch (err) {
+            console.error("Storing client options failed", err);
+        }
         debuglog("Stored client options");
 
         getFilter(); // Now get the filter and start syncing
