@@ -509,6 +509,7 @@ SyncApi.prototype.sync = function() {
                         "Creating and storing lazy load sync filter failed",
                         err,
                     );
+                    throw err;
                 }
             } else {
                 debuglog("LL: lazy loading requested but not supported " +
@@ -540,6 +541,7 @@ SyncApi.prototype.sync = function() {
             debuglog("Stored client options");
         } catch (err) {
             console.error("Storing client options failed", err);
+            throw err;
         }
 
         getFilter(); // Now get the filter and start syncing
