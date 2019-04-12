@@ -202,6 +202,8 @@ export class AutoDiscovery {
             } else {
                 // this can only ever be FAIL_PROMPT at this point.
                 clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
+                clientConfig["m.homeserver"].error =
+                    "Failed to get autodiscovery configuration from server";
             }
             return Promise.resolve(clientConfig);
         }
@@ -213,6 +215,7 @@ export class AutoDiscovery {
         );
         if (!hsUrl) {
             logger.error("Invalid base_url for m.homeserver");
+            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
             return Promise.resolve(clientConfig);
         }
 
@@ -222,6 +225,8 @@ export class AutoDiscovery {
         );
         if (!hsVersions || !hsVersions.raw["versions"]) {
             logger.error("Invalid /versions response");
+            clientConfig["m.homeserver"].error =
+                "Homeserver URL does not appear to be a valid Matrix homeserver";
             return Promise.resolve(clientConfig);
         }
 
@@ -263,6 +268,8 @@ export class AutoDiscovery {
             );
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
+                failingClientConfig["m.identity_server"].error =
+                    "Invalid base_url for m.identity_server";
                 return Promise.resolve(failingClientConfig);
             }
 
@@ -273,6 +280,8 @@ export class AutoDiscovery {
             );
             if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
                 logger.error("Invalid /api/v1 response");
+                failingClientConfig["m.identity_server"].error =
+                    "Identity server URL does not appear to be a valid identity server";
                 return Promise.resolve(failingClientConfig);
             }
         }
