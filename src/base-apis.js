@@ -891,7 +891,7 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
 /**
  * @param {string} roomId
  * @param {string} eventId
- * @param {string=} txnId     transaction id. One will be made up if not
+ * @param {string} [txnId]  transaction id. One will be made up if not
  *    supplied.
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
