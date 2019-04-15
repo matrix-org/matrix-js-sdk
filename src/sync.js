@@ -445,6 +445,16 @@ SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
     return false;
 };
 
+SyncApi.prototype._shouldAbortSync = function(error) {
+    if (err.errcode === "M_UNKNOWN_TOKEN") {
+        // The logout already happened, we just need to stop.
+        console.warn("Token no longer valid - assuming logout");
+        self.stop();
+        return true;
+    }
+    return false;
+};
+
 /**
  * Main entry point
  */
@@ -461,16 +471,6 @@ SyncApi.prototype.sync = function() {
 
     let savedSyncPromise = Promise.resolve();
     let savedSyncToken = null;
-
-    async function shouldAbortSync(err) {
-        if (err.errcode === "M_UNKNOWN_TOKEN") {
-            // The logout already happened, we just need to stop.
-            console.warn("Token no longer valid - assuming logout");
-            self.stop();
-            return true;
-        }
-        return false;
-    }
 
     // We need to do one-off checks before we can begin the /sync loop.
     // These are:
@@ -489,7 +489,7 @@ SyncApi.prototype.sync = function() {
             client.pushRules = result;
         } catch (err) {
             console.error("Getting push rules failed", err);
-            if (shouldAbortSync(err)) return;
+            if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             debuglog("Waiting for saved sync before retrying push rules...");
@@ -575,7 +575,7 @@ SyncApi.prototype.sync = function() {
             );
         } catch (err) {
             console.error("Getting filter failed", err);
-            if (shouldAbortSync(err)) return;
+            if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             debuglog("Waiting for saved sync before retrying filter...");
@@ -889,9 +889,7 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
     console.error("/sync error %s", err);
     console.error(err);
 
-    if (err.errcode === "M_UNKNOWN_TOKEN") {
-        console.warn("Access token no longer valid - stopping sync");
-        this.stop();
+    if(this._shouldAbortSync(err)) {
         return;
     }
 
