@@ -138,6 +138,160 @@ export class AutoDiscovery {
     static get SUCCESS() { return "SUCCESS"; }
 
     /**
+     * Validates and verifies client configuration information for purposes
+     * of logging in. Such information includes the homeserver URL
+     * and identity server URL the client would want. Additional details
+     * may also be included, and will be transparently brought into the
+     * response object unaltered.
+     * @param {string} wellknown The configuration object itself, as returned
+     * by the .well-known auto-discovery endpoint.
+     * @return {Promise<DiscoveredClientConfig>} Resolves to the verified
+     * configuration, which may include error states. Rejects on unexpected
+     * failure, not when verification fails.
+     */
+    static async fromDiscoveryConfig(wellknown) {
+        // Step 1 is to get the config, which is provided to us here.
+
+        // We default to an error state to make the first few checks easier to
+        // write. We'll update the properties of this object over the duration
+        // of this function.
+        const clientConfig = {
+            "m.homeserver": {
+                state: AutoDiscovery.FAIL_ERROR,
+                error: "Invalid homeserver discovery response",
+                base_url: null,
+            },
+            "m.identity_server": {
+                // Technically, we don't have a problem with the identity server
+                // config at this point.
+                state: AutoDiscovery.PROMPT,
+                error: null,
+                base_url: null,
+            },
+        };
+
+        if (!wellknown ||
+            !wellknown["m.homeserver"] ||
+            !wellknown["m.homeserver"]["base_url"]) {
+            logger.error("No m.homeserver key/base_url in config");
+
+            clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
+            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
+
+            return Promise.resolve(clientConfig);
+        }
+
+        // Step 2: Make sure the homeserver URL is valid *looking*. We'll make
+        // sure it points to a homeserver in Step 3.
+        const hsUrl = this._sanitizeWellKnownUrl(
+            wellknown["m.homeserver"]["base_url"],
+        );
+        if (!hsUrl) {
+            logger.error("Invalid base_url for m.homeserver");
+            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
+            return Promise.resolve(clientConfig);
+        }
+
+        // Step 3: Make sure the homeserver URL points to a homeserver.
+        const hsVersions = await this._fetchWellKnownObject(
+            `${hsUrl}/_matrix/client/versions`,
+        );
+        if (!hsVersions || !hsVersions.raw["versions"]) {
+            logger.error("Invalid /versions response");
+            clientConfig["m.homeserver"].error =
+                "Homeserver URL does not appear to be a valid Matrix homeserver";
+            return Promise.resolve(clientConfig);
+        }
+
+        // Step 4: Now that the homeserver looks valid, update our client config.
+        clientConfig["m.homeserver"] = {
+            state: AutoDiscovery.SUCCESS,
+            error: null,
+            base_url: hsUrl,
+        };
+
+        // Step 5: Try to pull out the identity server configuration
+        let isUrl = "";
+        if (wellknown["m.identity_server"]) {
+            // We prepare a failing identity server response to save lines later
+            // in this branch. Note that we also fail the homeserver check in the
+            // object because according to the spec we're supposed to FAIL_ERROR
+            // if *anything* goes wrong with the IS validation, including invalid
+            // format. This means we're supposed to stop discovery completely.
+            const failingClientConfig = {
+                "m.homeserver": {
+                    state: AutoDiscovery.FAIL_ERROR,
+                    error: "Invalid identity server discovery response",
+
+                    // We'll provide the base_url that was previously valid for
+                    // debugging purposes.
+                    base_url: clientConfig["m.homeserver"].base_url,
+                },
+                "m.identity_server": {
+                    state: AutoDiscovery.FAIL_ERROR,
+                    error: "Invalid identity server discovery response",
+                    base_url: null,
+                },
+            };
+
+            // Step 5a: Make sure the URL is valid *looking*. We'll make sure it
+            // points to an identity server in Step 5b.
+            isUrl = this._sanitizeWellKnownUrl(
+                wellknown["m.identity_server"]["base_url"],
+            );
+            if (!isUrl) {
+                logger.error("Invalid base_url for m.identity_server");
+                failingClientConfig["m.identity_server"].error =
+                    "Invalid base_url for m.identity_server";
+                return Promise.resolve(failingClientConfig);
+            }
+
+            // Step 5b: Verify there is an identity server listening on the provided
+            // URL.
+            const isResponse = await this._fetchWellKnownObject(
+                `${isUrl}/_matrix/identity/api/v1`,
+            );
+            if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
+                logger.error("Invalid /api/v1 response");
+                failingClientConfig["m.identity_server"].error =
+                    "Identity server URL does not appear to be a valid identity server";
+                return Promise.resolve(failingClientConfig);
+            }
+        }
+
+        // Step 6: Now that the identity server is valid, or never existed,
+        // populate the IS section.
+        if (isUrl && isUrl.length > 0) {
+            clientConfig["m.identity_server"] = {
+                state: AutoDiscovery.SUCCESS,
+                error: null,
+                base_url: isUrl,
+            };
+        }
+
+        // Step 7: Copy any other keys directly into the clientConfig. This is for
+        // things like custom configuration of services.
+        Object.keys(wellknown)
+            .map((k) => {
+                if (k === "m.homeserver" || k === "m.identity_server") {
+                    // Only copy selected parts of the config to avoid overwriting
+                    // important information.
+                    const notProps = ["error", "state", "base_url"];
+                    for (const prop of Object.keys(wellknown[k])) {
+                        if (notProps.includes(prop)) continue;
+                        clientConfig[k][prop] = wellknown[k][prop];
+                    }
+                } else {
+                    // Just copy the whole thing over otherwise
+                    clientConfig[k] = wellknown[k];
+                }
+            });
+
+        // Step 8: Give the config to the caller (finally)
+        return Promise.resolve(clientConfig);
+    }
+
+    /**
      * Attempts to automatically discover client configuration information
      * prior to logging in. Such information includes the homeserver URL
      * and identity server URL the client would want. Additional details
@@ -188,9 +342,7 @@ export class AutoDiscovery {
         const wellknown = await this._fetchWellKnownObject(
             `https://${domain}/.well-known/matrix/client`,
         );
-        if (!wellknown || wellknown.action !== "SUCCESS"
-            || !wellknown.raw["m.homeserver"]
-            || !wellknown.raw["m.homeserver"]["base_url"]) {
+        if (!wellknown || wellknown.action !== "SUCCESS") {
             logger.error("No m.homeserver key in well-known response");
             if (wellknown.reason) logger.error(wellknown.reason);
             if (wellknown.action === "IGNORE") {
@@ -208,102 +360,8 @@ export class AutoDiscovery {
             return Promise.resolve(clientConfig);
         }
 
-        // Step 2: Make sure the homeserver URL is valid *looking*. We'll make
-        // sure it points to a homeserver in Step 3.
-        const hsUrl = this._sanitizeWellKnownUrl(
-            wellknown.raw["m.homeserver"]["base_url"],
-        );
-        if (!hsUrl) {
-            logger.error("Invalid base_url for m.homeserver");
-            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
-            return Promise.resolve(clientConfig);
-        }
-
-        // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this._fetchWellKnownObject(
-            `${hsUrl}/_matrix/client/versions`,
-        );
-        if (!hsVersions || !hsVersions.raw["versions"]) {
-            logger.error("Invalid /versions response");
-            clientConfig["m.homeserver"].error =
-                "Homeserver URL does not appear to be a valid Matrix homeserver";
-            return Promise.resolve(clientConfig);
-        }
-
-        // Step 4: Now that the homeserver looks valid, update our client config.
-        clientConfig["m.homeserver"] = {
-            state: AutoDiscovery.SUCCESS,
-            error: null,
-            base_url: hsUrl,
-        };
-
-        // Step 5: Try to pull out the identity server configuration
-        let isUrl = "";
-        if (wellknown.raw["m.identity_server"]) {
-            // We prepare a failing identity server response to save lines later
-            // in this branch. Note that we also fail the homeserver check in the
-            // object because according to the spec we're supposed to FAIL_ERROR
-            // if *anything* goes wrong with the IS validation, including invalid
-            // format. This means we're supposed to stop discovery completely.
-            const failingClientConfig = {
-                "m.homeserver": {
-                    state: AutoDiscovery.FAIL_ERROR,
-                    error: "Invalid identity server discovery response",
-
-                    // We'll provide the base_url that was previously valid for
-                    // debugging purposes.
-                    base_url: clientConfig["m.homeserver"].base_url,
-                },
-                "m.identity_server": {
-                    state: AutoDiscovery.FAIL_ERROR,
-                    error: "Invalid identity server discovery response",
-                    base_url: null,
-                },
-            };
-
-            // Step 5a: Make sure the URL is valid *looking*. We'll make sure it
-            // points to an identity server in Step 5b.
-            isUrl = this._sanitizeWellKnownUrl(
-                wellknown.raw["m.identity_server"]["base_url"],
-            );
-            if (!isUrl) {
-                logger.error("Invalid base_url for m.identity_server");
-                failingClientConfig["m.identity_server"].error =
-                    "Invalid base_url for m.identity_server";
-                return Promise.resolve(failingClientConfig);
-            }
-
-            // Step 5b: Verify there is an identity server listening on the provided
-            // URL.
-            const isResponse = await this._fetchWellKnownObject(
-                `${isUrl}/_matrix/identity/api/v1`,
-            );
-            if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
-                logger.error("Invalid /api/v1 response");
-                failingClientConfig["m.identity_server"].error =
-                    "Identity server URL does not appear to be a valid identity server";
-                return Promise.resolve(failingClientConfig);
-            }
-        }
-
-        // Step 6: Now that the identity server is valid, or never existed,
-        // populate the IS section.
-        if (isUrl && isUrl.length > 0) {
-            clientConfig["m.identity_server"] = {
-                state: AutoDiscovery.SUCCESS,
-                error: null,
-                base_url: isUrl,
-            };
-        }
-
-        // Step 7: Copy any other keys directly into the clientConfig. This is for
-        // things like custom configuration of services.
-        Object.keys(wellknown.raw)
-            .filter((k) => k !== "m.homeserver" && k !== "m.identity_server")
-            .map((k) => clientConfig[k] = wellknown.raw[k]);
-
-        // Step 8: Give the config to the caller (finally)
-        return Promise.resolve(clientConfig);
+        // Step 2: Validate and parse the config
+        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw);
     }
 
     /**
