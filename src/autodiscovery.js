@@ -102,6 +102,56 @@ export class AutoDiscovery {
     // translate the meaning of the states in the spec, but also
     // support our own if needed.
 
+    static get ERROR_INVALID() {
+        return "Invalid homeserver discovery response";
+    }
+
+    static get ERROR_GENERIC_FAILURE() {
+        return "Failed to get autodiscovery configuration from server";
+    }
+
+    static get ERROR_INVALID_HS_BASE_URL() {
+        return "Invalid base_url for m.homeserver";
+    }
+
+    static get ERROR_INVALID_HOMESERVER() {
+        return "Homeserver URL does not appear to be a valid Matrix homeserver";
+    }
+
+    static get ERROR_INVALID_IS_BASE_URL() {
+        return "Invalid base_url for m.identity_server";
+    }
+
+    static get ERROR_INVALID_IDENTITY_SERVER() {
+        return "Identity server URL does not appear to be a valid identity server";
+    }
+
+    static get ERROR_INVALID_IS() {
+        return "Invalid identity server discovery response";
+    }
+
+    static get ERROR_MISSING_WELLKNOWN() {
+        return "No .well-known JSON file found";
+    }
+
+    static get ERROR_INVALID_JSON() {
+        return "Invalid JSON";
+    }
+
+    static get ALL_ERRORS() {
+        return [
+            AutoDiscovery.ERROR_INVALID,
+            AutoDiscovery.ERROR_GENERIC_FAILURE,
+            AutoDiscovery.ERROR_INVALID_HS_BASE_URL,
+            AutoDiscovery.ERROR_INVALID_HOMESERVER,
+            AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
+            AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER,
+            AutoDiscovery.ERROR_INVALID_IS,
+            AutoDiscovery.ERROR_MISSING_WELLKNOWN,
+            AutoDiscovery.ERROR_INVALID_JSON,
+        ];
+    }
+
     /**
      * The auto discovery failed. The client is expected to communicate
      * the error to the user and refuse logging in.
@@ -158,7 +208,7 @@ export class AutoDiscovery {
         const clientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
-                error: "Invalid homeserver discovery response",
+                error: AutoDiscovery.ERROR_INVALID,
                 base_url: null,
             },
             "m.identity_server": {
@@ -176,7 +226,7 @@ export class AutoDiscovery {
             logger.error("No m.homeserver key/base_url in config");
 
             clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
-            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_GENERIC_FAILURE;
 
             return Promise.resolve(clientConfig);
         }
@@ -188,7 +238,7 @@ export class AutoDiscovery {
         );
         if (!hsUrl) {
             logger.error("Invalid base_url for m.homeserver");
-            clientConfig["m.homeserver"].error = "Invalid base_url for m.homeserver";
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
             return Promise.resolve(clientConfig);
         }
 
@@ -198,8 +248,7 @@ export class AutoDiscovery {
         );
         if (!hsVersions || !hsVersions.raw["versions"]) {
             logger.error("Invalid /versions response");
-            clientConfig["m.homeserver"].error =
-                "Homeserver URL does not appear to be a valid Matrix homeserver";
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
             return Promise.resolve(clientConfig);
         }
 
@@ -221,7 +270,7 @@ export class AutoDiscovery {
             const failingClientConfig = {
                 "m.homeserver": {
                     state: AutoDiscovery.FAIL_ERROR,
-                    error: "Invalid identity server discovery response",
+                    error: AutoDiscovery.ERROR_INVALID_IS,
 
                     // We'll provide the base_url that was previously valid for
                     // debugging purposes.
@@ -229,7 +278,7 @@ export class AutoDiscovery {
                 },
                 "m.identity_server": {
                     state: AutoDiscovery.FAIL_ERROR,
-                    error: "Invalid identity server discovery response",
+                    error: AutoDiscovery.ERROR_INVALID_IS,
                     base_url: null,
                 },
             };
@@ -242,7 +291,7 @@ export class AutoDiscovery {
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
                 failingClientConfig["m.identity_server"].error =
-                    "Invalid base_url for m.identity_server";
+                    AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
                 return Promise.resolve(failingClientConfig);
             }
 
@@ -254,7 +303,7 @@ export class AutoDiscovery {
             if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
                 logger.error("Invalid /api/v1 response");
                 failingClientConfig["m.identity_server"].error =
-                    "Identity server URL does not appear to be a valid identity server";
+                    AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
                 return Promise.resolve(failingClientConfig);
             }
         }
@@ -432,7 +481,7 @@ export class AutoDiscovery {
                         let reason = (err ? err.message : null) || "General failure";
                         if (response.statusCode === 404) {
                             action = "IGNORE";
-                            reason = "No .well-known JSON file found";
+                            reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
                         }
                         resolve({raw: {}, action: action, reason: reason, error: err});
                         return;
@@ -441,12 +490,15 @@ export class AutoDiscovery {
                     try {
                         resolve({raw: JSON.parse(body), action: "SUCCESS"});
                     } catch (e) {
-                        let reason = "General failure";
-                        if (e.name === "SyntaxError") reason = "Invalid JSON";
+                        let reason = AutoDiscovery.ERROR_INVALID;
+                        if (e.name === "SyntaxError") {
+                            reason = AutoDiscovery.ERROR_INVALID_JSON;
+                        }
                         resolve({
                             raw: {},
                             action: "FAIL_PROMPT",
-                            reason: reason, error: e,
+                            reason: reason,
+                            error: e,
                         });
                     }
                 },
