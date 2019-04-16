@@ -318,18 +318,18 @@ specification.
 
 To provide the Olm library in a browser application:
 
- * download the transpiled libolm (from https://matrix.org/packages/npm/olm/).
+ * download the transpiled libolm (from https://packages.matrix.org/npm/olm/).
  * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
  
 To provide the Olm library in a node.js application:
 
- * ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``
+ * ``yarn add https://packages.matrix.org/npm/olm/olm-3.0.0.tgz``
    (replace the URL with the latest version you want to use from
-    https://matrix.org/packages/npm/olm/)
+    https://packages.matrix.org/npm/olm/)
  * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
 
 If you want to package Olm as dependency for your node.js application, you can
-use ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``. If your
+use ``yarn add https://packages.matrix.org/npm/olm/olm-3.0.0.tgz``. If your
 application also works without e2e crypto enabled, add ``--optional`` to mark it
 as an optional dependency.
 
