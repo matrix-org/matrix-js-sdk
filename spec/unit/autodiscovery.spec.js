@@ -94,7 +94,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -117,7 +117,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -140,7 +140,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -163,7 +163,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID,
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -191,7 +191,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID_HS_BASE_URL,
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -217,7 +217,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_GENERIC_FAILURE,
+                        error: AutoDiscovery.ERROR_INVALID_HS_BASE_URL,
                         base_url: null,
                     },
                     "m.identity_server": {

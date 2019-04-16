@@ -220,10 +220,17 @@ export class AutoDiscovery {
             },
         };
 
-        if (!wellknown ||
-            !wellknown["m.homeserver"] ||
-            !wellknown["m.homeserver"]["base_url"]) {
-            logger.error("No m.homeserver key/base_url in config");
+        if (!wellknown || !wellknown["m.homeserver"]) {
+            logger.error("No m.homeserver key in config");
+
+            clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID;
+
+            return Promise.resolve(clientConfig);
+        }
+
+        if (!wellknown["m.homeserver"]["base_url"]) {
+            logger.error("No m.homeserver base_url in config");
 
             clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
@@ -392,7 +399,7 @@ export class AutoDiscovery {
             `https://${domain}/.well-known/matrix/client`,
         );
         if (!wellknown || wellknown.action !== "SUCCESS") {
-            logger.error("No m.homeserver key in well-known response");
+            logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
             if (wellknown.action === "IGNORE") {
                 clientConfig["m.homeserver"] = {
@@ -403,7 +410,7 @@ export class AutoDiscovery {
             } else {
                 // this can only ever be FAIL_PROMPT at this point.
                 clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
-                clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_GENERIC_FAILURE;
+                clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID;
             }
             return Promise.resolve(clientConfig);
         }
