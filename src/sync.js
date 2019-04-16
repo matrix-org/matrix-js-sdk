@@ -1104,7 +1104,6 @@ SyncApi.prototype._processSyncResponse = async function(
         const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
 
-        room.updateMyMembership("invite");
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
             room.recalculate();
@@ -1114,6 +1113,7 @@ SyncApi.prototype._processSyncResponse = async function(
         stateEvents.forEach(function(e) {
             client.emit("event", e);
         });
+        room.updateMyMembership("invite");
     });
 
     // Handle joins
@@ -1142,8 +1142,6 @@ SyncApi.prototype._processSyncResponse = async function(
                 );
             }
         }
-
-        room.updateMyMembership("join");
 
         joinObj.timeline = joinObj.timeline || {};
 
@@ -1257,6 +1255,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.updateMyMembership("join");
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -1268,8 +1268,6 @@ SyncApi.prototype._processSyncResponse = async function(
             self._mapSyncEventsFormat(leaveObj.timeline, room);
         const accountDataEvents =
             self._mapSyncEventsFormat(leaveObj.account_data);
-
-        room.updateMyMembership("leave");
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
         room.addAccountData(accountDataEvents);
@@ -1291,6 +1289,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.updateMyMembership("leave");
     });
 
     // update the notification timeline, if appropriate.
