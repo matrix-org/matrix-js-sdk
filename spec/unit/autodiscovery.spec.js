@@ -94,7 +94,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -117,7 +117,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -140,7 +140,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -163,7 +163,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -191,7 +191,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -217,7 +217,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_PROMPT",
-                        error: "Invalid homeserver discovery response",
+                        error: "Failed to get autodiscovery configuration from server",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -245,7 +245,7 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
-                        error: "Invalid homeserver discovery response",
+                        error: "Invalid base_url for m.homeserver",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -274,7 +274,8 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
-                        error: "Invalid homeserver discovery response",
+                        error: "Homeserver URL does not appear to be a " +
+                            "valid Matrix homeserver",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -303,7 +304,8 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
-                        error: "Invalid homeserver discovery response",
+                        error: "Homeserver URL does not appear to be a " +
+                            "valid Matrix homeserver",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -334,7 +336,8 @@ describe("AutoDiscovery", function() {
                 const expected = {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
-                        error: "Invalid homeserver discovery response",
+                        error: "Homeserver URL does not appear to be a " +
+                            "valid Matrix homeserver",
                         base_url: null,
                     },
                     "m.identity_server": {
@@ -446,7 +449,7 @@ describe("AutoDiscovery", function() {
                     },
                     "m.identity_server": {
                         state: "FAIL_ERROR",
-                        error: "Invalid identity server discovery response",
+                        error: "Invalid base_url for m.identity_server",
                         base_url: null,
                     },
                 };
@@ -486,7 +489,7 @@ describe("AutoDiscovery", function() {
                     },
                     "m.identity_server": {
                         state: "FAIL_ERROR",
-                        error: "Invalid identity server discovery response",
+                        error: "Invalid base_url for m.identity_server",
                         base_url: null,
                     },
                 };
@@ -527,7 +530,8 @@ describe("AutoDiscovery", function() {
                     },
                     "m.identity_server": {
                         state: "FAIL_ERROR",
-                        error: "Invalid identity server discovery response",
+                        error: "Identity server URL does not appear to be a " +
+                            "valid identity server",
                         base_url: null,
                     },
                 };
@@ -568,7 +572,8 @@ describe("AutoDiscovery", function() {
                     },
                     "m.identity_server": {
                         state: "FAIL_ERROR",
-                        error: "Invalid identity server discovery response",
+                        error: "Identity server URL does not appear to be a " +
+                            "valid identity server",
                         base_url: null,
                     },
                 };
