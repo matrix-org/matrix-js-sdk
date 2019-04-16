@@ -446,7 +446,7 @@ SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
 };
 
 SyncApi.prototype._shouldAbortSync = function(error) {
-    if (err.errcode === "M_UNKNOWN_TOKEN") {
+    if (error.errcode === "M_UNKNOWN_TOKEN") {
         // The logout already happened, we just need to stop.
         console.warn("Token no longer valid - assuming logout");
         self.stop();
