@@ -226,7 +226,7 @@ export class AutoDiscovery {
             logger.error("No m.homeserver key/base_url in config");
 
             clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
-            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_GENERIC_FAILURE;
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
 
             return Promise.resolve(clientConfig);
         }
@@ -374,7 +374,7 @@ export class AutoDiscovery {
         const clientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
-                error: "Invalid homeserver discovery response",
+                error: AutoDiscovery.ERROR_INVALID,
                 base_url: null,
             },
             "m.identity_server": {
@@ -403,8 +403,7 @@ export class AutoDiscovery {
             } else {
                 // this can only ever be FAIL_PROMPT at this point.
                 clientConfig["m.homeserver"].state = AutoDiscovery.FAIL_PROMPT;
-                clientConfig["m.homeserver"].error =
-                    "Failed to get autodiscovery configuration from server";
+                clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_GENERIC_FAILURE;
             }
             return Promise.resolve(clientConfig);
         }
