@@ -449,7 +449,7 @@ SyncApi.prototype._shouldAbortSync = function(error) {
     if (error.errcode === "M_UNKNOWN_TOKEN") {
         // The logout already happened, we just need to stop.
         console.warn("Token no longer valid - assuming logout");
-        self.stop();
+        this.stop();
         return true;
     }
     return false;

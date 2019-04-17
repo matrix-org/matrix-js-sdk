@@ -157,7 +157,7 @@ describe("MatrixClient events", function() {
                     return;
                 }
 
-                expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
+                expect(event.event).toMatch(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
                     SYNC_DATA.presence.events[0].content.presence,
                 );
