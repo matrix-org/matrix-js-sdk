@@ -331,7 +331,7 @@ export class AutoDiscovery {
             .map((k) => {
                 if (k === "m.homeserver" || k === "m.identity_server") {
                     // Only copy selected parts of the config to avoid overwriting
-                    // important information.
+                    // properties computed by the validation logic above.
                     const notProps = ["error", "state", "base_url"];
                     for (const prop of Object.keys(wellknown[k])) {
                         if (notProps.includes(prop)) continue;
