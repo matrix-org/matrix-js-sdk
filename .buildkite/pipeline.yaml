@@ -22,3 +22,13 @@ steps:
     plugins:
       - docker#v3.0.1:
           image: "node:10"
+
+  - wait
+
+  - label: "🐴 Trigger matrix-react-sdk"
+    trigger: "matrix-react"
+    branches: "develop"
+    build:
+        branch: "develop"
+        message: "[js-sdk] ${BUILDKITE_MESSAGE}"
+    async: true

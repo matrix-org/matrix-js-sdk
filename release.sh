@@ -172,10 +172,10 @@ git commit package.json $pkglock -m "$tag"
 
 
 # figure out if we should be signing this release
-signing_id=
-if [ -f release_config.yaml ]; then
-    signing_id=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']"`
-fi
+signing_id=releases@riot.im
+#if [ -f release_config.yaml ]; then
+    #signing_id=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']"`
+#fi
 
 
 # If there is a 'dist' script in the package.json,
