@@ -35,6 +35,7 @@ import SskInfo from './sskinfo';
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
+import { CrossSigningInfo, CrossSigningLevel, CrossSigningVerification } from './CrossSigning';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -196,6 +197,14 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._lastNewSessionForced = {};
 
     this._verificationTransactions = new Map();
+
+    this._crossSigningInfo = new CrossSigningInfo(userId);
+    this._crossSigningInfo.on("cross-signing:savePrivateKeys", (...args) => {
+        this._baseApis.emit("cross-signing:savePrivateKeys", ...args);
+    });
+    this._crossSigningInfo.on("cross-signing:getKey", (...args) => {
+        this._baseApis.emit("cross-signing:getKey", ...args);
+    });
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -249,6 +258,74 @@ Crypto.prototype.init = async function() {
 
     console.log("Crypto: checking for key backup...");
     this._checkAndStartKeyBackup();
+};
+
+/**
+ * Generate new cross-signing keys.
+ *
+ * @param {CrossSigningLevel} level the level of cross-signing to reset.  New
+ * keys will be created for the given level and below.  Defaults to
+ * regenerating all keys.
+ */
+Crypto.prototype.resetCrossSigningKeys = async function(level) {
+    await this._crossSigningInfo.resetKeys(level);
+};
+
+/**
+ * Set the user's cross-signing keys to use.
+ *
+ * @param {object} keys A mapping of key type to key data.
+ */
+Crypto.prototype.setCrossSigningKeys = function(keys) {
+    this._crossSigningInfo.setKeys(keys);
+};
+
+/**
+ * Check whether a given user is trusted.
+ *
+ * @param {string} userId The ID of the user to check.
+ *
+ * @returns {integer} a bit mask indicating how the user is trusted (if at all)
+ *  - returnValue & 1: unused
+ *  - returnValue & 2: trust-on-first-use cross-signing key
+ *  - returnValue & 4: user's cross-signing key is verified
+ *
+ * TODO: is this a good way of representing it?  Or we could return an object
+ * with different keys, or a set?  The advantage of doing it this way is that
+ * you can define which methods you want to use, "&" with the appopriate mask,
+ * then test for truthiness.  Or if you want to just trust everything, then use
+ * the value alone.  However, I wonder if bit masks are too obscure...
+ */
+Crypto.prototype.checkUserTrust = function(userId) {
+    const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+    if (!userCrossSigning) {
+        return 0;
+    }
+    return this._crossSigningInfo.checkUserTrust(userCrossSigning) << 1;
+};
+
+/**
+ * Check whether a given device is trusted.
+ *
+ * @param {string} userId The ID of the user whose devices is to be checked.
+ * @param {string} deviceId The ID of the device to check
+ *
+ * @returns {integer} a bit mask indicating how the user is trusted (if at all)
+ *  - returnValue & 1: device marked as verified
+ *  - returnValue & 2: trust-on-first-use cross-signing key
+ *  - returnValue & 4: user's cross-signing key is verified and device is signed
+ *
+ * TODO: see checkUserTrust
+ */
+Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
+    const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+    const device = this._deviceList.getStoredDevice(userId, deviceId);
+    let rv = 0;
+    if (device.isVerified()) {
+        rv |= 1;
+    }
+    rv |= this._crossSigningInfo.checkDeviceTrust(userCrossSigning, device) << 1;
+    return rv;
 };
 
 /*
@@ -906,6 +983,24 @@ Crypto.prototype.setSskVerification = async function(userId, verified) {
 Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
+    const xsk = this._deviceList.getStoredCrossSigningForUser(userId);
+    if (xsk.getId() === deviceId) {
+        if (verified) {
+            xsk.verified = CrossSigningVerification.VERIFIED;
+            const device = await this._crossSigningInfo.signUser(xsk);
+            // FIXME: mark xsk as dirty in device list
+            this._baseApis.uploadKeySignatures({
+                [userId]: {
+                    [deviceId]: device,
+                },
+            });
+            return device;
+        } else {
+            // FIXME: ???
+        }
+        return;
+    }
+
     const devices = this._deviceList.getRawStoredDevicesForUser(userId);
     if (!devices || !devices[deviceId]) {
         throw new Error("Unknown device " + userId + ":" + deviceId);
@@ -937,6 +1032,18 @@ Crypto.prototype.setDeviceVerification = async function(
         this._deviceList.storeDevicesForUser(userId, devices);
         this._deviceList.saveIfDirty();
     }
+
+    // do cross-signing
+    if (verified && userId === this._userId) {
+        const device = await this._crossSigningInfo.signDevice(userId, dev);
+        // FIXME: mark device as dirty in device list
+        this._baseApis.uploadKeySignatures({
+            [userId]: {
+                [deviceId]: device,
+            },
+        });
+    }
+
     return DeviceInfo.fromStorage(dev, deviceId);
 };
 

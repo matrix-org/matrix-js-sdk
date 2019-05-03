@@ -27,7 +27,7 @@ import {EventEmitter} from 'events';
 
 import logger from '../logger';
 import DeviceInfo from './deviceinfo';
-import SskInfo from './sskinfo';
+import {CrossSigningInfo, CrossSigningVerification} from './CrossSigning';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
@@ -78,7 +78,7 @@ export default class DeviceList extends EventEmitter {
         // userId -> {
         //     [key info]
         // }
-        this._ssks = {};
+        this._crossSigningInfo = {};
 
         // map of identity keys to the user who owns it
         this._userByIdentityKey = {};
@@ -345,18 +345,18 @@ export default class DeviceList extends EventEmitter {
         return this._devices[userId];
     }
 
-    getRawStoredSskForUser(userId) {
-        return this._ssks[userId];
+    getRawStoredCrossSigningForUser(userId) {
+        return this._crossSigningInfo[userId];
     }
 
-    getStoredSskForUser(userId) {
-        if (!this._ssks[userId]) return null;
+    getStoredCrossSigningForUser(userId) {
+        if (!this._crossSigningInfo[userId]) return null;
 
-        return SskInfo.fromStorage(this._ssks[userId]);
+        return CrossSigningInfo.fromStorage(this._crossSigningInfo[userId], userId);
     }
 
-    storeSskForUser(userId, ssk) {
-        this._ssks[userId] = ssk;
+    storeCrossSigningForUser(userId, info) {
+        this._crossSigningInfo[userId] = info;
         this._dirty = true;
     }
 
@@ -587,8 +587,8 @@ export default class DeviceList extends EventEmitter {
         }
     }
 
-    setRawStoredSskForUser(userId, ssk) {
-        this._ssks[userId] = ssk;
+    setRawStoredCrossSigningForUser(userId, info) {
+        this._crossSigningInfo[userId] = info;
     }
 
     /**
@@ -838,6 +838,7 @@ class DeviceListUpdateSerialiser {
 
 async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         userResult) {
+    // FIXME: this isn't correct any more
     let updated = false;
 
     // remove any devices in the store which aren't in the response
@@ -885,6 +886,7 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
 async function _updateStoredSelfSigningKeyForUser(
     _olmDevice, userId, userStore, userResult,
 ) {
+    // FIXME: this function may need modifying
     let updated = false;
 
     if (userResult.user_id !== userId) {
@@ -925,8 +927,6 @@ async function _updateStoredSelfSigningKeyForUser(
         userStore.user_id = userResult.user_id;
         userStore.usage = userResult.usage;
         userStore.keys = userResult.keys;
-        // reset verification status since its now a new key
-        userStore.verified = SskInfo.SskVerification.UNVERIFIED;
     }
 
     return updated;

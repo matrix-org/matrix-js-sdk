@@ -302,7 +302,7 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
-     * Get the account keys fort cross-signing (eg. self-signing key,
+     * Get the account keys for cross-signing (eg. self-signing key,
      * user signing key).
      *
      * @param {*} txn An active transaction. See doTxn().

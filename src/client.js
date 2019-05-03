@@ -763,6 +763,29 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
+ * returns a function that just calls the corresponding function from this._crypto.
+ *
+ * @param {string} name the function to call
+ *
+ * @return {Function} a wrapper function
+ */
+function wrapCryptoFunc(name) {
+    return function(...args) {
+        if (!this._crypto) { // eslint-disable-line no-invalid-this
+            throw new Error("End-to-end encryption disabled");
+        }
+
+        return this._crypto[name](...args); // eslint-disable-line no-invalid-this
+    };
+}
+
+MatrixClient.prototype.checkUserTrust
+    = wrapCryptoFunc("checkUserTrust");
+
+MatrixClient.prototype.checkDeviceTrust
+    = wrapCryptoFunc("checkDeviceTrust");
+
+/**
  * Get e2e information on the device that sent an event
  *
  * @param {MatrixEvent} event event to be checked
@@ -792,6 +815,12 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
     }
     return device.isVerified();
 };
+
+MatrixClient.prototype.resetCrossSigningKeys
+    = wrapCryptoFunc("resetCrossSigningKeys");
+
+MatrixClient.prototype.setCrossSigningKeys
+    = wrapCryptoFunc("setCrossSigningKeys");
 
 /**
  * Cancel a room key request for this event if one is ongoing and resend the
