@@ -92,5 +92,8 @@
     "transform": [
       "sourceify"
     ]
+  },
+  "resolutions": {
+    "bs58/base-x": "3.0.4"
   }
 }
