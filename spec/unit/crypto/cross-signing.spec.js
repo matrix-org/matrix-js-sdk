@@ -69,7 +69,6 @@ describe("Cross Signing", function() {
         });
         // Alice verifies Bob's key
         alice.on("cross-signing:getKey", function(e) {
-            console.log(e);
             expect(e.type).toBe("user_signing");
             e.done(privateKeys.userSigning);
         });
@@ -102,10 +101,8 @@ describe("Cross Signing", function() {
         // set Alices' cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
-            console.log("save private keys");
             privateKeys = e;
         });
-        console.log("reset cross signing keys");
         alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
         const bobSigning = new global.Olm.PkSigning();
