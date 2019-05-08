@@ -20,6 +20,7 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
+import Relations from './relations';
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -54,22 +55,38 @@ if (DEBUG) {
  * map from event_id to timeline and index.
  *
  * @constructor
- * @param {?Room} room      the optional room for this timelineSet
- * @param {Object} opts     hash of options inherited from Room.
- *      opts.timelineSupport gives whether timeline support is enabled
- *      opts.filter is the filter object, if any, for this timelineSet.
+ * @param {?Room} room
+ * Room for this timelineSet. May be null for non-room cases, such as the
+ * notification timeline.
+ * @param {Object} opts Options inherited from Room.
+ *
+ * @param {boolean} [opts.timelineSupport = false]
+ * Set to true to enable improved timeline support.
+ * @param {Object} [opts.filter = null]
+ * The filter object, if any, for this timelineSet.
+ * @param {boolean} [opts.unstableClientRelationAggregation = false]
+ * Optional. Set to true to enable client-side aggregation of event relations
+ * via `getRelationsForEvent`.
+ * This feature is currently unstable and the API may change without notice.
  */
 function EventTimelineSet(room, opts) {
     this.room = room;
 
     this._timelineSupport = Boolean(opts.timelineSupport);
     this._liveTimeline = new EventTimeline(this);
+    this._unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
     // just a list - *not* ordered.
     this._timelines = [this._liveTimeline];
     this._eventIdToTimeline = {};
 
     this._filter = opts.filter || null;
+
+    if (this._unstableClientRelationAggregation) {
+        // A tree of objects to access a set of relations for an event, as in:
+        // this._relations[relatesToEventId][relationType][relationEventType]
+        this._relations = {};
+    }
 }
 utils.inherits(EventTimelineSet, EventEmitter);
 
@@ -523,6 +540,8 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
     timeline.addEvent(event, toStartOfTimeline);
     this._eventIdToTimeline[eventId] = timeline;
 
+    this._aggregateRelations(event);
+
     const data = {
         timeline: timeline,
         liveEvent: !toStartOfTimeline && timeline == this._liveTimeline,
@@ -655,6 +674,80 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
 
     // the timelines are not contiguous.
     return null;
+};
+
+/**
+ * Get a collection of relations to a given event in this timeline set.
+ *
+ * @param {String} eventId
+ * The ID of the event that you'd like to access relation events for.
+ * For example, with annotations, this would be the ID of the event being annotated.
+ * @param {String} relationType
+ * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
+ * @param {String} eventType
+ * The relation event's type, such as "m.reaction", etc.
+ *
+ * @returns {Relations}
+ * A container for relation events.
+ */
+EventTimelineSet.prototype.getRelationsForEvent = function(
+    eventId, relationType, eventType,
+) {
+    if (!this._unstableClientRelationAggregation) {
+        throw new Error("Client-side relation aggregation is disabled");
+    }
+
+    if (!eventId || !relationType || !eventType) {
+        throw new Error("Invalid arguments for `getRelationsForEvent`");
+    }
+
+    // debuglog("Getting relations for: ", eventId, relationType, eventType);
+
+    const relationsForEvent = this._relations[eventId] || {};
+    const relationsWithRelType = relationsForEvent[relationType] || {};
+    return relationsWithRelType[eventType];
+};
+
+/**
+ * Add relation events to the relevant relation collection.
+ *
+ * @param {MatrixEvent} event
+ * The new relation event to be aggregated.
+ */
+EventTimelineSet.prototype._aggregateRelations = function(event) {
+    if (!this._unstableClientRelationAggregation) {
+        return;
+    }
+
+    const content = event.getContent();
+    const relation = content && content["m.relates_to"];
+    if (!relation || !relation.rel_type || !relation.event_id) {
+        return;
+    }
+
+    const relatesToEventId = relation.event_id;
+    const relationType = relation.rel_type;
+    const eventType = event.getType();
+
+    // debuglog("Aggregating relation: ", event.getId(), eventType, relation);
+
+    let relationsForEvent = this._relations[relatesToEventId];
+    if (!relationsForEvent) {
+        relationsForEvent = this._relations[relatesToEventId] = {};
+    }
+    let relationsWithRelType = relationsForEvent[relationType];
+    if (!relationsWithRelType) {
+        relationsWithRelType = relationsForEvent[relationType] = {};
+    }
+    let relationsWithEventType = relationsWithRelType[eventType];
+    if (!relationsWithEventType) {
+        relationsWithEventType = relationsWithRelType[eventType] = new Relations(
+            relationType,
+            eventType,
+        );
+    }
+
+    relationsWithEventType.addEvent(event);
 };
 
 /**

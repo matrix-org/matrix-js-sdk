@@ -92,9 +92,12 @@ function synthesizeReceipt(userId, event, receiptType) {
  * "<b>detached</b>", pending messages will appear in a separate list,
  * accessbile via {@link module:models/room#getPendingEvents}. Default:
  * "chronological".
- *
  * @param {boolean} [opts.timelineSupport = false] Set to true to enable improved
  * timeline support.
+ * @param {boolean} [opts.unstableClientRelationAggregation = false]
+ * Optional. Set to true to enable client-side aggregation of event relations
+ * via `EventTimelineSet#getRelationsForEvent`.
+ * This feature is currently unstable and the API may change without notice.
  *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
