@@ -50,6 +50,12 @@ module.exports.EventStatus = {
 };
 
 const interns = {};
+function intern(str) {
+    if (!interns[str]) {
+        interns[str] = str;
+    }
+    return interns[str];
+}
 
 /**
  * Construct a Matrix Event object
@@ -87,20 +93,25 @@ module.exports.MatrixEvent = function MatrixEvent(
         if (!event[prop]) {
             return;
         }
-        if (!interns[event[prop]]) {
-            interns[event[prop]] = event[prop];
-        }
-        event[prop] = interns[event[prop]];
+        event[prop] = intern(event[prop]);
     });
 
     ["membership", "avatar_url", "displayname"].forEach((prop) => {
         if (!event.content || !event.content[prop]) {
             return;
         }
-        if (!interns[event.content[prop]]) {
-            interns[event.content[prop]] = event.content[prop];
+        event.content[prop] = intern(event.content[prop]);
+    });
+
+    ["rel_type"].forEach((prop) => {
+        if (
+            !event.content ||
+            !event.content["m.relates_to"] ||
+            !event.content["m.relates_to"][prop]
+        ) {
+            return;
         }
-        event.content[prop] = interns[event.content[prop]];
+        event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
     });
 
     this.event = event || {};
