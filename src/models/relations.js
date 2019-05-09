@@ -77,6 +77,8 @@ export default class Relations extends EventEmitter {
         }
 
         this._relations.add(event);
+
+        this.emit("Relations.add", event);
     }
 
     /**
