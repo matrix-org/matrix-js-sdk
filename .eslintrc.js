@@ -14,6 +14,9 @@ module.exports = {
         es6: true,
     },
     extends: ["eslint:recommended", "google"],
+    plugins: [
+        "babel",
+    ],
     rules: {
         // rules we've always adhered to or now do
         "max-len": ["error", {
@@ -73,5 +76,10 @@ module.exports = {
             "asyncArrow": "always",
         }],
         "arrow-parens": "off",
+
+        // eslint's built in no-invalid-this rule breaks with class properties
+        "no-invalid-this": "off",
+        // so we replace it with a version that is class property aware
+        "babel/no-invalid-this": "error",
     }
 }

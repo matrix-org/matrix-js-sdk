@@ -24,7 +24,7 @@ import Promise from 'bluebird';
 
 describe("MatrixEvent", () => {
     beforeEach(function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
     describe(".attemptDecryption", () => {

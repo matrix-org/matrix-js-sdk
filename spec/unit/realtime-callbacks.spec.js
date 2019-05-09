@@ -15,7 +15,7 @@ describe("realtime-callbacks", function() {
     }
 
     beforeEach(function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         clock = lolex.install();
         const fakeDate = clock.Date;
         callbacks.setNow(fakeDate.now.bind(fakeDate));
@@ -56,8 +56,8 @@ describe("realtime-callbacks", function() {
         it("should set 'this' to the global object", function() {
             let passed = false;
             const callback = function() {
-                expect(this).toBe(global); // eslint-disable-line no-invalid-this
-                expect(this.console).toBeTruthy(); // eslint-disable-line no-invalid-this
+                expect(this).toBe(global); // eslint-disable-line babel/no-invalid-this
+                expect(this.console).toBeTruthy(); // eslint-disable-line babel/no-invalid-this
                 passed = true;
             };
             callbacks.setTimeout(callback);

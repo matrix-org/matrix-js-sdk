@@ -35,7 +35,7 @@ class FakeClient {
 
 describe("InteractiveAuth", function() {
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
     it("should start an auth stage and complete it", function(done) {
