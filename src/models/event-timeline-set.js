@@ -744,6 +744,7 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
             relationType,
             eventType,
+            this.room,
         );
     }
 
