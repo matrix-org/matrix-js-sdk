@@ -116,10 +116,15 @@ function SyncApi(client, opts) {
  */
 SyncApi.prototype.createRoom = function(roomId) {
     const client = this.client;
+    const {
+        timelineSupport,
+        unstableClientRelationAggregation,
+    } = client;
     const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: this.opts.lazyLoadMembers,
         pendingEventOrdering: this.opts.pendingEventOrdering,
-        timelineSupport: client.timelineSupport,
+        timelineSupport,
+        unstableClientRelationAggregation,
     });
     client.reEmitter.reEmit(room, ["Room.name", "Room.timeline", "Room.redaction",
                           "Room.receipt", "Room.tags",
