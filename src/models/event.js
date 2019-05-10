@@ -363,7 +363,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         if (
             this._clearEvent && this._clearEvent.content &&
-                this._clearEvent.content.msgtype !== "m.bad.encrypted"
+            this._clearEvent.content.msgtype !== "m.bad.encrypted"
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
@@ -708,28 +708,28 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @return {?Object} push actions
      */
-     getPushActions: function() {
+    getPushActions: function() {
         return this._pushActions;
-     },
+    },
 
     /**
      * Set the push actions for this event.
      *
      * @param {Object} pushActions push actions
      */
-     setPushActions: function(pushActions) {
+    setPushActions: function(pushActions) {
         this._pushActions = pushActions;
-     },
+    },
 
-     /**
-      * Replace the `event` property and recalculate any properties based on it.
-      * @param {Object} event the object to assign to the `event` property
-      */
-     handleRemoteEcho: function(event) {
+    /**
+     * Replace the `event` property and recalculate any properties based on it.
+     * @param {Object} event the object to assign to the `event` property
+     */
+    handleRemoteEcho: function(event) {
         this.event = event;
         // successfully sent.
         this.status = null;
-     },
+    },
 });
 
 
