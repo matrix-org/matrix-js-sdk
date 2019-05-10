@@ -730,6 +730,16 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         // successfully sent.
         this.status = null;
     },
+
+    /**
+     * Get whether the event is a relation event.
+     * @return {boolean}
+     */
+    isRelation() {
+        const content = this.getContent();
+        const relation = content && content["m.relates_to"];
+        return relation && relation.rel_type && relation.event_id;
+    },
 });
 
 
