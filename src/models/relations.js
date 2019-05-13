@@ -43,10 +43,6 @@ export default class Relations extends EventEmitter {
         this._annotationsByKey = {};
         this._annotationsBySender = {};
         this._sortedAnnotationsByKey = [];
-
-        if (room) {
-            room.on("Room.beforeRedaction", this._onBeforeRedaction);
-        }
     }
 
     /**
@@ -77,6 +73,8 @@ export default class Relations extends EventEmitter {
         }
 
         this._relations.add(event);
+
+        event.on("Event.beforeRedaction", this._onBeforeRedaction);
 
         this.emit("Relations.add", event);
     }
@@ -127,7 +125,7 @@ export default class Relations extends EventEmitter {
      * For relations that have been redacted, we want to remove them from
      * aggregation data sets and emit an update event.
      *
-     * To do so, we listen for `Room.beforeRedaction`, which happens:
+     * To do so, we listen for `Event.beforeRedaction`, which happens:
      *   - after the server accepted the redaction and remote echoed back to us
      *   - before the original event has been marked redacted in the client
      *
@@ -161,6 +159,8 @@ export default class Relations extends EventEmitter {
                 return bEvents.size - aEvents.size;
             });
         }
+
+        redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
 
         // Dispatch a redaction event on this collection. `setTimeout` is used
         // to wait until the next event loop iteration by which time the event

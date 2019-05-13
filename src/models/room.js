@@ -1011,7 +1011,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // if we know about this event, redact its contents now.
         const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
         if (redactedEvent) {
-            this.emit("Room.beforeRedaction", redactedEvent, event, this);
             redactedEvent.makeRedacted(event);
             this.emit("Room.redaction", event, this);
 

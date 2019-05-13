@@ -661,6 +661,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             throw new Error("invalid redaction_event in makeRedacted");
         }
 
+        this.emit("Event.beforeRedaction", this, redaction_event);
+
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
