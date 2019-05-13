@@ -29,7 +29,7 @@ export async function makeTestClients(userInfos, options) {
                 for (const [deviceId, msg] of Object.entries(devMap)) {
                     if (deviceId in clientMap[userId]) {
                         const event = new MatrixEvent({
-                            sender: this.getUserId(), // eslint-disable-line no-invalid-this
+                            sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
                             type: type,
                             content: msg,
                         });

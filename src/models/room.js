@@ -1100,7 +1100,11 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
     this._txnToEvent[txnId] = event;
 
-    if (this._opts.pendingEventOrdering == "detached") {
+    // TODO: We currently ignore `pendingEventOrdering` for relation events.
+    // They are aggregated by the timeline set, and we want that to happen right
+    // away for easy local echo, but it complicates what should be a general
+    // code path by branching on the event type.
+    if (!event.isRelation() && this._opts.pendingEventOrdering == "detached") {
         if (this._pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
             console.warn("Setting event as NOT_SENT due to messages in the same state");
             event.status = EventStatus.NOT_SENT;

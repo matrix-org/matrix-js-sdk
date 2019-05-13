@@ -19,7 +19,7 @@ describe("Room", function() {
     let room;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         room = new Room(roomId);
         // mock RoomStates
         room.oldState = room.getLiveTimeline()._startState =

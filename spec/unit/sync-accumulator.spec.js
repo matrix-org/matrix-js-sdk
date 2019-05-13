@@ -26,7 +26,7 @@ describe("SyncAccumulator", function() {
     let sa;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         sa = new SyncAccumulator({
             maxTimelineEntries: 10,
         });

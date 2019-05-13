@@ -363,7 +363,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         if (
             this._clearEvent && this._clearEvent.content &&
-                this._clearEvent.content.msgtype !== "m.bad.encrypted"
+            this._clearEvent.content.msgtype !== "m.bad.encrypted"
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
@@ -661,6 +661,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             throw new Error("invalid redaction_event in makeRedacted");
         }
 
+        this.emit("Event.beforeRedaction", this, redaction_event);
+
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
@@ -708,28 +710,38 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @return {?Object} push actions
      */
-     getPushActions: function() {
+    getPushActions: function() {
         return this._pushActions;
-     },
+    },
 
     /**
      * Set the push actions for this event.
      *
      * @param {Object} pushActions push actions
      */
-     setPushActions: function(pushActions) {
+    setPushActions: function(pushActions) {
         this._pushActions = pushActions;
-     },
+    },
 
-     /**
-      * Replace the `event` property and recalculate any properties based on it.
-      * @param {Object} event the object to assign to the `event` property
-      */
-     handleRemoteEcho: function(event) {
+    /**
+     * Replace the `event` property and recalculate any properties based on it.
+     * @param {Object} event the object to assign to the `event` property
+     */
+    handleRemoteEcho: function(event) {
         this.event = event;
         // successfully sent.
         this.status = null;
-     },
+    },
+
+    /**
+     * Get whether the event is a relation event.
+     * @return {boolean}
+     */
+    isRelation() {
+        const content = this.getContent();
+        const relation = content && content["m.relates_to"];
+        return relation && relation.rel_type && relation.event_id;
+    },
 });
 
 

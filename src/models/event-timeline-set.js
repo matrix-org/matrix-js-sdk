@@ -744,7 +744,12 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
             relationType,
             eventType,
+            this.room,
         );
+        const relatesToEvent = this.findEventById(relatesToEventId);
+        if (relatesToEvent) {
+            relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
+        }
     }
 
     relationsWithEventType.addEvent(event);

@@ -26,7 +26,7 @@ describe("MatrixScheduler", function() {
     });
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         clock = lolex.install();
         scheduler = new MatrixScheduler(function(ev, attempts, err) {
             if (retryFn) {

@@ -21,7 +21,7 @@ describe("MatrixClient", function() {
     const accessToken = "aseukfgwef";
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         store = new MemoryStore();
 

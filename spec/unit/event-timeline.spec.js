@@ -18,7 +18,7 @@ describe("EventTimeline", function() {
     let timeline;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
 
         // XXX: this is a horrid hack; should use sinon or something instead to mock
         const timelineSet = { room: { roomId: roomId }};

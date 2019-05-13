@@ -11,7 +11,7 @@ describe("User", function() {
     let user;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         user = new User(userId);
     });
 
