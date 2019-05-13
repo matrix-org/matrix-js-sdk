@@ -124,8 +124,12 @@ export default class Relations extends EventEmitter {
     }
 
     /**
-     * For relations that are about to be redacted, remove them from aggregation
-     * data sets and emit an update event.
+     * For relations that have been redacted, we want to remove them from
+     * aggregation data sets and emit an update event.
+     *
+     * To do so, we listen for `Room.beforeRedaction`, which happens:
+     *   - after the server accepted the redaction and remote echoed back to us
+     *   - before the original event has been marked redacted in the client
      *
      * @param {MatrixEvent} redactedEvent
      * The original relation event that is about to be redacted.
