@@ -1041,9 +1041,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
             // report replacedEvent and not originalEvent because replaceEvent was in the timeline so far
             this.emit("Room.replaceEvent", replacedEvent, event, this);
         }
-        else {
-            console.warn(`could not find replaced event for target id ${replacedEventId} and if ${event.getId()}, body: ${event.getContent().body}`);
-        }
         // we don't add the event because the event type would get rendered
         return;
     }
