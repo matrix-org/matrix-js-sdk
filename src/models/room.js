@@ -1028,6 +1028,27 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // this may be needed to trigger an update.
     }
 
+    if (event.isReplacement()) {
+        const replacedEventId = event.getOriginalId();
+        const replacedEvent = replacedEventId &&
+            this.getUnfilteredTimelineSet().tryReplaceEvent(replacedEventId, event);
+        if (replacedEvent) {
+            // if this was already a replacement, get the original
+            let originalEvent = replacedEvent;
+            if (originalEvent.isReplacement()) {
+                originalEvent = originalEvent.getReplacedEvent();
+            }
+            event.setReplacedEvent(originalEvent);
+            // report replacedEvent and not originalEvent because replaceEvent was in the timeline so far
+            this.emit("Room.replaceEvent", replacedEvent, event, this);
+        }
+        else {
+            console.warn(`could not find replaced event for target id ${replacedEventId} and if ${event.getId()}, body: ${event.getContent().body}`);
+        }
+        // we don't add the event because the event type would get rendered
+        return;
+    }
+
     if (event.getUnsigned().transaction_id) {
         const existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
         if (existingEvent) {

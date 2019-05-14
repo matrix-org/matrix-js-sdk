@@ -132,6 +132,7 @@ SyncApi.prototype.createRoom = function(roomId) {
                           "Room.localEchoUpdated",
                           "Room.accountData",
                           "Room.myMembership",
+                          "Room.replaceEvent",
                          ]);
     this._registerStateListeners(room);
     return room;
