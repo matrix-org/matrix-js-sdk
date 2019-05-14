@@ -122,6 +122,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
+    this._replacedEvent = null;
 
     this._clearEvent = {};
 
@@ -208,6 +209,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
      */
     getTs: function() {
+        if (this._replacedEvent) {
+            return this._replacedEvent.getTs();
+        }
         return this.event.origin_server_ts;
     },
 
@@ -216,6 +220,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
      */
     getDate: function() {
+        if (this._replacedEvent) {
+            return this._replacedEvent.getDate();
+        }
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
     },
 
@@ -741,6 +748,30 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         const content = this.getContent();
         const relation = content && content["m.relates_to"];
         return relation && relation.rel_type && relation.event_id;
+    },
+
+    isReplacement() {
+        const content = this.getContent();
+        const relation = content && content["m.relates_to"];
+        return relation && relation.rel_type === "m.replace" && relation.event_id;
+    },
+
+    setReplacedEvent(replacedEvent) {
+        this._replacedEvent = replacedEvent;
+    },
+
+    getReplacedEvent() {
+        return this._replacedEvent;
+    },
+
+    getOriginalId() {
+        const content = this.getContent();
+        const relation = content && content["m.relates_to"];
+        if (relation && relation.rel_type === "m.replace") {
+            return relation.event_id;
+        } else {
+            return this.getId();
+        }
     },
 });
 
