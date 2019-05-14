@@ -263,10 +263,6 @@ EventTimelineSet.prototype.tryReplaceEvent = function(eventId, newEvent) {
         }
     }
     if (oldEvent) {
-        let originalEvent;
-        if (oldEvent.isReplacement()) {
-            originalEvent = oldEvent.getReplacedEvent();
-        }
         this.replaceEventId(oldEvent.getId(), newEvent.getId());
         return oldEvent;
     }
