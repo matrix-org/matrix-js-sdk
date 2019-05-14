@@ -1004,7 +1004,6 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @private
  */
 Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
-    let i;
     if (event.getType() === "m.room.redaction") {
         const redactId = event.event.redacts;
 
@@ -1059,7 +1058,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     }
 
     // add to our timeline sets
-    for (i = 0; i < this._timelineSets.length; i++) {
+    for (let i = 0; i < this._timelineSets.length; i++) {
         this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
     }
 
