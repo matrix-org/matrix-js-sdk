@@ -1099,6 +1099,10 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
  * unique transaction id.
  */
 Room.prototype.addPendingEvent = function(event, txnId) {
+    if (event.isReplacement()) {
+        return;
+    }
+
     if (event.status !== EventStatus.SENDING) {
         throw new Error("addPendingEvent called on an event with status " +
                         event.status);
