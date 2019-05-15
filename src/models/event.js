@@ -758,6 +758,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (this.isRedacted()) {
             return;
         }
+        // ignore previous replacements
+        if (this._replacingEvent && this._replacingEvent.getTs() > newEvent.getTs()) {
+            return;
+        }
         if (newEvent.isBeingDecrypted()) {
             throw new Error("Trying to replace event when " +
                 "new content hasn't been decrypted yet");
