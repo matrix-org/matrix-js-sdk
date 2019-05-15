@@ -784,6 +784,35 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     replacingEventId() {
         return this._replacingEvent && this._replacingEvent.getId();
     },
+
+    /**
+     * Summarise the event as JSON for debugging. If encrypted, include both the
+     * decrypted and encrypted view of the event. This is named `toJSON` for use
+     * with `JSON.stringify` which checks objects for functions named `toJSON`
+     * and will call them to customise the output if they are defined.
+     *
+     * @return {Object}
+     */
+    toJSON() {
+        const event = {
+            type: this.getType(),
+            sender: this.getSender(),
+            content: this.getContent(),
+            event_id: this.getId(),
+            origin_server_ts: this.getTs(),
+            unsigned: this.getUnsigned(),
+            room_id: this.getRoomId(),
+        };
+
+        if (!this.isEncrypted()) {
+            return event;
+        }
+
+        return {
+            decrypted: event,
+            encrypted: this.event,
+        };
+    },
 });
 
 
