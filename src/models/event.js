@@ -226,13 +226,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        const content = this._clearEvent.content || this.event.content || {};
-        if (this._replacingEvent) {
-            const newContent = this._replacingEvent.getContent()["m.new_content"];
-            return Object.assign({}, newContent, content["m.relates_to"]);
-        } else {
-            return content;
-        }
+        return this._clearEvent.content || this.event.content || {};
     },
 
     /**
@@ -764,6 +758,13 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (this.isRedacted()) {
             return;
         }
+        const oldContent = this.getContent();
+        const newContent = newEvent.getContent()["m.new_content"];
+        // need to always replace m.relates_to with the old one,
+        // even if there is none, as the m.replace relation should
+        // not be exposed on the target event m.relates_to (that's what the server does).
+        Object.assign(oldContent, newContent,
+            {"m.relates_to": oldContent["m.relates_to"]});
         this._replacingEvent = newEvent;
     },
 
