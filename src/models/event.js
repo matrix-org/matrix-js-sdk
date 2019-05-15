@@ -122,7 +122,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
-    this._replacedEvent = null;
+    this._replacingEvent = null;
 
     this._clearEvent = {};
 
@@ -209,9 +209,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
      */
     getTs: function() {
-        if (this._replacedEvent) {
-            return this._replacedEvent.getTs();
-        }
         return this.event.origin_server_ts;
     },
 
@@ -220,9 +217,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
      */
     getDate: function() {
-        if (this._replacedEvent) {
-            return this._replacedEvent.getDate();
-        }
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
     },
 
@@ -741,37 +735,54 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Get whether the event is a relation event.
+     * Get whether the event is a relation event, and of a given type if `relType` is passed in.
+     *
+     * @param {string?} relType if given, checks that the relation is of the given type
      * @return {boolean}
      */
-    isRelation() {
-        const content = this.getContent();
+    isRelation(relType = undefined) {
+        // must use event.content as m.relates_to is not encrypted
+        // and _clearEvent doesn't have it.
+        const content = this.event.content;
         const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id;
+        return relation && relation.rel_type && relation.event_id &&
+            ((relType && relation.rel_type === relType) || !relType);
     },
 
-    isReplacement() {
-        const content = this.getContent();
-        const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type === "m.replace" && relation.event_id;
-    },
-
-    setReplacedEvent(replacedEvent) {
-        this._replacedEvent = replacedEvent;
-    },
-
-    getReplacedEvent() {
-        return this._replacedEvent;
-    },
-
-    getOriginalId() {
-        const content = this.getContent();
-        const relation = content && content["m.relates_to"];
-        if (relation && relation.rel_type === "m.replace") {
-            return relation.event_id;
-        } else {
-            return this.getId();
+    /**
+     * Set an event that replaces the content of this event, through an m.replace relation.
+     *
+     * @param {MatrixEvent} newEvent the event with the replacing content.
+     */
+    makeReplaced(newEvent) {
+        if (this.isRedacted()) {
+            return;
         }
+        // ignore previous replacements
+        if (this._replacingEvent && this._replacingEvent.getTs() > newEvent.getTs()) {
+            return;
+        }
+        if (newEvent.isBeingDecrypted()) {
+            throw new Error("Trying to replace event when " +
+                "new content hasn't been decrypted yet");
+        }
+        const oldContent = this.getContent();
+        const newContent = newEvent.getContent()["m.new_content"];
+        // need to always replace m.relates_to with the old one,
+        // even if there is none, as the m.replace relation should
+        // not be exposed on the target event m.relates_to (that's what the server does).
+        Object.assign(oldContent, newContent,
+            {"m.relates_to": oldContent["m.relates_to"]});
+        this._replacingEvent = newEvent;
+    },
+
+    /**
+     * Returns the event ID of the event replacing the content of this event, if any.
+     *
+     * @return {string?}
+     */
+    replacingEventId() {
+        return this._replacingEvent && this._replacingEvent.getId();
     },
 });
 

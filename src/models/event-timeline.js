@@ -339,27 +339,6 @@ EventTimeline.prototype.addEvent = function(event, atStart) {
     }
 };
 
-
-/**
- * Replaces an event in the timeline, if it exists.
- *
- * @param {string} eventId  the id of the existing event
- * @param {boolean} newEvent  the new event
- * @return {MatrixEvent?} the old event, if found and replaced.
- */
-EventTimeline.prototype.tryReplaceEvent = function(eventId, newEvent) {
-    const eventIndex = this._events.findIndex(event => event.getOriginalId() === eventId);
-    if (eventIndex === -1) {
-        return;
-    }
-    const oldEvent = this._events[eventIndex];
-    this._events[eventIndex] = newEvent;
-    // copy over metadata, as we don't hold state for random locations in the timeline, only for the end or start
-    // and assuming for now that replacing an event doesn't change the sender that should be shown.
-    newEvent.sender = oldEvent.sender;
-    return oldEvent;
-};
-
 /**
  * Static helper method to set sender and target properties
  *
