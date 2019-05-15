@@ -1038,8 +1038,16 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         const replacedId = relatesTo && relatesTo.event_id;
         const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
         if (replacedEvent) {
-            replacedEvent.makeReplaced(event);
-            this.emit("Room.replaceEvent", replacedEvent, this);
+            const doAndEmitReplacement = () => {
+                replacedEvent.makeReplaced(event);
+                this.emit("Room.replaceEvent", replacedEvent, this);
+            };
+
+            if (event.isBeingDecrypted()) {
+                event.once("Event.decrypted", doAndEmitReplacement);
+            } else {
+                doAndEmitReplacement();
+            }
         }
     }
 

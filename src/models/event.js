@@ -758,6 +758,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (this.isRedacted()) {
             return;
         }
+        if (newEvent.isBeingDecrypted()) {
+            throw new Error("Trying to replace event when " +
+                "new content hasn't been decrypted yet");
+        }
         const oldContent = this.getContent();
         const newContent = newEvent.getContent()["m.new_content"];
         // need to always replace m.relates_to with the old one,
