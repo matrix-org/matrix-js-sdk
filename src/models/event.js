@@ -773,6 +773,33 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             return this.getId();
         }
     },
+
+    /**
+     * Summarise the event as JSON for debugging. If encrypted, include both the
+     * decrypted and encrypted view of the event.
+     *
+     * @return {Object}
+     */
+    toJSON() {
+        const event = {
+            type: this.getType(),
+            sender: this.getSender(),
+            content: this.getContent(),
+            event_id: this.getId(),
+            origin_server_ts: this.getTs(),
+            unsigned: this.getUnsigned(),
+            room_id: this.getRoomId(),
+        };
+
+        if (!this.isEncrypted()) {
+            return event;
+        }
+
+        return {
+            decrypted: event,
+            encrypted: this.event,
+        };
+    },
 });
 
 
