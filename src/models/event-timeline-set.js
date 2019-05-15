@@ -719,9 +719,16 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
         return;
     }
 
-    const content = event.getContent();
-    const relation = content && content["m.relates_to"];
-    if (!relation || !relation.rel_type || !relation.event_id) {
+    // If the event is currently encrypted, wait until it has been decrypted.
+    if (event.isBeingDecrypted()) {
+        event.once("Event.decrypted", () => {
+            this._aggregateRelations(event);
+        });
+        return;
+    }
+
+    const relation = event.getRelation();
+    if (!relation) {
         return;
     }
 
