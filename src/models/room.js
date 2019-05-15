@@ -1032,22 +1032,15 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // this may be needed to trigger an update.
     }
 
-    if (this._opts.unstableClientRelationReplacements && event.isReplacement()) {
-        const replacedEventId = event.getOriginalId();
-        const replacedEvent = replacedEventId &&
-            this.getUnfilteredTimelineSet().tryReplaceEvent(replacedEventId, event);
+
+    if (this._opts.unstableClientRelationReplacements && event.isRelation("m.replace")) {
+        const relatesTo = event.getContent()["m.relates_to"];
+        const replacedId = relatesTo && relatesTo.event_id;
+        const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
         if (replacedEvent) {
-            // if this was already a replacement, get the original
-            let originalEvent = replacedEvent;
-            if (originalEvent.isReplacement()) {
-                originalEvent = originalEvent.getReplacedEvent();
-            }
-            event.setReplacedEvent(originalEvent);
-            // report replacedEvent and not originalEvent because replaceEvent was in the timeline so far
-            this.emit("Room.replaceEvent", replacedEvent, event, this);
+            replacedEvent.makeReplaced(event);
+            this.emit("Room.replaceEvent", replacedEvent, this);
         }
-        // we don't add the event because the event type would get rendered
-        return;
     }
 
     if (event.getUnsigned().transaction_id) {
@@ -1101,7 +1094,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
  * unique transaction id.
  */
 Room.prototype.addPendingEvent = function(event, txnId) {
-    if (event.isReplacement()) {
+    if (event.isRelation("m.replace")) {
         return;
     }
 

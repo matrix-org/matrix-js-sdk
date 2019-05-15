@@ -122,7 +122,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
-    this._replacedEvent = null;
+    this._replacingEvent = null;
 
     this._clearEvent = {};
 
@@ -209,9 +209,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
      */
     getTs: function() {
-        if (this._replacedEvent) {
-            return this._replacedEvent.getTs();
-        }
         return this.event.origin_server_ts;
     },
 
@@ -220,9 +217,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
      */
     getDate: function() {
-        if (this._replacedEvent) {
-            return this._replacedEvent.getDate();
-        }
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
     },
 
@@ -232,7 +226,13 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        return this._clearEvent.content || this.event.content || {};
+        const content = this._clearEvent.content || this.event.content || {};
+        if (this._replacingEvent) {
+            const newContent = this._replacingEvent.getContent()["m.new_content"];
+            return Object.assign({}, newContent, content["m.relates_to"]);
+        } else {
+            return content;
+        }
     },
 
     /**
@@ -741,37 +741,34 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Get whether the event is a relation event.
+     * Get whether the event is a relation event, and of a given type if `relType` is passed in.
+     *
+     * @param {string?} relType if given, checks that the relation is of the given type
      * @return {boolean}
      */
-    isRelation() {
+    isRelation(relType = undefined) {
         const content = this.getContent();
         const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id;
+        return relation && relation.rel_type && relation.event_id &&
+            ((relType && relation.rel_type === relType) || !relType);
     },
 
-    isReplacement() {
-        const content = this.getContent();
-        const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type === "m.replace" && relation.event_id;
+    /**
+     * Set an event that replaces the content of this event, through an m.replace relation.
+     *
+     * @param {MatrixEvent} newEvent the event with the replacing content.
+     */
+    makeReplaced(newEvent) {
+        this._replacingEvent = newEvent;
     },
 
-    setReplacedEvent(replacedEvent) {
-        this._replacedEvent = replacedEvent;
-    },
-
-    getReplacedEvent() {
-        return this._replacedEvent;
-    },
-
-    getOriginalId() {
-        const content = this.getContent();
-        const relation = content && content["m.relates_to"];
-        if (relation && relation.rel_type === "m.replace") {
-            return relation.event_id;
-        } else {
-            return this.getId();
-        }
+    /**
+     * Returns the event ID of the event replacing the content of this event, if any.
+     *
+     * @return {string?}
+     */
+    replacingEventId() {
+        return this._replacingEvent && this._replacingEvent.getId();
     },
 });
 
