@@ -99,6 +99,11 @@ function synthesizeReceipt(userId, event, receiptType) {
  * via `EventTimelineSet#getRelationsForEvent`.
  * This feature is currently unstable and the API may change without notice.
  *
+ * @param {boolean} [opts.unstableClientRelationReplacements = false]
+ * Optional. Set to true to enable client-side handling of m.replace event relations,
+ * exposed through the `Room.replaceEvent` event.
+ * This feature is currently unstable and the API may change without notice.
+ *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
  * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
@@ -1004,7 +1009,6 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @private
  */
 Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
-    let i;
     if (event.getType() === "m.room.redaction") {
         const redactId = event.event.redacts;
 
@@ -1028,6 +1032,24 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // this may be needed to trigger an update.
     }
 
+    if (this._opts.unstableClientRelationReplacements && event.isReplacement()) {
+        const replacedEventId = event.getOriginalId();
+        const replacedEvent = replacedEventId &&
+            this.getUnfilteredTimelineSet().tryReplaceEvent(replacedEventId, event);
+        if (replacedEvent) {
+            // if this was already a replacement, get the original
+            let originalEvent = replacedEvent;
+            if (originalEvent.isReplacement()) {
+                originalEvent = originalEvent.getReplacedEvent();
+            }
+            event.setReplacedEvent(originalEvent);
+            // report replacedEvent and not originalEvent because replaceEvent was in the timeline so far
+            this.emit("Room.replaceEvent", replacedEvent, event, this);
+        }
+        // we don't add the event because the event type would get rendered
+        return;
+    }
+
     if (event.getUnsigned().transaction_id) {
         const existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
         if (existingEvent) {
@@ -1038,7 +1060,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
     }
 
     // add to our timeline sets
-    for (i = 0; i < this._timelineSets.length; i++) {
+    for (let i = 0; i < this._timelineSets.length; i++) {
         this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
     }
 
@@ -1079,6 +1101,10 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
  * unique transaction id.
  */
 Room.prototype.addPendingEvent = function(event, txnId) {
+    if (event.isReplacement()) {
+        return;
+    }
+
     if (event.status !== EventStatus.SENDING) {
         throw new Error("addPendingEvent called on an event with status " +
                         event.status);

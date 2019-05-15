@@ -244,6 +244,31 @@ EventTimelineSet.prototype.findEventById = function(eventId) {
 };
 
 /**
+ * Find an event by id which is stored in our timelines and replace it with a new event
+ *
+ * @param {string} eventId  event ID to look for
+ * @param {string} newEvent the event to replace with
+ * @return {?module:models/event~MatrixEvent} the replaced event, or undefined if unknown
+ */
+EventTimelineSet.prototype.tryReplaceEvent = function(eventId, newEvent) {
+    // we can't use this._eventIdToTimeline here to find the matching timeline
+    // because we need to match the original event id,
+    // which might have been replaced by a previous m.replace already.
+    // for now, loop through all timelines. Maybe a separate index would be justifyable.
+    let oldEvent;
+    for(const tl of this._timelines) {
+        oldEvent = tl.tryReplaceEvent(eventId, newEvent);
+        if (oldEvent) {
+            break;
+        }
+    }
+    if (oldEvent) {
+        this.replaceEventId(oldEvent.getId(), newEvent.getId());
+        return oldEvent;
+    }
+};
+
+/**
  * Add a new timeline to this timeline list
  *
  * @return {module:models/event-timeline~EventTimeline} newly-created timeline
