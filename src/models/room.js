@@ -1037,7 +1037,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         const relatesTo = event.getRelation();
         const replacedId = relatesTo && relatesTo.event_id;
         const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
-        if (replacedEvent) {
+        if (replacedEvent && event.getSender() === replacedEvent.getSender()) {
             const doAndEmitReplacement = () => {
                 replacedEvent.makeReplaced(event);
                 this.emit("Room.replaceEvent", replacedEvent, this);
