@@ -1034,7 +1034,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
 
 
     if (this._opts.unstableClientRelationReplacements && event.isRelation("m.replace")) {
-        const relatesTo = event.getContent()["m.relates_to"];
+        const relatesTo = event.getRelation();
         const replacedId = relatesTo && relatesTo.event_id;
         const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
         if (replacedEvent) {

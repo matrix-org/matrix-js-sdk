@@ -52,9 +52,8 @@ export default class Relations extends EventEmitter {
      * The new relation event to be aggregated.
      */
     addEvent(event) {
-        const content = event.getContent();
-        const relation = content && content["m.relates_to"];
-        if (!relation || !relation.rel_type || !relation.event_id) {
+        const relation = event.getRelation();
+        if (!relation) {
             console.error("Event must have relation info");
             return;
         }
@@ -139,8 +138,7 @@ export default class Relations extends EventEmitter {
 
         if (this.relationType === "m.annotation") {
             // Remove the redacted annotation from aggregation by key
-            const content = redactedEvent.getContent();
-            const relation = content && content["m.relates_to"];
+            const relation = redactedEvent.getRelation();
             if (!relation) {
                 return;
             }

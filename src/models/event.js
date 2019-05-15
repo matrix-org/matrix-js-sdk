@@ -735,18 +735,32 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Get whether the event is a relation event, and of a given type if `relType` is passed in.
+     * Get whether the event is a relation event, and of a given type if
+     * `relType` is passed in.
      *
-     * @param {string?} relType if given, checks that the relation is of the given type
+     * @param {string?} relType if given, checks that the relation is of the
+     * given type
      * @return {boolean}
      */
     isRelation(relType = undefined) {
-        // must use event.content as m.relates_to is not encrypted
-        // and _clearEvent doesn't have it.
-        const content = this.event.content;
+        // Relation info is lifted out of the encrypted content when sent to
+        // encrypted rooms, so we have to check `getWireContent` for this.
+        const content = this.getWireContent();
         const relation = content && content["m.relates_to"];
         return relation && relation.rel_type && relation.event_id &&
             ((relType && relation.rel_type === relType) || !relType);
+    },
+
+    /**
+     * Get relation info for the event, if any.
+     *
+     * @return {Object}
+     */
+    getRelation() {
+        if (!this.isRelation()) {
+            return null;
+        }
+        return this.getWireContent()["m.relates_to"];
     },
 
     /**
@@ -768,11 +782,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         const oldContent = this.getContent();
         const newContent = newEvent.getContent()["m.new_content"];
-        // need to always replace m.relates_to with the old one,
-        // even if there is none, as the m.replace relation should
-        // not be exposed on the target event m.relates_to (that's what the server does).
-        Object.assign(oldContent, newContent,
-            {"m.relates_to": oldContent["m.relates_to"]});
+        Object.assign(oldContent, newContent);
         this._replacingEvent = newEvent;
     },
 

@@ -719,9 +719,8 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
         return;
     }
 
-    const content = event.getContent();
-    const relation = content && content["m.relates_to"];
-    if (!relation || !relation.rel_type || !relation.event_id) {
+    const relation = event.getRelation();
+    if (!relation) {
         return;
     }
 
