@@ -747,7 +747,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {boolean}
      */
     isRelation(relType = undefined) {
-        const content = this.getContent();
+        // must use event.content as m.relates_to is not encrypted
+        // and _clearEvent doesn't have it.
+        const content = this.event.content;
         const relation = content && content["m.relates_to"];
         return relation && relation.rel_type && relation.event_id &&
             ((relType && relation.rel_type === relType) || !relType);
