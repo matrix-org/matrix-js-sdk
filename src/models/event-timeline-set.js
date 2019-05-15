@@ -719,6 +719,14 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
         return;
     }
 
+    // If the event is currently encrypted, wait until it has been decrypted.
+    if (event.isBeingDecrypted()) {
+        event.once("Event.decrypted", () => {
+            this._aggregateRelations(event);
+        });
+        return;
+    }
+
     const relation = event.getRelation();
     if (!relation) {
         return;
