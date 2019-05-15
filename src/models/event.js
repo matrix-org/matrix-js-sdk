@@ -761,6 +761,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {MatrixEvent} newEvent the event with the replacing content.
      */
     makeReplaced(newEvent) {
+        if (this.isRedacted()) {
+            return;
+        }
         this._replacingEvent = newEvent;
     },
 
