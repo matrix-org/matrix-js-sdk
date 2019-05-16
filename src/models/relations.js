@@ -285,4 +285,34 @@ export default class Relations extends EventEmitter {
 
         return this._annotationsBySender;
     }
+
+    /**
+     * Returns the most recent (and allowed) m.replace relation, if any.
+     *
+     * This is currently only supported for the m.replace relation type,
+     * once the target event is known, see `addEvent`.
+     *
+     * @return {MatrixEvent?}
+     */
+    getLastReplacement() {
+        if (this.relationType !== "m.replace") {
+            // Aggregating on last only makes sense for this relation type
+            return null;
+        }
+        if (!this._targetEvent) {
+            // Don't know which replacements to accept yet.
+            // This method shouldn't be called before the original
+            // event is known anyway.
+            return null;
+        }
+        return this.getRelations().reduce((last, event) => {
+            if (event.getSender() !== this._targetEvent.getSender()) {
+                return last;
+            }
+            if (last && last.getTs() > event.getTs()) {
+                return last;
+            }
+            return event;
+        }, null);
+    }
 }
