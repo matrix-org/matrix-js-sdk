@@ -121,11 +121,13 @@ export default class Relations extends EventEmitter {
             return;
         }
 
+        this._relations.delete(event);
+
         if (this.relationType === "m.annotation") {
             this._removeAnnotationFromAggregation(event);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
-
-        this._relations.delete(event);
 
         this.emit("Relations.remove", event);
     }
@@ -234,9 +236,13 @@ export default class Relations extends EventEmitter {
             return;
         }
 
+        this._relations.delete(redactedEvent);
+
         if (this.relationType === "m.annotation") {
             // Remove the redacted annotation from aggregation by key
             this._removeAnnotationFromAggregation(redactedEvent);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
 
         redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
