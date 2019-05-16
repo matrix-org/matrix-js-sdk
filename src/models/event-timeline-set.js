@@ -709,7 +709,6 @@ EventTimelineSet.prototype.getRelationsForEvent = function(
     return relationsWithRelType[eventType];
 };
 
-
 /**
  * Set an event as the target event if any Relations exist for it already
  *
