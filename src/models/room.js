@@ -1032,25 +1032,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // this may be needed to trigger an update.
     }
 
-
-    if (this._opts.unstableClientRelationReplacements && event.isRelation("m.replace")) {
-        const relatesTo = event.getRelation();
-        const replacedId = relatesTo && relatesTo.event_id;
-        const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
-        if (replacedEvent && event.getSender() === replacedEvent.getSender()) {
-            const doAndEmitReplacement = () => {
-                replacedEvent.makeReplaced(event);
-                this.emit("Room.replaceEvent", replacedEvent, this);
-            };
-
-            if (event.isBeingDecrypted()) {
-                event.once("Event.decrypted", doAndEmitReplacement);
-            } else {
-                doAndEmitReplacement();
-            }
-        }
-    }
-
     if (event.getUnsigned().transaction_id) {
         const existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
         if (existingEvent) {
