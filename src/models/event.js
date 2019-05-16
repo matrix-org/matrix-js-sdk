@@ -731,7 +731,27 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     handleRemoteEcho: function(event) {
         this.event = event;
         // successfully sent.
-        this.status = null;
+        this.setStatus(null);
+    },
+
+    /**
+     * Whether the event is in any phase of sending, send failure, waiting for
+     * remote echo, etc.
+     *
+     * @return {boolean}
+     */
+    isSending() {
+        return !!this.status;
+    },
+
+    /**
+     * Update the event's sending status and emit an event as well.
+     *
+     * @param {String} status The new status
+     */
+    setStatus(status) {
+        this.status = status;
+        this.emit("Event.status", this, status);
     },
 
     /**

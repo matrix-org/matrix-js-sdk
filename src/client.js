@@ -1723,7 +1723,7 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         content: content,
     });
     localEvent._txnId = txnId;
-    localEvent.status = EventStatus.SENDING;
+    localEvent.setStatus(EventStatus.SENDING);
 
     // add this event immediately to the local store as 'sending'.
     if (room) {
@@ -1853,7 +1853,7 @@ function _updatePendingEventStatus(room, event, newStatus) {
     if (room) {
         room.updatePendingEvent(event, newStatus);
     } else {
-        event.status = newStatus;
+        event.setStatus(newStatus);
     }
 }
 
