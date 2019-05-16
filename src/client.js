@@ -4168,6 +4168,10 @@ function _PojoToMatrixEventMapper(client) {
             ]);
             event.attemptDecryption(client._crypto);
         }
+        const room = client.getRoom(event.getRoomId());
+        if (room) {
+            room.reEmitter.reEmit(event, ["Event.replaced"]);
+        }
         return event;
     }
     return mapper;
