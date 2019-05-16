@@ -316,13 +316,19 @@ export default class Relations extends EventEmitter {
             return event;
         }, null);
     }
+
     /*
-     * @param {MatrixEvent} targetEvent the event related to.
+     * @param {MatrixEvent} targetEvent the event the relations are related to.
      */
     setTargetEvent(event) {
-        this._targetEvent = event;
-        if (this.relationType === "m.replace") {
-            this._targetEvent.makeReplaced(this.getLastReplacement());
+        if (!this._targetEvent) {
+            this._targetEvent = event;
+            if (this.relationType === "m.replace") {
+                const replacement = this.getLastReplacement();
+                if (replacement) {
+                    this._targetEvent.makeReplaced();
+                }
+            }
         }
     }
 }
