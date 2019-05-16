@@ -759,7 +759,7 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
         }
     }
 
-    relationsWithEventType.addEvent(event);
+    relationsWithEventType.addEvent(event, relatesToEvent);
 };
 
 /**

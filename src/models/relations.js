@@ -44,15 +44,17 @@ export default class Relations extends EventEmitter {
         this._annotationsByKey = {};
         this._annotationsBySender = {};
         this._sortedAnnotationsByKey = [];
+        this._targetEvent = null;
     }
 
     /**
      * Add relation events to this collection.
      *
      * @param {MatrixEvent} event
+     * @param {MatrixEvent?} targetEvent the event related to, if available.
      * The new relation event to be added.
      */
-    addEvent(event) {
+    addEvent(event, targetEvent) {
         if (this._relations.has(event)) {
             return;
         }
@@ -61,6 +63,12 @@ export default class Relations extends EventEmitter {
         if (!relation) {
             console.error("Event must have relation info");
             return;
+        }
+
+        // set the event these relations point to
+        // so m.replace can update the event
+        if (!this._targetEvent && targetEvent) {
+            this._targetEvent = targetEvent;
         }
 
         const relationType = relation.rel_type;
