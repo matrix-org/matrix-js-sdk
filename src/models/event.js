@@ -801,6 +801,18 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             this._replacingEvent = newEvent;
             this.emit("Event.replaced", this);
         }
+    },
+
+    /**
+     * Returns the  status of the event, or the replacing event in case `makeReplace` has been called.
+     *
+     * @return {EventStatus}
+     */
+    replacementOrOwnStatus() {
+        if (this._replacingEvent) {
+            return this._replacingEvent.status;
+        } else {
+            return this.status;
         }
     },
 
