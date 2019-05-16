@@ -51,10 +51,9 @@ export default class Relations extends EventEmitter {
      * Add relation events to this collection.
      *
      * @param {MatrixEvent} event
-     * @param {MatrixEvent?} targetEvent the event related to, if available.
      * The new relation event to be added.
      */
-    addEvent(event, targetEvent) {
+    addEvent(event) {
         if (this._relations.has(event)) {
             return;
         }
@@ -63,12 +62,6 @@ export default class Relations extends EventEmitter {
         if (!relation) {
             console.error("Event must have relation info");
             return;
-        }
-
-        // set the event these relations point to
-        // so m.replace can update the event
-        if (!this._targetEvent && targetEvent) {
-            this._targetEvent = targetEvent;
         }
 
         const relationType = relation.rel_type;
@@ -85,11 +78,13 @@ export default class Relations extends EventEmitter {
             event.on("Event.status", this._onEventStatus);
         }
 
+        this._relations.add(event);
+
         if (this.relationType === "m.annotation") {
             this._addAnnotationToAggregation(event);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
-
-        this._relations.add(event);
 
         event.on("Event.beforeRedaction", this._onBeforeRedaction);
 
@@ -320,5 +315,14 @@ export default class Relations extends EventEmitter {
             }
             return event;
         }, null);
+    }
+    /*
+     * @param {MatrixEvent} targetEvent the event related to.
+     */
+    setTargetEvent(event) {
+        this._targetEvent = event;
+        if (this.relationType === "m.replace") {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
+        }
     }
 }

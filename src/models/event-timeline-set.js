@@ -747,24 +747,21 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
         relationsWithRelType = relationsForEvent[relationType] = {};
     }
     let relationsWithEventType = relationsWithRelType[eventType];
-    const relatesToEvent = this.findEventById(relatesToEventId);
+
     if (!relationsWithEventType) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
             relationType,
             eventType,
             this.room,
         );
+        const relatesToEvent = this.findEventById(relatesToEventId);
         if (relatesToEvent) {
+            relationsWithEventType.setTargetEvent(relatesToEvent);
             relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
         }
     }
 
-    relationsWithEventType.addEvent(event, relatesToEvent);
-
-    if (relationType === "m.replace" && relatesToEvent) {
-        const replacement = relationsWithEventType.getLastReplacement();
-        relatesToEvent.makeReplaced(replacement);
-    }
+    relationsWithEventType.addEvent(event);
 };
 
 /**
