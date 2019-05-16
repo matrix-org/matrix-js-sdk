@@ -321,13 +321,16 @@ export default class Relations extends EventEmitter {
      * @param {MatrixEvent} targetEvent the event the relations are related to.
      */
     setTargetEvent(event) {
-        if (!this._targetEvent) {
-            this._targetEvent = event;
-            if (this.relationType === "m.replace") {
-                const replacement = this.getLastReplacement();
-                if (replacement) {
-                    this._targetEvent.makeReplaced();
-                }
+        if (this._targetEvent) {
+            return;
+        }
+        this._targetEvent = event;
+        if (this.relationType === "m.replace") {
+            const replacement = this.getLastReplacement();
+            // this is the initial update, so only call it if we already have something
+            // to not emit Event.replaced needlessly
+            if (replacement) {
+                this._targetEvent.makeReplaced(replacement);
             }
         }
     }
