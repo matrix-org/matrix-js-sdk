@@ -540,7 +540,7 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
     timeline.addEvent(event, toStartOfTimeline);
     this._eventIdToTimeline[eventId] = timeline;
 
-    this._aggregateRelations(event);
+    this.aggregateRelations(event);
 
     const data = {
         timeline: timeline,
@@ -714,7 +714,7 @@ EventTimelineSet.prototype.getRelationsForEvent = function(
  * @param {MatrixEvent} event
  * The new relation event to be aggregated.
  */
-EventTimelineSet.prototype._aggregateRelations = function(event) {
+EventTimelineSet.prototype.aggregateRelations = function(event) {
     if (!this._unstableClientRelationAggregation) {
         return;
     }
@@ -722,7 +722,7 @@ EventTimelineSet.prototype._aggregateRelations = function(event) {
     // If the event is currently encrypted, wait until it has been decrypted.
     if (event.isBeingDecrypted()) {
         event.once("Event.decrypted", () => {
-            this._aggregateRelations(event);
+            this.aggregateRelations(event);
         });
         return;
     }
