@@ -226,7 +226,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        if (this._replacingEvent && !this.isRedacted()) {
+        if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
             // content = Object.assign({}, content, newContent);
         } else {
@@ -669,6 +669,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
+        this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
