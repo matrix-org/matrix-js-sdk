@@ -179,10 +179,10 @@ export default class Relations extends EventEmitter {
         const sender = event.getSender();
         let eventsFromSender = this._annotationsBySender[sender];
         if (!eventsFromSender) {
-            eventsFromSender = this._annotationsBySender[sender] = [];
+            eventsFromSender = this._annotationsBySender[sender] = new Set();
         }
-        // Add the new event to the list for this sender
-        eventsFromSender.push(event);
+        // Add the new event to the set for this sender
+        eventsFromSender.add(event);
     }
 
     _removeAnnotationFromAggregation(event) {
@@ -192,19 +192,22 @@ export default class Relations extends EventEmitter {
         }
 
         const eventsForKey = this._annotationsByKey[key];
-        if (!eventsForKey) {
-            return;
+        if (eventsForKey) {
+            eventsForKey.delete(event);
+
+            // Re-sort the [key, events] pairs in descending order of event count
+            this._sortedAnnotationsByKey.sort((a, b) => {
+                const aEvents = a[1];
+                const bEvents = b[1];
+                return bEvents.size - aEvents.size;
+            });
         }
-        eventsForKey.delete(event);
 
-        // Re-sort the [key, events] pairs in descending order of event count
-        this._sortedAnnotationsByKey.sort((a, b) => {
-            const aEvents = a[1];
-            const bEvents = b[1];
-            return bEvents.size - aEvents.size;
-        });
-
-        // TODO: Remove from events by sender if needed
+        const sender = event.getSender();
+        const eventsFromSender = this._annotationsBySender[sender];
+        if (eventsFromSender) {
+            eventsFromSender.delete(event);
+        }
     }
 
     /**
@@ -263,7 +266,7 @@ export default class Relations extends EventEmitter {
      * This is currently only supported for the annotation relation type.
      *
      * @return {Object}
-     * An object with each relation sender as a key and the matching list of
+     * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
      */
     getAnnotationsBySender() {
