@@ -228,7 +228,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     getContent: function() {
         if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
-            // content = Object.assign({}, content, newContent);
         } else {
             return this._clearEvent.content || this.event.content || {};
         }
@@ -805,7 +804,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Returns the  status of the event, or the replacing event in case `makeReplace` has been called.
+     * Returns the status of the event, or the replacing event in case `makeReplace` has been called.
      *
      * @return {EventStatus}
      */
