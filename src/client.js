@@ -153,11 +153,6 @@ function keyFromRecoverySession(session, decryptionKey) {
  * via `EventTimelineSet#getRelationsForEvent`.
  * This feature is currently unstable and the API may change without notice.
  *
- * @param {boolean} [opts.unstableClientRelationReplacements = false]
- * Optional. Set to true to enable client-side handling of m.replace event relations,
- * exposed through the `Room.replaceEvent` event.
- * This feature is currently unstable and the API may change without notice.
- *
  * @param {Array} [opts.verificationMethods] Optional. The verification method
  * that the application can handle.  Each element should be an item from {@link
  * module:crypto~verificationMethods verificationMethods}, or a class that
@@ -224,7 +219,6 @@ function MatrixClient(opts) {
     this.urlPreviewCache = {};
     this._notifTimelineSet = null;
     this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
-    this.unstableClientRelationReplacements = !!opts.unstableClientRelationReplacements;
 
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;

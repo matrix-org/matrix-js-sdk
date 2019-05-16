@@ -99,11 +99,6 @@ function synthesizeReceipt(userId, event, receiptType) {
  * via `EventTimelineSet#getRelationsForEvent`.
  * This feature is currently unstable and the API may change without notice.
  *
- * @param {boolean} [opts.unstableClientRelationReplacements = false]
- * Optional. Set to true to enable client-side handling of m.replace event relations,
- * exposed through the `Room.replaceEvent` event.
- * This feature is currently unstable and the API may change without notice.
- *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
  * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
