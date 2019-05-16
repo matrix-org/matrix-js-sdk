@@ -1106,19 +1106,21 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         }
         this._pendingEventList.push(event);
 
-        // For pending events, add them to the relations collection immediately.
-        // (The alternate case below already covers this as part of adding to
-        // the timeline set.)
-        // TODO: We should consider whether this means it would be a better
-        // design to lift the relations handling up to the room instead.
-        for (let i = 0; i < this._timelineSets.length; i++) {
-            const timelineSet = this._timelineSets[i];
-            if (timelineSet.getFilter()) {
-                if (this._filter.filterRoomTimeline([event]).length) {
+        if (event.isRelation()) {
+            // For pending events, add them to the relations collection immediately.
+            // (The alternate case below already covers this as part of adding to
+            // the timeline set.)
+            // TODO: We should consider whether this means it would be a better
+            // design to lift the relations handling up to the room instead.
+            for (let i = 0; i < this._timelineSets.length; i++) {
+                const timelineSet = this._timelineSets[i];
+                if (timelineSet.getFilter()) {
+                    if (this._filter.filterRoomTimeline([event]).length) {
+                        timelineSet.aggregateRelations(event);
+                    }
+                } else {
                     timelineSet.aggregateRelations(event);
                 }
-            } else {
-                timelineSet.aggregateRelations(event);
             }
         }
     } else {
