@@ -44,6 +44,7 @@ export default class Relations extends EventEmitter {
         this._annotationsByKey = {};
         this._annotationsBySender = {};
         this._sortedAnnotationsByKey = [];
+        this._targetEvent = null;
     }
 
     /**
@@ -77,11 +78,13 @@ export default class Relations extends EventEmitter {
             event.on("Event.status", this._onEventStatus);
         }
 
+        this._relations.add(event);
+
         if (this.relationType === "m.annotation") {
             this._addAnnotationToAggregation(event);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
-
-        this._relations.add(event);
 
         event.on("Event.beforeRedaction", this._onBeforeRedaction);
 
@@ -113,11 +116,13 @@ export default class Relations extends EventEmitter {
             return;
         }
 
+        this._relations.delete(event);
+
         if (this.relationType === "m.annotation") {
             this._removeAnnotationFromAggregation(event);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
-
-        this._relations.delete(event);
 
         this.emit("Relations.remove", event);
     }
@@ -226,9 +231,13 @@ export default class Relations extends EventEmitter {
             return;
         }
 
+        this._relations.delete(redactedEvent);
+
         if (this.relationType === "m.annotation") {
             // Remove the redacted annotation from aggregation by key
             this._removeAnnotationFromAggregation(redactedEvent);
+        } else if (this.relationType === "m.replace" && this._targetEvent) {
+            this._targetEvent.makeReplaced(this.getLastReplacement());
         }
 
         redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
@@ -276,5 +285,53 @@ export default class Relations extends EventEmitter {
         }
 
         return this._annotationsBySender;
+    }
+
+    /**
+     * Returns the most recent (and allowed) m.replace relation, if any.
+     *
+     * This is currently only supported for the m.replace relation type,
+     * once the target event is known, see `addEvent`.
+     *
+     * @return {MatrixEvent?}
+     */
+    getLastReplacement() {
+        if (this.relationType !== "m.replace") {
+            // Aggregating on last only makes sense for this relation type
+            return null;
+        }
+        if (!this._targetEvent) {
+            // Don't know which replacements to accept yet.
+            // This method shouldn't be called before the original
+            // event is known anyway.
+            return null;
+        }
+        return this.getRelations().reduce((last, event) => {
+            if (event.getSender() !== this._targetEvent.getSender()) {
+                return last;
+            }
+            if (last && last.getTs() > event.getTs()) {
+                return last;
+            }
+            return event;
+        }, null);
+    }
+
+    /*
+     * @param {MatrixEvent} targetEvent the event the relations are related to.
+     */
+    setTargetEvent(event) {
+        if (this._targetEvent) {
+            return;
+        }
+        this._targetEvent = event;
+        if (this.relationType === "m.replace") {
+            const replacement = this.getLastReplacement();
+            // this is the initial update, so only call it if we already have something
+            // to not emit Event.replaced needlessly
+            if (replacement) {
+                this._targetEvent.makeReplaced(replacement);
+            }
+        }
     }
 }

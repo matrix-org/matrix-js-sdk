@@ -99,11 +99,6 @@ function synthesizeReceipt(userId, event, receiptType) {
  * via `EventTimelineSet#getRelationsForEvent`.
  * This feature is currently unstable and the API may change without notice.
  *
- * @param {boolean} [opts.unstableClientRelationReplacements = false]
- * Optional. Set to true to enable client-side handling of m.replace event relations,
- * exposed through the `Room.replaceEvent` event.
- * This feature is currently unstable and the API may change without notice.
- *
  * @prop {string} roomId The ID of this room.
  * @prop {string} name The human-readable display name for this room.
  * @prop {Array<MatrixEvent>} timeline The live event timeline for this room,
@@ -1032,25 +1027,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         // this may be needed to trigger an update.
     }
 
-
-    if (this._opts.unstableClientRelationReplacements && event.isRelation("m.replace")) {
-        const relatesTo = event.getRelation();
-        const replacedId = relatesTo && relatesTo.event_id;
-        const replacedEvent = this.getUnfilteredTimelineSet().findEventById(replacedId);
-        if (replacedEvent && event.getSender() === replacedEvent.getSender()) {
-            const doAndEmitReplacement = () => {
-                replacedEvent.makeReplaced(event);
-                this.emit("Room.replaceEvent", replacedEvent, this);
-            };
-
-            if (event.isBeingDecrypted()) {
-                event.once("Event.decrypted", doAndEmitReplacement);
-            } else {
-                doAndEmitReplacement();
-            }
-        }
-    }
-
     if (event.getUnsigned().transaction_id) {
         const existingEvent = this._txnToEvent[event.getUnsigned().transaction_id];
         if (existingEvent) {
@@ -1102,10 +1078,6 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
  * unique transaction id.
  */
 Room.prototype.addPendingEvent = function(event, txnId) {
-    if (event.isRelation("m.replace")) {
-        return;
-    }
-
     if (event.status !== EventStatus.SENDING) {
         throw new Error("addPendingEvent called on an event with status " +
                         event.status);
@@ -1134,19 +1106,21 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         }
         this._pendingEventList.push(event);
 
-        // For pending events, add them to the relations collection immediately.
-        // (The alternate case below already covers this as part of adding to
-        // the timeline set.)
-        // TODO: We should consider whether this means it would be a better
-        // design to lift the relations handling up to the room instead.
-        for (let i = 0; i < this._timelineSets.length; i++) {
-            const timelineSet = this._timelineSets[i];
-            if (timelineSet.getFilter()) {
-                if (this._filter.filterRoomTimeline([event]).length) {
+        if (event.isRelation()) {
+            // For pending events, add them to the relations collection immediately.
+            // (The alternate case below already covers this as part of adding to
+            // the timeline set.)
+            // TODO: We should consider whether this means it would be a better
+            // design to lift the relations handling up to the room instead.
+            for (let i = 0; i < this._timelineSets.length; i++) {
+                const timelineSet = this._timelineSets[i];
+                if (timelineSet.getFilter()) {
+                    if (this._filter.filterRoomTimeline([event]).length) {
+                        timelineSet.aggregateRelations(event);
+                    }
+                } else {
                     timelineSet.aggregateRelations(event);
                 }
-            } else {
-                timelineSet.aggregateRelations(event);
             }
         }
     } else {

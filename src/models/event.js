@@ -226,7 +226,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        return this._clearEvent.content || this.event.content || {};
+        if (this._replacingEvent) {
+            return this._replacingEvent.getContent()["m.new_content"] || {};
+        } else {
+            return this._clearEvent.content || this.event.content || {};
+        }
     },
 
     /**
@@ -664,6 +668,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
+        this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
@@ -786,24 +791,29 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     /**
      * Set an event that replaces the content of this event, through an m.replace relation.
      *
-     * @param {MatrixEvent} newEvent the event with the replacing content.
+     * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
     makeReplaced(newEvent) {
         if (this.isRedacted()) {
             return;
         }
-        // ignore previous replacements
-        if (this._replacingEvent && this._replacingEvent.getTs() > newEvent.getTs()) {
-            return;
+        if (this._replacingEvent !== newEvent) {
+            this._replacingEvent = newEvent;
+            this.emit("Event.replaced", this);
         }
-        if (newEvent.isBeingDecrypted()) {
-            throw new Error("Trying to replace event when " +
-                "new content hasn't been decrypted yet");
+    },
+
+    /**
+     * Returns the status of the event, or the replacing event in case `makeReplace` has been called.
+     *
+     * @return {EventStatus}
+     */
+    replacementOrOwnStatus() {
+        if (this._replacingEvent) {
+            return this._replacingEvent.status;
+        } else {
+            return this.status;
         }
-        const oldContent = this.getContent();
-        const newContent = newEvent.getContent()["m.new_content"];
-        Object.assign(oldContent, newContent);
-        this._replacingEvent = newEvent;
     },
 
     /**
