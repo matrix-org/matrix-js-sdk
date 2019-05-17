@@ -221,7 +221,19 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Get the (decrypted, if necessary) event content JSON.
+     * Get the (decrypted, if necessary) event content JSON, even if the event
+     * was replaced by another event.
+     *
+     * @return {Object} The event content JSON, or an empty object.
+     */
+    getOriginalContent: function() {
+        return this._clearEvent.content || this.event.content || {};
+    },
+
+    /**
+     * Get the (decrypted, if necessary) event content JSON,
+     * or the content from the replacing event, if any.
+     * See `makeReplaced`.
      *
      * @return {Object} The event content JSON, or an empty object.
      */
@@ -229,7 +241,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
         } else {
-            return this._clearEvent.content || this.event.content || {};
+            return this.getOriginalContent();
         }
     },
 
