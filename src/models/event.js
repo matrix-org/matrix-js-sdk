@@ -828,7 +828,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     /**
      * Returns the event replacing the content of this event, if any.
      *
-     * @return {string?}
+     * @return {MatrixEvent?}
      */
     replacingEvent() {
         return this._replacingEvent;
