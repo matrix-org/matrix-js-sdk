@@ -826,6 +826,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Returns the event replacing the content of this event, if any.
+     *
+     * @return {string?}
+     */
+    replacingEvent() {
+        return this._replacingEvent;
+    },
+
+    /**
      * Summarise the event as JSON for debugging. If encrypted, include both the
      * decrypted and encrypted view of the event. This is named `toJSON` for use
      * with `JSON.stringify` which checks objects for functions named `toJSON`
