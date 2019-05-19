@@ -378,7 +378,11 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
                 );
                 sigInfo.valid = true;
             } catch (e) {
-                logger.info("Bad signature from key ID " + keyId, e);
+                logger.info(
+                    "Bad signature from key ID " + keyId + " userID " + this._userId +
+                    " device ID " + device.deviceId + " fingerprint: " +
+                    device.getFingerprint(), backupInfo.auth_data, e,
+                );
                 sigInfo.valid = false;
             }
         } else {

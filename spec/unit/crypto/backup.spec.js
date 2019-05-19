@@ -126,7 +126,7 @@ describe("MegolmBackup", function() {
     let megolmDecryption;
     beforeEach(async function() {
         await Olm.init();
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
 
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockCrypto.backupKey = new Olm.PkEncryption();

@@ -480,7 +480,7 @@ export class AutoDiscovery {
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");
             request(
-                { method: "GET", uri: url },
+                { method: "GET", uri: url, timeout: 5000 },
                 (err, response, body) => {
                     if (err || response.statusCode < 200 || response.statusCode >= 300) {
                         let action = "FAIL_PROMPT";

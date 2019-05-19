@@ -1,3 +1,65 @@
+Changes in [1.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.1.0) (2019-05-07)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.1.0-rc.1...v1.1.0)
+
+ * No Changes since rc.1
+
+Changes in [1.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.1.0-rc.1) (2019-04-30)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.4...v1.1.0-rc.1)
+
+ * use the release version of olm 3.1.0
+   [\#903](https://github.com/matrix-org/matrix-js-sdk/pull/903)
+ * Use new Olm repo link in README
+   [\#901](https://github.com/matrix-org/matrix-js-sdk/pull/901)
+ * Support being fed a .well-known config object for validation
+   [\#897](https://github.com/matrix-org/matrix-js-sdk/pull/897)
+ * emit self-membership event at end of handling sync update
+   [\#900](https://github.com/matrix-org/matrix-js-sdk/pull/900)
+ * Use packages.matrix.org for Olm
+   [\#898](https://github.com/matrix-org/matrix-js-sdk/pull/898)
+ * Fix tests on develop
+   [\#899](https://github.com/matrix-org/matrix-js-sdk/pull/899)
+ * Stop syncing when the token is invalid
+   [\#895](https://github.com/matrix-org/matrix-js-sdk/pull/895)
+ * change event redact,  POST request to PUT request
+   [\#887](https://github.com/matrix-org/matrix-js-sdk/pull/887)
+ * Expose better autodiscovery error messages
+   [\#894](https://github.com/matrix-org/matrix-js-sdk/pull/894)
+ * Explicitly guard store usage during sync startup
+   [\#892](https://github.com/matrix-org/matrix-js-sdk/pull/892)
+ * Flag v3 rooms as safe
+   [\#893](https://github.com/matrix-org/matrix-js-sdk/pull/893)
+ * Cache failed capabilities lookups for shorter amounts of time
+   [\#890](https://github.com/matrix-org/matrix-js-sdk/pull/890)
+ * Fix highlight notifications for unencrypted rooms
+   [\#891](https://github.com/matrix-org/matrix-js-sdk/pull/891)
+ * Document checking crypto state before using `hasUnverifiedDevices`
+   [\#889](https://github.com/matrix-org/matrix-js-sdk/pull/889)
+ * Add logging to sync startup path
+   [\#888](https://github.com/matrix-org/matrix-js-sdk/pull/888)
+ * Track e2e highlights better, particularly in 'Mentions Only' rooms
+   [\#886](https://github.com/matrix-org/matrix-js-sdk/pull/886)
+ * support both the incorrect and correct MAC methods
+   [\#882](https://github.com/matrix-org/matrix-js-sdk/pull/882)
+ * Refuse to set forwards pagination token on live timeline
+   [\#885](https://github.com/matrix-org/matrix-js-sdk/pull/885)
+ * Degrade `IndexedDBStore` back to memory only on failure
+   [\#884](https://github.com/matrix-org/matrix-js-sdk/pull/884)
+ * Refuse to link live timelines into the forwards/backwards position when
+   either is invalid
+   [\#877](https://github.com/matrix-org/matrix-js-sdk/pull/877)
+ * Key backup logging improvements
+   [\#883](https://github.com/matrix-org/matrix-js-sdk/pull/883)
+ * Don't assume aborts are always from txn.abort()
+   [\#880](https://github.com/matrix-org/matrix-js-sdk/pull/880)
+ * Add a bunch of logging
+   [\#878](https://github.com/matrix-org/matrix-js-sdk/pull/878)
+ * Refuse splicing the live timeline into a broken position
+   [\#873](https://github.com/matrix-org/matrix-js-sdk/pull/873)
+ * Add existence check to local storage based crypto store
+   [\#872](https://github.com/matrix-org/matrix-js-sdk/pull/872)
+
 Changes in [1.0.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.0.4) (2019-04-08)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.0.3...v1.0.4)

@@ -30,7 +30,7 @@ describe("AutoDiscovery", function() {
     let httpBackend = null;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new MockHttpBackend();
         sdk.request(httpBackend.requestFn);
     });

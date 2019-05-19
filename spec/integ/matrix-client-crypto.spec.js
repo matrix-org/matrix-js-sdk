@@ -406,7 +406,7 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
 
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
         await aliTestClient.client.initCrypto();

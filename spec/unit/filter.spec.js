@@ -12,7 +12,7 @@ describe("Filter", function() {
     let filter;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         filter = new Filter(userId);
     });
 

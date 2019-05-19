@@ -68,7 +68,7 @@ function createLinkedTimelines() {
 
 describe("TimelineIndex", function() {
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
     describe("minIndex", function() {
@@ -164,7 +164,7 @@ describe("TimelineWindow", function() {
     }
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
     describe("load", function() {

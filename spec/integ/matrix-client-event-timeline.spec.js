@@ -103,7 +103,7 @@ describe("getEventTimeline support", function() {
     let client;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
     });
@@ -228,7 +228,7 @@ describe("MatrixClient event timelines", function() {
     let httpBackend = null;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
 

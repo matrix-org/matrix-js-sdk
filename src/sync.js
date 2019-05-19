@@ -117,10 +117,15 @@ function SyncApi(client, opts) {
  */
 SyncApi.prototype.createRoom = function(roomId) {
     const client = this.client;
+    const {
+        timelineSupport,
+        unstableClientRelationAggregation,
+    } = client;
     const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: this.opts.lazyLoadMembers,
         pendingEventOrdering: this.opts.pendingEventOrdering,
-        timelineSupport: client.timelineSupport,
+        timelineSupport,
+        unstableClientRelationAggregation,
     });
     client.reEmitter.reEmit(room, ["Room.name", "Room.timeline", "Room.redaction",
                           "Room.receipt", "Room.tags",
@@ -128,6 +133,7 @@ SyncApi.prototype.createRoom = function(roomId) {
                           "Room.localEchoUpdated",
                           "Room.accountData",
                           "Room.myMembership",
+                          "Room.replaceEvent",
                          ]);
     this._registerStateListeners(room);
     return room;
@@ -712,7 +718,6 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
  * @param {boolean} syncOptions.hasSyncedBefore
  */
 SyncApi.prototype._sync = async function(syncOptions) {
-    debuglog("Starting sync request processing...");
     const client = this.client;
 
     if (!this._running) {
@@ -751,9 +756,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     // Reset after a successful sync
     this._failedSyncCount = 0;
 
-    debuglog("Storing sync data...");
     await client.store.setSyncData(data);
-    debuglog("Sync data stored");
 
     const syncEventData = {
         oldSyncToken: syncToken,
@@ -768,7 +771,6 @@ SyncApi.prototype._sync = async function(syncOptions) {
     }
 
     try {
-        debuglog("Processing sync response...");
         await this._processSyncResponse(syncEventData, data);
     } catch(e) {
         // log the exception with stack if we have it, else fall back

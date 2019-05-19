@@ -149,6 +149,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  * maintain support for back-paginating the live timeline after a '/sync'
  * result with a gap.
  *
+ * @param {boolean} [opts.unstableClientRelationAggregation = false]
+ * Optional. Set to true to enable client-side aggregation of event relations
+ * via `EventTimelineSet#getRelationsForEvent`.
+ * This feature is currently unstable and the API may change without notice.
+ *
  * @param {Array} [opts.verificationMethods] Optional. The verification method
  * that the application can handle.  Each element should be an item from {@link
  * module:crypto~verificationMethods verificationMethods}, or a class that
@@ -214,6 +219,7 @@ function MatrixClient(opts) {
     this.timelineSupport = Boolean(opts.timelineSupport);
     this.urlPreviewCache = {};
     this._notifTimelineSet = null;
+    this.unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
     this._crypto = null;
     this._cryptoStore = opts.cryptoStore;
@@ -1712,7 +1718,7 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         content: content,
     });
     localEvent._txnId = txnId;
-    localEvent.status = EventStatus.SENDING;
+    localEvent.setStatus(EventStatus.SENDING);
 
     // add this event immediately to the local store as 'sending'.
     if (room) {
@@ -1842,7 +1848,7 @@ function _updatePendingEventStatus(room, event, newStatus) {
     if (room) {
         room.updatePendingEvent(event, newStatus);
     } else {
-        event.status = newStatus;
+        event.setStatus(newStatus);
     }
 }
 
@@ -4156,6 +4162,10 @@ function _PojoToMatrixEventMapper(client) {
                 "Event.decrypted",
             ]);
             event.attemptDecryption(client._crypto);
+        }
+        const room = client.getRoom(event.getRoomId());
+        if (room) {
+            room.reEmitter.reEmit(event, ["Event.replaced"]);
         }
         return event;
     }

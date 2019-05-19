@@ -904,7 +904,7 @@ MatrixBaseApis.prototype.redactEvent = function(
         callback = txnId;
     }
 
-    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId/$tnxId", {
+    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId/$txnId", {
         $roomId: roomId,
         $eventId: eventId,
         $txnId: txnId ? txnId : this.makeTxnId(),

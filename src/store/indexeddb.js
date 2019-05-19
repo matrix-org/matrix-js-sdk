@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/* eslint-disable no-invalid-this */
+/* eslint-disable babel/no-invalid-this */
 
 import Promise from 'bluebird';
 import {MemoryStore} from "./memory";
