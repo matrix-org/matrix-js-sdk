@@ -45,6 +45,7 @@ const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
+import logger from '../src/logger';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
@@ -70,7 +71,7 @@ function keysFromRecoverySession(sessions, decryptionKey, roomId) {
             decrypted.room_id = roomId;
             keys.push(decrypted);
         } catch (e) {
-            console.log("Failed to decrypt session from backup");
+            logger.log("Failed to decrypt session from backup");
         }
     }
     return keys;
@@ -449,7 +450,7 @@ MatrixClient.prototype.getCapabilities = function() {
 
     if (this._cachedCapabilities) {
         if (now < this._cachedCapabilities.expiration) {
-            console.log("Returning cached capabilities");
+            logger.log("Returning cached capabilities");
             return Promise.resolve(this._cachedCapabilities.capabilities);
         }
     }
@@ -458,7 +459,7 @@ MatrixClient.prototype.getCapabilities = function() {
     return this._http.authedRequest(
         undefined, "GET", "/capabilities",
     ).catch((e) => {
-        console.error(e);
+        logger.error(e);
         return null; // otherwise consume the error
     }).then((r) => {
         if (!r) r = {};
@@ -475,7 +476,7 @@ MatrixClient.prototype.getCapabilities = function() {
             expiration: now + cacheMs,
         };
 
-        console.log("Caching capabilities: ", capabilities);
+        logger.log("Caching capabilities: ", capabilities);
         return capabilities;
     });
 };
@@ -501,7 +502,7 @@ MatrixClient.prototype.initCrypto = async function() {
     }
 
     if (this._crypto) {
-        console.warn("Attempt to re-initialise e2e encryption on MatrixClient");
+        logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
         return;
     }
 
@@ -515,7 +516,7 @@ MatrixClient.prototype.initCrypto = async function() {
     }
 
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
-    console.log("Crypto: initialising roomlist...");
+    logger.log("Crypto: initialising roomlist...");
     await this._roomList.init();
 
     const userId = this.getUserId();
@@ -550,7 +551,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.warning",
     ]);
 
-    console.log("Crypto: initialising crypto object...");
+    logger.log("Crypto: initialising crypto object...");
     await crypto.init();
 
     this.olmVersion = Crypto.getOlmVersion();
@@ -1244,7 +1245,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
                 key.session_id = targetSessionId;
                 keys.push(key);
             } catch (e) {
-                console.log("Failed to decrypt session from backup");
+                logger.log("Failed to decrypt session from backup");
             }
         }
 
@@ -1696,7 +1697,7 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         txnId = this.makeTxnId();
     }
 
-    console.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
+    logger.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
 
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
@@ -1778,7 +1779,7 @@ function _sendEvent(client, room, event, callback) {
         return res;
     }, function(err) {
         // the request failed to send.
-        console.error("Error sending event", err.stack || err);
+        logger.error("Error sending event", err.stack || err);
 
         try {
             // set the error on the event before we update the status:
@@ -1794,7 +1795,7 @@ function _sendEvent(client, room, event, callback) {
                 callback(err);
             }
         } catch (err2) {
-            console.error("Exception in error handler!", err2.stack || err);
+            logger.error("Exception in error handler!", err2.stack || err);
         }
         throw err;
     });
@@ -1872,7 +1873,7 @@ function _sendEventHttpRequest(client, event) {
     return client._http.authedRequest(
         undefined, "PUT", path, undefined, event.getWireContent(),
     ).then((res) => {
-        console.log(
+        logger.log(
             `Event sent to ${event.getRoomId()} with event id ${res.event_id}`,
         );
         return res;
@@ -2179,10 +2180,10 @@ MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=fals
     // Work backwards first, looking at create events.
     let createEvent = currentRoom.currentState.getStateEvents("m.room.create", "");
     while (createEvent) {
-        console.log(`Looking at ${createEvent.getId()}`);
+        logger.log(`Looking at ${createEvent.getId()}`);
         const predecessor = createEvent.getContent()['predecessor'];
         if (predecessor && predecessor['room_id']) {
-            console.log(`Looking at predecessor ${predecessor['room_id']}`);
+            logger.log(`Looking at predecessor ${predecessor['room_id']}`);
             const refRoom = this.getRoom(predecessor['room_id']);
             if (!refRoom) break; // end of the chain
 
@@ -3547,7 +3548,7 @@ MatrixClient.prototype.syncLeftRooms = function() {
 
     // cleanup locks
     this._syncLeftRoomsPromise.then(function(res) {
-        console.log("Marking success of sync left room request");
+        logger.log("Marking success of sync left room request");
         self._syncedLeftRooms = true; // flip the bit on success
     }).finally(function() {
         self._syncLeftRoomsPromise = null; // cleanup ongoing request state
@@ -3792,7 +3793,7 @@ MatrixClient.prototype.startClient = async function(opts) {
 
     if (this._syncApi) {
         // This shouldn't happen since we thought the client was not running
-        console.error("Still have sync object whilst not running: stopping old one");
+        logger.error("Still have sync object whilst not running: stopping old one");
         this._syncApi.stop();
     }
 
@@ -3835,7 +3836,7 @@ MatrixClient.prototype._storeClientOptions = function() {
  * clean shutdown.
  */
 MatrixClient.prototype.stopClient = function() {
-    console.log('stopping MatrixClient');
+    logger.log('stopping MatrixClient');
 
     this.clientRunning = false;
     // TODO: f.e. Room => self.store.storeRoom(room) ?
@@ -3976,7 +3977,7 @@ function setupCallEventHandler(client) {
                 return; // stale/old invite event
             }
             if (call) {
-                console.log(
+                logger.log(
                     "WARN: Already have a MatrixCall with id %s but got an " +
                     "invite. Clobbering.",
                     content.call_id,
@@ -3987,7 +3988,7 @@ function setupCallEventHandler(client) {
                 forceTURN: client._forceTURN,
             });
             if (!call) {
-                console.log(
+                logger.log(
                     "Incoming call ID " + content.call_id + " but this client " +
                     "doesn't support WebRTC",
                 );
@@ -4032,14 +4033,14 @@ function setupCallEventHandler(client) {
                 if (existingCall.state === 'wait_local_media' ||
                         existingCall.state === 'create_offer' ||
                         existingCall.callId > call.callId) {
-                    console.log(
+                    logger.log(
                         "Glare detected: answering incoming call " + call.callId +
                         " and canceling outgoing call " + existingCall.callId,
                     );
                     existingCall._replacedBy(call);
                     call.answer();
                 } else {
-                    console.log(
+                    logger.log(
                         "Glare detected: rejecting incoming call " + call.callId +
                         " and keeping outgoing call " + existingCall.callId,
                     );
@@ -4109,7 +4110,7 @@ function checkTurnServers(client) {
 
     client.turnServer().done(function(res) {
         if (res.uris) {
-            console.log("Got TURN URIs: " + res.uris + " refresh in " +
+            logger.log("Got TURN URIs: " + res.uris + " refresh in " +
                 res.ttl + " secs");
             // map the response to a format that can be fed to
             // RTCPeerConnection
@@ -4125,7 +4126,7 @@ function checkTurnServers(client) {
             }, (res.ttl || (60 * 60)) * 1000 * 0.9);
         }
     }, function(err) {
-        console.error("Failed to get TURN URIs");
+        logger.error("Failed to get TURN URIs");
         client._checkTurnServersTimeoutID =
             setTimeout(function() {
  checkTurnServers(client);

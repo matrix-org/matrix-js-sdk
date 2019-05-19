@@ -32,6 +32,7 @@ const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
+import logger from '../src/logger';
 
 import {InvalidStoreError} from './errors';
 
@@ -58,7 +59,7 @@ function debuglog(...params) {
     if (!DEBUG) {
         return;
     }
-    console.log(...params);
+    logger.log(...params);
 }
 
 
@@ -386,7 +387,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         peekRoom.addLiveEvents(events);
         self._peekPoll(peekRoom, res.end);
     }, function(err) {
-        console.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
+        logger.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
         setTimeout(function() {
             self._peekPoll(peekRoom, token);
         }, 30 * 1000);
@@ -448,7 +449,7 @@ SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
 SyncApi.prototype._shouldAbortSync = function(error) {
     if (error.errcode === "M_UNKNOWN_TOKEN") {
         // The logout already happened, we just need to stop.
-        console.warn("Token no longer valid - assuming logout");
+        logger.warn("Token no longer valid - assuming logout");
         this.stop();
         return true;
     }
@@ -488,7 +489,7 @@ SyncApi.prototype.sync = function() {
 
             client.pushRules = result;
         } catch (err) {
-            console.error("Getting push rules failed", err);
+            logger.error("Getting push rules failed", err);
             if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
@@ -516,7 +517,7 @@ SyncApi.prototype.sync = function() {
                     );
                     debuglog("Created and stored lazy load sync filter");
                 } catch (err) {
-                    console.error(
+                    logger.error(
                         "Creating and storing lazy load sync filter failed",
                         err,
                     );
@@ -540,7 +541,7 @@ SyncApi.prototype.sync = function() {
             // we leave the state as 'ERROR' which isn't great since this normally means
             // we're retrying. The client must be stopped before clearing the stores anyway
             // so the app should stop the client, clear the store and start it again.
-            console.warn("InvalidStoreError: store is not usable: stopping sync.");
+            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
             return;
         }
         if (this.opts.lazyLoadMembers && this.opts.crypto) {
@@ -551,7 +552,7 @@ SyncApi.prototype.sync = function() {
             await this.client._storeClientOptions();
             debuglog("Stored client options");
         } catch (err) {
-            console.error("Storing client options failed", err);
+            logger.error("Storing client options failed", err);
             throw err;
         }
 
@@ -574,7 +575,7 @@ SyncApi.prototype.sync = function() {
                 getFilterName(client.credentials.userId), filter,
             );
         } catch (err) {
-            console.error("Getting filter failed", err);
+            logger.error("Getting filter failed", err);
             if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
@@ -621,7 +622,7 @@ SyncApi.prototype.sync = function() {
                 return self._syncFromCache(savedSync);
             }
         }).catch(err => {
-            console.error("Getting saved sync failed", err);
+            logger.error("Getting saved sync failed", err);
         });
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
@@ -693,7 +694,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     try {
         await this._processSyncResponse(syncEventData, data);
     } catch(e) {
-        console.error("Error processing cached sync", e.stack || e);
+        logger.error("Error processing cached sync", e.stack || e);
     }
 
     // Don't emit a prepared if we've bailed because the store is invalid:
@@ -772,7 +773,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
-        console.error("Caught /sync error", e.stack || e);
+        logger.error("Caught /sync error", e.stack || e);
 
         // Emit the exception for client handling
         this.client.emit("sync.unexpectedError", e);
@@ -886,15 +887,15 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
         return;
     }
 
-    console.error("/sync error %s", err);
-    console.error(err);
+    logger.error("/sync error %s", err);
+    logger.error(err);
 
     if(this._shouldAbortSync(err)) {
         return;
     }
 
     this._failedSyncCount++;
-    console.log('Number of consecutive failed sync requests:', this._failedSyncCount);
+    logger.log('Number of consecutive failed sync requests:', this._failedSyncCount);
 
     debuglog("Starting keep-alive");
     // Note that we do *not* mark the sync connection as
@@ -1048,7 +1049,7 @@ SyncApi.prototype._processSyncResponse = async function(
                             content.msgtype == "m.bad.encrypted"
                     ) {
                         // the mapper already logged a warning.
-                        console.log(
+                        logger.log(
                             'Ignoring undecryptable to-device event from ' +
                                 toDeviceEvent.getSender(),
                         );

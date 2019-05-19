@@ -29,6 +29,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
+import logger from '../../src/logger';
 import ReEmitter from '../ReEmitter';
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -206,7 +207,7 @@ utils.inherits(Room, EventEmitter);
 Room.prototype.getVersion = function() {
     const createEvent = this.currentState.getStateEvents("m.room.create", "");
     if (!createEvent) {
-        console.warn("Room " + this.room_id + " does not have an m.room.create event");
+        logger.warn("Room " + this.room_id + " does not have an m.room.create event");
         return '1';
     }
     const ver = createEvent.getContent()['room_version'];
@@ -260,8 +261,8 @@ Room.prototype.getRecommendedVersion = async function() {
     }
 
     const currentVersion = this.getVersion();
-    console.log(`[${this.roomId}] Current version: ${currentVersion}`);
-    console.log(`[${this.roomId}] Version capability: `, versionCap);
+    logger.log(`[${this.roomId}] Current version: ${currentVersion}`);
+    logger.log(`[${this.roomId}] Version capability: `, versionCap);
 
     const result = {
         version: currentVersion,
@@ -283,9 +284,9 @@ Room.prototype.getRecommendedVersion = async function() {
         result.needsUpgrade = true;
         result.urgent = !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
         if (result.urgent) {
-            console.warn(`URGENT upgrade required on ${this.roomId}`);
+            logger.warn(`URGENT upgrade required on ${this.roomId}`);
         } else {
-            console.warn(`Non-urgent upgrade required on ${this.roomId}`);
+            logger.warn(`Non-urgent upgrade required on ${this.roomId}`);
         }
         return Promise.resolve(result);
     }
@@ -468,7 +469,7 @@ Room.prototype._loadMembers = async function() {
     if (rawMembersEvents === null) {
         fromServer = true;
         rawMembersEvents = await this._loadMembersFromServer();
-        console.log(`LL: got ${rawMembersEvents.length} ` +
+        logger.log(`LL: got ${rawMembersEvents.length} ` +
             `members from server for room ${this.roomId}`);
     }
     const memberEvents = rawMembersEvents.map(this._client.getEventMapper());
@@ -512,21 +513,21 @@ Room.prototype.loadMembersIfNeeded = function() {
             const oobMembers = this.currentState.getMembers()
                 .filter((m) => m.isOutOfBand())
                 .map((m) => m.events.member.event);
-            console.log(`LL: telling store to write ${oobMembers.length}`
+            logger.log(`LL: telling store to write ${oobMembers.length}`
                 + ` members for room ${this.roomId}`);
             const store = this._client.store;
             return store.setOutOfBandMembers(this.roomId, oobMembers)
                 // swallow any IDB error as we don't want to fail
                 // because of this
                 .catch((err) => {
-                    console.log("LL: storing OOB room members failed, oh well",
+                    logger.log("LL: storing OOB room members failed, oh well",
                         err);
                 });
         }
     }).catch((err) => {
         // as this is not awaited anywhere,
         // at least show the error in the console
-        console.error(err);
+        logger.error(err);
     });
 
     this._membersPromise = inMemoryUpdate;
@@ -552,9 +553,9 @@ Room.prototype.clearLoadedMembersIfNeeded = async function() {
  */
 Room.prototype._cleanupAfterLeaving = function() {
     this.clearLoadedMembersIfNeeded().catch((err) => {
-        console.error(`error after clearing loaded members from ` +
+        logger.error(`error after clearing loaded members from ` +
             `room ${this.roomId} after leaving`);
-        console.dir(err);
+        logger.dir(err);
     });
 };
 
@@ -1099,7 +1100,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
     if (this._opts.pendingEventOrdering == "detached") {
         if (this._pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
-            console.warn("Setting event as NOT_SENT due to messages in the same state");
+            logger.warn("Setting event as NOT_SENT due to messages in the same state");
             event.status = EventStatus.NOT_SENT;
         }
         this._pendingEventList.push(event);
@@ -1209,7 +1210,7 @@ ALLOWED_TRANSITIONS[EventStatus.CANCELLED] =
  * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
  */
 Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
-    console.log(`setting pendingEvent status to ${newStatus} in ${event.getRoomId()}`);
+    logger.log(`setting pendingEvent status to ${newStatus} in ${event.getRoomId()}`);
 
     // if the message was sent, we expect an event id
     if (newStatus == EventStatus.SENT && !newEventId) {

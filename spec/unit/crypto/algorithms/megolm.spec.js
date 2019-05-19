@@ -10,6 +10,7 @@ import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import Crypto from '../../../../lib/crypto';
+import logger from '../../../../src/logger';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
@@ -21,7 +22,7 @@ const Olm = global.Olm;
 
 describe("MegolmDecryption", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm unit tests: libolm not present');
+        logger.warn('Not running megolm unit tests: libolm not present');
         return;
     }
 

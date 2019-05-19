@@ -23,6 +23,7 @@ limitations under the License.
  */
 
 import Promise from 'bluebird';
+import logger from '../../../src/logger';
 
 const logger = require("../../logger");
 const utils = require("../../utils");
@@ -278,7 +279,7 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
         ).catch((e) => {
             // This throws if the upload failed, but this is fine
             // since it will have written it to the db and will retry.
-            console.log("Failed to back up group session", e);
+            logger.log("Failed to back up group session", e);
         });
     }
 
@@ -955,7 +956,7 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
             ).catch((e) => {
                 // This throws if the upload failed, but this is fine
                 // since it will have written it to the db and will retry.
-                console.log("Failed to back up group session", e);
+                logger.log("Failed to back up group session", e);
             });
         }
     }).catch((e) => {
@@ -1088,7 +1089,7 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
             ).catch((e) => {
                 // This throws if the upload failed, but this is fine
                 // since it will have written it to the db and will retry.
-                console.log("Failed to back up group session", e);
+                logger.log("Failed to back up group session", e);
             });
         }
         // have another go at decrypting events sent with this session.

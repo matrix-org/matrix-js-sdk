@@ -462,7 +462,7 @@ OlmDevice.prototype.createInboundSession = async function(
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
     if (this._sessionsInProgress[theirDeviceIdentityKey]) {
-        console.log("waiting for session to be created");
+        logger.log("waiting for session to be created");
         try {
             await this._sessionsInProgress[theirDeviceIdentityKey];
         } catch (e) {

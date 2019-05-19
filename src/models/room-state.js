@@ -21,6 +21,7 @@ const EventEmitter = require("events").EventEmitter;
 
 const utils = require("../utils");
 const RoomMember = require("./room-member");
+import logger from '../../src/logger';
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;
@@ -447,7 +448,7 @@ RoomState.prototype.clearOutOfBandMembers = function() {
             delete this.members[userId];
         }
     });
-    console.log(`LL: RoomState removed ${count} members...`);
+    logger.log(`LL: RoomState removed ${count} members...`);
     this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
 };
 
@@ -456,11 +457,11 @@ RoomState.prototype.clearOutOfBandMembers = function() {
  * @param {MatrixEvent[]} stateEvents array of membership state events
  */
 RoomState.prototype.setOutOfBandMembers = function(stateEvents) {
-    console.log(`LL: RoomState about to set ${stateEvents.length} OOB members ...`);
+    logger.log(`LL: RoomState about to set ${stateEvents.length} OOB members ...`);
     if (this._oobMemberFlags.status !== OOB_STATUS_INPROGRESS) {
         return;
     }
-    console.log(`LL: RoomState put in OOB_STATUS_FINISHED state ...`);
+    logger.log(`LL: RoomState put in OOB_STATUS_FINISHED state ...`);
     this._oobMemberFlags.status = OOB_STATUS_FINISHED;
     stateEvents.forEach((e) => this._setOutOfBandMember(e));
 };

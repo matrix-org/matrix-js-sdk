@@ -13,15 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import logger from '../../../../src/logger';
 
 try {
     global.Olm = require('olm');
 } catch (e) {
-    console.warn("unable to run device verification tests: libolm not available");
+    logger.warn("unable to run device verification tests: libolm not available");
 }
 
 import expect from 'expect';
-
 import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 import {ShowQRCode, ScanQRCode} from '../../../../lib/crypto/verification/QRCode';
@@ -30,7 +30,7 @@ const Olm = global.Olm;
 
 describe("QR code verification", function() {
     if (!global.Olm) {
-        console.warn('Not running device verification tests: libolm not present');
+        logger.warn('Not running device verification tests: libolm not present');
         return;
     }
 

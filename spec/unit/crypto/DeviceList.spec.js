@@ -19,6 +19,7 @@ import DeviceList from '../../../lib/crypto/DeviceList';
 import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
 import testUtils from '../../test-utils';
 import utils from '../../../lib/utils';
+import logger from '../../../src/logger';
 
 import expect from 'expect';
 import Promise from 'bluebird';
@@ -134,7 +135,7 @@ describe('DeviceList', function() {
         }).then(() => {
             // uh-oh; user restarts before second request completes. The new instance
             // should know we never got a complete device list.
-            console.log("Creating new devicelist to simulate app reload");
+            logger.log("Creating new devicelist to simulate app reload");
             downloadSpy.reset();
             const dl2 = createTestDeviceList();
             const queryDefer3 = Promise.defer();

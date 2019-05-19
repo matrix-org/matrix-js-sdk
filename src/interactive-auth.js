@@ -21,6 +21,7 @@ import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");
+import logger from '../src/logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -268,7 +269,7 @@ InteractiveAuth.prototype = {
 
         prom = prom.then(
             function(result) {
-                console.log("result from request: ", result);
+                logger.log("result from request: ", result);
                 self._completionDeferred.resolve(result);
             }, function(error) {
                 // sometimes UI auth errors don't come with flows
@@ -301,7 +302,7 @@ InteractiveAuth.prototype = {
             // since we don't want to suddenly fail if the internet connection
             // had a blip whilst we were polling
             prom = prom.catch((error) => {
-                console.log("Ignoring error from UI auth: " + error);
+                logger.log("Ignoring error from UI auth: " + error);
             });
         }
         prom.done();
@@ -351,9 +352,9 @@ InteractiveAuth.prototype = {
      */
     _chooseStage: function() {
         const flow = this._chooseFlow();
-        console.log("Active flow => %s", JSON.stringify(flow));
+        logger.log("Active flow => %s", JSON.stringify(flow));
         const nextStage = this._firstUncompletedStage(flow);
-        console.log("Next stage: %s", nextStage);
+        logger.log("Next stage: %s", nextStage);
         return nextStage;
     },
 

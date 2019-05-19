@@ -15,10 +15,11 @@ limitations under the License.
 */
 
 // try to load the olm library.
+import logger from '../src/logger';
 
 try {
     global.Olm = require('olm');
-    console.log('loaded libolm');
+    logger.log('loaded libolm');
 } catch (e) {
-    console.warn("unable to run crypto tests: libolm not available");
+    logger.warn("unable to run crypto tests: libolm not available");
 }

@@ -36,6 +36,7 @@ import Promise from 'bluebird';
 const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
 const TestClient = require('../TestClient').default;
+import logger from '../../src/logger';
 
 let aliTestClient;
 const roomId = "!room:localhost";
@@ -95,7 +96,7 @@ function expectBobQueryKeys() {
 
     const aliKeys = {};
     aliKeys[aliDeviceId] = aliTestClient.deviceKeys;
-    console.log("query result will be", aliKeys);
+    logger.log("query result will be", aliKeys);
 
     bobTestClient.httpBackend.when(
         "POST", "/keys/query",
@@ -334,7 +335,7 @@ function recvMessage(httpBackend, client, sender, message) {
             if (event.getType() == "m.room.member") {
                 return;
             }
-            console.log(client.credentials.userId + " received event",
+            logger.log(client.credentials.userId + " received event",
                         event);
 
             client.removeListener("event", onEvent);
@@ -607,7 +608,7 @@ describe("MatrixClient crypto", function() {
 
                 const eventPromise = new Promise((resolve, reject) => {
                     const onEvent = function(event) {
-                        console.log(bobUserId + " received event",
+                        logger.log(bobUserId + " received event",
                                     event);
                         resolve(event);
                     };
@@ -734,7 +735,7 @@ describe("MatrixClient crypto", function() {
 
         return Promise.resolve()
             .then(() => {
-                console.log(aliTestClient + ': starting');
+                logger.log(aliTestClient + ': starting');
                 httpBackend.when("GET", "/pushrules").respond(200, {});
                 httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
                 aliTestClient.expectDeviceKeyUpload();
@@ -746,7 +747,7 @@ describe("MatrixClient crypto", function() {
                 aliTestClient.client.startClient({});
 
                 return httpBackend.flushAllExpected().then(() => {
-                    console.log(aliTestClient + ': started');
+                    logger.log(aliTestClient + ': started');
                 });
             })
             .then(() => httpBackend.when("POST", "/keys/upload")
@@ -755,7 +756,7 @@ describe("MatrixClient crypto", function() {
                     expect(content.one_time_keys).toNotEqual({});
                     expect(Object.keys(content.one_time_keys).length)
                         .toBeGreaterThanOrEqualTo(1);
-                    console.log('received %i one-time keys',
+                    logger.log('received %i one-time keys',
                                 Object.keys(content.one_time_keys).length);
                     // cancel futher calls by telling the client
                     // we have more than we need

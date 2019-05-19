@@ -355,9 +355,9 @@ describe("MatrixClient", function() {
                 return client._crypto._olmDevice.sign(anotherjson.stringify(b));
             };
 
-            console.log("Ed25519: " + ed25519key);
-            console.log("boris:", sign(borisKeys.dev1));
-            console.log("chaz:", sign(chazKeys.dev2));
+            logger.log("Ed25519: " + ed25519key);
+            logger.log("boris:", sign(borisKeys.dev1));
+            logger.log("chaz:", sign(chazKeys.dev2));
             */
 
             httpBackend.when("POST", "/keys/query").check(function(req) {

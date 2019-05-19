@@ -5,6 +5,7 @@ const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const EventTimeline = sdk.EventTimeline;
+import logger from '../../src/logger';
 
 const baseUrl = "http://localhost.or.something";
 const userId = "@alice:localhost";
@@ -84,7 +85,7 @@ function startClient(httpBackend, client) {
     // set up a promise which will resolve once the client is initialised
     const deferred = Promise.defer();
     client.on("sync", function(state) {
-        console.log("sync", state);
+        logger.log("sync", state);
         if (state != "SYNCING") {
             return;
         }
@@ -669,11 +670,11 @@ describe("MatrixClient event timelines", function() {
                 // initiate the send, and set up checks to be done when it completes
                 // - but note that it won't complete until after the /sync does, below.
                 client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
-                    console.log("sendTextMessage completed");
+                    logger.log("sendTextMessage completed");
                     expect(res.event_id).toEqual(event.event_id);
                     return client.getEventTimeline(timelineSet, event.event_id);
                 }).then(function(tl) {
-                    console.log("getEventTimeline completed (2)");
+                    logger.log("getEventTimeline completed (2)");
                     expect(tl.getEvents().length).toEqual(2);
                     expect(tl.getEvents()[1].getContent().body).toEqual("a body");
                 }),
@@ -684,7 +685,7 @@ describe("MatrixClient event timelines", function() {
                 ]).then(function() {
                     return client.getEventTimeline(timelineSet, event.event_id);
                 }).then(function(tl) {
-                    console.log("getEventTimeline completed (1)");
+                    logger.log("getEventTimeline completed (1)");
                     expect(tl.getEvents().length).toEqual(2);
                     expect(tl.getEvents()[1].event).toEqual(event);
 

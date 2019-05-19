@@ -39,9 +39,10 @@ let _realCallbackKey;
 // each is an object with keys [runAt, func, params, key].
 const _callbackList = [];
 
+import logger from '../src/logger';
+
 // var debuglog = console.log.bind(console);
 const debuglog = function() {};
-
 /**
  * Replace the function used by this module to get the current time.
  *
@@ -170,7 +171,7 @@ function _runCallbacks() {
         try {
             cb.func.apply(global, cb.params);
         } catch (e) {
-            console.error("Uncaught exception in callback function",
+            logger.error("Uncaught exception in callback function",
                           e.stack || e);
         }
     }

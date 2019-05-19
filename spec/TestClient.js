@@ -27,6 +27,7 @@ import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
 import Promise from 'bluebird';
 import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
+import logger from '../src/logger';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -82,7 +83,7 @@ TestClient.prototype.toString = function() {
  * @return {Promise}
  */
 TestClient.prototype.start = function() {
-    console.log(this + ': starting');
+    logger.log(this + ': starting');
     this.httpBackend.when("GET", "/pushrules").respond(200, {});
     this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
     this.expectDeviceKeyUpload();
@@ -100,7 +101,7 @@ TestClient.prototype.start = function() {
         this.httpBackend.flushAllExpected(),
         testUtils.syncPromise(this.client),
     ]).then(() => {
-        console.log(this + ': started');
+        logger.log(this + ': started');
     });
 };
 
@@ -122,7 +123,7 @@ TestClient.prototype.expectDeviceKeyUpload = function() {
         expect(content.one_time_keys).toBe(undefined);
         expect(content.device_keys).toBeTruthy();
 
-        console.log(self + ': received device keys');
+        logger.log(self + ': received device keys');
         // we expect this to happen before any one-time keys are uploaded.
         expect(Object.keys(self.oneTimeKeys).length).toEqual(0);
 
@@ -159,7 +160,7 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
               expect(content.device_keys).toBe(undefined);
               expect(content.one_time_keys).toBeTruthy();
               expect(content.one_time_keys).toNotEqual({});
-              console.log('%s: received %i one-time keys', this,
+              logger.log('%s: received %i one-time keys', this,
                           Object.keys(content.one_time_keys).length);
               this.oneTimeKeys = content.one_time_keys;
               return {one_time_key_counts: {
@@ -223,11 +224,11 @@ TestClient.prototype.getSigningKey = function() {
  * @returns {Promise} promise which completes once the sync has been flushed
  */
 TestClient.prototype.flushSync = function() {
-    console.log(`${this}: flushSync`);
+    logger.log(`${this}: flushSync`);
     return Promise.all([
         this.httpBackend.flush('/sync', 1),
         testUtils.syncPromise(this.client),
     ]).then(() => {
-        console.log(`${this}: flushSync completed`);
+        logger.log(`${this}: flushSync completed`);
     });
 };

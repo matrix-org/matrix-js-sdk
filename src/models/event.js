@@ -24,6 +24,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
+import logger from '../../src/logger';
 
 /**
  * Enum for event statuses.
@@ -367,7 +368,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         // new info.
         //
         if (this._decryptionPromise) {
-            console.log(
+            logger.log(
                 `Event ${this.getId()} already being decrypted; queueing a retry`,
             );
             this._retryDecryption = true;
@@ -441,7 +442,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 if (e.name !== "DecryptionError") {
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
-                    console.error(
+                    logger.error(
                         `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
                     );
                     this._decryptionPromise = null;
@@ -467,7 +468,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 //
                 if (this._retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    console.log(
+                    logger.log(
                         `Got error decrypting event (id=${this.getId()}: ` +
                         `${e}), but retrying`,
                     );
@@ -476,7 +477,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                console.warn(
+                logger.warn(
                     `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
                 );
 

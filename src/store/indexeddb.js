@@ -25,6 +25,7 @@ import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
 import User from "../models/user";
 import {MatrixEvent} from "../models/event";
+import logger from '../../src/logger';
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -124,16 +125,16 @@ IndexedDBStore.exists = function(indexedDB, dbName) {
   */
 IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
-        console.log(`IndexedDBStore.startup: already started`);
+        logger.log(`IndexedDBStore.startup: already started`);
         return Promise.resolve();
     }
 
-    console.log(`IndexedDBStore.startup: connecting to backend`);
+    logger.log(`IndexedDBStore.startup: connecting to backend`);
     return this.backend.connect().then(() => {
-        console.log(`IndexedDBStore.startup: loading presence events`);
+        logger.log(`IndexedDBStore.startup: loading presence events`);
         return this.backend.getUserPresenceEvents();
     }).then((userPresenceEvents) => {
-        console.log(`IndexedDBStore.startup: processing presence events`);
+        logger.log(`IndexedDBStore.startup: processing presence events`);
         userPresenceEvents.forEach(([userId, rawEvent]) => {
             const u = new User(userId);
             if (rawEvent) {
@@ -174,9 +175,9 @@ IndexedDBStore.prototype.getSavedSyncToken = degradable(function() {
 IndexedDBStore.prototype.deleteAllData = degradable(function() {
     MemoryStore.prototype.deleteAllData.call(this);
     return this.backend.clearDatabase().then(() => {
-        console.log("Deleted indexeddb data.");
+        logger.log("Deleted indexeddb data.");
     }, (err) => {
-        console.error(`Failed to delete indexeddb data: ${err}`);
+        logger.error(`Failed to delete indexeddb data: ${err}`);
         throw err;
     });
 });
@@ -290,18 +291,18 @@ function degradable(func, fallback) {
         try {
             return await func.call(this, ...args);
         } catch (e) {
-            console.error("IndexedDBStore failure, degrading to MemoryStore", e);
+            logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
             this.emit("degraded", e);
             try {
                 // We try to delete IndexedDB after degrading since this store is only a
                 // cache (the app will still function correctly without the data).
                 // It's possible that deleting repair IndexedDB for the next app load,
                 // potenially by making a little more space available.
-                console.log("IndexedDBStore trying to delete degraded data");
+                logger.log("IndexedDBStore trying to delete degraded data");
                 await this.backend.clearDatabase();
-                console.log("IndexedDBStore delete after degrading succeeeded");
+                logger.log("IndexedDBStore delete after degrading succeeeded");
             } catch (e) {
-                console.warn("IndexedDBStore delete after degrading failed", e);
+                logger.warn("IndexedDBStore delete after degrading failed", e);
             }
             // Degrade the store from being an instance of `IndexedDBStore` to instead be
             // an instance of `MemoryStore` so that future API calls use the memory path
