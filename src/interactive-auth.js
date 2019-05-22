@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -88,6 +89,12 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {string?} opts.emailSid If returning from having completed m.login.email.identity
  *     auth, the sid for the email verification session.
  *
+ * @param {function?} opts.requestEmailToken A function that takes the email address (string),
+ *     clientSecret (string), attempt number (int) and sessionId (string) and calls the
+ *     relevant requestToken function and returns the promise returned by that function.
+ *     If the resulting promise rejects, the rejection will propagate through to the
+ *     attemptAuth promise.
+ *
  */
 function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
@@ -95,14 +102,17 @@ function InteractiveAuth(opts) {
     this._requestCallback = opts.doRequest;
     // startAuthStage included for backwards compat
     this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
-    this._completionDeferred = null;
+    this._resolveFunc = null;
+    this._rejectFunc = null;
     this._inputs = opts.inputs || {};
+    this._requestEmailTokenCallback = opts.requestEmailToken;
 
     if (opts.sessionId) this._data.session = opts.sessionId;
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
     if (this._emailSid === undefined) this._emailSid = null;
 
+    this._chosenFlow = null;
     this._currentStage = null;
 }
 
@@ -115,11 +125,12 @@ InteractiveAuth.prototype = {
      *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
-        this._completionDeferred = Promise.defer();
+        // This promise will be quite long-lived and will resolve when the
+        // request is authenticated and completes successfully.
+        return new Promise((resolve, reject) => {
+            this._resolveFunc = resolve;
+            this._rejectFunc = reject;
 
-        // wrap in a promise so that if _startNextAuthStage
-        // throws, it rejects the promise in a consistent way
-        return Promise.resolve().then(() => {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
@@ -127,7 +138,6 @@ InteractiveAuth.prototype = {
             } else {
                 this._startNextAuthStage();
             }
-            return this._completionDeferred.promise;
         });
     },
 
@@ -194,6 +204,10 @@ InteractiveAuth.prototype = {
         return params[loginType];
     },
 
+    getChosenFlow() {
+        return this._chosenFlow;
+    },
+
     /**
      * submit a new auth dict and fire off the request. This will either
      * make attemptAuth resolve/reject, or cause the startAuthStage callback
@@ -207,7 +221,7 @@ InteractiveAuth.prototype = {
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
     submitAuthDict: function(authData, background) {
-        if (!this._completionDeferred) {
+        if (!this._resolveFunc) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
 
@@ -253,58 +267,74 @@ InteractiveAuth.prototype = {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    _doRequest: function(auth, background) {
-        const self = this;
-
-        // hackery to make sure that synchronous exceptions end up in the catch
-        // handler (without the additional event loop entailed by q.fcall or an
-        // extra Promise.resolve().then)
-        let prom;
+    _doRequest: async function(auth, background) {
         try {
-            prom = this._requestCallback(auth, background);
-        } catch (e) {
-            prom = Promise.reject(e);
-        }
+            const result = await this._requestCallback(auth, background);
+            this._resolveFunc(result);
+        } catch (error) {
+            // sometimes UI auth errors don't come with flows
+            const errorFlows = error.data ? error.data.flows : null;
+            const haveFlows = Boolean(this._data.flows) || Boolean(errorFlows);
+            if (error.httpStatus !== 401 || !error.data || !haveFlows) {
+                // doesn't look like an interactive-auth failure.
+                if (!background) {
+                    this._rejectFunc(error);
+                } else {
+                    // We ignore all failures here (even non-UI auth related ones)
+                    // since we don't want to suddenly fail if the internet connection
+                    // had a blip whilst we were polling
+                    console.log(
+                        "Background poll request failed doing UI auth: ignoring",
+                        error,
+                    );
+                }
+            }
+            // if the error didn't come with flows, completed flows or session ID,
+            // copy over the ones we have. Synapse sometimes sends responses without
+            // any UI auth data (eg. when polling for email validation, if the email
+            // has not yet been validated). This appears to be a Synapse bug, which
+            // we workaround here.
+            if (!error.data.flows && !error.data.completed && !error.data.session) {
+                error.data.flows = this._data.flows;
+                error.data.completed = this._data.completed;
+                error.data.session = this._data.session;
+            }
+            this._data = error.data;
+            this._startNextAuthStage();
 
-        prom = prom.then(
-            function(result) {
-                console.log("result from request: ", result);
-                self._completionDeferred.resolve(result);
-            }, function(error) {
-                // sometimes UI auth errors don't come with flows
-                const errorFlows = error.data ? error.data.flows : null;
-                const haveFlows = Boolean(self._data.flows) || Boolean(errorFlows);
-                if (error.httpStatus !== 401 || !error.data || !haveFlows) {
-                    // doesn't look like an interactive-auth failure. fail the whole lot.
-                    throw error;
+            if (
+                !this._emailSid &&
+                this._chosenFlow.stages.includes('m.login.email.identity')
+            ) {
+                // If we've picked a flow with email auth, we send the email
+                // now because we want the request to fail as soon as possible
+                // if the email address is not valid (ie. already taken or not
+                // registered, depending on what the operation is).
+                try {
+                    const requestTokenResult = await this._requestEmailTokenCallback(
+                        this._inputs.emailAddress,
+                        this._clientSecret,
+                        1, // TODO: Multiple send attempts?
+                        this._data.session,
+                    );
+                    this._emailSid = requestTokenResult.sid;
+                    // NB. promise is not resolved here - at some point, doRequest
+                    // will be called again and if the user has jumped through all
+                    // the hoops correctly, auth will be complete and the request
+                    // will succeed.
+                    // Also, we should expose the fact that this request has compledted
+                    // so clients can know that the email has actually been sent.
+                } catch (e) {
+                    // we failed to request an email token, so fail the request.
+                    // This could be due to the email already beeing registered
+                    // (or not being registered, depending on what we're trying
+                    // to do) or it could be a network failure. Either way, pass
+                    // the failure up as the user can't complete auth if we can't
+                    // send the email, foe whatever reason.
+                    this._rejectFunc(e);
                 }
-                // if the error didn't come with flows, completed flows or session ID,
-                // copy over the ones we have. Synapse sometimes sends responses without
-                // any UI auth data (eg. when polling for email validation, if the email
-                // has not yet been validated). This appears to be a Synapse bug, which
-                // we workaround here.
-                if (!error.data.flows && !error.data.completed && !error.data.session) {
-                    error.data.flows = self._data.flows;
-                    error.data.completed = self._data.completed;
-                    error.data.session = self._data.session;
-                }
-                self._data = error.data;
-                self._startNextAuthStage();
-            },
-        );
-        if (!background) {
-            prom = prom.catch((e) => {
-                this._completionDeferred.reject(e);
-            });
-        } else {
-            // We ignore all failures here (even non-UI auth related ones)
-            // since we don't want to suddenly fail if the internet connection
-            // had a blip whilst we were polling
-            prom = prom.catch((error) => {
-                console.log("Ignoring error from UI auth: " + error);
-            });
+            }
         }
-        prom.done();
     },
 
     /**
@@ -320,7 +350,7 @@ InteractiveAuth.prototype = {
         }
         this._currentStage = nextStage;
 
-        if (nextStage == 'm.login.dummy') {
+        if (nextStage === 'm.login.dummy') {
             this.submitAuthDict({
                 type: 'm.login.dummy',
             });
@@ -350,9 +380,11 @@ InteractiveAuth.prototype = {
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     _chooseStage: function() {
-        const flow = this._chooseFlow();
-        console.log("Active flow => %s", JSON.stringify(flow));
-        const nextStage = this._firstUncompletedStage(flow);
+        if (this._chosenFlow === null) {
+            this._chosenFlow = this._chooseFlow();
+        }
+        console.log("Active flow => %s", JSON.stringify(this._chosenFlow));
+        const nextStage = this._firstUncompletedStage(this._chosenFlow);
         console.log("Next stage: %s", nextStage);
         return nextStage;
     },
