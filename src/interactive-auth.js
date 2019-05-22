@@ -285,7 +285,7 @@ InteractiveAuth.prototype = {
                     // had a blip whilst we were polling
                     console.log(
                         "Background poll request failed doing UI auth: ignoring",
-                        error,.
+                        error,
                     );
                 }
             }
