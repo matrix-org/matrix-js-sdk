@@ -125,7 +125,9 @@ InteractiveAuth.prototype = {
      *     no suitable authentication flow can be found
      */
     attemptAuth: function() {
-        return new Promise(async (resolve, reject) => {
+        // This promise will be quite long-lived and will resolve when the
+        // request is authenticated and completes successfully.
+        return new Promise((resolve, reject) => {
             this._resolveFunc = resolve;
             this._rejectFunc = reject;
 
@@ -268,7 +270,6 @@ InteractiveAuth.prototype = {
     _doRequest: async function(auth, background) {
         try {
             const result = await this._requestCallback(auth, background);
-            console.log("result from request: ", result);
             this._resolveFunc(result);
         } catch (error) {
             // sometimes UI auth errors don't come with flows
@@ -282,7 +283,10 @@ InteractiveAuth.prototype = {
                     // We ignore all failures here (even non-UI auth related ones)
                     // since we don't want to suddenly fail if the internet connection
                     // had a blip whilst we were polling
-                    console.log("Ignoring error from UI auth: " + error);
+                    console.log(
+                        "Background poll request failed doing UI auth: ignoring",
+                        error,.
+                    );
                 }
             }
             // if the error didn't come with flows, completed flows or session ID,
@@ -314,6 +318,12 @@ InteractiveAuth.prototype = {
                         this._data.session,
                     );
                     this._emailSid = requestTokenResult.sid;
+                    // NB. promise is not resolved here - at some point, doRequest
+                    // will be called again and if the user has jumped through all
+                    // the hoops correctly, auth will be complete and the request
+                    // will succeed.
+                    // Also, we should expose the fact that this request has compledted
+                    // so clients can know that the email has actually been sent.
                 } catch (e) {
                     // we failed to request an email token, so fail the request.
                     // This could be due to the email already beeing registered
@@ -333,7 +343,7 @@ InteractiveAuth.prototype = {
      * @private
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    _startNextAuthStage: async function() {
+    _startNextAuthStage: function() {
         const nextStage = this._chooseStage();
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
