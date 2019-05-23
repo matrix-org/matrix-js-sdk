@@ -268,9 +268,7 @@ export class AutoDiscovery {
 
         // Step 5: Try to pull out the identity server configuration
         let isUrl = "";
-        logger.log("[Debug] This is just before the branch for IS validation");
         if (wellknown["m.identity_server"]) {
-            logger.log("[Debug] WK has identity server - attempting validation");
             // We prepare a failing identity server response to save lines later
             // in this branch. Note that we also fail the homeserver check in the
             // object because according to the spec we're supposed to FAIL_ERROR
@@ -298,7 +296,6 @@ export class AutoDiscovery {
                 wellknown["m.identity_server"]["base_url"],
             );
             if (!isUrl) {
-                logger.log("[Debug] First error: isUrl is falsey");
                 logger.error("Invalid base_url for m.identity_server");
                 failingClientConfig["m.identity_server"].error =
                     AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
@@ -311,20 +308,11 @@ export class AutoDiscovery {
                 `${isUrl}/_matrix/identity/api/v1`,
             );
             if (!isResponse || !isResponse.raw || isResponse.action !== "SUCCESS") {
-                logger.log("[Debug] Second error: response from IS failed");
-                const debugObj = {
-                    responseExists: !!isResponse,
-                    rawExists: isResponse ? !!isResponse.raw : '<no response>',
-                    action: isResponse ? isResponse.action : '<no response>',
-                };
-                logger.log("[Debug] IS Response: " + JSON.stringify(debugObj));
                 logger.error("Invalid /api/v1 response");
                 failingClientConfig["m.identity_server"].error =
                     AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
                 return Promise.resolve(failingClientConfig);
             }
-
-            logger.log("[Debug] fell through IS checks - probably valid IS");
         }
 
         // Step 6: Now that the identity server is valid, or never existed,
