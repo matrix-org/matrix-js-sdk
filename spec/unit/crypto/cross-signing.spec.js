@@ -56,11 +56,11 @@ describe("Cross Signing", function() {
         // Alice downloads Bob's device key
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
-                selfSigning: {
+                master: {
                     user_id: "@bob:example.com",
-                    usage: ["self_signing"],
+                    usage: ["master"],
                     keys: {
-                        "ed25519:bobs+ssk+pubkey": "bobs+ssk+pubkey",
+                        "ed25519:bobs+master+pubkey": "bobs+master+pubkey",
                     },
                 },
             },
@@ -70,14 +70,14 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's key
         alice.on("cross-signing:getKey", function(e) {
             expect(e.type).toBe("user_signing");
-            e.done(privateKeys.userSigning);
+            e.done(privateKeys.user_signing);
         });
         const promise = new Promise((resolve, reject) => {
             alice.uploadKeySignatures = (...args) => {
                 resolve(...args);
             };
         });
-        alice.setDeviceVerified("@bob:example.com", "bobs+ssk+pubkey", true);
+        await alice.setDeviceVerified("@bob:example.com", "bobs+master+pubkey", true);
         // Alice should send a signature of Bob's key to the server
         await promise;
     });
@@ -105,18 +105,35 @@ describe("Cross Signing", function() {
         });
         alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
+        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterPrivkey = bobMasterSigning.generate_seed();
+        const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
+        const bobSSK = {
+            user_id: "@bob:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + bobPubkey]: bobPubkey,
+            },
+        };
+        const sskSig = bobMasterSigning.sign(anotherjson.stringify(bobSSK));
+        bobSSK.signatures = {
+            "@bob:example.com": {
+                ["ed25519:" + bobMasterPubkey]: sskSig,
+            },
+        };
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
-                selfSigning: {
+                master: {
                     user_id: "@bob:example.com",
-                    usage: ["self_signing"],
+                    usage: ["master"],
                     keys: {
-                        ["ed25519:" + bobPubkey]: bobPubkey,
+                        ["ed25519:" + bobMasterPubkey]: bobMasterPubkey,
                     },
                 },
+                self_signing: bobSSK,
             },
             fu: 1,
             unsigned: {},
@@ -131,9 +148,11 @@ describe("Cross Signing", function() {
             },
         };
         const sig = bobSigning.sign(anotherjson.stringify(bobDevice));
-        bobDevice.signatures = {};
-        bobDevice.signatures["@bob:example.com"] = {};
-        bobDevice.signatures["@bob:example.com"]["ed25519:" + bobPubkey] = sig;
+        bobDevice.signatures = {
+            "@bob:example.com": {
+                ["ed25519:" + bobPubkey]: sig,
+            },
+        };
         alice._crypto._deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
@@ -143,10 +162,10 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's SSK
         alice.on("cross-signing:getKey", function(e) {
             expect(e.type).toBe("user_signing");
-            e.done(privateKeys.userSigning);
+            e.done(privateKeys.user_signing);
         });
         alice.uploadKeySignatures = () => {};
-        await alice.setDeviceVerified("@bob:example.com", bobPubkey, true);
+        await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
         // Bob's device key should be trusted
         expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
@@ -171,18 +190,35 @@ describe("Cross Signing", function() {
         alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
         // (NOTE: device key is not signed by ssk)
+        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterPrivkey = bobMasterSigning.generate_seed();
+        const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
+        const bobSSK = {
+            user_id: "@bob:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + bobPubkey]: bobPubkey,
+            },
+        };
+        const sskSig = bobMasterSigning.sign(anotherjson.stringify(bobSSK));
+        bobSSK.signatures = {
+            "@bob:example.com": {
+                ["ed25519:" + bobMasterPubkey]: sskSig,
+            },
+        };
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
-                selfSigning: {
+                master: {
                     user_id: "@bob:example.com",
-                    usage: ["self_signing"],
+                    usage: ["master"],
                     keys: {
-                        ["ed25519:" + bobPubkey]: bobPubkey,
+                        ["ed25519:" + bobMasterPubkey]: bobMasterPubkey,
                     },
                 },
+                self_signing: bobSSK,
             },
             fu: 1,
             unsigned: {},
@@ -204,10 +240,10 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's SSK
         alice.on("cross-signing:getKey", function(e) {
             expect(e.type).toBe("user_signing");
-            e.done(privateKeys.userSigning);
+            e.done(privateKeys.user_signing);
         });
         alice.uploadKeySignatures = () => {};
-        await alice.setDeviceVerified("@bob:example.com", bobPubkey, true);
+        await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
         // Bob's device key should be untrusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
     });
@@ -222,18 +258,35 @@ describe("Cross Signing", function() {
         });
         alice.resetCrossSigningKeys();
         // Alice downloads Bob's keys
+        const bobMasterSigning = new global.Olm.PkSigning();
+        const bobMasterPrivkey = bobMasterSigning.generate_seed();
+        const bobMasterPubkey = bobMasterSigning.init_with_seed(bobMasterPrivkey);
         const bobSigning = new global.Olm.PkSigning();
         const bobPrivkey = bobSigning.generate_seed();
         const bobPubkey = bobSigning.init_with_seed(bobPrivkey);
+        const bobSSK = {
+            user_id: "@bob:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + bobPubkey]: bobPubkey,
+            },
+        };
+        const sskSig = bobMasterSigning.sign(anotherjson.stringify(bobSSK));
+        bobSSK.signatures = {
+            "@bob:example.com": {
+                ["ed25519:" + bobMasterPubkey]: sskSig,
+            },
+        };
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
-                selfSigning: {
+                master: {
                     user_id: "@bob:example.com",
-                    usage: ["self_signing"],
+                    usage: ["master"],
                     keys: {
-                        ["ed25519:" + bobPubkey]: bobPubkey,
+                        ["ed25519:" + bobMasterPubkey]: bobMasterPubkey,
                     },
                 },
+                self_signing: bobSSK,
             },
             fu: 1,
             unsigned: {},
@@ -258,25 +311,42 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's SSK
         alice.on("cross-signing:getKey", function(e) {
             expect(e.type).toBe("user_signing");
-            e.done(privateKeys.userSigning);
+            e.done(privateKeys.user_signing);
         });
         alice.uploadKeySignatures = () => {};
-        await alice.setDeviceVerified("@bob:example.com", bobPubkey, true);
+        await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
         // Bob's device key should be trusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
         // Alice downloads new SSK for Bob
+        const bobMasterSigning2 = new global.Olm.PkSigning();
+        const bobMasterPrivkey2 = bobMasterSigning2.generate_seed();
+        const bobMasterPubkey2 = bobMasterSigning2.init_with_seed(bobMasterPrivkey2);
         const bobSigning2 = new global.Olm.PkSigning();
         const bobPrivkey2 = bobSigning2.generate_seed();
         const bobPubkey2 = bobSigning2.init_with_seed(bobPrivkey2);
+        const bobSSK2 = {
+            user_id: "@bob:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + bobPubkey2]: bobPubkey2,
+            },
+        };
+        const sskSig2 = bobMasterSigning2.sign(anotherjson.stringify(bobSSK2));
+        bobSSK2.signatures = {
+            "@bob:example.com": {
+                ["ed25519:" + bobMasterPubkey2]: sskSig2,
+            },
+        };
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
-                selfSigning: {
+                master: {
                     user_id: "@bob:example.com",
-                    usage: ["self_signing"],
+                    usage: ["master"],
                     keys: {
-                        ["ed25519:" + bobPubkey2]: bobPubkey2,
+                        ["ed25519:" + bobMasterPubkey2]: bobMasterPubkey2,
                     },
                 },
+                self_signing: bobSSK2,
             },
             fu: 0,
             unsigned: {},
@@ -287,10 +357,10 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's SSK
         alice.on("cross-signing:getKey", function(e) {
             expect(e.type).toBe("user_signing");
-            e.done(privateKeys.userSigning);
+            e.done(privateKeys.user_signing);
         });
         alice.uploadKeySignatures = () => {};
-        await alice.setDeviceVerified("@bob:example.com", bobPubkey2, true);
+        await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey2, true);
         // Bob should be trusted but not his device
         expect(alice.checkUserTrust("@bob:example.com")).toBe(4);
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);

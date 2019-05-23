@@ -94,114 +94,101 @@ export class CrossSigningInfo extends EventEmitter {
      * @return {string} the ID
      */
     getId() {
-        return getPublicKey(this.keys.selfSigning)[1];
+        return getPublicKey(this.keys.master)[1];
     }
 
     async resetKeys(level) {
-        if (level === undefined) {
-            level = CrossSigningLevel.SELF_SIGNING;
+        if (level === undefined || level & 4) {
+            level = CrossSigningLevel.MASTER;
+        } else if (level === 0) {
+            return;
         }
 
         const privateKeys = {};
         const keys = {};
-        let sskSigning;
-        let sskPub;
-        switch (level) {
-        case CrossSigningLevel.SELF_SIGNING: {
-            sskSigning = new global.Olm.PkSigning();
-            privateKeys.selfSigning = sskSigning.generate_seed();
-            sskPub = sskSigning.init_with_seed(privateKeys.selfSigning);
-            keys.selfSigning = {
+        let masterSigning;
+        let masterPub;
+
+        if (level & 4) {
+            masterSigning = new global.Olm.PkSigning();
+            privateKeys.master = masterSigning.generate_seed();
+            masterPub = masterSigning.init_with_seed(privateKeys.master);
+            keys.master = {
+                user_id: this.userId,
+                usage: ['master'],
+                keys: {
+                    ['ed25519:' + masterPub]: masterPub,
+                },
+            };
+        } else {
+            [masterPub, masterSigning] = await getPrivateKey(this, "master", (pubkey) => {
+                // make sure it agrees with the pubkey that we have
+                if (pubkey !== getPublicKey(this.keys.master)[1]) {
+                    return "Key does not match";
+                }
+                return;
+            });
+        }
+
+        if (level & CrossSigningLevel.SELF_SIGNING) {
+            const sskSigning = new global.Olm.PkSigning();
+            privateKeys.self_signing = sskSigning.generate_seed();
+            const sskPub = sskSigning.init_with_seed(privateKeys.self_signing);
+            keys.self_signing = {
                 user_id: this.userId,
                 usage: ['self_signing'],
                 keys: {
                     ['ed25519:' + sskPub]: sskPub,
                 },
             };
-            if (this.keys.selfSigning) {
-                keys.selfSigning.replaces = getPublicKey(this.keys.selfSigning)[1];
-
-                // try to get ssk private key
-                const [oldPubkey, oldSskSigning]
-                      = await getPrivateKey(this, "self_signing", (pubkey) => {
-                          // make sure it agrees with the pubkey that we have
-                          if (pubkey !== keys.selfSigning.replaces) {
-                              return "Key does not match";
-                          }
-                          return;
-                      });
-                if (oldSskSigning) {
-                    pkSign(keys.selfSigning, oldSskSigning, this.userId, oldPubkey);
-                }
-            }
+            pkSign(keys.self_signing, masterSigning, this.userId, masterPub);
         }
-        // fall through
-        case CrossSigningLevel.USER_SIGNING: {
-            if (!sskSigning) {
-                // if we didn't generate a new SSK above, then we need to ask
-                // the client to provide the private key so that we can sign
-                // the new USK
-                [sskPub, sskSigning] = await getPrivateKey(this, "self_signing", (pubkey) => {
-                    // make sure it agrees with the pubkey that we have
-                    if (pubkey !== getPublicKey(this.keys.selfSigning)[1]) {
-                        return "Key does not match";
-                    }
-                    return;
-                });
-            }
+
+        if (level & CrossSigningLevel.USER_SIGNING) {
             const uskSigning = new global.Olm.PkSigning();
-            privateKeys.userSigning = uskSigning.generate_seed();
-            const uskPub = uskSigning.init_with_seed(privateKeys.userSigning);
-            keys.userSigning = {
+            privateKeys.user_signing = uskSigning.generate_seed();
+            const uskPub = uskSigning.init_with_seed(privateKeys.user_signing);
+            keys.user_signing = {
                 user_id: this.userId,
                 usage: ['user_signing'],
                 keys: {
                     ['ed25519:' + uskPub]: uskPub,
                 },
             };
-            pkSign(keys.userSigning, sskSigning, this.userId, sskPub);
-            break;
+            pkSign(keys.user_signing, masterSigning, this.userId, masterPub);
         }
-        default:
-            // FIXME:
-        }
+
         Object.assign(this.keys, keys);
         this.emit("cross-signing:savePrivateKeys", privateKeys);
     }
 
     setKeys(keys) {
         const signingKeys = {};
-        if (keys.selfSigning) {
-            if (this.keys.selfSigning) {
-                const [oldKeyId, oldKey] = getPublicKey(this.keys.selfSigning);
-                // check if ssk is signed by previous key
-                // if the signature checks out, then keep the same First-Use status
-                // otherwise First-Use is false
-                if (keys.selfSigning.signatures
-                    && keys.selfSigning.signatures[this.userId]
-                    && keys.selfSigning.signatures[this.userId][oldKeyId]) {
-                    try {
-                        pkVerify(keys.selfSigning, oldKey, this.userId);
-                    } catch (e) {
-                        this.fu = false;
-                    }
-                } else {
-                    this.fu = false;
-                }
-            } else {
-                // this is the first key that we're setting, so First-Use is true
-                this.fu = true;
+        if (keys.master) {
+            // First-Use is true if and only if we had no previous key for the user
+            this.fu = !(this.keys.self_signing);
+            signingKeys.master = keys.master;
+            if (!keys.user_signing || !keys.self_signing) {
+                throw new Error("Must have new self-signing and user-signing"
+                                + "keys when new master key is set");
             }
-            signingKeys.selfSigning = keys.selfSigning;
         } else {
-            signingKeys.selfSigning = this.keys.selfSigning;
+            signingKeys.master = this.keys.master;
         }
-        // FIXME: if self-signing key is set, then a new user-signing key must
-        // be set as well
-        if (keys.userSigning) {
-            const usk = getPublicKey(signingKeys.selfSigning)[1];
+        const masterKey = getPublicKey(signingKeys.master)[1];
+
+        // verify signatures
+        if (keys.user_signing) {
             try {
-                pkVerify(keys.userSigning, usk, this.userId);
+                pkVerify(keys.user_signing, masterKey, this.userId);
+            } catch (e) {
+                // FIXME: what do we want to do here?
+                throw e;
+            }
+        }
+        if (keys.self_signing) {
+            try {
+                pkVerify(keys.self_signing, masterKey, this.userId);
             } catch (e) {
                 // FIXME: what do we want to do here?
                 throw e;
@@ -209,11 +196,14 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         // if everything checks out, then save the keys
-        if (keys.selfSigning) {
-            this.keys.selfSigning = keys.selfSigning;
+        if (keys.master) {
+            this.keys.master = keys.master;
         }
-        if (keys.userSigning) {
-            this.keys.userSigning = keys.userSigning;
+        if (keys.self_signing) {
+            this.keys.self_signing = keys.self_signing;
+        }
+        if (keys.user_signing) {
+            this.keys.user_signing = keys.user_signing;
         }
     }
 
@@ -221,9 +211,9 @@ export class CrossSigningInfo extends EventEmitter {
         const [pubkey, usk] = await getPrivateKey(this, "user_signing", (key) => {
             return;
         });
-        const otherSsk = key.keys.selfSigning;
-        pkSign(otherSsk, usk, this.userId, pubkey);
-        return otherSsk;
+        const otherMaster = key.keys.master;
+        pkSign(otherMaster, usk, this.userId, pubkey);
+        return otherMaster;
     }
 
     async signDevice(userId, device) {
@@ -245,10 +235,10 @@ export class CrossSigningInfo extends EventEmitter {
 
     checkUserTrust(userCrossSigning) {
         let userTrusted;
-        const userSSK = userCrossSigning.keys.selfSigning;
-        const uskId = getPublicKey(this.keys.userSigning)[1];
+        const userMaster = userCrossSigning.keys.master;
+        const uskId = getPublicKey(this.keys.user_signing)[1];
         try {
-            pkVerify(userSSK, uskId, this.userId);
+            pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
         } catch (e) {
             userTrusted = false;
@@ -262,9 +252,11 @@ export class CrossSigningInfo extends EventEmitter {
     checkDeviceTrust(userCrossSigning, device) {
         const userTrust = this.checkUserTrust(userCrossSigning);
 
+        const userSSK = userCrossSigning.keys.self_signing;
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
         try {
-            pkVerify(deviceObj, userCrossSigning.getId(), userCrossSigning.userId);
+            pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
+            pkVerify(deviceObj, getPublicKey(userSSK)[1], userCrossSigning.userId);
             return userTrust;
         } catch (e) {
             return 0;
@@ -283,6 +275,7 @@ function deviceToObject(device, userId) {
 }
 
 export const CrossSigningLevel = {
+    MASTER: 7,
     SELF_SIGNING: 1,
     USER_SIGNING: 2,
 };
