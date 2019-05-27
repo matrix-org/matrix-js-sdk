@@ -1,8 +1,7 @@
 Matrix Javascript SDK
 =====================
-[![Build Status](http://matrix.org/jenkins/buildStatus/icon?job=JavascriptSDK)](http://matrix.org/jenkins/job/JavascriptSDK/)
 
-This is the [Matrix](https://matrix.org) Client-Server v1/v2 alpha SDK for
+This is the [Matrix](https://matrix.org) Client-Server r0 SDK for
 JavaScript. This SDK can be run in a browser or in Node.js.
 
 Quickstart
