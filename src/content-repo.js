@@ -51,10 +51,10 @@ module.exports = {
         const params = {};
 
         if (width) {
-            params.width = width;
+            params.width = Math.round(width);
         }
         if (height) {
-            params.height = height;
+            params.height = Math.round(height);
         }
         if (resizeMethod) {
             params.method = resizeMethod;
