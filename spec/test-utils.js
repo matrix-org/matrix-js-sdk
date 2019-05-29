@@ -1,7 +1,7 @@
 "use strict";
 import expect from 'expect';
 import Promise from 'bluebird';
-const logger = require("../logger");
+const logger = require("../lib/logger");
 
 // load olm before the sdk if possible
 import './olm-loader';
