@@ -829,7 +829,11 @@ class DeviceListUpdateSerialiser {
 
         // now do the same for the cross-signing keys
         {
-            if (crossSigningResponse && Object.keys(crossSigningResponse).length) {
+            // FIXME: should we be ignoring empty cross-signing responses, or
+            // should we be dropping the keys?
+            if (crossSigningResponse
+                && (crossSigningResponse.master || crossSigningResponse.self_signing
+                    || crossSigningResponse.user_signing)) {
                 const crossSigning
                       = this._deviceList.getStoredCrossSigningForUser(userId)
                       || new CrossSigningInfo(userId);
