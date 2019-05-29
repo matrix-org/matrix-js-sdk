@@ -1,5 +1,6 @@
 /*
 Copyright 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +23,8 @@ import anotherjson from 'another-json';
 import olmlib from '../../../lib/crypto/olmlib';
 
 import TestClient from '../../TestClient';
+
+import {HttpResponse, setHttpResponses} from '../../test-utils';
 
 async function makeTestClient(userInfo, options) {
     const client = (new TestClient(
@@ -86,12 +89,126 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.on("cross-signing:newKey", function(e) {
-            // FIXME: ???
+
+        const masterKey = new Uint8Array([
+            0xda, 0x5a, 0x27, 0x60, 0xe3, 0x3a, 0xc5, 0x82,
+            0x9d, 0x12, 0xc3, 0xbe, 0xe8, 0xaa, 0xc2, 0xef,
+            0xae, 0xb1, 0x05, 0xc1, 0xe7, 0x62, 0x78, 0xa6,
+            0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
+        ]);
+        const selfSigningKey = new Uint8Array([
+            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66,
+            0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0,
+            0x17, 0xb5, 0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49,
+            0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
+        ]);
+
+        const keyChangePromise = new Promise((resolve, reject) => {
+            alice.once("cross-signing:keysChanged", (e) => {
+                resolve(e);
+            });
         });
+
+        alice.once("cross-signing:newKey", (e) => {
+            e.done(masterKey);
+        });
+
+        const deviceInfo = alice._crypto._deviceList._devices["@alice:example.com"]
+            .Osborne2;
+        const aliceDevice = {
+            user_id: "@alice:example.com",
+            device_id: "Osborne2",
+        };
+        aliceDevice.keys = deviceInfo.keys;
+        aliceDevice.algorithms = deviceInfo.algorithms;
+        await alice._crypto._signObject(aliceDevice);
+        olmlib.pkSign(aliceDevice, selfSigningKey, "@alice:example.com");
+
         // feed sync result that includes ssk, usk, device key
-        // client should emit event asking about ssk
+        const responses = [
+            HttpResponse.PUSH_RULES_RESPONSE,
+            {
+                method: "POST",
+                path: "/keys/upload/Osborne2",
+                data: {
+                    one_time_key_counts: {
+                        curve25519: 100,
+                        signed_curve25519: 100,
+                    },
+                },
+            },
+            HttpResponse.filterResponse("@alice:example.com"),
+            {
+                method: "GET",
+                path: "/sync",
+                data: {
+                    next_batch: "abcdefg",
+                    device_lists: {
+                        changed: [
+                            "@alice:example.com",
+                            "@bob:example.com",
+                        ],
+                    },
+                },
+            },
+            {
+                method: "POST",
+                path: "/keys/query",
+                data: {
+                    "failures": {},
+                    "device_keys": {
+                        "@alice:example.com": {
+                            "Osborne2": aliceDevice,
+                        },
+                    },
+                    "master_keys": {
+                        "@alice:example.com": {
+                            user_id: "@alice:example.com",
+                            usage: ["master"],
+                            keys: {
+                                "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                                "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                            },
+                        },
+                    },
+                    "self_signing_keys": {
+                        "@alice:example.com": {
+                            user_id: "@alice:example.com",
+                            usage: ["self-signing"],
+                            keys: {
+                                "ed25519:EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ":
+                                "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                            },
+                            signatures: {
+                                "@alice:example.com": {
+                                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                                    "Wqx/HXR851KIi8/u/UX+fbAMtq9Uj8sr8FsOcqrLfVYa6lAmbXs"
+                                    + "Vhfy4AlZ3dnEtjgZx0U0QDrghEn2eYBeOCA",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                method: "POST",
+                path: "/keys/upload/Osborne2",
+                data: {
+                    one_time_key_counts: {
+                        curve25519: 100,
+                        signed_curve25519: 100,
+                    },
+                },
+            },
+        ];
+        setHttpResponses(alice, responses);
+
+        await alice.startClient();
+
         // once ssk is confirmed, device key should be trusted
+        await keyChangePromise;
+        expect(alice.checkUserTrust("@alice:example.com")).toBe(6);
+        expect(alice.checkDeviceTrust("@alice:example.com", "Osborne2")).toBe(7);
     });
 
     it("should use trust chain to determine device verification", async function() {

@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018, 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +28,7 @@ import {EventEmitter} from 'events';
 
 import logger from '../logger';
 import DeviceInfo from './deviceinfo';
-import {CrossSigningInfo, CrossSigningVerification} from './CrossSigning';
+import {CrossSigningInfo} from './CrossSigning';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
@@ -754,7 +755,9 @@ class DeviceListUpdateSerialiser {
             downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
+            const master_keys = res.master_keys || {};
             const ssks = res.self_signing_keys || {};
+            const usks = res.user_signing_keys || {};
 
             // do each user in a separate promise, to avoid wedging the CPU
             // (https://github.com/vector-im/riot-web/issues/3158)
@@ -765,7 +768,11 @@ class DeviceListUpdateSerialiser {
             for (const userId of downloadUsers) {
                 prom = prom.delay(5).then(() => {
                     return this._processQueryResponseForUser(
-                        userId, dk[userId], ssks[userId],
+                        userId, dk[userId], {
+                            master: master_keys[userId],
+                            self_signing: ssks[userId],
+                            user_signing: usks[userId],
+                        },
                     );
                 });
             }
@@ -790,9 +797,11 @@ class DeviceListUpdateSerialiser {
         return deferred.promise;
     }
 
-    async _processQueryResponseForUser(userId, dkResponse, sskResponse) {
+    async _processQueryResponseForUser(
+        userId, dkResponse, crossSigningResponse, sskResponse,
+    ) {
         logger.log('got device keys for ' + userId + ':', dkResponse);
-        logger.log('got self-signing keys for ' + userId + ':', sskResponse);
+        logger.log('got cross-signing keys for ' + userId + ':', crossSigningResponse);
 
         {
             // map from deviceid -> deviceinfo for this user
@@ -818,19 +827,23 @@ class DeviceListUpdateSerialiser {
             this._deviceList._setRawStoredDevicesForUser(userId, storage);
         }
 
-        // now do the same for the self-signing key
+        // now do the same for the cross-signing keys
         {
-            const ssk = this._deviceList.getRawStoredSskForUser(userId) || {};
+            if (crossSigningResponse && Object.keys(crossSigningResponse).length) {
+                const crossSigning
+                      = this._deviceList.getStoredCrossSigningForUser(userId)
+                      || new CrossSigningInfo(userId);
 
-            const updated = await _updateStoredSelfSigningKeyForUser(
-                this._olmDevice, userId, ssk, sskResponse || {},
-            );
+                crossSigning.setKeys(crossSigningResponse);
 
-            this._deviceList.setRawStoredSskForUser(userId, ssk);
+                this._deviceList.setRawStoredCrossSigningForUser(
+                    userId, crossSigning.toStorage(),
+                );
 
-            // NB. Unlike most events in the js-sdk, this one is internal to the
-            // js-sdk and is not re-emitted
-            if (updated) this._deviceList.emit('userSskUpdated', userId);
+                // NB. Unlike most events in the js-sdk, this one is internal to the
+                // js-sdk and is not re-emitted
+                this._deviceList.emit('userCrossSigningUpdated', userId);
+            }
         }
     }
 }
@@ -883,55 +896,6 @@ async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
     return updated;
 }
 
-async function _updateStoredSelfSigningKeyForUser(
-    _olmDevice, userId, userStore, userResult,
-) {
-    // FIXME: this function may need modifying
-    let updated = false;
-
-    if (userResult.user_id !== userId) {
-        logger.warn("Mismatched user_id " + userResult.user_id +
-           " in self-signing key from " + userId);
-        return;
-    }
-    if (!userResult || !userResult.usage.includes('self_signing')) {
-        logger.warn(
-            "Self-signing key for " + userId +
-            " does not include 'self_signing' usage: ignoring",
-        );
-        return;
-    }
-    const keyCount = Object.keys(userResult.keys).length;
-    if (keyCount !== 1) {
-        logger.warn(
-            "Self-signing key block for " + userId + " has " +
-            keyCount + " keys: expected exactly 1. Ignoring.",
-        );
-        return;
-    }
-    let oldKeyId = null;
-    let oldKey = null;
-    if (userStore.keys && Object.keys(userStore.keys).length > 0) {
-        oldKeyId = Object.keys(userStore.keys)[0];
-        oldKey = userStore.keys[oldKeyId];
-    }
-    const newKeyId = Object.keys(userResult.keys)[0];
-    const newKey = userResult.keys[newKeyId];
-    if (oldKeyId !== newKeyId || oldKey !== newKey) {
-        updated = true;
-        logger.info(
-            "New self-signing key detected for " + userId +
-            ": " + newKeyId + ", was previously " + oldKeyId,
-        );
-
-        userStore.user_id = userResult.user_id;
-        userStore.usage = userResult.usage;
-        userStore.keys = userResult.keys;
-    }
-
-    return updated;
-}
-
 /*
  * Process a device in a /query response, and add it to the userStore
  *
@@ -955,6 +919,7 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     }
 
     const unsigned = deviceResult.unsigned || {};
+    const signatures = deviceResult.signatures || {};
 
     try {
         await olmlib.verifySignature(_olmDevice, deviceResult, userId, deviceId, signKey);
@@ -987,5 +952,6 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
     deviceStore.keys = deviceResult.keys || {};
     deviceStore.algorithms = deviceResult.algorithms || [];
     deviceStore.unsigned = unsigned;
+    deviceStore.signatures = signatures;
     return true;
 }

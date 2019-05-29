@@ -2,6 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,11 +32,10 @@ const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");
 const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
-import SskInfo from './sskinfo';
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
-import { CrossSigningInfo, CrossSigningLevel, CrossSigningVerification } from './CrossSigning';
+import { CrossSigningInfo } from './CrossSigning';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -104,7 +104,7 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  */
 export default function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
-    this._onDeviceListUserSskUpdated = this._onDeviceListUserSskUpdated.bind(this);
+    this._onDeviceListUserCrossSigningUpdated = this._onDeviceListUserCrossSigningUpdated.bind(this);
 
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
@@ -146,7 +146,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     );
     // XXX: This isn't removed at any point, but then none of the event listeners
     // this class sets seem to be removed at any point... :/
-    this._deviceList.on('userSskUpdated', this._onDeviceListUserSskUpdated);
+    this._deviceList.on('userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -269,6 +269,7 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype.resetCrossSigningKeys = async function(level) {
     await this._crossSigningInfo.resetKeys(level);
+    this._baseApis.emit("cross-signing:keysChanged", {});
 };
 
 /**
@@ -278,6 +279,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(level) {
  */
 Crypto.prototype.setCrossSigningKeys = function(keys) {
     this._crossSigningInfo.setKeys(keys);
+    this._baseApis.emit("cross-signing:keysChanged", {});
 };
 
 /**
@@ -331,34 +333,93 @@ Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
 /*
  * Event handler for DeviceList's userNewDevices event
  */
-Crypto.prototype._onDeviceListUserSskUpdated = async function(userId) {
+Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
     if (userId === this._userId) {
-        this.checkOwnSskTrust();
+        this.checkOwnCrossSigningTrust();
     }
 };
 
 /*
- * Check the copy of our SSK that we have in the device list and see if it
- * matches our private part. If it does, mark it as trusted.
+ * Check the copy of our cross-signing key that we have in the device list and
+ * see if we can get the private key. If so, mark it as trusted.
  */
-Crypto.prototype.checkOwnSskTrust = async function() {
+Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const userId = this._userId;
 
-    // If we see an update to our own SSK, check it against the SSK we have and,
-    // if it matches, mark it as verified
+    // If we see an update to our own master key, check it against the master
+    // key we have and, if it matches, mark it as verified
 
-    // First, get the pubkey of the one we can see
-    const seenSsk = this._deviceList.getStoredSskForUser(userId);
-    if (!seenSsk) {
+    // First, get the new cross-signing info
+    const newCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+    if (!newCrossSigning) {
         logger.error(
-            "Got SSK update event for user " + userId +
-            " but no new SSK found!",
+            "Got cross-signing update event for user " + userId +
+            " but no new cross-signing information found!",
         );
         return;
     }
-    const seenPubkey = seenSsk.getFingerprint();
 
+    const seenPubkey = newCrossSigning.getId();
+    const changed = this._crossSigningInfo.getId() !== seenPubkey;
+    let privkey;
+    if (changed) {
+        // try to get the private key if the master key changed
+        logger.info("Got new master key", seenPubkey);
+
+        let error;
+        do {
+            privkey = await new Promise((resolve, reject) => {
+                this._baseApis.emit("cross-signing:newKey", {
+                    publicKey: seenPubkey,
+                    type: "master",
+                    error,
+                    done: (key) => {
+                        // check key matches
+                        const signing = new global.Olm.PkSigning();
+                        try {
+                            const pubkey = signing.init_with_seed(key);
+                            if (pubkey !== seenPubkey) {
+                                error = "Key does not match";
+                                logger.info("Key does not match: got " + pubkey
+                                            + " expected " + seenPubkey);
+                                return;
+                            }
+                        } finally {
+                            signing.free();
+                        }
+                        resolve(key);
+                    },
+                    cancel: (error) => {
+                        reject(error || new Error("Cancelled by user"));
+                    },
+                });
+            });
+        } while (!privkey);
+        this._baseApis.emit("cross-signing:savePrivateKeys", {master: privkey});
+
+        logger.info("Got private key");
+    }
+
+    // FIXME: fetch the private key?
+    if (this._crossSigningInfo.getId("self_signing")
+        !== newCrossSigning.getId("self_signing")) {
+        logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
+    }
+    if (this._crossSigningInfo.getId("user_signing")
+        !== newCrossSigning.getId("user_signing")) {
+        logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
+    }
+
+    this._crossSigningInfo.setKeys(newCrossSigning.keys);
+    // FIXME: save it ... somewhere?
+
+    if (changed) {
+        this._baseApis.emit("cross-signing:keysChanged", {});
+    }
+
+    // FIXME:
     // Now dig out the account keys and get the pubkey of the one in there
+    /*
     let accountKeys = null;
     await this._cryptoStore.doTxn(
         'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -401,6 +462,7 @@ Crypto.prototype.checkOwnSskTrust = async function() {
             localPubkey + ", published: " + seenPubkey,
         );
     }
+    */
 };
 
 /**
@@ -986,7 +1048,6 @@ Crypto.prototype.setDeviceVerification = async function(
     const xsk = this._deviceList.getStoredCrossSigningForUser(userId);
     if (xsk.getId() === deviceId) {
         if (verified) {
-            xsk.verified = CrossSigningVerification.VERIFIED;
             const device = await this._crossSigningInfo.signUser(xsk);
             // FIXME: mark xsk as dirty in device list
             this._baseApis.uploadKeySignatures({
