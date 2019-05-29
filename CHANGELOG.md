@@ -1,3 +1,47 @@
+Changes in [1.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.2.0) (2019-05-29)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.2.0-rc.1...v1.2.0)
+
+
+Changes in [1.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.2.0-rc.1) (2019-05-23)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.1.0...v1.2.0-rc.1)
+
+ * interactive-auth now handles requesting email tokens
+   [\#926](https://github.com/matrix-org/matrix-js-sdk/pull/926)
+ * allow access to unreplaced message content
+   [\#923](https://github.com/matrix-org/matrix-js-sdk/pull/923)
+ * Add method to retrieve replacing event
+   [\#922](https://github.com/matrix-org/matrix-js-sdk/pull/922)
+ * More logging when signature verification fails
+   [\#921](https://github.com/matrix-org/matrix-js-sdk/pull/921)
+ * Local echo for m.replace relations
+   [\#920](https://github.com/matrix-org/matrix-js-sdk/pull/920)
+ * Track relations as pending and remove when cancelled
+   [\#919](https://github.com/matrix-org/matrix-js-sdk/pull/919)
+ * Add stringify helper to summarise events when debugging
+   [\#916](https://github.com/matrix-org/matrix-js-sdk/pull/916)
+ * Message editing: filter out replacements for senders that are not the
+   original sender
+   [\#918](https://github.com/matrix-org/matrix-js-sdk/pull/918)
+ * Wait until decrypt before aggregating
+   [\#917](https://github.com/matrix-org/matrix-js-sdk/pull/917)
+ * Message editing: mark original event as replaced instead of replacing the
+   event object
+   [\#914](https://github.com/matrix-org/matrix-js-sdk/pull/914)
+ * Support for replacing message through m.replace relationship.
+   [\#913](https://github.com/matrix-org/matrix-js-sdk/pull/913)
+ * Use a short timeout for .well-known requests
+   [\#912](https://github.com/matrix-org/matrix-js-sdk/pull/912)
+ * Redaction and change events for relations
+   [\#911](https://github.com/matrix-org/matrix-js-sdk/pull/911)
+ * Add basic read path for relations
+   [\#910](https://github.com/matrix-org/matrix-js-sdk/pull/910)
+ * Add a concept of default push rules, using it for tombstone notifications
+   [\#860](https://github.com/matrix-org/matrix-js-sdk/pull/860)
+ * yarn upgrade
+   [\#907](https://github.com/matrix-org/matrix-js-sdk/pull/907)
+
 Changes in [1.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.1.0) (2019-05-07)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.1.0-rc.1...v1.1.0)
