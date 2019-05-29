@@ -50,12 +50,12 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        // set Alices' cross-signing key
+        // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.resetCrossSigningKeys();
+        await alice.resetCrossSigningKeys();
         // Alice downloads Bob's device key
         alice._crypto._deviceList.storeCrossSigningForUser("@bob:example.com", {
             keys: {
@@ -85,7 +85,7 @@ describe("Cross Signing", function() {
         await promise;
     });
 
-    it("should get ssk and usk from sync", async function() {
+    it("should get cross-signing keys from sync", async function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
@@ -124,7 +124,7 @@ describe("Cross Signing", function() {
         await alice._crypto._signObject(aliceDevice);
         olmlib.pkSign(aliceDevice, selfSigningKey, "@alice:example.com");
 
-        // feed sync result that includes ssk, usk, device key
+        // feed sync result that includes master key, ssk, device key
         const responses = [
             HttpResponse.PUSH_RULES_RESPONSE,
             {
@@ -215,12 +215,12 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        // set Alices' cross-signing key
+        // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.resetCrossSigningKeys();
+        await alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
         const bobMasterSigning = new global.Olm.PkSigning();
         const bobMasterPrivkey = bobMasterSigning.generate_seed();
@@ -299,12 +299,12 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        // set Alices' cross-signing key
+        // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.resetCrossSigningKeys();
+        await alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
         // (NOTE: device key is not signed by ssk)
         const bobMasterSigning = new global.Olm.PkSigning();
@@ -373,7 +373,7 @@ describe("Cross Signing", function() {
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.resetCrossSigningKeys();
+        await alice.resetCrossSigningKeys();
         // Alice downloads Bob's keys
         const bobMasterSigning = new global.Olm.PkSigning();
         const bobMasterPrivkey = bobMasterSigning.generate_seed();
