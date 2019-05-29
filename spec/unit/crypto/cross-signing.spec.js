@@ -289,10 +289,163 @@ describe("Cross Signing", function() {
     });
 
     it("should trust signatures received from other devices", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+        alice._crypto._deviceList.startTrackingDeviceList("@bob:example.com");
+        alice._crypto._deviceList.stopTrackingAllDeviceLists = () => {};
+
+        // set Alice's cross-signing key
+        let privateKeys;
+        alice.on("cross-signing:savePrivateKeys", function(e) {
+            privateKeys = e;
+        });
+        await alice.resetCrossSigningKeys();
+
+        alice.once("cross-signing:getKey", (e) => {
+            e.done(privateKeys[e.type]);
+        });
+
+        const selfSigningKey = new Uint8Array([
+            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66,
+            0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0,
+            0x17, 0xb5, 0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49,
+            0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
+        ]);
+
+        const keyChangePromise = new Promise((resolve, reject) => {
+            alice._crypto._deviceList.once("userCrossSigningUpdated", (userId) => {
+                if (userId === "@bob:example.com") {
+                    resolve();
+                }
+            });
+        });
+
+        const deviceInfo = alice._crypto._deviceList._devices["@alice:example.com"]
+            .Osborne2;
+        const aliceDevice = {
+            user_id: "@alice:example.com",
+            device_id: "Osborne2",
+        };
+        aliceDevice.keys = deviceInfo.keys;
+        aliceDevice.algorithms = deviceInfo.algorithms;
+        await alice._crypto._signObject(aliceDevice);
+
+        const bobOlmAccount = new global.Olm.Account();
+        bobOlmAccount.create();
+        const bobKeys = JSON.parse(bobOlmAccount.identity_keys());
+        const bobDevice = {
+            user_id: "@bob:example.com",
+            device_id: "Dynabook",
+            algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+            keys: {
+                "ed25519:Dynabook": bobKeys.ed25519,
+                "curve25519:Dynabook": bobKeys.curve25519,
+            },
+        };
+        const deviceStr = anotherjson.stringify(bobDevice);
+        bobDevice.signatures = {
+            "@bob:example.com": {
+                "ed25519:Dynabook": bobOlmAccount.sign(deviceStr),
+            },
+        };
+        olmlib.pkSign(bobDevice, selfSigningKey, "@bob:example.com");
+
+        const bobMaster = {
+            user_id: "@bob:example.com",
+            usage: ["master"],
+            keys: {
+                "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+            },
+        };
+        olmlib.pkSign(bobMaster, privateKeys.user_signing, "@alice:example.com");
+
         // Alice downloads Bob's keys
         // - device key
-        // - ssk signed by her usk
+        // - ssk
+        // - master key signed by her usk (pretend that it was signed by another
+        //   of Alice's devices)
+        const responses = [
+            HttpResponse.PUSH_RULES_RESPONSE,
+            {
+                method: "POST",
+                path: "/keys/upload/Osborne2",
+                data: {
+                    one_time_key_counts: {
+                        curve25519: 100,
+                        signed_curve25519: 100,
+                    },
+                },
+            },
+            HttpResponse.filterResponse("@alice:example.com"),
+            {
+                method: "GET",
+                path: "/sync",
+                data: {
+                    next_batch: "abcdefg",
+                    device_lists: {
+                        changed: [
+                            "@bob:example.com",
+                        ],
+                    },
+                },
+            },
+            {
+                method: "POST",
+                path: "/keys/query",
+                data: {
+                    "failures": {},
+                    "device_keys": {
+                        "@alice:example.com": {
+                            "Osborne2": aliceDevice,
+                        },
+                        "@bob:example.com": {
+                            "Dynabook": bobDevice,
+                        },
+                    },
+                    "master_keys": {
+                        "@bob:example.com": bobMaster,
+                    },
+                    "self_signing_keys": {
+                        "@bob:example.com": {
+                            user_id: "@bob:example.com",
+                            usage: ["self-signing"],
+                            keys: {
+                                "ed25519:EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ":
+                                "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                            },
+                            signatures: {
+                                "@bob:example.com": {
+                                    "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                                    "2KLiufImvEbfJuAFvsaZD+PsL8ELWl7N1u9yr/9hZvwRghBfQMB"
+                                    + "LAI86b1kDV9+Cq1lt85ykReeCEzmTEPY2BQ",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            {
+                method: "POST",
+                path: "/keys/upload/Osborne2",
+                data: {
+                    one_time_key_counts: {
+                        curve25519: 100,
+                        signed_curve25519: 100,
+                    },
+                },
+            },
+        ];
+        setHttpResponses(alice, responses);
+
+        await alice.startClient();
+
+        await keyChangePromise;
+
         // Bob's device key should be trusted
+        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
+        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
     });
 
     it("should dis-trust an unsigned device", async function() {
