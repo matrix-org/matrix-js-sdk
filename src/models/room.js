@@ -558,7 +558,7 @@ Room.prototype._cleanupAfterLeaving = function() {
     this.clearLoadedMembersIfNeeded().catch((err) => {
         logger.error(`error after clearing loaded members from ` +
             `room ${this.roomId} after leaving`);
-        logger.dir(err);
+        logger.log(err);
     });
 };
 
