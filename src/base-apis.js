@@ -263,8 +263,7 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
 
     return this._http.authedRequest(
         (error, response) => {
-            if (loginType === "m.login.password" && response &&
-                response.access_token && response.user_id) {
+            if (response && response.access_token && response.user_id) {
                 this._http.opts.accessToken = response.access_token;
                 this.credentials = {
                     userId: response.user_id,
