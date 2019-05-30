@@ -20,6 +20,7 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
+import logger from '../../src/logger';
 import Relations from './relations';
 
 // var DEBUG = false;
@@ -28,7 +29,7 @@ const DEBUG = true;
 let debuglog;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
-    debuglog = console.log.bind(console);
+    debuglog = logger.log.bind(logger);
 } else {
     debuglog = function() {};
 }
@@ -422,7 +423,7 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         }
 
         // time to join the timelines.
-        console.info("Already have timeline for " + eventId +
+        logger.info("Already have timeline for " + eventId +
                      " - joining timeline " + timeline + " to " +
                      existingTimeline);
 
@@ -436,15 +437,15 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         if (backwardsIsLive || forwardsIsLive) {
             // The live timeline should never be spliced into a non-live position.
             // We use independent logging to better discover the problem at a glance.
-            console.warn({backwardsIsLive, forwardsIsLive}); // debugging
+            logger.warn({backwardsIsLive, forwardsIsLive}); // debugging
             if (backwardsIsLive) {
-                console.warn(
+                logger.warn(
                     "Refusing to set a preceding existingTimeLine on our " +
                     "timeline as the existingTimeLine is live (" + existingTimeline + ")",
                 );
             }
             if (forwardsIsLive) {
-                console.warn(
+                logger.warn(
                     "Refusing to set our preceding timeline on a existingTimeLine " +
                     "as our timeline is live (" + timeline + ")",
                 );
@@ -464,8 +465,8 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // timeline we ended up on.
     if (lastEventWasNew || !didUpdate) {
         if (direction === EventTimeline.FORWARDS && timeline === this._liveTimeline) {
-            console.warn({lastEventWasNew, didUpdate}); // for debugging
-            console.warn(
+            logger.warn({lastEventWasNew, didUpdate}); // for debugging
+            logger.warn(
                 `Refusing to set forwards pagination token of live timeline ` +
                 `${timeline} to ${paginationToken}`,
             );

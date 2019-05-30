@@ -5,6 +5,7 @@ import Promise from 'bluebird';
 // load olm before the sdk if possible
 import './olm-loader';
 
+import logger from '../src/logger';
 import sdk from '..';
 const MatrixEvent = sdk.MatrixEvent;
 
@@ -25,7 +26,7 @@ module.exports.syncPromise = function(client, count) {
 
     const p = new Promise((resolve, reject) => {
         const cb = (state) => {
-            console.log(`${Date.now()} syncPromise(${count}): ${state}`);
+            logger.log(`${Date.now()} syncPromise(${count}): ${state}`);
             if (state == 'SYNCING') {
                 resolve();
             } else {
@@ -48,8 +49,8 @@ module.exports.syncPromise = function(client, count) {
 module.exports.beforeEach = function(context) {
     const desc = context.currentTest.fullTitle();
 
-    console.log(desc);
-    console.log(new Array(1 + desc.length).join("="));
+    logger.log(desc);
+    logger.log(new Array(1 + desc.length).join("="));
 };
 
 /**
@@ -232,11 +233,11 @@ module.exports.awaitDecryption = function(event) {
         return Promise.resolve(event);
     }
 
-    console.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
+    logger.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
 
     return new Promise((resolve, reject) => {
         event.once('Event.decrypted', (ev) => {
-            console.log(`${Date.now()} event ${event.getId()} now decrypted`);
+            logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
             resolve(ev);
         });
     });

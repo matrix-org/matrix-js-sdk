@@ -22,6 +22,7 @@ import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");
+import logger from '../src/logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -283,7 +284,7 @@ InteractiveAuth.prototype = {
                     // We ignore all failures here (even non-UI auth related ones)
                     // since we don't want to suddenly fail if the internet connection
                     // had a blip whilst we were polling
-                    console.log(
+                    logger.log(
                         "Background poll request failed doing UI auth: ignoring",
                         error,
                     );
@@ -383,9 +384,9 @@ InteractiveAuth.prototype = {
         if (this._chosenFlow === null) {
             this._chosenFlow = this._chooseFlow();
         }
-        console.log("Active flow => %s", JSON.stringify(this._chosenFlow));
+        logger.log("Active flow => %s", JSON.stringify(this._chosenFlow));
         const nextStage = this._firstUncompletedStage(this._chosenFlow);
-        console.log("Next stage: %s", nextStage);
+        logger.log("Next stage: %s", nextStage);
         return nextStage;
     },
 

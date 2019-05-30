@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
+import logger from '../../src/logger';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web
@@ -140,7 +141,7 @@ RemoteIndexedDBStoreBackend.prototype = {
 
             // tell the worker the db name.
             this._startPromise = this._doCmd('_setupWorker', [this._dbName]).then(() => {
-                console.log("IndexedDB worker is ready");
+                logger.log("IndexedDB worker is ready");
             });
         }
         return this._startPromise;
@@ -170,13 +171,13 @@ RemoteIndexedDBStoreBackend.prototype = {
 
         if (msg.command == 'cmd_success' || msg.command == 'cmd_fail') {
             if (msg.seq === undefined) {
-                console.error("Got reply from worker with no seq");
+                logger.error("Got reply from worker with no seq");
                 return;
             }
 
             const def = this._inFlight[msg.seq];
             if (def === undefined) {
-                console.error("Got reply for unknown seq " + msg.seq);
+                logger.error("Got reply for unknown seq " + msg.seq);
                 return;
             }
             delete this._inFlight[msg.seq];
@@ -189,7 +190,7 @@ RemoteIndexedDBStoreBackend.prototype = {
                 def.reject(error);
             }
         } else {
-            console.warn("Unrecognised message from worker: " + msg);
+            logger.warn("Unrecognised message from worker: " + msg);
         }
     },
 };

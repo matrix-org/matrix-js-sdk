@@ -24,7 +24,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
-const logger = require("../logger");
+import logger from '../logger';
 const utils = require("../utils");
 
 /**

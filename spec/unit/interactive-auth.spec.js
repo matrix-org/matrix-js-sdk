@@ -24,6 +24,7 @@ const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
 import expect from 'expect';
+import logger from '../../src/logger';
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
@@ -64,7 +65,7 @@ describe("InteractiveAuth", function() {
 
         // first we expect a call here
         stateUpdated.andCall(function(stage) {
-            console.log('aaaa');
+            logger.log('aaaa');
             expect(stage).toEqual("logintype");
             ia.submitAuthDict({
                 type: "logintype",
@@ -75,7 +76,7 @@ describe("InteractiveAuth", function() {
         // .. which should trigger a call here
         const requestRes = {"a": "b"};
         doRequest.andCall(function(authData) {
-            console.log('cccc');
+            logger.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
                 type: "logintype",
@@ -106,7 +107,7 @@ describe("InteractiveAuth", function() {
 
         // first we expect a call to doRequest
         doRequest.andCall(function(authData) {
-            console.log("request1", authData);
+            logger.log("request1", authData);
             expect(authData).toEqual({});
             const err = new MatrixError({
                 session: "sessionId",
@@ -132,7 +133,7 @@ describe("InteractiveAuth", function() {
 
             // submitAuthDict should trigger another call to doRequest
             doRequest.andCall(function(authData) {
-                console.log("request2", authData);
+                logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
                     type: "logintype",

@@ -28,6 +28,7 @@ import testUtils from '../../test-utils';
 
 import OlmDevice from '../../../lib/crypto/OlmDevice';
 import Crypto from '../../../lib/crypto';
+import logger from '../../../src/logger';
 
 const Olm = global.Olm;
 
@@ -112,7 +113,7 @@ function makeTestClient(sessionStore, cryptoStore) {
 
 describe("MegolmBackup", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn('Not running megolm backup unit tests: libolm not present');
         return;
     }
 

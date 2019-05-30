@@ -7,6 +7,7 @@ const utils = require("../test-utils");
 
 import expect from 'expect';
 import lolex from 'lolex';
+import logger from '../../src/logger';
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
@@ -69,7 +70,7 @@ describe("MatrixClient", function() {
             "MatrixClient[UT] RECV " + method + " " + path + "  " +
             "EXPECT " + (next ? next.method : next) + " " + (next ? next.path : next)
         );
-        console.log(logLine);
+        logger.log(logLine);
 
         if (!next) { // no more things to return
             if (pendingLookup) {
@@ -91,7 +92,7 @@ describe("MatrixClient", function() {
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
-            console.log(
+            logger.log(
                 "MatrixClient[UT] Matched. Returning " +
                 (next.error ? "BAD" : "GOOD") + " response",
             );
@@ -353,7 +354,7 @@ describe("MatrixClient", function() {
         function syncChecker(expectedStates, done) {
             return function syncListener(state, old) {
                 const expected = expectedStates.shift();
-                console.log(
+                logger.log(
                     "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
                 );
                 if (!expected) {

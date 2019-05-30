@@ -17,6 +17,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
+import logger from '../../src/logger';
 
 /**
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
@@ -129,8 +130,8 @@ class IndexedDBStoreWorker {
                 result: ret,
             });
         }, (err) => {
-            console.error("Error running command: "+msg.command);
-            console.error(err);
+            logger.error("Error running command: "+msg.command);
+            logger.error(err);
             this.postMessage.call(null, {
                 command: 'cmd_fail',
                 seq: msg.seq,

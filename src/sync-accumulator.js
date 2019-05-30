@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import utils from "./utils";
+import logger from '../src/logger';
 
 
 /**
@@ -168,7 +169,7 @@ class SyncAccumulator {
                 }
                 break;
             default:
-                console.error("Unknown cateogory: ", category);
+                logger.error("Unknown cateogory: ", category);
         }
     }
 

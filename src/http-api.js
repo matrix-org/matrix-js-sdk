@@ -22,6 +22,7 @@ import Promise from 'bluebird';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
+import logger from '../src/logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -175,7 +176,7 @@ module.exports.MatrixHttpApi.prototype = {
             if (global.XMLHttpRequest) {
                 rawResponse = false;
             } else {
-                console.warn(
+                logger.warn(
                     "Returning the raw JSON from uploadContent(). Future " +
                     "versions of the js-sdk will change this default, to " +
                     "return the parsed object. Set opts.rawResponse=false " +
@@ -188,7 +189,7 @@ module.exports.MatrixHttpApi.prototype = {
         let onlyContentUri = opts.onlyContentUri;
         if (!rawResponse && onlyContentUri === undefined) {
             if (global.XMLHttpRequest) {
-                console.warn(
+                logger.warn(
                     "Returning only the content-uri from uploadContent(). " +
                     "Future versions of the js-sdk will change this " +
                     "default, to return the whole response object. Set " +

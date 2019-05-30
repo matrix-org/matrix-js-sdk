@@ -19,6 +19,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 const EventTimeline = require("./models/event-timeline");
+import logger from '../src/logger';
 
 /**
  * @private
@@ -28,7 +29,7 @@ const DEBUG = false;
 /**
  * @private
  */
-const debuglog = DEBUG ? console.log.bind(console) : function() {};
+const debuglog = DEBUG ? logger.log.bind(logger) : function() {};
 
 /**
  * the number of times we ask the server for more events before giving up

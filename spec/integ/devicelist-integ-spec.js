@@ -20,6 +20,7 @@ import Promise from 'bluebird';
 
 import TestClient from '../TestClient';
 import testUtils from '../test-utils';
+import logger from '../../src/logger';
 
 const ROOM_ID = "!room:id";
 
@@ -71,7 +72,7 @@ function getSyncResponse(roomMembers) {
 
 describe("DeviceList management:", function() {
     if (!global.Olm) {
-        console.warn('not running deviceList tests: Olm not present');
+        logger.warn('not running deviceList tests: Olm not present');
         return;
     }
 
@@ -108,7 +109,7 @@ describe("DeviceList management:", function() {
 
             return aliceTestClient.flushSync();
         }).then(function() {
-            console.log("Forcing alice to download our device keys");
+            logger.log("Forcing alice to download our device keys");
 
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(200, {
                 device_keys: {
@@ -121,7 +122,7 @@ describe("DeviceList management:", function() {
                 aliceTestClient.httpBackend.flush('/keys/query', 1),
             ]);
         }).then(function() {
-            console.log("Telling alice to send a megolm message");
+            logger.log("Telling alice to send a megolm message");
 
             aliceTestClient.httpBackend.when(
                 'PUT', '/send/',
