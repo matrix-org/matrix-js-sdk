@@ -24,6 +24,7 @@ limitations under the License.
  */
 
 "use strict";
+import logger from '../src/logger';
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
@@ -39,10 +40,9 @@ let _realCallbackKey;
 // each is an object with keys [runAt, func, params, key].
 const _callbackList = [];
 
-import logger from '../src/logger';
-
-// var debuglog = console.log.bind(console);
+// var debuglog = logger.log.bind(logger);
 const debuglog = function() {};
+
 /**
  * Replace the function used by this module to get the current time.
  *

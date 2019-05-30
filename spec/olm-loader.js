@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// try to load the olm library.
 import logger from '../src/logger';
 
+// try to load the olm library.
 try {
     global.Olm = require('olm');
     logger.log('loaded libolm');
