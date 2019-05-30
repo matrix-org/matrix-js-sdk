@@ -25,7 +25,7 @@ const anotherjson = require('another-json');
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
-const logger = require("../logger");
+import logger from '../logger';
 const utils = require("../utils");
 const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");

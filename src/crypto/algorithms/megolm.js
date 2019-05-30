@@ -25,7 +25,6 @@ limitations under the License.
 import Promise from 'bluebird';
 import logger from '../../../src/logger';
 
-const logger = require("../../logger");
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const base = require("./base");
