@@ -53,6 +53,7 @@ module.exports = {
         // rules we do not want from the google styleguide
         "object-curly-spacing": ["off"],
         "spaced-comment": ["off"],
+        "guard-for-in": ["off"],
 
         // in principle we prefer single quotes, but life is too short
         quotes: ["off"],
