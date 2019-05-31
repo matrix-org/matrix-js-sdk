@@ -12,7 +12,7 @@ describe('Login request', function() {
         client.stop();
     });
 
-    it('should store "access_token" and "user_id" if found in response', async function() {
+    it('should store "access_token" and "user_id" if in response', async function() {
         const response = { user_id: 1, access_token: Date.now().toString(16) };
 
         client.httpBackend.when('POST', '/login').respond(200, response);
