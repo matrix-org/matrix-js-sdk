@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,7 @@
     "start:watch": "babel -s -w --skip-initial-build -d lib src",
     "start:init": "babel -s -d lib src",
     "clean": "rimraf lib dist",
-    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
+    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && terser -c -m -o dist/browser-matrix.min.js --source-map \"content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
     "dist": "yarn build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 101 src spec",
@@ -87,15 +87,12 @@
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
-    "uglify-js": "^2.8.26",
+    "terser": "^4.0.0",
     "watchify": "^3.11.1"
   },
   "browserify": {
     "transform": [
       "sourceify"
     ]
-  },
-  "resolutions": {
-    "bs58/base-x": "3.0.4"
   }
 }
