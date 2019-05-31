@@ -1,3 +1,16 @@
+Changes in [2.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.0) (2019-05-31)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.2.0...v2.0.0)
+
+BREAKING CHANGES
+----------------
+
+ * This package now publishes in ES6 / ES2015 syntax to NPM
+ * Saves access_token and user_id after login for all login types
+   [\#932](https://github.com/matrix-org/matrix-js-sdk/pull/932)
+ * Fix recovery key encoding for base-x 3.0.5
+   [\#931](https://github.com/matrix-org/matrix-js-sdk/pull/931)
+
 Changes in [1.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v1.2.0) (2019-05-29)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.2.0-rc.1...v1.2.0)
