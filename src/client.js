@@ -448,13 +448,14 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
 /**
  * Gets the capabilities of the homeserver. Always returns an object of
  * capability keys and their options, which may be empty.
+ * @param {boolean} fresh True to ignore any cached values.
  * @return {module:client.Promise} Resolves to the capabilities of the homeserver
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.getCapabilities = function() {
+MatrixClient.prototype.getCapabilities = function(fresh=false) {
     const now = new Date().getTime();
 
-    if (this._cachedCapabilities) {
+    if (this._cachedCapabilities && !fresh) {
         if (now < this._cachedCapabilities.expiration) {
             logger.log("Returning cached capabilities");
             return Promise.resolve(this._cachedCapabilities.capabilities);
