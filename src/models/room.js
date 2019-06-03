@@ -1124,6 +1124,15 @@ Room.prototype.addPendingEvent = function(event, txnId) {
                 }
             }
         }
+
+        if (event.getType() === "m.room.redaction") {
+            const redactId = event.event.redacts;
+            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            if (redactedEvent) {
+                redactedEvent.markLocallyRedacted(event);
+                this.emit("Room.redaction", event, this);
+            }
+        }
     } else {
         for (let i = 0; i < this._timelineSets.length; i++) {
             const timelineSet = this._timelineSets[i];
@@ -1368,6 +1377,17 @@ Room.prototype.removeEvent = function(eventId) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
+            // undo local echo of redaction
+            if (removed.getType() === "m.room.redaction") {
+                const redactId = event.event.redacts;
+                const redactedEvent = this.getUnfilteredTimelineSet()
+                    .findEventById(redactId);
+                if (redactedEvent) {
+                    redactedEvent.unmarkLocallyRedacted();
+                    // re-render after undoing redaction
+                    this.emit("Room.redaction", removed, this);
+                }
+            }
             removedAny = true;
         }
     }
