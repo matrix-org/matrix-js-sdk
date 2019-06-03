@@ -277,11 +277,11 @@ Room.prototype.getRecommendedVersion = async function() {
         );
 
         const caps = await this._client.getCapabilities(true);
-        if (!caps) {
-            logger.warn("No server capabilities - assuming upgrade needed");
+        versionCap = caps["m.room_versions"];
+        if (!versionCap) {
+            logger.warn("No room version capability - assuming upgrade required.");
             return result;
         } else {
-            versionCap = caps["m.room_versions"];
             result = this._checkVersionAgainstCapability(versionCap);
         }
     }
@@ -301,7 +301,7 @@ Room.prototype._checkVersionAgainstCapability = function(versionCap) {
     };
 
     // If the room is on the default version then nothing needs to change
-    if (currentVersion === versionCap.default) return Promise.resolve(result);
+    if (currentVersion === versionCap.default) return result;
 
     const stableVersions = Object.keys(versionCap.available)
         .filter((v) => versionCap.available[v] === 'stable');
