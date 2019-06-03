@@ -896,7 +896,7 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.redactEvent = function(
+MatrixBaseApis.prototype.sendRedaction = function(
     roomId, eventId, txnId, callback,
 ) {
     if (arguments.length === 3) {
