@@ -56,7 +56,7 @@ function DeviceInfo(deviceId) {
     this.verified = DeviceVerification.UNVERIFIED;
     this.known = false;
     this.unsigned = {};
-    this.signatures = {}
+    this.signatures = {};
 }
 
 /**
