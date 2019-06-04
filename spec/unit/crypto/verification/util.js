@@ -33,11 +33,16 @@ export async function makeTestClients(userInfos, options) {
                             type: type,
                             content: msg,
                         });
-                        setTimeout(
-                            () => clientMap[userId][deviceId]
-                                .emit("toDeviceEvent", event),
-                            0,
-                        );
+                        const client = clientMap[userId][deviceId];
+                        if (event.isEncrypted()) {
+                            event.attemptDecryption(client._crypto)
+                                .then(() => client.emit("toDeviceEvent", event));
+                        } else {
+                            setTimeout(
+                                () => client.emit("toDeviceEvent", event),
+                                0,
+                            );
+                        }
                     }
                 }
             }

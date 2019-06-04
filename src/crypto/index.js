@@ -36,6 +36,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
 import { CrossSigningInfo } from './CrossSigning';
+import SecretStorage from './Secrets';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -205,6 +206,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._crossSigningInfo.on("cross-signing:getKey", (...args) => {
         this._baseApis.emit("cross-signing:getKey", ...args);
     });
+
+    this._secretStorage = new SecretStorage(baseApis);
+    // TODO: expose SecretStorage methods
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -320,13 +324,16 @@ Crypto.prototype.checkUserTrust = function(userId) {
  * TODO: see checkUserTrust
  */
 Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
-    const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
-    const device = this._deviceList.getStoredDevice(userId, deviceId);
     let rv = 0;
-    if (device.isVerified()) {
+
+    const device = this._deviceList.getStoredDevice(userId, deviceId);
+    if (device && device.isVerified()) {
         rv |= 1;
     }
-    rv |= this._crossSigningInfo.checkDeviceTrust(userCrossSigning, device) << 1;
+    const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+    if (device && userCrossSigning) {
+        rv |= this._crossSigningInfo.checkDeviceTrust(userCrossSigning, device) << 1;
+    }
     return rv;
 };
 
@@ -1013,16 +1020,6 @@ Crypto.prototype.getStoredDevice = function(userId, deviceId) {
  */
 Crypto.prototype.saveDeviceList = function(delay) {
     return this._deviceList.saveIfDirty(delay);
-};
-
-Crypto.prototype.setSskVerification = async function(userId, verified) {
-    const ssk = this._deviceList.getRawStoredSskForUser(userId);
-    if (!ssk) {
-        throw new Error("No self-signing key found for user " + userId);
-    }
-    ssk.verified = verified;
-    this._deviceList.storeSskForUser(userId, ssk);
-    this._deviceList.saveIfDirty();
 };
 
 /**
@@ -1953,6 +1950,10 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onRoomKeyEvent(event);
         } else if (event.getType() == "m.room_key_request") {
             this._onRoomKeyRequestEvent(event);
+        } else if (event.getType() === "m.secret.request") {
+            this._secretStorage._onRequestReceived(event);
+        } else if (event.getType() === "m.secret.share") {
+            this._secretStorage._onSecretReceived(event);
         } else if (event.getType() === "m.key.verification.request") {
             this._onKeyVerificationRequest(event);
         } else if (event.getType() === "m.key.verification.start") {
