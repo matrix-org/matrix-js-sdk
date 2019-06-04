@@ -1684,7 +1684,6 @@ MatrixClient.prototype.setPowerLevel = function(roomId, userId, powerLevel,
     );
 };
 
-
 /**
  * @param {string} roomId
  * @param {string} eventType
