@@ -675,6 +675,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     unmarkLocallyRedacted: function() {
         const value = this._locallyRedacted;
         this._locallyRedacted = false;
+        if (this.event.unsigned) {
+            this.event.unsigned.redacted_because = null;
+        }
         return value;
     },
 
@@ -684,6 +687,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         this.emit("Event.beforeRedaction", this, redactionEvent);
         this._locallyRedacted = true;
+        if (!this.event.unsigned) {
+            this.event.unsigned = {};
+        }
+        this.event.unsigned.redacted_because = redactionEvent.event;
     },
     /**
      * Update the content of an event in the same way it would be by the server
