@@ -1108,7 +1108,10 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         this._pendingEventList.push(event);
 
         if (event.isRelation()) {
-            this._aggregateNonLiveEvent(event);
+            // For pending events, add them to the relations collection immediately.
+            // (The alternate case below already covers this as part of adding to
+            // the timeline set.)
+            this._aggregateNonLiveRelation(event);
         }
 
         if (event.getType() === "m.room.redaction") {
@@ -1136,12 +1139,17 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
     this.emit("Room.localEchoUpdated", event, this, null, null);
 };
-// live events are aggregated in the timelineset
-// but for local echo (and undoing the local echo of a redaction) we do it here.
-Room.prototype._aggregateNonLiveEvent = function(event) {
-    // For pending events, add them to the relations collection immediately.
-    // (The alternate case below already covers this as part of adding to
-    // the timeline set.)
+/**
+ * Used to aggregate the local echo for a relation, and also
+ * for re-applying a relation after it's redaction has been cancelled,
+ * as the local echo for the redaction of the relation would have
+ * un-aggregated the relation. Note that this is different from regular messages,
+ * which are just kept detached for their local echo.
+ *
+ * Also note that live events are aggregated in the live EventTimelineSet.
+ * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
+ */
+Room.prototype._aggregateNonLiveRelation = function(event) {
     // TODO: We should consider whether this means it would be a better
     // design to lift the relations handling up to the room instead.
     for (let i = 0; i < this._timelineSets.length; i++) {
@@ -1318,7 +1326,7 @@ Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
         this.emit("Room.redaction", redactionEvent, this);
         // reapply relation now redaction failed
         if (redactedEvent.isRelation()) {
-            this._aggregateNonLiveEvent(redactedEvent);
+            this._aggregateNonLiveRelation(redactedEvent);
         }
     }
 };
