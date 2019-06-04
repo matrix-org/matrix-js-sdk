@@ -1108,21 +1108,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         this._pendingEventList.push(event);
 
         if (event.isRelation()) {
-            // For pending events, add them to the relations collection immediately.
-            // (The alternate case below already covers this as part of adding to
-            // the timeline set.)
-            // TODO: We should consider whether this means it would be a better
-            // design to lift the relations handling up to the room instead.
-            for (let i = 0; i < this._timelineSets.length; i++) {
-                const timelineSet = this._timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (this._filter.filterRoomTimeline([event]).length) {
-                        timelineSet.aggregateRelations(event);
-                    }
-                } else {
-                    timelineSet.aggregateRelations(event);
-                }
-            }
+            this._aggregateNonLiveEvent(event);
         }
 
         if (event.getType() === "m.room.redaction") {
@@ -1149,6 +1135,25 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     }
 
     this.emit("Room.localEchoUpdated", event, this, null, null);
+};
+// live events are aggregated in the timelineset
+// but for local echo (and undoing the local echo of a redaction) we do it here.
+Room.prototype._aggregateNonLiveEvent = function(event) {
+    // For pending events, add them to the relations collection immediately.
+    // (The alternate case below already covers this as part of adding to
+    // the timeline set.)
+    // TODO: We should consider whether this means it would be a better
+    // design to lift the relations handling up to the room instead.
+    for (let i = 0; i < this._timelineSets.length; i++) {
+        const timelineSet = this._timelineSets[i];
+        if (timelineSet.getFilter()) {
+            if (this._filter.filterRoomTimeline([event]).length) {
+                timelineSet.aggregateRelations(event);
+            }
+        } else {
+            timelineSet.aggregateRelations(event);
+        }
+    }
 };
 
 /**
@@ -1286,12 +1291,13 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
         if (this._pendingEventList) {
-            utils.removeElement(
-                this._pendingEventList,
-                function(ev) {
-                    return ev.getId() == oldEventId;
-                }, false,
-            );
+            const idx = this._pendingEventList.findIndex(ev => ev.getId() === oldEventId);
+            if (idx !== -1) {
+                const [removedEvent] = this._pendingEventList.splice(idx, 1);
+                if (removedEvent.getType() === "m.room.redaction") {
+                    this._revertRedactionLocalEcho(removedEvent);
+                }
+            }
         }
         this.removeEvent(oldEventId);
     }
@@ -1299,6 +1305,23 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
 
+Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
+    const redactId = redactionEvent.event.redacts;
+    if (!redactId) {
+        return;
+    }
+    const redactedEvent = this.getUnfilteredTimelineSet()
+        .findEventById(redactId);
+    if (redactedEvent) {
+        redactedEvent.unmarkLocallyRedacted();
+        // re-render after undoing redaction
+        this.emit("Room.redaction", redactionEvent, this);
+        // reapply relation now redaction failed
+        if (redactedEvent.isRelation()) {
+            this._aggregateNonLiveEvent(redactedEvent);
+        }
+    }
+};
 
 /**
  * Add some events to this room. This can include state events, message
@@ -1377,16 +1400,8 @@ Room.prototype.removeEvent = function(eventId) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
-            // undo local echo of redaction
             if (removed.getType() === "m.room.redaction") {
-                const redactId = event.event.redacts;
-                const redactedEvent = this.getUnfilteredTimelineSet()
-                    .findEventById(redactId);
-                if (redactedEvent) {
-                    redactedEvent.unmarkLocallyRedacted();
-                    // re-render after undoing redaction
-                    this.emit("Room.redaction", removed, this);
-                }
+                this._revertRedactionLocalEcho(removed);
             }
             removedAny = true;
         }
