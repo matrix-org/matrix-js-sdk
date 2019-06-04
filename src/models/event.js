@@ -692,6 +692,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         this.event.unsigned.redacted_because = redactionEvent.event;
     },
+
     /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
@@ -749,7 +750,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {boolean} True if this event has been redacted
      */
     isRedacted: function() {
-        return this._locallyRedacted || Boolean(this.getUnsigned().redacted_because);
+        return Boolean(this.getUnsigned().redacted_because);
     },
 
     /**
