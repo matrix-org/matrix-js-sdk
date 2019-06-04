@@ -263,6 +263,33 @@ Room.prototype.getRecommendedVersion = async function() {
         }
     }
 
+    let result = this._checkVersionAgainstCapability(versionCap);
+    if (result.urgent && result.needsUpgrade) {
+        // Something doesn't feel right: we shouldn't need to update
+        // because the version we're on should be in the protocol's
+        // namespace. This usually means that the server was updated
+        // before the client was, making us think the newest possible
+        // room version is not stable. As a solution, we'll refresh
+        // the capability we're using to determine this.
+        logger.warn(
+            "Refreshing room version capability because the server looks " +
+            "to be supporting a newer room version we don't know about.",
+        );
+
+        const caps = await this._client.getCapabilities(true);
+        versionCap = caps["m.room_versions"];
+        if (!versionCap) {
+            logger.warn("No room version capability - assuming upgrade required.");
+            return result;
+        } else {
+            result = this._checkVersionAgainstCapability(versionCap);
+        }
+    }
+
+    return result;
+};
+
+Room.prototype._checkVersionAgainstCapability = function(versionCap) {
     const currentVersion = this.getVersion();
     logger.log(`[${this.roomId}] Current version: ${currentVersion}`);
     logger.log(`[${this.roomId}] Version capability: `, versionCap);
@@ -274,7 +301,7 @@ Room.prototype.getRecommendedVersion = async function() {
     };
 
     // If the room is on the default version then nothing needs to change
-    if (currentVersion === versionCap.default) return Promise.resolve(result);
+    if (currentVersion === versionCap.default) return result;
 
     const stableVersions = Object.keys(versionCap.available)
         .filter((v) => versionCap.available[v] === 'stable');
@@ -291,12 +318,12 @@ Room.prototype.getRecommendedVersion = async function() {
         } else {
             logger.warn(`Non-urgent upgrade required on ${this.roomId}`);
         }
-        return Promise.resolve(result);
+        return result;
     }
 
     // The room is on a stable, but non-default, version by this point.
     // No upgrade needed.
-    return Promise.resolve(result);
+    return result;
 };
 
 /**
