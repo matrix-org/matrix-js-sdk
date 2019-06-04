@@ -1323,7 +1323,7 @@ Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
     if (redactedEvent) {
         redactedEvent.unmarkLocallyRedacted();
         // re-render after undoing redaction
-        this.emit("Room.redaction", redactionEvent, this);
+        this.emit("Room.redactionCancelled", redactionEvent, this);
         // reapply relation now redaction failed
         if (redactedEvent.isRelation()) {
             this._aggregateNonLiveRelation(redactedEvent);
@@ -1836,6 +1836,17 @@ module.exports = Room;
  * @event module:client~MatrixClient#"Room.redaction"
  * @param {MatrixEvent} event The matrix event which was redacted
  * @param {Room} room The room containing the redacted event
+ */
+
+/**
+ * Fires when an event that was previously redacted isn't anymore.
+ * This happens when the redaction couldn't be sent and
+ * was subsequently cancelled by the user. Redactions have a local echo
+ * which is undone in this scenario.
+ *
+ * @event module:client~MatrixClient#"Room.redactionCancelled"
+ * @param {MatrixEvent} event The matrix event which isn't redacted anymore
+ * @param {Room} room The room containing the unredacted event
  */
 
 /**
