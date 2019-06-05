@@ -21,6 +21,7 @@ limitations under the License.
 
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
+import logger from '../../logger';
 
 export default class VerificationBase extends EventEmitter {
     /**
