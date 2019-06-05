@@ -685,12 +685,16 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (this._locallyRedacted) {
             return;
         }
-        this.emit("Event.beforeRedaction", this, redactionEvent);
+        const callbacks = [];
+        this.emit("Event.beforeRedaction", this, redactionEvent, callbacks);
         this._locallyRedacted = true;
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
         this.event.unsigned.redacted_because = redactionEvent.event;
+        for(const callback of callbacks) {
+            callback();
+        }
     },
 
     /**
@@ -708,7 +712,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this._locallyRedacted = false;
 
-        this.emit("Event.beforeRedaction", this, redaction_event);
+        const callbacks = [];
+        this.emit("Event.beforeRedaction", this, redaction_event, callbacks);
 
         this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
@@ -741,6 +746,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             if (!keeps[key]) {
                 delete content[key];
             }
+        }
+
+        for(const callback of callbacks) {
+            callback();
         }
     },
 
@@ -799,6 +808,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     setStatus(status) {
         this.status = status;
         this.emit("Event.status", this, status);
+    },
+
+    replaceLocalEventId(eventId) {
+        this.event.event_id = eventId;
+        this.emit("Event.localEventIdReplaced", this);
     },
 
     /**
@@ -874,6 +888,25 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      */
     replacingEvent() {
         return this._replacingEvent;
+    },
+
+
+    getTargetId() {
+        const relation = this.getRelation();
+        if (relation) {
+            return relation.event_id;
+        } else if (this.getType() === "m.room.redaction") {
+            return this.event.redacts;
+        }
+    },
+
+    updateTargetId(eventId) {
+        const relation = this.getRelation();
+        if (relation) {
+            relation.event_id = eventId;
+        } else if (this.getType() === "m.room.redaction") {
+            this.event.redacts = eventId;
+        }
     },
 
     /**

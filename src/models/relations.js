@@ -226,7 +226,7 @@ export default class Relations extends EventEmitter {
      * @param {MatrixEvent} redactedEvent
      * The original relation event that is about to be redacted.
      */
-    _onBeforeRedaction = (redactedEvent) => {
+    _onBeforeRedaction = (redactedEvent, _, callbacks) => {
         if (!this._relations.has(redactedEvent)) {
             return;
         }
@@ -245,9 +245,9 @@ export default class Relations extends EventEmitter {
         // Dispatch a redaction event on this collection. `setTimeout` is used
         // to wait until the next event loop iteration by which time the event
         // has actually been marked as redacted.
-        setTimeout(() => {
+        callbacks.push(() => {
             this.emit("Relations.redaction");
-        }, 0);
+        });
     }
 
     /**

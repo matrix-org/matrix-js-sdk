@@ -1730,29 +1730,15 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     }));
 
     const room = this.getRoom(roomId);
-    const relation = localEvent.getRelation();
-    if (relation) {
-        const targetId = relation.event_id;
-
-        if (/*targetId is local id*/) {
-            //add to list with pending relations that needs updating?
-            // or listen for "Event.status"?
-        }
-
-
-        // this will throw with chronological ordering :/
+    const targetId = localEvent.getTargetId();
+    if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
-        // we should check here if there is no target, and it's a local id, then something's wrong
-        if (target) {
-
-        }
-        && relation.event_id is a localId) {
-        // we'll need to get the event from the room to check the status? or can we look into the queue?
-        //make sure that the target event is a pending event for the room (or event present in the queue? no, not everything is queued I guess?)
-        //listen for Room.localEchoUpdated
-            // if SENT: replace the target event_id with the new one.
-            // if CANCELLED: cancel this one as well?
-            // we need to be sure this will happen before our event is sent of course.
+        target.once("Event.localEventIdReplaced", () => {
+            console.log(`replacing relation id from ${targetId} to ${target.getId()}`);
+            localEvent.updateTargetId(target.getId());
+        });
+        // if CANCELLED: cancel this one as well?
+        // we need to be sure this will happen before our event is sent of course.
     }
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
