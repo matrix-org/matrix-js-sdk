@@ -24,6 +24,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
+import logger from '../../src/logger';
 
 /**
  * Enum for event statuses.
@@ -50,6 +51,12 @@ module.exports.EventStatus = {
 };
 
 const interns = {};
+function intern(str) {
+    if (!interns[str]) {
+        interns[str] = str;
+    }
+    return interns[str];
+}
 
 /**
  * Construct a Matrix Event object
@@ -87,20 +94,25 @@ module.exports.MatrixEvent = function MatrixEvent(
         if (!event[prop]) {
             return;
         }
-        if (!interns[event[prop]]) {
-            interns[event[prop]] = event[prop];
-        }
-        event[prop] = interns[event[prop]];
+        event[prop] = intern(event[prop]);
     });
 
     ["membership", "avatar_url", "displayname"].forEach((prop) => {
         if (!event.content || !event.content[prop]) {
             return;
         }
-        if (!interns[event.content[prop]]) {
-            interns[event.content[prop]] = event.content[prop];
+        event.content[prop] = intern(event.content[prop]);
+    });
+
+    ["rel_type"].forEach((prop) => {
+        if (
+            !event.content ||
+            !event.content["m.relates_to"] ||
+            !event.content["m.relates_to"][prop]
+        ) {
+            return;
         }
-        event.content[prop] = interns[event.content[prop]];
+        event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
     });
 
     this.event = event || {};
@@ -111,6 +123,8 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.error = null;
     this.forwardLooking = true;
     this._pushActions = null;
+    this._replacingEvent = null;
+    this._locallyRedacted = false;
 
     this._clearEvent = {};
 
@@ -209,12 +223,33 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Get the (decrypted, if necessary) event content JSON.
+     * Get the (decrypted, if necessary) event content JSON, even if the event
+     * was replaced by another event.
+     *
+     * @return {Object} The event content JSON, or an empty object.
+     */
+    getOriginalContent: function() {
+        if (this._locallyRedacted) {
+            return {};
+        }
+        return this._clearEvent.content || this.event.content || {};
+    },
+
+    /**
+     * Get the (decrypted, if necessary) event content JSON,
+     * or the content from the replacing event, if any.
+     * See `makeReplaced`.
      *
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        return this._clearEvent.content || this.event.content || {};
+        if (this._locallyRedacted) {
+            return {};
+        } else if (this._replacingEvent) {
+            return this._replacingEvent.getContent()["m.new_content"] || {};
+        } else {
+            return this.getOriginalContent();
+        }
     },
 
     /**
@@ -352,7 +387,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         if (
             this._clearEvent && this._clearEvent.content &&
-                this._clearEvent.content.msgtype !== "m.bad.encrypted"
+            this._clearEvent.content.msgtype !== "m.bad.encrypted"
         ) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
@@ -367,7 +402,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         // new info.
         //
         if (this._decryptionPromise) {
-            console.log(
+            logger.log(
                 `Event ${this.getId()} already being decrypted; queueing a retry`,
             );
             this._retryDecryption = true;
@@ -441,7 +476,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 if (e.name !== "DecryptionError") {
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
-                    console.error(
+                    logger.error(
                         `Error decrypting event (id=${this.getId()}): ${e.stack || e}`,
                     );
                     this._decryptionPromise = null;
@@ -467,7 +502,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 //
                 if (this._retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    console.log(
+                    logger.log(
                         `Got error decrypting event (id=${this.getId()}: ` +
                         `${e}), but retrying`,
                     );
@@ -476,7 +511,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                console.warn(
+                logger.warn(
                     `Error decrypting event (id=${this.getId()}): ${e.detailedString}`,
                 );
 
@@ -637,6 +672,27 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         return this.event.unsigned || {};
     },
 
+    unmarkLocallyRedacted: function() {
+        const value = this._locallyRedacted;
+        this._locallyRedacted = false;
+        if (this.event.unsigned) {
+            this.event.unsigned.redacted_because = null;
+        }
+        return value;
+    },
+
+    markLocallyRedacted: function(redactionEvent) {
+        if (this._locallyRedacted) {
+            return;
+        }
+        this.emit("Event.beforeRedaction", this, redactionEvent);
+        this._locallyRedacted = true;
+        if (!this.event.unsigned) {
+            this.event.unsigned = {};
+        }
+        this.event.unsigned.redacted_because = redactionEvent.event;
+    },
+
     /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
@@ -650,6 +706,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             throw new Error("invalid redaction_event in makeRedacted");
         }
 
+        this._locallyRedacted = false;
+
+        this.emit("Event.beforeRedaction", this, redaction_event);
+
+        this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
@@ -697,28 +758,152 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @return {?Object} push actions
      */
-     getPushActions: function() {
+    getPushActions: function() {
         return this._pushActions;
-     },
+    },
 
     /**
      * Set the push actions for this event.
      *
      * @param {Object} pushActions push actions
      */
-     setPushActions: function(pushActions) {
+    setPushActions: function(pushActions) {
         this._pushActions = pushActions;
-     },
+    },
 
-     /**
-      * Replace the `event` property and recalculate any properties based on it.
-      * @param {Object} event the object to assign to the `event` property
-      */
-     handleRemoteEcho: function(event) {
+    /**
+     * Replace the `event` property and recalculate any properties based on it.
+     * @param {Object} event the object to assign to the `event` property
+     */
+    handleRemoteEcho: function(event) {
         this.event = event;
         // successfully sent.
-        this.status = null;
-     },
+        this.setStatus(null);
+    },
+
+    /**
+     * Whether the event is in any phase of sending, send failure, waiting for
+     * remote echo, etc.
+     *
+     * @return {boolean}
+     */
+    isSending() {
+        return !!this.status;
+    },
+
+    /**
+     * Update the event's sending status and emit an event as well.
+     *
+     * @param {String} status The new status
+     */
+    setStatus(status) {
+        this.status = status;
+        this.emit("Event.status", this, status);
+    },
+
+    /**
+     * Get whether the event is a relation event, and of a given type if
+     * `relType` is passed in.
+     *
+     * @param {string?} relType if given, checks that the relation is of the
+     * given type
+     * @return {boolean}
+     */
+    isRelation(relType = undefined) {
+        // Relation info is lifted out of the encrypted content when sent to
+        // encrypted rooms, so we have to check `getWireContent` for this.
+        const content = this.getWireContent();
+        const relation = content && content["m.relates_to"];
+        return relation && relation.rel_type && relation.event_id &&
+            ((relType && relation.rel_type === relType) || !relType);
+    },
+
+    /**
+     * Get relation info for the event, if any.
+     *
+     * @return {Object}
+     */
+    getRelation() {
+        if (!this.isRelation()) {
+            return null;
+        }
+        return this.getWireContent()["m.relates_to"];
+    },
+
+    /**
+     * Set an event that replaces the content of this event, through an m.replace relation.
+     *
+     * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
+     */
+    makeReplaced(newEvent) {
+        if (this.isRedacted()) {
+            return;
+        }
+        if (this._replacingEvent !== newEvent) {
+            this._replacingEvent = newEvent;
+            this.emit("Event.replaced", this);
+        }
+    },
+
+    /**
+     * Returns the status of the event, or the replacing event in case `makeReplace` has been called.
+     *
+     * @return {EventStatus}
+     */
+    replacementOrOwnStatus() {
+        if (this._replacingEvent) {
+            return this._replacingEvent.status;
+        } else {
+            return this.status;
+        }
+    },
+
+    /**
+     * Returns the event ID of the event replacing the content of this event, if any.
+     *
+     * @return {string?}
+     */
+    replacingEventId() {
+        return this._replacingEvent && this._replacingEvent.getId();
+    },
+
+    /**
+     * Returns the event replacing the content of this event, if any.
+     *
+     * @return {MatrixEvent?}
+     */
+    replacingEvent() {
+        return this._replacingEvent;
+    },
+
+    /**
+     * Summarise the event as JSON for debugging. If encrypted, include both the
+     * decrypted and encrypted view of the event. This is named `toJSON` for use
+     * with `JSON.stringify` which checks objects for functions named `toJSON`
+     * and will call them to customise the output if they are defined.
+     *
+     * @return {Object}
+     */
+    toJSON() {
+        const event = {
+            type: this.getType(),
+            sender: this.getSender(),
+            content: this.getContent(),
+            event_id: this.getId(),
+            origin_server_ts: this.getTs(),
+            unsigned: this.getUnsigned(),
+            room_id: this.getRoomId(),
+        };
+
+        if (!this.isEncrypted()) {
+            return event;
+        }
+
+        return {
+            decrypted: event,
+            encrypted: this.event,
+        };
+    },
 });
 
 

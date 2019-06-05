@@ -20,6 +20,8 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
+import logger from '../../src/logger';
+import Relations from './relations';
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -27,7 +29,7 @@ const DEBUG = true;
 let debuglog;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
-    debuglog = console.log.bind(console);
+    debuglog = logger.log.bind(logger);
 } else {
     debuglog = function() {};
 }
@@ -54,22 +56,38 @@ if (DEBUG) {
  * map from event_id to timeline and index.
  *
  * @constructor
- * @param {?Room} room      the optional room for this timelineSet
- * @param {Object} opts     hash of options inherited from Room.
- *      opts.timelineSupport gives whether timeline support is enabled
- *      opts.filter is the filter object, if any, for this timelineSet.
+ * @param {?Room} room
+ * Room for this timelineSet. May be null for non-room cases, such as the
+ * notification timeline.
+ * @param {Object} opts Options inherited from Room.
+ *
+ * @param {boolean} [opts.timelineSupport = false]
+ * Set to true to enable improved timeline support.
+ * @param {Object} [opts.filter = null]
+ * The filter object, if any, for this timelineSet.
+ * @param {boolean} [opts.unstableClientRelationAggregation = false]
+ * Optional. Set to true to enable client-side aggregation of event relations
+ * via `getRelationsForEvent`.
+ * This feature is currently unstable and the API may change without notice.
  */
 function EventTimelineSet(room, opts) {
     this.room = room;
 
     this._timelineSupport = Boolean(opts.timelineSupport);
     this._liveTimeline = new EventTimeline(this);
+    this._unstableClientRelationAggregation = !!opts.unstableClientRelationAggregation;
 
     // just a list - *not* ordered.
     this._timelines = [this._liveTimeline];
     this._eventIdToTimeline = {};
 
     this._filter = opts.filter || null;
+
+    if (this._unstableClientRelationAggregation) {
+        // A tree of objects to access a set of relations for an event, as in:
+        // this._relations[relatesToEventId][relationType][relationEventType]
+        this._relations = {};
+    }
 }
 utils.inherits(EventTimelineSet, EventEmitter);
 
@@ -405,7 +423,7 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         }
 
         // time to join the timelines.
-        console.info("Already have timeline for " + eventId +
+        logger.info("Already have timeline for " + eventId +
                      " - joining timeline " + timeline + " to " +
                      existingTimeline);
 
@@ -413,25 +431,30 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         const existingIsLive = existingTimeline === this._liveTimeline;
         const timelineIsLive = timeline === this._liveTimeline;
 
-        if (direction === EventTimeline.BACKWARDS && existingIsLive) {
+        const backwardsIsLive = direction === EventTimeline.BACKWARDS && existingIsLive;
+        const forwardsIsLive = direction === EventTimeline.FORWARDS && timelineIsLive;
+
+        if (backwardsIsLive || forwardsIsLive) {
             // The live timeline should never be spliced into a non-live position.
-            console.warn(
-                "Refusing to set a preceding existingTimeLine on our " +
-                "timeline as the existingTimeLine is live (" + existingTimeline + ")",
-            );
-        } else {
-            timeline.setNeighbouringTimeline(existingTimeline, direction);
+            // We use independent logging to better discover the problem at a glance.
+            logger.warn({backwardsIsLive, forwardsIsLive}); // debugging
+            if (backwardsIsLive) {
+                logger.warn(
+                    "Refusing to set a preceding existingTimeLine on our " +
+                    "timeline as the existingTimeLine is live (" + existingTimeline + ")",
+                );
+            }
+            if (forwardsIsLive) {
+                logger.warn(
+                    "Refusing to set our preceding timeline on a existingTimeLine " +
+                    "as our timeline is live (" + timeline + ")",
+                );
+            }
+            continue; // abort splicing - try next event
         }
 
-        if (inverseDirection === EventTimeline.BACKWARDS && timelineIsLive) {
-            // The live timeline should never be spliced into a non-live position.
-            console.warn(
-                "Refusing to set our preceding timeline on a existingTimeLine " +
-                "as our timeline is live (" + timeline + ")",
-            );
-        } else {
-            existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
-        }
+        timeline.setNeighbouringTimeline(existingTimeline, direction);
+        existingTimeline.setNeighbouringTimeline(timeline, inverseDirection);
 
         timeline = existingTimeline;
         didUpdate = true;
@@ -441,6 +464,14 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
     // new information, we update the pagination token for whatever
     // timeline we ended up on.
     if (lastEventWasNew || !didUpdate) {
+        if (direction === EventTimeline.FORWARDS && timeline === this._liveTimeline) {
+            logger.warn({lastEventWasNew, didUpdate}); // for debugging
+            logger.warn(
+                `Refusing to set forwards pagination token of live timeline ` +
+                `${timeline} to ${paginationToken}`,
+            );
+            return;
+        }
         timeline.setPaginationToken(paginationToken, direction);
     }
 };
@@ -509,6 +540,9 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
     const eventId = event.getId();
     timeline.addEvent(event, toStartOfTimeline);
     this._eventIdToTimeline[eventId] = timeline;
+
+    this.setRelationsTarget(event);
+    this.aggregateRelations(event);
 
     const data = {
         timeline: timeline,
@@ -642,6 +676,122 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
 
     // the timelines are not contiguous.
     return null;
+};
+
+/**
+ * Get a collection of relations to a given event in this timeline set.
+ *
+ * @param {String} eventId
+ * The ID of the event that you'd like to access relation events for.
+ * For example, with annotations, this would be the ID of the event being annotated.
+ * @param {String} relationType
+ * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
+ * @param {String} eventType
+ * The relation event's type, such as "m.reaction", etc.
+ *
+ * @returns {Relations}
+ * A container for relation events.
+ */
+EventTimelineSet.prototype.getRelationsForEvent = function(
+    eventId, relationType, eventType,
+) {
+    if (!this._unstableClientRelationAggregation) {
+        throw new Error("Client-side relation aggregation is disabled");
+    }
+
+    if (!eventId || !relationType || !eventType) {
+        throw new Error("Invalid arguments for `getRelationsForEvent`");
+    }
+
+    // debuglog("Getting relations for: ", eventId, relationType, eventType);
+
+    const relationsForEvent = this._relations[eventId] || {};
+    const relationsWithRelType = relationsForEvent[relationType] || {};
+    return relationsWithRelType[eventType];
+};
+
+/**
+ * Set an event as the target event if any Relations exist for it already
+ *
+ * @param {MatrixEvent} event
+ * The event to check as relation target.
+ */
+EventTimelineSet.prototype.setRelationsTarget = function(event) {
+    if (!this._unstableClientRelationAggregation) {
+        return;
+    }
+
+    const relationsForEvent = this._relations[event.getId()];
+    if (!relationsForEvent) {
+        return;
+    }
+    // don't need it for non m.replace relations for now
+    const relationsWithRelType = relationsForEvent["m.replace"];
+    if (!relationsWithRelType) {
+        return;
+    }
+    // only doing replacements for messages for now (e.g. edits)
+    const relationsWithEventType = relationsWithRelType["m.room.message"];
+
+    if (relationsWithEventType) {
+        relationsWithEventType.setTargetEvent(event);
+    }
+};
+
+/**
+ * Add relation events to the relevant relation collection.
+ *
+ * @param {MatrixEvent} event
+ * The new relation event to be aggregated.
+ */
+EventTimelineSet.prototype.aggregateRelations = function(event) {
+    if (!this._unstableClientRelationAggregation) {
+        return;
+    }
+
+    // If the event is currently encrypted, wait until it has been decrypted.
+    if (event.isBeingDecrypted()) {
+        event.once("Event.decrypted", () => {
+            this.aggregateRelations(event);
+        });
+        return;
+    }
+
+    const relation = event.getRelation();
+    if (!relation) {
+        return;
+    }
+
+    const relatesToEventId = relation.event_id;
+    const relationType = relation.rel_type;
+    const eventType = event.getType();
+
+    // debuglog("Aggregating relation: ", event.getId(), eventType, relation);
+
+    let relationsForEvent = this._relations[relatesToEventId];
+    if (!relationsForEvent) {
+        relationsForEvent = this._relations[relatesToEventId] = {};
+    }
+    let relationsWithRelType = relationsForEvent[relationType];
+    if (!relationsWithRelType) {
+        relationsWithRelType = relationsForEvent[relationType] = {};
+    }
+    let relationsWithEventType = relationsWithRelType[eventType];
+
+    if (!relationsWithEventType) {
+        relationsWithEventType = relationsWithRelType[eventType] = new Relations(
+            relationType,
+            eventType,
+            this.room,
+        );
+        const relatesToEvent = this.findEventById(relatesToEventId);
+        if (relatesToEvent) {
+            relationsWithEventType.setTargetEvent(relatesToEvent);
+            relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
+        }
+    }
+
+    relationsWithEventType.addEvent(event);
 };
 
 /**

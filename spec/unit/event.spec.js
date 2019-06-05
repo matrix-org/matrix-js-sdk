@@ -21,10 +21,11 @@ import testUtils from '../test-utils';
 
 import expect from 'expect';
 import Promise from 'bluebird';
+import logger from '../../src/logger';
 
 describe("MatrixEvent", () => {
     beforeEach(function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
     describe(".attemptDecryption", () => {
@@ -48,7 +49,7 @@ describe("MatrixEvent", () => {
             const crypto = {
                 decryptEvent: function() {
                     ++callCount;
-                    console.log(`decrypt: ${callCount}`);
+                    logger.log(`decrypt: ${callCount}`);
                     if (callCount == 1) {
                         // schedule a second decryption attempt while
                         // the first one is still running.

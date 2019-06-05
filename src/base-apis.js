@@ -263,8 +263,7 @@ MatrixBaseApis.prototype.login = function(loginType, data, callback) {
 
     return this._http.authedRequest(
         (error, response) => {
-            if (loginType === "m.login.password" && response &&
-                response.access_token && response.user_id) {
+            if (response && response.access_token && response.user_id) {
                 this._http.opts.accessToken = response.access_token;
                 this.credentials = {
                     userId: response.user_id,
@@ -886,21 +885,6 @@ MatrixBaseApis.prototype.sendStateEvent = function(roomId, eventType, content, s
     return this._http.authedRequest(
         callback, "PUT", path, undefined, content,
     );
-};
-
-/**
- * @param {string} roomId
- * @param {string} eventId
- * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
- * @return {module:http-api.MatrixError} Rejects: with an error response.
- */
-MatrixBaseApis.prototype.redactEvent = function(roomId, eventId, callback) {
-    const path = utils.encodeUri("/rooms/$roomId/redact/$eventId", {
-        $roomId: roomId,
-        $eventId: eventId,
-    });
-    return this._http.authedRequest(callback, "POST", path, undefined, {});
 };
 
 /**

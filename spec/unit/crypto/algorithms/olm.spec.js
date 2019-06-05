@@ -20,6 +20,7 @@ import expect from 'expect';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
+import logger from '../../../../src/logger';
 
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import olmlib from '../../../../lib/crypto/olmlib';
@@ -45,7 +46,7 @@ async function setupSession(initiator, opponent) {
 
 describe("OlmDecryption", function() {
     if (!global.Olm) {
-        console.warn('Not running megolm unit tests: libolm not present');
+        logger.warn('Not running megolm unit tests: libolm not present');
         return;
     }
 
@@ -53,7 +54,7 @@ describe("OlmDecryption", function() {
     let bobOlmDevice;
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
 
         await global.Olm.init();
 

@@ -22,7 +22,7 @@ limitations under the License.
  */
 import Promise from 'bluebird';
 
-const logger = require("../../logger");
+import logger from '../../logger';
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const DeviceInfo = require("../deviceinfo");

@@ -1,7 +1,8 @@
 {
     "presets": ["es2015", "es2016"],
     "plugins": [
-	"transform-class-properties",
+        "transform-class-properties",
+
         // this transforms async functions into generator functions, which
         // are then made to use the regenerator module by babel's
         // transform-regnerator plugin (which is enabled by es2015).

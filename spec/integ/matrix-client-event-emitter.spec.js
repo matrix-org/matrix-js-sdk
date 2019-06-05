@@ -15,7 +15,7 @@ describe("MatrixClient events", function() {
     const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line no-invalid-this
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -157,7 +157,7 @@ describe("MatrixClient events", function() {
                     return;
                 }
 
-                expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
+                expect(event.event).toMatch(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
                     SYNC_DATA.presence.events[0].content.presence,
                 );

@@ -32,6 +32,7 @@ const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
+import logger from '../src/logger';
 
 import {InvalidStoreError} from './errors';
 
@@ -58,7 +59,7 @@ function debuglog(...params) {
     if (!DEBUG) {
         return;
     }
-    console.log(...params);
+    logger.log(...params);
 }
 
 
@@ -116,17 +117,25 @@ function SyncApi(client, opts) {
  */
 SyncApi.prototype.createRoom = function(roomId) {
     const client = this.client;
+    const {
+        timelineSupport,
+        unstableClientRelationAggregation,
+    } = client;
     const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: this.opts.lazyLoadMembers,
         pendingEventOrdering: this.opts.pendingEventOrdering,
-        timelineSupport: client.timelineSupport,
+        timelineSupport,
+        unstableClientRelationAggregation,
     });
-    client.reEmitter.reEmit(room, ["Room.name", "Room.timeline", "Room.redaction",
+    client.reEmitter.reEmit(room, ["Room.name", "Room.timeline",
+                          "Room.redaction",
+                          "Room.redactionCancelled",
                           "Room.receipt", "Room.tags",
                           "Room.timelineReset",
                           "Room.localEchoUpdated",
                           "Room.accountData",
                           "Room.myMembership",
+                          "Room.replaceEvent",
                          ]);
     this._registerStateListeners(room);
     return room;
@@ -386,7 +395,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         peekRoom.addLiveEvents(events);
         self._peekPoll(peekRoom, res.end);
     }, function(err) {
-        console.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
+        logger.error("[%s] Peek poll failed: %s", peekRoom.roomId, err);
         setTimeout(function() {
             self._peekPoll(peekRoom, token);
         }, 30 * 1000);
@@ -445,6 +454,16 @@ SyncApi.prototype._wasLazyLoadingToggled = async function(lazyLoadMembers) {
     return false;
 };
 
+SyncApi.prototype._shouldAbortSync = function(error) {
+    if (error.errcode === "M_UNKNOWN_TOKEN") {
+        // The logout already happened, we just need to stop.
+        logger.warn("Token no longer valid - assuming logout");
+        this.stop();
+        return true;
+    }
+    return false;
+};
+
 /**
  * Main entry point
  */
@@ -472,13 +491,17 @@ SyncApi.prototype.sync = function() {
 
     async function getPushRules() {
         try {
+            debuglog("Getting push rules...");
             const result = await client.getPushRules();
             debuglog("Got push rules");
 
             client.pushRules = result;
         } catch (err) {
+            logger.error("Getting push rules failed", err);
+            if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying push rules...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getPushRules();
             return;
@@ -487,22 +510,35 @@ SyncApi.prototype.sync = function() {
     }
 
     const checkLazyLoadStatus = async () => {
+        debuglog("Checking lazy load status...");
         if (this.opts.lazyLoadMembers && client.isGuest()) {
             this.opts.lazyLoadMembers = false;
         }
         if (this.opts.lazyLoadMembers) {
+            debuglog("Checking server lazy load support...");
             const supported = await client.doesServerSupportLazyLoading();
             if (supported) {
-                this.opts.filter = await client.createFilter(
-                    Filter.LAZY_LOADING_SYNC_FILTER,
-                );
+                try {
+                    debuglog("Creating and storing lazy load sync filter...");
+                    this.opts.filter = await client.createFilter(
+                        Filter.LAZY_LOADING_SYNC_FILTER,
+                    );
+                    debuglog("Created and stored lazy load sync filter");
+                } catch (err) {
+                    logger.error(
+                        "Creating and storing lazy load sync filter failed",
+                        err,
+                    );
+                    throw err;
+                }
             } else {
-                console.log("LL: lazy loading requested but not supported " +
+                debuglog("LL: lazy loading requested but not supported " +
                     "by server, so disabling");
                 this.opts.lazyLoadMembers = false;
             }
         }
         // need to vape the store when enabling LL and wasn't enabled before
+        debuglog("Checking whether lazy loading has changed in store...");
         const shouldClear = await this._wasLazyLoadingToggled(this.opts.lazyLoadMembers);
         if (shouldClear) {
             this._storeIsInvalid = true;
@@ -513,18 +549,26 @@ SyncApi.prototype.sync = function() {
             // we leave the state as 'ERROR' which isn't great since this normally means
             // we're retrying. The client must be stopped before clearing the stores anyway
             // so the app should stop the client, clear the store and start it again.
-            console.warn("InvalidStoreError: store is not usable: stopping sync.");
+            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
             return;
         }
         if (this.opts.lazyLoadMembers && this.opts.crypto) {
             this.opts.crypto.enableLazyLoading();
         }
-        await this.client._storeClientOptions();
+        try {
+            debuglog("Storing client options...");
+            await this.client._storeClientOptions();
+            debuglog("Stored client options");
+        } catch (err) {
+            logger.error("Storing client options failed", err);
+            throw err;
+        }
 
         getFilter(); // Now get the filter and start syncing
     };
 
     async function getFilter() {
+        debuglog("Getting filter...");
         let filter;
         if (self.opts.filter) {
             filter = self.opts.filter;
@@ -539,8 +583,11 @@ SyncApi.prototype.sync = function() {
                 getFilterName(client.credentials.userId), filter,
             );
         } catch (err) {
+            logger.error("Getting filter failed", err);
+            if (self._shouldAbortSync(err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying filter...");
             await self.recoverFromSyncStartupError(savedSyncPromise, err);
             getFilter();
             return;
@@ -554,11 +601,12 @@ SyncApi.prototype.sync = function() {
         if (self._currentSyncRequest === null) {
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
-            console.log("Sending first sync request...");
+            debuglog("Sending first sync request...");
             self._currentSyncRequest = self._doSyncRequest({ filterId }, savedSyncToken);
         }
 
         // Now wait for the saved sync to finish...
+        debuglog("Waiting for saved sync before starting sync processing...");
         await savedSyncPromise;
         self._sync({ filterId });
     }
@@ -570,13 +618,19 @@ SyncApi.prototype.sync = function() {
         // Pull the saved sync token out first, before the worker starts sending
         // all the sync data which could take a while. This will let us send our
         // first incremental sync request before we've processed our saved data.
+        debuglog("Getting saved sync token...");
         savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
+            debuglog("Got saved sync token");
             savedSyncToken = tok;
+            debuglog("Getting saved sync...");
             return client.store.getSavedSync();
         }).then((savedSync) => {
+            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
             if (savedSync) {
                 return self._syncFromCache(savedSync);
             }
+        }).catch(err => {
+            logger.error("Getting saved sync failed", err);
         });
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
@@ -648,7 +702,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
     try {
         await this._processSyncResponse(syncEventData, data);
     } catch(e) {
-        console.error("Error processing cached sync", e.stack || e);
+        logger.error("Error processing cached sync", e.stack || e);
     }
 
     // Don't emit a prepared if we've bailed because the store is invalid:
@@ -723,7 +777,7 @@ SyncApi.prototype._sync = async function(syncOptions) {
     } catch(e) {
         // log the exception with stack if we have it, else fall back
         // to the plain description
-        console.error("Caught /sync error", e.stack || e);
+        logger.error("Caught /sync error", e.stack || e);
 
         // Emit the exception for client handling
         this.client.emit("sync.unexpectedError", e);
@@ -837,11 +891,15 @@ SyncApi.prototype._onSyncError = function(err, syncOptions) {
         return;
     }
 
-    console.error("/sync error %s", err);
-    console.error(err);
+    logger.error("/sync error %s", err);
+    logger.error(err);
+
+    if(this._shouldAbortSync(err)) {
+        return;
+    }
 
     this._failedSyncCount++;
-    console.log('Number of consecutive failed sync requests:', this._failedSyncCount);
+    logger.log('Number of consecutive failed sync requests:', this._failedSyncCount);
 
     debuglog("Starting keep-alive");
     // Note that we do *not* mark the sync connection as
@@ -995,7 +1053,7 @@ SyncApi.prototype._processSyncResponse = async function(
                             content.msgtype == "m.bad.encrypted"
                     ) {
                         // the mapper already logged a warning.
-                        console.log(
+                        logger.log(
                             'Ignoring undecryptable to-device event from ' +
                                 toDeviceEvent.getSender(),
                         );
@@ -1051,7 +1109,6 @@ SyncApi.prototype._processSyncResponse = async function(
         const stateEvents =
             self._mapSyncEventsFormat(inviteObj.invite_state, room);
 
-        room.updateMyMembership("invite");
         self._processRoomEvents(room, stateEvents);
         if (inviteObj.isBrandNewRoom) {
             room.recalculate();
@@ -1061,6 +1118,7 @@ SyncApi.prototype._processSyncResponse = async function(
         stateEvents.forEach(function(e) {
             client.emit("event", e);
         });
+        room.updateMyMembership("invite");
     });
 
     // Handle joins
@@ -1076,12 +1134,19 @@ SyncApi.prototype._processSyncResponse = async function(
             room.setUnreadNotificationCount(
                 'total', joinObj.unread_notifications.notification_count,
             );
-            room.setUnreadNotificationCount(
-                'highlight', joinObj.unread_notifications.highlight_count,
-            );
-        }
 
-        room.updateMyMembership("join");
+            // We track unread notifications ourselves in encrypted rooms, so don't
+            // bother setting it here. We trust our calculations better than the
+            // server's for this case, and therefore will assume that our non-zero
+            // count is accurate.
+            const encrypted = client.isRoomEncrypted(room.roomId);
+            if (!encrypted
+                || (encrypted && room.getUnreadNotificationCount('highlight') <= 0)) {
+                room.setUnreadNotificationCount(
+                    'highlight', joinObj.unread_notifications.highlight_count,
+                );
+            }
+        }
 
         joinObj.timeline = joinObj.timeline || {};
 
@@ -1195,6 +1260,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.updateMyMembership("join");
     });
 
     // Handle leaves (e.g. kicked rooms)
@@ -1206,8 +1273,6 @@ SyncApi.prototype._processSyncResponse = async function(
             self._mapSyncEventsFormat(leaveObj.timeline, room);
         const accountDataEvents =
             self._mapSyncEventsFormat(leaveObj.account_data);
-
-        room.updateMyMembership("leave");
 
         self._processRoomEvents(room, stateEvents, timelineEvents);
         room.addAccountData(accountDataEvents);
@@ -1229,6 +1294,8 @@ SyncApi.prototype._processSyncResponse = async function(
         accountDataEvents.forEach(function(e) {
             client.emit("event", e);
         });
+
+        room.updateMyMembership("leave");
     });
 
     // update the notification timeline, if appropriate.

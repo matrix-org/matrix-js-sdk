@@ -22,6 +22,7 @@ limitations under the License.
  */
 
 const utils = require("../../utils");
+import logger from '../../logger';
 
 const DEBUG = false;  // set true to enable console logging.
 const E2E_PREFIX = "session.e2e.";
@@ -257,7 +258,7 @@ function removeByPrefix(store, prefix) {
 
 function debuglog() {
     if (DEBUG) {
-        console.log(...arguments);
+        logger.log(...arguments);
     }
 }
 

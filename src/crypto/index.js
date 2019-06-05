@@ -26,7 +26,7 @@ const anotherjson = require('another-json');
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
-const logger = require("../logger");
+import logger from '../logger';
 const utils = require("../utils");
 const OlmDevice = require("./OlmDevice");
 const olmlib = require("./olmlib");
@@ -218,11 +218,11 @@ utils.inherits(Crypto, EventEmitter);
  * Returns a promise which resolves once the crypto module is ready for use.
  */
 Crypto.prototype.init = async function() {
-    console.log("Crypto: initialising Olm...");
+    logger.log("Crypto: initialising Olm...");
     await global.Olm.init();
-    console.log("Crypto: initialising Olm device...");
+    logger.log("Crypto: initialising Olm device...");
     await this._olmDevice.init();
-    console.log("Crypto: loading device list...");
+    logger.log("Crypto: loading device list...");
     await this._deviceList.load();
 
     // build our device keys: these will later be uploaded
@@ -231,7 +231,7 @@ Crypto.prototype.init = async function() {
     this._deviceKeys["curve25519:" + this._deviceId] =
         this._olmDevice.deviceCurve25519Key;
 
-    console.log("Crypto: fetching own devices...");
+    logger.log("Crypto: fetching own devices...");
     let myDevices = this._deviceList.getRawStoredDevicesForUser(
         this._userId,
     );
@@ -242,7 +242,7 @@ Crypto.prototype.init = async function() {
 
     if (!myDevices[this._deviceId]) {
         // add our own deviceinfo to the cryptoStore
-        console.log("Crypto: adding this device to the store...");
+        logger.log("Crypto: adding this device to the store...");
         const deviceInfo = {
             keys: this._deviceKeys,
             algorithms: this._supportedAlgorithms,
@@ -260,7 +260,7 @@ Crypto.prototype.init = async function() {
     // (this is important for key backups & things)
     this._deviceList.startTrackingDeviceList(this._userId);
 
-    console.log("Crypto: checking for key backup...");
+    logger.log("Crypto: checking for key backup...");
     this._checkAndStartKeyBackup();
 };
 
@@ -479,9 +479,9 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
  * to it.
  */
 Crypto.prototype._checkAndStartKeyBackup = async function() {
-    console.log("Checking key backup status...");
+    logger.log("Checking key backup status...");
     if (this._baseApis.isGuest()) {
-        console.log("Skipping key backup check since user is guest");
+        logger.log("Skipping key backup check since user is guest");
         this._checkedForBackup = true;
         return null;
     }
@@ -489,7 +489,7 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
     try {
         backupInfo = await this._baseApis.getKeyBackupVersion();
     } catch (e) {
-        console.log("Error checking for active key backup", e);
+        logger.log("Error checking for active key backup", e);
         if (e.httpStatus / 100 === 4) {
             // well that's told us. we won't try again.
             this._checkedForBackup = true;
@@ -501,27 +501,27 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
     const trustInfo = await this.isKeyBackupTrusted(backupInfo);
 
     if (trustInfo.usable && !this.backupInfo) {
-        console.log(
+        logger.log(
             "Found usable key backup v" + backupInfo.version +
             ": enabling key backups",
         );
         this._baseApis.enableKeyBackup(backupInfo);
     } else if (!trustInfo.usable && this.backupInfo) {
-        console.log("No usable key backup: disabling key backup");
+        logger.log("No usable key backup: disabling key backup");
         this._baseApis.disableKeyBackup();
     } else if (!trustInfo.usable && !this.backupInfo) {
-        console.log("No usable key backup: not enabling key backup");
+        logger.log("No usable key backup: not enabling key backup");
     } else if (trustInfo.usable && this.backupInfo) {
         // may not be the same version: if not, we should switch
         if (backupInfo.version !== this.backupInfo.version) {
-            console.log(
+            logger.log(
                 "On backup version " + this.backupInfo.version + " but found " +
                 "version " + backupInfo.version + ": switching.",
             );
             this._baseApis.disableKeyBackup();
             this._baseApis.enableKeyBackup(backupInfo);
         } else {
-            console.log("Backup version " + backupInfo.version + " still current");
+            logger.log("Backup version " + backupInfo.version + " still current");
         }
     }
 
@@ -591,7 +591,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     for (const keyId of Object.keys(mySigs)) {
         const keyIdParts = keyId.split(':');
         if (keyIdParts[0] !== 'ed25519') {
-            console.log("Ignoring unknown signature type: " + keyIdParts[0]);
+            logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
             continue;
         }
         // Could be an SSK but just say this is the device ID for backwards compat
@@ -636,7 +636,11 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
                 );
                 sigInfo.valid = true;
             } catch (e) {
-                logger.info("Bad signature from key ID " + keyId, e);
+                logger.info(
+                    "Bad signature from key ID " + keyId + " userID " + this._userId +
+                    " device ID " + device.deviceId + " fingerprint: " +
+                    device.getFingerprint(), backupInfo.auth_data, e,
+                );
                 sigInfo.valid = false;
             }
         } else {
@@ -1528,7 +1532,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
                 numFailures = 0;
             } catch (err) {
                 numFailures++;
-                console.log("Key backup request failed", err);
+                logger.log("Key backup request failed", err);
                 if (err.data) {
                     if (
                         err.data.errcode == 'M_NOT_FOUND' ||
@@ -2240,7 +2244,7 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     if (!handler) {
         return;
     } else if (event.getType() === "m.key.verification.cancel") {
-        console.log(event);
+        logger.log(event);
         if (handler.verifier) {
             handler.verifier.cancel(event);
         } else if (handler.request && handler.request.cancel) {

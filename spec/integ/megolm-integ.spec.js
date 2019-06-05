@@ -23,6 +23,7 @@ import expect from 'expect';
 const utils = require('../../lib/utils');
 const testUtils = require('../test-utils');
 const TestClient = require('../TestClient').default;
+import logger from '../../src/logger';
 
 const ROOM_ID = "!room:id";
 
@@ -203,7 +204,7 @@ function getSyncResponse(roomMembers) {
 
 describe("megolm", function() {
     if (!global.Olm) {
-        console.warn('not running megolm tests: Olm not present');
+        logger.warn('not running megolm tests: Olm not present');
         return;
     }
     const Olm = global.Olm;
@@ -282,7 +283,7 @@ describe("megolm", function() {
     }
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line no-invalid-this
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
 
         aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs",
@@ -416,7 +417,7 @@ describe("megolm", function() {
 
             return new Promise((resolve, reject) => {
                 event.once('Event.decrypted', (ev) => {
-                    console.log(`${Date.now()} event ${event.getId()} now decrypted`);
+                    logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
                     resolve(ev);
                 });
             });
@@ -555,7 +556,7 @@ describe("megolm", function() {
             ).respond(200, function(path, content) {
                 const ct = content.ciphertext;
                 const r = inboundGroupSession.decrypt(ct);
-                console.log('Decrypted received megolm message', r);
+                logger.log('Decrypted received megolm message', r);
 
                 expect(r.message_index).toEqual(0);
                 const decrypted = JSON.parse(r.plaintext);
@@ -600,7 +601,7 @@ describe("megolm", function() {
 
             return aliceTestClient.flushSync();
         }).then(function() {
-            console.log('Forcing alice to download our device keys');
+            logger.log('Forcing alice to download our device keys');
 
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
                 200, getTestKeysQueryResponse('@bob:xyz'),
@@ -611,10 +612,10 @@ describe("megolm", function() {
                 aliceTestClient.httpBackend.flush('/keys/query', 1),
             ]);
         }).then(function() {
-            console.log('Telling alice to block our device');
+            logger.log('Telling alice to block our device');
             aliceTestClient.client.setDeviceBlocked('@bob:xyz', 'DEVICE_ID');
 
-            console.log('Telling alice to send a megolm message');
+            logger.log('Telling alice to send a megolm message');
             aliceTestClient.httpBackend.when(
                 'PUT', '/send/',
             ).respond(200, {
@@ -656,7 +657,7 @@ describe("megolm", function() {
 
             return aliceTestClient.flushSync();
         }).then(function() {
-            console.log("Fetching bob's devices and marking known");
+            logger.log("Fetching bob's devices and marking known");
 
             aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
                 200, getTestKeysQueryResponse('@bob:xyz'),
@@ -669,17 +670,17 @@ describe("megolm", function() {
                 aliceTestClient.client.setDeviceKnown('@bob:xyz', 'DEVICE_ID');
             });
         }).then(function() {
-            console.log('Telling alice to send a megolm message');
+            logger.log('Telling alice to send a megolm message');
 
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room.encrypted/',
             ).respond(200, function(path, content) {
-                console.log('sendToDevice: ', content);
+                logger.log('sendToDevice: ', content);
                 const m = content.messages['@bob:xyz'].DEVICE_ID;
                 const ct = m.ciphertext[testSenderKey];
                 expect(ct.type).toEqual(1); // normal message
                 const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
-                console.log('decrypted sendToDevice:', decrypted);
+                logger.log('decrypted sendToDevice:', decrypted);
                 expect(decrypted.type).toEqual('m.room_key');
                 megolmSessionId = decrypted.content.session_id;
                 return {};
@@ -688,7 +689,7 @@ describe("megolm", function() {
             aliceTestClient.httpBackend.when(
                 'PUT', '/send/',
             ).respond(200, function(path, content) {
-                console.log('/send:', content);
+                logger.log('/send:', content);
                 expect(content.session_id).toEqual(megolmSessionId);
                 return {
                     event_id: '$event_id',
@@ -704,14 +705,14 @@ describe("megolm", function() {
                 }),
             ]);
         }).then(function() {
-            console.log('Telling alice to block our device');
+            logger.log('Telling alice to block our device');
             aliceTestClient.client.setDeviceBlocked('@bob:xyz', 'DEVICE_ID');
 
-            console.log('Telling alice to send another megolm message');
+            logger.log('Telling alice to send another megolm message');
             aliceTestClient.httpBackend.when(
                 'PUT', '/send/',
             ).respond(200, function(path, content) {
-                console.log('/send:', content);
+                logger.log('/send:', content);
                 expect(content.session_id).toNotEqual(megolmSessionId);
                 return {
                     event_id: '$event_id',
@@ -792,7 +793,7 @@ describe("megolm", function() {
             aliceTestClient.httpBackend.when(
                 'PUT', '/sendToDevice/m.room.encrypted/',
             ).respond(200, function(path, content) {
-                console.log("sendToDevice: ", content);
+                logger.log("sendToDevice: ", content);
                 const m = content.messages[aliceTestClient.userId].DEVICE_ID;
                 const ct = m.ciphertext[testSenderKey];
                 expect(ct.type).toEqual(0); // pre-key message
@@ -812,7 +813,7 @@ describe("megolm", function() {
             ).respond(200, function(path, content) {
                 const ct = content.ciphertext;
                 const r = inboundGroupSession.decrypt(ct);
-                console.log('Decrypted received megolm message', r);
+                logger.log('Decrypted received megolm message', r);
                 decrypted = JSON.parse(r.plaintext);
 
                 return {
@@ -865,7 +866,7 @@ describe("megolm", function() {
             return aliceTestClient.flushSync();
         }).then(function() {
             // this will block
-            console.log('Forcing alice to download our device keys');
+            logger.log('Forcing alice to download our device keys');
             downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
 
             // so will this.

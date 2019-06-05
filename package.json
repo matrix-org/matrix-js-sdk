@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -9,12 +9,12 @@
     "test:watch": "mocha --watch --compilers js:babel-core/register --recursive spec --colors",
     "test": "yarn test:build && yarn test:run",
     "check": "yarn test:build && _mocha --recursive specbuild --colors",
-    "gendoc": "babel --no-babelrc -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
+    "gendoc": "babel --no-babelrc --plugins transform-class-properties -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
     "start": "yarn start:init && yarn start:watch",
     "start:watch": "babel -s -w --skip-initial-build -d lib src",
     "start:init": "babel -s -d lib src",
     "clean": "rimraf lib dist",
-    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && uglifyjs -c -m -o dist/browser-matrix.min.js --source-map dist/browser-matrix.min.js.map --in-source-map dist/browser-matrix.js.map dist/browser-matrix.js",
+    "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && terser -c -m -o dist/browser-matrix.min.js --source-map \"content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
     "dist": "yarn build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
     "lint": "eslint --max-warnings 101 src spec",
@@ -54,7 +54,6 @@
   "dependencies": {
     "another-json": "^0.2.0",
     "babel-runtime": "^6.26.0",
-    "base-x": "3.0.4",
     "bluebird": "^3.5.0",
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
@@ -76,6 +75,7 @@
     "browserify-shim": "^3.8.13",
     "eslint": "^5.12.0",
     "eslint-config-google": "^0.7.1",
+    "eslint-plugin-babel": "^5.3.0",
     "exorcist": "^0.4.0",
     "expect": "^1.20.2",
     "istanbul": "^0.4.5",
@@ -84,11 +84,11 @@
     "matrix-mock-request": "^1.2.3",
     "mocha": "^5.2.0",
     "mocha-jenkins-reporter": "^0.4.0",
-    "olm": "https://matrix.org/packages/npm/olm/olm-3.1.0-pre1.tgz",
+    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.0.tgz",
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
-    "uglify-js": "^2.8.26",
+    "terser": "^4.0.0",
     "watchify": "^3.11.1"
   },
   "browserify": {

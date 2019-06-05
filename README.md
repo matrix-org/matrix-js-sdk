@@ -1,8 +1,7 @@
 Matrix Javascript SDK
 =====================
-[![Build Status](http://matrix.org/jenkins/buildStatus/icon?job=JavascriptSDK)](http://matrix.org/jenkins/job/JavascriptSDK/)
 
-This is the [Matrix](https://matrix.org) Client-Server v1/v2 alpha SDK for
+This is the [Matrix](https://matrix.org) Client-Server r0 SDK for
 JavaScript. This SDK can be run in a browser or in Node.js.
 
 Quickstart
@@ -297,9 +296,9 @@ Then visit ``http://localhost:8005`` to see the API docs.
 End-to-end encryption support
 =============================
 
-The SDK supports end-to-end encryption via the Olm and Megolm protocols, using
-[libolm](http://matrix.org/git/olm). It is left up to the application to make
-libolm available, via the ``Olm`` global.
+The SDK supports end-to-end encryption via the and Megolm protocols, using
+[libolm](https://gitlab.matrix.org/matrix-org/olm). It is left up to the 
+application to make libolm available, via the ``Olm`` global.
 
 It is also necessry to call ``matrixClient.initCrypto()`` after creating a new
 ``MatrixClient`` (but **before** calling ``matrixClient.startClient()``) to
@@ -318,18 +317,18 @@ specification.
 
 To provide the Olm library in a browser application:
 
- * download the transpiled libolm (from https://matrix.org/packages/npm/olm/).
+ * download the transpiled libolm (from https://packages.matrix.org/npm/olm/).
  * load ``olm.js`` as a ``<script>`` *before* ``browser-matrix.js``.
  
 To provide the Olm library in a node.js application:
 
- * ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``
+ * ``yarn add https://packages.matrix.org/npm/olm/olm-3.0.0.tgz``
    (replace the URL with the latest version you want to use from
-    https://matrix.org/packages/npm/olm/)
+    https://packages.matrix.org/npm/olm/)
  * ``global.Olm = require('olm');`` *before* loading ``matrix-js-sdk``.
 
 If you want to package Olm as dependency for your node.js application, you can
-use ``yarn add https://matrix.org/packages/npm/olm/olm-3.0.0.tgz``. If your
+use ``yarn add https://packages.matrix.org/npm/olm/olm-3.0.0.tgz``. If your
 application also works without e2e crypto enabled, add ``--optional`` to mark it
 as an optional dependency.
 

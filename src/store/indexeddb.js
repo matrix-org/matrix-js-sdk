@@ -15,13 +15,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/* eslint-disable babel/no-invalid-this */
+
 import Promise from 'bluebird';
 import {MemoryStore} from "./memory";
 import utils from "../utils";
+import {EventEmitter} from 'events';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
 import User from "../models/user";
 import {MatrixEvent} from "../models/event";
+import logger from '../../src/logger';
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -110,6 +114,7 @@ const IndexedDBStore = function IndexedDBStore(opts) {
     };
 };
 utils.inherits(IndexedDBStore, MemoryStore);
+utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
 
 IndexedDBStore.exists = function(indexedDB, dbName) {
     return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
@@ -120,16 +125,16 @@ IndexedDBStore.exists = function(indexedDB, dbName) {
   */
 IndexedDBStore.prototype.startup = function() {
     if (this.startedUp) {
-        console.log(`IndexedDBStore.startup: already started`);
+        logger.log(`IndexedDBStore.startup: already started`);
         return Promise.resolve();
     }
 
-    console.log(`IndexedDBStore.startup: connecting to backend`);
+    logger.log(`IndexedDBStore.startup: connecting to backend`);
     return this.backend.connect().then(() => {
-        console.log(`IndexedDBStore.startup: loading presence events`);
+        logger.log(`IndexedDBStore.startup: loading presence events`);
         return this.backend.getUserPresenceEvents();
     }).then((userPresenceEvents) => {
-        console.log(`IndexedDBStore.startup: processing presence events`);
+        logger.log(`IndexedDBStore.startup: processing presence events`);
         userPresenceEvents.forEach(([userId, rawEvent]) => {
             const u = new User(userId);
             if (rawEvent) {
@@ -146,36 +151,36 @@ IndexedDBStore.prototype.startup = function() {
  * client state to where it was at the last save, or null if there
  * is no saved sync data.
  */
-IndexedDBStore.prototype.getSavedSync = function() {
+IndexedDBStore.prototype.getSavedSync = degradable(function() {
     return this.backend.getSavedSync();
-};
+}, "getSavedSync");
 
 /** @return {Promise<bool>} whether or not the database was newly created in this session. */
-IndexedDBStore.prototype.isNewlyCreated = function() {
+IndexedDBStore.prototype.isNewlyCreated = degradable(function() {
     return this.backend.isNewlyCreated();
-};
+}, "isNewlyCreated");
 
 /**
  * @return {Promise} If there is a saved sync, the nextBatch token
  * for this sync, otherwise null.
  */
-IndexedDBStore.prototype.getSavedSyncToken = function() {
+IndexedDBStore.prototype.getSavedSyncToken = degradable(function() {
     return this.backend.getNextBatchToken();
-},
+}, "getSavedSyncToken"),
 
 /**
  * Delete all data from this store.
  * @return {Promise} Resolves if the data was deleted from the database.
  */
-IndexedDBStore.prototype.deleteAllData = function() {
+IndexedDBStore.prototype.deleteAllData = degradable(function() {
     MemoryStore.prototype.deleteAllData.call(this);
     return this.backend.clearDatabase().then(() => {
-        console.log("Deleted indexeddb data.");
+        logger.log("Deleted indexeddb data.");
     }, (err) => {
-        console.error(`Failed to delete indexeddb data: ${err}`);
+        logger.error(`Failed to delete indexeddb data: ${err}`);
         throw err;
     });
-};
+});
 
 /**
  * Whether this store would like to save its data
@@ -203,7 +208,7 @@ IndexedDBStore.prototype.save = function() {
     return Promise.resolve();
 };
 
-IndexedDBStore.prototype._reallySave = function() {
+IndexedDBStore.prototype._reallySave = degradable(function() {
     this._syncTs = Date.now(); // set now to guard against multi-writes
 
     // work out changed users (this doesn't handle deletions but you
@@ -219,14 +224,12 @@ IndexedDBStore.prototype._reallySave = function() {
         this._userModifiedMap[u.userId] = u.getLastModifiedTime();
     }
 
-    return this.backend.syncToDatabase(userTuples).catch((err) => {
-        console.error("sync fail:", err);
-    });
-};
+    return this.backend.syncToDatabase(userTuples);
+});
 
-IndexedDBStore.prototype.setSyncData = function(syncData) {
+IndexedDBStore.prototype.setSyncData = degradable(function(syncData) {
     return this.backend.setSyncData(syncData);
-};
+}, "setSyncData");
 
 /**
  * Returns the out-of-band membership events for this room that
@@ -235,9 +238,9 @@ IndexedDBStore.prototype.setSyncData = function(syncData) {
  * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
  * @returns {null} in case the members for this room haven't been stored yet
  */
-IndexedDBStore.prototype.getOutOfBandMembers = function(roomId) {
+IndexedDBStore.prototype.getOutOfBandMembers = degradable(function(roomId) {
     return this.backend.getOutOfBandMembers(roomId);
-};
+}, "getOutOfBandMembers");
 
 /**
  * Stores the out-of-band membership events for this room. Note that
@@ -247,20 +250,71 @@ IndexedDBStore.prototype.getOutOfBandMembers = function(roomId) {
  * @param {event[]} membershipEvents the membership events to store
  * @returns {Promise} when all members have been stored
  */
-IndexedDBStore.prototype.setOutOfBandMembers = function(roomId, membershipEvents) {
+IndexedDBStore.prototype.setOutOfBandMembers = degradable(function(
+    roomId,
+    membershipEvents,
+) {
+    MemoryStore.prototype.setOutOfBandMembers.call(this, roomId, membershipEvents);
     return this.backend.setOutOfBandMembers(roomId, membershipEvents);
-};
+}, "setOutOfBandMembers");
 
-IndexedDBStore.prototype.clearOutOfBandMembers = function(roomId) {
+IndexedDBStore.prototype.clearOutOfBandMembers = degradable(function(roomId) {
+    MemoryStore.prototype.clearOutOfBandMembers.call(this);
     return this.backend.clearOutOfBandMembers(roomId);
-};
+}, "clearOutOfBandMembers");
 
-IndexedDBStore.prototype.getClientOptions = function() {
+IndexedDBStore.prototype.getClientOptions = degradable(function() {
     return this.backend.getClientOptions();
-};
+}, "getClientOptions");
 
-IndexedDBStore.prototype.storeClientOptions = function(options) {
+IndexedDBStore.prototype.storeClientOptions = degradable(function(options) {
+    MemoryStore.prototype.storeClientOptions.call(this, options);
     return this.backend.storeClientOptions(options);
-};
+}, "storeClientOptions");
 
 module.exports.IndexedDBStore = IndexedDBStore;
+
+/**
+ * All member functions of `IndexedDBStore` that access the backend use this wrapper to
+ * watch for failures after initial store startup, including `QuotaExceededError` as
+ * free disk space changes, etc.
+ *
+ * When IndexedDB fails via any of these paths, we degrade this back to a `MemoryStore`
+ * in place so that the current operation and all future ones are in-memory only.
+ *
+ * @param {Function} func The degradable work to do.
+ * @param {String} fallback The method name for fallback.
+ * @returns {Function} A wrapped member function.
+ */
+function degradable(func, fallback) {
+    return async function(...args) {
+        try {
+            return await func.call(this, ...args);
+        } catch (e) {
+            logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
+            this.emit("degraded", e);
+            try {
+                // We try to delete IndexedDB after degrading since this store is only a
+                // cache (the app will still function correctly without the data).
+                // It's possible that deleting repair IndexedDB for the next app load,
+                // potenially by making a little more space available.
+                logger.log("IndexedDBStore trying to delete degraded data");
+                await this.backend.clearDatabase();
+                logger.log("IndexedDBStore delete after degrading succeeeded");
+            } catch (e) {
+                logger.warn("IndexedDBStore delete after degrading failed", e);
+            }
+            // Degrade the store from being an instance of `IndexedDBStore` to instead be
+            // an instance of `MemoryStore` so that future API calls use the memory path
+            // directly and skip IndexedDB entirely. This should be safe as
+            // `IndexedDBStore` already extends from `MemoryStore`, so we are making the
+            // store become its parent type in a way. The mutator methods of
+            // `IndexedDBStore` also maintain the state that `MemoryStore` uses (many are
+            // not overridden at all).
+            Object.setPrototypeOf(this, MemoryStore.prototype);
+            if (fallback) {
+                return await MemoryStore.prototype[fallback].call(this, ...args);
+            }
+        }
+    };
+}
