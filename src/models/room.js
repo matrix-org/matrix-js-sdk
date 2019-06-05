@@ -1834,7 +1834,7 @@ module.exports = Room;
  * event).
  *
  * @event module:client~MatrixClient#"Room.redaction"
- * @param {MatrixEvent} event The matrix event which was redacted
+ * @param {MatrixEvent} event The matrix redaction event
  * @param {Room} room The room containing the redacted event
  */
 
@@ -1845,7 +1845,7 @@ module.exports = Room;
  * which is undone in this scenario.
  *
  * @event module:client~MatrixClient#"Room.redactionCancelled"
- * @param {MatrixEvent} event The matrix event which isn't redacted anymore
+ * @param {MatrixEvent} event The matrix redaction event that was cancelled.
  * @param {Room} room The room containing the unredacted event
  */
 
