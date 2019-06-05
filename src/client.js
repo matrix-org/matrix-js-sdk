@@ -1696,6 +1696,21 @@ MatrixClient.prototype.setPowerLevel = function(roomId, userId, powerLevel,
  */
 MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
                                             callback) {
+    return this._sendCompleteEvent(roomId, {
+        type: eventType,
+        content: content,
+    }, txnId, callback);
+};
+/**
+ * @param {string} roomId
+ * @param {object} eventObject An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+ * @param {string} txnId the txnId.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
+                                            callback) {
     if (utils.isFunction(txnId)) {
         callback = txnId; txnId = undefined;
     }
@@ -1704,20 +1719,20 @@ MatrixClient.prototype.sendEvent = function(roomId, eventType, content, txnId,
         txnId = this.makeTxnId();
     }
 
-    logger.log(`sendEvent of type ${eventType} in ${roomId} with txnId ${txnId}`);
+    const localEvent = new MatrixEvent(Object.assign(eventObject, {
+        event_id: "~" + roomId + ":" + txnId,
+        user_id: this.credentials.userId,
+        room_id: roomId,
+        origin_server_ts: new Date().getTime(),
+    }));
+
+    const type = localEvent.getType();
+    logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
     // we always construct a MatrixEvent when sending because the store and
     // scheduler use them. We'll extract the params back out if it turns out
     // the client has no scheduler or store.
     const room = this.getRoom(roomId);
-    const localEvent = new MatrixEvent({
-        event_id: "~" + roomId + ":" + txnId,
-        user_id: this.credentials.userId,
-        room_id: roomId,
-        type: eventType,
-        origin_server_ts: new Date().getTime(),
-        content: content,
-    });
     localEvent._txnId = txnId;
     localEvent.setStatus(EventStatus.SENDING);
 
@@ -1871,6 +1886,9 @@ function _sendEventHttpRequest(client, event) {
             pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
         }
         path = utils.encodeUri(pathTemplate, pathParams);
+    } else if (event.getType() === "m.room.redaction") {
+        const pathTemplate = `/rooms/$roomId/redact/${event.event.redacts}/$txnId`;
+        path = utils.encodeUri(pathTemplate, pathParams);
     } else {
         path = utils.encodeUri(
             "/rooms/$roomId/send/$eventType/$txnId", pathParams,
@@ -1886,6 +1904,23 @@ function _sendEventHttpRequest(client, event) {
         return res;
     });
 }
+
+/**
+ * @param {string} roomId
+ * @param {string} eventId
+ * @param {string} [txnId]  transaction id. One will be made up if not
+ *    supplied.
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.redactEvent = function(roomId, eventId, txnId, callback) {
+    return this._sendCompleteEvent(roomId, {
+        type: "m.room.redaction",
+        content: {},
+        redacts: eventId,
+    }, txnId, callback);
+};
 
 /**
  * @param {string} roomId

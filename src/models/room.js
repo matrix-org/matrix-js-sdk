@@ -1138,17 +1138,15 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             // For pending events, add them to the relations collection immediately.
             // (The alternate case below already covers this as part of adding to
             // the timeline set.)
-            // TODO: We should consider whether this means it would be a better
-            // design to lift the relations handling up to the room instead.
-            for (let i = 0; i < this._timelineSets.length; i++) {
-                const timelineSet = this._timelineSets[i];
-                if (timelineSet.getFilter()) {
-                    if (this._filter.filterRoomTimeline([event]).length) {
-                        timelineSet.aggregateRelations(event);
-                    }
-                } else {
-                    timelineSet.aggregateRelations(event);
-                }
+            this._aggregateNonLiveRelation(event);
+        }
+
+        if (event.getType() === "m.room.redaction") {
+            const redactId = event.event.redacts;
+            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            if (redactedEvent) {
+                redactedEvent.markLocallyRedacted(event);
+                this.emit("Room.redaction", event, this);
             }
         }
     } else {
@@ -1167,6 +1165,30 @@ Room.prototype.addPendingEvent = function(event, txnId) {
     }
 
     this.emit("Room.localEchoUpdated", event, this, null, null);
+};
+/**
+ * Used to aggregate the local echo for a relation, and also
+ * for re-applying a relation after it's redaction has been cancelled,
+ * as the local echo for the redaction of the relation would have
+ * un-aggregated the relation. Note that this is different from regular messages,
+ * which are just kept detached for their local echo.
+ *
+ * Also note that live events are aggregated in the live EventTimelineSet.
+ * @param {module:models/event.MatrixEvent} event the relation event that needs to be aggregated.
+ */
+Room.prototype._aggregateNonLiveRelation = function(event) {
+    // TODO: We should consider whether this means it would be a better
+    // design to lift the relations handling up to the room instead.
+    for (let i = 0; i < this._timelineSets.length; i++) {
+        const timelineSet = this._timelineSets[i];
+        if (timelineSet.getFilter()) {
+            if (this._filter.filterRoomTimeline([event]).length) {
+                timelineSet.aggregateRelations(event);
+            }
+        } else {
+            timelineSet.aggregateRelations(event);
+        }
+    }
 };
 
 /**
@@ -1304,12 +1326,13 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     } else if (newStatus == EventStatus.CANCELLED) {
         // remove it from the pending event list, or the timeline.
         if (this._pendingEventList) {
-            utils.removeElement(
-                this._pendingEventList,
-                function(ev) {
-                    return ev.getId() == oldEventId;
-                }, false,
-            );
+            const idx = this._pendingEventList.findIndex(ev => ev.getId() === oldEventId);
+            if (idx !== -1) {
+                const [removedEvent] = this._pendingEventList.splice(idx, 1);
+                if (removedEvent.getType() === "m.room.redaction") {
+                    this._revertRedactionLocalEcho(removedEvent);
+                }
+            }
         }
         this.removeEvent(oldEventId);
     }
@@ -1317,6 +1340,23 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
     this.emit("Room.localEchoUpdated", event, this, oldEventId, oldStatus);
 };
 
+Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
+    const redactId = redactionEvent.event.redacts;
+    if (!redactId) {
+        return;
+    }
+    const redactedEvent = this.getUnfilteredTimelineSet()
+        .findEventById(redactId);
+    if (redactedEvent) {
+        redactedEvent.unmarkLocallyRedacted();
+        // re-render after undoing redaction
+        this.emit("Room.redactionCancelled", redactionEvent, this);
+        // reapply relation now redaction failed
+        if (redactedEvent.isRelation()) {
+            this._aggregateNonLiveRelation(redactedEvent);
+        }
+    }
+};
 
 /**
  * Add some events to this room. This can include state events, message
@@ -1395,6 +1435,9 @@ Room.prototype.removeEvent = function(eventId) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
+            if (removed.getType() === "m.room.redaction") {
+                this._revertRedactionLocalEcho(removed);
+            }
             removedAny = true;
         }
     }
@@ -1818,8 +1861,19 @@ module.exports = Room;
  * event).
  *
  * @event module:client~MatrixClient#"Room.redaction"
- * @param {MatrixEvent} event The matrix event which was redacted
+ * @param {MatrixEvent} event The matrix redaction event
  * @param {Room} room The room containing the redacted event
+ */
+
+/**
+ * Fires when an event that was previously redacted isn't anymore.
+ * This happens when the redaction couldn't be sent and
+ * was subsequently cancelled by the user. Redactions have a local echo
+ * which is undone in this scenario.
+ *
+ * @event module:client~MatrixClient#"Room.redactionCancelled"
+ * @param {MatrixEvent} event The matrix redaction event that was cancelled.
+ * @param {Room} room The room containing the unredacted event
  */
 
 /**

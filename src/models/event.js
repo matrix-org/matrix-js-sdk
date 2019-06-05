@@ -124,6 +124,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.forwardLooking = true;
     this._pushActions = null;
     this._replacingEvent = null;
+    this._locallyRedacted = false;
 
     this._clearEvent = {};
 
@@ -228,6 +229,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getOriginalContent: function() {
+        if (this._locallyRedacted) {
+            return {};
+        }
         return this._clearEvent.content || this.event.content || {};
     },
 
@@ -239,7 +243,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        if (this._replacingEvent) {
+        if (this._locallyRedacted) {
+            return {};
+        } else if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
         } else {
             return this.getOriginalContent();
@@ -666,6 +672,27 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         return this.event.unsigned || {};
     },
 
+    unmarkLocallyRedacted: function() {
+        const value = this._locallyRedacted;
+        this._locallyRedacted = false;
+        if (this.event.unsigned) {
+            this.event.unsigned.redacted_because = null;
+        }
+        return value;
+    },
+
+    markLocallyRedacted: function(redactionEvent) {
+        if (this._locallyRedacted) {
+            return;
+        }
+        this.emit("Event.beforeRedaction", this, redactionEvent);
+        this._locallyRedacted = true;
+        if (!this.event.unsigned) {
+            this.event.unsigned = {};
+        }
+        this.event.unsigned.redacted_because = redactionEvent.event;
+    },
+
     /**
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
@@ -678,6 +705,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (!redaction_event.event) {
             throw new Error("invalid redaction_event in makeRedacted");
         }
+
+        this._locallyRedacted = false;
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
