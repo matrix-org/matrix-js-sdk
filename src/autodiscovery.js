@@ -319,7 +319,7 @@ export class AutoDiscovery {
 
                 // Supply the base_url to the caller because they may be ignoring
                 // liveliness errors, like this one.
-                clientConfig["m.identity_server"].base_url = isUrl;
+                failingClientConfig["m.identity_server"].base_url = isUrl;
 
                 return Promise.resolve(failingClientConfig);
             }
