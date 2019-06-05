@@ -1887,8 +1887,10 @@ function _sendEventHttpRequest(client, event) {
         }
         path = utils.encodeUri(pathTemplate, pathParams);
     } else if (event.getType() === "m.room.redaction") {
-        const pathTemplate = `/rooms/$roomId/redact/${event.event.redacts}/$txnId`;
-        path = utils.encodeUri(pathTemplate, pathParams);
+        const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
+        path = utils.encodeUri(pathTemplate, Object.assign({
+            $redactsEventId: event.event.redacts,
+        }, pathParams));
     } else {
         path = utils.encodeUri(
             "/rooms/$roomId/send/$eventType/$txnId", pathParams,
