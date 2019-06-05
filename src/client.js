@@ -1719,6 +1719,9 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         txnId = this.makeTxnId();
     }
 
+    // we always construct a MatrixEvent when sending because the store and
+    // scheduler use them. We'll extract the params back out if it turns out
+    // the client has no scheduler or store.
     const localEvent = new MatrixEvent(Object.assign(eventObject, {
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
@@ -1726,13 +1729,34 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         origin_server_ts: new Date().getTime(),
     }));
 
+    const room = this.getRoom(roomId);
+    const relation = localEvent.getRelation();
+    if (relation) {
+        const targetId = relation.event_id;
+
+        if (/*targetId is local id*/) {
+            //add to list with pending relations that needs updating?
+            // or listen for "Event.status"?
+        }
+
+
+        // this will throw with chronological ordering :/
+        const target = room.getPendingEvents().find(e => e.getId() === targetId);
+        // we should check here if there is no target, and it's a local id, then something's wrong
+        if (target) {
+
+        }
+        && relation.event_id is a localId) {
+        // we'll need to get the event from the room to check the status? or can we look into the queue?
+        //make sure that the target event is a pending event for the room (or event present in the queue? no, not everything is queued I guess?)
+        //listen for Room.localEchoUpdated
+            // if SENT: replace the target event_id with the new one.
+            // if CANCELLED: cancel this one as well?
+            // we need to be sure this will happen before our event is sent of course.
+    }
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-    // we always construct a MatrixEvent when sending because the store and
-    // scheduler use them. We'll extract the params back out if it turns out
-    // the client has no scheduler or store.
-    const room = this.getRoom(roomId);
     localEvent._txnId = txnId;
     localEvent.setStatus(EventStatus.SENDING);
 
