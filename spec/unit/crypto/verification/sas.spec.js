@@ -22,6 +22,7 @@ try {
 }
 
 import expect from 'expect';
+import olmlib from '../../../../lib/crypto/olmlib';
 
 import sdk from '../../../..';
 
@@ -78,38 +79,35 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.setDeviceVerified = expect.createSpy();
-            alice.getDeviceEd25519Key = () => {
-                return "alice+base64+ed25519+key";
-            };
-            alice.getStoredDevice = () => {
-                return DeviceInfo.fromStorage(
-                    {
-                        keys: {
-                            "ed25519:Dynabook": "bob+base64+ed25519+key",
-                        },
+            const aliceDevice = alice._crypto._olmDevice;
+            const bobDevice = bob._crypto._olmDevice;
+
+            alice._crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+                Dynabook: {
+                    user_id: "@bob:example.com",
+                    device_id: "Dynabook",
+                    algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                    keys: {
+                        "ed25519:Dynabook": bobDevice.deviceEd25519Key,
+                        "curve25519:Dynabook": bobDevice.deviceCurve25519Key,
                     },
-                    "Dynabook",
-                );
-            };
+                },
+            });
             alice.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.setDeviceVerified = expect.createSpy();
-            bob.getStoredDevice = () => {
-                return DeviceInfo.fromStorage(
-                    {
-                        keys: {
-                            "ed25519:Osborne2": "alice+base64+ed25519+key",
-                        },
+            bob._crypto._deviceList.storeDevicesForUser("@alice:example.com", {
+                Osborne2: {
+                    user_id: "@alice:example.com",
+                    device_id: "Osborne2",
+                    algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                    keys: {
+                        "ed25519:Osborne2": aliceDevice.deviceEd25519Key,
+                        "curve25519:Osborne2": aliceDevice.deviceCurve25519Key,
                     },
-                    "Osborne2",
-                );
-            };
-            bob.getDeviceEd25519Key = () => {
-                return "bob+base64+ed25519+key";
-            };
+                },
+            });
             bob.downloadKeys = () => {
                 return Promise.resolve();
             };
@@ -180,10 +178,12 @@ describe("SAS verification", function() {
             expect(macMethod).toBe("hkdf-hmac-sha256");
 
             // make sure Alice and Bob verified each other
-            expect(alice.setDeviceVerified)
-                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
-            expect(bob.setDeviceVerified)
-                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+            const bobDevice
+                  = await alice.getStoredDevice("@bob:example.com", "Dynabook");
+            expect(bobDevice.isVerified()).toBeTruthy();
+            const aliceDevice
+                  = await bob.getStoredDevice("@alice:example.com", "Osborne2");
+            expect(aliceDevice.isVerified()).toBeTruthy();
         });
 
         it("should be able to verify using the old MAC", async function() {
@@ -218,10 +218,40 @@ describe("SAS verification", function() {
 
             expect(macMethod).toBe("hmac-sha256");
 
-            expect(alice.setDeviceVerified)
-                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
-            expect(bob.setDeviceVerified)
-                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+            const bobDevice
+                  = await alice.getStoredDevice("@bob:example.com", "Dynabook");
+            expect(bobDevice.isVerified()).toBeTruthy();
+            const aliceDevice
+                  = await bob.getStoredDevice("@alice:example.com", "Osborne2");
+            expect(aliceDevice.isVerified()).toBeTruthy();
+        });
+
+        it("should verify a cross-signing key", async function() {
+            const privateKeys = {};
+            alice.on("cross-signing:savePrivateKeys", function(e) {
+                privateKeys.alice = e;
+            });
+            await alice.resetCrossSigningKeys();
+            bob.on("cross-signing:savePrivateKeys", function(e) {
+                privateKeys.bob = e;
+            });
+            await bob.resetCrossSigningKeys();
+
+            bob.on("cross-signing:getKey", function(e) {
+                e.done(privateKeys.bob[e.type]);
+            });
+
+            bob._crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
+                keys: alice._crypto._crossSigningInfo.keys,
+            });
+            await Promise.all([
+                aliceVerifier.verify(),
+                bobPromise.then((verifier) => verifier.verify()),
+            ]);
+
+            expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(1);
+            expect(bob.checkUserTrust("@alice:example.com")).toBe(6);
+            expect(bob.checkDeviceTrust("@alice:example.com", "Osborne2")).toBe(1);
         });
     });
 

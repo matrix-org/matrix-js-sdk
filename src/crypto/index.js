@@ -287,6 +287,18 @@ Crypto.prototype.setCrossSigningKeys = function(keys) {
 };
 
 /**
+ * Get the user's cross-signing key ID.
+ *
+ * @param {string} type The type of key to get the ID of.  One of "master",
+ * "self_signing", or "user_signing".  Defaults to "master".
+ *
+ * @returns {string} the key ID
+ */
+Crypto.prototype.getCrossSigningId = function(type) {
+    return this._crossSigningInfo.getId(type);
+};
+
+/**
  * Check whether a given user is trusted.
  *
  * @param {string} userId The ID of the user to check.

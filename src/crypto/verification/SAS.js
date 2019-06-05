@@ -354,19 +354,32 @@ export default class SAS extends Base {
     }
 
     _sendMAC(olmSAS, method) {
-        const keyId = `ed25519:${this._baseApis.deviceId}`;
         const mac = {};
+        const keyList = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this._baseApis.getUserId() + this._baseApis.deviceId
               + this.userId + this.deviceId
               + this.transactionId;
 
-        mac[keyId] = olmSAS[macMethods[method]](
+        const deviceKeyId = `ed25519:${this._baseApis.deviceId}`;
+        mac[deviceKeyId] = olmSAS[macMethods[method]](
             this._baseApis.getDeviceEd25519Key(),
-            baseInfo + keyId,
+            baseInfo + deviceKeyId,
         );
+        keyList.push(deviceKeyId);
+
+        const crossSigningId = this._baseApis.getCrossSigningId();
+        if (crossSigningId) {
+            const crossSigningKeyId = `ed25519:${crossSigningId}`;
+            mac[crossSigningKeyId] = olmSAS[macMethods[method]](
+                crossSigningId,
+                baseInfo + crossSigningKeyId,
+            );
+            keyList.push(crossSigningKeyId);
+        }
+
         const keys = olmSAS[macMethods[method]](
-            keyId,
+            keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
         this._sendToDevice("m.key.verification.mac", { mac, keys });

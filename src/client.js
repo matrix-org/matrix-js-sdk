@@ -854,6 +854,9 @@ MatrixClient.prototype.resetCrossSigningKeys
 MatrixClient.prototype.setCrossSigningKeys
     = wrapCryptoFunc("setCrossSigningKeys");
 
+MatrixClient.prototype.getCrossSigningId
+    = wrapCryptoFunc("getCrossSigningId");
+
 /**
  * Cancel a room key request for this event if one is ongoing and resend the
  * request.
