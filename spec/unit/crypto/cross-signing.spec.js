@@ -67,8 +67,6 @@ describe("Cross Signing", function() {
                     },
                 },
             },
-            verified: 0,
-            unsigned: {},
         });
         // Alice verifies Bob's key
         alice.on("cross-signing:getKey", function(e) {

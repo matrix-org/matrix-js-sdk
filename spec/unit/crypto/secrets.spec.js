@@ -17,15 +17,12 @@ limitations under the License.
 import '../../olm-loader';
 
 import expect from 'expect';
-import anotherjson from 'another-json';
 import { MatrixEvent } from '../../../lib/models/event';
 
 import olmlib from '../../../lib/crypto/olmlib';
 
 import TestClient from '../../TestClient';
 import { makeTestClients } from './verification/util';
-
-import {HttpResponse, setHttpResponses} from '../../test-utils';
 
 async function makeTestClient(userInfo, options) {
     const client = (new TestClient(

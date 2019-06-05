@@ -1047,7 +1047,7 @@ Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
     const xsk = this._deviceList.getStoredCrossSigningForUser(userId);
-    if (xsk.getId() === deviceId) {
+    if (xsk && xsk.getId() === deviceId) {
         if (verified) {
             const device = await this._crossSigningInfo.signUser(xsk);
             // FIXME: mark xsk as dirty in device list
