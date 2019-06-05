@@ -183,17 +183,29 @@ export default class VerificationBase extends EventEmitter {
     }
 
     async _verifyKeys(userId, keys, verifier) {
+        // we try to verify all the keys that we're told about, but we might
+        // not know about all of them, so keep track of the keys that we know
+        // about, and ignore the rest
+        const verifiedDevices = [];
+
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
             const device = await this._baseApis.getStoredDevice(userId, deviceId);
             if (!device) {
-                throw new Error(`Could not find device ${deviceId}`);
+                logger.warn(`verification: Could not find device ${deviceId} to verify`);
             } else {
                 await verifier(keyId, device, keyInfo);
+                verifiedDevices.push(deviceId);
             }
         }
-        for (const keyId of Object.keys(keys)) {
-            const deviceId = keyId.split(':', 2)[1];
+
+        // if none of the keys could be verified, then error because the app
+        // should be informed about that
+        if (!verifiedDevices.length) {
+            throw new Error("No devices could be verified");
+        }
+
+        for (const deviceId of verifiedDevices) {
             await this._baseApis.setDeviceVerified(userId, deviceId);
         }
     }
