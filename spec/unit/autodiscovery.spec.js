@@ -275,7 +275,7 @@ describe("AutoDiscovery", function() {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
                         error: AutoDiscovery.ERROR_INVALID_HOMESERVER,
-                        base_url: null,
+                        base_url: "https://example.org",
                     },
                     "m.identity_server": {
                         state: "PROMPT",
@@ -304,7 +304,7 @@ describe("AutoDiscovery", function() {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
                         error: AutoDiscovery.ERROR_INVALID_HOMESERVER,
-                        base_url: null,
+                        base_url: "https://example.org",
                     },
                     "m.identity_server": {
                         state: "PROMPT",
@@ -335,7 +335,7 @@ describe("AutoDiscovery", function() {
                     "m.homeserver": {
                         state: "FAIL_ERROR",
                         error: AutoDiscovery.ERROR_INVALID_HOMESERVER,
-                        base_url: null,
+                        base_url: "https://example.org",
                     },
                     "m.identity_server": {
                         state: "PROMPT",
@@ -528,7 +528,7 @@ describe("AutoDiscovery", function() {
                     "m.identity_server": {
                         state: "FAIL_ERROR",
                         error: AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER,
-                        base_url: null,
+                        base_url: "https://identity.example.org",
                     },
                 };
 
@@ -569,7 +569,7 @@ describe("AutoDiscovery", function() {
                     "m.identity_server": {
                         state: "FAIL_ERROR",
                         error: AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER,
-                        base_url: null,
+                        base_url: "https://identity.example.org",
                     },
                 };
 
