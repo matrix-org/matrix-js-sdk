@@ -115,6 +115,8 @@ function InteractiveAuth(opts) {
 
     this._chosenFlow = null;
     this._currentStage = null;
+
+    this._polling = false;
 }
 
 InteractiveAuth.prototype = {
@@ -147,8 +149,9 @@ InteractiveAuth.prototype = {
      * completed out-of-band. If so, the attemptAuth promise will
      * be resolved.
      */
-    poll: function() {
+    poll: async function() {
         if (!this._data.session) return;
+        if (this._polling) return;
 
         let authDict = {};
         if (this._currentStage == EMAIL_STAGE_TYPE) {
@@ -169,7 +172,12 @@ InteractiveAuth.prototype = {
             }
         }
 
-        this.submitAuthDict(authDict, true);
+        this._polling = true;
+        try {
+            await this.submitAuthDict(authDict, true);
+        } finally {
+            this._polling = false;
+        }
     },
 
     /**
@@ -221,7 +229,7 @@ InteractiveAuth.prototype = {
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData, background) {
+    submitAuthDict: async function(authData, background) {
         if (!this._resolveFunc) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -232,7 +240,7 @@ InteractiveAuth.prototype = {
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth, background);
+        await this._doRequest(auth, background);
     },
 
     /**
