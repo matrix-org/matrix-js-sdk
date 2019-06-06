@@ -177,7 +177,7 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
  * @see module:scheduler~queueAlgorithm
  */
 MatrixScheduler.QUEUE_MESSAGES = function(event) {
-    if (event.getType() === "m.room.message") {
+    if (event.getType() === "m.room.message" || !!event.getTargetId()) {
         // put these events in the 'message' queue.
         return "message";
     }
