@@ -112,6 +112,7 @@ function InteractiveAuth(opts) {
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
     if (this._emailSid === undefined) this._emailSid = null;
+    this._requestingEmailToken = false;
 
     this._chosenFlow = null;
     this._currentStage = null;
@@ -313,12 +314,14 @@ InteractiveAuth.prototype = {
 
             if (
                 !this._emailSid &&
+                !this._requestingEmailToken &&
                 this._chosenFlow.stages.includes('m.login.email.identity')
             ) {
                 // If we've picked a flow with email auth, we send the email
                 // now because we want the request to fail as soon as possible
                 // if the email address is not valid (ie. already taken or not
                 // registered, depending on what the operation is).
+                this._requestingEmailToken = true;
                 try {
                     const requestTokenResult = await this._requestEmailTokenCallback(
                         this._inputs.emailAddress,
@@ -341,6 +344,8 @@ InteractiveAuth.prototype = {
                     // the failure up as the user can't complete auth if we can't
                     // send the email, foe whatever reason.
                     this._rejectFunc(e);
+                } finally {
+                    this._requestingEmailToken = false;
                 }
             }
         }
