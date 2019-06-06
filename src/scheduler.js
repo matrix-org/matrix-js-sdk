@@ -220,7 +220,14 @@ function _processQueue(scheduler, queueName) {
     );
     // fire the process function and if it resolves, resolve the deferred. Else
     // invoke the retry algorithm.
-    scheduler._procFn(obj.event).done(function(res) {
+
+    // First wait for a resolved promise, so the resolve handlers for
+    // the deferred of the previously sent event can run.
+    // This way enqueued relations/redactions to enqueued events can receive
+    // the remove id of their target before being sent.
+    Promise.resolve().then(() => {
+        return scheduler._procFn(obj.event);
+    }).then(function(res) {
         // remove this from the queue
         _removeNextEvent(scheduler, queueName);
         debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
