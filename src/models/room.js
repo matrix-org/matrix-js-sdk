@@ -1143,7 +1143,8 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
         if (event.getType() === "m.room.redaction") {
             const redactId = event.event.redacts;
-            let redactedEvent = this._pendingEventList && this._pendingEventList.find(e => e.getId() === redactId);
+            let redactedEvent = this._pendingEventList &&
+                this._pendingEventList.find(e => e.getId() === redactId);
             if (!redactedEvent) {
                 redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
             }
