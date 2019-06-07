@@ -1719,6 +1719,9 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         txnId = this.makeTxnId();
     }
 
+    // we always construct a MatrixEvent when sending because the store and
+    // scheduler use them. We'll extract the params back out if it turns out
+    // the client has no scheduler or store.
     const localEvent = new MatrixEvent(Object.assign(eventObject, {
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
@@ -1726,13 +1729,17 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         origin_server_ts: new Date().getTime(),
     }));
 
+    const room = this.getRoom(roomId);
+    const targetId = localEvent.getTargetId();
+    if (targetId && targetId.startsWith("~")) {
+        const target = room.getPendingEvents().find(e => e.getId() === targetId);
+        target.once("Event.localEventIdReplaced", () => {
+            localEvent.updateTargetId(target.getId());
+        });
+    }
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-    // we always construct a MatrixEvent when sending because the store and
-    // scheduler use them. We'll extract the params back out if it turns out
-    // the client has no scheduler or store.
-    const room = this.getRoom(roomId);
     localEvent._txnId = txnId;
     localEvent.setStatus(EventStatus.SENDING);
 

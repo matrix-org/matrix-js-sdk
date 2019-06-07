@@ -1318,7 +1318,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
 
     if (newStatus == EventStatus.SENT) {
         // update the event id
-        event.event.event_id = newEventId;
+        event.replaceLocalEventId(newEventId);
 
         // if the event was already in the timeline (which will be the case if
         // opts.pendingEventOrdering==chronological), we need to update the

@@ -801,6 +801,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         this.emit("Event.status", this, status);
     },
 
+    replaceLocalEventId(eventId) {
+        this.event.event_id = eventId;
+        this.emit("Event.localEventIdReplaced", this);
+    },
+
     /**
      * Get whether the event is a relation event, and of a given type if
      * `relType` is passed in.
@@ -874,6 +879,25 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      */
     replacingEvent() {
         return this._replacingEvent;
+    },
+
+
+    getTargetId() {
+        const relation = this.getRelation();
+        if (relation) {
+            return relation.event_id;
+        } else if (this.getType() === "m.room.redaction") {
+            return this.event.redacts;
+        }
+    },
+
+    updateTargetId(eventId) {
+        const relation = this.getRelation();
+        if (relation) {
+            relation.event_id = eventId;
+        } else if (this.getType() === "m.room.redaction") {
+            this.event.redacts = eventId;
+        }
     },
 
     /**
