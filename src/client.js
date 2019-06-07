@@ -1730,11 +1730,11 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     }));
 
     const room = this.getRoom(roomId);
-    const targetId = localEvent.getTargetId();
+    const targetId = localEvent.getRelatedId();
     if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
         target.once("Event.localEventIdReplaced", () => {
-            localEvent.updateTargetId(target.getId());
+            localEvent.updateRelatedId(target.getId());
         });
     }
     const type = localEvent.getType();

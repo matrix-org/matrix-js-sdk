@@ -881,8 +881,12 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         return this._replacingEvent;
     },
 
-
-    getTargetId() {
+    /**
+     * For relations and redactions, returns the event_id this event is referring to.
+     *
+     * @return {string?}
+     */
+    getRelatedId() {
         const relation = this.getRelation();
         if (relation) {
             return relation.event_id;
@@ -891,7 +895,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
     },
 
-    updateTargetId(eventId) {
+    /**
+     * Update the related id with a new one.
+     *
+     * Used to replace a local id with remote one before sending
+     * an event with a related id.
+     *
+     * @param {string} eventId the new event id
+     */
+    updateRelatedId(eventId) {
         const relation = this.getRelation();
         if (relation) {
             relation.event_id = eventId;
