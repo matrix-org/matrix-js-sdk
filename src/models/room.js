@@ -1143,7 +1143,10 @@ Room.prototype.addPendingEvent = function(event, txnId) {
 
         if (event.getType() === "m.room.redaction") {
             const redactId = event.event.redacts;
-            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            let redactedEvent = this._pendingEventList && this._pendingEventList.find(e => e.getId() === redactId);
+            if (!redactedEvent) {
+                redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            }
             if (redactedEvent) {
                 redactedEvent.markLocallyRedacted(event);
                 this.emit("Room.redaction", event, this);
