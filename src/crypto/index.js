@@ -371,7 +371,9 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
-                    backupInfo.auth_data,
+                    // verifySignature modifies the object so we need to copy
+                    // if we verify more than one sig
+                    Object.assign({}, backupInfo.auth_data),
                     this._userId,
                     device.deviceId,
                     device.getFingerprint(),
