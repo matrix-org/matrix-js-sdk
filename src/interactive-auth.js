@@ -147,9 +147,9 @@ InteractiveAuth.prototype = {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
-                this._busyChangedCallback(true);
+                if (this._busyChangedCallback) this._busyChangedCallback(true);
                 this._doRequest(this._data).finally(() => {
-                    this._busyChangedCallback(false);
+                    if (this._busyChangedCallback) this._busyChangedCallback(false);
                 });
             } else {
                 this._startNextAuthStage();
@@ -273,7 +273,7 @@ InteractiveAuth.prototype = {
             await this._submitPromise;
         } finally {
             this._submitPromise = null;
-            if (!background) this._busyChangedCallback(false);
+            if (!background && this._busyChangedCallback) this._busyChangedCallback(false);
         }
     },
 
