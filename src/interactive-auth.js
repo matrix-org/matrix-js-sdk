@@ -55,11 +55,11 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  *     promise which resolves to the successful response or rejects with a
  *     MatrixError.
  *
- * @param {function(bool): module:client.Promise} opts.setBusy
- *     called whenever the interactive auth logic is busy submitting
- *     information provided by the user. After this has been called with
- *     true the UI should indicate that a request is in progress until it
- *     is called again with false.
+ * @param {function(bool): module:client.Promise} opts.busyChanged
+ *     called whenever the interactive auth logic becomes busy submitting
+ *     information provided by the user or finsihes. After this has been
+ *     called with true the UI should indicate that a request is in progress
+ *     until it is called again with false.
  *
  * @param {function(string, object?)} opts.stateUpdated
  *     called when the status of the UI auth changes, ie. when the state of
@@ -107,7 +107,7 @@ function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
     this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
-    this._setBusyCallback = opts.setBusy;
+    this._busyChangedCallback = opts.busyChanged;
     // startAuthStage included for backwards compat
     this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
     this._resolveFunc = null;
@@ -147,9 +147,9 @@ InteractiveAuth.prototype = {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
-                this._setBusyCallback(true);
+                this._busyChangedCallback(true);
                 this._doRequest(this._data).finally(() => {
-                    this._setBusyCallback(false);
+                    this._busyChangedCallback(false);
                 });
             } else {
                 this._startNextAuthStage();
@@ -244,8 +244,8 @@ InteractiveAuth.prototype = {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
 
-        if (!background && this._setBusyCallback) {
-            this._setBusyCallback(true);
+        if (!background && this._busyChangedCallback) {
+            this._busyChangedCallback(true);
         }
 
         // if we're currently trying a request, wait for it to finish
@@ -267,13 +267,13 @@ InteractiveAuth.prototype = {
         utils.extend(auth, authData);
 
         try {
-            // NB. the 'background' flag is deprecated by the setBusy
+            // NB. the 'background' flag is deprecated by the busyChanged
             // callback and is here for backwards compat
             this._submitPromise = this._doRequest(auth, background);
             await this._submitPromise;
         } finally {
             this._submitPromise = null;
-            if (!background) this._setBusyCallback(false);
+            if (!background) this._busyChangedCallback(false);
         }
     },
 
