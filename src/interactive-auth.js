@@ -126,7 +126,7 @@ function InteractiveAuth(opts) {
 
     // if we are currently trying to submit an auth dict (which includes polling)
     // the promise the will resolve/reject when it completes
-    this._submitPromise = false;
+    this._submitPromise = null;
 }
 
 InteractiveAuth.prototype = {
