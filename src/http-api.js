@@ -165,10 +165,6 @@ module.exports.MatrixHttpApi.prototype = {
         const contentType = opts.type || file.type || 'application/octet-stream';
         const fileName = opts.name || file.name;
 
-        // we used to recommend setting file.stream to the thing to upload on
-        // nodejs.
-        const body = file.stream ? file.stream : file;
-
         // backwards-compatibility hacks where we used to do different things
         // between browser and node.
         let rawResponse = opts.rawResponse;
