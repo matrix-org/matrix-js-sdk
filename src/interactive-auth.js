@@ -273,7 +273,9 @@ InteractiveAuth.prototype = {
             await this._submitPromise;
         } finally {
             this._submitPromise = null;
-            if (!background && this._busyChangedCallback) this._busyChangedCallback(false);
+            if (!background && this._busyChangedCallback) {
+                this._busyChangedCallback(false);
+            }
         }
     },
 
