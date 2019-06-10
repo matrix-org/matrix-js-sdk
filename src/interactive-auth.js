@@ -52,7 +52,8 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {function(object?): module:client.Promise} opts.doRequest
  *     called with the new auth dict to submit the request. Also passes a
  *     second deprecated arg which is a flag set to true if this request
- *     is a background request. Should return a promise which resolves
+ *     is a background request. The busyChanged callback should be used
+ *     instead of the backfround flag. Should return a promise which resolves
  *     to the successful response or rejects with a MatrixError.
  *
  * @param {function(bool): module:client.Promise} opts.busyChanged
