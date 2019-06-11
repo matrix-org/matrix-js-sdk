@@ -776,9 +776,23 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {Object} event the object to assign to the `event` property
      */
     handleRemoteEcho: function(event) {
+        const oldUnsigned = this.getUnsigned();
+        const oldId = this.getId();
         this.event = event;
+        // keep being redacted if
+        // the event was redacted as a local echo
+        if (oldUnsigned.redacted_because) {
+            if (!this.event.unsigned) {
+                this.event.unsigned = {};
+            }
+            this.event.unsigned.redacted_because = oldUnsigned.redacted_because;
+        }
         // successfully sent.
         this.setStatus(null);
+        if (this.getId() !== oldId) {
+            // emit the event if it changed
+            this.emit("Event.localEventIdReplaced", this);
+        }
     },
 
     /**
