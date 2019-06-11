@@ -165,9 +165,21 @@ module.exports.MatrixHttpApi.prototype = {
         const contentType = opts.type || file.type || 'application/octet-stream';
         const fileName = opts.name || file.name;
 
-        // we used to recommend setting file.stream to the thing to upload on
-        // nodejs.
-        const body = file.stream ? file.stream : file;
+        // We used to recommend setting file.stream to the thing to upload on
+        // Node.js. As of 2019-06-11, this is still in widespread use in various
+        // clients, so we should preserve this for simple objects used in
+        // Node.js. File API objects (via either the File or Blob interfaces) in
+        // the browser now define a `stream` method, which leads to trouble
+        // here, so we also check the type of `stream`.
+        let body = file;
+        if (body.stream && typeof body.stream !== "function") {
+            logger.warn(
+                "Using `file.stream` as the content to upload. Future " +
+                "versions of the js-sdk will change this to expect `file` to " +
+                "be the content directly.",
+            );
+            body = body.stream;
+        }
 
         // backwards-compatibility hacks where we used to do different things
         // between browser and node.
