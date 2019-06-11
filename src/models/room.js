@@ -1215,7 +1215,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     const oldStatus = localEvent.status;
 
     // no longer pending
-    delete this._txnToEvent[remoteEvent.transaction_id];
+    delete this._txnToEvent[remoteEvent.getUnsigned().transaction_id];
 
     // if it's in the pending list, remove it
     if (this._pendingEventList) {
