@@ -749,6 +749,10 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
         return;
     }
 
+    if (event.isRedacted()) {
+        return;
+    }
+
     // If the event is currently encrypted, wait until it has been decrypted.
     if (event.isBeingDecrypted()) {
         event.once("Event.decrypted", () => {
