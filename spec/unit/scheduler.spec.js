@@ -310,7 +310,7 @@ describe("MatrixScheduler", function() {
                 expect(ev).toEqual(eventA);
                 return defer.promise;
             });
-            // as queing doesn't start processing
+            // as queueing doesn't start processing
             // synchronously anymore (see commit bbdb5ac)
             // wait just long enough before it does
             Promise.resolve().then(() => {
