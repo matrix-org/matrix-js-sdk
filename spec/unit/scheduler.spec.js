@@ -105,7 +105,7 @@ describe("MatrixScheduler", function() {
         });
 
         scheduler.queueEvent(eventA);
-        // as queing doesn't start processing
+        // as queueing doesn't start processing
         // synchronously anymore (see commit bbdb5ac)
         // wait just long enough before it does
         await Promise.resolve();
