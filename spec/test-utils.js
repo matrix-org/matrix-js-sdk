@@ -245,10 +245,11 @@ module.exports.awaitDecryption = function(event) {
 
 
 const HttpResponse = module.exports.HttpResponse = function(
-    httpLookups, acceptKeepalives,
+    httpLookups, acceptKeepalives, ignoreUnhandledSync,
 ) {
     this.httpLookups = httpLookups;
     this.acceptKeepalives = acceptKeepalives === undefined ? true : acceptKeepalives;
+    this.ignoreUnhandledSync = ignoreUnhandledSync;
     this.pendingLookup = null;
 };
 
@@ -266,6 +267,10 @@ HttpResponse.prototype.request = function HttpResponse(
     logger.log(logLine);
 
     if (!next) { // no more things to return
+        if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
+            logger.log("MatrixClient[UT] Ignoring.");
+            return Promise.defer().promise;
+        }
         if (this.pendingLookup) {
             if (this.pendingLookup.method === method
                 && this.pendingLookup.path === path) {
@@ -313,6 +318,10 @@ HttpResponse.prototype.request = function HttpResponse(
             });
         }
         return Promise.resolve(next.data);
+    } else if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
+        logger.log("MatrixClient[UT] Ignoring.");
+        this.httpLookups.unshift(next);
+        return Promise.defer().promise;
     }
     expect(true).toBe(false, "Expected different request. " + logLine);
     return Promise.defer().promise;
@@ -358,9 +367,11 @@ HttpResponse.defaultResponses = function(userId) {
 };
 
 module.exports.setHttpResponses = function setHttpResponses(
-    client, responses, acceptKeepalives,
+    client, responses, acceptKeepalives, ignoreUnhandledSyncs,
 ) {
-    const httpResponseObj = new HttpResponse(responses, acceptKeepalives);
+    const httpResponseObj = new HttpResponse(
+        responses, acceptKeepalives, ignoreUnhandledSyncs,
+    );
 
     const httpReq = httpResponseObj.request.bind(httpResponseObj);
     client._http = [
