@@ -1,3 +1,46 @@
+Changes in [2.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.1-rc.1) (2019-06-12)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.0.0...v2.0.1-rc.1)
+
+ * Fix content uploads for modern browsers
+   [\#952](https://github.com/matrix-org/matrix-js-sdk/pull/952)
+ * Don't overlap auth submissions with polls
+   [\#951](https://github.com/matrix-org/matrix-js-sdk/pull/951)
+ * Add funding details for GitHub sponsor button
+   [\#945](https://github.com/matrix-org/matrix-js-sdk/pull/945)
+ * Fix backup sig validation with multiple sigs
+   [\#944](https://github.com/matrix-org/matrix-js-sdk/pull/944)
+ * Don't send another token request while one's in flight
+   [\#943](https://github.com/matrix-org/matrix-js-sdk/pull/943)
+ * Don't poll UI auth again until current poll finishes
+   [\#942](https://github.com/matrix-org/matrix-js-sdk/pull/942)
+ * Provide the discovered URLs when a liveliness error occurs
+   [\#938](https://github.com/matrix-org/matrix-js-sdk/pull/938)
+ * Encode event IDs when redacting events
+   [\#941](https://github.com/matrix-org/matrix-js-sdk/pull/941)
+ * add missing logger
+   [\#940](https://github.com/matrix-org/matrix-js-sdk/pull/940)
+ * verification: don't error if we don't know about some keys
+   [\#939](https://github.com/matrix-org/matrix-js-sdk/pull/939)
+ * Local echo for redactions
+   [\#937](https://github.com/matrix-org/matrix-js-sdk/pull/937)
+ * Refresh safe room versions when the server looks more modern than us
+   [\#934](https://github.com/matrix-org/matrix-js-sdk/pull/934)
+ * Add v4 as a safe room version
+   [\#935](https://github.com/matrix-org/matrix-js-sdk/pull/935)
+ * Disable guard-for-in rule
+   [\#933](https://github.com/matrix-org/matrix-js-sdk/pull/933)
+ * Extend loglevel logging for the whole project
+   [\#924](https://github.com/matrix-org/matrix-js-sdk/pull/924)
+ * fix(login): saves access_token and user_id after login for all login types
+   [\#930](https://github.com/matrix-org/matrix-js-sdk/pull/930)
+ * Do not try to request thumbnails with non-integer sizes
+   [\#929](https://github.com/matrix-org/matrix-js-sdk/pull/929)
+ * Revert "Add a bunch of debugging to .well-known IS validation"
+   [\#928](https://github.com/matrix-org/matrix-js-sdk/pull/928)
+ * Add a bunch of debugging to .well-known IS validation
+   [\#927](https://github.com/matrix-org/matrix-js-sdk/pull/927)
+
 Changes in [2.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.0) (2019-05-31)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v1.2.0...v2.0.0)
