@@ -655,6 +655,7 @@ export default class DeviceList extends EventEmitter {
                 }
             });
             this.saveIfDirty();
+            this.emit("crypto.devicesUpdated", users);
         };
 
         return prom;

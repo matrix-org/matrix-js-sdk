@@ -195,8 +195,13 @@ export class CrossSigningInfo extends EventEmitter {
                 logger.error(error);
                 throw new Error(error);
             }
-            // First-Use is true if and only if we had no previous key for the user
-            this.fu = !(this.keys.self_signing);
+            if (!this.keys.master) {
+                // this is the first key we've seen, so first-use is true
+                this.fu = true;
+            } else if (getPublicKey(keys.master)[1] !== this.getId()) {
+                // this is a different key, so first-use is false
+                this.fu = false;
+            } // otherwise, same key, so no change
             signingKeys.master = keys.master;
         } else if (this.keys.master) {
             signingKeys.master = this.keys.master;
@@ -254,7 +259,11 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async signUser(key) {
+        if (!this.keys.user_signing) {
+            return;
+        }
         const [pubkey, usk] = await getPrivateKey(this, "user_signing", (key) => {
+            // FIXME:
             return;
         });
         try {
@@ -268,9 +277,15 @@ export class CrossSigningInfo extends EventEmitter {
 
     async signDevice(userId, device) {
         if (userId !== this.userId) {
-            throw new Error("Urgh!");
+            throw new Error(
+                `Trying to sign ${userId}'s device; can only sign our own device`,
+            );
+        }
+        if (!this.keys.self_signing) {
+            return;
         }
         const [pubkey, ssk] = await getPrivateKey(this, "self_signing", (key) => {
+            // FIXME:
             return;
         });
         try {
@@ -288,6 +303,8 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     checkUserTrust(userCrossSigning) {
+        // if we're checking our own key, then it's trusted if the master key
+        // and self-signing key match
         if (this.userId === userCrossSigning.userId
             && this.getId() && this.getId() === userCrossSigning.getId()
             && this.getId("self_signing")
@@ -298,7 +315,8 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         if (!this.keys.user_signing) {
-            return 0;
+            return (userCrossSigning.fu ? CrossSigningVerification.TOFU
+                    : CrossSigningVerification.UNVERIFIED);
         }
 
         let userTrusted;

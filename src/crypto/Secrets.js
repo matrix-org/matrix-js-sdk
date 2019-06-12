@@ -17,6 +17,9 @@ limitations under the License.
 import {EventEmitter} from 'events';
 import logger from '../logger';
 import olmlib from './olmlib';
+import { randomString } from '../randomstring';
+import { keyForNewBackup } from './backup_password';
+import { encodeRecoveryKey, decodeRecoveryKey } from './recoverykey';
 
 /** Implements MSC-1946
  */
@@ -26,6 +29,56 @@ export default class SecretStorage extends EventEmitter {
         this._baseApis = baseApis;
         this._requests = {};
         this._incomingRequests = {};
+    }
+
+    async addKey(type, opts) {
+        const keyData = {
+            algorithm: opts.algorithm,
+        };
+
+        switch (opts.algorithm) {
+        case "m.secret_storage.v1.curve25519-aes-sha2":
+        {
+            const decryption = new global.Olm.PkDecryption();
+            try {
+                if (opts.passphrase) {
+                    const key = await keyForNewBackup(opts.passphrase);
+                    keyData.passphrase = {
+                        algorithm: "m.pbkdf2",
+                        iterations: key.iterations,
+                        salt: key.salt,
+                    };
+                    opts.encodedkey = encodeRecoveryKey(key.key);
+                    keyData.pubkey = decryption.init_with_private_key(key.key);
+                } else if (opts.privkey) {
+                    keyData.pubkey = decryption.init_with_private_key(opts.privkey);
+                    opts.encodedkey = encodeRecoveryKey(opts.privkey);
+                } else {
+                    keyData.pubkey = decryption.generate_key();
+                    opts.encodedkey = encodeRecoveryKey(decryption.get_private_key());
+                }
+            } finally {
+                decryption.free();
+            }
+            break;
+        }
+        default:
+            throw new Error(`Unknown key algorithm ${opts.algorithm}`);
+        }
+
+        let keyName;
+
+        do {
+            keyName = randomString(32);
+        } while (!this._baseApis.getAccountData(`m.secret_storage.key.${keyName}`));
+
+        // FIXME: sign keyData?
+
+        await this._baseApis.setAccountData(
+            `m.secret_storage.key.${keyName}`, keyData,
+        );
+
+        return keyName;
     }
 
     /** store an encrypted secret on the server
@@ -285,7 +338,11 @@ export default class SecretStorage extends EventEmitter {
                 });
             }
         } else if (content.action === "request") {
-            // if from us and device is trusted (or else check trust)
+            if (deviceId === this._baseApis.deviceId) {
+                // no point in trying to send ourself the secret
+                return;
+            }
+
             // check if we have the secret
             logger.info("received request for secret (" + sender
                         + ", " + deviceId + ", " + content.request_id + ")");
@@ -308,6 +365,15 @@ export default class SecretStorage extends EventEmitter {
                         sender_key: this._baseApis._crypto._olmDevice.deviceCurve25519Key,
                         ciphertext: {},
                     };
+                    await olmlib.ensureOlmSessionsForDevices(
+                        this._baseApis._crypto._olmDevice,
+                        this._baseApis,
+                        {
+                            [sender]: [
+                                await this._baseApis.getStoredDevice(sender, deviceId),
+                            ],
+                        },
+                    );
                     await olmlib.encryptMessageForDevice(
                         encryptedContent.ciphertext,
                         this._baseApis.getUserId(),

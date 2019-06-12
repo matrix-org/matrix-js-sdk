@@ -1676,9 +1676,10 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
     );
 };
 
-MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(keys) {
+MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
+    const data = Object.assign({}, keys, {auth});
     return this._http.authedRequestWithPrefix(
-        undefined, "POST", "/keys/device_signing/upload", undefined, keys,
+        undefined, "POST", "/keys/device_signing/upload", undefined, data,
         httpApi.PREFIX_UNSTABLE,
     );
 };

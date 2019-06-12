@@ -50,10 +50,15 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
+        alice.uploadDeviceSigningKeys = async function(e) {return;};
+        alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
+        });
+        alice.on("cross-signing:getKey", function(e) {
+            e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
         // Alice downloads Bob's device key
@@ -69,10 +74,6 @@ describe("Cross Signing", function() {
             },
         });
         // Alice verifies Bob's key
-        alice.on("cross-signing:getKey", function(e) {
-            expect(e.type).toBe("user_signing");
-            e.done(privateKeys.user_signing);
-        });
         const promise = new Promise((resolve, reject) => {
             alice.uploadKeySignatures = (...args) => {
                 resolve(...args);
@@ -109,6 +110,10 @@ describe("Cross Signing", function() {
 
         alice.once("cross-signing:newKey", (e) => {
             e.done(masterKey);
+        });
+        alice.on("cross-signing:getKey", (e) => {
+            // will be called to sign our own device
+            e.done(selfSigningKey);
         });
 
         const deviceInfo = alice._crypto._deviceList._devices["@alice:example.com"]
@@ -198,8 +203,13 @@ describe("Cross Signing", function() {
                     },
                 },
             },
+            {
+                method: "POST",
+                path: "/keys/signatures/upload",
+                data: {},
+            },
         ];
-        setHttpResponses(alice, responses);
+        setHttpResponses(alice, responses, true, true);
 
         await alice.startClient();
 
@@ -213,10 +223,15 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
+        alice.uploadDeviceSigningKeys = async function(e) {return;};
+        alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
+        });
+        alice.on("cross-signing:getKey", function(e) {
+            e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
@@ -275,10 +290,6 @@ describe("Cross Signing", function() {
         expect(alice.checkUserTrust("@bob:example.com")).toBe(2);
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(2);
         // Alice verifies Bob's SSK
-        alice.on("cross-signing:getKey", function(e) {
-            expect(e.type).toBe("user_signing");
-            e.done(privateKeys.user_signing);
-        });
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
         // Bob's device key should be trusted
@@ -292,17 +303,18 @@ describe("Cross Signing", function() {
         );
         alice._crypto._deviceList.startTrackingDeviceList("@bob:example.com");
         alice._crypto._deviceList.stopTrackingAllDeviceLists = () => {};
+        alice.uploadDeviceSigningKeys = async function(e) {return;};
+        alice.uploadKeySignatures = async function(e) {return;};
 
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        await alice.resetCrossSigningKeys();
-
-        alice.once("cross-signing:getKey", (e) => {
+        alice.on("cross-signing:getKey", (e) => {
             e.done(privateKeys[e.type]);
         });
+        await alice.resetCrossSigningKeys();
 
         const selfSigningKey = new Uint8Array([
             0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66,
@@ -450,10 +462,15 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
+        alice.uploadDeviceSigningKeys = async function(e) {return;};
+        alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
+        });
+        alice.on("cross-signing:getKey", (e) => {
+            e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
         // Alice downloads Bob's ssk and device key
@@ -506,12 +523,9 @@ describe("Cross Signing", function() {
         // Bob's device key should be untrusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
         // Alice verifies Bob's SSK
-        alice.on("cross-signing:getKey", function(e) {
-            expect(e.type).toBe("user_signing");
-            e.done(privateKeys.user_signing);
-        });
-        alice.uploadKeySignatures = () => {};
+        console.log("verifying bob's device");
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
+        console.log("done");
         // Bob's device key should be untrusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
     });
@@ -520,9 +534,14 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
+        alice.uploadDeviceSigningKeys = async function(e) {return;};
+        alice.uploadKeySignatures = async function(e) {return;};
         let privateKeys;
         alice.on("cross-signing:savePrivateKeys", function(e) {
             privateKeys = e;
+        });
+        alice.on("cross-signing:getKey", function(e) {
+            e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
         // Alice downloads Bob's keys
@@ -577,10 +596,6 @@ describe("Cross Signing", function() {
             Dynabook: bobDevice,
         });
         // Alice verifies Bob's SSK
-        alice.on("cross-signing:getKey", function(e) {
-            expect(e.type).toBe("user_signing");
-            e.done(privateKeys.user_signing);
-        });
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
         // Bob's device key should be trusted
@@ -624,8 +639,7 @@ describe("Cross Signing", function() {
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
         // Alice verifies Bob's SSK
         alice.on("cross-signing:getKey", function(e) {
-            expect(e.type).toBe("user_signing");
-            e.done(privateKeys.user_signing);
+            e.done(privateKeys[e.type]);
         });
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey2, true);

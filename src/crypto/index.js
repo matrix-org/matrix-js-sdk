@@ -25,6 +25,7 @@ limitations under the License.
 const anotherjson = require('another-json');
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
+import ReEmitter from '../ReEmitter';
 
 import logger from '../logger';
 const utils = require("../utils");
@@ -107,6 +108,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
     this._onDeviceListUserCrossSigningUpdated = this._onDeviceListUserCrossSigningUpdated.bind(this);
 
+    this._reEmitter = new ReEmitter(this);
     this._baseApis = baseApis;
     this._sessionStore = sessionStore;
     this._userId = userId;
@@ -148,6 +150,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // XXX: This isn't removed at any point, but then none of the event listeners
     // this class sets seem to be removed at any point... :/
     this._deviceList.on('userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated);
+    this._reEmitter.reEmit(this._deviceList, ["crypto.devicesUpdated"]);
 
     // the last time we did a check for the number of one-time-keys on the
     // server.
@@ -200,17 +203,34 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._verificationTransactions = new Map();
 
     this._crossSigningInfo = new CrossSigningInfo(userId);
-    this._crossSigningInfo.on("cross-signing:savePrivateKeys", (...args) => {
-        this._baseApis.emit("cross-signing:savePrivateKeys", ...args);
-    });
-    this._crossSigningInfo.on("cross-signing:getKey", (...args) => {
-        this._baseApis.emit("cross-signing:getKey", ...args);
-    });
+    this._reEmitter.reEmit(this._crossSigningInfo, [
+        "cross-signing:savePrivateKeys",
+        "cross-signing:getKey",
+    ]);
 
     this._secretStorage = new SecretStorage(baseApis);
     // TODO: expose SecretStorage methods
 }
 utils.inherits(Crypto, EventEmitter);
+
+Crypto.prototype.storeSecret = function(name, secret, keys) {
+    return this._secretStorage.store(name, secret, keys);
+};
+
+Crypto.prototype.getSecret = function(name) {
+    return this._secretStorage.get(name);
+};
+
+Crypto.prototype.isSecretStored = function(name, checkKey) {
+    return this._secretStorage.isStored(name, checkKey);
+};
+
+Crypto.prototype.requestSecret = function(name, devices) {
+    if (!devices) {
+        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(this._userId));
+    }
+    return this._secretStorage.request(name, devices);
+};
 
 /**
  * Initialise the crypto module so that it is ready for use
@@ -271,19 +291,22 @@ Crypto.prototype.init = async function() {
  * keys will be created for the given level and below.  Defaults to
  * regenerating all keys.
  */
-Crypto.prototype.resetCrossSigningKeys = async function(level) {
+Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
     await this._crossSigningInfo.resetKeys(level);
+    const keys = {};
+    for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
+        keys[name + "_key"] = key;
+    }
+    await this._baseApis.uploadDeviceSigningKeys(authDict || {}, keys);
     this._baseApis.emit("cross-signing:keysChanged", {});
-};
 
-/**
- * Set the user's cross-signing keys to use.
- *
- * @param {object} keys A mapping of key type to key data.
- */
-Crypto.prototype.setCrossSigningKeys = function(keys) {
-    this._crossSigningInfo.setKeys(keys);
-    this._baseApis.emit("cross-signing:keysChanged", {});
+    const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
+    const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
+    await this._baseApis.uploadKeySignatures({
+        [this._userId]: {
+            [this._deviceId]: signedDevice,
+        },
+    });
 };
 
 /**
@@ -296,6 +319,10 @@ Crypto.prototype.setCrossSigningKeys = function(keys) {
  */
 Crypto.prototype.getCrossSigningId = function(type) {
     return this._crossSigningInfo.getId(type);
+};
+
+Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
+    return this._deviceList.getStoredCrossSigningForUser(userId);
 };
 
 /**
@@ -419,18 +446,28 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         logger.info("Got private key");
     }
 
-    // FIXME: fetch the private key?
-    if (this._crossSigningInfo.getId("self_signing")
-        !== newCrossSigning.getId("self_signing")) {
-        logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
-    }
-    if (this._crossSigningInfo.getId("user_signing")
-        !== newCrossSigning.getId("user_signing")) {
-        logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
-    }
+    const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
+    const oldUserSigningId = this._crossSigningInfo.getId("user_signing")
 
     this._crossSigningInfo.setKeys(newCrossSigning.keys);
     // FIXME: save it ... somewhere?
+
+    if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
+        logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
+
+        const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
+        const signedDevice = await this._crossSigningInfo.signDevice(
+            this._userId, device,
+        );
+        await this._baseApis.uploadKeySignatures({
+            [this._userId]: {
+                [this._deviceId]: signedDevice,
+            },
+        });
+    }
+    if (oldUserSigningId !== newCrossSigning.getId("user_signing")) {
+        logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
+    }
 
     if (changed) {
         this._baseApis.emit("cross-signing:keysChanged", {});
@@ -1062,12 +1099,13 @@ Crypto.prototype.setDeviceVerification = async function(
     if (xsk && xsk.getId() === deviceId) {
         if (verified) {
             const device = await this._crossSigningInfo.signUser(xsk);
-            // FIXME: mark xsk as dirty in device list
-            this._baseApis.uploadKeySignatures({
-                [userId]: {
-                    [deviceId]: device,
-                },
-            });
+            if (device) {
+                this._baseApis.uploadKeySignatures({
+                    [userId]: {
+                        [deviceId]: device,
+                    },
+                });
+            }
             return device;
         } else {
             // FIXME: ???
@@ -1109,13 +1147,16 @@ Crypto.prototype.setDeviceVerification = async function(
 
     // do cross-signing
     if (verified && userId === this._userId) {
-        const device = await this._crossSigningInfo.signDevice(userId, dev);
-        // FIXME: mark device as dirty in device list
-        this._baseApis.uploadKeySignatures({
-            [userId]: {
-                [deviceId]: device,
-            },
-        });
+        const device = await this._crossSigningInfo.signDevice(
+            userId, DeviceInfo.fromStorage(dev, deviceId),
+        );
+        if (device) {
+            this._baseApis.uploadKeySignatures({
+                [userId]: {
+                    [deviceId]: device,
+                },
+            });
+        }
     }
 
     return DeviceInfo.fromStorage(dev, deviceId);

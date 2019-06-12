@@ -559,6 +559,9 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequest",
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
+        "crypto.devicesUpdated",
+        "cross-signing:savePrivateKeys",
+        "cross-signing:getKey",
     ]);
 
     logger.log("Crypto: initialising crypto object...");
@@ -795,27 +798,34 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
- * returns a function that just calls the corresponding function from this._crypto.
+ * add methods that call the corresponding method in this._crypto
  *
- * @param {string} name the function to call
- *
- * @return {Function} a wrapper function
+ * @param {class} MatrixClient the class to add the method to
+ * @param {string} names the names of the methods to call
  */
-function wrapCryptoFunc(name) {
-    return function(...args) {
-        if (!this._crypto) { // eslint-disable-line no-invalid-this
-            throw new Error("End-to-end encryption disabled");
-        }
+function wrapCryptoFuncs(MatrixClient, names) {
+    for (const name of names) {
+        MatrixClient.prototype[name] = function(...args) {
+            if (!this._crypto) { // eslint-disable-line no-invalid-this
+                throw new Error("End-to-end encryption disabled");
+            }
 
-        return this._crypto[name](...args); // eslint-disable-line no-invalid-this
-    };
+            return this._crypto[name](...args); // eslint-disable-line no-invalid-this
+        };
+    }
 }
 
-MatrixClient.prototype.checkUserTrust
-    = wrapCryptoFunc("checkUserTrust");
+wrapCryptoFuncs(MatrixClient, [
+    "checkUserTrust",
+    "checkDeviceTrust",
+]);
 
-MatrixClient.prototype.checkDeviceTrust
-    = wrapCryptoFunc("checkDeviceTrust");
+wrapCryptoFuncs(MatrixClient, [
+    "storeSecret",
+    "getSecret",
+    "isSecretStored",
+    "requestSecret",
+]);
 
 /**
  * Get e2e information on the device that sent an event
@@ -848,14 +858,11 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
     return device.isVerified();
 };
 
-MatrixClient.prototype.resetCrossSigningKeys
-    = wrapCryptoFunc("resetCrossSigningKeys");
-
-MatrixClient.prototype.setCrossSigningKeys
-    = wrapCryptoFunc("setCrossSigningKeys");
-
-MatrixClient.prototype.getCrossSigningId
-    = wrapCryptoFunc("getCrossSigningId");
+wrapCryptoFuncs(MatrixClient, [
+    "resetCrossSigningKeys",
+    "getCrossSigningId",
+    "getStoredCrossSigningForUser",
+]);
 
 /**
  * Cancel a room key request for this event if one is ongoing and resend the
