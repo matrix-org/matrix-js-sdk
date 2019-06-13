@@ -1032,7 +1032,7 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @private
  */
 Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
-    if (event.getType() === "m.room.redaction") {
+    if (event.isRedaction()) {
         const redactId = event.event.redacts;
 
         // if we know about this event, redact its contents now.
@@ -1141,9 +1141,13 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             this._aggregateNonLiveRelation(event);
         }
 
-        if (event.getType() === "m.room.redaction") {
+        if (event.isRedaction()) {
             const redactId = event.event.redacts;
-            const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            let redactedEvent = this._pendingEventList &&
+                this._pendingEventList.find(e => e.getId() === redactId);
+            if (!redactedEvent) {
+                redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
+            }
             if (redactedEvent) {
                 redactedEvent.markLocallyRedacted(event);
                 this.emit("Room.redaction", event, this);
@@ -1211,7 +1215,7 @@ Room.prototype._handleRemoteEcho = function(remoteEvent, localEvent) {
     const oldStatus = localEvent.status;
 
     // no longer pending
-    delete this._txnToEvent[remoteEvent.transaction_id];
+    delete this._txnToEvent[remoteEvent.getUnsigned().transaction_id];
 
     // if it's in the pending list, remove it
     if (this._pendingEventList) {
@@ -1315,7 +1319,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
 
     if (newStatus == EventStatus.SENT) {
         // update the event id
-        event.event.event_id = newEventId;
+        event.replaceLocalEventId(newEventId);
 
         // if the event was already in the timeline (which will be the case if
         // opts.pendingEventOrdering==chronological), we need to update the
@@ -1329,7 +1333,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
             const idx = this._pendingEventList.findIndex(ev => ev.getId() === oldEventId);
             if (idx !== -1) {
                 const [removedEvent] = this._pendingEventList.splice(idx, 1);
-                if (removedEvent.getType() === "m.room.redaction") {
+                if (removedEvent.isRedaction()) {
                     this._revertRedactionLocalEcho(removedEvent);
                 }
             }
@@ -1435,7 +1439,7 @@ Room.prototype.removeEvent = function(eventId) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
-            if (removed.getType() === "m.room.redaction") {
+            if (removed.isRedaction()) {
                 this._revertRedactionLocalEcho(removed);
             }
             removedAny = true;

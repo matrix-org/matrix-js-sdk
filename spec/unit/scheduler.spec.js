@@ -48,7 +48,7 @@ describe("MatrixScheduler", function() {
         clock.uninstall();
     });
 
-    it("should process events in a queue in a FIFO manner", function(done) {
+    it("should process events in a queue in a FIFO manner", async function() {
         retryFn = function() {
             return 0;
         };
@@ -57,28 +57,30 @@ describe("MatrixScheduler", function() {
         };
         const deferA = Promise.defer();
         const deferB = Promise.defer();
-        let resolvedA = false;
+        let yieldedA = false;
         scheduler.setProcessFunction(function(event) {
-            if (resolvedA) {
+            if (yieldedA) {
                 expect(event).toEqual(eventB);
                 return deferB.promise;
             } else {
+                yieldedA = true;
                 expect(event).toEqual(eventA);
                 return deferA.promise;
             }
         });
-        scheduler.queueEvent(eventA);
-        scheduler.queueEvent(eventB).done(function() {
-            expect(resolvedA).toBe(true);
-            done();
-        });
-        deferA.resolve({});
-        resolvedA = true;
-        deferB.resolve({});
+        const abPromise = Promise.all([
+            scheduler.queueEvent(eventA),
+            scheduler.queueEvent(eventB),
+        ]);
+        deferB.resolve({b: true});
+        deferA.resolve({a: true});
+        const [a, b] = await abPromise;
+        expect(a.a).toEqual(true);
+        expect(b.b).toEqual(true);
     });
 
     it("should invoke the retryFn on failure and wait the amount of time specified",
-    function(done) {
+    async function() {
         const waitTimeMs = 1500;
         const retryDefer = Promise.defer();
         retryFn = function() {
@@ -97,24 +99,26 @@ describe("MatrixScheduler", function() {
                 return defer.promise;
             } else if (procCount === 2) {
                 // don't care about this defer
-                return Promise.defer().promise;
+                return new Promise();
             }
             expect(procCount).toBeLessThan(3);
         });
 
         scheduler.queueEvent(eventA);
+        // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
+        // wait just long enough before it does
+        await Promise.resolve();
         expect(procCount).toEqual(1);
         defer.reject({});
-        retryDefer.promise.done(function() {
-            expect(procCount).toEqual(1);
-            clock.tick(waitTimeMs);
-            expect(procCount).toEqual(2);
-            done();
-        });
+        await retryDefer.promise;
+        expect(procCount).toEqual(1);
+        clock.tick(waitTimeMs);
+        await Promise.resolve();
+        expect(procCount).toEqual(2);
     });
 
     it("should give up if the retryFn on failure returns -1 and try the next event",
-    function(done) {
+    async function() {
         // Queue A & B.
         // Reject A and return -1 on retry.
         // Expect B to be tried next and the promise for A to be rejected.
@@ -122,8 +126,8 @@ describe("MatrixScheduler", function() {
             return -1;
         };
         queueFn = function() {
- return "yep";
-};
+            return "yep";
+        };
 
         const deferA = Promise.defer();
         const deferB = Promise.defer();
@@ -142,13 +146,17 @@ describe("MatrixScheduler", function() {
 
         const globalA = scheduler.queueEvent(eventA);
         scheduler.queueEvent(eventB);
-
+        // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
+        // wait just long enough before it does
+        await Promise.resolve();
         expect(procCount).toEqual(1);
         deferA.reject({});
-        globalA.catch(function() {
+        try {
+            await globalA;
+        } catch(err) {
+            await Promise.resolve();
             expect(procCount).toEqual(2);
-            done();
-        });
+        }
     });
 
     it("should treat each queue separately", function(done) {
@@ -300,7 +308,11 @@ describe("MatrixScheduler", function() {
                 expect(ev).toEqual(eventA);
                 return defer.promise;
             });
-            expect(procCount).toEqual(1);
+            // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
+            // wait just long enough before it does
+            Promise.resolve().then(() => {
+                expect(procCount).toEqual(1);
+            });
         });
 
         it("should not call the processFn if there are no queued events", function() {

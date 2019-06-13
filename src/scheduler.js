@@ -177,7 +177,8 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
  * @see module:scheduler~queueAlgorithm
  */
 MatrixScheduler.QUEUE_MESSAGES = function(event) {
-    if (event.getType() === "m.room.message") {
+    // enqueue messages or events that associate with another event (redactions and relations)
+    if (event.getType() === "m.room.message" || event.hasAssocation()) {
         // put these events in the 'message' queue.
         return "message";
     }
@@ -220,7 +221,14 @@ function _processQueue(scheduler, queueName) {
     );
     // fire the process function and if it resolves, resolve the deferred. Else
     // invoke the retry algorithm.
-    scheduler._procFn(obj.event).done(function(res) {
+
+    // First wait for a resolved promise, so the resolve handlers for
+    // the deferred of the previously sent event can run.
+    // This way enqueued relations/redactions to enqueued events can receive
+    // the remove id of their target before being sent.
+    Promise.resolve().then(() => {
+        return scheduler._procFn(obj.event);
+    }).then(function(res) {
         // remove this from the queue
         _removeNextEvent(scheduler, queueName);
         debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
