@@ -167,7 +167,7 @@ MatrixBaseApis.prototype.register = function(
     } else if (bindThreepids === null || bindThreepids === undefined) {
         bindThreepids = {};
     }
-    if (typeof inhibit_login === 'function') {
+    if (typeof inhibitLogin === 'function') {
         callback = inhibitLogin;
         inhibitLogin = undefined;
     }
