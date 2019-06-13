@@ -922,6 +922,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Checks if this event is associated with another event. See `getAssociatedId`.
+     *
+     * @return {bool}
+     */
+    hasAssocation() {
+        return !!this.getAssociatedId();
+    },
+
+    /**
      * Update the related id with a new one.
      *
      * Used to replace a local id with remote one before sending
