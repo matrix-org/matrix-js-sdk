@@ -900,7 +900,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @return {string?}
      */
-    getRelatedId() {
+    getAssociatedId() {
         const relation = this.getRelation();
         if (relation) {
             return relation.event_id;
@@ -917,7 +917,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @param {string} eventId the new event id
      */
-    updateRelatedId(eventId) {
+    updateAssociatedId(eventId) {
         const relation = this.getRelation();
         if (relation) {
             relation.event_id = eventId;

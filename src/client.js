@@ -1735,11 +1735,11 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     // that hasn't been sent yet (e.g. with a local id starting with a ~)
     // then listen for the remote echo of that event so that by the time
     // this event does get sent, we have the correct event_id
-    const targetId = localEvent.getRelatedId();
+    const targetId = localEvent.getAssociatedId();
     if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
         target.once("Event.localEventIdReplaced", () => {
-            localEvent.updateRelatedId(target.getId());
+            localEvent.updateAssociatedId(target.getId());
         });
     }
     const type = localEvent.getType();
