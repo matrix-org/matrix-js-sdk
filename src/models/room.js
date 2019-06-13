@@ -1356,10 +1356,7 @@ Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
         // re-render after undoing redaction
         this.emit("Room.redactionCancelled", redactionEvent, this);
         // reapply relation now redaction failed
-        if (
-            redactedEvent.isRelation() &&
-            redactedEvent.status !== EventStatus.CANCELLED
-        ) {
+        if (redactedEvent.isRelation()) {
             this._aggregateNonLiveRelation(redactedEvent);
         }
     }
