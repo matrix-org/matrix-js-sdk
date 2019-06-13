@@ -105,8 +105,7 @@ describe("MatrixScheduler", function() {
         });
 
         scheduler.queueEvent(eventA);
-        // as queueing doesn't start processing
-        // synchronously anymore (see commit bbdb5ac)
+        // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
         // wait just long enough before it does
         await Promise.resolve();
         expect(procCount).toEqual(1);
@@ -147,8 +146,7 @@ describe("MatrixScheduler", function() {
 
         const globalA = scheduler.queueEvent(eventA);
         scheduler.queueEvent(eventB);
-        // as queing doesn't start processing
-        // synchronously anymore (see commit bbdb5ac)
+        // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
         // wait just long enough before it does
         await Promise.resolve();
         expect(procCount).toEqual(1);
@@ -310,8 +308,7 @@ describe("MatrixScheduler", function() {
                 expect(ev).toEqual(eventA);
                 return defer.promise;
             });
-            // as queueing doesn't start processing
-            // synchronously anymore (see commit bbdb5ac)
+            // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
             // wait just long enough before it does
             Promise.resolve().then(() => {
                 expect(procCount).toEqual(1);

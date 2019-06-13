@@ -1742,6 +1742,7 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
             localEvent.updateAssociatedId(target.getId());
         });
     }
+
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
