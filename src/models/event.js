@@ -788,8 +788,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         const oldUnsigned = this.getUnsigned();
         const oldId = this.getId();
         this.event = event;
-        // keep being redacted if
-        // the event was redacted as a local echo
+        // if this event was redacted before it was sent, it's locally marked as redacted.
+        // At this point, we've received the remote echo for the event, but not yet for
+        // the redaction that we are sending ourselves. Preserve the locally redacted
+        // state by copying over redacted_because so we don't get a flash of
+        // redacted, not-redacted, redacted as remote echos come in
         if (oldUnsigned.redacted_because) {
             if (!this.event.unsigned) {
                 this.event.unsigned = {};
