@@ -1730,6 +1730,11 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
     }));
 
     const room = this.getRoom(roomId);
+
+    // if this is a relation or redaction of an event
+    // that hasn't been sent yet (e.g. with a local id starting with a ~)
+    // then listen for the remote echo of that event so that by the time
+    // this event does get sent, we have the correct event_id
     const targetId = localEvent.getRelatedId();
     if (targetId && targetId.startsWith("~")) {
         const target = room.getPendingEvents().find(e => e.getId() === targetId);
