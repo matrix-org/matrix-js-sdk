@@ -1032,7 +1032,7 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  * @private
  */
 Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
-    if (event.getType() === "m.room.redaction") {
+    if (event.isRedaction()) {
         const redactId = event.event.redacts;
 
         // if we know about this event, redact its contents now.
@@ -1141,7 +1141,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
             this._aggregateNonLiveRelation(event);
         }
 
-        if (event.getType() === "m.room.redaction") {
+        if (event.isRedaction()) {
             const redactId = event.event.redacts;
             let redactedEvent = this._pendingEventList &&
                 this._pendingEventList.find(e => e.getId() === redactId);
@@ -1333,7 +1333,7 @@ Room.prototype.updatePendingEvent = function(event, newStatus, newEventId) {
             const idx = this._pendingEventList.findIndex(ev => ev.getId() === oldEventId);
             if (idx !== -1) {
                 const [removedEvent] = this._pendingEventList.splice(idx, 1);
-                if (removedEvent.getType() === "m.room.redaction") {
+                if (removedEvent.isRedaction()) {
                     this._revertRedactionLocalEcho(removedEvent);
                 }
             }
@@ -1442,7 +1442,7 @@ Room.prototype.removeEvent = function(eventId) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const removed = this._timelineSets[i].removeEvent(eventId);
         if (removed) {
-            if (removed.getType() === "m.room.redaction") {
+            if (removed.isRedaction()) {
                 this._revertRedactionLocalEcho(removed);
             }
             removedAny = true;

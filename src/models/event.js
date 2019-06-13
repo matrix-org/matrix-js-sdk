@@ -754,6 +754,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Check if this event is a redaction of another event
+     *
+     * @return {boolean} True if this event is a redaction
+     */
+    isRedaction: function() {
+        return this.getType() === "m.room.redaction";
+    },
+
+    /**
      * Get the push actions, if known, for this event
      *
      * @return {?Object} push actions
@@ -904,7 +913,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         const relation = this.getRelation();
         if (relation) {
             return relation.event_id;
-        } else if (this.getType() === "m.room.redaction") {
+        } else if (this.isRedaction()) {
             return this.event.redacts;
         }
     },
@@ -921,7 +930,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         const relation = this.getRelation();
         if (relation) {
             relation.event_id = eventId;
-        } else if (this.getType() === "m.room.redaction") {
+        } else if (this.isRedaction()) {
             this.event.redacts = eventId;
         }
     },
