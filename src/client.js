@@ -734,19 +734,19 @@ async function _setDeviceVerification(
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
- * @param {Array} devices array of device IDs to send requests to.  Defaults to
- *    all devices owned by the user
  * @param {Array} methods array of verification methods to use.  Defaults to
  *    all known methods
+ * @param {Array} devices array of device IDs to send requests to.  Defaults to
+ *    all devices owned by the user
  *
  * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
  *    when the request is accepted by the other user
  */
-MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
+MatrixClient.prototype.requestVerification = function(userId, methods, devices) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.requestVerification(userId, devices);
+    return this._crypto.requestVerification(userId, methods, devices);
 };
 
 /**
