@@ -335,8 +335,10 @@ module.exports.MemoryStore.prototype = {
 
     /**
      * Save does nothing as there is no backing data store.
+     * @param {bool} force True to force a save (but the memory
+     *     store still can't save anything)
      */
-    save: function() {},
+    save: function(force) {},
 
     /**
      * Startup does nothing as this store doesn't require starting up.
