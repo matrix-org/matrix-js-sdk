@@ -204,14 +204,18 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._crossSigningInfo = new CrossSigningInfo(userId);
     this._reEmitter.reEmit(this._crossSigningInfo, [
-        "cross-signing:savePrivateKeys",
-        "cross-signing:getKey",
+        "cross-signing.savePrivateKeys",
+        "cross-signing.getKey",
     ]);
 
     this._secretStorage = new SecretStorage(baseApis);
     // TODO: expose SecretStorage methods
 }
 utils.inherits(Crypto, EventEmitter);
+
+Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
+    return this._secretStorage.store(algorithm, opts, keyID);
+};
 
 Crypto.prototype.storeSecret = function(name, secret, keys) {
     return this._secretStorage.store(name, secret, keys);
@@ -287,7 +291,8 @@ Crypto.prototype.init = async function() {
 /**
  * Generate new cross-signing keys.
  *
- * @param {CrossSigningLevel} level the level of cross-signing to reset.  New
+ * @param {object} authDict Auth data to supply for User-Interactive auth.
+ * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
  * keys will be created for the given level and below.  Defaults to
  * regenerating all keys.
  */
@@ -298,7 +303,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
         keys[name + "_key"] = key;
     }
     await this._baseApis.uploadDeviceSigningKeys(authDict || {}, keys);
-    this._baseApis.emit("cross-signing:keysChanged", {});
+    this._baseApis.emit("cross-signing.keysChanged", {});
 
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
@@ -312,8 +317,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
 /**
  * Get the user's cross-signing key ID.
  *
- * @param {string} type The type of key to get the ID of.  One of "master",
- * "self_signing", or "user_signing".  Defaults to "master".
+ * @param {string} [type=master] The type of key to get the ID of.  One of
+ *     "master", "self_signing", or "user_signing".  Defaults to "master".
  *
  * @returns {string} the key ID
  */
@@ -321,6 +326,13 @@ Crypto.prototype.getCrossSigningId = function(type) {
     return this._crossSigningInfo.getId(type);
 };
 
+/**
+ * Get the cross signing information for a given user.
+ *
+ * @param {string} userId the user ID to get the cross-signing info for.
+ *
+ * @returns {CrossSigningInfo} the cross signing informmation for the user.
+ */
 Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
     return this._deviceList.getStoredCrossSigningForUser(userId);
 };
@@ -415,7 +427,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         let error;
         do {
             privkey = await new Promise((resolve, reject) => {
-                this._baseApis.emit("cross-signing:newKey", {
+                this._baseApis.emit("cross-signing.newKey", {
                     publicKey: seenPubkey,
                     type: "master",
                     error,
@@ -436,18 +448,21 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                         resolve(key);
                     },
                     cancel: (error) => {
+                        // FIXME: should we forcibly push our copy of the key
+                        // to the server if the client rejects the server's
+                        // key?
                         reject(error || new Error("Cancelled by user"));
                     },
                 });
             });
         } while (!privkey);
-        this._baseApis.emit("cross-signing:savePrivateKeys", {master: privkey});
+        this._baseApis.emit("cross-signing.savePrivateKeys", {master: privkey});
 
         logger.info("Got private key");
     }
 
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
-    const oldUserSigningId = this._crossSigningInfo.getId("user_signing")
+    const oldUserSigningId = this._crossSigningInfo.getId("user_signing");
 
     this._crossSigningInfo.setKeys(newCrossSigning.keys);
     // FIXME: save it ... somewhere?
@@ -470,7 +485,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
 
     if (changed) {
-        this._baseApis.emit("cross-signing:keysChanged", {});
+        this._baseApis.emit("cross-signing.keysChanged", {});
     }
 
     // FIXME:

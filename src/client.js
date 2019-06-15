@@ -560,8 +560,8 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
         "crypto.devicesUpdated",
-        "cross-signing:savePrivateKeys",
-        "cross-signing:getKey",
+        "cross-signing.savePrivateKeys",
+        "cross-signing.getKey",
     ]);
 
     logger.log("Crypto: initialising crypto object...");
@@ -815,12 +815,149 @@ function wrapCryptoFuncs(MatrixClient, names) {
     }
 }
 
+/**
+ * Generate new cross-signing keys.
+ *
+ * @function module:client~MatrixClient#resetCrossSigningKeys
+ * @param {object} authDict Auth data to supply for User-Interactive auth.
+ * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
+ * keys will be created for the given level and below.  Defaults to
+ * regenerating all keys.
+ */
+
+/**
+ * Get the user's cross-signing key ID.
+ *
+ * @function module:client~MatrixClient#getCrossSigningId
+ * @param {string} [type=master] The type of key to get the ID of.  One of
+ *     "master", "self_signing", or "user_signing".  Defaults to "master".
+ *
+ * @returns {string} the key ID
+ */
+
+/**
+ * Get the cross signing information for a given user.
+ *
+ * @function module:client~MatrixClient#getStoredCrossSigningForUser
+ * @param {string} userId the user ID to get the cross-signing info for.
+ *
+ * @returns {CrossSigningInfo} the cross signing informmation for the user.
+ */
+
+/**
+ * Check whether a given user is trusted.
+ *
+ * @function module:client~MatrixClient#checkUserTrust
+ * @param {string} userId The ID of the user to check.
+ *
+ * @returns {integer} a bit mask indicating how the user is trusted (if at all)
+ *  - returnValue & 1: unused
+ *  - returnValue & 2: trust-on-first-use cross-signing key
+ *  - returnValue & 4: user's cross-signing key is verified
+ *
+ * TODO: is this a good way of representing it?  Or we could return an object
+ * with different keys, or a set?  The advantage of doing it this way is that
+ * you can define which methods you want to use, "&" with the appopriate mask,
+ * then test for truthiness.  Or if you want to just trust everything, then use
+ * the value alone.  However, I wonder if bit masks are too obscure...
+ */
+
+/**
+ * Check whether a given device is trusted.
+ *
+ * @function module:client~MatrixClient#checkDeviceTrust
+ * @param {string} userId The ID of the user whose devices is to be checked.
+ * @param {string} deviceId The ID of the device to check
+ *
+ * @returns {integer} a bit mask indicating how the user is trusted (if at all)
+ *  - returnValue & 1: device marked as verified
+ *  - returnValue & 2: trust-on-first-use cross-signing key
+ *  - returnValue & 4: user's cross-signing key is verified and device is signed
+ *
+ * TODO: see checkUserTrust
+ */
+
 wrapCryptoFuncs(MatrixClient, [
+    "resetCrossSigningKeys",
+    "getCrossSigningId",
+    "getStoredCrossSigningForUser",
     "checkUserTrust",
     "checkDeviceTrust",
 ]);
 
+/**
+ * Check if the sender of an event is verified
+ *
+ * @param {MatrixEvent} event event to be checked
+ *
+ * @returns {integer} a bit mask indicating how the user is trusted (if at all)
+ *  - returnValue & 1: device marked as verified
+ *  - returnValue & 2: trust-on-first-use cross-signing key
+ *  - returnValue & 4: user's cross-signing key is verified
+ */
+MatrixClient.prototype.checkEventSenderTrust = async function(event) {
+    const device = await this.getEventSenderDeviceInfo(event);
+    if (!device) {
+        return 0;
+    }
+    return await this._crypto.checkDeviceTrust(event.getSender(), device.deviceId);
+};
+
+/**
+ * Add a key for encrypting secrets.
+ *
+ * @function module:client~MatrixClient#addSecretKey
+ * @param {string} algorithm the algorithm used by the key
+ * @param {object} opts the options for the algorithm.  The properties used
+ *     depend on the algorithm given.  This object may be modified to pass
+ *     information back about the key.
+ * @param {string} [keyName] the name of the key.  If not given, a random
+ *     name will be generated.
+ *
+ * @return {string} the name of the key
+ */
+
+/**
+ * Store an encrypted secret on the server
+ *
+ * @function module:client~MatrixClient#storeSecret
+ * @param {string} name The name of the secret
+ * @param {string} secret The secret contents.
+ * @param {Array} keys The IDs of the keys to use to encrypt the secret
+ */
+
+/**
+ * Get a secret from storage.
+ *
+ * @function module:client~MatrixClient#getSecret
+ * @param {string} name the name of the secret
+ *
+ * @return {string} the contents of the secret
+ */
+
+/**
+ * Check if a secret is stored on the server.
+ *
+ * @function module:client~MatrixClient#isSecretStored
+ * @param {string} name the name of the secret
+ * @param {boolean} checkKey check if the secret is encrypted by a trusted
+ *     key (currently unimplemented)
+ *
+ * @return {boolean} whether or not the secret is stored
+ */
+
+/**
+ * Request a secret from another device.
+ *
+ * @function module:client~MatrixClient#requestSecret
+ * @param {string} name the name of the secret to request
+ * @param {string[]} devices the devices to request the secret from
+ *
+ * @return {string} the contents of the secret
+ */
+
 wrapCryptoFuncs(MatrixClient, [
+    "addSecretKey",
     "storeSecret",
     "getSecret",
     "isSecretStored",
@@ -857,12 +994,6 @@ MatrixClient.prototype.isEventSenderVerified = async function(event) {
     }
     return device.isVerified();
 };
-
-wrapCryptoFuncs(MatrixClient, [
-    "resetCrossSigningKeys",
-    "getCrossSigningId",
-    "getStoredCrossSigningForUser",
-]);
 
 /**
  * Cancel a room key request for this event if one is ongoing and resend the
@@ -4710,6 +4841,80 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @event module:client~MatrixClient#"crypto.verification.start"
  * @param {module:crypto/verification/Base} verifier a verifier object to
  *     perform the key verification
+ */
+
+/**
+ * Fires when private keys for cross-signing need to be saved.
+ * @event module:client~MatrixClient#"cross-signing.savePrivateKeys"
+ * @param {object} keys the private keys to save.
+ * @param {UInt8Array} [keys.master] the private master key
+ * @param {UInt8Array} [keys.self_signing] the private user-signing key
+ * @param {UInt8Array} [keys.user_signing] the private self-signing key
+ */
+
+/**
+ * Fires when a private key is needed.
+ * @event module:client~MatrixClient#"cross-signing.getKey"
+ * @param {object} data
+ * @param {string} data.type the type of key needed.  Will be one of "master",
+ *     "self_signing", or "user_signing"
+ * @param {Function} data.done a function to call with the private key as a
+ *     `UInt8Array`
+ * @param {Function} data.cancel a function to call if the private key cannot
+ *     be provided
+ * @param {string} [data.error] Error string to display to the user.  Normally
+ *     provided if a previously provided key was invalid, to re-prompt the
+ *     user.
+ */
+
+/**
+ * Fires when a new cross-signing key is provided from the server.  The handler
+ * must verify the key by providing the private key for the given public key.
+ * @event module:client~MatrixClient#"cross-signing.newKey"
+ * @param {object} data
+ * @param {string} data.publicKey the public key received from the server
+ * @param {string} data.type the type of key that was received.  Currently will
+ *     only be "master".
+ * @param {Function} data.done a function to call with the private key
+ *     corresponding to the given public key.
+ * @param {Function} data.cancel a function to call if the private key cannot be
+ *     provided, indicating that the client does not accept the cross-signing key.
+ * @param {string} [data.error] Error string to display to the user.  Normally
+ *     provided if a previously provided key was invalid.
+ */
+
+/**
+ * Fires when a secret has been requested by another client.  Clients should
+ * ensure that the requesting device is allowed to have the secret.  For
+ * example, if the device is not already trusted, a verification should be
+ * performed before sharing the secret.  The client may also wish to prompt the
+ * user before sharing the secret.
+ * @event module:client~MatrixClient#"crypto.secrets.request"
+ * @param {object} data
+ * @param {string} data.name The name of the secret being requested.
+ * @param {string} data.user_id (string) The user ID of the client requesting
+ *     the secret.  In most cases, this shoud be the same as the client's user.
+ * @param {string} data.device_id The device ID of the client requesting the secret.
+ * @param {string} data.request_id The ID of the request.  Used to match a
+ *     corresponding `crypto.secrets.request_cancelled`.  The request ID will be
+ *     unique per sender, device pair.
+ * @param {int} data.device_trust: The trust status of the device requesting
+ *     the secret.  Will be a bit mask in the same form as returned by {@link
+ *     module:client~MatrixClient#checkDeviceTrust}.
+ * @param {Function} data.send A function to call to send the secret to the
+ *     requester
+ */
+
+/**
+ * Fires when a secret request has been cancelled.  If the client is prompting
+ * the user to ask whether they want to share a secret, the prompt can be
+ * dismissed.
+ * @event module:client~MatrixClient#"crypto.secrets.request_cancelled"
+ * @param {object} data
+ * @param {string} data.user_id The user ID of the client that had requested the secret.
+ * @param {string} data.device_id The device ID of the client that had requested the
+ *     secret.
+ * @param {string} data.request_id The ID of the original request.
  */
 
 // EventEmitter JSDocs

@@ -33,7 +33,7 @@ async function getPrivateKey(self, type, check) {
     let signing;
     do {
         [pubkey, signing] = await new Promise((resolve, reject) => {
-            self.emit("cross-signing:getKey", {
+            self.emit("cross-signing.getKey", {
                 type: type,
                 error,
                 done: (key) => {
@@ -178,7 +178,7 @@ export class CrossSigningInfo extends EventEmitter {
             }
 
             Object.assign(this.keys, keys);
-            this.emit("cross-signing:savePrivateKeys", privateKeys);
+            this.emit("cross-signing.savePrivateKeys", privateKeys);
         } finally {
             if (masterSigning) {
                 masterSigning.free();

@@ -21,7 +21,9 @@ import { randomString } from '../randomstring';
 import { keyForNewBackup } from './backup_password';
 import { encodeRecoveryKey, decodeRecoveryKey } from './recoverykey';
 
-/** Implements MSC-1946
+/**
+ * Implements secret storage and sharing (MSC-1946)
+ * @module crypto/Secrets
  */
 export default class SecretStorage extends EventEmitter {
     constructor(baseApis) {
@@ -31,12 +33,26 @@ export default class SecretStorage extends EventEmitter {
         this._incomingRequests = {};
     }
 
-    async addKey(type, opts) {
-        const keyData = {
-            algorithm: opts.algorithm,
-        };
+    /**
+     * Add a key for encrypting secrets.
+     *
+     * @param {string} algorithm the algorithm used by the key.
+     * @param {object} opts the options for the algorithm.  The properties used
+     *     depend on the algorithm given.  This object may be modified to pass
+     *     information back about the key.
+     * @param {string} [keyID] the ID of the key.  If not given, a random
+     *     ID will be generated.
+     *
+     * @return {string} the ID of the key
+     */
+    async addKey(algorithm, opts, keyID) {
+        const keyData = {algorithm};
 
-        switch (opts.algorithm) {
+        if (opts.name) {
+            keyData.name = opts.name;
+        }
+
+        switch (algorithm) {
         case "m.secret_storage.v1.curve25519-aes-sha2":
         {
             const decryption = new global.Olm.PkDecryption();
@@ -66,22 +82,25 @@ export default class SecretStorage extends EventEmitter {
             throw new Error(`Unknown key algorithm ${opts.algorithm}`);
         }
 
-        let keyName;
-
-        do {
-            keyName = randomString(32);
-        } while (!this._baseApis.getAccountData(`m.secret_storage.key.${keyName}`));
+        if (!keyID) {
+            do {
+                keyID = randomString(32);
+            } while (!this._baseApis.getAccountData(`m.secret_storage.key.${keyID}`));
+        }
 
         // FIXME: sign keyData?
 
         await this._baseApis.setAccountData(
-            `m.secret_storage.key.${keyName}`, keyData,
+            `m.secret_storage.key.${keyID}`, keyData,
         );
 
-        return keyName;
+        return keyID;
     }
 
-    /** store an encrypted secret on the server
+    // TODO: need a function to get all the secret keys
+
+    /**
+     * Store an encrypted secret on the server
      *
      * @param {string} name The name of the secret
      * @param {string} secret The secret contents.
@@ -124,6 +143,13 @@ export default class SecretStorage extends EventEmitter {
         await this._baseApis.setAccountData(name, {encrypted});
     }
 
+    /**
+     * Get a secret from storage.
+     *
+     * @param {string} name the name of the secret
+     *
+     * @return {string} the contents of the secret
+     */
     async get(name) {
         const secretInfo = this._baseApis.getAccountData(name);
         if (!secretInfo) {
@@ -225,6 +251,15 @@ export default class SecretStorage extends EventEmitter {
         }
     }
 
+    /**
+     * Check if a secret is stored on the server.
+     *
+     * @param {string} name the name of the secret
+     * @param {boolean} checkKey check if the secret is encrypted by a trusted
+     *     key (currently unimplemented)
+     *
+     * @return {boolean} whether or not the secret is stored
+     */
     isStored(name, checkKey) {
         // check if secret exists
         const secretInfo = this._baseApis.getAccountData(name);
@@ -263,6 +298,14 @@ export default class SecretStorage extends EventEmitter {
         return false;
     }
 
+    /**
+     * Request a secret from another device
+     *
+     * @param {string} name the name of the secret to request
+     * @param {string[]} devices the devices to request the secret from
+     *
+     * @return {string} the contents of the secret
+     */
     request(name, devices) {
         const requestId = this._baseApis.makeTxnId();
 
@@ -347,7 +390,7 @@ export default class SecretStorage extends EventEmitter {
             logger.info("received request for secret (" + sender
                         + ", " + deviceId + ", " + content.request_id + ")");
             this._baseApis.emit("crypto.secrets.request", {
-                sender: sender,
+                user_id: sender,
                 device_id: deviceId,
                 request_id: content.request_id,
                 name: content.name,
