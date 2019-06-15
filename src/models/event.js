@@ -754,6 +754,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Check if this event is a redaction of another event
+     *
+     * @return {boolean} True if this event is a redaction
+     */
+    isRedaction: function() {
+        return this.getType() === "m.room.redaction";
+    },
+
+    /**
      * Get the push actions, if known, for this event
      *
      * @return {?Object} push actions
@@ -776,9 +785,26 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {Object} event the object to assign to the `event` property
      */
     handleRemoteEcho: function(event) {
+        const oldUnsigned = this.getUnsigned();
+        const oldId = this.getId();
         this.event = event;
+        // if this event was redacted before it was sent, it's locally marked as redacted.
+        // At this point, we've received the remote echo for the event, but not yet for
+        // the redaction that we are sending ourselves. Preserve the locally redacted
+        // state by copying over redacted_because so we don't get a flash of
+        // redacted, not-redacted, redacted as remote echos come in
+        if (oldUnsigned.redacted_because) {
+            if (!this.event.unsigned) {
+                this.event.unsigned = {};
+            }
+            this.event.unsigned.redacted_because = oldUnsigned.redacted_because;
+        }
         // successfully sent.
         this.setStatus(null);
+        if (this.getId() !== oldId) {
+            // emit the event if it changed
+            this.emit("Event.localEventIdReplaced", this);
+        }
     },
 
     /**
@@ -799,6 +825,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     setStatus(status) {
         this.status = status;
         this.emit("Event.status", this, status);
+    },
+
+    replaceLocalEventId(eventId) {
+        this.event.event_id = eventId;
+        this.emit("Event.localEventIdReplaced", this);
     },
 
     /**
@@ -874,6 +905,46 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      */
     replacingEvent() {
         return this._replacingEvent;
+    },
+
+    /**
+     * For relations and redactions, returns the event_id this event is referring to.
+     *
+     * @return {string?}
+     */
+    getAssociatedId() {
+        const relation = this.getRelation();
+        if (relation) {
+            return relation.event_id;
+        } else if (this.isRedaction()) {
+            return this.event.redacts;
+        }
+    },
+
+    /**
+     * Checks if this event is associated with another event. See `getAssociatedId`.
+     *
+     * @return {bool}
+     */
+    hasAssocation() {
+        return !!this.getAssociatedId();
+    },
+
+    /**
+     * Update the related id with a new one.
+     *
+     * Used to replace a local id with remote one before sending
+     * an event with a related id.
+     *
+     * @param {string} eventId the new event id
+     */
+    updateAssociatedId(eventId) {
+        const relation = this.getRelation();
+        if (relation) {
+            relation.event_id = eventId;
+        } else if (this.isRedaction()) {
+            this.event.redacts = eventId;
+        }
     },
 
     /**

@@ -198,11 +198,13 @@ IndexedDBStore.prototype.wantsSave = function() {
 
 /**
  * Possibly write data to the database.
+ *
+ * @param {bool} force True to force a save to happen
  * @return {Promise} Promise resolves after the write completes
  *     (or immediately if no write is performed)
  */
-IndexedDBStore.prototype.save = function() {
-    if (this.wantsSave()) {
+IndexedDBStore.prototype.save = function(force) {
+    if (force || this.wantsSave()) {
         return this._reallySave();
     }
     return Promise.resolve();

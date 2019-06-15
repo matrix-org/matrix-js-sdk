@@ -49,11 +49,18 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
- * @param {function(object?, bool?): module:client.Promise} opts.doRequest
- *     called with the new auth dict to submit the request and a flag set
- *     to true if this request is a background request. Should return a
- *     promise which resolves to the successful response or rejects with a
- *     MatrixError.
+ * @param {function(object?): module:client.Promise} opts.doRequest
+ *     called with the new auth dict to submit the request. Also passes a
+ *     second deprecated arg which is a flag set to true if this request
+ *     is a background request. The busyChanged callback should be used
+ *     instead of the backfround flag. Should return a promise which resolves
+ *     to the successful response or rejects with a MatrixError.
+ *
+ * @param {function(bool): module:client.Promise} opts.busyChanged
+ *     called whenever the interactive auth logic becomes busy submitting
+ *     information provided by the user or finsihes. After this has been
+ *     called with true the UI should indicate that a request is in progress
+ *     until it is called again with false.
  *
  * @param {function(string, object?)} opts.stateUpdated
  *     called when the status of the UI auth changes, ie. when the state of
@@ -101,6 +108,7 @@ function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
     this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
+    this._busyChangedCallback = opts.busyChanged;
     // startAuthStage included for backwards compat
     this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
     this._resolveFunc = null;
@@ -112,9 +120,14 @@ function InteractiveAuth(opts) {
     this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
     this._emailSid = opts.emailSid;
     if (this._emailSid === undefined) this._emailSid = null;
+    this._requestingEmailToken = false;
 
     this._chosenFlow = null;
     this._currentStage = null;
+
+    // if we are currently trying to submit an auth dict (which includes polling)
+    // the promise the will resolve/reject when it completes
+    this._submitPromise = null;
 }
 
 InteractiveAuth.prototype = {
@@ -135,7 +148,10 @@ InteractiveAuth.prototype = {
             // if we have no flows, try a request (we'll have
             // just a session ID in _data if resuming)
             if (!this._data.flows) {
-                this._doRequest(this._data);
+                if (this._busyChangedCallback) this._busyChangedCallback(true);
+                this._doRequest(this._data).finally(() => {
+                    if (this._busyChangedCallback) this._busyChangedCallback(false);
+                });
             } else {
                 this._startNextAuthStage();
             }
@@ -147,8 +163,11 @@ InteractiveAuth.prototype = {
      * completed out-of-band. If so, the attemptAuth promise will
      * be resolved.
      */
-    poll: function() {
+    poll: async function() {
         if (!this._data.session) return;
+        // if we currently have a request in flight, there's no point making
+        // another just to check what the status is
+        if (this._submitPromise) return;
 
         let authDict = {};
         if (this._currentStage == EMAIL_STAGE_TYPE) {
@@ -221,9 +240,25 @@ InteractiveAuth.prototype = {
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: function(authData, background) {
+    submitAuthDict: async function(authData, background) {
         if (!this._resolveFunc) {
             throw new Error("submitAuthDict() called before attemptAuth()");
+        }
+
+        if (!background && this._busyChangedCallback) {
+            this._busyChangedCallback(true);
+        }
+
+        // if we're currently trying a request, wait for it to finish
+        // as otherwise we can get multiple 200 responses which can mean
+        // things like multiple logins for register requests.
+        // (but discard any expections as we only care when its done,
+        // not whether it worked or not)
+        while (this._submitPromise) {
+            try {
+                await this._submitPromise;
+            } catch (e) {
+            }
         }
 
         // use the sessionid from the last request.
@@ -232,7 +267,17 @@ InteractiveAuth.prototype = {
         };
         utils.extend(auth, authData);
 
-        this._doRequest(auth, background);
+        try {
+            // NB. the 'background' flag is deprecated by the busyChanged
+            // callback and is here for backwards compat
+            this._submitPromise = this._doRequest(auth, background);
+            await this._submitPromise;
+        } finally {
+            this._submitPromise = null;
+            if (!background && this._busyChangedCallback) {
+                this._busyChangedCallback(false);
+            }
+        }
     },
 
     /**
@@ -305,12 +350,14 @@ InteractiveAuth.prototype = {
 
             if (
                 !this._emailSid &&
+                !this._requestingEmailToken &&
                 this._chosenFlow.stages.includes('m.login.email.identity')
             ) {
                 // If we've picked a flow with email auth, we send the email
                 // now because we want the request to fail as soon as possible
                 // if the email address is not valid (ie. already taken or not
                 // registered, depending on what the operation is).
+                this._requestingEmailToken = true;
                 try {
                     const requestTokenResult = await this._requestEmailTokenCallback(
                         this._inputs.emailAddress,
@@ -333,6 +380,8 @@ InteractiveAuth.prototype = {
                     // the failure up as the user can't complete auth if we can't
                     // send the email, foe whatever reason.
                     this._rejectFunc(e);
+                } finally {
+                    this._requestingEmailToken = false;
                 }
             }
         }

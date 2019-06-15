@@ -740,19 +740,19 @@ async function _setDeviceVerification(
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
- * @param {Array} devices array of device IDs to send requests to.  Defaults to
- *    all devices owned by the user
  * @param {Array} methods array of verification methods to use.  Defaults to
  *    all known methods
+ * @param {Array} devices array of device IDs to send requests to.  Defaults to
+ *    all devices owned by the user
  *
  * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
  *    when the request is accepted by the other user
  */
-MatrixClient.prototype.requestVerification = function(userId, devices, methods) {
+MatrixClient.prototype.requestVerification = function(userId, methods, devices) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.requestVerification(userId, devices);
+    return this._crypto.requestVerification(userId, methods, devices);
 };
 
 /**
@@ -2047,6 +2047,9 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         txnId = this.makeTxnId();
     }
 
+    // we always construct a MatrixEvent when sending because the store and
+    // scheduler use them. We'll extract the params back out if it turns out
+    // the client has no scheduler or store.
     const localEvent = new MatrixEvent(Object.assign(eventObject, {
         event_id: "~" + roomId + ":" + txnId,
         user_id: this.credentials.userId,
@@ -2054,13 +2057,23 @@ MatrixClient.prototype._sendCompleteEvent = function(roomId, eventObject, txnId,
         origin_server_ts: new Date().getTime(),
     }));
 
+    const room = this.getRoom(roomId);
+
+    // if this is a relation or redaction of an event
+    // that hasn't been sent yet (e.g. with a local id starting with a ~)
+    // then listen for the remote echo of that event so that by the time
+    // this event does get sent, we have the correct event_id
+    const targetId = localEvent.getAssociatedId();
+    if (targetId && targetId.startsWith("~")) {
+        const target = room.getPendingEvents().find(e => e.getId() === targetId);
+        target.once("Event.localEventIdReplaced", () => {
+            localEvent.updateAssociatedId(target.getId());
+        });
+    }
+
     const type = localEvent.getType();
     logger.log(`sendEvent of type ${type} in ${roomId} with txnId ${txnId}`);
 
-    // we always construct a MatrixEvent when sending because the store and
-    // scheduler use them. We'll extract the params back out if it turns out
-    // the client has no scheduler or store.
-    const room = this.getRoom(roomId);
     localEvent._txnId = txnId;
     localEvent.setStatus(EventStatus.SENDING);
 
@@ -2214,9 +2227,11 @@ function _sendEventHttpRequest(client, event) {
             pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
         }
         path = utils.encodeUri(pathTemplate, pathParams);
-    } else if (event.getType() === "m.room.redaction") {
-        const pathTemplate = `/rooms/$roomId/redact/${event.event.redacts}/$txnId`;
-        path = utils.encodeUri(pathTemplate, pathParams);
+    } else if (event.isRedaction()) {
+        const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
+        path = utils.encodeUri(pathTemplate, Object.assign({
+            $redactsEventId: event.event.redacts,
+        }, pathParams));
     } else {
         path = utils.encodeUri(
             "/rooms/$roomId/send/$eventType/$txnId", pathParams,

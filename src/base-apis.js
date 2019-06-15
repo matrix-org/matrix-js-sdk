@@ -151,13 +151,14 @@ MatrixBaseApis.prototype.isUsernameAvailable = function(username) {
  *     threepid uses during registration in the ID server. Set 'msisdn' to
  *     true to bind msisdn.
  * @param {string} guestAccessToken
+ * @param {string} inhibitLogin
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.register = function(
     username, password,
-    sessionId, auth, bindThreepids, guestAccessToken,
+    sessionId, auth, bindThreepids, guestAccessToken, inhibitLogin,
     callback,
 ) {
     // backwards compat
@@ -165,6 +166,10 @@ MatrixBaseApis.prototype.register = function(
         bindThreepids = {email: true};
     } else if (bindThreepids === null || bindThreepids === undefined) {
         bindThreepids = {};
+    }
+    if (typeof inhibitLogin === 'function') {
+        callback = inhibitLogin;
+        inhibitLogin = undefined;
     }
 
     if (auth === undefined || auth === null) {
@@ -191,6 +196,9 @@ MatrixBaseApis.prototype.register = function(
     }
     if (guestAccessToken !== undefined && guestAccessToken !== null) {
         params.guest_access_token = guestAccessToken;
+    }
+    if (inhibitLogin !== undefined && inhibitLogin !== null) {
+        params.inhibit_login = inhibitLogin;
     }
     // Temporary parameter added to make the register endpoint advertise
     // msisdn flows. This exists because there are clients that break

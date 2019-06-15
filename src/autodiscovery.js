@@ -256,6 +256,11 @@ export class AutoDiscovery {
         if (!hsVersions || !hsVersions.raw["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
+
+            // Supply the base_url to the caller because they may be ignoring liveliness
+            // errors, like this one.
+            clientConfig["m.homeserver"].base_url = hsUrl;
+
             return Promise.resolve(clientConfig);
         }
 
@@ -311,6 +316,11 @@ export class AutoDiscovery {
                 logger.error("Invalid /api/v1 response");
                 failingClientConfig["m.identity_server"].error =
                     AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
+
+                // Supply the base_url to the caller because they may be ignoring
+                // liveliness errors, like this one.
+                failingClientConfig["m.identity_server"].base_url = isUrl;
+
                 return Promise.resolve(failingClientConfig);
             }
         }
