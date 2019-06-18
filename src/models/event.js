@@ -31,7 +31,7 @@ import logger from '../../src/logger';
  * @readonly
  * @enum {string}
  */
-module.exports.EventStatus = {
+const EventStatus = {
     /** The event was not sent and will no longer be retried. */
     NOT_SENT: "not_sent",
 
@@ -49,6 +49,7 @@ module.exports.EventStatus = {
     /** The event was cancelled before it was successfully sent. */
     CANCELLED: "cancelled",
 };
+module.exports.EventStatus = EventStatus;
 
 const interns = {};
 function intern(str) {
@@ -877,16 +878,24 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Returns the status of the event, or the replacing event in case `makeReplace` has been called.
+     * Returns the status of any associated edit or redaction
+     * (not for reactions/annotations are their local echo doesn't affect the orignal event),
+     * or else the status of the event.
      *
      * @return {EventStatus}
      */
-    replacementOrOwnStatus() {
+    getAssociatedLocalEchoStatus() {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
-        } else {
-            return this.status;
+        } else if (this._locallyRedacted) {
+            const unsigned = this.event.unsigned;
+            const redactedBecause = unsigned && unsigned.redacted_because;
+            const redactionId = redactedBecause && redactedBecause.event_id;
+            if (redactionId && redactionId.startsWith("~")) {
+                return EventStatus.SENDING;
+            }
         }
+        return this.status;
     },
 
     /**
