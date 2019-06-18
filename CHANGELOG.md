@@ -1,3 +1,18 @@
+Changes in [2.0.1-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.1-rc.2) (2019-06-18)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.0.1-rc.1...v2.0.1-rc.2)
+
+ * return 'sending' status for an event that is only locally redacted
+   [\#960](https://github.com/matrix-org/matrix-js-sdk/pull/960)
+ * Key verification request fixes
+   [\#954](https://github.com/matrix-org/matrix-js-sdk/pull/954)
+ * Add flag to force saving sync store
+   [\#956](https://github.com/matrix-org/matrix-js-sdk/pull/956)
+ * Expose the inhibit_login flag to register
+   [\#953](https://github.com/matrix-org/matrix-js-sdk/pull/953)
+ *  Support redactions and relations of/with unsent events.
+   [\#947](https://github.com/matrix-org/matrix-js-sdk/pull/947)
+
 Changes in [2.0.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.1-rc.1) (2019-06-12)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.0.0...v2.0.1-rc.1)
