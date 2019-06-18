@@ -879,7 +879,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
     /**
      * Returns the status of any associated edit or redaction
-     * (not for reactions/annotations are their local echo doesn't affect the orignal event),
+     * (not for reactions/annotations as their local echo doesn't affect the orignal event),
      * or else the status of the event.
      *
      * @return {EventStatus}
