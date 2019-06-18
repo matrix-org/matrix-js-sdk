@@ -20,6 +20,7 @@ limitations under the License.
 const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
+import {EventStatus} from "./event";
 import logger from '../../src/logger';
 import Relations from './relations';
 
@@ -746,6 +747,10 @@ EventTimelineSet.prototype.setRelationsTarget = function(event) {
  */
 EventTimelineSet.prototype.aggregateRelations = function(event) {
     if (!this._unstableClientRelationAggregation) {
+        return;
+    }
+
+    if (event.isRedacted() || event.status === EventStatus.CANCELLED) {
         return;
     }
 

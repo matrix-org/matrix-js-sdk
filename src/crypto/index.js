@@ -1667,6 +1667,11 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
     }
 
     const sender = event.getSender();
+    if (sender === this._userId && content.from_device === this._deviceId) {
+        // ignore requests from ourselves, because it doesn't make sense for a
+        // device to verify itself
+        return;
+    }
     if (this._verificationTransactions.has(sender)) {
         if (this._verificationTransactions.get(sender).has(content.transaction_id)) {
             // transaction already exists: cancel it and drop the existing
@@ -1719,7 +1724,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
             },
         );
     } else {
-        // notify the application that of the verification request, so it can
+        // notify the application of the verification request, so it can
         // decide what to do with it
         const request = {
             event: event,

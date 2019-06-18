@@ -242,12 +242,7 @@ export default class Relations extends EventEmitter {
 
         redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
 
-        // Dispatch a redaction event on this collection. `setTimeout` is used
-        // to wait until the next event loop iteration by which time the event
-        // has actually been marked as redacted.
-        setTimeout(() => {
-            this.emit("Relations.redaction");
-        }, 0);
+        this.emit("Relations.redaction");
     }
 
     /**
