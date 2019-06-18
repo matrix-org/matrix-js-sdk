@@ -884,7 +884,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *
      * @return {EventStatus}
      */
-    getAssociatedLocalEchoStatus() {
+    getAssociatedStatus() {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
         } else if (this._locallyRedacted) {
