@@ -63,6 +63,7 @@ export default class VerificationBase extends EventEmitter {
         this.transactionId = transactionId;
         this.startEvent = startEvent;
         this.request = request;
+        this.cancelled = false;
         this._parent = parent;
         this._done = false;
         this._promise = null;
@@ -76,7 +77,7 @@ export default class VerificationBase extends EventEmitter {
         console.log("Refreshing/starting the verification transaction timeout timer");
         clearTimeout(this._transactionTimeoutTimer);
         setTimeout(() => {
-           if (!this._done) {
+           if (!this._done && !this.cancelled) {
                console.log("Triggering verification timeout");
                this.cancel(timeoutException);
            }
@@ -135,6 +136,7 @@ export default class VerificationBase extends EventEmitter {
 
     cancel(e) {
         if (!this._done) {
+            this.cancelled = true;
             if (this.userId && this.deviceId && this.transactionId) {
                 // send a cancellation to the other user (if it wasn't
                 // cancelled by the other user)
@@ -168,7 +170,9 @@ export default class VerificationBase extends EventEmitter {
                 }
             }
             if (this._promise !== null) {
-                this._reject(e);
+                // when we cancel without a promise, we end up with a promise
+                // but no reject function. If cancel is called again, we'd error.
+                if (this._reject) this._reject(e);
             } else {
                 this._promise = Promise.reject(e);
             }
