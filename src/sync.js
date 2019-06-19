@@ -1043,8 +1043,26 @@ SyncApi.prototype._processSyncResponse = async function(
     if (data.to_device && utils.isArray(data.to_device.events) &&
         data.to_device.events.length > 0
        ) {
+        const cancelledKeyVerificationTxns = [];
         data.to_device.events
             .map(client.getEventMapper())
+            .map((toDeviceEvent) => { // map is a cheap inline forEach
+                // We want to flag m.key.verification.start events as cancelled
+                // if there's an accompanying m.key.verification.cancel event, so
+                // we pull out the transaction IDs from the cancellation events
+                // so we can flag the verification events as cancelled in the loop
+                // below.
+                if (toDeviceEvent.getType() === "m.key.verification.cancel") {
+                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    if (txnId) {
+                        cancelledKeyVerificationTxns.push(txnId);
+                    }
+                }
+
+                // as mentioned above, .map is a cheap inline forEach, so return
+                // the unmodified event.
+                return toDeviceEvent;
+            })
             .forEach(
                 function(toDeviceEvent) {
                     const content = toDeviceEvent.getContent();
@@ -1058,6 +1076,14 @@ SyncApi.prototype._processSyncResponse = async function(
                                 toDeviceEvent.getSender(),
                         );
                         return;
+                    }
+
+                    if (toDeviceEvent.getType() === "m.key.verification.start"
+                        || toDeviceEvent.getType() === "m.key.verification.request") {
+                        const txnId = content['transaction_id'];
+                        if (cancelledKeyVerificationTxns.includes(txnId)) {
+                            toDeviceEvent.flagCancelled();
+                        }
                     }
 
                     client.emit("toDeviceEvent", toDeviceEvent);

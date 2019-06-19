@@ -1648,6 +1648,11 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
  * @param {module:models/event.MatrixEvent} event verification request event
  */
 Crypto.prototype._onKeyVerificationRequest = function(event) {
+    if (event.isCancelled()) {
+        logger.warn("Ignoring flagged verification request from " + event.getSender());
+        return;
+    }
+
     const content = event.getContent();
     if (!("from_device" in content) || typeof content.from_device !== "string"
         || !("transaction_id" in content) || typeof content.from_device !== "string"
@@ -1764,6 +1769,11 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
  * @param {module:models/event.MatrixEvent} event verification start event
  */
 Crypto.prototype._onKeyVerificationStart = function(event) {
+    if (event.isCancelled()) {
+        logger.warn("Ignoring flagged verification start from " + event.getSender());
+        return;
+    }
+
     const sender = event.getSender();
     const content = event.getContent();
     const transactionId = content.transaction_id;

@@ -126,6 +126,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this._pushActions = null;
     this._replacingEvent = null;
     this._locallyRedacted = false;
+    this._isCancelled = false;
 
     this._clearEvent = {};
 
@@ -954,6 +955,25 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         } else if (this.isRedaction()) {
             this.event.redacts = eventId;
         }
+    },
+
+    /**
+     * Flags an event as cancelled due to future conditions. For example, a verification
+     * request event in the same sync transaction may be flagged as cancelled to warn
+     * listeners that a cancellation event is coming down the same pipe shortly.
+     * @param {boolean} cancelled Whether the event is to be cancelled or not.
+     */
+    flagCancelled(cancelled = true) {
+        this._isCancelled = cancelled;
+    },
+
+    /**
+     * Gets whether or not the event is flagged as cancelled. See flagCancelled() for
+     * more information.
+     * @returns {boolean} True if the event is cancelled, false otherwise.
+     */
+    isCancelled() {
+        return this._isCancelled;
     },
 
     /**
