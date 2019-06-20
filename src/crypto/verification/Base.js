@@ -75,7 +75,9 @@ export default class VerificationBase extends EventEmitter {
 
     _resetTimer() {
         console.log("Refreshing/starting the verification transaction timeout timer");
-        if (this._transactionTimeoutTimer !== null) clearTimeout(this._transactionTimeoutTimer);
+        if (this._transactionTimeoutTimer !== null) {
+            clearTimeout(this._transactionTimeoutTimer);
+        }
         setTimeout(() => {
            if (!this._done && !this.cancelled) {
                console.log("Triggering verification timeout");
