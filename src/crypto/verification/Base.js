@@ -70,12 +70,12 @@ export default class VerificationBase extends EventEmitter {
         this._transactionTimeoutTimer = null;
 
         // At this point, the verification request was received so start the timeout timer.
-        this._pingTransaction();
+        this._resetTimer();
     }
 
-    _pingTransaction() {
+    _resetTimer() {
         console.log("Refreshing/starting the verification transaction timeout timer");
-        clearTimeout(this._transactionTimeoutTimer);
+        if (this._transactionTimeoutTimer !== null) clearTimeout(this._transactionTimeoutTimer);
         setTimeout(() => {
            if (!this._done && !this.cancelled) {
                console.log("Triggering verification timeout");
@@ -111,7 +111,7 @@ export default class VerificationBase extends EventEmitter {
         } else if (e.getType() === this._expectedEvent) {
             this._expectedEvent = undefined;
             this._rejectEvent = undefined;
-            this._pingTransaction();
+            this._resetTimer();
             this._resolveEvent(e);
         } else {
             this._expectedEvent = undefined;
@@ -203,7 +203,7 @@ export default class VerificationBase extends EventEmitter {
         });
         if (this._doVerification && !this._started) {
             this._started = true;
-            this._pingTransaction(); // restart the timeout
+            this._resetTimer(); // restart the timeout
             Promise.resolve(this._doVerification())
                 .then(this.done.bind(this), this.cancel.bind(this));
         }
