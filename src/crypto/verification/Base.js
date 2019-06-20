@@ -22,6 +22,9 @@ limitations under the License.
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 import logger from '../../logger';
+import {newTimeoutError} from "./Error";
+
+const timeoutException = new Error("Verification timed out");
 
 export default class VerificationBase extends EventEmitter {
     /**
@@ -60,9 +63,27 @@ export default class VerificationBase extends EventEmitter {
         this.transactionId = transactionId;
         this.startEvent = startEvent;
         this.request = request;
+        this.cancelled = false;
         this._parent = parent;
         this._done = false;
         this._promise = null;
+        this._transactionTimeoutTimer = null;
+
+        // At this point, the verification request was received so start the timeout timer.
+        this._resetTimer();
+    }
+
+    _resetTimer() {
+        console.log("Refreshing/starting the verification transaction timeout timer");
+        if (this._transactionTimeoutTimer !== null) {
+            clearTimeout(this._transactionTimeoutTimer);
+        }
+        setTimeout(() => {
+           if (!this._done && !this.cancelled) {
+               console.log("Triggering verification timeout");
+               this.cancel(timeoutException);
+           }
+        }, 10 * 60 * 1000); // 10 minutes
     }
 
     _sendToDevice(type, content) {
@@ -92,6 +113,7 @@ export default class VerificationBase extends EventEmitter {
         } else if (e.getType() === this._expectedEvent) {
             this._expectedEvent = undefined;
             this._rejectEvent = undefined;
+            this._resetTimer();
             this._resolveEvent(e);
         } else {
             this._expectedEvent = undefined;
@@ -116,10 +138,14 @@ export default class VerificationBase extends EventEmitter {
 
     cancel(e) {
         if (!this._done) {
+            this.cancelled = true;
             if (this.userId && this.deviceId && this.transactionId) {
                 // send a cancellation to the other user (if it wasn't
                 // cancelled by the other user)
-                if (e instanceof MatrixEvent) {
+                if (e === timeoutException) {
+                    const timeoutEvent = newTimeoutError();
+                    this._sendToDevice(timeoutEvent.getType(), timeoutEvent.getContent());
+                } else if (e instanceof MatrixEvent) {
                     const sender = e.getSender();
                     if (sender !== this.userId) {
                         const content = e.getContent();
@@ -146,7 +172,9 @@ export default class VerificationBase extends EventEmitter {
                 }
             }
             if (this._promise !== null) {
-                this._reject(e);
+                // when we cancel without a promise, we end up with a promise
+                // but no reject function. If cancel is called again, we'd error.
+                if (this._reject) this._reject(e);
             } else {
                 this._promise = Promise.reject(e);
             }
@@ -177,6 +205,7 @@ export default class VerificationBase extends EventEmitter {
         });
         if (this._doVerification && !this._started) {
             this._started = true;
+            this._resetTimer(); // restart the timeout
             Promise.resolve(this._doVerification())
                 .then(this.done.bind(this), this.cancel.bind(this));
         }
