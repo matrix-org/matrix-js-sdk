@@ -477,6 +477,8 @@ module.exports.MatrixHttpApi.prototype = {
                     err.message,
                     err.data.consent_uri,
                 );
+            } else {
+                self.event_emitter.emit(err.errcode);
             }
         });
 
