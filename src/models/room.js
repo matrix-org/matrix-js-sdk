@@ -797,20 +797,20 @@ Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
  * @return {array} The room's alias as an array of strings
  */
 Room.prototype.getAliases = function() {
-    const alias_strings = [];
+    const aliasStrings = [];
 
-    const alias_events = this.currentState.getStateEvents("m.room.aliases");
-    if (alias_events) {
-        for (let i = 0; i < alias_events.length; ++i) {
-            const alias_event = alias_events[i];
-            if (utils.isArray(alias_event.getContent().aliases)) {
+    const aliasEvents = this.currentState.getStateEvents("m.room.aliases");
+    if (aliasEvents) {
+        for (let i = 0; i < aliasEvents.length; ++i) {
+            const aliasEvent = aliasEvents[i];
+            if (utils.isArray(aliasEvent.getContent().aliases)) {
                 Array.prototype.push.apply(
-                    alias_strings, alias_event.getContent().aliases,
+                    aliasStrings, aliasEvent.getContent().aliases,
                 );
             }
         }
     }
-    return alias_strings;
+    return aliasStrings;
 };
 
 /**
@@ -1419,11 +1419,11 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
 
 /**
  * Removes events from this room.
- * @param {String[]} event_ids A list of event_ids to remove.
+ * @param {String[]} eventIds A list of eventIds to remove.
  */
-Room.prototype.removeEvents = function(event_ids) {
-    for (let i = 0; i < event_ids.length; ++i) {
-        this.removeEvent(event_ids[i]);
+Room.prototype.removeEvents = function(eventIds) {
+    for (let i = 0; i < eventIds.length; ++i) {
+        this.removeEvent(eventIds[i]);
     }
 };
 
