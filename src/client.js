@@ -3925,9 +3925,13 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
                 prefix: '',
             },
         );
+
+        const versions = response["versions"];
         const unstableFeatures = response["unstable_features"];
+
         this._serverSupportsLazyLoading =
-            unstableFeatures && unstableFeatures["m.lazy_load_members"];
+            (versions && versions.includes("r0.5.0"))
+            || (unstableFeatures && unstableFeatures["m.lazy_load_members"]);
     }
     return this._serverSupportsLazyLoading;
 };
