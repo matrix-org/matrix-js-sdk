@@ -38,7 +38,7 @@ import ReEmitter from '../ReEmitter';
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-const KNOWN_SAFE_ROOM_VERSION = '1';
+const KNOWN_SAFE_ROOM_VERSION = '4';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4'];
 
 function synthesizeReceipt(userId, event, receiptType) {
