@@ -3966,9 +3966,17 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
 };
 
 MatrixClient.prototype.relations =
-async function(roomId, eventId, relationType, eventType) {
-    const events = await this.fetchRelations(roomId, eventId, relationType, eventType);
-    return events.map(this.getEventMapper());
+async function(roomId, eventId, relationType, eventType, opts = {}) {
+    const result = await this.fetchRelations(
+        roomId,
+        eventId,
+        relationType,
+        eventType,
+        opts);
+    return {
+        events: result.chunk.map(this.getEventMapper()),
+        nextBatch: result.next_batch,
+    };
 };
 
 function setupCallEventHandler(client) {

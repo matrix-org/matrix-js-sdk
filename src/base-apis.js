@@ -440,14 +440,20 @@ MatrixBaseApis.prototype.createRoom = function(options, callback) {
 };
 
 MatrixBaseApis.prototype.fetchRelations =
-    async function(roomId, eventId, relationType, eventType) {
+    async function(roomId, eventId, relationType, eventType, opts) {
+    const queryParams = {};
+    if (opts.token) {
+        queryParams.from = opts.token;
+    }
+    const queryString = utils.encodeParams(queryParams);
     // valid options include: room_alias_name, visibility, invite
     const response = await this._http.authedRequestWithPrefix(
         undefined,
-        "GET", `/rooms/${roomId}/relations/${eventId}/${relationType}/${eventType}`,
+        "GET",
+        `/rooms/${roomId}/relations/${eventId}/${relationType}/${eventType}?` + queryString,
         null, null, httpApi.PREFIX_UNSTABLE,
     );
-    return response.chunk;
+    return response;
 };
 
 /**
