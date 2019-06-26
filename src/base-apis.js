@@ -453,7 +453,6 @@ MatrixBaseApis.prototype.fetchRelations =
             $relationType: relationType,
             $eventType: eventType,
         });
-    // valid options include: room_alias_name, visibility, invite
     const response = await this._http.authedRequestWithPrefix(
         undefined, "GET", path, null, null, httpApi.PREFIX_UNSTABLE,
     );
