@@ -438,6 +438,35 @@ MatrixBaseApis.prototype.createRoom = function(options, callback) {
         callback, "POST", "/createRoom", undefined, options,
     );
 };
+/**
+ * Fetches relations for a given event
+ * @param {string} roomId the room of the event
+ * @param {string} eventId the id of the event
+ * @param {string} relationType the rel_type of the relations requested
+ * @param {string} eventType the event type of the relations requested
+ * @param {Object} opts options with optional values for the request.
+ * @param {Object} opts.from the pagination token returned from a previous request as `next_batch` to return following relations.
+ * @return {Object} the response, with chunk and next_batch.
+ */
+MatrixBaseApis.prototype.fetchRelations =
+    async function(roomId, eventId, relationType, eventType, opts) {
+    const queryParams = {};
+    if (opts.from) {
+        queryParams.from = opts.from;
+    }
+    const queryString = utils.encodeParams(queryParams);
+    const path = utils.encodeUri(
+        "/rooms/$roomId/relations/$eventId/$relationType/$eventType?" + queryString, {
+            $roomId: roomId,
+            $eventId: eventId,
+            $relationType: relationType,
+            $eventType: eventType,
+        });
+    const response = await this._http.authedRequestWithPrefix(
+        undefined, "GET", path, null, null, httpApi.PREFIX_UNSTABLE,
+    );
+    return response;
+};
 
 /**
  * @param {string} roomId

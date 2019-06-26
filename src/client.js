@@ -3979,6 +3979,30 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
     return this._canResetTimelineCallback;
 };
 
+/**
+ * Returns relations for a given event
+ * @param {string} roomId the room of the event
+ * @param {string} eventId the id of the event
+ * @param {string} relationType the rel_type of the relations requested
+ * @param {string} eventType the event type of the relations requested
+ * @param {Object} opts options with optional values for the request.
+ * @param {Object} opts.from the pagination token returned from a previous request as `nextBatch` to return following relations.
+ * @return {Object} an object with `events` as `MatrixEvent[]` and optionally `nextBatch` if more relations are available.
+ */
+MatrixClient.prototype.relations =
+async function(roomId, eventId, relationType, eventType, opts = {}) {
+    const result = await this.fetchRelations(
+        roomId,
+        eventId,
+        relationType,
+        eventType,
+        opts);
+    return {
+        events: result.chunk.map(this.getEventMapper()),
+        nextBatch: result.next_batch,
+    };
+};
+
 function setupCallEventHandler(client) {
     const candidatesByCall = {
         // callId: [Candidate]
