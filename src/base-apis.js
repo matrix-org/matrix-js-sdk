@@ -442,8 +442,8 @@ MatrixBaseApis.prototype.createRoom = function(options, callback) {
 MatrixBaseApis.prototype.fetchRelations =
     async function(roomId, eventId, relationType, eventType, opts) {
     const queryParams = {};
-    if (opts.token) {
-        queryParams.from = opts.token;
+    if (opts.from) {
+        queryParams.from = opts.from;
     }
     const queryString = utils.encodeParams(queryParams);
     const path = utils.encodeUri(
