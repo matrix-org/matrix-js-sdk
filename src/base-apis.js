@@ -446,12 +446,16 @@ MatrixBaseApis.prototype.fetchRelations =
         queryParams.from = opts.token;
     }
     const queryString = utils.encodeParams(queryParams);
+    const path = utils.encodeUri(
+        "/rooms/$roomId/relations/$eventId/$relationType/$eventType?" + queryString, {
+            $roomId: roomId,
+            $eventId: eventId,
+            $relationType: relationType,
+            $eventType: eventType,
+        });
     // valid options include: room_alias_name, visibility, invite
     const response = await this._http.authedRequestWithPrefix(
-        undefined,
-        "GET",
-        `/rooms/${roomId}/relations/${eventId}/${relationType}/${eventType}?` + queryString,
-        null, null, httpApi.PREFIX_UNSTABLE,
+        undefined, "GET", path, null, null, httpApi.PREFIX_UNSTABLE,
     );
     return response;
 };
