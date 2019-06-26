@@ -1863,6 +1863,20 @@ function _encryptEventIfNeeded(client, event, room) {
         return null;
     }
 
+    if (event.getType() === "m.reaction") {
+        // For reactions, there is a very little gained by encrypting the entire
+        // event, as relation data is already kept in the clear. Event
+        // encryption for a reaction effectively only obscures the event type,
+        // but the purpose is still obvious from the relation data, so nothing
+        // is really gained. It also causes quite a few problems, such as:
+        //   * triggers notifications via default push rules
+        //   * prevents server-side bundling for reactions
+        // The reaction key / content / emoji value does warrant encrypting, but
+        // this will be handled separately by encrypting just this value.
+        // See https://github.com/matrix-org/matrix-doc/pull/1849#pullrequestreview-248763642
+        return null;
+    }
+
     if (!client._crypto) {
         throw new Error(
             "This room is configured to use encryption, but your client does " +
