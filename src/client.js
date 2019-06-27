@@ -1886,6 +1886,21 @@ function _encryptEventIfNeeded(client, event, room) {
 
     return client._crypto.encryptEvent(event, room);
 }
+/**
+ * Returns the eventType that should be used taking encryption into account
+ * for a given eventType.
+ * @param {MatrixClient} client the client
+ * @param {string} roomId the room for the events `eventType` relates to
+ * @param {string} eventType the event type
+ * @return {string} the event type taking encryption into account
+ */
+function _getEncryptedIfNeededEventType(client, roomId, eventType) {
+    if (eventType === "m.reaction") {
+        return eventType;
+    }
+    const isEncrypted = client.isRoomEncrypted(roomId);
+    return isEncrypted ? "m.room.encrypted" : eventType;
+}
 
 function _updatePendingEventStatus(room, event, newStatus) {
     if (room) {
@@ -3980,7 +3995,9 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
 };
 
 /**
- * Returns relations for a given event
+ * Returns relations for a given event. Handles encryption transparently,
+ * with the caveat that the amount of events returned might be 0, even though you get a nextBatch.
+ * When the returned promise resolves, all messages should have finished trying to decrypt.
  * @param {string} roomId the room of the event
  * @param {string} eventId the id of the event
  * @param {string} relationType the rel_type of the relations requested
@@ -3991,14 +4008,23 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
  */
 MatrixClient.prototype.relations =
 async function(roomId, eventId, relationType, eventType, opts = {}) {
+    const fetchedEventType = _getEncryptedIfNeededEventType(this, roomId, eventType);
     const result = await this.fetchRelations(
         roomId,
         eventId,
         relationType,
-        eventType,
+        fetchedEventType,
         opts);
+
+    let events = result.chunk.map(this.getEventMapper());
+    if (fetchedEventType === "m.room.encrypted") {
+        await Promise.all(events.map(e => {
+            return new Promise(resolve => e.once("Event.decrypted", resolve));
+        }));
+        events = events.filter(e => e.getType() === eventType);
+    }
     return {
-        events: result.chunk.map(this.getEventMapper()),
+        events,
         nextBatch: result.next_batch,
     };
 };
