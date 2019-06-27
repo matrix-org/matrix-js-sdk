@@ -3980,7 +3980,9 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
 };
 
 /**
- * Returns relations for a given event
+ * Returns relations for a given event. Handles encryption transparently,
+ * with the caveat that the amount of events returned might be 0, even though you get a nextBatch.
+ * When the returned promise resolves, all messages should have finished trying to decrypt.
  * @param {string} roomId the room of the event
  * @param {string} eventId the id of the event
  * @param {string} relationType the rel_type of the relations requested
@@ -3991,14 +3993,25 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
  */
 MatrixClient.prototype.relations =
 async function(roomId, eventId, relationType, eventType, opts = {}) {
+    const isEncrypted = this.isRoomEncrypted(roomId);
+    const fetchedEventType = isEncrypted ? "m.room.encrypted" : eventType;
+
     const result = await this.fetchRelations(
         roomId,
         eventId,
         relationType,
-        eventType,
+        fetchedEventType,
         opts);
+
+    let events = result.chunk.map(this.getEventMapper());
+    if (isEncrypted) {
+        await Promise.all(events.map(e => {
+            return new Promise(resolve => e.once("Event.decrypted", resolve));
+        }));
+        events = events.filter(e => e.getType() === eventType);
+    }
     return {
-        events: result.chunk.map(this.getEventMapper()),
+        events,
         nextBatch: result.next_batch,
     };
 };
