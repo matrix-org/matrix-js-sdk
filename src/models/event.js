@@ -913,6 +913,14 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Returns the event that wants to redact this event, but hasn't been sent yet.
+     * @return {MatrixEvent} the event
+     */
+    localRedactionEvent() {
+        return this._localRedactionEvent;
+    },
+
+    /**
      * For relations and redactions, returns the event_id this event is referring to.
      *
      * @return {string?}
