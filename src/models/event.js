@@ -905,6 +905,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
     /**
      * Returns the event replacing the content of this event, if any.
+     * Replacements are aggregated on the server, so this would only
+     * return an event in case it came down the sync, or for local echo of edits.
      *
      * @return {MatrixEvent?}
      */
