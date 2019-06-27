@@ -4008,9 +4008,7 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
  */
 MatrixClient.prototype.relations =
 async function(roomId, eventId, relationType, eventType, opts = {}) {
-    const isEncrypted = this.isRoomEncrypted(roomId);
     const fetchedEventType = _getEncryptedIfNeededEventType(this, roomId, eventType);
-
     const result = await this.fetchRelations(
         roomId,
         eventId,
@@ -4019,7 +4017,7 @@ async function(roomId, eventId, relationType, eventType, opts = {}) {
         opts);
 
     let events = result.chunk.map(this.getEventMapper());
-    if (isEncrypted) {
+    if (fetchedEventType === "m.room.encrypted") {
         await Promise.all(events.map(e => {
             return new Promise(resolve => e.once("Event.decrypted", resolve));
         }));
