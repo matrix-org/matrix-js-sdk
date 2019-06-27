@@ -1886,6 +1886,21 @@ function _encryptEventIfNeeded(client, event, room) {
 
     return client._crypto.encryptEvent(event, room);
 }
+/**
+ * Returns the eventType that should be used taking encryption into account
+ * for a given eventType.
+ * @param {MatrixClient} client the client
+ * @param {string} roomId the room for the events `eventType` relates to
+ * @param {string} eventType the event type
+ * @return {string} the event type taking encryption into account
+ */
+function _getEncryptedIfNeededEventType(client, roomId, eventType) {
+    if (eventType === "m.reaction") {
+        return eventType;
+    }
+    const isEncrypted = client.isRoomEncrypted(roomId);
+    return isEncrypted ? "m.room.encrypted" : eventType;
+}
 
 function _updatePendingEventStatus(room, event, newStatus) {
     if (room) {
@@ -3994,7 +4009,7 @@ MatrixClient.prototype.getCanResetTimelineCallback = function() {
 MatrixClient.prototype.relations =
 async function(roomId, eventId, relationType, eventType, opts = {}) {
     const isEncrypted = this.isRoomEncrypted(roomId);
-    const fetchedEventType = isEncrypted ? "m.room.encrypted" : eventType;
+    const fetchedEventType = _getEncryptedIfNeededEventType(this, roomId, eventType);
 
     const result = await this.fetchRelations(
         roomId,
