@@ -302,25 +302,25 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
-     * Get the account keys for cross-signing (eg. self-signing key,
+     * Get the public part of the cross-signing keys (eg. self-signing key,
      * user signing key).
      *
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(string)} func Called with the account keys object:
      *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
      */
-    getAccountKeys(txn, func) {
-        this._backendPromise.value().getAccountKeys(txn, func);
+    getCrossSigningKeys(txn, func) {
+        this._backendPromise.value().getCrossSigningKeys(txn, func);
     }
 
     /**
-     * Write the account keys back to the store
+     * Write the cross-siging keys back to the store
      *
      * @param {*} txn An active transaction. See doTxn().
-     * @param {string} keys Account keys object as getAccountKeys()
+     * @param {string} keys keys object as getCrossSigningKeys()
      */
-    storeAccountKeys(txn, keys) {
-        this._backendPromise.value().storeAccountKeys(txn, keys);
+    storeCrossSigningKeys(txn, keys) {
+        this._backendPromise.value().storeCrossSigningKeys(txn, keys);
     }
 
     // Olm sessions

@@ -280,6 +280,17 @@ Crypto.prototype.init = async function() {
         );
         this._deviceList.saveIfDirty();
     }
+
+    await this._cryptoStore.doTxn(
+        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.getCrossSigningKeys(txn, (keys) => {
+                if (keys) {
+                    this._crossSigningInfo.setKeys(keys);
+                }
+            });
+        },
+    );
     // make sure we are keeping track of our own devices
     // (this is important for key backups & things)
     this._deviceList.startTrackingDeviceList(this._userId);
@@ -298,6 +309,14 @@ Crypto.prototype.init = async function() {
  */
 Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
     await this._crossSigningInfo.resetKeys(level);
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
+        },
+    );
+
+    // send keys to server
     const keys = {};
     for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
         keys[name + "_key"] = key;
@@ -305,6 +324,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
     await this._baseApis.uploadDeviceSigningKeys(authDict || {}, keys);
     this._baseApis.emit("cross-signing.keysChanged", {});
 
+    // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
     await this._baseApis.uploadKeySignatures({
@@ -465,7 +485,12 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const oldUserSigningId = this._crossSigningInfo.getId("user_signing");
 
     this._crossSigningInfo.setKeys(newCrossSigning.keys);
-    // FIXME: save it ... somewhere?
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
+        },
+    );
 
     if (oldSelfSigningId !== newCrossSigning.getId("self_signing")) {
         logger.info("Got new self-signing key", newCrossSigning.getId("self_signing"));
@@ -820,24 +845,6 @@ Crypto.prototype.uploadDeviceKeys = function() {
 
     let accountKeys;
     return crypto._signObject(deviceKeys).then(() => {
-        return this._cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
-            (txn) => {
-                this._cryptoStore.getAccountKeys(txn, keys => {
-                    accountKeys = keys;
-                });
-            },
-        );
-    }).then(() => {
-        if (accountKeys && accountKeys.self_signing_key_seed) {
-            // if we have an SSK, sign the key with the SSK too
-            pkSign(
-                deviceKeys,
-                Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
-                userId,
-            );
-        }
-
         return crypto._baseApis.uploadKeysRequest({
             device_keys: deviceKeys,
         }, {

@@ -332,9 +332,9 @@ export class Backend {
         objectStore.put(newData, "-");
     }
 
-    getAccountKeys(txn, func) {
+    getCrossSigningKeys(txn, func) {
         const objectStore = txn.objectStore("account");
-        const getReq = objectStore.get("keys");
+        const getReq = objectStore.get("crossSigningKeys");
         getReq.onsuccess = function() {
             try {
                 func(getReq.result || null);
@@ -344,9 +344,9 @@ export class Backend {
         };
     }
 
-    storeAccountKeys(txn, keys) {
+    storeCrossSigningKeys(txn, keys) {
         const objectStore = txn.objectStore("account");
-        objectStore.put(keys, "keys");
+        objectStore.put(keys, "crossSigningKeys");
     }
 
     // Olm Sessions
