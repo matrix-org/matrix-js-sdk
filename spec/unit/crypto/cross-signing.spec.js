@@ -54,10 +54,10 @@ describe("Cross Signing", function() {
         alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
-        alice.on("cross-signing:savePrivateKeys", function(e) {
+        alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.on("cross-signing:getKey", function(e) {
+        alice.on("cross-signing.getKey", function(e) {
             e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
@@ -103,15 +103,15 @@ describe("Cross Signing", function() {
         ]);
 
         const keyChangePromise = new Promise((resolve, reject) => {
-            alice.once("cross-signing:keysChanged", (e) => {
+            alice.once("cross-signing.keysChanged", (e) => {
                 resolve(e);
             });
         });
 
-        alice.once("cross-signing:newKey", (e) => {
+        alice.once("cross-signing.newKey", (e) => {
             e.done(masterKey);
         });
-        alice.on("cross-signing:getKey", (e) => {
+        alice.on("cross-signing.getKey", (e) => {
             // will be called to sign our own device
             e.done(selfSigningKey);
         });
@@ -227,10 +227,10 @@ describe("Cross Signing", function() {
         alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
-        alice.on("cross-signing:savePrivateKeys", function(e) {
+        alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.on("cross-signing:getKey", function(e) {
+        alice.on("cross-signing.getKey", function(e) {
             e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
@@ -308,10 +308,10 @@ describe("Cross Signing", function() {
 
         // set Alice's cross-signing key
         let privateKeys;
-        alice.on("cross-signing:savePrivateKeys", function(e) {
+        alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.on("cross-signing:getKey", (e) => {
+        alice.on("cross-signing.getKey", (e) => {
             e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
@@ -466,10 +466,10 @@ describe("Cross Signing", function() {
         alice.uploadKeySignatures = async function(e) {return;};
         // set Alice's cross-signing key
         let privateKeys;
-        alice.on("cross-signing:savePrivateKeys", function(e) {
+        alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.on("cross-signing:getKey", (e) => {
+        alice.on("cross-signing.getKey", (e) => {
             e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
@@ -537,10 +537,10 @@ describe("Cross Signing", function() {
         alice.uploadDeviceSigningKeys = async function(e) {return;};
         alice.uploadKeySignatures = async function(e) {return;};
         let privateKeys;
-        alice.on("cross-signing:savePrivateKeys", function(e) {
+        alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
         });
-        alice.on("cross-signing:getKey", function(e) {
+        alice.on("cross-signing.getKey", function(e) {
             e.done(privateKeys[e.type]);
         });
         await alice.resetCrossSigningKeys();
@@ -638,7 +638,7 @@ describe("Cross Signing", function() {
         expect(alice.checkUserTrust("@bob:example.com")).toBe(0);
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
         // Alice verifies Bob's SSK
-        alice.on("cross-signing:getKey", function(e) {
+        alice.on("cross-signing.getKey", function(e) {
             e.done(privateKeys[e.type]);
         });
         alice.uploadKeySignatures = () => {};
