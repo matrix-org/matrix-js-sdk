@@ -438,7 +438,6 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
         if (backwardsIsLive || forwardsIsLive) {
             // The live timeline should never be spliced into a non-live position.
             // We use independent logging to better discover the problem at a glance.
-            logger.warn({backwardsIsLive, forwardsIsLive}); // debugging
             if (backwardsIsLive) {
                 logger.warn(
                     "Refusing to set a preceding existingTimeLine on our " +
