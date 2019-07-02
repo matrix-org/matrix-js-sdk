@@ -869,7 +869,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
     makeReplaced(newEvent) {
-        if (this.isRedacted()) {
+        // don't allow redacted events to be replaced.
+        // if newEvent is null we allow to go through though,
+        // as with local redaction, the replacing event might get
+        // cancelled, which should be reflected on the target event.
+        if (this.isRedacted() && newEvent) {
             return;
         }
         if (this._replacingEvent !== newEvent) {
