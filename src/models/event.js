@@ -995,6 +995,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             room_id: this.getRoomId(),
         };
 
+        // if this is a redaction then attach the redacts key
+        if (this.isRedaction()) {
+            event.redacts = this.event.redacts;
+        }
+
         if (!this.isEncrypted()) {
             return event;
         }
