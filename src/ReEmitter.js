@@ -34,12 +34,18 @@ export default class Reemitter {
     }
 
     reEmit(source, eventNames) {
+        // We include the source as the last argument for event handlers which may need it,
+        // such as read receipt listeners on the client class which won't have the context
+        // of the room.
+        const forSource = (handler, ...args) => {
+            handler(...args, source);
+        };
         for (const eventName of eventNames) {
             if (this.boundHandlers[eventName] === undefined) {
                 this.boundHandlers[eventName] = this._handleEvent.bind(this, eventName);
             }
-            const boundHandler = this.boundHandlers[eventName];
 
+            const boundHandler = forSource.bind(this, this.boundHandlers[eventName]);
             source.on(eventName, boundHandler);
         }
     }
