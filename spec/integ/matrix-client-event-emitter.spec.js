@@ -308,7 +308,7 @@ describe("MatrixClient events", function() {
             let sessionLoggedOutCount = 0;
             client.on("Session.logged_out", function(errObj) {
                 sessionLoggedOutCount++;
-                expect(errObj).toMatchObject(error);
+                expect(errObj.data).toEqual(error);
             });
 
             client.startClient();
@@ -327,7 +327,7 @@ describe("MatrixClient events", function() {
             let sessionLoggedOutCount = 0;
             client.on("Session.logged_out", function(errObj) {
                 sessionLoggedOutCount++;
-                expect(errObj).toMatchObject(error);
+                expect(errObj.data).toEqual(error);
             });
 
             client.startClient();
