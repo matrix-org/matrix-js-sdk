@@ -50,8 +50,6 @@ import {
     newUnknownMethodError,
 } from './verification/Error';
 
-import { pkSign } from './PkSigning';
-
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
     [ShowQRCode.NAME]: ShowQRCode,
