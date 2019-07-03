@@ -4555,7 +4555,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * when then login session can be renewed by using a refresh token.
  * @event module:client~MatrixClient#"Session.logged_out"
  * @example
- * matrixClient.on("Session.logged_out", function(call){
+ * matrixClient.on("Session.logged_out", function(errorObj){
  *   // show the login screen
  * });
  */
