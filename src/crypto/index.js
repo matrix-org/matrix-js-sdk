@@ -1946,7 +1946,7 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._onRoomKeyRequestEvent(event);
         } else if (event.getType() === "m.secret.request") {
             this._secretStorage._onRequestReceived(event);
-        } else if (event.getType() === "m.secret.share") {
+        } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
         } else if (event.getType() === "m.key.verification.request") {
             this._onKeyVerificationRequest(event);

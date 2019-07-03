@@ -397,7 +397,7 @@ export default class SecretStorage extends EventEmitter {
                 device_trust: this._baseApis.checkDeviceTrust(sender, deviceId),
                 send: async (secret) => {
                     const payload = {
-                        type: "m.secret.share",
+                        type: "m.secret.send",
                         content: {
                             request_id: content.request_id,
                             secret: secret,
