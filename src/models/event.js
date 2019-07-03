@@ -125,7 +125,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.forwardLooking = true;
     this._pushActions = null;
     this._replacingEvent = null;
-    this._locallyRedacted = false;
+    this._localRedactionEvent = null;
     this._isCancelled = false;
 
     this._clearEvent = {};
@@ -231,7 +231,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getOriginalContent: function() {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return {};
         }
         return this._clearEvent.content || this.event.content || {};
@@ -245,7 +245,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return {};
         } else if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
@@ -675,20 +675,20 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     unmarkLocallyRedacted: function() {
-        const value = this._locallyRedacted;
-        this._locallyRedacted = false;
+        const value = this._localRedactionEvent;
+        this._localRedactionEvent = null;
         if (this.event.unsigned) {
             this.event.unsigned.redacted_because = null;
         }
-        return value;
+        return !!value;
     },
 
     markLocallyRedacted: function(redactionEvent) {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return;
         }
         this.emit("Event.beforeRedaction", this, redactionEvent);
-        this._locallyRedacted = true;
+        this._localRedactionEvent = redactionEvent;
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
@@ -708,7 +708,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             throw new Error("invalid redaction_event in makeRedacted");
         }
 
-        this._locallyRedacted = false;
+        this._localRedactionEvent = null;
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
@@ -869,7 +869,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
     makeReplaced(newEvent) {
-        if (this.isRedacted()) {
+        // don't allow redacted events to be replaced.
+        // if newEvent is null we allow to go through though,
+        // as with local redaction, the replacing event might get
+        // cancelled, which should be reflected on the target event.
+        if (this.isRedacted() && newEvent) {
             return;
         }
         if (this._replacingEvent !== newEvent) {
@@ -888,13 +892,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     getAssociatedStatus() {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
-        } else if (this._locallyRedacted) {
-            const unsigned = this.event.unsigned;
-            const redactedBecause = unsigned && unsigned.redacted_because;
-            const redactionId = redactedBecause && redactedBecause.event_id;
-            if (redactionId && redactionId.startsWith("~")) {
-                return EventStatus.SENDING;
-            }
+        } else if (this._localRedactionEvent) {
+            return this._localRedactionEvent.status;
         }
         return this.status;
     },
@@ -910,11 +909,21 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
     /**
      * Returns the event replacing the content of this event, if any.
+     * Replacements are aggregated on the server, so this would only
+     * return an event in case it came down the sync, or for local echo of edits.
      *
      * @return {MatrixEvent?}
      */
     replacingEvent() {
         return this._replacingEvent;
+    },
+
+    /**
+     * Returns the event that wants to redact this event, but hasn't been sent yet.
+     * @return {MatrixEvent} the event
+     */
+    localRedactionEvent() {
+        return this._localRedactionEvent;
     },
 
     /**
