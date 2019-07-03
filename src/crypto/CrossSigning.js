@@ -40,13 +40,15 @@ async function getPrivateKey(self, type, check) {
                     // FIXME: the key needs to be interpreted?
                     const signing = new global.Olm.PkSigning();
                     const pubkey = signing.init_with_seed(key);
-                    error = check(pubkey, signing);
-                    if (error) {
+                    // make sure it agrees with the pubkey that we have
+                    if (pubkey !== getPublicKey(self.keys[type])[1]) {
+                        error = "Key does not match";
                         logger.error(error);
                         signing.free();
                         resolve([null, null]);
+                    } else {
+                        resolve([pubkey, signing]);
                     }
-                    resolve([pubkey, signing]);
                 },
                 cancel: (error) => {
                     reject(error || new Error("Cancelled"));
@@ -131,14 +133,7 @@ export class CrossSigningInfo extends EventEmitter {
                     },
                 };
             } else {
-                [masterPub, masterSigning] = await getPrivateKey(
-                    this, "master", (pubkey) => {
-                        // make sure it agrees with the pubkey that we have
-                        if (pubkey !== getPublicKey(this.keys.master)[1]) {
-                            return "Key does not match";
-                        }
-                        return;
-                    });
+                [masterPub, masterSigning] = await getPrivateKey(this, "master");
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
@@ -258,21 +253,21 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
+    async signObject(data, type) {
+        const [pubkey, signing] = await getPrivateKey(this, type);
+        try {
+            pkSign(data, signing, this.userId, pubkey);
+            return data;
+        } finally {
+            signing.free();
+        }
+    }
+
     async signUser(key) {
         if (!this.keys.user_signing) {
             return;
         }
-        const [pubkey, usk] = await getPrivateKey(this, "user_signing", (key) => {
-            // FIXME:
-            return;
-        });
-        try {
-            const otherMaster = key.keys.master;
-            pkSign(otherMaster, usk, this.userId, pubkey);
-            return otherMaster;
-        } finally {
-            usk.free();
-        }
+        return this.signObject(key.keys.master, "user_signing");
     }
 
     async signDevice(userId, device) {
@@ -284,22 +279,14 @@ export class CrossSigningInfo extends EventEmitter {
         if (!this.keys.self_signing) {
             return;
         }
-        const [pubkey, ssk] = await getPrivateKey(this, "self_signing", (key) => {
-            // FIXME:
-            return;
-        });
-        try {
-            const keyObj = {
+        return this.signObject(
+            {
                 algorithms: device.algorithms,
                 keys: device.keys,
                 device_id: device.deviceId,
                 user_id: userId,
-            };
-            pkSign(keyObj, ssk, this.userId, pubkey);
-            return keyObj;
-        } finally {
-            ssk.free();
-        }
+            }, "self_signing",
+        );
     }
 
     checkUserTrust(userCrossSigning) {

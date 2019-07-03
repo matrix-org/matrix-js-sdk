@@ -513,52 +513,10 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         this._baseApis.emit("cross-signing.keysChanged", {});
     }
 
-    // FIXME:
-    // Now dig out the account keys and get the pubkey of the one in there
-    /*
-    let accountKeys = null;
-    await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
-        (txn) => {
-            this._cryptoStore.getAccountKeys(txn, keys => {
-                accountKeys = keys;
-            });
-        },
-    );
-    if (!accountKeys || !accountKeys.self_signing_key_seed) {
-        logger.info(
-            "Ignoring new self-signing key for us because we have no private part stored",
-        );
-        return;
-    }
-    let signing;
-    let localPubkey;
-    try {
-        signing = new global.Olm.PkSigning();
-        localPubkey = signing.init_with_seed(
-            Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
-        );
-    } finally {
-        if (signing) signing.free();
-        signing = null;
-    }
-    if (!localPubkey) {
-        logger.error("Unable to compute public key for stored SSK seed");
-    }
-
-    // Finally, are they the same?
-    if (seenPubkey === localPubkey) {
-        logger.info("Published self-signing key matches local copy: marking as verified");
-        this.setSskVerification(userId, SskInfo.SskVerification.VERIFIED);
-        // Now we may be able to trust our key backup
-        await this.checkKeyBackup();
-    } else {
-        logger.info(
-            "Published self-signing key DOES NOT match local copy! Local: " +
-            localPubkey + ", published: " + seenPubkey,
-        );
-    }
-    */
+    // Now we may be able to trust our key backup
+    await this.checkKeyBackup();
+    // FIXME: if we previously trusted the backup, should we automatically sign
+    // the backup with the new key (if not already signed)?
 };
 
 /**
@@ -686,21 +644,23 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         // Could be an SSK but just say this is the device ID for backwards compat
         const sigInfo = { deviceId: keyIdParts[1] }; // XXX: is this how we're supposed to get the device ID?
 
-        // first check to see if it's from our SSK
-        const ssk = this._deviceList.getStoredSskForUser(this._userId);
-        if (ssk && ssk.getKeyId() === keyId) {
-            sigInfo.self_signing_key = ssk;
+        // first check to see if it's from our cross-signing key
+        const crossSigningId = this._crossSigningInfo.getId();
+        if (crossSigningId === keyId) {
+            sigInfo.cross_signing_key = crossSigningId;
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
                     backupInfo.auth_data,
                     this._userId,
                     sigInfo.deviceId,
-                    ssk.getFingerprint(),
+                    crossSigningId,
                 );
                 sigInfo.valid = true;
             } catch (e) {
-                console.log("Bad signature from ssk " + ssk.getKeyId(), e);
+                logger.warning(
+                    "Bad signature from cross signing key " + crossSigningId, e,
+                );
                 sigInfo.valid = false;
             }
             ret.sigs.push(sigInfo);
@@ -745,7 +705,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         return (
             s.valid && (
                 (s.device && s.device.isVerified()) ||
-                (s.self_signing_key && s.self_signing_key.isVerified())
+                (s.cross_signing_key)
             )
         );
     });
@@ -843,7 +803,6 @@ Crypto.prototype.uploadDeviceKeys = function() {
         user_id: userId,
     };
 
-    let accountKeys;
     return crypto._signObject(deviceKeys).then(() => {
         return crypto._baseApis.uploadKeysRequest({
             device_keys: deviceKeys,
@@ -853,52 +812,6 @@ Crypto.prototype.uploadDeviceKeys = function() {
             device_id: deviceId,
         });
     });
-};
-
-/**
- * If a self-signing key is available, uploads the signature of this device from
- * the self-signing key
- *
- * @return {bool} Promise: True if signatures were uploaded or otherwise false
- *     (eg. if no account keys were available)
- */
-Crypto.prototype.uploadDeviceKeySignatures = async function() {
-    const crypto = this;
-    const userId = crypto._userId;
-    const deviceId = crypto._deviceId;
-
-    const thisDeviceKey = {
-        algorithms: crypto._supportedAlgorithms,
-        device_id: deviceId,
-        keys: crypto._deviceKeys,
-        user_id: userId,
-    };
-    let accountKeys;
-    await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
-        (txn) => {
-            this._cryptoStore.getAccountKeys(txn, keys => {
-                accountKeys = keys;
-            },
-        );
-    });
-    if (!accountKeys || !accountKeys.self_signing_key_seed) return false;
-
-    // Sign this device with the SSK
-    pkSign(
-        thisDeviceKey,
-        Buffer.from(accountKeys.self_signing_key_seed, 'base64'),
-        userId,
-    );
-
-    const content = {
-        [userId]: {
-            [deviceId]: thisDeviceKey,
-        },
-    };
-
-    await crypto._baseApis.uploadKeySignatures(content);
-    return true;
 };
 
 /**
