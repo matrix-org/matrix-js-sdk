@@ -713,6 +713,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
+        // before removing content, preserve the rel_type
+        // if this is a relation, so we can still tell the
+        // difference between a redacted edit and message
         const relation = this.getRelation();
         if (relation) {
             this._relationTypeBeforeRedaction = relation.rel_type;
