@@ -52,6 +52,22 @@ const DEFAULT_OVERRIDE_RULES = [
             },
         ],
     },
+    {
+        // For homeservers which don't support MSC2153 yet
+        rule_id: ".m.rule.reaction",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: "event_match",
+                key: "type",
+                pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            "dont_notify",
+        ],
+    },
 ];
 
 /**
