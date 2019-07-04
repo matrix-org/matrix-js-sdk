@@ -470,7 +470,7 @@ module.exports.MatrixHttpApi.prototype = {
         const self = this;
         requestPromise.catch(function(err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
-                self.event_emitter.emit("Session.logged_out");
+                self.event_emitter.emit("Session.logged_out", err);
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
                 self.event_emitter.emit(
                     "no_consent",
