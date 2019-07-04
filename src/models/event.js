@@ -126,6 +126,7 @@ module.exports.MatrixEvent = function MatrixEvent(
     this._pushActions = null;
     this._replacingEvent = null;
     this._localRedactionEvent = null;
+    this._relationTypeBeforeRedaction = null;
     this._isCancelled = false;
 
     this._clearEvent = {};
@@ -712,6 +713,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
+        const relation = this.getRelation();
+        if (relation) {
+            this._relationTypeBeforeRedaction = relation.rel_type;
+        }
         this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
@@ -843,12 +848,20 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {boolean}
      */
     isRelation(relType = undefined) {
+        let eventRelType;
         // Relation info is lifted out of the encrypted content when sent to
         // encrypted rooms, so we have to check `getWireContent` for this.
         const content = this.getWireContent();
         const relation = content && content["m.relates_to"];
-        return relation && relation.rel_type && relation.event_id &&
-            ((relType && relation.rel_type === relType) || !relType);
+        if (relation) {
+            if (!relation || !relation.event_id) {
+                return false;
+            }
+            eventRelType = relation && relation.rel_type;
+        } else if (this.isRedacted()) {
+            eventRelType = this._relationTypeBeforeRedaction;
+        }
+        return eventRelType && ((relType && eventRelType === relType) || !relType);
     },
 
     /**
