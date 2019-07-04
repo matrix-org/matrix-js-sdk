@@ -207,7 +207,6 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     ]);
 
     this._secretStorage = new SecretStorage(baseApis);
-    // TODO: expose SecretStorage methods
 }
 utils.inherits(Crypto, EventEmitter);
 
