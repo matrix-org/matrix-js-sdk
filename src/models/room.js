@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2018, 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -346,11 +347,28 @@ Room.prototype.userMayUpgradeRoom = function(userId) {
 Room.prototype.getPendingEvents = function() {
     if (this._opts.pendingEventOrdering !== "detached") {
         throw new Error(
-            "Cannot call getPendingEventList with pendingEventOrdering == " +
+            "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this._opts.pendingEventOrdering);
     }
 
     return this._pendingEventList;
+};
+
+/**
+ * Check whether the pending event list contains a given event by ID.
+ *
+ * @param {string} eventId The event ID to check for.
+ * @return {boolean}
+ * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
+ */
+Room.prototype.hasPendingEvent = function(eventId) {
+    if (this._opts.pendingEventOrdering !== "detached") {
+        throw new Error(
+            "Cannot call hasPendingEvent with pendingEventOrdering == " +
+                this._opts.pendingEventOrdering);
+    }
+
+    return this._pendingEventList.some(event => event.getId() === eventId);
 };
 
 /**
