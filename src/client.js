@@ -1208,6 +1208,19 @@ MatrixClient.prototype.scheduleAllGroupSessionsForBackup = async function() {
     await this._crypto.scheduleAllGroupSessionsForBackup();
 };
 
+/**
+ * Marks all group sessions as needing to be backed up without scheduling
+ * them to upload in the background.
+ * @returns {Promise<int>} Resolves to the number of sessions requiring a backup.
+ */
+MatrixClient.prototype.flagAllGroupSessionsForBackup = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+
+    return this._crypto.flagAllGroupSessionsForBackup();
+};
+
 MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
     try {
         decodeRecoveryKey(recoveryKey);
