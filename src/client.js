@@ -2148,7 +2148,12 @@ MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.sendReadReceipt = function(event, callback) {
+MatrixClient.prototype.sendReadReceipt = async function(event, callback) {
+    const eventId = event.getId();
+    const room = this.getRoom(event.getRoomId());
+    if (room && room.hasPendingEvent(eventId)) {
+        throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
+    }
     return this.sendReceipt(event, "m.read", callback);
 };
 
@@ -2158,20 +2163,25 @@ MatrixClient.prototype.sendReadReceipt = function(event, callback) {
  * and displayed as a horizontal line in the timeline that is visually distinct to the
  * position of the user's own read receipt.
  * @param {string} roomId ID of the room that has been read
- * @param {string} eventId ID of the event that has been read
+ * @param {string} rmEventId ID of the event that has been read
  * @param {string} rrEvent the event tracked by the read receipt. This is here for
  * convenience because the RR and the RM are commonly updated at the same time as each
  * other. The local echo of this receipt will be done if set. Optional.
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
-MatrixClient.prototype.setRoomReadMarkers = function(roomId, eventId, rrEvent) {
-    const rmEventId = eventId;
-    let rrEventId;
+MatrixClient.prototype.setRoomReadMarkers = async function(roomId, rmEventId, rrEvent) {
+    const room = this.getRoom(roomId);
+    if (room && room.hasPendingEvent(rmEventId)) {
+        throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
+    }
 
     // Add the optional RR update, do local echo like `sendReceipt`
+    let rrEventId;
     if (rrEvent) {
         rrEventId = rrEvent.getId();
-        const room = this.getRoom(roomId);
+        if (room && room.hasPendingEvent(rrEventId)) {
+            throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
+        }
         if (room) {
             room._addLocalEchoReceipt(this.credentials.userId, rrEvent, "m.read");
         }
