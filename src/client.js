@@ -310,7 +310,9 @@ function MatrixClient(opts) {
                     break;
                 }
 
-                highlightCount += event.getPushActions().tweaks.highlight ? 1 : 0;
+                highlightCount += this.getPushActionsForEvent(
+                    event,
+                ).tweaks.highlight ? 1 : 0;
             }
 
             // Note: we don't need to handle 'total' notifications because the counts
