@@ -50,8 +50,8 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.uploadDeviceSigningKeys = async function(e) {return;};
-        alice.uploadKeySignatures = async function(e) {return;};
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing.savePrivateKeys", function(e) {
@@ -223,8 +223,8 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.uploadDeviceSigningKeys = async function(e) {return;};
-        alice.uploadKeySignatures = async function(e) {return;};
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing.savePrivateKeys", function(e) {
@@ -303,8 +303,8 @@ describe("Cross Signing", function() {
         );
         alice._crypto._deviceList.startTrackingDeviceList("@bob:example.com");
         alice._crypto._deviceList.stopTrackingAllDeviceLists = () => {};
-        alice.uploadDeviceSigningKeys = async function(e) {return;};
-        alice.uploadKeySignatures = async function(e) {return;};
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
 
         // set Alice's cross-signing key
         let privateKeys;
@@ -462,8 +462,8 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.uploadDeviceSigningKeys = async function(e) {return;};
-        alice.uploadKeySignatures = async function(e) {return;};
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
         // set Alice's cross-signing key
         let privateKeys;
         alice.on("cross-signing.savePrivateKeys", function(e) {
@@ -523,9 +523,7 @@ describe("Cross Signing", function() {
         // Bob's device key should be untrusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
         // Alice verifies Bob's SSK
-        console.log("verifying bob's device");
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
-        console.log("done");
         // Bob's device key should be untrusted
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
     });
@@ -534,8 +532,8 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.uploadDeviceSigningKeys = async function(e) {return;};
-        alice.uploadKeySignatures = async function(e) {return;};
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
         let privateKeys;
         alice.on("cross-signing.savePrivateKeys", function(e) {
             privateKeys = e;
