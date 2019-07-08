@@ -1,3 +1,39 @@
+Changes in [2.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.1.0) (2019-07-08)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.1.0-rc.1...v2.1.0)
+
+ * Fix exception whilst syncing
+   [\#979](https://github.com/matrix-org/matrix-js-sdk/pull/979)
+
+Changes in [2.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.1.0-rc.1) (2019-07-03)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.0.1...v2.1.0-rc.1)
+
+ * Handle self read receipts for fixing e2e notification counts
+   [\#974](https://github.com/matrix-org/matrix-js-sdk/pull/974)
+ * Add redacts field to event.toJSON
+   [\#973](https://github.com/matrix-org/matrix-js-sdk/pull/973)
+ * Handle associated event send failures
+   [\#972](https://github.com/matrix-org/matrix-js-sdk/pull/972)
+ * Remove irrelevant debug line from timeline handling
+   [\#971](https://github.com/matrix-org/matrix-js-sdk/pull/971)
+ * Handle relations in encrypted rooms
+   [\#969](https://github.com/matrix-org/matrix-js-sdk/pull/969)
+ * Relations endpoint support
+   [\#967](https://github.com/matrix-org/matrix-js-sdk/pull/967)
+ * Disable event encryption for reactions
+   [\#968](https://github.com/matrix-org/matrix-js-sdk/pull/968)
+ * Change the known safe room version to version 4
+   [\#966](https://github.com/matrix-org/matrix-js-sdk/pull/966)
+ * Check for lazy-loading support in the spec versions instead
+   [\#965](https://github.com/matrix-org/matrix-js-sdk/pull/965)
+ * Use camelCase instead of underscore
+   [\#963](https://github.com/matrix-org/matrix-js-sdk/pull/963)
+ * Time out verification attempts after 10 minutes of inactivity
+   [\#961](https://github.com/matrix-org/matrix-js-sdk/pull/961)
+ * Don't handle key verification requests which are immediately cancelled
+   [\#962](https://github.com/matrix-org/matrix-js-sdk/pull/962)
+
 Changes in [2.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.0.1) (2019-06-19)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.0.1-rc.2...v2.0.1)
