@@ -561,6 +561,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.devicesUpdated",
         "cross-signing.savePrivateKeys",
         "cross-signing.getKey",
+        "cross-signing.upgradeDeviceVerifications",
     ]);
 
     logger.log("Crypto: initialising crypto object...");
@@ -4749,6 +4750,22 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *     provided, indicating that the client does not accept the cross-signing key.
  * @param {string} [data.error] Error string to display to the user.  Normally
  *     provided if a previously provided key was invalid.
+ */
+
+/**
+ * Fires when a device verification can be upgraded to a cross-signing
+ * verification.  The handler should call the `accept` callback in order to
+ * perform the upgrade.
+ * @event module:client~MatrixClient#"cross-signing.upgradeDeviceVerifications"
+ * @param {object} data
+ * @param {object} data.users The users whose device verifications can be
+ *     upgraded to cross-signing verifications.  This will be a map of user IDs
+ *     to objects with the properties `devices` (array of the user's devices
+ *     that verified their cross-signing key), and `crossSigningInfo` (the
+ *     user's cross-signing information)
+ * @param {object} data.accept a function to call to upgrade the device
+ *     verifications.  It should be called with an array of the user IDs who
+ *     should be cross-signed.
  */
 
 /**

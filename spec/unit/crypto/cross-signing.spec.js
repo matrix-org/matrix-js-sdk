@@ -46,6 +46,30 @@ describe("Cross Signing", function() {
         await global.Olm.init();
     });
 
+    it("should sign the master key with the device key", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+        alice.uploadDeviceSigningKeys = expect.createSpy()
+            .andCall(async (auth, keys) => {
+                await olmlib.verifySignature(
+                    alice._crypto._olmDevice, keys.master_key, "@alice:example.com",
+                    "Osborne2", alice._crypto._olmDevice.deviceEd25519Key,
+                );
+            });
+        alice.uploadKeySignatures = async () => {};
+        // set Alice's cross-signing key
+        let privateKeys;
+        alice.on("cross-signing.savePrivateKeys", function(e) {
+            privateKeys = e;
+        });
+        alice.on("cross-signing.getKey", function(e) {
+            e.done(privateKeys[e.type]);
+        });
+        await alice.resetCrossSigningKeys();
+        expect(alice.uploadDeviceSigningKeys).toHaveBeenCalled();
+    });
+
     it("should upload a signature when a user is verified", async function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
@@ -114,6 +138,23 @@ describe("Cross Signing", function() {
         alice.on("cross-signing.getKey", (e) => {
             // will be called to sign our own device
             e.done(selfSigningKey);
+        });
+
+        const uploadSigsPromise = new Promise((resolve, reject) => {
+            alice.uploadKeySignatures = expect.createSpy().andCall(async (content) => {
+                await olmlib.verifySignature(
+                    alice._crypto._olmDevice,
+                    content["@alice:example.com"]["nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"],
+                    "@alice:example.com",
+                    "Osborne2", alice._crypto._olmDevice.deviceEd25519Key,
+                );
+                olmlib.pkVerify(
+                    content["@alice:example.com"]["Osborne2"],
+                    "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                    "@alice:example.com",
+                );
+                resolve();
+            });
         });
 
         const deviceInfo = alice._crypto._deviceList._devices["@alice:example.com"]
@@ -203,11 +244,6 @@ describe("Cross Signing", function() {
                     },
                 },
             },
-            {
-                method: "POST",
-                path: "/keys/signatures/upload",
-                data: {},
-            },
         ];
         setHttpResponses(alice, responses, true, true);
 
@@ -215,6 +251,7 @@ describe("Cross Signing", function() {
 
         // once ssk is confirmed, device key should be trusted
         await keyChangePromise;
+        await uploadSigsPromise;
         expect(alice.checkUserTrust("@alice:example.com")).toBe(6);
         expect(alice.checkDeviceTrust("@alice:example.com", "Osborne2")).toBe(7);
     });
@@ -653,5 +690,84 @@ describe("Cross Signing", function() {
         // Bob's device should be trusted again (but not TOFU)
         expect(alice.checkUserTrust("@bob:example.com")).toBe(4);
         expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(4);
+    });
+
+    it("should offer to upgrade device verifications to cross-signing", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"}
+        );
+        const bob = await makeTestClient(
+            {userId: "@bob:example.com", deviceId: "Dynabook"},
+        );
+        const privateKeys = {};
+
+        bob.uploadDeviceSigningKeys = async () => {};
+        bob.uploadKeySignatures = async () => {};
+        // set Bob's cross-signing key
+        bob.on("cross-signing.savePrivateKeys", function(e) {
+            privateKeys.bob = e;
+        });
+        bob.on("cross-signing.getKey", function(e) {
+            e.done(privateKeys.bob[e.type]);
+        });
+        await bob.resetCrossSigningKeys();
+        alice._crypto._deviceList.storeDevicesForUser("@bob:example.com", {
+            Dynabook: {
+                algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+                keys: {
+                    "curve25519:Dynabook": bob._crypto._olmDevice.deviceCurve25519Key,
+                    "ed25519:Dynabook": bob._crypto._olmDevice.deviceEd25519Key,
+                },
+                verified: 1,
+                known: true,
+            }
+        });
+        alice._crypto._deviceList.storeCrossSigningForUser(
+            "@bob:example.com",
+            bob._crypto._crossSigningInfo.toStorage(),
+        );
+
+        alice.uploadDeviceSigningKeys = async () => {};
+        alice.uploadKeySignatures = async () => {};
+        // set Alice's cross-signing key
+        alice.on("cross-signing.savePrivateKeys", function(e) {
+            privateKeys.alice = e;
+        });
+        alice.on("cross-signing.getKey", function(e) {
+            e.done(privateKeys.alice[e.type]);
+        });
+        // when alice sets up cross-signing, she should notice that bob's
+        // cross-signing key is signed by his Dynabook, which alice has
+        // verified, and ask if the device verification should be upgraded to a
+        // cross-signing verification
+        let upgradePromise = new Promise((resolve, reject) => {
+            alice.once("cross-signing.upgradeDeviceVerifications", async (e) => {
+                expect(e.users["@bob:example.com"]).toExist();
+                await e.accept(["@bob:example.com"]);
+                resolve();
+            });
+        });
+        await alice.resetCrossSigningKeys();
+        await upgradePromise;
+
+        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
+
+        // "forget" that Bob is trusted
+        delete alice._crypto._deviceList._crossSigningInfo["@bob:example.com"]
+            .keys.master.signatures["@alice:example.com"];
+
+        expect(alice.checkUserTrust("@bob:example.com")).toBe(2);
+
+        upgradePromise = new Promise((resolve, reject) => {
+            alice.once("cross-signing.upgradeDeviceVerifications", async (e) => {
+                expect(e.users["@bob:example.com"]).toExist();
+                await e.accept(["@bob:example.com"]);
+                resolve();
+            });
+        });
+        alice._crypto._deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
+        await upgradePromise;
+
+        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
     });
 });
