@@ -1288,6 +1288,18 @@ Crypto.prototype.backupGroupSession = async function(
  * upload in the background as soon as possible.
  */
 Crypto.prototype.scheduleAllGroupSessionsForBackup = async function() {
+    await this.flagAllGroupSessionsForBackup();
+
+    // Schedule keys to upload in the background as soon as possible.
+    this.scheduleKeyBackupSend(0 /* maxDelay */);
+};
+
+/**
+ * Marks all group sessions as needing to be backed up without scheduling
+ * them to upload in the background.
+ * @returns {Promise<int>} Resolves to the number of sessions requiring a backup.
+ */
+Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
     await this._cryptoStore.doTxn(
         'readwrite',
         [
@@ -1305,9 +1317,7 @@ Crypto.prototype.scheduleAllGroupSessionsForBackup = async function() {
 
     const remaining = await this._cryptoStore.countSessionsNeedingBackup();
     this.emit("crypto.keyBackupSessionsRemaining", remaining);
-
-    // Schedule keys to upload in the background as soon as possible.
-    this.scheduleKeyBackupSend(0 /* maxDelay */);
+    return remaining;
 };
 
 /* eslint-disable valid-jsdoc */    //https://github.com/eslint/eslint/issues/7307
