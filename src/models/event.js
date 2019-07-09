@@ -898,7 +898,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         return this.status;
     },
 
-    _getServerAggregatedRelation(relType) {
+    getServerAggregatedRelation(relType) {
         const relations = this.getUnsigned()["m.relations"];
         if (relations) {
             return relations[relType];
@@ -911,7 +911,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {string?}
      */
     replacingEventId() {
-        const replaceRelation = this._getServerAggregatedRelation("m.replace");
+        const replaceRelation = this.getServerAggregatedRelation("m.replace");
         if (replaceRelation) {
             return replaceRelation.event_id;
         } else if (this._replacingEvent) {
@@ -936,7 +936,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Date?}
      */
     replacingEventDate() {
-        const replaceRelation = this._getServerAggregatedRelation("m.replace");
+        const replaceRelation = this.getServerAggregatedRelation("m.replace");
         if (replaceRelation) {
             const ts = replaceRelation.origin_server_ts;
             if (Number.isFinite(ts)) {
