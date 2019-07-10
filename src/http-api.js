@@ -102,7 +102,7 @@ module.exports.MatrixHttpApi.prototype = {
         };
         return {
             base: this.opts.baseUrl,
-            path: "/_matrix/media/v1/upload",
+            path: "/_matrix/media/r0/upload",
             params: params,
         };
     },
@@ -291,7 +291,7 @@ module.exports.MatrixHttpApi.prototype = {
                     });
                 }
             });
-            let url = this.opts.baseUrl + "/_matrix/media/v1/upload";
+            let url = this.opts.baseUrl + "/_matrix/media/r0/upload";
 
             const queryArgs = [];
 
@@ -327,7 +327,7 @@ module.exports.MatrixHttpApi.prototype = {
 
             promise = this.authedRequest(
                 opts.callback, "POST", "/upload", queryParams, body, {
-                    prefix: "/_matrix/media/v1",
+                    prefix: "/_matrix/media/r0",
                     headers: {"Content-Type": contentType},
                     json: false,
                     bodyParser: bodyParser,
