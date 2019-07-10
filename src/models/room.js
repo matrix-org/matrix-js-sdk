@@ -1420,18 +1420,23 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
     }
 
     for (i = 0; i < events.length; i++) {
-        if (events[i].getType() === "m.typing") {
-            this.currentState.setTypingEvent(events[i]);
-        } else if (events[i].getType() === "m.receipt") {
-            this.addReceipt(events[i]);
-        }
-        // N.B. account_data is added directly by /sync to avoid
-        // having to maintain an event.isAccountData() here
-        else {
-            // TODO: We should have a filter to say "only add state event
-            // types X Y Z to the timeline".
-            this._addLiveEvent(events[i], duplicateStrategy);
-        }
+        // TODO: We should have a filter to say "only add state event
+        // types X Y Z to the timeline".
+        this._addLiveEvent(events[i], duplicateStrategy);
+    }
+};
+
+/**
+ * Adds/handles ephemeral events such as typing notifications and read receipts.
+ * @param {MatrixEvent[]} events A list of events to process
+ */
+Room.prototype.addEphemeralEvents = function(events) {
+    for (const event of events) {
+        if (event.getType() === 'm.typing') {
+            this.currentState.setTypingEvent(event);
+        } else if (event.getType() === 'm.receipt') {
+            this.addReceipt(event);
+        } // else ignore - life is too short for us to care about these events
     }
 };
 
