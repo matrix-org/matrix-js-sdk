@@ -32,9 +32,9 @@ const utils = require("./utils");
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
         case SERVICETYPES.IS:
-            return baseUrl + httpApi.PREFIX_IDENTITY_V2
+            return baseUrl + httpApi.PREFIX_IDENTITY_V2;
         case SERVICETYPES.IM:
-            return baseUrl + '/terms/'
+            return baseUrl + '/terms/';
         default:
             throw new Error('Unsupported service type');
     }
@@ -1909,7 +1909,9 @@ MatrixBaseApis.prototype.getTerms = function(serviceType, baseUrl, accessToken) 
     );
 };
 
-MatrixBaseApis.prototype.agreeToTerms = function(serviceType, baseUrl, accessToken, termsUrls) {
+MatrixBaseApis.prototype.agreeToTerms = function(
+    serviceType, baseUrl, accessToken, termsUrls,
+) {
     const url = termsUrlForService(serviceType, baseUrl);
     const headers = {
         Authorization: "Bearer " + accessToken,
