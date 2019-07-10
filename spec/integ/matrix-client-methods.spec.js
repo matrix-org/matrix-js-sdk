@@ -396,7 +396,7 @@ describe("MatrixClient", function() {
         const auth = {a: 1};
         it("should pass through an auth dict", function(done) {
             httpBackend.when(
-                "DELETE", "/_matrix/client/unstable/devices/my_device",
+                "DELETE", "/_matrix/client/r0/devices/my_device",
             ).check(function(req) {
                 expect(req.data).toEqual({auth: auth});
             }).respond(200);

@@ -391,9 +391,8 @@ MatrixBaseApis.prototype.deactivateAccount = function(auth, erase) {
         body.erase = erase;
     }
 
-    return this._http.authedRequestWithPrefix(
+    return this._http.authedRequest(
         undefined, "POST", '/account/deactivate', undefined, body,
-        httpApi.PREFIX_R0,
     );
 };
 
@@ -1329,9 +1328,7 @@ MatrixBaseApis.prototype.deleteThreePid = function(medium, address) {
         'medium': medium,
         'address': address,
     };
-    return this._http.authedRequestWithPrefix(
-        undefined, "POST", path, null, data, httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "POST", path, null, data);
 };
 
 /**
@@ -1365,10 +1362,7 @@ MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback)
  */
 MatrixBaseApis.prototype.getDevices = function() {
     const path = "/devices";
-    return this._http.authedRequestWithPrefix(
-        undefined, "GET", path, undefined, undefined,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, path, undefined, undefined);
 };
 
 /**
@@ -1384,11 +1378,7 @@ MatrixBaseApis.prototype.setDeviceDetails = function(device_id, body) {
         $device_id: device_id,
     });
 
-
-    return this._http.authedRequestWithPrefix(
-        undefined, "PUT", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, body);
 };
 
 /**
@@ -1410,10 +1400,7 @@ MatrixBaseApis.prototype.deleteDevice = function(device_id, auth) {
         body.auth = auth;
     }
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "DELETE", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "DELETE", path, undefined, body);
 };
 
 /**
@@ -1431,10 +1418,8 @@ MatrixBaseApis.prototype.deleteMultipleDevices = function(devices, auth) {
         body.auth = auth;
     }
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "POST", "/delete_devices", undefined, body,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    const path = "/delete_devices";
+    return this._http.authedRequest(undefined, "POST", path, undefined, body);
 };
 
 
@@ -1610,9 +1595,7 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     } else {
         path = "/keys/upload";
     }
-    return this._http.authedRequestWithPrefix(
-        callback, "POST", path, undefined, content, httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(callback, "POST", path, undefined, content);
 };
 
 /**
@@ -1647,10 +1630,7 @@ MatrixBaseApis.prototype.downloadKeysForUsers = function(userIds, opts) {
         content.device_keys[u] = {};
     });
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "POST", "/keys/query", undefined, content,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "POST", "/keys/query", undefined, content);
 };
 
 /**
@@ -1678,10 +1658,8 @@ MatrixBaseApis.prototype.claimOneTimeKeys = function(devices, key_algorithm) {
         query[deviceId] = key_algorithm;
     }
     const content = {one_time_keys: queries};
-    return this._http.authedRequestWithPrefix(
-        undefined, "POST", "/keys/claim", undefined, content,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    const path = "/keys/claim";
+    return this._http.authedRequest(undefined, "POST", path, undefined, content);
 };
 
 /**
@@ -1700,10 +1678,8 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
         to: newToken,
     };
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "GET", "/keys/changes", qps, undefined,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    const path = "/keys/changes";
+    return this._http.authedRequest(undefined, "GET", path, qps, undefined);
 };
 
 
@@ -1821,10 +1797,7 @@ MatrixBaseApis.prototype.sendToDevice = function(
         messages: contentMap,
     };
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "PUT", path, undefined, body,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "PUT", path, undefined, body);
 };
 
 // Third party Lookup API
@@ -1836,9 +1809,8 @@ MatrixBaseApis.prototype.sendToDevice = function(
  * @return {module:client.Promise} Resolves to the result object
  */
 MatrixBaseApis.prototype.getThirdpartyProtocols = function() {
-    return this._http.authedRequestWithPrefix(
+    return this._http.authedRequest(
         undefined, "GET", "/thirdparty/protocols", undefined, undefined,
-        httpApi.PREFIX_UNSTABLE,
     ).then((response) => {
         // sanity check
         if (!response || typeof(response) !== 'object') {
@@ -1863,10 +1835,7 @@ MatrixBaseApis.prototype.getThirdpartyLocation = function(protocol, params) {
         $protocol: protocol,
     });
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "GET", path, params, undefined,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "GET", path, params, undefined);
 };
 
 /**
@@ -1882,10 +1851,7 @@ MatrixBaseApis.prototype.getThirdpartyUser = function(protocol, params) {
         $protocol: protocol,
     });
 
-    return this._http.authedRequestWithPrefix(
-        undefined, "GET", path, params, undefined,
-        httpApi.PREFIX_UNSTABLE,
-    );
+    return this._http.authedRequest(undefined, "GET", path, params, undefined);
 };
 
 /**
