@@ -1917,7 +1917,7 @@ MatrixBaseApis.prototype.agreeToTerms = function(
         Authorization: "Bearer " + accessToken,
     };
     return this._http.requestOtherUrl(
-        undefined, 'POST', url, null, {user_accepts: termsUrls}, { headers },
+        undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers },
     );
 };
 
