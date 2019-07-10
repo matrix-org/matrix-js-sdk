@@ -1905,7 +1905,7 @@ MatrixBaseApis.prototype.getThirdpartyUser = function(protocol, params) {
 MatrixBaseApis.prototype.getTerms = function(serviceType, baseUrl, accessToken) {
     const url = termsUrlForService(serviceType, baseUrl);
     return this._http.requestOtherUrl(
-        undefined, 'GET', url, null, null, null,
+        undefined, 'GET', url,
     );
 };
 
