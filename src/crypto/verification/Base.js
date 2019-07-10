@@ -78,12 +78,19 @@ export default class VerificationBase extends EventEmitter {
         if (this._transactionTimeoutTimer !== null) {
             clearTimeout(this._transactionTimeoutTimer);
         }
-        setTimeout(() => {
+        this._transactionTimeoutTimer = setTimeout(() => {
            if (!this._done && !this.cancelled) {
                console.log("Triggering verification timeout");
                this.cancel(timeoutException);
            }
         }, 10 * 60 * 1000); // 10 minutes
+    }
+
+    _endTimer() {
+        if (this._transactionTimeoutTimer !== null) {
+            clearTimeout(this._transactionTimeoutTimer);
+            this._transactionTimeoutTimer = null;
+        }
     }
 
     _sendToDevice(type, content) {
@@ -131,12 +138,14 @@ export default class VerificationBase extends EventEmitter {
     }
 
     done() {
+        this._endTimer(); // always kill the activity timer
         if (!this._done) {
             this._resolve();
         }
     }
 
     cancel(e) {
+        this._endTimer(); // always kill the activity timer
         if (!this._done) {
             this.cancelled = true;
             if (this.userId && this.deviceId && this.transactionId) {
@@ -196,10 +205,12 @@ export default class VerificationBase extends EventEmitter {
         this._promise = new Promise((resolve, reject) => {
             this._resolve = (...args) => {
                 this._done = true;
+                this._endTimer();
                 resolve(...args);
             };
             this._reject = (...args) => {
                 this._done = true;
+                this._endTimer();
                 reject(...args);
             };
         });
