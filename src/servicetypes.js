@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export const SERVICETYPES = Object.freeze({
-    IS: 'SERVICETYPE_IS',
-    IM: 'SERVICETYPE_IM',
+export const SERVICE_TYPES = Object.freeze({
+    IS: 'SERVICE_TYPE_IS',
+    IM: 'SERVICE_TYPE_IM',
 });

@@ -77,7 +77,7 @@ module.exports.InteractiveAuth = require("./interactive-auth");
 /** The {@link module:auto-discovery|AutoDiscovery} class. */
 module.exports.AutoDiscovery = require("./autodiscovery").AutoDiscovery;
 
-module.exports.SERVICETYPES = require('./servicetypes').SERVICETYPES;
+module.exports.SERVICE_TYPES = require('./service-types').SERVICE_TYPES;
 
 module.exports.MemoryCryptoStore =
     require("./crypto/store/memory-crypto-store").default;
