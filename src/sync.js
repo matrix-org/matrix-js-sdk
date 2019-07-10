@@ -1245,10 +1245,8 @@ SyncApi.prototype._processSyncResponse = async function(
             room.setSummary(joinObj.summary);
         }
 
-        // XXX: should we be adding ephemeralEvents to the timeline?
-        // It feels like that for symmetry with room.addAccountData()
-        // there should be a room.addEphemeralEvents() or similar.
-        room.addLiveEvents(ephemeralEvents);
+        // we deliberately don't add ephemeral events to the timeline
+        room.addEphemeralEvents(ephemeralEvents);
 
         // we deliberately don't add accountData to the timeline
         room.addAccountData(accountDataEvents);
