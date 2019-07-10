@@ -17,7 +17,7 @@ limitations under the License.
 */
 "use strict";
 
-import { SERVICETYPES } from './servicetypes';
+import { SERVICE_TYPES } from './service-types';
 
 /**
  * This is an internal module. MatrixBaseApis is currently only meant to be used
@@ -31,9 +31,9 @@ const utils = require("./utils");
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
-        case SERVICETYPES.IS:
+        case SERVICE_TYPES.IS:
             return baseUrl + httpApi.PREFIX_IDENTITY_V2;
-        case SERVICETYPES.IM:
+        case SERVICE_TYPES.IM:
             return baseUrl + '/terms/';
         default:
             throw new Error('Unsupported service type');
