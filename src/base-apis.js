@@ -32,9 +32,9 @@ const utils = require("./utils");
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
         case SERVICE_TYPES.IS:
-            return baseUrl + httpApi.PREFIX_IDENTITY_V2;
+            return baseUrl + httpApi.PREFIX_IDENTITY_V2 + '/terms';
         case SERVICE_TYPES.IM:
-            return baseUrl + '/terms/';
+            return baseUrl + '/terms';
         default:
             throw new Error('Unsupported service type');
     }
