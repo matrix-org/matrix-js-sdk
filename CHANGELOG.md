@@ -1,3 +1,10 @@
+Changes in [2.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.1.1) (2019-07-11)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.1.0...v2.1.1)
+
+ * Process emphemeral events outside timeline handling
+   [\#989](https://github.com/matrix-org/matrix-js-sdk/pull/989)
+
 Changes in [2.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.1.0) (2019-07-08)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.1.0-rc.1...v2.1.0)
