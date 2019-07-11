@@ -48,7 +48,7 @@ describe("MatrixClient", function() {
         const buf = new Buffer('hello world');
         it("should upload the file", function(done) {
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload",
+                "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
@@ -87,7 +87,7 @@ describe("MatrixClient", function() {
 
         it("should parse the response if rawResponse=false", function(done) {
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload",
+                "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.opts.json).toBeFalsy();
             }).respond(200, { "content_uri": "uri" });
@@ -107,7 +107,7 @@ describe("MatrixClient", function() {
 
         it("should parse errors into a MatrixError", function(done) {
             httpBackend.when(
-                "POST", "/_matrix/media/v1/upload",
+                "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
                 expect(req.opts.json).toBeFalsy();
@@ -396,7 +396,7 @@ describe("MatrixClient", function() {
         const auth = {a: 1};
         it("should pass through an auth dict", function(done) {
             httpBackend.when(
-                "DELETE", "/_matrix/client/unstable/devices/my_device",
+                "DELETE", "/_matrix/client/r0/devices/my_device",
             ).check(function(req) {
                 expect(req.data).toEqual({auth: auth});
             }).respond(200);

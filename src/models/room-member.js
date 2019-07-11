@@ -249,7 +249,7 @@ RoomMember.prototype.getDMInviter = function() {
  * "crop" or "scale".
  * @param {Boolean} allowDefault (optional) Passing false causes this method to
  * return null if the user has no avatar image. Otherwise, a default image URL
- * will be returned. Default: true.
+ * will be returned. Default: true. (Deprecated)
  * @param {Boolean} allowDirectLinks (optional) If true, the avatar URL will be
  * returned even if it is a direct hyperlink rather than a matrix content URL.
  * If false, any non-matrix content URLs will be ignored. Setting this option to

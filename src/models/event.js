@@ -1053,7 +1053,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 /* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
  * This is specified here:
- *  http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#redactions
+ *  http://matrix.org/speculator/spec/HEAD/client_server/latest.html#redactions
  *
  * Also:
  *  - We keep 'unsigned' since that is created by the local server

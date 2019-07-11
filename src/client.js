@@ -979,7 +979,8 @@ MatrixClient.prototype.checkKeyBackup = function() {
  */
 MatrixClient.prototype.getKeyBackupVersion = function() {
     return this._http.authedRequest(
-        undefined, "GET", "/room_keys/version",
+        undefined, "GET", "/room_keys/version", undefined, undefined,
+        {prefix: httpApi.PREFIX_UNSTABLE},
     ).then((res) => {
         if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
             const err = "Unknown backup algorithm: " + res.algorithm;
@@ -1123,6 +1124,7 @@ MatrixClient.prototype.createKeyBackupVersion = function(info) {
     return this._crypto._signObject(data.auth_data).then(() => {
         return this._http.authedRequest(
             undefined, "POST", "/room_keys/version", undefined, data,
+            {prefix: httpApi.PREFIX_UNSTABLE},
         );
     }).then((res) => {
         this.enableKeyBackup({
@@ -1152,6 +1154,7 @@ MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
 
     return this._http.authedRequest(
         undefined, "DELETE", path, undefined, undefined,
+        {prefix: httpApi.PREFIX_UNSTABLE},
     );
 };
 
@@ -1193,6 +1196,7 @@ MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "PUT", path.path, path.queryData, data,
+        {prefix: httpApi.PREFIX_UNSTABLE},
     );
 };
 
@@ -1280,7 +1284,8 @@ MatrixClient.prototype._restoreKeyBackup = function(
     }
 
     return this._http.authedRequest(
-        undefined, "GET", path.path, path.queryData,
+        undefined, "GET", path.path, path.queryData, undefined,
+        {prefix: httpApi.PREFIX_UNSTABLE},
     ).then((res) => {
         if (res.rooms) {
             for (const [roomId, roomData] of Object.entries(res.rooms)) {
@@ -1329,7 +1334,8 @@ MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, versio
 
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
-        undefined, "DELETE", path.path, path.queryData,
+        undefined, "DELETE", path.path, path.queryData, undefined,
+        {prefix: httpApi.PREFIX_UNSTABLE},
     );
 };
 
@@ -3065,9 +3071,8 @@ MatrixClient.prototype.paginateEventTimeline = function(eventTimeline, opts) {
             params.from = token;
         }
 
-        promise =
-            this._http.authedRequestWithPrefix(undefined, "GET", path, params,
-                undefined, httpApi.PREFIX_UNSTABLE,
+        promise = this._http.authedRequest(
+            undefined, "GET", path, params, undefined,
         ).then(function(res) {
             const token = res.next_token;
             const matrixEvents = [];

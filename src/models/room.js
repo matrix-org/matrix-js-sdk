@@ -781,7 +781,7 @@ Room.prototype.getBlacklistUnverifiedDevices = function() {
  * @param {string} resizeMethod The thumbnail resize method to use, either
  * "crop" or "scale".
  * @param {boolean} allowDefault True to allow an identicon for this room if an
- * avatar URL wasn't explicitly set. Default: true.
+ * avatar URL wasn't explicitly set. Default: true. (Deprecated)
  * @return {?string} the avatar URL or null.
  */
 Room.prototype.getAvatarUrl = function(baseUrl, width, height, resizeMethod,
