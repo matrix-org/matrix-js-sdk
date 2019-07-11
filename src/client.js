@@ -4081,15 +4081,21 @@ async function(roomId, eventId, relationType, eventType, opts = {}) {
         relationType,
         fetchedEventType,
         opts);
-
-    let events = result.chunk.map(this.getEventMapper());
+    const mapper = this.getEventMapper();
+    let originalEvent;
+    if (result.original_event) {
+        originalEvent = mapper(result.original_event);
+    }
+    let events = result.chunk.map(mapper);
     if (fetchedEventType === "m.room.encrypted") {
-        await Promise.all(events.map(e => {
+        const allEvents = originalEvent ? events.concat(originalEvent) : events;
+        await Promise.all(allEvents.map(e => {
             return new Promise(resolve => e.once("Event.decrypted", resolve));
         }));
         events = events.filter(e => e.getType() === eventType);
     }
     return {
+        originalEvent,
         events,
         nextBatch: result.next_batch,
     };
