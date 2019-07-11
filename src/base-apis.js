@@ -1361,8 +1361,9 @@ MatrixBaseApis.prototype.setPassword = function(authDict, newPassword, callback)
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getDevices = function() {
-    const path = "/devices";
-    return this._http.authedRequest(undefined, path, undefined, undefined);
+    return this._http.authedRequest(
+        undefined, 'GET', "/devices", undefined, undefined,
+    );
 };
 
 /**
