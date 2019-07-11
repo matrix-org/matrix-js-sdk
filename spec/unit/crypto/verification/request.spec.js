@@ -69,8 +69,14 @@ describe("verification request", function() {
         bob.on("crypto.verification.request", (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();
+
+            // XXX: Private function access (but it's a test, so we're okay)
+            bobVerifier._endTimer();
         });
         const aliceVerifier = await alice.requestVerification("@bob:example.com");
         expect(aliceVerifier).toBeAn(SAS);
+
+        // XXX: Private function access (but it's a test, so we're okay)
+        aliceVerifier._endTimer();
     });
 });

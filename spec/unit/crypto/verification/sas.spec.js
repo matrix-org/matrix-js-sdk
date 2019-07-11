@@ -57,6 +57,9 @@ describe("SAS verification", function() {
         await sas.verify()
             .catch(spy);
         expect(spy).toHaveBeenCalled();
+
+        // Cancel the SAS for cleanup (we started a verification, so abort)
+        sas.cancel();
     });
 
     describe("verification", function() {
