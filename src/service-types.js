@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 export const SERVICE_TYPES = Object.freeze({
-    IS: 'SERVICE_TYPE_IS',
-    IM: 'SERVICE_TYPE_IM',
+    IS: 'SERVICE_TYPE_IS', // An Identity Service
+    IM: 'SERVICE_TYPE_IM', // An Integration Manager
 });
