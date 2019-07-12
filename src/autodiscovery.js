@@ -495,7 +495,7 @@ export class AutoDiscovery {
                     if (err || response.statusCode < 200 || response.statusCode >= 300) {
                         let action = "FAIL_PROMPT";
                         let reason = (err ? err.message : null) || "General failure";
-                        if (response.statusCode === 404) {
+                        if (!err && response.statusCode === 404) {
                             action = "IGNORE";
                             reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
                         }
