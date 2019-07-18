@@ -1,3 +1,46 @@
+Changes in [2.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0) (2019-07-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0-rc.2...v2.2.0)
+
+ * Upgrade lodash dependencies
+
+Changes in [2.2.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0-rc.2) (2019-07-12)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0-rc.1...v2.2.0-rc.2)
+
+ * Fix regression from 2.2.0-rc.1 in request to /devices
+   [\#995](https://github.com/matrix-org/matrix-js-sdk/pull/995)
+
+Changes in [2.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0-rc.1) (2019-07-12)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.1.1...v2.2.0-rc.1)
+
+ * End the verification timer when verification is done
+   [\#993](https://github.com/matrix-org/matrix-js-sdk/pull/993)
+ * Stabilize usage of stably stable APIs (in a stable way)
+   [\#990](https://github.com/matrix-org/matrix-js-sdk/pull/990)
+ * Expose original_event for /relations
+   [\#987](https://github.com/matrix-org/matrix-js-sdk/pull/987)
+ * Process ephemeral events outside timeline handling
+   [\#989](https://github.com/matrix-org/matrix-js-sdk/pull/989)
+ * Don't accept any locally known edits earlier than the last known server-side
+   aggregated edit
+   [\#986](https://github.com/matrix-org/matrix-js-sdk/pull/986)
+ * Get edit date transparently from server aggregations or local echo
+   [\#984](https://github.com/matrix-org/matrix-js-sdk/pull/984)
+ * Add a function to flag keys for backup without scheduling a backup
+   [\#982](https://github.com/matrix-org/matrix-js-sdk/pull/982)
+ * Block read marker and read receipt from advancing into pending events
+   [\#981](https://github.com/matrix-org/matrix-js-sdk/pull/981)
+ * Upgrade dependencies
+   [\#977](https://github.com/matrix-org/matrix-js-sdk/pull/977)
+ * Add default push rule to ignore reactions
+   [\#976](https://github.com/matrix-org/matrix-js-sdk/pull/976)
+ * Fix exception whilst syncing
+   [\#979](https://github.com/matrix-org/matrix-js-sdk/pull/979)
+ * Include the error object when raising Session.logged_out
+   [\#975](https://github.com/matrix-org/matrix-js-sdk/pull/975)
+
 Changes in [2.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.1.1) (2019-07-11)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.1.0...v2.1.1)
