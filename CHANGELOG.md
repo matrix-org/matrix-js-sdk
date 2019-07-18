@@ -1,3 +1,9 @@
+Changes in [2.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0) (2019-07-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0-rc.2...v2.2.0)
+
+ * Upgrade lodash dependencies
+
 Changes in [2.2.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0-rc.2) (2019-07-12)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0-rc.1...v2.2.0-rc.2)
