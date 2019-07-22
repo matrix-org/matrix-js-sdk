@@ -34,7 +34,7 @@ function termsUrlForService(serviceType, baseUrl) {
         case SERVICE_TYPES.IS:
             return baseUrl + httpApi.PREFIX_IDENTITY_V2 + '/terms';
         case SERVICE_TYPES.IM:
-            return baseUrl + '/terms';
+            return baseUrl + '/_matrix/integrations/v1/terms';
         default:
             throw new Error('Unsupported service type');
     }
