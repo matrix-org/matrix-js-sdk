@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@ limitations under the License.
 */
 "use strict";
 
+import { SERVICE_TYPES } from './service-types';
+
 /**
  * This is an internal module. MatrixBaseApis is currently only meant to be used
  * by {@link client~MatrixClient}.
@@ -25,6 +28,17 @@ limitations under the License.
 
 const httpApi = require("./http-api");
 const utils = require("./utils");
+
+function termsUrlForService(serviceType, baseUrl) {
+    switch (serviceType) {
+        case SERVICE_TYPES.IS:
+            return baseUrl + httpApi.PREFIX_IDENTITY_V2 + '/terms';
+        case SERVICE_TYPES.IM:
+            return baseUrl + '/_matrix/integrations/v1/terms';
+        default:
+            throw new Error('Unsupported service type');
+    }
+}
 
 /**
  * Low-level wrappers for the Matrix APIs
@@ -1853,6 +1867,25 @@ MatrixBaseApis.prototype.getThirdpartyUser = function(protocol, params) {
     });
 
     return this._http.authedRequest(undefined, "GET", path, params, undefined);
+};
+
+MatrixBaseApis.prototype.getTerms = function(serviceType, baseUrl) {
+    const url = termsUrlForService(serviceType, baseUrl);
+    return this._http.requestOtherUrl(
+        undefined, 'GET', url,
+    );
+};
+
+MatrixBaseApis.prototype.agreeToTerms = function(
+    serviceType, baseUrl, accessToken, termsUrls,
+) {
+    const url = termsUrlForService(serviceType, baseUrl);
+    const headers = {
+        Authorization: "Bearer " + accessToken,
+    };
+    return this._http.requestOtherUrl(
+        undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers },
+    );
 };
 
 /**

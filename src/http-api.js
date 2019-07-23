@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,9 +47,14 @@ module.exports.PREFIX_R0 = "/_matrix/client/r0";
 module.exports.PREFIX_UNSTABLE = "/_matrix/client/unstable";
 
 /**
- * URI path for the identity API
+ * URI path for v1 of the the identity API
  */
 module.exports.PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
+
+/**
+ * URI path for the v2 identity API
+ */
+module.exports.PREFIX_IDENTITY_V2 = "/_matrix/identity/v2";
 
 /**
  * URI path for the media repo API
