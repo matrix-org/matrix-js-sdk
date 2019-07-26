@@ -76,6 +76,8 @@ module.exports.TimelineWindow = require("./timeline-window").TimelineWindow;
 module.exports.InteractiveAuth = require("./interactive-auth");
 /** The {@link module:auto-discovery|AutoDiscovery} class. */
 module.exports.AutoDiscovery = require("./autodiscovery").AutoDiscovery;
+/** The {@link module:direct-chats|DirectChats} class. */
+module.exports.DirectChats = require("./direct-chats");
 
 module.exports.SERVICE_TYPES = require('./service-types').SERVICE_TYPES;
 

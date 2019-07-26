@@ -18,6 +18,8 @@ limitations under the License.
 */
 "use strict";
 
+import {DirectChats} from "./direct-chats";
+
 const PushProcessor = require('./pushprocessor');
 
 /**
@@ -324,6 +326,15 @@ function MatrixClient(opts) {
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+/**
+ * Gets the shared direct chat manager for this client.
+ * @returns {DirectChats} The direct chat manager for this client.
+ */
+MatrixClient.prototype.unstable_getDirectChats = function() {
+    if (!this._directChats) this._directChats = new DirectChats(this);
+    return this._directChats;
+};
 
 /**
  * Clear any data out of the persistent stores used by the client.
