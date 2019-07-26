@@ -40,7 +40,7 @@ export class DirectChats {
 
         this._usersToRooms = {}; // {userIds: roomId}
         this._roomsToUsers = {}; // {roomId: userIds}
-        this._remapRooms(this._direct ? this._direct.getContent()['rooms'] : null);
+        this._remapRooms(this._direct ? this._direct.getContent()['rooms'] : null, true);
 
         this._client.on("accountData", (data) => {
             if (data.getType() === 'm.direct_chats') {
@@ -174,9 +174,10 @@ export class DirectChats {
      * DMs do not change who they are with. Raises `DirectChats.change` from
      * the MatrixClient if the direct chats change.
      * @param {string[]} roomIds The room IDs to now consider as DMs.
+     * @param {boolean} firstUpdate True if this is the first update for the DMs. Default false.
      * @private
      */
-    _remapRooms(roomIds) {
+    _remapRooms(roomIds, firstUpdate=false) {
         logger.info("Updating DMs for " + roomIds.length + " room IDs");
 
         if (!roomIds) {
@@ -184,7 +185,9 @@ export class DirectChats {
             const removedIds = this.roomIds;
             this._usersToRooms = {};
             this._roomsToUsers = {};
-            this._client.emit("DirectChats.change", [], removedIds);
+            if (!firstUpdate) {
+                this._client.emit("DirectChats.change", [], removedIds);
+            }
             return;
         }
 
@@ -236,8 +239,11 @@ export class DirectChats {
             actuallyRemovedIds.push(oldRoomId);
         }
 
-        if (removed || added) {
-            this._client.emit("DirectChats.change", actuallyAddedIds, actuallyRemovedIds);
+        if (actuallyRemovedIds.length || actuallyAddedIds.length) {
+            if (!firstUpdate) {
+                this._client.emit("DirectChats.change", actuallyAddedIds, actuallyRemovedIds);
+                this._client.setAccountData("m.direct_chats", {rooms: this.roomIds}, undefined);
+            }
         }
     }
 
