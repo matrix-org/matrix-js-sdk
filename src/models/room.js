@@ -388,6 +388,7 @@ Room.prototype.getMyMembership = function() {
     return this._selfMembership;
 };
 
+// TODO: TravisR - Figure out what to do with this, if anything
 /**
  * If this room is a DM we're invited to,
  * try to find out who invited us
@@ -409,6 +410,7 @@ Room.prototype.getDMInviter = function() {
     }
 };
 
+// TODO: TravisR - Figure out what to do with this, if anything
 /**
  * Assuming this room is a DM room, tries to guess with which user.
  * @return {string} user id of the other member (could be syncing user)
@@ -1821,6 +1823,8 @@ function calculateRoomName(room, userId, ignoreRoomNameEvent) {
         otherMembers = otherMembers.slice(0, 5);
         otherNames = otherMembers.map((m) => m.name);
     }
+
+    // TODO: TravisR - Synapse code to change m.heroes for DMs.
 
     if (inviteJoinCount) {
         return memberNamesToRoomName(otherNames, inviteJoinCount);
