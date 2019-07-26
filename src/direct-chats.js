@@ -107,7 +107,7 @@ export class DirectChats {
         await this._client.setAccountData(
             "m.direct_chats",
             {rooms: [response['room_id'], ...this.roomIds]},
-            null,
+            undefined,
         );
         return this._client.getRoom(response['room_id']);
     }
@@ -144,7 +144,7 @@ export class DirectChats {
             allRoomIds.push(...roomIds);
         }
         this._remapRooms(allRoomIds);
-        await this._client.setAccountData("m.direct_chats", {rooms: this.roomIds}, null);
+        await this._client.setAccountData("m.direct_chats", {rooms: this.roomIds}, undefined);
     }
 
     /**
