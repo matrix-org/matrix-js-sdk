@@ -164,7 +164,7 @@ export class DirectChats {
             const roomIds = legacy[key];
             allRoomIds.push(...roomIds);
         }
-        this._remapRooms(allRoomIds);
+        this._remapRooms([...this.roomIds, ...allRoomIds]);
         await this._client.setAccountData("m.direct_chats", {rooms: this.roomIds}, undefined);
     }
 
