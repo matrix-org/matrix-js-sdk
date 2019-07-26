@@ -65,6 +65,24 @@ export class DirectChats {
     }
 
     /**
+     * Adds a room as a direct chat. If the room does not meet the requirements
+     * for a direct chat, this will do nothing.
+     * @param {string} roomId The room ID to add a direct chat.
+     */
+    addDirectChat(roomId) {
+        this._remapRooms([roomId, ...this.roomIds]);
+    }
+
+    /**
+     * Removes a direct chat. If the room was previously not a direct chat, this
+     * does nothing.
+     * @param {string} roomId The room ID to remove as a direct chat.
+     */
+    removeDirectChat(roomId) {
+        this._remapRooms(this.roomIds.filter(r => r !== roomId));
+    }
+
+    /**
      * Determines if a given room ID is a direct chat.
      * @param {string} roomId The room ID to test.
      * @returns {boolean} True if the room is a direct chat, false otherwise.
@@ -177,6 +195,8 @@ export class DirectChats {
         for (const newRoomId of added) {
             const room = this._client.getRoom(newRoomId);
             if (!room) return;
+
+            // TODO: TravisR - Check join rules for DM
 
             const tombstone = room.currentState.getStateEvents('m.room.tombstone', '');
             if (tombstone) continue;
