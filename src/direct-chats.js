@@ -43,6 +43,7 @@ export class DirectChats {
         this._remapRooms(this._direct ? this._direct.getContent()['rooms'] : null);
 
         this._client.on("accountData", (data) => {
+            if (data.getType() !== 'm.direct_chats') return;
             this._remapRooms(data.getContent()['rooms']);
         });
     }
