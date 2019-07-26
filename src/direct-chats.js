@@ -20,6 +20,7 @@ import logger from '../src/logger';
 
 // TODO: TravisR - Handle members leaving direct chats, including ourselves.
 // TODO: TravisR - Handle accepting invites to direct chats
+// TODO: TravisR - Add backwards compatibility (update both account data events)
 
 /**
  * Manages direct chats for a given MatrixClient
@@ -102,7 +103,11 @@ export class DirectChats {
             invite: partnerIds,
             is_direct: true,
         });
-        await this._client.setAccountData("m.direct_chats", {rooms: [response['room_id'], ...this.roomIds]}, null);
+        await this._client.setAccountData(
+            "m.direct_chats",
+            {rooms: [response['room_id'], ...this.roomIds]},
+            null,
+        );
         return this._client.getRoom(response['room_id']);
     }
 
@@ -244,7 +249,7 @@ export class DirectChats {
      * @private
      */
     _getMinimumPowerLevel(powerLevelEvent) {
-        let stateDefault = powerLevelEvent.getContent()['state_default'];
+        const stateDefault = powerLevelEvent.getContent()['state_default'];
         if (!isNaN(stateDefault) && stateDefault !== null) {
             return stateDefault;
         }
