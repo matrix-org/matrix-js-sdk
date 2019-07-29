@@ -1702,6 +1702,27 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
 // ==========================
 
 /**
+ * Register with an Identity Server using the OpenID token from the user's
+ * Homeserver, which can be retrieved via
+ * {@link module:client~MatrixClient#getOpenIdToken}.
+ *
+ * Note that the `/account/register` endpoint (as well as IS authentication in
+ * general) was added as part of the v2 API version.
+ *
+ * @param {object} hsOpenIdToken
+ * @return {module:client.Promise} Resolves: with object containing an Identity
+ * Server access token.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
+    const uri = this.idBaseUrl + httpApi.PREFIX_IDENTITY_V2 + "/account/register";
+    return this._http.requestOtherUrl(
+        undefined, "POST", uri,
+        null, hsOpenIdToken,
+    );
+};
+
+/**
  * Requests an email verification token directly from an Identity Server.
  *
  * Note that the Home Server offers APIs to proxy this API for specific
@@ -1767,22 +1788,33 @@ MatrixBaseApis.prototype.submitMsisdnToken = function(sid, clientSecret, token) 
 /**
  * Looks up the public Matrix ID mapping for a given 3rd party
  * identifier from the Identity Server
+ *
  * @param {string} medium The medium of the threepid, eg. 'email'
  * @param {string} address The textual address of the threepid
  * @param {module:client.callback} callback Optional.
+ * @param {string} isAccessToken The `access_token` field of the Identity Server
+ * `/account/register` response (see {@link registerWithIdentityServer}).
+ *
  * @return {module:client.Promise} Resolves: A threepid mapping
  *                                 object or the empty object if no mapping
  *                                 exists
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.lookupThreePid = function(medium, address, callback) {
+MatrixBaseApis.prototype.lookupThreePid = function(
+    medium,
+    address,
+    callback,
+    isAccessToken,
+) {
     const params = {
         medium: medium,
         address: address,
     };
+
+    // TODO: Testing only - add fallback to v1
     return this._http.idServerRequest(
         callback, "GET", "/lookup",
-        params, httpApi.PREFIX_IDENTITY_V1,
+        params, httpApi.PREFIX_IDENTITY_V2, isAccessToken,
     );
 };
 

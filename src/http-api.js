@@ -374,7 +374,14 @@ module.exports.MatrixHttpApi.prototype = {
         return this.uploads;
     },
 
-    idServerRequest: function(callback, method, path, params, prefix) {
+    idServerRequest: function(
+        callback,
+        method,
+        path,
+        params,
+        prefix,
+        accessToken,
+    ) {
         const fullUri = this.opts.idBaseUrl + prefix + path;
 
         if (callback !== undefined && !utils.isFunction(callback)) {
@@ -394,6 +401,11 @@ module.exports.MatrixHttpApi.prototype = {
             opts.qs = params;
         } else {
             opts.form = params;
+        }
+        if (accessToken) {
+            opts.headers = {
+                Authorization: `Bearer ${accessToken}`,
+            };
         }
 
         const defer = Promise.defer();
