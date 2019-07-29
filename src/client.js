@@ -62,7 +62,6 @@ Promise.config({warnings: false});
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
-const MAX_TOMBSTONE_HISTORY = 30;
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -2382,8 +2381,8 @@ MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=fals
 
         // Push to the end because we're looking forwards
         upgradeHistory.push(refRoom);
-        const roomIds = upgradeHistory.map((ref) => ref.roomId);
-        if ((new Set(roomIds)).size < roomIds.length) {
+        const roomIds = new Set(upgradeHistory.map((ref) => ref.roomId));
+        if (roomIds.size < upgradeHistory.length) {
            // The last room added to the list introduced a previous roomId
            // To avoid recursion, return the last rooms - 1
            return upgradeHistory.slice(0, upgradeHistory.length - 1);
