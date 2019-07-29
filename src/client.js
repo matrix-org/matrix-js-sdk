@@ -62,6 +62,7 @@ Promise.config({warnings: false});
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
+const MAX_TOMBSTONE_HISTORY = 30;
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
     const keys = [];
@@ -2369,6 +2370,7 @@ MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=fals
     while (tombstoneEvent) {
         const refRoom = this.getRoom(tombstoneEvent.getContent()['replacement_room']);
         if (!refRoom) break; // end of the chain
+        if (refRoom.roomId === currentRoom.roomId) break; // Tombstone is referencing it's own room
 
         if (verifyLinks) {
             createEvent = refRoom.currentState.getStateEvents("m.room.create", "");
@@ -2380,6 +2382,12 @@ MatrixClient.prototype.getRoomUpgradeHistory = function(roomId, verifyLinks=fals
 
         // Push to the end because we're looking forwards
         upgradeHistory.push(refRoom);
+        const roomIds = upgradeHistory.map((ref) => ref.roomId);
+        if ((new Set(roomIds)).size < roomIds.length) {
+           // The last room added to the list introduced a previous roomId
+           // To avoid recursion, return the last rooms - 1
+           return upgradeHistory.slice(0, upgradeHistory.length - 1);
+        }
 
         // Set the current room to the reference room so we know where we're at
         currentRoom = refRoom;
