@@ -21,6 +21,7 @@ import logger from '../src/logger';
 // TODO: TravisR - Handle members leaving direct chats, including ourselves.
 // TODO: TravisR - Handle accepting invites to direct chats
 // TODO: TravisR - Add backwards compatibility (update both account data events)
+// TODO: TravisR - Tests for this class
 
 /**
  * Manages direct chats for a given MatrixClient
@@ -45,8 +46,10 @@ export class DirectChats {
         this._client.on("accountData", (data) => {
             if (data.getType() === 'm.direct_chats') {
                 this._remapRooms(data.getContent()['rooms']);
+                this._direct = data;
             } else if (data.getType() === 'm.direct') {
                 logger.warn("Received update to old m.direct data - possible migration needed");
+                this._legacy = data;
             }
         });
     }
@@ -56,7 +59,10 @@ export class DirectChats {
      * @returns {boolean} True if data can be migrated, false otherwise.
      */
     get canMigrate() {
-        return !this._direct && !!this._legacy;
+        const missingNewDirectChats = !this._direct
+            || !this._direct.getContent()['rooms']
+            || !this._direct.getContent()['rooms'].length;
+        return missingNewDirectChats && !!this._legacy;
     }
 
     /**
@@ -187,6 +193,7 @@ export class DirectChats {
             this._roomsToUsers = {};
             if (!firstUpdate) {
                 this._client.emit("DirectChats.change", [], removedIds);
+                this._client.setAccountData("m.direct_chats", {rooms: this.roomIds}, undefined);
             }
             return;
         }
