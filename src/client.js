@@ -1369,8 +1369,10 @@ MatrixClient.prototype.getGroups = function() {
  * @return {module:client.Promise} Resolves with an object containing the config.
  */
 MatrixClient.prototype.getMediaConfig = function(callback) {
-    return this._http.authedRequestWithPrefix(
-        callback, "GET", "/config", undefined, undefined, httpApi.PREFIX_MEDIA_R0,
+    return this._http.authedRequest(
+        callback, "GET", "/config", undefined, undefined, {
+            prefix: httpApi.PREFIX_MEDIA_R0,
+        },
     );
 };
 
@@ -2275,11 +2277,13 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
     }
 
     const self = this;
-    return this._http.authedRequestWithPrefix(
+    return this._http.authedRequest(
         callback, "GET", "/preview_url", {
             url: url,
             ts: ts,
-        }, undefined, httpApi.PREFIX_MEDIA_R0,
+        }, undefined, {
+            prefix: httpApi.PREFIX_MEDIA_R0,
+        },
     ).then(function(response) {
         // TODO: expire cache occasionally
         self.urlPreviewCache[key] = response;
