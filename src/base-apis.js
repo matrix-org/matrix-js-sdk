@@ -17,14 +17,15 @@ limitations under the License.
 */
 "use strict";
 
-import { SERVICE_TYPES } from './service-types';
-
 /**
  * This is an internal module. MatrixBaseApis is currently only meant to be used
  * by {@link client~MatrixClient}.
  *
  * @module base-apis
  */
+
+import { SERVICE_TYPES } from './service-types';
+import logger from './logger';
 
 const httpApi = require("./http-api");
 const utils = require("./utils");
@@ -1800,7 +1801,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = function(sid, clientSecret, token) 
  *                                 exists
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.lookupThreePid = function(
+MatrixBaseApis.prototype.lookupThreePid = async function(
     medium,
     address,
     callback,
@@ -1811,11 +1812,26 @@ MatrixBaseApis.prototype.lookupThreePid = function(
         address: address,
     };
 
-    // TODO: Testing only - add fallback to v1
-    return this._http.idServerRequest(
-        callback, "GET", "/lookup",
-        params, httpApi.PREFIX_IDENTITY_V2, isAccessToken,
-    );
+    try {
+        const response = await this._http.idServerRequest(
+            undefined, "GET", "/lookup",
+            params, httpApi.PREFIX_IDENTITY_V2, isAccessToken,
+        );
+        // TODO: Fold callback into above call once v1 path below is removed
+        if (callback) callback(null, response);
+        return response;
+    } catch (err) {
+        if (err.cors === "rejected" || err.httpStatus === 404) {
+            // Fall back to deprecated v1 API for now
+            logger.warn("IS doesn't support v2, falling back to deprecated v1");
+            return await this._http.idServerRequest(
+                callback, "GET", "/lookup",
+                params, httpApi.PREFIX_IDENTITY_V1,
+            );
+        }
+        if (callback) callback(err);
+        throw err;
+    }
 };
 
 
