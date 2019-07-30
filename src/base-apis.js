@@ -1773,6 +1773,7 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "POST", "/validate/email/requestToken",
@@ -1824,6 +1825,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 undefined, "POST", "/validate/msisdn/submitToken",
@@ -1872,6 +1874,7 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "GET", "/lookup",
