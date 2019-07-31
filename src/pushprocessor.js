@@ -47,7 +47,7 @@ const DEFAULT_OVERRIDE_RULES = [
                 kind: "event_match",
                 key: "state_key",
                 pattern: "",
-            }
+            },
         ],
         actions: [
             "notify",
