@@ -29,6 +29,7 @@ import logger from './logger';
 
 const httpApi = require("./http-api");
 const utils = require("./utils");
+const PushProcessor = require("./pushprocessor");
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
@@ -1477,7 +1478,9 @@ MatrixBaseApis.prototype.setPusher = function(pusher, callback) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.getPushRules = function(callback) {
-    return this._http.authedRequest(callback, "GET", "/pushrules/");
+    return this._http.authedRequest(callback, "GET", "/pushrules/").then(rules => {
+        return PushProcessor.rewriteDefaultRules(rules);
+    });
 };
 
 /**
