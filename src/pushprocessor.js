@@ -468,7 +468,13 @@ PushProcessor.actionListToActionsObject = function(actionlist) {
  * @returns {object} The rewritten rules
  */
 PushProcessor.rewriteDefaultRules = function(incomingRules) {
-    const newRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+    let newRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+
+    // These lines are mostly to make the tests happy. We shouldn't run into these
+    // properties missing in practice.
+    if (!newRules) newRules = {};
+    if (!newRules.global) newRules.global = {};
+    if (!newRules.global.override) newRules.global.override = [];
 
     // Fix default override rules
     newRules.global.override = newRules.global.override.map(r => {
