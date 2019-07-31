@@ -1,3 +1,16 @@
+Changes in [2.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.0-rc.1) (2019-07-31)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0...v2.3.0-rc.1)
+
+ * Add support for IS v2 API with authentication
+   [\#1002](https://github.com/matrix-org/matrix-js-sdk/pull/1002)
+ * Tombstone bugfixes
+   [\#1001](https://github.com/matrix-org/matrix-js-sdk/pull/1001)
+ * Support for MSC2140 (terms of service for IS/IM)
+   [\#988](https://github.com/matrix-org/matrix-js-sdk/pull/988)
+ * Add a request method to /devices
+   [\#994](https://github.com/matrix-org/matrix-js-sdk/pull/994)
+
 Changes in [2.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.2.0) (2019-07-18)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0-rc.2...v2.2.0)
