@@ -32,6 +32,7 @@ const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
+const PushProcessor = require("./pushprocessor");
 import logger from '../src/logger';
 
 import {InvalidStoreError} from './errors';
@@ -1030,8 +1031,9 @@ SyncApi.prototype._processSyncResponse = async function(
                 // honour push rules that were previously cached. Base rules
                 // will be updated when we recieve push rules via getPushRules
                 // (see SyncApi.prototype.sync) before syncing over the network.
-                if (accountDataEvent.getType() == 'm.push_rules') {
-                    client.pushRules = accountDataEvent.getContent();
+                if (accountDataEvent.getType() === 'm.push_rules') {
+                    const rules = accountDataEvent.getContent();
+                    client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
                 client.emit("accountData", accountDataEvent);
                 return accountDataEvent;

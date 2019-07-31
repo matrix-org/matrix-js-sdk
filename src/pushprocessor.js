@@ -43,6 +43,11 @@ const DEFAULT_OVERRIDE_RULES = [
                 key: "type",
                 pattern: "m.room.tombstone",
             },
+            {
+                kind: "event_match",
+                key: "state_key",
+                pattern: "",
+            }
         ],
         actions: [
             "notify",
@@ -453,6 +458,32 @@ PushProcessor.actionListToActionsObject = function(actionlist) {
         }
     }
     return actionobj;
+};
+
+/**
+ * Rewrites conditions on a client's push rules to match the defaults
+ * where applicable. Useful for upgrading push rules to more strict
+ * conditions when the server is falling behind on defaults.
+ * @param {object} incomingRules The client's existing push rules
+ * @returns {object} The rewritten rules
+ */
+PushProcessor.rewriteDefaultRules = function(incomingRules) {
+    const newRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+
+    // Fix default override rules
+    newRules.global.override = newRules.global.override.map(r => {
+        const defaultRule = DEFAULT_OVERRIDE_RULES.find(d => d.rule_id === r.rule_id);
+        if (!defaultRule) return r;
+
+        // Copy over the actions, default, and conditions. Don't touch the user's
+        // preference.
+        r.default = defaultRule.default;
+        r.conditions = defaultRule.conditions;
+        r.actions = defaultRule.actions;
+        return r;
+    });
+
+    return newRules;
 };
 
 /**
