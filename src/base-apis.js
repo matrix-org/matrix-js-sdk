@@ -1889,6 +1889,25 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
     }
 };
 
+/**
+ * Get account info from the Identity Server. This is useful as a neutral check
+ * to verify that other APIs are likely to approve access by testing that the
+ * token is valid, terms have been agreed, etc.
+ *
+ * @param {string} identityAccessToken The `access_token` field of the Identity
+ * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ *
+ * @return {module:client.Promise} Resolves: an object with account info.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.getIdentityAccount = function(
+    identityAccessToken,
+) {
+    return this._http.idServerRequest(
+        undefined, "GET", "/account",
+        undefined, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+    );
+};
 
 // Direct-to-device messaging
 // ==========================
