@@ -1,3 +1,10 @@
+Changes in [2.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.0) (2019-08-05)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.0-rc.1...v2.3.0)
+
+ * [release] Support rewriting push rules when our internal defaults change
+   [\#1008](https://github.com/matrix-org/matrix-js-sdk/pull/1008)
+
 Changes in [2.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.0-rc.1) (2019-07-31)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.2.0...v2.3.0-rc.1)
