@@ -477,8 +477,10 @@ MatrixBaseApis.prototype.fetchRelations =
             $relationType: relationType,
             $eventType: eventType,
         });
-    const response = await this._http.authedRequestWithPrefix(
-        undefined, "GET", path, null, null, httpApi.PREFIX_UNSTABLE,
+    const response = await this._http.authedRequest(
+        undefined, "GET", path, null, null, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
     return response;
 };
