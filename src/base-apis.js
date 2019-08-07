@@ -1892,7 +1892,8 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
 /**
  * Looks up the public Matrix ID mappings for multiple 3PIDs.
  *
- * @param {array} query Array of arrays containing [medium, address]
+ * @param {Array.<Array.<string>>} query Array of arrays containing
+ * [medium, address]
  * @param {string} identityAccessToken The `access_token` field of the Identity
  * Server `/account/register` response (see {@link registerWithIdentityServer}).
  *
