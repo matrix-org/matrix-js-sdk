@@ -1890,6 +1890,44 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
 };
 
 /**
+ * Looks up the public Matrix ID mappings for multiple 3PIDs.
+ *
+ * @param {array} query Array of arrays containing [medium, address]
+ * @param {string} identityAccessToken The `access_token` field of the Identity
+ * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ *
+ * @return {module:client.Promise} Resolves: Lookup results from IS.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.bulkLookupThreePids = async function(
+    query,
+    identityAccessToken,
+) {
+    const params = {
+        threepids: query,
+    };
+
+    try {
+        return await this._http.idServerRequest(
+            undefined, "POST", "/bulk_lookup", JSON.stringify(params),
+            httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+    } catch (err) {
+        if (err.cors === "rejected" || err.httpStatus === 404) {
+            // Fall back to deprecated v1 API for now
+            // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
+            logger.warn("IS doesn't support v2, falling back to deprecated v1");
+            return await this._http.idServerRequest(
+                undefined, "POST", "/bulk_lookup", JSON.stringify(params),
+                httpApi.PREFIX_IDENTITY_V1, identityAccessToken,
+            );
+        }
+        throw err;
+    }
+};
+
+/**
  * Get account info from the Identity Server. This is useful as a neutral check
  * to verify that other APIs are likely to approve access by testing that the
  * token is valid, terms have been agreed, etc.

@@ -396,16 +396,19 @@ module.exports.MatrixHttpApi.prototype = {
             withCredentials: false,
             json: false,
             _matrix_opts: this.opts,
+            headers: {},
         };
         if (method == 'GET') {
             opts.qs = params;
-        } else {
+        } else if (typeof params === "object") {
             opts.form = params;
+        } else if (typeof params === "string") {
+            // Assume the caller has serialised the body to JSON
+            opts.body = params;
+            opts.headers['Content-Type'] = "application/json";
         }
         if (accessToken) {
-            opts.headers = {
-                Authorization: `Bearer ${accessToken}`,
-            };
+            opts.headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
         const defer = Promise.defer();
