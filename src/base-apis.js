@@ -1769,7 +1769,8 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
     try {
         const response = await this._http.idServerRequest(
             undefined, "POST", "/validate/email/requestToken",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
+            identityAccessToken,
         );
         // TODO: Fold callback into above call once v1 path below is removed
         if (callback) callback(null, response);
@@ -1824,7 +1825,8 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
     try {
         return await this._http.idServerRequest(
             undefined, "POST", "/validate/msisdn/submitToken",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
+            identityAccessToken,
         );
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
