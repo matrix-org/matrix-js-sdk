@@ -2,6 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1989,6 +1990,23 @@ MatrixBaseApis.prototype.agreeToTerms = function(
     return this._http.requestOtherUrl(
         undefined, 'POST', url, null, { user_accepts: termsUrls }, { headers },
     );
+};
+
+/**
+ * Reports an event as inappropriate to the server, which may then notify the appropriate people.
+ * @param {string} roomId The room in which the event being reported is located.
+ * @param {string} eventId The event to report.
+ * @param {number} score The score to rate this content as where -100 is most offensive and 0 is inoffensive.
+ * @param {string} reason The reason the content is being reported. May be blank.
+ * @returns {module:client.Promise} Resolves to an empty object if successful
+ */
+MatrixBaseApis.prototype.reportEvent = function(roomId, eventId, score, reason) {
+    const path = utils.encodeUri("/rooms/$roomId/report/$eventId", {
+        $roomId: roomId,
+        $eventId: eventId,
+    });
+
+    return this._http.authedRequest(undefined, "POST", path, null, {score, reason});
 };
 
 /**
