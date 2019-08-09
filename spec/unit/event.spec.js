@@ -21,7 +21,7 @@ import testUtils from '../test-utils';
 
 import expect from 'expect';
 import Promise from 'bluebird';
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 describe("MatrixEvent", () => {
     beforeEach(function() {

@@ -53,4 +53,4 @@ MockStorageApi.prototype = {
 };
 
 /** */
-module.exports = MockStorageApi;
+export default MockStorageApi;

@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 import Promise from 'bluebird';

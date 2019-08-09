@@ -4,7 +4,7 @@ import Promise from 'bluebird';
 
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
+import utils from "../test-utils";
 const EventStatus = sdk.EventStatus;
 
 import expect from 'expect';

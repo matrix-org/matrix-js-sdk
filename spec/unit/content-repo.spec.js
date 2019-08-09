@@ -1,7 +1,7 @@
 "use strict";
 import 'source-map-support/register';
 const ContentRepo = require("../../lib/content-repo");
-const testUtils = require("../test-utils");
+import testUtils from "../test-utils";
 
 import expect from 'expect';
 

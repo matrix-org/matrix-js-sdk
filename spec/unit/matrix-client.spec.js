@@ -3,11 +3,11 @@ import 'source-map-support/register';
 import Promise from 'bluebird';
 const sdk = require("../..");
 const MatrixClient = sdk.MatrixClient;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 import lolex from 'lolex';
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";

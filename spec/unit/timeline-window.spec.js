@@ -6,7 +6,7 @@ const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;
 const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
 
-const utils = require("../test-utils");
+import utils from "../test-utils";
 import expect from 'expect';
 
 const ROOM_ID = "roomId";

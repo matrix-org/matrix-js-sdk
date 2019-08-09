@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const sdk = require("../..");
 const User = sdk.User;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 

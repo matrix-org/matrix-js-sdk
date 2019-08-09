@@ -20,7 +20,7 @@ import Promise from 'bluebird';
 
 import TestClient from '../TestClient';
 import testUtils from '../test-utils';
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 const ROOM_ID = "!room:id";
 

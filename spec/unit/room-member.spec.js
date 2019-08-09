@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const sdk = require("../..");
 const RoomMember = sdk.RoomMember;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 

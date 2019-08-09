@@ -34,9 +34,9 @@ import expect from 'expect';
 const sdk = require("../..");
 import Promise from 'bluebird';
 const utils = require("../../lib/utils");
-const testUtils = require("../test-utils");
+import testUtils from "../test-utils";
 const TestClient = require('../TestClient').default;
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 let aliTestClient;
 const roomId = "!room:localhost";

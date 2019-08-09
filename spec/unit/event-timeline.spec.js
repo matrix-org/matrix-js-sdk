@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 function mockRoomStates(timeline) {
     timeline._startState = utils.mock(sdk.RoomState, "startState");

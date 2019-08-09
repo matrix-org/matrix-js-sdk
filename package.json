@@ -6,7 +6,7 @@
   "scripts": {
     "test:build": "babel spec -s -d specbuild --verbose --extensions \".ts,.js\"",
     "test:run": "istanbul cover --report text --report cobertura --config .istanbul.yml -i \"lib/**/*.js\" node_modules/mocha/bin/_mocha -- --recursive specbuild --colors --reporter mocha-jenkins-reporter --reporter-options junit_report_path=reports/test-results.xml",
-    "test:watch": "mocha --watch --compilers js:babel-core/register --recursive spec --colors",
+    "test:watch": "mocha --watch --compilers js:@babel/register --recursive spec --colors",
     "test": "yarn test:build && yarn test:run",
     "check": "yarn test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel src --no-babelrc --plugins @babel/plugin-proposal-class-properties -d .jsdocbuild --verbose --extensions \".ts,.js\" && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
@@ -73,6 +73,7 @@
     "@babel/plugin-transform-runtime": "^7.5.5",
     "@babel/preset-env": "^7.5.5",
     "@babel/preset-typescript": "^7.3.3",
+    "@babel/register": "^7.5.5",
     "@babel/runtime": "^7.5.5",
     "babel-eslint": "^10.0.1",
     "browserify": "^16.2.3",

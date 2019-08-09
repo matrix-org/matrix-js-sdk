@@ -21,9 +21,9 @@ import Promise from 'bluebird';
 import expect from 'expect';
 
 const utils = require('../../lib/utils');
-const testUtils = require('../test-utils');
+import testUtils from "../test-utils";
 const TestClient = require('../TestClient').default;
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 const ROOM_ID = "!room:id";
 

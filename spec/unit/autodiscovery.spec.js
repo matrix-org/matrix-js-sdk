@@ -18,7 +18,7 @@ limitations under the License.
 import 'source-map-support/register';
 import Promise from 'bluebird';
 const sdk = require("../..");
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 const AutoDiscovery = sdk.AutoDiscovery;
 

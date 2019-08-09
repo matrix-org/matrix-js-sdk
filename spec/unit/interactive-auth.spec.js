@@ -18,13 +18,13 @@ limitations under the License.
 import 'source-map-support/register';
 import Promise from 'bluebird';
 const sdk = require("../..");
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
 import expect from 'expect';
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)

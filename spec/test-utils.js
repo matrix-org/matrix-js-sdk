@@ -5,7 +5,7 @@ import Promise from 'bluebird';
 // load olm before the sdk if possible
 import './olm-loader';
 
-import logger from '../src/logger';
+import logger from '../lib/logger';
 import sdk from '..';
 const MatrixEvent = sdk.MatrixEvent;
 
@@ -16,7 +16,7 @@ const MatrixEvent = sdk.MatrixEvent;
  * @param {Number=} count Number of syncs to wait for (default 1)
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
-module.exports.syncPromise = function(client, count) {
+function syncPromise(client, count) {
     if (count === undefined) {
         count = 1;
     }
@@ -37,21 +37,21 @@ module.exports.syncPromise = function(client, count) {
     });
 
     return p.then(() => {
-        return module.exports.syncPromise(client, count-1);
+        return syncPromise(client, count-1);
     });
-};
+}
 
 /**
  * Perform common actions before each test case, e.g. printing the test case
  * name to stdout.
  * @param {Mocha.Context} context  The test context
  */
-module.exports.beforeEach = function(context) {
+function beforeEach(context) {
     const desc = context.currentTest.fullTitle();
 
     logger.log(desc);
     logger.log(new Array(1 + desc.length).join("="));
-};
+}
 
 /**
  * Create a spy for an object and automatically spy its methods.
@@ -59,7 +59,7 @@ module.exports.beforeEach = function(context) {
  * @param {string} name The name of the class
  * @return {Object} An instantiated object with spied methods/properties.
  */
-module.exports.mock = function(constr, name) {
+function mock(constr, name) {
     // Based on
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
@@ -80,7 +80,7 @@ module.exports.mock = function(constr, name) {
         }
     }
     return result;
-};
+}
 
 /**
  * Create an Event.
@@ -93,7 +93,7 @@ module.exports.mock = function(constr, name) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object} a JSON object representing this event.
  */
-module.exports.mkEvent = function(opts) {
+function mkEvent(opts) {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
@@ -112,14 +112,14 @@ module.exports.mkEvent = function(opts) {
         event.state_key = "";
     }
     return opts.event ? new MatrixEvent(event) : event;
-};
+}
 
 /**
  * Create an m.presence event.
  * @param {Object} opts Values for the presence.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkPresence = function(opts) {
+function mkPresence(opts) {
     if (!opts.user) {
         throw new Error("Missing user");
     }
@@ -135,7 +135,7 @@ module.exports.mkPresence = function(opts) {
         },
     };
     return opts.event ? new MatrixEvent(event) : event;
-};
+}
 
 /**
  * Create an m.room.member event.
@@ -150,7 +150,7 @@ module.exports.mkPresence = function(opts) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMembership = function(opts) {
+function mkMembership(opts) {
     opts.type = "m.room.member";
     if (!opts.skey) {
         opts.skey = opts.sender || opts.user;
@@ -167,8 +167,8 @@ module.exports.mkMembership = function(opts) {
     if (opts.url) {
         opts.content.avatar_url = opts.url;
     }
-    return module.exports.mkEvent(opts);
-};
+    return mkEvent(opts);
+}
 
 /**
  * Create an m.room.message event.
@@ -179,7 +179,7 @@ module.exports.mkMembership = function(opts) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMessage = function(opts) {
+function mkMessage(opts) {
     opts.type = "m.room.message";
     if (!opts.msg) {
         opts.msg = "Random->" + Math.random();
@@ -191,8 +191,8 @@ module.exports.mkMessage = function(opts) {
         msgtype: "m.text",
         body: opts.msg,
     };
-    return module.exports.mkEvent(opts);
-};
+    return mkEvent(opts);
+}
 
 
 /**
@@ -200,10 +200,10 @@ module.exports.mkMessage = function(opts) {
  *
  * @constructor
  */
-module.exports.MockStorageApi = function() {
+const MockStorageApi = function() {
     this.data = {};
 };
-module.exports.MockStorageApi.prototype = {
+MockStorageApi.prototype = {
     get length() {
         return Object.keys(this.data).length;
     },
@@ -228,7 +228,7 @@ module.exports.MockStorageApi.prototype = {
  * @param {MatrixEvent} event
  * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
  */
-module.exports.awaitDecryption = function(event) {
+function awaitDecryption(event) {
     if (!event.isBeingDecrypted()) {
         return Promise.resolve(event);
     }
@@ -241,4 +241,17 @@ module.exports.awaitDecryption = function(event) {
             resolve(ev);
         });
     });
+}
+
+const utils = {
+    syncPromise,
+    beforeEach,
+    mock,
+    mkEvent,
+    mkPresence,
+    mkMembership,
+    mkMessage,
+    MockStorageApi,
+    awaitDecryption,
 };
+export default utils;

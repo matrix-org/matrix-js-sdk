@@ -19,7 +19,7 @@ import DeviceList from '../../../lib/crypto/DeviceList';
 import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
 import testUtils from '../../test-utils';
 import utils from '../../../lib/utils';
-import logger from '../../../src/logger';
+import logger from '../../../lib/logger';
 
 import expect from 'expect';
 import Promise from 'bluebird';

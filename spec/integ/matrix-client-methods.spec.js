@@ -6,7 +6,7 @@ const publicGlobals = require("../../lib/matrix");
 const Room = publicGlobals.Room;
 const MemoryStore = publicGlobals.MemoryStore;
 const Filter = publicGlobals.Filter;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 const MockStorageApi = require("../MockStorageApi");
 
 import expect from 'expect';

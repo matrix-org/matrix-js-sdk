@@ -2,7 +2,7 @@
 
 import 'source-map-support/register';
 const callbacks = require("../../lib/realtime-callbacks");
-const testUtils = require("../test-utils.js");
+import testUtils from "../test-utils";
 
 import expect from 'expect';
 import lolex from 'lolex';

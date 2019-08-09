@@ -27,7 +27,7 @@ import MockHttpBackend from 'matrix-mock-request';
 import expect from 'expect';
 import Promise from 'bluebird';
 import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
-import logger from '../src/logger';
+import logger from '../lib/logger';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient

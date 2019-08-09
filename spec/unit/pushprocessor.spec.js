@@ -1,7 +1,7 @@
 "use strict";
 import 'source-map-support/register';
 const PushProcessor = require("../../lib/pushprocessor");
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 

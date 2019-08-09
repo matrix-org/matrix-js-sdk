@@ -6,7 +6,7 @@ import Promise from 'bluebird';
 const sdk = require("../..");
 const MatrixScheduler = sdk.MatrixScheduler;
 const MatrixError = sdk.MatrixError;
-const utils = require("../test-utils");
+import utils from "../test-utils";
 
 import expect from 'expect';
 import lolex from 'lolex';
