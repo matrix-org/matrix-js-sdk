@@ -118,6 +118,15 @@ MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
 };
 
 /**
+ * Set the Identity Server URL of this client
+ * @param {string} url New Identity Server URL
+ */
+MatrixBaseApis.prototype.setIdentityServerUrl = function(url) {
+    this.idBaseUrl = utils.ensureNoTrailingSlash(url);
+    this._http.setIdBaseUrl(this._idBaseUrl);
+};
+
+/**
  * Get the access token associated with this account.
  * @return {?String} The access_token or null
  */
