@@ -255,7 +255,8 @@ Crypto.prototype._checkAndStartKeyBackup = async function() {
     }
     let backupInfo;
     try {
-        backupInfo = await this._baseApis.getKeyBackupVersion();
+        // HACK: Wrapping the promise with bluebird fixes the tests.
+        backupInfo = await Promise.resolve(this._baseApis.getKeyBackupVersion());
     } catch (e) {
         logger.log("Error checking for active key backup", e);
         if (e.httpStatus / 100 === 4) {
@@ -1169,8 +1170,9 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
                 return;
             }
             try {
+                // HACK: Wrapping the promise with bluebird fixes the tests.
                 const numBackedUp =
-                    await this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
+                    await Promise.resolve(this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST));
                 if (numBackedUp === 0) {
                     // no sessions left needing backup: we're done
                     return;

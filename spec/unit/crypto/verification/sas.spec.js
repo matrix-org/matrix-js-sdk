@@ -23,6 +23,7 @@ try {
 
 import expect from 'expect';
 
+import Promise from 'bluebird';
 import sdk from '../../../..';
 
 import {verificationMethods} from '../../../../lib/crypto';

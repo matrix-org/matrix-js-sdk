@@ -16,6 +16,7 @@ limitations under the License.
 
 import TestClient from '../../../TestClient';
 
+import Promise from 'bluebird';
 import sdk from '../../../..';
 const MatrixEvent = sdk.MatrixEvent;
 

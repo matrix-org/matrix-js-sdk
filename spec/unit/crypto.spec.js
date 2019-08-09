@@ -13,6 +13,7 @@ import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
 import lolex from 'lolex';
+import Promise from 'bluebird';
 
 const EventEmitter = require("events").EventEmitter;
 

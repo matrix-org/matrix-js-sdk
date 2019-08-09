@@ -23,6 +23,7 @@ import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 import logger from '../../logger';
 import {newTimeoutError} from "./Error";
+import Promise from 'bluebird';
 
 const timeoutException = new Error("Verification timed out");
 
@@ -231,11 +232,12 @@ export default class VerificationBase extends EventEmitter {
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
-            const device = await this._baseApis.getStoredDevice(userId, deviceId);
+            // HACK: Wrapping the promise with bluebird fixes the tests.
+            const device = await Promise.resolve(this._baseApis.getStoredDevice(userId, deviceId));
             if (!device) {
                 logger.warn(`verification: Could not find device ${deviceId} to verify`);
             } else {
-                await verifier(keyId, device, keyInfo);
+                await Promise.resolve(verifier(keyId, device, keyInfo));
                 verifiedDevices.push(deviceId);
             }
         }
@@ -247,7 +249,8 @@ export default class VerificationBase extends EventEmitter {
         }
 
         for (const deviceId of verifiedDevices) {
-            await this._baseApis.setDeviceVerified(userId, deviceId);
+            // HACK: Wrapping the promise with bluebird fixes the tests.
+            await Promise.resolve(this._baseApis.setDeviceVerified(userId, deviceId));
         }
     }
 }

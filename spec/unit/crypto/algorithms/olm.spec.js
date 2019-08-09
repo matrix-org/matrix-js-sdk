@@ -21,6 +21,7 @@ import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
 import logger from '../../../../lib/logger';
+import Promise from 'bluebird';
 
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import olmlib from '../../../../lib/crypto/olmlib';

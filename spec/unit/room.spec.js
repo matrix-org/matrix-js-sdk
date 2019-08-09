@@ -6,6 +6,7 @@ const RoomState = sdk.RoomState;
 const MatrixEvent = sdk.MatrixEvent;
 const EventStatus = sdk.EventStatus;
 const EventTimeline = sdk.EventTimeline;
+import Promise from 'bluebird';
 import utils from "../test-utils";
 
 import expect from 'expect';

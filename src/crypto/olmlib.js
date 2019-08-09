@@ -197,9 +197,10 @@ module.exports.ensureOlmSessionsForDevices = async function(
     const oneTimeKeyAlgorithm = "signed_curve25519";
     let res;
     try {
-        res = await baseApis.claimOneTimeKeys(
+        // HACK: Wrapping the promise with bluebird fixes the tests.
+        res = await Promise.resolve(baseApis.claimOneTimeKeys(
             devicesWithoutSession, oneTimeKeyAlgorithm,
-        );
+        ));
     } catch (e) {
         for (const resolver of Object.values(resolveSession)) {
             resolver.resolve();
