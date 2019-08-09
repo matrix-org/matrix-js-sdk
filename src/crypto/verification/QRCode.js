@@ -19,6 +19,7 @@ limitations under the License.
  * @module crypto/verification/QRCode
  */
 
+import Promise from 'bluebird';
 import Base from "./Base";
 import {
     errorFactory,

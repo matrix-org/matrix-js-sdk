@@ -19,6 +19,7 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
+import Promise from 'bluebird';
 import Base from "./Base";
 import anotherjson from 'another-json';
 import {

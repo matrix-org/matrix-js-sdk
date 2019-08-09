@@ -30,6 +30,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
+import Promise from 'bluebird';
 import logger from '../../src/logger';
 import ReEmitter from '../ReEmitter';
 

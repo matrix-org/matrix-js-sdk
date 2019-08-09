@@ -27,7 +27,7 @@ limitations under the License.
 
 import { SERVICE_TYPES } from './service-types';
 import logger from './logger';
-
+import Promise from 'bluebird';
 const httpApi = require("./http-api");
 const utils = require("./utils");
 const PushProcessor = require("./pushprocessor");

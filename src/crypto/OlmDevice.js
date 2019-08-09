@@ -17,6 +17,7 @@ limitations under the License.
 
 import logger from '../logger';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+import Promise from 'bluebird';
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.

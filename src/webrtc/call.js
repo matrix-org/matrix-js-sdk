@@ -19,6 +19,7 @@ limitations under the License.
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  * @module webrtc/call
  */
+import Promise from 'bluebird';
 const utils = require("../utils");
 const EventEmitter = require("events").EventEmitter;
 import logger from '../../src/logger';
