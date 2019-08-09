@@ -161,15 +161,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  * implements the {$link module:crypto/verification/Base verifier interface}.
  */
 function MatrixClient(opts) {
-    // Allow trailing slash in HS url
-    if (opts.baseUrl && opts.baseUrl.endsWith("/")) {
-        opts.baseUrl = opts.baseUrl.substr(0, opts.baseUrl.length - 1);
-    }
-
-    // Allow trailing slash in IS url
-    if (opts.idBaseUrl && opts.idBaseUrl.endsWith("/")) {
-        opts.idBaseUrl = opts.idBaseUrl.substr(0, opts.idBaseUrl.length - 1);
-    }
+    opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
+    opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
 
     MatrixBaseApis.call(this, opts);
 
