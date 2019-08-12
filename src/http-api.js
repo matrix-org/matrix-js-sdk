@@ -389,6 +389,10 @@ module.exports.MatrixHttpApi.prototype = {
         prefix,
         accessToken,
     ) {
+        if (!this.opts.idBaseUrl) {
+            throw new Error("No ID Server Base URL set");
+        }
+
         const fullUri = this.opts.idBaseUrl + prefix + path;
 
         if (callback !== undefined && !utils.isFunction(callback)) {
