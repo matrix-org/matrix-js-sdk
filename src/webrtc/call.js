@@ -61,9 +61,9 @@ function MatrixCall(opts) {
     this.URL = opts.URL;
     // Array of Objects with urls, username, credential keys
     this.turnServers = opts.turnServers || [];
-    if (this.turnServers.length === 0) {
+    if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
         this.turnServers.push({
-            urls: [MatrixCall.FALLBACK_STUN_SERVER],
+            urls: [MatrixCall.FALLBACK_ICE_SERVER],
         });
     }
     utils.forEach(this.turnServers, function(server) {
@@ -92,8 +92,8 @@ function MatrixCall(opts) {
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
-/** The fallback server to use for STUN. */
-MatrixCall.FALLBACK_STUN_SERVER = 'stun:turn.matrix.org';
+/** The fallback ICE server to use for STUN or TURN protocols. */
+MatrixCall.FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** An error code when the local client failed to create an offer. */
 MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
 /**
@@ -1337,7 +1337,9 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
  * @param {Object?} options DEPRECATED optional options map.
- * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be forced. This option is deprecated - use opts.forceTURN when creating the matrix client since it's only possible to set this option on outbound calls.
+ * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be
+ * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
+ * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
 module.exports.createNewMatrixCall = function(client, roomId, options) {

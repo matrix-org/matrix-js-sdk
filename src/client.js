@@ -221,6 +221,7 @@ function MatrixClient(opts) {
     this._verificationMethods = opts.verificationMethods;
 
     this._forceTURN = opts.forceTURN || false;
+    this._fallbackICEServerAllowed = false;
 
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -3883,6 +3884,28 @@ MatrixClient.prototype.getTurnServers = function() {
     return this._turnServers || [];
 };
 
+/**
+ * Set whether to allow a fallback ICE server should be used for negotiating a
+ * WebRTC connection if the homeserver doesn't provide any servers. Defaults to
+ * false.
+ *
+ * @param {boolean} allow
+ */
+MatrixClient.prototype.setFallbackICEServerAllowed = function(allow) {
+    this._fallbackICEServerAllowed = allow;
+};
+
+/**
+ * Get whether to allow a fallback ICE server should be used for negotiating a
+ * WebRTC connection if the homeserver doesn't provide any servers. Defaults to
+ * false.
+ *
+ * @returns {boolean}
+ */
+MatrixClient.prototype.isFallbackICEServerAllowed = function() {
+    return this._fallbackICEServerAllowed;
+};
+
 // Higher level APIs
 // =================
 
@@ -4330,13 +4353,15 @@ function checkTurnServers(client) {
             client._checkTurnServersTimeoutID = setTimeout(() => {
                 checkTurnServers(client);
             }, (res.ttl || (60 * 60)) * 1000 * 0.9);
+        } else {
+            logger.warn("No TURN URIs from homeserver");
+            client.emit("Call.noTURNServers");
         }
     }, function(err) {
         logger.error("Failed to get TURN URIs");
-        client._checkTurnServersTimeoutID =
-            setTimeout(function() {
- checkTurnServers(client);
-}, 60000);
+        client._checkTurnServersTimeoutID = setTimeout(function() {
+            checkTurnServers(client);
+        }, 60000);
     });
 }
 
