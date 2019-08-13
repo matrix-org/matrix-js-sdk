@@ -1731,6 +1731,10 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
+    if (!this.idBaseUrl) {
+        throw new Error("No Identity Server base URL set");
+    }
+
     const uri = this.idBaseUrl + httpApi.PREFIX_IDENTITY_V2 + "/account/register";
     return this._http.requestOtherUrl(
         undefined, "POST", uri,
