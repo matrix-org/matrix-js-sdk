@@ -665,7 +665,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
         },
     };
     self.peerConn.createAnswer(function(description) {
-        debuglog("Created answer: " + description);
+        debuglog("Created answer: ", description);
         self.peerConn.setLocalDescription(description, function() {
             self._answerContent = {
                 version: 0,
@@ -754,7 +754,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
  */
 MatrixCall.prototype._gotLocalOffer = function(description) {
     const self = this;
-    debuglog("Created offer: " + description);
+    debuglog("Created offer: ", description);
 
     if (self.state == 'ended') {
         debuglog("Ignoring newly created offer on call ID " + self.callId +
