@@ -93,7 +93,7 @@ function MatrixCall(opts) {
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
 /** The fallback server to use for STUN. */
-MatrixCall.FALLBACK_STUN_SERVER = 'stun:stun.l.google.com:19302';
+MatrixCall.FALLBACK_STUN_SERVER = 'stun:turn.matrix.org';
 /** An error code when the local client failed to create an offer. */
 MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
 /**
