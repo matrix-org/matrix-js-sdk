@@ -1217,24 +1217,9 @@ const _placeCallWithConstraints = function(self, constraints) {
 };
 
 const _createPeerConnection = function(self) {
-    let servers = self.turnServers;
-    if (self.webRtc.vendor === "mozilla") {
-        // modify turnServers struct to match what mozilla expects.
-        servers = [];
-        for (let i = 0; i < self.turnServers.length; i++) {
-            for (let j = 0; j < self.turnServers[i].urls.length; j++) {
-                servers.push({
-                    url: self.turnServers[i].urls[j],
-                    username: self.turnServers[i].username,
-                    credential: self.turnServers[i].credential,
-                });
-            }
-        }
-    }
-
     const pc = new self.webRtc.RtcPeerConnection({
         iceTransportPolicy: self.forceTURN ? 'relay' : undefined,
-        iceServers: servers,
+        iceServers: self.turnServers,
     });
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
     pc.onsignalingstatechange = hookCallback(self, self._onSignallingStateChanged);
