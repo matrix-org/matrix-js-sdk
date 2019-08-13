@@ -96,6 +96,13 @@ module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
 };
 
 module.exports.MatrixHttpApi.prototype = {
+    /**
+     * Sets the baase URL for the identity server
+     * @param {string} url The new base url
+     */
+    setIdBaseUrl: function(url) {
+        this.opts.idBaseUrl = url;
+    },
 
     /**
      * Get the content repository url with query parameters.
@@ -382,6 +389,10 @@ module.exports.MatrixHttpApi.prototype = {
         prefix,
         accessToken,
     ) {
+        if (!this.opts.idBaseUrl) {
+            throw new Error("No Identity Server base URL set");
+        }
+
         const fullUri = this.opts.idBaseUrl + prefix + path;
 
         if (callback !== undefined && !utils.isFunction(callback)) {

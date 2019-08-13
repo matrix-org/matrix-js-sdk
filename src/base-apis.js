@@ -118,6 +118,15 @@ MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
 };
 
 /**
+ * Set the Identity Server URL of this client
+ * @param {string} url New Identity Server URL
+ */
+MatrixBaseApis.prototype.setIdentityServerUrl = function(url) {
+    this.idBaseUrl = utils.ensureNoTrailingSlash(url);
+    this._http.setIdBaseUrl(this._idBaseUrl);
+};
+
+/**
  * Get the access token associated with this account.
  * @return {?String} The access_token or null
  */
@@ -1722,6 +1731,10 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
+    if (!this.idBaseUrl) {
+        throw new Error("No Identity Server base URL set");
+    }
+
     const uri = this.idBaseUrl + httpApi.PREFIX_IDENTITY_V2 + "/account/register";
     return this._http.requestOtherUrl(
         undefined, "POST", uri,

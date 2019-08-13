@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -698,4 +699,12 @@ module.exports.globToRegexp = function(glob, extended) {
         });
     }
     return pat;
+};
+
+module.exports.ensureNoTrailingSlash = function(url) {
+    if (url && url.endsWith("/")) {
+        return url.substr(0, url.length - 1);
+    } else {
+        return url;
+    }
 };
