@@ -159,6 +159,13 @@ function keyFromRecoverySession(session, decryptionKey) {
  * that the application can handle.  Each element should be an item from {@link
  * module:crypto~verificationMethods verificationMethods}, or a class that
  * implements the {$link module:crypto/verification/Base verifier interface}.
+ *
+ * @param {boolean} [opts.forceTURN]
+ * Optional. Whether relaying calls through a TURN server should be forced.
+ *
+ * @param {boolean} [opts.fallbackICEServerAllowed]
+ * Optional. Whether to allow a fallback ICE server should be used for negotiating a
+ * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
  */
 function MatrixClient(opts) {
     opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
@@ -221,7 +228,7 @@ function MatrixClient(opts) {
     this._verificationMethods = opts.verificationMethods;
 
     this._forceTURN = opts.forceTURN || false;
-    this._fallbackICEServerAllowed = false;
+    this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
 
     // List of which rooms have encryption enabled: separate from crypto because
     // we still want to know which rooms are encrypted even if crypto is disabled:
