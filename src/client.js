@@ -4360,9 +4360,6 @@ function checkTurnServers(client) {
             client._checkTurnServersTimeoutID = setTimeout(() => {
                 checkTurnServers(client);
             }, (res.ttl || (60 * 60)) * 1000 * 0.9);
-        } else {
-            logger.warn("No TURN URIs from homeserver");
-            client.emit("Call.noTURNServers");
         }
     }, function(err) {
         logger.error("Failed to get TURN URIs");
