@@ -123,7 +123,7 @@ MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
  */
 MatrixBaseApis.prototype.setIdentityServerUrl = function(url) {
     this.idBaseUrl = utils.ensureNoTrailingSlash(url);
-    this._http.setIdBaseUrl(this._idBaseUrl);
+    this._http.setIdBaseUrl(this.idBaseUrl);
 };
 
 /**
