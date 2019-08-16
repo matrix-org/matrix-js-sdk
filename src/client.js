@@ -3426,7 +3426,7 @@ MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
 
     if (this.idBaseUrl) {
         const idServerUrl = url.parse(this.idBaseUrl);
-        if (idServerUrl.host === null) {
+        if (!idServerUrl.host) {
             throw new Error("Invalid ID server URL: " + this.idBaseUrl);
         }
         postParams.id_server = idServerUrl.host;
