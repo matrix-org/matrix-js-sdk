@@ -523,10 +523,21 @@ MatrixClient.prototype._getCapabilitiesOfKind = function(kind, fresh=false) {
         }
     }
 
+    let prom;
+    if (kind === 'user') {
+        prom = this._http.authedRequest(
+            undefined, "GET", "/capabilities/user",
+        );
+    } else if (kind == 'server') {
+        prom = this._http.request(
+            undefined, "GET", "/capabilities/server",
+        );
+    } else {
+        throw new Exception("Unknown capabilities kind: " + kind);
+    }
+
     // We swallow errors because we need a default object anyhow
-    return this._http.authedRequest(
-        undefined, "GET", "/capabilities/" + kind,
-    ).catch((e) => {
+    return prom.catch((e) => {
         if (kind === 'user' && (e.httpStatus == 400 || e.httpStatus == 404)) {
             // try old endpoint
             return this._http.authedRequest(
