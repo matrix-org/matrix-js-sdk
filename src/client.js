@@ -240,7 +240,7 @@ function MatrixClient(opts) {
 
     this._serverSupportsLazyLoading = null;
 
-    this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
+    this._cachedCapabilities = {}; // { user/server: { capabilities: {}, lastUpdated: timestamp } }
 
     // The SDK doesn't really provide a clean way for events to recalculate the push
     // actions for themselves, so we have to kinda help them out when they are encrypted.
@@ -490,28 +490,52 @@ MatrixClient.prototype.setNotifTimelineSet = function(notifTimelineSet) {
 };
 
 /**
- * Gets the capabilities of the homeserver. Always returns an object of
- * capability keys and their options, which may be empty.
+ * Gets the user-specific capabilities of the homeserver
+ * Always returns an object of capability keys and their options,
+ * which may be empty.
  * @param {boolean} fresh True to ignore any cached values.
  * @return {module:client.Promise} Resolves to the capabilities of the homeserver
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.getCapabilities = function(fresh=false) {
+MatrixClient.prototype.getUserCapabilities = function(fresh=false) {
+    return this._getCapabilitiesOfKind('user', fresh);
+};
+
+/**
+ * Gets the non user-specific capabilities of the homeserver
+ * Always returns an object of capability keys and their options,
+ * which may be empty.
+ * @param {boolean} fresh True to ignore any cached values.
+ * @return {module:client.Promise} Resolves to the capabilities of the homeserver
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getServerCapabilities = function(fresh=false) {
+    return this._getCapabilitiesOfKind('server', fresh);
+};
+
+MatrixClient.prototype._getCapabilitiesOfKind = function(kind, fresh=false) {
     const now = new Date().getTime();
 
-    if (this._cachedCapabilities && !fresh) {
-        if (now < this._cachedCapabilities.expiration) {
+    if (this._cachedCapabilities[kind] && !fresh) {
+        if (now < this._cachedCapabilities[kind].expiration) {
             logger.log("Returning cached capabilities");
-            return Promise.resolve(this._cachedCapabilities.capabilities);
+            return Promise.resolve(this._cachedCapabilities[kind].capabilities);
         }
     }
 
     // We swallow errors because we need a default object anyhow
     return this._http.authedRequest(
-        undefined, "GET", "/capabilities",
+        undefined, "GET", "/capabilities/" + kind,
     ).catch((e) => {
-        logger.error(e);
-        return null; // otherwise consume the error
+        if (kind === 'user' && (e.httpStatus == 400 || e.httpStatus == 404)) {
+            // try old endpoint
+            return this._http.authedRequest(
+                undefined, "GET", "/capabilities",
+            );
+        } else {
+            logger.error(e);
+            return null; // otherwise consume the error
+        }
     }).then((r) => {
         if (!r) r = {};
         const capabilities = r["capabilities"] || {};
@@ -522,14 +546,25 @@ MatrixClient.prototype.getCapabilities = function(fresh=false) {
             ? CAPABILITIES_CACHE_MS
             : 60000 + (Math.random() * 5000);
 
-        this._cachedCapabilities = {
+        this._cachedCapabilities[kind] = {
             capabilities: capabilities,
             expiration: now + cacheMs,
         };
 
-        logger.log("Caching capabilities: ", capabilities);
+        logger.log("Caching " + kind + " capabilities: ", capabilities);
         return capabilities;
     });
+};
+
+/**
+ * DEPRECATED
+ * Backwards compatibility alias for getUserCapabilities()
+ * @param {boolean} fresh True to ignore any cached values.
+ * @return {module:client.Promise} Resolves to the capabilities of the homeserver
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getCapabilities = function(fresh=false) {
+    return this.getUserCapabilities();
 };
 
 // Crypto bits
