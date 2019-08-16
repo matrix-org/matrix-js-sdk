@@ -3243,14 +3243,9 @@ MatrixClient.prototype.setGuestAccess = function(roomId, opts) {
 
 /**
  * Requests an email verification token for the purposes of registration.
- * This API proxies the Identity Server /validate/email/requestToken API,
- * adding registration-specific behaviour. Specifically, if an account with
- * the given email address already exists, it will either send an email
- * to the address informing them of this or return M_THREEPID_IN_USE
- * (which one is up to the Home Server).
- *
- * requestEmailToken calls the equivalent API directly on the ID server,
- * therefore bypassing the registration-specific logic.
+ * This API requests a token from the homeserver.
+ * The doesServerRequireIdServerParam() method can be used to determine if
+ * the server requires the id_server parameter to be provided.
  *
  * Parameters and return value are as for requestEmailToken
 
@@ -3275,8 +3270,9 @@ MatrixClient.prototype.requestRegisterEmailToken = function(email, clientSecret,
 
 /**
  * Requests a text message verification token for the purposes of registration.
- * This API proxies the Identity Server /validate/msisdn/requestToken API,
- * adding registration-specific behaviour, as with requestRegisterEmailToken.
+ * This API requests a token from the homeserver.
+ * The doesServerRequireIdServerParam() method can be used to determine if
+ * the server requires the id_server parameter to be provided.
  *
  * @param {string} phoneCountry The ISO 3166-1 alpha-2 code for the country in which
  *    phoneNumber should be parsed relative to.
@@ -3303,15 +3299,13 @@ MatrixClient.prototype.requestRegisterMsisdnToken = function(phoneCountry, phone
 /**
  * Requests an email verification token for the purposes of adding a
  * third party identifier to an account.
- * This API proxies the Identity Server /validate/email/requestToken API,
- * adding specific behaviour for the addition of email addresses to an
- * account. Specifically, if an account with
- * the given email address already exists, it will either send an email
- * to the address informing them of this or return M_THREEPID_IN_USE
- * (which one is up to the Home Server).
- *
- * requestEmailToken calls the equivalent API directly on the ID server,
- * therefore bypassing the email addition specific logic.
+ * This API requests a token from the homeserver.
+ * The doesServerRequireIdServerParam() method can be used to determine if
+ * the server requires the id_server parameter to be provided.
+ * If an account with the given email address already exists and is
+ * associated with an account other than the one the user is authed as, 
+ * it will either send an email to the address informing them of this
+ * or return M_THREEPID_IN_USE (which one is up to the Home Server).
  *
  * @param {string} email As requestEmailToken
  * @param {string} clientSecret As requestEmailToken
@@ -3428,14 +3422,16 @@ MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phone
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
 MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
-    const id_server_url = url.parse(this.idBaseUrl);
-    if (id_server_url.host === null) {
-        throw new Error("Invalid ID server URL: " + this.idBaseUrl);
+    const postParams = Object.assign({}, params);
+
+    if (this.idBaseUrl) {
+        const idServerUrl = url.parse(this.idBaseUrl);
+        if (idServerUrl.host === null) {
+            throw new Error("Invalid ID server URL: " + this.idBaseUrl);
+        }
+        postParams.id_server = idServerUrl.host;
     }
 
-    const postParams = Object.assign({}, params, {
-        id_server: id_server_url.host,
-    });
     return this._http.request(
         undefined, "POST", endpoint, undefined,
         postParams,
