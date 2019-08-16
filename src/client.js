@@ -3303,7 +3303,7 @@ MatrixClient.prototype.requestRegisterMsisdnToken = function(phoneCountry, phone
  * The doesServerRequireIdServerParam() method can be used to determine if
  * the server requires the id_server parameter to be provided.
  * If an account with the given email address already exists and is
- * associated with an account other than the one the user is authed as, 
+ * associated with an account other than the one the user is authed as,
  * it will either send an email to the address informing them of this
  * or return M_THREEPID_IN_USE (which one is up to the Home Server).
  *
