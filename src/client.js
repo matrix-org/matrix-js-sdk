@@ -533,7 +533,7 @@ MatrixClient.prototype._getCapabilitiesOfKind = function(kind, fresh=false) {
             undefined, "GET", "/capabilities/server",
         );
     } else {
-        throw new Exception("Unknown capabilities kind: " + kind);
+        throw new Error("Unknown capabilities kind: " + kind);
     }
 
     // We swallow errors because we need a default object anyhow
