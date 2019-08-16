@@ -238,7 +238,7 @@ function MatrixClient(opts) {
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
 
-    this._serverSupportsLazyLoading = null;
+    this._serverVersionsCache = null;
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
 
@@ -4045,12 +4045,13 @@ MatrixClient.prototype.stopClient = function() {
 };
 
 /*
- * Query the server to see if it support members lazy loading
- * @return {Promise<boolean>} true if server supports lazy loading
+ * Get the API versions supported by the server, along with any
+ * unstable APIs it supports
+ * @return {Promise<object>} The server /versions response
  */
-MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
-    if (this._serverSupportsLazyLoading === null) {
-        const response = await this._http.request(
+MatrixClient.prototype.getVersions = async function() {
+    if (this._serverVersionsCache === null) {
+        this._serverVersionsCache = await this._http.request(
             undefined, // callback
             "GET", "/_matrix/client/versions",
             undefined, // queryParams
@@ -4059,15 +4060,38 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
                 prefix: '',
             },
         );
-
-        const versions = response["versions"];
-        const unstableFeatures = response["unstable_features"];
-
-        this._serverSupportsLazyLoading =
-            (versions && versions.includes("r0.5.0"))
-            || (unstableFeatures && unstableFeatures["m.lazy_load_members"]);
     }
-    return this._serverSupportsLazyLoading;
+    return this._serverVersionsCache;
+};
+
+/*
+ * Query the server to see if it support members lazy loading
+ * @return {Promise<boolean>} true if server supports lazy loading
+ */
+MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
+    const response = await this.getVersions();
+
+    const versions = response["versions"];
+    const unstableFeatures = response["unstable_features"];
+
+    return (versions && versions.includes("r0.5.0"))
+        || (unstableFeatures && unstableFeatures["m.lazy_load_members"]);
+};
+
+/*
+ * Query the server to see if the `id_server` parameter is required
+ * when registering with an 3pid, adding a 3pid or resetting password.
+ * @return {Promise<boolean>} true if id_server parameter is required
+ */
+MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
+    const response = await this.getVersions();
+
+    const unstableFeatures = response["unstable_features"];
+    if (unstableFeatures["m.require_identity_server"] === undefined) {
+        return true;
+    } else {
+        return unstableFeatures["m.require_identity_server"];
+    }
 };
 
 /*
