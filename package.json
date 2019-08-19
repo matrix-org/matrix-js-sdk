@@ -17,7 +17,7 @@
     "build": "babel -s -d lib src && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && terser -c -m -o dist/browser-matrix.min.js --source-map \"content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
     "dist": "yarn build",
     "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
-    "lint": "eslint --max-warnings 101 src spec",
+    "lint": "eslint --max-warnings 93 src spec",
     "prepare": "yarn clean && yarn build && git rev-parse HEAD > git-revision.txt"
   },
   "repository": {
