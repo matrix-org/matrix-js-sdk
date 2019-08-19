@@ -238,6 +238,8 @@ function MatrixClient(opts) {
     // The pushprocessor caches useful things, so keep one and re-use it
     this._pushProcessor = new PushProcessor(this);
 
+    // Cache of the server's /versions response
+    // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     this._serverVersionsCache = null;
 
     this._cachedCapabilities = null; // { capabilities: {}, lastUpdated: timestamp }
