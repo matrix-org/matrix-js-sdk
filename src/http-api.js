@@ -431,7 +431,7 @@ module.exports.MatrixHttpApi.prototype = {
         // option as we do with the home server, but it does return JSON, so
         // parse it manually
         return defer.promise.then(function(response) {
-            return JSON.parse(response);
+            return typeof(response) === 'string' ? JSON.parse(response) : response;
         });
     },
 
