@@ -1908,7 +1908,8 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
         // Abuse the olm hashing
         const olmutil = new global.Olm.Utility();
         params["addresses"] = addressPairs.map(p => {
-            const hashed = olmutil.sha256(`${p[0]} ${p[1]} ${params['pepper']}`);
+            const hashed = olmutil.sha256(`${p[0]} ${p[1]} ${params['pepper']}`)
+                .replace(/\+/g, '-').replace(/\//g, '_'); // URL-safe base64
             localMapping[hashed] = p[0];
             return hashed;
         });
