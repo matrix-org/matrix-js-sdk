@@ -1891,7 +1891,7 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
     };
 
     // Get hash information first before trying to do a lookup
-    const hashes = await this.getIdentityHashDetails();
+    const hashes = await this.getIdentityHashDetails(identityAccessToken);
     if (!hashes || !hashes['lookup_pepper'] || !hashes['algorithms']) {
         throw new Error("Unsupported identity server: bad response");
     }
