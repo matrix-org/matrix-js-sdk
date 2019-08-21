@@ -1877,7 +1877,7 @@ MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) 
  * The first element of each pair is the address, the second is the 3PID medium.
  * Eg: ["email@example.org", "email"]
  * @param {string} identityAccessToken The access token for the identity server.
- * @returns {Promise<{address, mxid}[]>} A collection of address mappings to
+ * @returns {Promise<Array<{address, mxid}>>} A collection of address mappings to
  * found MXIDs. Results where no user could be found will not be listed.
  */
 MatrixBaseApis.prototype.identityHashedLookup = async function(
