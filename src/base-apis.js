@@ -1860,7 +1860,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
 /**
  * Gets the V2 hashing information from the identity server. Primarily useful for
  * lookups.
- * @param identityAccessToken The access token for the identity server.
+ * @param {string} identityAccessToken The access token for the identity server.
  * @returns {Promise<object>} The hashing information for the identity server.
  */
 MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) {
@@ -1873,10 +1873,10 @@ MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) 
 /**
  * Performs a hashed lookup of addresses against the identity server. This is
  * only supported on identity servers which have at least the version 2 API.
- * @param addressPairs An array of 2 element arrays. The first element of each
- * pair is the address, the second is the 3PID medium. Eg: ["email@example.org",
- * "email"]
- * @param identityAccessToken The access token for the identity server.
+ * @param {Array<Array<string,string>>} addressPairs An array of 2 element arrays.
+ * The first element of each pair is the address, the second is the 3PID medium.
+ * Eg: ["email@example.org", "email"]
+ * @param {string} identityAccessToken The access token for the identity server.
  * @returns {Promise<{address, mxid}[]>} A collection of address mappings to
  * found MXIDs. Results where no user could be found will not be listed.
  */
