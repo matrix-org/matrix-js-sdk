@@ -1858,6 +1858,93 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
 };
 
 /**
+ * Gets the V2 hashing information from the identity server. Primarily useful for
+ * lookups.
+ * @param identityAccessToken The access token for the identity server.
+ * @returns {Promise<object>} The hashing information for the identity server.
+ */
+MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) {
+    return this._http.idServerRequest(
+        undefined, "GET", "/hash_details",
+        null, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+    );
+};
+
+/**
+ * Performs a hashed lookup of addresses against the identity server. This is
+ * only supported on identity servers which have at least the version 2 API.
+ * @param addressPairs An array of 2 element arrays. The first element of each
+ * pair is the address, the second is the 3PID medium. Eg: ["email@example.org",
+ * "email"]
+ * @param identityAccessToken The access token for the identity server.
+ * @returns {Promise<{address, mxid}[]>} A collection of address mappings to
+ * found MXIDs. Results where no user could be found will not be listed.
+ */
+MatrixBaseApis.prototype.identityHashedLookup = async function(
+    addressPairs, // [["email@example.org", "email"], ["10005550000", "msisdn"]]
+    identityAccessToken,
+) {
+    const params = {
+        // addresses: ["email@example.org", "10005550000"],
+        // algorithm: "sha256",
+        // pepper: "abc123"
+    };
+
+    // Get hash information first before trying to do a lookup
+    const hashes = await this.getIdentityHashDetails();
+    if (!hashes || !hashes['lookup_pepper'] || !hashes['algorithms']) {
+        throw new Error("Unsupported identity server: bad response");
+    }
+
+    params['pepper'] = hashes['lookup_pepper'];
+
+    const localMapping = {
+        // hashed identifier => plain text address
+        // For use in this function's return format
+    };
+
+    // When picking an algorithm, we pick the hashed over no hashes
+    if (hashes['algorithms'].includes('sha256')) {
+        // Abuse the olm hashing
+        const olmutil = new global.Olm.Utility();
+        params["addresses"] = addressPairs.map(p => {
+            const hashed = olmutil.sha256(`${p[0]} ${p[1]} ${params['pepper']}`);
+            localMapping[hashed] = p[0];
+            return hashed;
+        });
+        params["algorithm"] = "sha256";
+    } else if (hashes['algorithms'].includes('none')) {
+        params["addresses"] = addressPairs.map(p => {
+            const unhashed = `${p[0]} ${p[1]}`;
+            localMapping[unhashed] = p[0];
+            return unhashed;
+        });
+        params["algorithm"] = "none";
+    } else {
+        throw new Error("Unsupported identity server: unknown hash algorithm");
+    }
+
+    const response = await this._http.idServerRequest(
+        undefined, "POST", "/lookup",
+        params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+    );
+
+    if (!response || !response['mappings']) return []; // no results
+
+    const foundAddresses = [/* {address: "plain@example.org", mxid} */];
+    for (const hashed of Object.keys(response['mappings'])) {
+        const mxid = response['mappings'][hashed];
+        const plainAddress = localMapping[hashed];
+        if (!plainAddress) {
+            throw new Error("Identity server returned more results than expected");
+        }
+
+        foundAddresses.push({address: plainAddress, mxid});
+    }
+    return foundAddresses;
+};
+
+/**
  * Looks up the public Matrix ID mapping for a given 3rd party
  * identifier from the Identity Server
  *
@@ -1878,31 +1965,51 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
     callback,
     identityAccessToken,
 ) {
-    const params = {
-        medium: medium,
-        address: address,
-    };
-
     try {
-        const response = await this._http.idServerRequest(
-            undefined, "GET", "/lookup",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            [[address, medium]], identityAccessToken,
         );
+        const result = response.find(p => p.address === address);
+        if (!result) {
+            // TODO: Fold callback into above call once v1 path below is removed
+            if (callback) callback(null, {});
+            return {};
+        }
+
+        const mapping = {
+            address,
+            medium,
+            mxid: result.mxid,
+
+            // We can't reasonably fill these parameters:
+            // not_before
+            // not_after
+            // ts
+            // signatures
+        };
+
         // TODO: Fold callback into above call once v1 path below is removed
-        if (callback) callback(null, response);
-        return response;
+        if (callback) callback(null, mapping);
+        return mapping;
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
             // See https://github.com/vector-im/riot-web/issues/10443
+            const params = {
+                medium: medium,
+                address: address,
+            };
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "GET", "/lookup",
                 params, httpApi.PREFIX_IDENTITY_V1,
             );
         }
-        if (callback) callback(err);
+        if (callback) callback(err, undefined);
         throw err;
     }
 };
@@ -1922,20 +2029,38 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
     query,
     identityAccessToken,
 ) {
-    const params = {
-        threepids: query,
-    };
-
     try {
-        return await this._http.idServerRequest(
-            undefined, "POST", "/bulk_lookup", JSON.stringify(params),
-            httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            // We have to reverse the query order to get [address, medium] pairs
+            query.map(p => [p[1], p[0]]), identityAccessToken,
         );
+
+        const v1results = [];
+        for (const mapping of response) {
+            const originalQuery = query.find(p => p[1] === mapping.address);
+            if (!originalQuery) {
+                throw new Error("Identity sever returned unexpected results");
+            }
+
+            v1results.push([
+                originalQuery[0], // medium
+                mapping.address,
+                mapping.mxid,
+            ]);
+        }
+
+        return {threepids: v1results};
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
             // See https://github.com/vector-im/riot-web/issues/10443
+            const params = {
+                threepids: query,
+            };
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 undefined, "POST", "/bulk_lookup", JSON.stringify(params),

@@ -412,7 +412,7 @@ module.exports.MatrixHttpApi.prototype = {
         if (method == 'GET') {
             opts.qs = params;
         } else if (typeof params === "object") {
-            opts.form = params;
+            opts.json = params;
         } else if (typeof params === "string") {
             // Assume the caller has serialised the body to JSON
             opts.body = params;
