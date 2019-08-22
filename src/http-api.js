@@ -412,7 +412,7 @@ module.exports.MatrixHttpApi.prototype = {
         if (method == 'GET') {
             opts.qs = params;
         } else if (typeof params === "object") {
-            opts.form = params;
+            opts.json = params;
         } else if (typeof params === "string") {
             // Assume the caller has serialised the body to JSON
             opts.body = params;
@@ -431,7 +431,7 @@ module.exports.MatrixHttpApi.prototype = {
         // option as we do with the home server, but it does return JSON, so
         // parse it manually
         return defer.promise.then(function(response) {
-            return JSON.parse(response);
+            return typeof(response) === 'string' ? JSON.parse(response) : response;
         });
     },
 
