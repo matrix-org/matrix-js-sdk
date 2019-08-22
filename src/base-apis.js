@@ -1783,8 +1783,7 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
     try {
         const response = await this._http.idServerRequest(
             undefined, "POST", "/validate/email/requestToken",
-            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
-            identityAccessToken,
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
         );
         // TODO: Fold callback into above call once v1 path below is removed
         if (callback) callback(null, response);
@@ -1839,8 +1838,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
     try {
         return await this._http.idServerRequest(
             undefined, "POST", "/validate/msisdn/submitToken",
-            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
-            identityAccessToken,
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
         );
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
@@ -2064,7 +2062,7 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
             };
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
-                undefined, "POST", "/bulk_lookup", JSON.stringify(params),
+                undefined, "POST", "/bulk_lookup", params,
                 httpApi.PREFIX_IDENTITY_V1, identityAccessToken,
             );
         }

@@ -405,18 +405,14 @@ module.exports.MatrixHttpApi.prototype = {
             uri: fullUri,
             method: method,
             withCredentials: false,
-            json: false,
+            json: true, // we want a JSON response if we can
             _matrix_opts: this.opts,
             headers: {},
         };
-        if (method == 'GET') {
+        if (method === 'GET') {
             opts.qs = params;
         } else if (typeof params === "object") {
             opts.json = params;
-        } else if (typeof params === "string") {
-            // Assume the caller has serialised the body to JSON
-            opts.body = params;
-            opts.headers['Content-Type'] = "application/json";
         }
         if (accessToken) {
             opts.headers['Authorization'] = `Bearer ${accessToken}`;
@@ -427,12 +423,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts,
             requestCallback(defer, callback, this.opts.onlyData),
         );
-        // ID server does not always take JSON, so we can't use requests' 'json'
-        // option as we do with the home server, but it does return JSON, so
-        // parse it manually
-        return defer.promise.then(function(response) {
-            return typeof(response) === 'string' ? JSON.parse(response) : response;
-        });
+        return defer.promise;
     },
 
     /**
