@@ -108,10 +108,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {string} opts.userId The user ID for this user.
  *
- * @param {Function} [opts.getIdentityAccessToken]
- * Optional. A callback that returns a Promise<String> of an identity access
- * token to supply with identity requests. If the callback is unset, no access
- * token will be supplied.
+ * @param {IdentityServerProvider} [opts.identityServer]
+ * Optional. A provider object with one function `getAccessToken`, which is a
+ * callback that returns a Promise<String> of an identity access token to supply
+ * with identity requests. If the object is unset, no access token will be
+ * supplied.
  * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
  * replace the previous approach of manual access tokens params with this
  * callback throughout the SDK.
@@ -2471,10 +2472,11 @@ MatrixClient.prototype.inviteByThreePid = async function(
     };
 
     if (
-        this.getIdentityAccessToken &&
+        this.identityServer &&
+        this.identityServer.getAccessToken &&
         await this.doesServerAcceptIdentityAccessToken()
     ) {
-        const identityAccessToken = await this.getIdentityAccessToken();
+        const identityAccessToken = await this.identityServer.getAccessToken();
         if (identityAccessToken) {
             params.id_access_token = identityAccessToken;
         }
@@ -3458,10 +3460,11 @@ MatrixClient.prototype._requestTokenFromEndpoint = async function(endpoint, para
         postParams.id_server = idServerUrl.host;
 
         if (
-            this.getIdentityAccessToken &&
+            this.identityServer &&
+            this.identityServer.getAccessToken &&
             await this.doesServerAcceptIdentityAccessToken()
         ) {
-            const identityAccessToken = await this.getIdentityAccessToken();
+            const identityAccessToken = await this.identityServer.getAccessToken();
             if (identityAccessToken) {
                 postParams.id_access_token = identityAccessToken;
             }
