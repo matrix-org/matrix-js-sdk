@@ -63,6 +63,15 @@ function termsUrlForService(serviceType, baseUrl) {
  *
  * @param {string} opts.accessToken The access_token for this user.
  *
+ * @param {IdentityServerProvider} [opts.identityServer]
+ * Optional. A provider object with one function `getAccessToken`, which is a
+ * callback that returns a Promise<String> of an identity access token to supply
+ * with identity requests. If the object is unset, no access token will be
+ * supplied.
+ * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
+ * replace the previous approach of manual access tokens params with this
+ * callback throughout the SDK.
+ *
  * @param {Number=} opts.localTimeoutMs Optional. The default maximum amount of
  * time to wait before timing out HTTP requests. If not specified, there is no
  * timeout.
@@ -79,6 +88,7 @@ function MatrixBaseApis(opts) {
 
     this.baseUrl = opts.baseUrl;
     this.idBaseUrl = opts.idBaseUrl;
+    this.identityServer = opts.identityServer;
 
     const httpOpts = {
         baseUrl: opts.baseUrl,

@@ -108,6 +108,15 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {string} opts.userId The user ID for this user.
  *
+ * @param {IdentityServerProvider} [opts.identityServer]
+ * Optional. A provider object with one function `getAccessToken`, which is a
+ * callback that returns a Promise<String> of an identity access token to supply
+ * with identity requests. If the object is unset, no access token will be
+ * supplied.
+ * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
+ * replace the previous approach of manual access tokens params with this
+ * callback throughout the SDK.
+ *
  * @param {Object=} opts.store
  *    The data store used for sync data from the homeserver. If not specified,
  *    this client will not store any HTTP responses. The `createClient` helper
@@ -2438,7 +2447,12 @@ MatrixClient.prototype.inviteByEmail = function(roomId, email, callback) {
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, callback) {
+MatrixClient.prototype.inviteByThreePid = async function(
+    roomId,
+    medium,
+    address,
+    callback,
+) {
     const path = utils.encodeUri(
         "/rooms/$roomId/invite",
         { $roomId: roomId },
@@ -2451,12 +2465,24 @@ MatrixClient.prototype.inviteByThreePid = function(roomId, medium, address, call
             errcode: "ORG.MATRIX.JSSDK_MISSING_PARAM",
         }));
     }
-
-    return this._http.authedRequest(callback, "POST", path, undefined, {
+    const params = {
         id_server: identityServerUrl,
         medium: medium,
         address: address,
-    });
+    };
+
+    if (
+        this.identityServer &&
+        this.identityServer.getAccessToken &&
+        await this.doesServerAcceptIdentityAccessToken()
+    ) {
+        const identityAccessToken = await this.identityServer.getAccessToken();
+        if (identityAccessToken) {
+            params.id_access_token = identityAccessToken;
+        }
+    }
+
+    return this._http.authedRequest(callback, "POST", path, undefined, params);
 };
 
 /**
@@ -3423,7 +3449,7 @@ MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phone
  * @param {object} params Parameters for the POST request
  * @return {module:client.Promise} Resolves: As requestEmailToken
  */
-MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
+MatrixClient.prototype._requestTokenFromEndpoint = async function(endpoint, params) {
     const postParams = Object.assign({}, params);
 
     if (this.idBaseUrl) {
@@ -3432,6 +3458,17 @@ MatrixClient.prototype._requestTokenFromEndpoint = function(endpoint, params) {
             throw new Error("Invalid ID server URL: " + this.idBaseUrl);
         }
         postParams.id_server = idServerUrl.host;
+
+        if (
+            this.identityServer &&
+            this.identityServer.getAccessToken &&
+            await this.doesServerAcceptIdentityAccessToken()
+        ) {
+            const identityAccessToken = await this.identityServer.getAccessToken();
+            if (identityAccessToken) {
+                postParams.id_access_token = identityAccessToken;
+            }
+        }
     }
 
     return this._http.request(
@@ -4090,6 +4127,23 @@ MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
     } else {
         return unstableFeatures["m.require_identity_server"];
     }
+};
+
+/*
+ * Query the server to see if the `id_access_token` parameter can be safely
+ * passed to the homeserver. Some homeservers may trigger errors if they are not
+ * prepared for the new parameter.
+ * @return {Promise<boolean>} true if id_access_token can be sent
+ */
+MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
+    const response = await this.getVersions();
+
+    const unstableFeatures = response["unstable_features"];
+    if (unstableFeatures["m.id_access_token"] === undefined) {
+        return false;
+    }
+
+    return unstableFeatures["m.id_access_token"];
 };
 
 /*
