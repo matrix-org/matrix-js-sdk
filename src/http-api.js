@@ -836,7 +836,8 @@ function parseErrorResponse(response, body) {
     let err;
     if (contentType) {
         if (contentType.type === 'application/json') {
-            err = new module.exports.MatrixError(JSON.parse(body));
+            const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
+            err = new module.exports.MatrixError(jsonBody);
         } else if (contentType.type === 'text/plain') {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
         }
