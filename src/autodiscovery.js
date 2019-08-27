@@ -430,6 +430,26 @@ export class AutoDiscovery {
     }
 
     /**
+     * Gets the raw discovery client configuration for the given domain name.
+     * Should only be used if there's no validation to be done on the resulting
+     * object, otherwise use findClientConfig().
+     * @param {string} domain The domain to get the client config for.
+     * @returns {Promise<object>} Resolves to the domain's client config. Can
+     * be an empty object.
+     */
+    static async getRawClientConfig(domain) {
+        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+            throw new Error("'domain' must be a string of non-zero length");
+        }
+
+        const response = await this._fetchWellKnownObject(
+            `https://${domain}/.well-known/matrix/client`,
+        );
+        if (!response) return {};
+        return response.raw || {};
+    }
+
+    /**
      * Sanitizes a given URL to ensure it is either an HTTP or HTTP URL and
      * is suitable for the requirements laid out by .well-known auto discovery.
      * If valid, the URL will also be stripped of any trailing slashes.
