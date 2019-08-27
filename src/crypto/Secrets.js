@@ -319,7 +319,7 @@ export default class SecretStorage extends EventEmitter {
         const cancel = (reason) => {
             // send cancellation event
             const cancelData = {
-                action: "cancel_request",
+                action: "request_cancellation",
                 requesting_device_id: this._baseApis.deviceId,
                 request_id: requestId,
             };
@@ -369,7 +369,7 @@ export default class SecretStorage extends EventEmitter {
         }
         const deviceId = content.requesting_device_id;
         // check if it's a cancel
-        if (content.action === "cancel_request") {
+        if (content.action === "request_cancellation") {
             if (this._incomingRequests[deviceId]
                 && this._incomingRequests[deviceId][content.request_id]) {
                 logger.info("received request cancellation for secret (" + sender
