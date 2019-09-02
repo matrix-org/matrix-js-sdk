@@ -3985,7 +3985,7 @@ MatrixClient.prototype.whoisSynapseUser = function(userId) {
  * Deactivates a user using Synapse's administrator API. <strong>This
  * function is implementation specific and may change as a result.</strong>
  * @param {string} userId the User ID to deactivate.
- * @return {object} the deactive response - see Synapse docs for information.
+ * @return {object} the deactivate response - see Synapse docs for information.
  */
 MatrixClient.prototype.deactivateSynapseUser = function(userId) {
     const path = utils.encodeUri(
