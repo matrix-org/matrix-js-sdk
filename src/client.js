@@ -3886,6 +3886,55 @@ MatrixClient.prototype.getTurnServers = function() {
     return this._turnServers || [];
 };
 
+// Synapse-specific APIs
+// =====================
+
+/**
+ * Determines if the current user is an administrator of the Synapse homeserver.
+ * Returns false if untrue or the homeserver does not appear to be a Synapse
+ * homeserver. <strong>This function is implementation specific and may change
+ * as a result.</strong>
+ * @return {boolean} true if the user appears to be a Synapse administrator.
+ */
+MatrixClient.prototype.isSynapseAdministrator = function() {
+    return this.whoisSynapseUser(this.getUserId())
+        .then(() => true)
+        .catch(() => false);
+};
+
+/**
+ * Performs a whois lookup on a user using Synapse's administrator API.
+ * <strong>This function is implementation specific and may change as a
+ * result.</strong>
+ * @param {string} userId the User ID to look up.
+ * @return {object} the whois response - see Synapse docs for information.
+ */
+MatrixClient.prototype.whoisSynapseUser = function(userId) {
+    const path = utils.encodeUri(
+        "/_synapse/admin/v1/whois/$userId",
+        { $userId: userId },
+    );
+    return this._http.authedRequest(
+        undefined, 'GET', path, undefined, undefined, {prefix: ''},
+    );
+};
+
+/**
+ * Deactivates a user using Synapse's administrator API. <strong>This
+ * function is implementation specific and may change as a result.</strong>
+ * @param {string} userId the User ID to deactivate.
+ * @return {object} the deactive response - see Synapse docs for information.
+ */
+MatrixClient.prototype.deactivateSynapseUser = function(userId) {
+    const path = utils.encodeUri(
+        "/_synapse/admin/v1/deactivate/$userId",
+        { $userId: userId },
+    );
+    return this._http.authedRequest(
+        undefined, 'POST', path, undefined, undefined, {prefix: ''},
+    );
+};
+
 // Higher level APIs
 // =================
 
