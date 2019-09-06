@@ -1007,7 +1007,7 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     const content = {
         "m.fully_read": rmEventId,
         "m.read": rrEventId,
-        "m.hidden": Boolean(opts ? opts.hidden : false)
+        "m.hidden": Boolean(opts ? opts.hidden : false),
     };
 
     return this._http.authedRequest(

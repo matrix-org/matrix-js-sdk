@@ -2269,7 +2269,9 @@ MatrixClient.prototype.sendReadReceipt = async function(event, opts, callback) {
  * <b>This property is unstable and may change in the future.</b>
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
-MatrixClient.prototype.setRoomReadMarkers = async function(roomId, rmEventId, rrEvent, opts) {
+MatrixClient.prototype.setRoomReadMarkers = async function(
+    roomId, rmEventId, rrEvent, opts,
+) {
     const room = this.getRoom(roomId);
     if (room && room.hasPendingEvent(rmEventId)) {
         throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
