@@ -2192,11 +2192,17 @@ MatrixClient.prototype.sendHtmlEmote = function(roomId, body, htmlBody, callback
  * Send a receipt.
  * @param {Event} event The event being acknowledged
  * @param {string} receiptType The kind of receipt e.g. "m.read"
+ * @param {object} opts Additional content to send alongside the receipt.
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
+MatrixClient.prototype.sendReceipt = function(event, receiptType, opts, callback) {
+    if (typeof(opts) === 'function') {
+        callback = opts;
+        opts = {};
+    }
+
     if (this.isGuest()) {
         return Promise.resolve({}); // guests cannot send receipts so don't bother.
     }
@@ -2207,7 +2213,7 @@ MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
         $eventId: event.getId(),
     });
     const promise = this._http.authedRequest(
-        callback, "POST", path, undefined, {},
+        callback, "POST", path, undefined, opts || {},
     );
 
     const room = this.getRoom(event.getRoomId());
@@ -2220,17 +2226,32 @@ MatrixClient.prototype.sendReceipt = function(event, receiptType, callback) {
 /**
  * Send a read receipt.
  * @param {Event} event The event that has been read.
+ * @param {object} opts The options for the read receipt.
+ * @param {boolean} opts.hidden True to prevent the receipt from being sent to
+ * other users and homeservers. Default false (send to everyone). <b>This
+ * property is unstable and may change in the future.</b>
  * @param {module:client.callback} callback Optional.
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.sendReadReceipt = async function(event, callback) {
+MatrixClient.prototype.sendReadReceipt = async function(event, opts, callback) {
+    if (typeof(opts) === 'function') {
+        callback = opts;
+        opts = {};
+    }
+    if (!opts) opts = {};
+
     const eventId = event.getId();
     const room = this.getRoom(event.getRoomId());
     if (room && room.hasPendingEvent(eventId)) {
         throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
     }
-    return this.sendReceipt(event, "m.read", callback);
+
+    const addlContent = {
+        "m.hidden": Boolean(opts.hidden),
+    };
+
+    return this.sendReceipt(event, "m.read", addlContent, callback);
 };
 
 /**
@@ -2243,9 +2264,12 @@ MatrixClient.prototype.sendReadReceipt = async function(event, callback) {
  * @param {string} rrEvent the event tracked by the read receipt. This is here for
  * convenience because the RR and the RM are commonly updated at the same time as each
  * other. The local echo of this receipt will be done if set. Optional.
+ * @param {object} opts Options for the read markers
+ * @param {object} opts.hidden True to hide the receipt from other users and homeservers.
+ * <b>This property is unstable and may change in the future.</b>
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
-MatrixClient.prototype.setRoomReadMarkers = async function(roomId, rmEventId, rrEvent) {
+MatrixClient.prototype.setRoomReadMarkers = async function(roomId, rmEventId, rrEvent, opts) {
     const room = this.getRoom(roomId);
     if (room && room.hasPendingEvent(rmEventId)) {
         throw new Error(`Cannot set read marker to a pending event (${rmEventId})`);
@@ -2263,7 +2287,7 @@ MatrixClient.prototype.setRoomReadMarkers = async function(roomId, rmEventId, rr
         }
     }
 
-    return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId);
+    return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, opts);
 };
 
 /**

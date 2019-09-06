@@ -993,10 +993,13 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
  * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
  * for convenience because the RR and the RM are commonly updated at the same time as
  * each other. Optional.
+ * @param {object} opts Options for the read markers.
+ * @param {object} opts.hidden True to hide the read receipt from other users. <b>This
+ * property is currently unstable and may change in the future.</b>
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
 MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
-                                function(roomId, rmEventId, rrEventId) {
+                                function(roomId, rmEventId, rrEventId, opts) {
     const path = utils.encodeUri("/rooms/$roomId/read_markers", {
         $roomId: roomId,
     });
@@ -1004,6 +1007,7 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     const content = {
         "m.fully_read": rmEventId,
         "m.read": rrEventId,
+        "m.hidden": Boolean(opts ? opts.hidden : false)
     };
 
     return this._http.authedRequest(
