@@ -1916,15 +1916,23 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
         // Abuse the olm hashing
         const olmutil = new global.Olm.Utility();
         params["addresses"] = addressPairs.map(p => {
-            const hashed = olmutil.sha256(`${p[0]} ${p[1]} ${params['pepper']}`)
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const hashed = olmutil.sha256(`${addr} ${med} ${params['pepper']}`)
                 .replace(/\+/g, '-').replace(/\//g, '_'); // URL-safe base64
+            // Map the hash to a known (case-sensitive) address. We use the case
+            // sensitive version because the caller might be expecting that.
             localMapping[hashed] = p[0];
             return hashed;
         });
         params["algorithm"] = "sha256";
     } else if (hashes['algorithms'].includes('none')) {
         params["addresses"] = addressPairs.map(p => {
-            const unhashed = `${p[0]} ${p[1]}`;
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const unhashed = `${addr} ${med}`;
+            // Map the ""hash"" to a known (case-sensitive) address. We use the case
+            // sensitive version because the caller might be expecting that.
             localMapping[unhashed] = p[0];
             return unhashed;
         });
