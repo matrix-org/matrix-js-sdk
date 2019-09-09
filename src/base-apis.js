@@ -1931,8 +1931,8 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
             const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
             const med = p[1].toLowerCase();
             const unhashed = `${addr} ${med}`;
-            // Map the ""hash"" to a known (case-sensitive) address. We use the case
-            // sensitive version because the caller might be expecting that.
+            // Map the unhashed values to a known (case-sensitive) address. We use
+            // the case sensitive version because the caller might be expecting that.
             localMapping[unhashed] = p[0];
             return unhashed;
         });
