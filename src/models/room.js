@@ -1057,6 +1057,18 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
         if (redactedEvent) {
             redactedEvent.makeRedacted(event);
+
+            // If this is in the current state, replace it with the redacted version
+            if (redactedEvent.getStateKey()) {
+                const currentStateEvent = this.currentState.getStateEvents(
+                    redactedEvent.getType(),
+                    redactedEvent.getStateKey(),
+                );
+                if (currentStateEvent.getId() === redactedEvent.getId()) {
+                    this.currentState.setStateEvents([redactedEvent]);
+                }
+            }
+
             this.emit("Room.redaction", event, this);
 
             // TODO: we stash user displaynames (among other things) in
