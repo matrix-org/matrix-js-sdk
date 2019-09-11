@@ -1,3 +1,10 @@
+Changes in [2.3.1-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.1-rc.1) (2019-09-11)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.0...v2.3.1-rc.1)
+
+ * Update room members on member event redaction
+   [\#1031](https://github.com/matrix-org/matrix-js-sdk/pull/1031)
+
 Changes in [2.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.0) (2019-08-05)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.0-rc.1...v2.3.0)
