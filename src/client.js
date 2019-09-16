@@ -4196,6 +4196,13 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
 MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
     const response = await this.getVersions();
 
+    const versions = response["versions"];
+
+    // Supporting r0.6.0 is the same as having the flag set to false
+    if (versions && versions.includes("r0.6.0")) {
+        return false;
+    }
+
     const unstableFeatures = response["unstable_features"];
     if (unstableFeatures["m.require_identity_server"] === undefined) {
         return true;
@@ -4213,12 +4220,11 @@ MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
 MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
     const response = await this.getVersions();
 
+    const versions = response["versions"];
     const unstableFeatures = response["unstable_features"];
-    if (unstableFeatures["m.id_access_token"] === undefined) {
-        return false;
-    }
 
-    return unstableFeatures["m.id_access_token"];
+    return (versions && versions.includes("r0.6.0"))
+        || (unstableFeatures && unstableFeatures["m.id_access_token"]);
 };
 
 /*
