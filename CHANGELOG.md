@@ -1,3 +1,19 @@
+Changes in [2.3.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.2) (2019-09-16)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.2-rc.1...v2.3.2)
+
+ * [Release] Fix addPendingEvent with pending event order == chronological
+   [\#1034](https://github.com/matrix-org/matrix-js-sdk/pull/1034)
+
+Changes in [2.3.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.2-rc.1) (2019-09-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.1...v2.3.2-rc.1)
+
+ * Synapse admin functions to release
+   [\#1033](https://github.com/matrix-org/matrix-js-sdk/pull/1033)
+ * [To Release] Add matrix base API to report an event
+   [\#1032](https://github.com/matrix-org/matrix-js-sdk/pull/1032)
+
 Changes in [2.3.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.3.1) (2019-09-12)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.1-rc.1...v2.3.1)
