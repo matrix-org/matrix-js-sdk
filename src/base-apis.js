@@ -1339,10 +1339,16 @@ MatrixBaseApis.prototype.getThreePids = function(callback) {
 };
 
 /**
+ * Add a 3PID to your homeserver account and optionally bind it to an identity
+ * server as well. An identity server is required as part of the `creds` object.
+ *
+ * This API is deprecated, and you should instead use `addThreePidOnly`
+ * for homeservers that support it.
+ *
  * @param {Object} creds
  * @param {boolean} bind
  * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
@@ -1353,6 +1359,46 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
     };
     return this._http.authedRequest(
         callback, "POST", path, null, data,
+    );
+};
+
+/**
+ * Add a 3PID to your homeserver account. This API does not use an identity
+ * server, as the homeserver is expected to handle 3PID ownership validation.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `account/3pid/<medium>/requestToken` on the homeserver.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addThreePidOnly = function(data) {
+    const path = "/account/3pid/add";
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data,
+    );
+};
+
+/**
+ * Bind a 3PID for discovery onto an identity server via the homeserver. The
+ * identity server handles 3PID ownership validation and the homeserver records
+ * the new binding to track where all 3PIDs for the account are bound.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `validate/<medium>/requestToken` on the identity server. It should also
+ * contain `id_server` and `id_access_token` fields as well.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.bindThreePid = function(data) {
+    const path = "/account/3pid/bind";
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data,
     );
 };
 
