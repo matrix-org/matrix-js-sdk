@@ -4227,6 +4227,22 @@ MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
         || (unstableFeatures && unstableFeatures["m.id_access_token"]);
 };
 
+/**
+ * Query the server to see if it supports separate 3PID add and bind functions.
+ * This affects the sequence of API calls clients should use for these operations,
+ * so it's helpful to be able to check for support.
+ * @return {Promise<boolean>} true if separate functions are supported
+ */
+MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
+    const response = await this.getVersions();
+
+    const versions = response["versions"];
+    const unstableFeatures = response["unstable_features"];
+
+    return (versions && versions.includes("r0.6.0"))
+        || (unstableFeatures && unstableFeatures["m.separate_add_and_bind"]);
+};
+
 /*
  * Get if lazy loading members is being used.
  * @return {boolean} Whether or not members are lazy loaded by this client
