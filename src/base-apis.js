@@ -1411,14 +1411,19 @@ MatrixBaseApis.prototype.bindThreePid = function(data) {
  * homeserver removes its record of the binding to keep an updated record of
  * where all 3PIDs for the account are bound.
  *
- * @param {Object} data A object with 3PID validation data from having called
- * `validate/<medium>/requestToken` on the identity server. It should also
- * contain `id_server` and `id_access_token` fields as well.
+ * @param {string} medium The threepid medium (eg. 'email')
+ * @param {string} address The threepid address (eg. 'bob@example.com')
+ *        this must be as returned by getThreePids.
  * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.unbindThreePid = function(data) {
+MatrixBaseApis.prototype.unbindThreePid = function(medium, address) {
     const path = "/account/3pid/unbind";
+    const data = {
+        medium,
+        address,
+        id_server: this.getIdentityServerUrl(true),
+    };
     return this._http.authedRequest(
         undefined, "POST", path, null, data, {
             prefix: httpApi.PREFIX_UNSTABLE,
