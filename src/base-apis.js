@@ -1377,7 +1377,9 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
 MatrixBaseApis.prototype.addThreePidOnly = function(data) {
     const path = "/account/3pid/add";
     return this._http.authedRequest(
-        undefined, "POST", path, null, data,
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
@@ -1398,7 +1400,9 @@ MatrixBaseApis.prototype.addThreePidOnly = function(data) {
 MatrixBaseApis.prototype.bindThreePid = function(data) {
     const path = "/account/3pid/bind";
     return this._http.authedRequest(
-        undefined, "POST", path, null, data,
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
