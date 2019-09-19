@@ -450,6 +450,8 @@ PushProcessor.actionListToActionsObject = function(actionlist) {
         const action = actionlist[i];
         if (action === 'notify') {
             actionobj.notify = true;
+        if (action === 'dont_push') {
+            actionobj.push = false;
         } else if (typeof action === 'object') {
             if (action.value === undefined) {
                 action.value = true;
