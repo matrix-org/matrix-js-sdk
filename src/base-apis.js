@@ -1407,6 +1407,26 @@ MatrixBaseApis.prototype.bindThreePid = function(data) {
 };
 
 /**
+ * Unbind a 3PID for discovery on an identity server via the homeserver. The
+ * homeserver removes its record of the binding to keep an updated record of
+ * where all 3PIDs for the account are bound.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `validate/<medium>/requestToken` on the identity server. It should also
+ * contain `id_server` and `id_access_token` fields as well.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.unbindThreePid = function(data) {
+    const path = "/account/3pid/unbind";
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
+
+/**
  * @param {string} medium The threepid medium (eg. 'email')
  * @param {string} address The threepid address (eg. 'bob@example.com')
  *        this must be as returned by getThreePids.
