@@ -4154,7 +4154,7 @@ MatrixClient.prototype.stopClient = function() {
     global.clearTimeout(this._checkTurnServersTimeoutID);
 };
 
-/*
+/**
  * Get the API versions supported by the server, along with any
  * unstable APIs it supports
  * @return {Promise<object>} The server /versions response
@@ -4174,7 +4174,7 @@ MatrixClient.prototype.getVersions = async function() {
     return this._serverVersionsCache;
 };
 
-/*
+/**
  * Query the server to see if it support members lazy loading
  * @return {Promise<boolean>} true if server supports lazy loading
  */
@@ -4188,7 +4188,7 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
         || (unstableFeatures && unstableFeatures["m.lazy_load_members"]);
 };
 
-/*
+/**
  * Query the server to see if the `id_server` parameter is required
  * when registering with an 3pid, adding a 3pid or resetting password.
  * @return {Promise<boolean>} true if id_server parameter is required
@@ -4211,7 +4211,7 @@ MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
     }
 };
 
-/*
+/**
  * Query the server to see if the `id_access_token` parameter can be safely
  * passed to the homeserver. Some homeservers may trigger errors if they are not
  * prepared for the new parameter.
@@ -4227,7 +4227,23 @@ MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
         || (unstableFeatures && unstableFeatures["m.id_access_token"]);
 };
 
-/*
+/**
+ * Query the server to see if it supports separate 3PID add and bind functions.
+ * This affects the sequence of API calls clients should use for these operations,
+ * so it's helpful to be able to check for support.
+ * @return {Promise<boolean>} true if separate functions are supported
+ */
+MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
+    const response = await this.getVersions();
+
+    const versions = response["versions"];
+    const unstableFeatures = response["unstable_features"];
+
+    return (versions && versions.includes("r0.6.0"))
+        || (unstableFeatures && unstableFeatures["m.separate_add_and_bind"]);
+};
+
+/**
  * Get if lazy loading members is being used.
  * @return {boolean} Whether or not members are lazy loaded by this client
  */
@@ -4235,7 +4251,7 @@ MatrixClient.prototype.hasLazyLoadMembersEnabled = function() {
     return !!this._clientOpts.lazyLoadMembers;
 };
 
-/*
+/**
  * Set a function which is called when /sync returns a 'limited' response.
  * It is called with a room ID and returns a boolean. It should return 'true' if the SDK
  * can SAFELY remove events from this room. It may not be safe to remove events if there
