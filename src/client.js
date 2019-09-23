@@ -3478,7 +3478,9 @@ MatrixClient.prototype.requestPasswordMsisdnToken = function(phoneCountry, phone
 MatrixClient.prototype._requestTokenFromEndpoint = async function(endpoint, params) {
     const postParams = Object.assign({}, params);
 
-    if (this.idBaseUrl) {
+    // If the HS supports separate add and bind, then requestToken endpoints
+    // don't need an IS as they are all validated by the HS directly.
+    if (!await this.doesServerSupportSeparateAddAndBind() && this.idBaseUrl) {
         const idServerUrl = url.parse(this.idBaseUrl);
         if (!idServerUrl.host) {
             throw new Error("Invalid ID server URL: " + this.idBaseUrl);
