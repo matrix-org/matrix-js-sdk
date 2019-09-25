@@ -174,16 +174,19 @@ InteractiveAuth.prototype = {
             // The email can be validated out-of-band, but we need to provide the
             // creds so the HS can go & check it.
             if (this._emailSid) {
-                const idServerParsedUrl = url.parse(
-                    this._matrixClient.getIdentityServerUrl(),
-                );
+                const creds = {
+                    sid: this._emailSid,
+                    client_secret: this._clientSecret,
+                };
+                if (await this._matrixClient.doesServerRequireIdServerParam()) {
+                    const idServerParsedUrl = url.parse(
+                        this._matrixClient.getIdentityServerUrl(),
+                    );
+                    creds.id_server = idServerParsedUrl.host;
+                }
                 authDict = {
                     type: EMAIL_STAGE_TYPE,
-                    threepid_creds: {
-                        sid: this._emailSid,
-                        client_secret: this._clientSecret,
-                        id_server: idServerParsedUrl.host,
-                    },
+                    threepid_creds: creds,
                 };
             }
         }
