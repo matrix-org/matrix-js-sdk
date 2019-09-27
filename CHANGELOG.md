@@ -1,3 +1,10 @@
+Changes in [2.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.0) (2019-09-27)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.0-rc.1...v2.4.0)
+
+ * Clean Yarn cache during release
+   [\#1045](https://github.com/matrix-org/matrix-js-sdk/pull/1045)
+
 Changes in [2.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.0-rc.1) (2019-09-25)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.3.2...v2.4.0-rc.1)
