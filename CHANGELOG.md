@@ -1,3 +1,12 @@
+Changes in [2.4.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.1) (2019-10-01)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.0...v2.4.1)
+
+ * Upgrade deps
+   [\#1046](https://github.com/matrix-org/matrix-js-sdk/pull/1046)
+ * Ignore crypto events with no content
+   [\#1043](https://github.com/matrix-org/matrix-js-sdk/pull/1043)
+
 Changes in [2.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.0) (2019-09-27)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.0-rc.1...v2.4.0)
