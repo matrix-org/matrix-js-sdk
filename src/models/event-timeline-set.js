@@ -94,7 +94,7 @@ utils.inherits(EventTimelineSet, EventEmitter);
 
 /**
  * Get all the timelines in this set
- * @return {[module:models/event-timeline~EventTimeline]} the timelines in this set
+ * @return {module:models/event-timeline~EventTimeline[]} the timelines in this set
  */
 EventTimelineSet.prototype.getTimelines = function() {
     return this._timelines;
