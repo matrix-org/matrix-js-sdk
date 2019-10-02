@@ -93,6 +93,13 @@ function EventTimelineSet(room, opts) {
 utils.inherits(EventTimelineSet, EventEmitter);
 
 /**
+ * Get all the timelines in this set
+ * @return {[EventTimeline]} the timelines in this set
+ */
+EventTimelineSet.prototype.getTimelines = function() {
+    return this._timelines;
+};
+/**
  * Get the filter object this timeline set is filtered on, if any
  * @return {?Filter} the optional filter for this timelineSet
  */
