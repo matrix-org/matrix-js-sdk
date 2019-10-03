@@ -27,6 +27,37 @@ import utils from '../utils.js';
 import logger from '../../src/logger';
 
 /**
+ * return a copy of o that has been recursively frozen with
+ * Object.freeze().
+ * The object will be squashed down into a plain object with
+ * JSON.stringify/parse before freezing.
+ * Will throw if o contains cycles
+ *
+ * @param {object} o The object to be copied
+ * @returns {object} a frozen copy of o
+ */
+function deeplyFrozen(o) {
+    // This will make sure the object doesn't contain cycles which
+    // would cause infinite recursion (and also remove any types).
+    // NB. This deliberately doesn't use utils.deepCopy even though
+    // it is (at time of writing) the same because we specifically want
+    // a copy that doesn't support cycles.
+    const copy = JSON.parse(JSON.stringify(o));
+
+    function recursiveFreeze(innerObj) {
+        for (const val of Object.values(innerObj)) {
+            if (typeof val === 'object' && val !== null) {
+                recursiveFreeze(val);
+            }
+        }
+        Object.freeze(innerObj);
+    }
+
+    recursiveFreeze(copy);
+    return copy;
+}
+
+/**
  * Enum for event statuses.
  * @readonly
  * @enum {string}
@@ -116,7 +147,11 @@ module.exports.MatrixEvent = function MatrixEvent(
         event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
     });
 
-    this.event = event || {};
+    // We take the raw event object and keep it as a property, so freeze it and its
+    // content at this point. We'll give out the event content directly in getContent()
+    // so anything that modifies the object returned by it will change the content of the
+    // event in the store, at which point things are going to get weird.
+    this.event = deeplyFrozen(event || {});
 
     this.sender = null;
     this.target = null;
@@ -341,8 +376,10 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             type: this.event.type,
             content: this.event.content,
         };
-        this.event.type = crypto_type;
-        this.event.content = crypto_content;
+        this.event = deeplyFrozen(Object.assign({}, this.event, {
+            type: crypto_type,
+            content: deeplyFrozen(crypto_content),
+        }));
         this._senderCurve25519Key = senderCurve25519Key;
         this._claimedEd25519Key = claimedEd25519Key;
     },
@@ -549,7 +586,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     _badEncryptedMessage: function(reason) {
-        return {
+        const ev = {
             clearEvent: {
                 type: "m.room.message",
                 content: {
@@ -558,6 +595,8 @@ utils.extend(module.exports.MatrixEvent.prototype, {
                 },
             },
         };
+        Object.freeze(ev);
+        return ev;
     },
 
     /**
@@ -573,7 +612,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      *     the decryption result, including the plaintext and some key info
      */
     _setClearData: function(decryptionResult) {
-        this._clearEvent = decryptionResult.clearEvent;
+        this._clearEvent = deeplyFrozen(decryptionResult.clearEvent);
         this._senderCurve25519Key =
             decryptionResult.senderCurve25519Key || null;
         this._claimedEd25519Key =
@@ -677,9 +716,12 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     unmarkLocallyRedacted: function() {
         const value = this._localRedactionEvent;
         this._localRedactionEvent = null;
-        if (this.event.unsigned) {
-            this.event.unsigned.redacted_because = null;
-        }
+        this.event = deeplyFrozen(Object.assign({}, this.event, {
+            unsigned: deeplyFrozen(Object.assign({}, this.event.unsigned || {}, {
+                redacted_because: null,
+            })),
+        }));
+
         return !!value;
     },
 
@@ -689,10 +731,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         }
         this.emit("Event.beforeRedaction", this, redactionEvent);
         this._localRedactionEvent = redactionEvent;
-        if (!this.event.unsigned) {
-            this.event.unsigned = {};
-        }
-        this.event.unsigned.redacted_because = redactionEvent.event;
+        this.event = deeplyFrozen(Object.assign({}, this.event, {
+            unsigned: deeplyFrozen(Object.assign({}, this.event.unsigned || {}, {
+                redacted_because: redactionEvent.event,
+            })),
+        }));
     },
 
     /**
@@ -713,26 +756,26 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         this.emit("Event.beforeRedaction", this, redaction_event);
 
         this._replacingEvent = null;
+
+        const unfrozenEvent = JSON.parse(JSON.stringify(this.event));
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
         // The server removes (most of) the content of the event, and adds a
         // "redacted_because" key to the unsigned section containing the
         // redacted event.
-        if (!this.event.unsigned) {
-            this.event.unsigned = {};
+        if (!unfrozenEvent.unsigned) {
+            unfrozenEvent.unsigned = {};
         }
-        this.event.unsigned.redacted_because = redaction_event.event;
+        unfrozenEvent.unsigned.redacted_because = redaction_event.event;
 
         let key;
-        for (key in this.event) {
-            if (!this.event.hasOwnProperty(key)) {
-                continue;
-            }
+        for (key of unfrozenEvent) {
             if (!_REDACT_KEEP_KEY_MAP[key]) {
-                delete this.event[key];
+                delete unfrozenEvent[key];
             }
         }
+        this.event = deeplyFrozen(unfrozenEvent);
 
         const keeps = _REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
         const content = this.getContent();
@@ -789,17 +832,18 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     handleRemoteEcho: function(event) {
         const oldUnsigned = this.getUnsigned();
         const oldId = this.getId();
-        this.event = event;
+        this.event = deeplyFrozen(event);
         // if this event was redacted before it was sent, it's locally marked as redacted.
         // At this point, we've received the remote echo for the event, but not yet for
         // the redaction that we are sending ourselves. Preserve the locally redacted
         // state by copying over redacted_because so we don't get a flash of
         // redacted, not-redacted, redacted as remote echos come in
         if (oldUnsigned.redacted_because) {
-            if (!this.event.unsigned) {
-                this.event.unsigned = {};
-            }
-            this.event.unsigned.redacted_because = oldUnsigned.redacted_because;
+            this.event = deeplyFrozen(Object.assign({}, this.event, {
+                unsigned: deeplyFrozen(Object.assign({}, this.event.unsigned || {}, {
+                    redacted_because: oldUnsigned.redacted_because,
+                })),
+            }));
         }
         // successfully sent.
         this.setStatus(null);
@@ -830,7 +874,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     replaceLocalEventId(eventId) {
-        this.event.event_id = eventId;
+        this.event = deeplyFrozen(Object.assign({}, this.event, {
+            event_id: eventId,
+        }));
         this.emit("Event.localEventIdReplaced", this);
     },
 
@@ -991,7 +1037,9 @@ utils.extend(module.exports.MatrixEvent.prototype, {
         if (relation) {
             relation.event_id = eventId;
         } else if (this.isRedaction()) {
-            this.event.redacts = eventId;
+            this.event = deeplyFrozen(Object.assign({}, this.event, {
+                redacts: eventId,
+            }));
         }
     },
 
