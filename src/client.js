@@ -786,6 +786,40 @@ async function _setDeviceVerification(
 }
 
 /**
+ * Request a key verification from another user, using a DM.
+ *
+ * @param {string} userId the user to request verification with
+ * @param {string} roomId the room to use for verification
+ * @param {Array} methods array of verification methods to use.  Defaults to
+ *    all known methods
+ *
+ * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
+ *    when the request is accepted by the other user
+ */
+MatrixClient.prototype.requestVerificationDM = function(userId, roomId, methods) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.requestVerificationDM(userId, roomId, methods);
+};
+
+/**
+ * Accept a key verification request from a DM.
+ *
+ * @param {module:models/event~MatrixEvent} event the verification request
+ * that is accepted
+ * @param {string} method the verification mmethod to use
+ *
+ * @returns {module:crypto/verification/Base} a verifier
+ */
+MatrixClient.prototype.acceptVerificationDM = function(event, method) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.acceptVerificationDM(event, method);
+};
+
+/**
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
