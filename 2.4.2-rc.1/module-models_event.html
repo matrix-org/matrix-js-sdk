@@ -1,0 +1,6704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: models/event</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: models/event</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description">This is an internal module. See <a href="global.html#MatrixEvent">MatrixEvent</a> and RoomEvent for
+the public classes.</div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line18">line 18</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Classes</h3>
+
+        <dl>
+            <dt><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></dt>
+            <dd></dd>
+        </dl>
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="~EventStatus"><span class="type-signature">(inner, constant) </span>EventStatus<span class="type-signature"> :string</span></h4>
+
+
+
+
+<div class="description">
+    Enum for event statuses.
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">string</span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+    <h5 class="subsection-title">Properties:</h5>
+
+    
+
+<table class="props">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>NOT_SENT</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event was not sent and will no longer be retried.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>ENCRYPTING</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The message is being encrypted</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>SENDING</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event is in the process of being sent.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>QUEUED</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event is in a queue waiting to be sent.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>SENT</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event has been sent to the server, but we have not yet received the
+echo.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>CANCELLED</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event was cancelled before it was successfully sent.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line34">line 34</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~_setClearData"><span class="type-signature">(inner) </span>_setClearData<span class="signature">(decryptionResult)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the cleartext data on this event.
+
+(This is used after decrypting an event; it should not be used by applications).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>decryptionResult</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">module:crypto~EventDecryptionResult</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the decryption result, including the plaintext and some key info</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line551">line 551</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<h5>Fires:</h5>
+<ul>
+    <li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">module:models/event.event:MatrixEvent"Event.decrypted"</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~attemptDecryption"><span class="type-signature">(inner) </span>attemptDecryption<span class="signature">(crypto)</span><span class="type-signature"> &rarr; {<a href="global.html">Promise</a>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Start the process of trying to decrypt this event.
+
+(This is used within the SDK: it isn't intended for use by applications)
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>crypto</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-crypto.html">module:crypto</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">crypto module</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line374">line 374</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    promise which resolves (to undefined) when the decryption
+attempt is completed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html">Promise</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~cancelAndResendKeyRequest"><span class="type-signature">(inner) </span>cancelAndResendKeyRequest<span class="signature">(crypto, userId)</span><span class="type-signature"> &rarr; {<a href="global.html">Promise</a>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Cancel any room key request for this event and resend another.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>crypto</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-crypto.html">module:crypto</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">crypto module</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the user who received this event</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line409">line 409</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    a promise that resolves when the request is queued
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html">Promise</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~flagCancelled"><span class="type-signature">(inner) </span>flagCancelled<span class="signature">(cancelled)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Flags an event as cancelled due to future conditions. For example, a verification
+request event in the same sync transaction may be flagged as cancelled to warn
+listeners that a cancellation event is coming down the same pipe shortly.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>cancelled</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Whether the event is to be cancelled or not.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line976">line 976</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getAge"><span class="type-signature">(inner) </span>getAge<span class="signature">()</span><span class="type-signature"> &rarr; {Number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the age of this event. This represents the age of the event when the
+event arrived at the device, and not the age of the event when this
+function was called.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line289">line 289</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The age of this event in milliseconds.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getAssociatedId"><span class="type-signature">(inner) </span>getAssociatedId<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    For relations and redactions, returns the event_id this event is referring to.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line935">line 935</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getAssociatedStatus"><span class="type-signature">(inner) </span>getAssociatedStatus<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="global.html#EventStatus">EventStatus</a>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns the status of any associated edit or redaction
+(not for reactions/annotations as their local echo doesn't affect the orignal event),
+or else the status of the event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line864">line 864</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html#EventStatus">EventStatus</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getClaimedEd25519Key"><span class="type-signature">(inner) </span>getClaimedEd25519Key<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the ed25519 the sender of this event claims to own.
+
+For Olm messages, this claim is encoded directly in the plaintext of the
+event itself. For megolm messages, it is implied by the m.room_key event
+which established the megolm session.
+
+Until we download the device list of the sender, it's just a claim: the
+device list gives a proof that the owner of the curve25519 key used for
+this event (and returned by #getSenderKey) also owns the ed25519 key by
+signing the public curve25519 key with the ed25519 key.
+
+In general, applications should not use this method directly, but should
+instead use MatrixClient.getEventSenderDeviceInfo.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line624">line 624</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getClearContent"><span class="type-signature">(inner) </span>getClearContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Gets the cleartext content for this event. If the event is not encrypted,
+or encryption has not been completed, this will return null.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line564">line 564</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The cleartext (decrypted) content for the event
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getContent"><span class="type-signature">(inner) </span>getContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the (decrypted, if necessary) event content JSON,
+or the content from the replacing event, if any.
+See `makeReplaced`.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line240">line 240</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event content JSON, or an empty object.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getDate"><span class="type-signature">(inner) </span>getDate<span class="signature">()</span><span class="type-signature"> &rarr; {Date}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the timestamp of this event, as a Date object.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line216">line 216</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event date, e.g. <code>new Date(1433502692297)</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Date</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getDirectionalContent"><span class="type-signature">(inner) </span>getDirectionalContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get either 'content' or 'prev_content' depending on if this event is
+'forward-looking' or not. This can be modified via event.forwardLooking.
+In practice, this means we get the chronologically earlier content value
+for this event (this method should surely be called getEarlierContent)
+<strong>This method is experimental and may change.</strong>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line279">line 279</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    event.content if this event is forward-looking, else
+event.prev_content.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getForwardingCurve25519KeyChain"><span class="type-signature">(inner) </span>getForwardingCurve25519KeyChain<span class="signature">()</span><span class="type-signature"> &rarr; {Array.&lt;string>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the curve25519 keys of the devices which were involved in telling us
+about the claimedEd25519Key and sender curve25519 key.
+
+Normally this will be empty, but in the case of a forwarded megolm
+session, the sender keys are sent to us by another device (the forwarding
+device), which we need to trust to do this. In that case, the result will
+be a list consisting of one entry.
+
+If the device that sent us the key (A) got it from another device which
+it wasn't prepared to vouch for (B), the result will be [A, B]. And so on.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line642">line 642</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    base64-encoded curve25519 keys, from oldest to newest.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;string></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getId"><span class="type-signature">(inner) </span>getId<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the event_id for this event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line163">line 163</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event ID, e.g. <code>$143350589368169JsLZx:localhost
+</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getKeyRequestRecipients"><span class="type-signature">(inner) </span>getKeyRequestRecipients<span class="signature">(userId)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Calculate the recipients for keyshare requests.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the user who received this event.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line426">line 426</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    array of recipients
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getKeysClaimed"><span class="type-signature">(inner) </span>getKeysClaimed<span class="signature">()</span><span class="type-signature"> &rarr; {Object.&lt;string, string>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    The additional keys the sender of this encrypted event claims to possess.
+
+Just a wrapper for #getClaimedEd25519Key (q.v.)
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line601">line 601</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object.&lt;string, string></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getOriginalContent"><span class="type-signature">(inner) </span>getOriginalContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the (decrypted, if necessary) event content JSON, even if the event
+was replaced by another event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line226">line 226</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event content JSON, or an empty object.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getPrevContent"><span class="type-signature">(inner) </span>getPrevContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the previous event content JSON. This will only return something for
+state events which exist in the timeline.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line265">line 265</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The previous event content JSON, or an empty object.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getPushActions"><span class="type-signature">(inner) </span>getPushActions<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the push actions, if known, for this event
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line745">line 745</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    push actions
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getRelation"><span class="type-signature">(inner) </span>getRelation<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get relation info for the event, if any.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line831">line 831</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getRoomId"><span class="type-signature">(inner) </span>getRoomId<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the room_id for this event. This will return <code>undefined</code>
+for <code>m.presence</code> events.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line200">line 200</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
+</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getSender"><span class="type-signature">(inner) </span>getSender<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the user_id for this event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line171">line 171</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The user ID, e.g. <code>@alice:matrix.org</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getSenderKey"><span class="type-signature">(inner) </span>getSenderKey<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    The curve25519 key for the device that we think sent this event
+
+For an Olm-encrypted event, this is inferred directly from the DH
+exchange at the start of the session: the curve25519 key is involved in
+the DH exchange, so only a device which holds the private part of that
+key can establish such a session.
+
+For a megolm-encrypted event, it is inferred from the Olm message which
+established the megolm session
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line590">line 590</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getStateKey"><span class="type-signature">(inner) </span>getStateKey<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the event state_key if it has one. This will return <code>undefined
+</code> for message events.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line298">line 298</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event's <code>state_key</code>.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getTs"><span class="type-signature">(inner) </span>getTs<span class="signature">()</span><span class="type-signature"> &rarr; {Number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the timestamp of this event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line208">line 208</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event timestamp, e.g. <code>1433502692297</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getType"><span class="type-signature">(inner) </span>getType<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the (decrypted, if necessary) type of event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line180">line 180</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event type, e.g. <code>m.room.message</code>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getWireContent"><span class="type-signature">(inner) </span>getWireContent<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the (possibly encrypted) event content JSON that will be sent to the
+homeserver.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line256">line 256</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event content JSON, or an empty object.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~getWireType"><span class="type-signature">(inner) </span>getWireType<span class="signature">()</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get the (possibly encrypted) type of the event that will be sent to the
+homeserver.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line190">line 190</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The event type.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~handleRemoteEcho"><span class="type-signature">(inner) </span>handleRemoteEcho<span class="signature">(event)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Replace the `event` property and recalculate any properties based on it.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the object to assign to the `event` property</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line762">line 762</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~hasAssocation"><span class="type-signature">(inner) </span>hasAssocation<span class="signature">()</span><span class="type-signature"> &rarr; {bool}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Checks if this event is associated with another event. See `getAssociatedId`.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line949">line 949</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">bool</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isBeingDecrypted"><span class="type-signature">(inner) </span>isBeingDecrypted<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if this event is currently being decrypted.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line346">line 346</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this event is currently being decrypted, else false.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isCancelled"><span class="type-signature">(inner) </span>isCancelled<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Gets whether or not the event is flagged as cancelled. See flagCancelled() for
+more information.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line985">line 985</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if the event is cancelled, false otherwise.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isDecryptionFailure"><span class="type-signature">(inner) </span>isDecryptionFailure<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if this event is an encrypted event which we failed to decrypt
+
+(This implies that we might retry decryption at some point in the future)
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line358">line 358</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this event is an encrypted event which we
+    couldn't decrypt.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isEncrypted"><span class="type-signature">(inner) </span>isEncrypted<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if the event is encrypted.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line573">line 573</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this event is encrypted.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isRedacted"><span class="type-signature">(inner) </span>isRedacted<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if this event has been redacted
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line727">line 727</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this event has been redacted
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isRedaction"><span class="type-signature">(inner) </span>isRedaction<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if this event is a redaction of another event
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line736">line 736</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this event is a redaction
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isRelation"><span class="type-signature">(inner) </span>isRelation<span class="signature">(relType<span class="signature-attributes">nullable</span>)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Get whether the event is a relation event, and of a given type if
+`relType` is passed in.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>relType</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">if given, checks that the relation is of the
+given type</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line818">line 818</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isSending"><span class="type-signature">(inner) </span>isSending<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Whether the event is in any phase of sending, send failure, waiting for
+remote echo, etc.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line791">line 791</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isState"><span class="type-signature">(inner) </span>isState<span class="signature">()</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Check if this event is a state event.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line306">line 306</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if this is a state event.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~localRedactionEvent"><span class="type-signature">(inner) </span>localRedactionEvent<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="global.html#MatrixEvent">MatrixEvent</a>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns the event that wants to redact this event, but hasn't been sent yet.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line926">line 926</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    the event
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~makeEncrypted"><span class="type-signature">(inner) </span>makeEncrypted<span class="signature">(crypto_type, crypto_content, senderCurve25519Key, claimedEd25519Key)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Replace the content of this event with encrypted versions.
+(This is used when sending an event; it should not be used by applications).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>crypto_type</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">type of the encrypted event - typically
+<tt>"m.room.encrypted"</tt></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>crypto_content</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">raw 'content' for the encrypted event.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>senderCurve25519Key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">curve25519 key to record for the
+  sender of this event.
+  See module:models/event.MatrixEvent#getSenderKey.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>claimedEd25519Key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">claimed ed25519 key to record for the
+  sender if this event.
+  See module:models/event.MatrixEvent#getClaimedEd25519Key</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line329">line 329</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~makeRedacted"><span class="type-signature">(inner) </span>makeRedacted<span class="signature">(redaction_event)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the content of an event in the same way it would be by the server
+if it were redacted before it was sent to us
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>redaction_event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-models_event.MatrixEvent.html">module:models/event.MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">event causing the redaction</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line678">line 678</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~makeReplaced"><span class="type-signature">(inner) </span>makeReplaced<span class="signature">(newEvent<span class="signature-attributes">nullable</span>)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Set an event that replaces the content of this event, through an m.replace relation.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>newEvent</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">the event with the replacing content, if any.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line843">line 843</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~replacingEvent"><span class="type-signature">(inner) </span>replacingEvent<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {<a href="global.html#MatrixEvent">MatrixEvent</a>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns the event replacing the content of this event, if any.
+Replacements are aggregated on the server, so this would only
+return an event in case it came down the sync, or for local echo of edits.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line901">line 901</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="global.html#MatrixEvent">MatrixEvent</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~replacingEventDate"><span class="type-signature">(inner) </span>replacingEventDate<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {Date}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns the origin_server_ts of the event replacing the content of this event, if any.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line910">line 910</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Date</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~replacingEventId"><span class="type-signature">(inner) </span>replacingEventId<span class="signature">()</span><span class="type-signature"> &rarr; (nullable) {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns the event ID of the event replacing the content of this event, if any.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line885">line 885</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~setPushActions"><span class="type-signature">(inner) </span>setPushActions<span class="signature">(pushActions)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Set the push actions for this event.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>pushActions</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">push actions</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line754">line 754</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~setStatus"><span class="type-signature">(inner) </span>setStatus<span class="signature">(status)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the event's sending status and emit an event as well.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>status</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The new status</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line800">line 800</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~toJSON"><span class="type-signature">(inner) </span>toJSON<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Summarise the event as JSON for debugging. If encrypted, include both the
+decrypted and encrypted view of the event. This is named `toJSON` for use
+with `JSON.stringify` which checks objects for functions named `toJSON`
+and will call them to customise the output if they are defined.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line997">line 997</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~updateAssociatedId"><span class="type-signature">(inner) </span>updateAssociatedId<span class="signature">(eventId)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the related id with a new one.
+
+Used to replace a local id with remote one before sending
+an event with a related id.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>eventId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the new event id</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line961">line 961</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+
+    
+
+    
+        <h3 class="subsection-title">Events</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".event:MatrixEvent%22Event.decrypted%22">MatrixEvent"Event.decrypted"</h4>
+    
+
+    
+
+
+
+<div class="description">
+    Fires when an event is decrypted
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>event</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-models_event.MatrixEvent.html">module:models/event.MatrixEvent</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The matrix event which has been decrypted</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="module-crypto_algorithms_base.DecryptionError.html">module:crypto/algorithms/base.DecryptionError</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The error that occured during decryption, or `undefined` if no
+   error occured.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="models_event.js.html">models/event.js</a>, <a href="models_event.js.html#line1049">line 1049</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="Backend.html">Backend</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module.html#.exports">exports</a></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList
+
+Manages the list of other users' devicesmodule:</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList
+
+Manages the list of encrypted roomsmodule:</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ScanQRCode.html">crypto/verification/QRCode/ScanQRCode</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ShowQRCode.html">crypto/verification/QRCode/ShowQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator-SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.start%2522">MatrixClient"crypto.verification.start"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_removeEvent">_removeEvent</a></li><li><a href="global.html#addEvent">addEvent</a></li><li><a href="global.html#AutoDiscovery">AutoDiscovery</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentHelpers">ContentHelpers</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getAnnotationsBySender">getAnnotationsBySender</a></li><li><a href="global.html#getLastReplacement">getLastReplacement</a></li><li><a href="global.html#getRelations">getRelations</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#getSortedAnnotationsByKey">getSortedAnnotationsByKey</a></li><li><a href="global.html#Group">Group</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#InvalidStoreError">InvalidStoreError</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#MemoryStore">MemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallAudioOutput">setMatrixCallAudioOutput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.2</a> on Wed Oct 09 2019 16:51:28 GMT+0100 (British Summer Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: crypto/store/indexeddb-crypto-store-backend.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: crypto/store/indexeddb-crypto-store-backend.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2017 Vector Creations Ltd
+Copyright 2018 New Vector Ltd
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import Promise from 'bluebird';
+
+import logger from '../../logger';
+import utils from '../../utils';
+
+export const VERSION = 7;
+
+/**
+ * Implementation of a CryptoStore which is backed by an existing
+ * IndexedDB connection. Generally you want IndexedDBCryptoStore
+ * which connects to the database and defers to one of these.
+ *
+ * @implements {module:crypto/store/base~CryptoStore}
+ */
+export class Backend {
+    /**
+     * @param {IDBDatabase} db
+     */
+    constructor(db) {
+        this._db = db;
+
+        // make sure we close the db on `onversionchange` - otherwise
+        // attempts to delete the database will block (and subsequent
+        // attempts to re-create it will also block).
+        db.onversionchange = ev => {
+            logger.log(`versionchange for indexeddb ${this._dbName}: closing`);
+            db.close();
+        };
+    }
+
+    /**
+     * Look for an existing outgoing room key request, and if none is found,
+     * add a new one
+     *
+     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
+     *
+     * @returns {Promise} resolves to
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     *    same instance as passed in, or the existing one.
+     */
+    getOrAddOutgoingRoomKeyRequest(request) {
+        const requestBody = request.requestBody;
+
+        const deferred = Promise.defer();
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
+        txn.onerror = deferred.reject;
+
+        // first see if we already have an entry for this request.
+        this._getOutgoingRoomKeyRequest(txn, requestBody, existing => {
+            if (existing) {
+                // this entry matches the request - return it.
+                logger.log(`already have key request outstanding for ` + `${requestBody.room_id} / ${requestBody.session_id}: ` + `not sending another`);
+                deferred.resolve(existing);
+                return;
+            }
+
+            // we got to the end of the list without finding a match
+            // - add the new request.
+            logger.log(`enqueueing key request for ${requestBody.room_id} / ` + requestBody.session_id);
+            txn.oncomplete = () => {
+                deferred.resolve(request);
+            };
+            const store = txn.objectStore("outgoingRoomKeyRequests");
+            store.add(request);
+        });
+
+        return deferred.promise;
+    }
+
+    /**
+     * Look for an existing room key request
+     *
+     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     *    existing request to look for
+     *
+     * @return {Promise} resolves to the matching
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    not found
+     */
+    getOutgoingRoomKeyRequest(requestBody) {
+        const deferred = Promise.defer();
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        txn.onerror = deferred.reject;
+
+        this._getOutgoingRoomKeyRequest(txn, requestBody, existing => {
+            deferred.resolve(existing);
+        });
+        return deferred.promise;
+    }
+
+    /**
+     * look for an existing room key request in the db
+     *
+     * @private
+     * @param {IDBTransaction} txn  database transaction
+     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     *    existing request to look for
+     * @param {Function} callback  function to call with the results of the
+     *    search. Either passed a matching
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    not found.
+     */
+    _getOutgoingRoomKeyRequest(txn, requestBody, callback) {
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const idx = store.index("session");
+        const cursorReq = idx.openCursor([requestBody.room_id, requestBody.session_id]);
+
+        cursorReq.onsuccess = ev => {
+            const cursor = ev.target.result;
+            if (!cursor) {
+                // no match found
+                callback(null);
+                return;
+            }
+
+            const existing = cursor.value;
+
+            if (utils.deepCompare(existing.requestBody, requestBody)) {
+                // got a match
+                callback(existing);
+                return;
+            }
+
+            // look at the next entry in the index
+            cursor.continue();
+        };
+    }
+
+    /**
+     * Look for room key requests by state
+     *
+     * @param {Array&lt;Number>} wantedStates list of acceptable states
+     *
+     * @return {Promise} resolves to the a
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    there are no pending requests in those states. If there are multiple
+     *    requests in those states, an arbitrary one is chosen.
+     */
+    getOutgoingRoomKeyRequestByState(wantedStates) {
+        if (wantedStates.length === 0) {
+            return Promise.resolve(null);
+        }
+
+        // this is a bit tortuous because we need to make sure we do the lookup
+        // in a single transaction, to avoid having a race with the insertion
+        // code.
+
+        // index into the wantedStates array
+        let stateIndex = 0;
+        let result;
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (cursor) {
+                // got a match
+                result = cursor.value;
+                return;
+            }
+
+            // try the next state in the list
+            stateIndex++;
+            if (stateIndex >= wantedStates.length) {
+                // no matches
+                return;
+            }
+
+            const wantedState = wantedStates[stateIndex];
+            const cursorReq = ev.target.source.openCursor(wantedState);
+            cursorReq.onsuccess = onsuccess;
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const wantedState = wantedStates[stateIndex];
+        const cursorReq = store.index("state").openCursor(wantedState);
+        cursorReq.onsuccess = onsuccess;
+
+        return promiseifyTxn(txn).then(() => result);
+    }
+
+    getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
+        let stateIndex = 0;
+        const results = [];
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (cursor) {
+                const keyReq = cursor.value;
+                if (keyReq.recipients.includes({ userId, deviceId })) {
+                    results.push(keyReq);
+                }
+                cursor.continue();
+            } else {
+                // try the next state in the list
+                stateIndex++;
+                if (stateIndex >= wantedStates.length) {
+                    // no matches
+                    return;
+                }
+
+                const wantedState = wantedStates[stateIndex];
+                const cursorReq = ev.target.source.openCursor(wantedState);
+                cursorReq.onsuccess = onsuccess;
+            }
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        const store = txn.objectStore("outgoingRoomKeyRequests");
+
+        const wantedState = wantedStates[stateIndex];
+        const cursorReq = store.index("state").openCursor(wantedState);
+        cursorReq.onsuccess = onsuccess;
+
+        return promiseifyTxn(txn).then(() => results);
+    }
+
+    /**
+     * Look for an existing room key request by id and state, and update it if
+     * found
+     *
+     * @param {string} requestId      ID of request to update
+     * @param {number} expectedState  state we expect to find the request in
+     * @param {Object} updates        name/value map of updates to apply
+     *
+     * @returns {Promise} resolves to
+     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    updated request, or null if no matching row was found
+     */
+    updateOutgoingRoomKeyRequest(requestId, expectedState, updates) {
+        let result = null;
+
+        function onsuccess(ev) {
+            const cursor = ev.target.result;
+            if (!cursor) {
+                return;
+            }
+            const data = cursor.value;
+            if (data.state != expectedState) {
+                logger.warn(`Cannot update room key request from ${expectedState} ` + `as it was already updated to ${data.state}`);
+                return;
+            }
+            Object.assign(data, updates);
+            cursor.update(data);
+            result = data;
+        }
+
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
+        const cursorReq = txn.objectStore("outgoingRoomKeyRequests").openCursor(requestId);
+        cursorReq.onsuccess = onsuccess;
+        return promiseifyTxn(txn).then(() => result);
+    }
+
+    /**
+     * Look for an existing room key request by id and state, and delete it if
+     * found
+     *
+     * @param {string} requestId      ID of request to update
+     * @param {number} expectedState  state we expect to find the request in
+     *
+     * @returns {Promise} resolves once the operation is completed
+     */
+    deleteOutgoingRoomKeyRequest(requestId, expectedState) {
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
+        const cursorReq = txn.objectStore("outgoingRoomKeyRequests").openCursor(requestId);
+        cursorReq.onsuccess = ev => {
+            const cursor = ev.target.result;
+            if (!cursor) {
+                return;
+            }
+            const data = cursor.value;
+            if (data.state != expectedState) {
+                logger.warn(`Cannot delete room key request in state ${data.state} ` + `(expected ${expectedState})`);
+                return;
+            }
+            cursor.delete();
+        };
+        return promiseifyTxn(txn);
+    }
+
+    // Olm Account
+
+    getAccount(txn, func) {
+        const objectStore = txn.objectStore("account");
+        const getReq = objectStore.get("-");
+        getReq.onsuccess = function () {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeAccount(txn, newData) {
+        const objectStore = txn.objectStore("account");
+        objectStore.put(newData, "-");
+    }
+
+    // Olm Sessions
+
+    countEndToEndSessions(txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const countReq = objectStore.count();
+        countReq.onsuccess = function () {
+            func(countReq.result);
+        };
+    }
+
+    getEndToEndSessions(deviceKey, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const idx = objectStore.index("deviceKey");
+        const getReq = idx.openCursor(deviceKey);
+        const results = {};
+        getReq.onsuccess = function () {
+            const cursor = getReq.result;
+            if (cursor) {
+                results[cursor.value.sessionId] = {
+                    session: cursor.value.session,
+                    lastReceivedMessageTs: cursor.value.lastReceivedMessageTs
+                };
+                cursor.continue();
+            } else {
+                try {
+                    func(results);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    getEndToEndSession(deviceKey, sessionId, txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const getReq = objectStore.get([deviceKey, sessionId]);
+        getReq.onsuccess = function () {
+            try {
+                if (getReq.result) {
+                    func({
+                        session: getReq.result.session,
+                        lastReceivedMessageTs: getReq.result.lastReceivedMessageTs
+                    });
+                } else {
+                    func(null);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    getAllEndToEndSessions(txn, func) {
+        const objectStore = txn.objectStore("sessions");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function () {
+            const cursor = getReq.result;
+            if (cursor) {
+                func(cursor.value);
+                cursor.continue();
+            } else {
+                try {
+                    func(null);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
+        const objectStore = txn.objectStore("sessions");
+        objectStore.put({
+            deviceKey,
+            sessionId,
+            session: sessionInfo.session,
+            lastReceivedMessageTs: sessionInfo.lastReceivedMessageTs
+        });
+    }
+
+    // Inbound group sessions
+
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.get([senderCurve25519Key, sessionId]);
+        getReq.onsuccess = function () {
+            try {
+                if (getReq.result) {
+                    func(getReq.result.session);
+                } else {
+                    func(null);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    getAllEndToEndInboundGroupSessions(txn, func) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function () {
+            const cursor = getReq.result;
+            if (cursor) {
+                try {
+                    func({
+                        senderKey: cursor.value.senderCurve25519Key,
+                        sessionId: cursor.value.sessionId,
+                        sessionData: cursor.value.session
+                    });
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+                cursor.continue();
+            } else {
+                try {
+                    func(null);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const addReq = objectStore.add({
+            senderCurve25519Key, sessionId, session: sessionData
+        });
+        addReq.onerror = ev => {
+            if (addReq.error.name === 'ConstraintError') {
+                // This stops the error from triggering the txn's onerror
+                ev.stopPropagation();
+                // ...and this stops it from aborting the transaction
+                ev.preventDefault();
+                logger.log("Ignoring duplicate inbound group session: " + senderCurve25519Key + " / " + sessionId);
+            } else {
+                abortWithException(txn, new Error("Failed to add inbound group session: " + addReq.error));
+            }
+        };
+    }
+
+    storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        objectStore.put({
+            senderCurve25519Key, sessionId, session: sessionData
+        });
+    }
+
+    getEndToEndDeviceData(txn, func) {
+        const objectStore = txn.objectStore("device_data");
+        const getReq = objectStore.get("-");
+        getReq.onsuccess = function () {
+            try {
+                func(getReq.result || null);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+    }
+
+    storeEndToEndDeviceData(deviceData, txn) {
+        const objectStore = txn.objectStore("device_data");
+        objectStore.put(deviceData, "-");
+    }
+
+    storeEndToEndRoom(roomId, roomInfo, txn) {
+        const objectStore = txn.objectStore("rooms");
+        objectStore.put(roomInfo, roomId);
+    }
+
+    getEndToEndRooms(txn, func) {
+        const rooms = {};
+        const objectStore = txn.objectStore("rooms");
+        const getReq = objectStore.openCursor();
+        getReq.onsuccess = function () {
+            const cursor = getReq.result;
+            if (cursor) {
+                rooms[cursor.key] = cursor.value;
+                cursor.continue();
+            } else {
+                try {
+                    func(rooms);
+                } catch (e) {
+                    abortWithException(txn, e);
+                }
+            }
+        };
+    }
+
+    // session backups
+
+    getSessionsNeedingBackup(limit) {
+        return new Promise((resolve, reject) => {
+            const sessions = [];
+
+            const txn = this._db.transaction(["sessions_needing_backup", "inbound_group_sessions"], "readonly");
+            txn.onerror = reject;
+            txn.oncomplete = function () {
+                resolve(sessions);
+            };
+            const objectStore = txn.objectStore("sessions_needing_backup");
+            const sessionStore = txn.objectStore("inbound_group_sessions");
+            const getReq = objectStore.openCursor();
+            getReq.onsuccess = function () {
+                const cursor = getReq.result;
+                if (cursor) {
+                    const sessionGetReq = sessionStore.get(cursor.key);
+                    sessionGetReq.onsuccess = function () {
+                        sessions.push({
+                            senderKey: sessionGetReq.result.senderCurve25519Key,
+                            sessionId: sessionGetReq.result.sessionId,
+                            sessionData: sessionGetReq.result.session
+                        });
+                    };
+                    if (!limit || sessions.length &lt; limit) {
+                        cursor.continue();
+                    }
+                }
+            };
+        });
+    }
+
+    countSessionsNeedingBackup(txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readonly");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return new Promise((resolve, reject) => {
+            const req = objectStore.count();
+            req.onerror = reject;
+            req.onsuccess = () => resolve(req.result);
+        });
+    }
+
+    unmarkSessionsNeedingBackup(sessions, txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map(session => {
+            return new Promise((resolve, reject) => {
+                const req = objectStore.delete([session.senderKey, session.sessionId]);
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+    }
+
+    markSessionsNeedingBackup(sessions, txn) {
+        if (!txn) {
+            txn = this._db.transaction("sessions_needing_backup", "readwrite");
+        }
+        const objectStore = txn.objectStore("sessions_needing_backup");
+        return Promise.all(sessions.map(session => {
+            return new Promise((resolve, reject) => {
+                const req = objectStore.put({
+                    senderCurve25519Key: session.senderKey,
+                    sessionId: session.sessionId
+                });
+                req.onsuccess = resolve;
+                req.onerror = reject;
+            });
+        }));
+    }
+
+    doTxn(mode, stores, func) {
+        const txn = this._db.transaction(stores, mode);
+        const promise = promiseifyTxn(txn);
+        const result = func(txn);
+        return promise.then(() => {
+            return result;
+        });
+    }
+}
+
+export function upgradeDatabase(db, oldVersion) {
+    logger.log(`Upgrading IndexedDBCryptoStore from version ${oldVersion}` + ` to ${VERSION}`);
+    if (oldVersion &lt; 1) {
+        // The database did not previously exist.
+        createDatabase(db);
+    }
+    if (oldVersion &lt; 2) {
+        db.createObjectStore("account");
+    }
+    if (oldVersion &lt; 3) {
+        const sessionsStore = db.createObjectStore("sessions", {
+            keyPath: ["deviceKey", "sessionId"]
+        });
+        sessionsStore.createIndex("deviceKey", "deviceKey");
+    }
+    if (oldVersion &lt; 4) {
+        db.createObjectStore("inbound_group_sessions", {
+            keyPath: ["senderCurve25519Key", "sessionId"]
+        });
+    }
+    if (oldVersion &lt; 5) {
+        db.createObjectStore("device_data");
+    }
+    if (oldVersion &lt; 6) {
+        db.createObjectStore("rooms");
+    }
+    if (oldVersion &lt; 7) {
+        db.createObjectStore("sessions_needing_backup", {
+            keyPath: ["senderCurve25519Key", "sessionId"]
+        });
+    }
+    // Expand as needed.
+}
+
+function createDatabase(db) {
+    const outgoingRoomKeyRequestsStore = db.createObjectStore("outgoingRoomKeyRequests", { keyPath: "requestId" });
+
+    // we assume that the RoomKeyRequestBody will have room_id and session_id
+    // properties, to make the index efficient.
+    outgoingRoomKeyRequestsStore.createIndex("session", ["requestBody.room_id", "requestBody.session_id"]);
+
+    outgoingRoomKeyRequestsStore.createIndex("state", "state");
+}
+
+/*
+ * Aborts a transaction with a given exception
+ * The transaction promise will be rejected with this exception.
+ */
+function abortWithException(txn, e) {
+    // We cheekily stick our exception onto the transaction object here
+    // We could alternatively make the thing we pass back to the app
+    // an object containing the transaction and exception.
+    txn._mx_abortexception = e;
+    try {
+        txn.abort();
+    } catch (e) {
+        // sometimes we won't be able to abort the transaction
+        // (ie. if it's aborted or completed)
+    }
+}
+
+function promiseifyTxn(txn) {
+    return new Promise((resolve, reject) => {
+        txn.oncomplete = () => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            }
+            resolve();
+        };
+        txn.onerror = event => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            } else {
+                logger.log("Error performing indexeddb txn", event);
+                reject(event.target.error);
+            }
+        };
+        txn.onabort = event => {
+            if (txn._mx_abortexception !== undefined) {
+                reject(txn._mx_abortexception);
+            } else {
+                logger.log("Error performing indexeddb txn", event);
+                reject(event.target.error);
+            }
+        };
+    });
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="Backend.html">Backend</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module.html#.exports">exports</a></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList
+
+Manages the list of other users' devicesmodule:</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList
+
+Manages the list of encrypted roomsmodule:</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ScanQRCode.html">crypto/verification/QRCode/ScanQRCode</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ShowQRCode.html">crypto/verification/QRCode/ShowQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator-SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.start%2522">MatrixClient"crypto.verification.start"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_removeEvent">_removeEvent</a></li><li><a href="global.html#addEvent">addEvent</a></li><li><a href="global.html#AutoDiscovery">AutoDiscovery</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentHelpers">ContentHelpers</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getAnnotationsBySender">getAnnotationsBySender</a></li><li><a href="global.html#getLastReplacement">getLastReplacement</a></li><li><a href="global.html#getRelations">getRelations</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#getSortedAnnotationsByKey">getSortedAnnotationsByKey</a></li><li><a href="global.html#Group">Group</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#InvalidStoreError">InvalidStoreError</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#MemoryStore">MemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallAudioOutput">setMatrixCallAudioOutput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.2</a> on Wed Oct 09 2019 16:51:27 GMT+0100 (British Summer Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
