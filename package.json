@@ -83,7 +83,7 @@
     "matrix-mock-request": "^1.2.3",
     "mocha": "^5.2.0",
     "mocha-jenkins-reporter": "^0.4.0",
-    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.0.tgz",
+    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
     "rimraf": "^2.5.4",
     "source-map-support": "^0.4.11",
     "sourceify": "^0.1.0",
