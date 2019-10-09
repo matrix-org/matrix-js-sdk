@@ -17,7 +17,7 @@ limitations under the License.
 import Promise from 'bluebird';
 
 import logger from '../../logger';
-import MemoryCryptoStore from './memory-crypto-store.js';
+import MemoryCryptoStore from './memory-crypto-store';
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
