@@ -3530,6 +3530,10 @@ object.pick@^1.3.0:
   dependencies:
     isobject "^3.0.1"
 
+olm@/Users/dave/Downloads/olm-3.1.4.tgz:
+  version "3.1.4"
+  resolved "/Users/dave/Downloads/olm-3.1.4.tgz#0f03128b7d3b2f614d2216409a1dfccca765fdb3"
+
 "olm@https://packages.matrix.org/npm/olm/olm-3.1.0.tgz":
   version "3.1.0"
   resolved "https://packages.matrix.org/npm/olm/olm-3.1.0.tgz#2c8fc2a42b7ea12febc31baa73ec03d9b601da16"
