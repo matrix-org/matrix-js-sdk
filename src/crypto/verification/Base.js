@@ -169,6 +169,10 @@ export default class VerificationBase extends EventEmitter {
     done() {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
+            if (this.roomId) {
+                // verification in DM requires a done message
+                this._send("m.key.verification.done", {});
+            }
             this._resolve();
         }
     }
