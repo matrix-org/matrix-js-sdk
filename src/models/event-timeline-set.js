@@ -689,8 +689,9 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
  * @param {String} eventType
  * The relation event's type, such as "m.reaction", etc.
  *
- * @returns {Relations}
- * A container for relation events.
+ * @returns {?Relations}
+ * A container for relation events, or undefined if either an event argument is invalid or
+ * aggregation is disabled.
  */
 EventTimelineSet.prototype.getRelationsForEvent = function(
     eventId, relationType, eventType,
