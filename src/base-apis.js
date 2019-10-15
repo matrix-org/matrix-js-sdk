@@ -993,10 +993,13 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
  * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
  * for convenience because the RR and the RM are commonly updated at the same time as
  * each other. Optional.
+ * @param {object} opts Options for the read markers.
+ * @param {object} opts.hidden True to hide the read receipt from other users. <b>This
+ * property is currently unstable and may change in the future.</b>
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
 MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
-                                function(roomId, rmEventId, rrEventId) {
+                                function(roomId, rmEventId, rrEventId, opts) {
     const path = utils.encodeUri("/rooms/$roomId/read_markers", {
         $roomId: roomId,
     });
@@ -1004,6 +1007,7 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     const content = {
         "m.fully_read": rmEventId,
         "m.read": rrEventId,
+        "m.hidden": Boolean(opts ? opts.hidden : false),
     };
 
     return this._http.authedRequest(
@@ -1335,10 +1339,16 @@ MatrixBaseApis.prototype.getThreePids = function(callback) {
 };
 
 /**
+ * Add a 3PID to your homeserver account and optionally bind it to an identity
+ * server as well. An identity server is required as part of the `creds` object.
+ *
+ * This API is deprecated, and you should instead use `addThreePidOnly`
+ * for homeservers that support it.
+ *
  * @param {Object} creds
  * @param {boolean} bind
  * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
@@ -1349,6 +1359,75 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
     };
     return this._http.authedRequest(
         callback, "POST", path, null, data,
+    );
+};
+
+/**
+ * Add a 3PID to your homeserver account. This API does not use an identity
+ * server, as the homeserver is expected to handle 3PID ownership validation.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `account/3pid/<medium>/requestToken` on the homeserver.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addThreePidOnly = function(data) {
+    const path = "/account/3pid/add";
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
+
+/**
+ * Bind a 3PID for discovery onto an identity server via the homeserver. The
+ * identity server handles 3PID ownership validation and the homeserver records
+ * the new binding to track where all 3PIDs for the account are bound.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `validate/<medium>/requestToken` on the identity server. It should also
+ * contain `id_server` and `id_access_token` fields as well.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.bindThreePid = function(data) {
+    const path = "/account/3pid/bind";
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
+
+/**
+ * Unbind a 3PID for discovery on an identity server via the homeserver. The
+ * homeserver removes its record of the binding to keep an updated record of
+ * where all 3PIDs for the account are bound.
+ *
+ * @param {string} medium The threepid medium (eg. 'email')
+ * @param {string} address The threepid address (eg. 'bob@example.com')
+ *        this must be as returned by getThreePids.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.unbindThreePid = function(medium, address) {
+    const path = "/account/3pid/unbind";
+    const data = {
+        medium,
+        address,
+        id_server: this.getIdentityServerUrl(true),
+    };
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
@@ -1753,10 +1832,11 @@ MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
 };
 
 /**
- * Requests an email verification token directly from an Identity Server.
+ * Requests an email verification token directly from an identity server.
  *
- * Note that the Homeserver offers APIs to proxy this API for specific
- * situations, allowing for better feedback to the user.
+ * This API is used as part of binding an email for discovery on an identity
+ * server. The validation data that results should be passed to the
+ * `bindThreePid` method to complete the binding process.
  *
  * @param {string} email The email address to request a token for
  * @param {string} clientSecret A secret binary string generated by the client.
@@ -1768,12 +1848,12 @@ MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
  * @param {string} nextLink Optional If specified, the client will be redirected
  *                 to this link after validation.
  * @param {module:client.callback} callback Optional.
- * @param {string} identityAccessToken The `access_token` field of the Identity
- * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ * @param {string} identityAccessToken The `access_token` field of the identity
+ * server `/account/register` response (see {@link registerWithIdentityServer}).
  *
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
- * @throws Error if no Identity Server is set
+ * @throws Error if no identity server is set
  */
 MatrixBaseApis.prototype.requestEmailToken = async function(
     email,
@@ -1815,7 +1895,75 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
 };
 
 /**
- * Submits an MSISDN token to the identity server
+ * Requests a MSISDN verification token directly from an identity server.
+ *
+ * This API is used as part of binding a MSISDN for discovery on an identity
+ * server. The validation data that results should be passed to the
+ * `bindThreePid` method to complete the binding process.
+ *
+ * @param {string} phoneCountry The ISO 3166-1 alpha-2 code for the country in
+ *                 which phoneNumber should be parsed relative to.
+ * @param {string} phoneNumber The phone number, in national or international
+ *                 format
+ * @param {string} clientSecret A secret binary string generated by the client.
+ *                 It is recommended this be around 16 ASCII characters.
+ * @param {number} sendAttempt If an identity server sees a duplicate request
+ *                 with the same sendAttempt, it will not send another SMS.
+ *                 To request another SMS to be sent, use a larger value for
+ *                 the sendAttempt param as was used in the previous request.
+ * @param {string} nextLink Optional If specified, the client will be redirected
+ *                 to this link after validation.
+ * @param {module:client.callback} callback Optional.
+ * @param {string} identityAccessToken The `access_token` field of the Identity
+ * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ *
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ * @throws Error if no identity server is set
+ */
+MatrixBaseApis.prototype.requestMsisdnToken = async function(
+    phoneCountry,
+    phoneNumber,
+    clientSecret,
+    sendAttempt,
+    nextLink,
+    callback,
+    identityAccessToken,
+) {
+    const params = {
+        client_secret: clientSecret,
+        country: phoneCountry,
+        phone_number: phoneNumber,
+        send_attempt: sendAttempt,
+        next_link: nextLink,
+    };
+
+    try {
+        const response = await this._http.idServerRequest(
+            undefined, "POST", "/validate/msisdn/requestToken",
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+        // TODO: Fold callback into above call once v1 path below is removed
+        if (callback) callback(null, response);
+        return response;
+    } catch (err) {
+        if (err.cors === "rejected" || err.httpStatus === 404) {
+            // Fall back to deprecated v1 API for now
+            // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
+            logger.warn("IS doesn't support v2, falling back to deprecated v1");
+            return await this._http.idServerRequest(
+                callback, "POST", "/validate/msisdn/requestToken",
+                params, httpApi.PREFIX_IDENTITY_V1,
+            );
+        }
+        if (callback) callback(err);
+        throw err;
+    }
+};
+
+/**
+ * Submits a MSISDN token to the identity server
  *
  * This is used when submitting the code sent by SMS to a phone number.
  * The ID server has an equivalent API for email but the js-sdk does
@@ -1863,6 +2011,41 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
         }
         throw err;
     }
+};
+
+/**
+ * Submits a MSISDN token to an arbitrary URL.
+ *
+ * This is used when submitting the code sent by SMS to a phone number in the
+ * newer 3PID flow where the homeserver validates 3PID ownership (as part of
+ * `requestAdd3pidMsisdnToken`). The homeserver response may include a
+ * `submit_url` to specify where the token should be sent, and this helper can
+ * be used to pass the token to this URL.
+ *
+ * @param {string} url The URL to submit the token to
+ * @param {string} sid The sid given in the response to requestToken
+ * @param {string} clientSecret A secret binary string generated by the client.
+ *                 This must be the same value submitted in the requestToken call.
+ * @param {string} msisdnToken The MSISDN token, as enetered by the user.
+ *
+ * @return {module:client.Promise} Resolves: Object, currently with no parameters.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.submitMsisdnTokenOtherUrl = function(
+    url,
+    sid,
+    clientSecret,
+    msisdnToken,
+) {
+    const params = {
+        sid: sid,
+        client_secret: clientSecret,
+        token: msisdnToken,
+    };
+
+    return this._http.requestOtherUrl(
+        undefined, "POST", url, undefined, params,
+    );
 };
 
 /**
@@ -1916,15 +2099,23 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
         // Abuse the olm hashing
         const olmutil = new global.Olm.Utility();
         params["addresses"] = addressPairs.map(p => {
-            const hashed = olmutil.sha256(`${p[0]} ${p[1]} ${params['pepper']}`)
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const hashed = olmutil.sha256(`${addr} ${med} ${params['pepper']}`)
                 .replace(/\+/g, '-').replace(/\//g, '_'); // URL-safe base64
+            // Map the hash to a known (case-sensitive) address. We use the case
+            // sensitive version because the caller might be expecting that.
             localMapping[hashed] = p[0];
             return hashed;
         });
         params["algorithm"] = "sha256";
     } else if (hashes['algorithms'].includes('none')) {
         params["addresses"] = addressPairs.map(p => {
-            const unhashed = `${p[0]} ${p[1]}`;
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const unhashed = `${addr} ${med}`;
+            // Map the unhashed values to a known (case-sensitive) address. We use
+            // the case sensitive version because the caller might be expecting that.
             localMapping[unhashed] = p[0];
             return unhashed;
         });

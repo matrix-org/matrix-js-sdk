@@ -1370,24 +1370,36 @@ module.exports.createNewMatrixCall = function(client, roomId, options) {
             return getUserMedia.apply(w.navigator, arguments);
         };
     }
-    webRtc.RtcPeerConnection = (
-        w.RTCPeerConnection || w.webkitRTCPeerConnection || w.mozRTCPeerConnection
-    );
-    webRtc.RtcSessionDescription = (
-        w.RTCSessionDescription || w.webkitRTCSessionDescription ||
-        w.mozRTCSessionDescription
-    );
-    webRtc.RtcIceCandidate = (
-        w.RTCIceCandidate || w.webkitRTCIceCandidate || w.mozRTCIceCandidate
-    );
-    webRtc.vendor = null;
-    if (w.mozRTCPeerConnection) {
-        webRtc.vendor = "mozilla";
-    } else if (w.webkitRTCPeerConnection) {
-        webRtc.vendor = "webkit";
-    } else if (w.RTCPeerConnection) {
-        webRtc.vendor = "generic";
+
+    // Firefox throws on so little as accessing the RTCPeerConnection when operating in
+    // a secure mode. There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616
+    // though the concern is that the browser throwing a SecurityError will brick the
+    // client creation process.
+    try {
+        webRtc.RtcPeerConnection = (
+            w.RTCPeerConnection || w.webkitRTCPeerConnection || w.mozRTCPeerConnection
+        );
+        webRtc.RtcSessionDescription = (
+            w.RTCSessionDescription || w.webkitRTCSessionDescription ||
+            w.mozRTCSessionDescription
+        );
+        webRtc.RtcIceCandidate = (
+            w.RTCIceCandidate || w.webkitRTCIceCandidate || w.mozRTCIceCandidate
+        );
+        webRtc.vendor = null;
+        if (w.mozRTCPeerConnection) {
+            webRtc.vendor = "mozilla";
+        } else if (w.webkitRTCPeerConnection) {
+            webRtc.vendor = "webkit";
+        } else if (w.RTCPeerConnection) {
+            webRtc.vendor = "generic";
+        }
+    } catch (e) {
+        logger.error("Failed to set up WebRTC object: possible browser interference?");
+        logger.error(e);
+        return null;
     }
+
     if (!webRtc.RtcIceCandidate || !webRtc.RtcSessionDescription ||
             !webRtc.RtcPeerConnection || !webRtc.getUserMedia) {
         return null; // WebRTC is not supported.

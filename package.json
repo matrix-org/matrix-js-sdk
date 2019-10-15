@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "2.3.0",
+  "version": "2.4.1",
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
@@ -54,11 +54,11 @@
   "dependencies": {
     "another-json": "^0.2.0",
     "babel-runtime": "^6.26.0",
-    "bluebird": "^3.5.0",
+    "bluebird": "^3.7.0",
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
     "content-type": "^1.0.2",
-    "loglevel": "1.6.1",
+    "loglevel": "^1.6.4",
     "qs": "^6.5.2",
     "request": "^2.88.0",
     "unhomoglyph": "^1.0.2"
@@ -75,19 +75,19 @@
     "eslint": "^5.12.0",
     "eslint-config-google": "^0.7.1",
     "eslint-plugin-babel": "^5.3.0",
-    "exorcist": "^0.4.0",
+    "exorcist": "^1.0.1",
     "expect": "^1.20.2",
     "istanbul": "^0.4.5",
     "jsdoc": "^3.5.5",
     "lolex": "^1.5.2",
     "matrix-mock-request": "^1.2.3",
-    "mocha": "^5.2.0",
+    "mocha": "^6.2.1",
     "mocha-jenkins-reporter": "^0.4.0",
-    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.0.tgz",
-    "rimraf": "^2.5.4",
-    "source-map-support": "^0.4.11",
-    "sourceify": "^0.1.0",
-    "terser": "^4.0.0",
+    "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
+    "rimraf": "^3.0.0",
+    "source-map-support": "^0.5.13",
+    "sourceify": "^1.0.0",
+    "terser": "^4.3.8",
     "watchify": "^3.11.1"
   },
   "browserify": {

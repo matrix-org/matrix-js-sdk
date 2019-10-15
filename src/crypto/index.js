@@ -951,6 +951,15 @@ Crypto.prototype.forceDiscardSession = function(roomId) {
  *   the device query is always inhibited as the members are not tracked.
  */
 Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDeviceQuery) {
+    // ignore crypto events with no algorithm defined
+    // This will happen if a crypto event is redacted before we fetch the room state
+    // It would otherwise just throw later as an unknown algorithm would, but we may
+    // as well catch this here
+    if (!config.algorithm) {
+        console.log("Ignoring setRoomEncryption with no algorithm");
+        return;
+    }
+
     // if state is being replayed from storage, we might already have a configuration
     // for this room as they are persisted as well.
     // We just need to make sure the algorithm is initialized in this case.
