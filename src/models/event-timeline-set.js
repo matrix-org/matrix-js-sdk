@@ -695,7 +695,8 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
  * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
  * @param {String} eventType
  * The relation event's type, such as "m.reaction", etc.
- * @throws If <code>eventId, relationType or eventType</code> are not valid.
+ * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
+ * are not valid.
  *
  * @returns {?Relations}
  * A container for relation events or undefined if there are no relation events for
