@@ -1,3 +1,18 @@
+Changes in [2.4.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.2) (2019-10-18)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.2-rc.1...v2.4.2)
+
+ * No changes since v2.4.2-rc.1
+
+Changes in [2.4.2-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.2-rc.1) (2019-10-09)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.1...v2.4.2-rc.1)
+
+ * Log state of Olm sessions
+   [\#1047](https://github.com/matrix-org/matrix-js-sdk/pull/1047)
+ * Add method to get access to all timelines
+   [\#1048](https://github.com/matrix-org/matrix-js-sdk/pull/1048)
+
 Changes in [2.4.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.1) (2019-10-01)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.0...v2.4.1)
