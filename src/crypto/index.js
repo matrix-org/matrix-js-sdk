@@ -782,7 +782,7 @@ function verificationEventHandler(target, userId, roomId, eventId) {
     };
 }
 
-Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
+Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
     let methodMap;
     if (methods) {
         methodMap = new Map();
@@ -797,16 +797,15 @@ Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
         methodMap = this._baseApis._crypto._verificationMethods;
     }
 
-    return new Promise(async (_resolve, _reject) => {
+    let eventId = undefined;
+    const listenPromise = new Promise(async (_resolve, _reject) => {
         const listener = (event) => {
             // listen for events related to this verification
             if (event.getRoomId() !== roomId
                 || event.getSender() !== userId) {
                 return;
             }
-            const content = event.getContent();
-            const relatesTo
-                  = content["m.relationship"] || content["m.relates_to"];
+            const relatesTo = event.getRelation();
             if (!relatesTo || !relatesTo.rel_type
                 || relatesTo.rel_type !== "m.reference"
                 || !relatesTo.event_id
@@ -814,6 +813,7 @@ Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
                 return;
             }
 
+            const content = event.getContent();
             // the event seems to be related to this verification
             switch (event.getType()) {
             case "m.key.verification.start": {
@@ -824,6 +824,8 @@ Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
                 verifier.handler = verificationEventHandler(
                     verifier, userId, roomId, eventId,
                 );
+                // this handler gets removed when the verification finishes
+                // (see the verify method of crypto/verification/Base.js)
                 this._baseApis.on("event", verifier.handler);
                 resolve(verifier);
                 break;
@@ -844,22 +846,24 @@ Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
             this._baseApis.off("event", listener);
             _reject(...args);
         };
-
-        const res = await this._baseApis.sendEvent(
-            roomId, "m.room.message",
-            {
-                body: this._baseApis.getUserId() + " is requesting to verify " +
-                    "your key, but your client does not support in-chat key " +
-                    "verification.  You will need to use legacy key " +
-                    "verification to verify keys.",
-                msgtype: "m.key.verification.request",
-                to: userId,
-                from_device: this._baseApis.getDeviceId(),
-                methods: [...methodMap.keys()],
-            },
-        );
-        const eventId = res.event_id;
     });
+
+    const res = await this._baseApis.sendEvent(
+        roomId, "m.room.message",
+        {
+            body: this._baseApis.getUserId() + " is requesting to verify " +
+                "your key, but your client does not support in-chat key " +
+                "verification.  You will need to use legacy key " +
+                "verification to verify keys.",
+            msgtype: "m.key.verification.request",
+            to: userId,
+            from_device: this._baseApis.getDeviceId(),
+            methods: [...methodMap.keys()],
+        },
+    );
+    eventId = res.event_id;
+
+    return listenPromise;
 };
 
 Crypto.prototype.acceptVerificationDM = function(event, Method) {

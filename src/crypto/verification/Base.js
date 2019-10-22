@@ -123,9 +123,9 @@ export default class VerificationBase extends EventEmitter {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
-        // FIXME: only use one of m.relationship/m.relates_to, once MSC1849
-        // decides which one to use
-        content["m.relationship"] = content["m.relates_to"] = {
+        // FIXME: if MSC1849 decides to use m.relationship instead of
+        // m.relates_to, we should follow suit here
+        content["m.relates_to"] = {
             rel_type: "m.reference",
             event_id: this.transactionId,
         };
