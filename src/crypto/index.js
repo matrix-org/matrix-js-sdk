@@ -798,7 +798,7 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
     }
 
     let eventId = undefined;
-    const listenPromise = new Promise(async (_resolve, _reject) => {
+    const listenPromise = new Promise((_resolve, _reject) => {
         const listener = (event) => {
             // listen for events related to this verification
             if (event.getRoomId() !== roomId
