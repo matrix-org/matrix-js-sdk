@@ -23,7 +23,7 @@ import Promise from 'bluebird';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
-import logger from '../src/logger';
+import logger from './logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than

@@ -21,7 +21,7 @@ const EventEmitter = require("events").EventEmitter;
 
 const utils = require("../utils");
 const RoomMember = require("./room-member");
-import logger from '../../src/logger';
+import logger from '../logger';
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;

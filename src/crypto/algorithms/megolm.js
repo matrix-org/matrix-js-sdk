@@ -23,7 +23,7 @@ limitations under the License.
  */
 
 import Promise from 'bluebird';
-import logger from '../../../src/logger';
+import logger from '../../logger';
 
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
