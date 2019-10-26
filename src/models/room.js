@@ -30,7 +30,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
-import logger from '../../src/logger';
+import logger from '../logger';
 import ReEmitter from '../ReEmitter';
 
 // These constants are used as sane defaults when the homeserver doesn't support

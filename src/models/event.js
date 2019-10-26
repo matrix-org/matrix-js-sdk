@@ -24,7 +24,7 @@ limitations under the License.
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
-import logger from '../../src/logger';
+import logger from '../logger';
 
 /**
  * Enum for event statuses.

@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import Promise from 'bluebird';
-import logger from '../../src/logger';
+import logger from '../logger';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web

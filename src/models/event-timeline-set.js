@@ -21,7 +21,7 @@ const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
 import {EventStatus} from "./event";
-import logger from '../../src/logger';
+import logger from '../logger';
 import Relations from './relations';
 
 // var DEBUG = false;

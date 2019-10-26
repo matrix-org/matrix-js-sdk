@@ -24,7 +24,7 @@ limitations under the License.
  */
 
 "use strict";
-import logger from '../src/logger';
+import logger from './logger';
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.

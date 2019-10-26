@@ -21,7 +21,7 @@ limitations under the License.
  */
 const utils = require("../utils");
 const EventEmitter = require("events").EventEmitter;
-import logger from '../../src/logger';
+import logger from '../logger';
 const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)

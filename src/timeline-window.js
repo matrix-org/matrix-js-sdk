@@ -19,7 +19,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 const EventTimeline = require("./models/event-timeline");
-import logger from '../src/logger';
+import logger from './logger';
 
 /**
  * @private

@@ -22,7 +22,7 @@ import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");
-import logger from '../src/logger';
+import logger from './logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

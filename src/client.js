@@ -46,7 +46,7 @@ const olmlib = require("./crypto/olmlib");
 
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
-import logger from '../src/logger';
+import logger from './logger';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
