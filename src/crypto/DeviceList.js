@@ -756,7 +756,7 @@ class DeviceListUpdateSerialiser {
             downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
-            const masterKeys = res.masterKeys || {};
+            const masterKeys = res.master_keys || {};
             const ssks = res.self_signing_keys || {};
             const usks = res.user_signing_keys || {};
 
