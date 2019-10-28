@@ -101,11 +101,11 @@ describe("Secrets", function() {
             ],
         );
 
-        const vaxDevice = vax._crypto._olmDevice;
-        const osborne2Device = osborne2._crypto._olmDevice;
-        const secretStorage = osborne2._crypto._secretStorage;
+        const vaxDevice = vax.client._crypto._olmDevice;
+        const osborne2Device = osborne2.client._crypto._olmDevice;
+        const secretStorage = osborne2.client._crypto._secretStorage;
 
-        osborne2._crypto._deviceList.storeDevicesForUser("@alice:example.com", {
+        osborne2.client._crypto._deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
                 user_id: "@alice:example.com",
                 device_id: "VAX",
@@ -116,7 +116,7 @@ describe("Secrets", function() {
                 },
             },
         });
-        vax._crypto._deviceList.storeDevicesForUser("@alice:example.com", {
+        vax.client._crypto._deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
                 user_id: "@alice:example.com",
                 device_id: "Osborne2",
@@ -128,7 +128,7 @@ describe("Secrets", function() {
             },
         });
 
-        vax.once("crypto.secrets.request", function(e) {
+        vax.client.once("crypto.secrets.request", function(e) {
             expect(e.name).toBe("foo");
             e.send("bar");
         });
@@ -137,7 +137,7 @@ describe("Secrets", function() {
         const otks = (await osborne2Device.getOneTimeKeys()).curve25519;
         await osborne2Device.markKeysAsPublished();
 
-        await vax._crypto._olmDevice.createOutboundSession(
+        await vax.client._crypto._olmDevice.createOutboundSession(
             osborne2Device.deviceCurve25519Key,
             Object.values(otks)[0],
         );
