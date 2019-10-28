@@ -51,7 +51,7 @@ describe("verification request", function() {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice._crypto._deviceList.getRawStoredDevicesForUser = function() {
+        alice.client._crypto._deviceList.getRawStoredDevicesForUser = function() {
             return {
                 Dynabook: {
                     keys: {
@@ -60,17 +60,17 @@ describe("verification request", function() {
                 },
             };
         };
-        alice.downloadKeys = () => {
+        alice.client.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.downloadKeys = () => {
+        bob.client.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.on("crypto.verification.request", (request) => {
+        bob.client.on("crypto.verification.request", (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();
         });
-        const aliceVerifier = await alice.requestVerification("@bob:example.com");
+        const aliceVerifier = await alice.client.requestVerification("@bob:example.com");
         expect(aliceVerifier).toBeAn(SAS);
     });
 });

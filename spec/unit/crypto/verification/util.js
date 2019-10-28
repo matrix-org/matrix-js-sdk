@@ -50,19 +50,19 @@ export async function makeTestClients(userInfos, options) {
     };
 
     for (const userInfo of userInfos) {
-        const client = (new TestClient(
+        const testClient = new TestClient(
             userInfo.userId, userInfo.deviceId, undefined, undefined,
             options,
-        )).client;
+        );
         if (!(userInfo.userId in clientMap)) {
             clientMap[userInfo.userId] = {};
         }
-        clientMap[userInfo.userId][userInfo.deviceId] = client;
-        client.sendToDevice = sendToDevice;
-        clients.push(client);
+        clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
+        testClient.client.sendToDevice = sendToDevice;
+        clients.push(testClient);
     }
 
-    await Promise.all(clients.map((client) => client.initCrypto()));
+    await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
 
     return clients;
 }
