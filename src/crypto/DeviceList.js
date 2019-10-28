@@ -756,7 +756,7 @@ class DeviceListUpdateSerialiser {
             downloadUsers, opts,
         ).then((res) => {
             const dk = res.device_keys || {};
-            const master_keys = res.master_keys || {};
+            const masterKeys = res.masterKeys || {};
             const ssks = res.self_signing_keys || {};
             const usks = res.user_signing_keys || {};
 
@@ -770,7 +770,7 @@ class DeviceListUpdateSerialiser {
                 prom = prom.delay(5).then(() => {
                     return this._processQueryResponseForUser(
                         userId, dk[userId], {
-                            master: master_keys[userId],
+                            master: masterKeys[userId],
                             self_signing: ssks[userId],
                             user_signing: usks[userId],
                         },

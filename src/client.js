@@ -53,8 +53,6 @@ import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
 import { randomString } from './randomstring';
 
-import IndexedDBCryptoStore from './crypto/store/indexeddb-crypto-store';
-
 // Disable warnings for now: we use deprecated bluebird functions
 // and need to migrate, but they spam the console with warnings.
 Promise.config({warnings: false});

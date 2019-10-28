@@ -144,7 +144,9 @@ describe("Cross Signing", function() {
             alice.uploadKeySignatures = expect.createSpy().andCall(async (content) => {
                 await olmlib.verifySignature(
                     alice._crypto._olmDevice,
-                    content["@alice:example.com"]["nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"],
+                    content["@alice:example.com"][
+                        "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
+                    ],
                     "@alice:example.com",
                     "Osborne2", alice._crypto._olmDevice.deviceEd25519Key,
                 );
@@ -694,7 +696,7 @@ describe("Cross Signing", function() {
 
     it("should offer to upgrade device verifications to cross-signing", async function() {
         const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"}
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
         const bob = await makeTestClient(
             {userId: "@bob:example.com", deviceId: "Dynabook"},
@@ -720,7 +722,7 @@ describe("Cross Signing", function() {
                 },
                 verified: 1,
                 known: true,
-            }
+            },
         });
         alice._crypto._deviceList.storeCrossSigningForUser(
             "@bob:example.com",

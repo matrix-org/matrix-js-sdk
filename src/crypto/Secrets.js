@@ -19,7 +19,7 @@ import logger from '../logger';
 import olmlib from './olmlib';
 import { randomString } from '../randomstring';
 import { keyForNewBackup } from './backup_password';
-import { encodeRecoveryKey, decodeRecoveryKey } from './recoverykey';
+import { encodeRecoveryKey } from './recoverykey';
 
 /**
  * Implements secret storage and sharing (MSC-1946)

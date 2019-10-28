@@ -27,7 +27,6 @@ import olmlib from '../../../../lib/crypto/olmlib';
 import sdk from '../../../..';
 
 import {verificationMethods} from '../../../../lib/crypto';
-import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 import SAS from '../../../../lib/crypto/verification/SAS';
 
@@ -109,12 +108,16 @@ describe("SAS verification", function() {
                 },
             };
 
-            alice.client._crypto._deviceList.storeDevicesForUser("@bob:example.com", BOB_DEVICES);
+            alice.client._crypto._deviceList.storeDevicesForUser(
+                "@bob:example.com", BOB_DEVICES,
+            );
             alice.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.client._crypto._deviceList.storeDevicesForUser("@alice:example.com", ALICE_DEVICES);
+            bob.client._crypto._deviceList.storeDevicesForUser(
+                "@alice:example.com", ALICE_DEVICES,
+            );
             bob.downloadKeys = () => {
                 return Promise.resolve();
             };
@@ -265,7 +268,9 @@ describe("SAS verification", function() {
 
         it("should verify a cross-signing key", async function() {
             const privateKeys = {};
-            alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(200, {});
+            alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
+                200, {},
+            );
             alice.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             alice.client.on("cross-signing.savePrivateKeys", function(e) {
                 privateKeys.alice = e;
@@ -288,9 +293,11 @@ describe("SAS verification", function() {
 
             await bob.client.resetCrossSigningKeys();
 
-            bob.client._crypto._deviceList.storeCrossSigningForUser("@alice:example.com", {
-                keys: alice.client._crypto._crossSigningInfo.keys,
-            });
+            bob.client._crypto._deviceList.storeCrossSigningForUser(
+                "@alice:example.com", {
+                    keys: alice.client._crypto._crossSigningInfo.keys,
+                },
+            );
 
             alice.httpBackend.when('POST', '/keys/query').respond(200, {
                 failures: {},

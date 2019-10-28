@@ -104,7 +104,8 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  */
 export default function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
-    this._onDeviceListUserCrossSigningUpdated = this._onDeviceListUserCrossSigningUpdated.bind(this);
+    this._onDeviceListUserCrossSigningUpdated =
+        this._onDeviceListUserCrossSigningUpdated.bind(this);
 
     this._reEmitter = new ReEmitter(this);
     this._baseApis = baseApis;
@@ -147,7 +148,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     );
     // XXX: This isn't removed at any point, but then none of the event listeners
     // this class sets seem to be removed at any point... :/
-    this._deviceList.on('userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated);
+    this._deviceList.on(
+        'userCrossSigningUpdated', this._onDeviceListUserCrossSigningUpdated,
+    );
     this._reEmitter.reEmit(this._deviceList, ["crypto.devicesUpdated"]);
 
     // the last time we did a check for the number of one-time-keys on the
