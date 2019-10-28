@@ -47,7 +47,7 @@ module.exports = {
             }
         }
         let serverAndMediaId = mxc.slice(6); // strips mxc://
-        let prefix = "/_matrix/media/v1/download/";
+        let prefix = "/_matrix/media/r0/download/";
         const params = {};
 
         if (width) {
@@ -62,7 +62,7 @@ module.exports = {
         if (utils.keys(params).length > 0) {
             // these are thumbnailing params so they probably want the
             // thumbnailing API...
-            prefix = "/_matrix/media/v1/thumbnail/";
+            prefix = "/_matrix/media/r0/thumbnail/";
         }
 
         const fragmentOffset = serverAndMediaId.indexOf("#");
@@ -83,6 +83,7 @@ module.exports = {
      * @param {Number} width The desired width of the image in pixels. Default: 96.
      * @param {Number} height The desired height of the image in pixels. Default: 96.
      * @return {string} The complete URL to the identicon.
+     * @deprecated This is no longer in the specification.
      */
     getIdenticonUri: function(baseUrl, identiconString, width, height) {
         if (!identiconString) {
@@ -99,7 +100,7 @@ module.exports = {
             height: height,
         };
 
-        const path = utils.encodeUri("/_matrix/media/v1/identicon/$ident", {
+        const path = utils.encodeUri("/_matrix/media/unstable/identicon/$ident", {
             $ident: identiconString,
         });
         return baseUrl + path +

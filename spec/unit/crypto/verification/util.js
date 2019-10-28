@@ -48,6 +48,25 @@ export async function makeTestClients(userInfos, options) {
             }
         }
     };
+    const sendEvent = function(room, type, content) {
+        // make up a unique ID as the event ID
+        const eventId = "$" + this.makeTxnId(); // eslint-disable-line babel/no-invalid-this
+        const event = new MatrixEvent({
+            sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
+            type: type,
+            content: content,
+            room_id: room,
+            event_id: eventId,
+        });
+        for (const client of clients) {
+            setTimeout(
+                () => client.emit("event", event),
+                0,
+            );
+        }
+
+        return {event_id: eventId};
+    };
 
     for (const userInfo of userInfos) {
         const testClient = new TestClient(
@@ -59,6 +78,7 @@ export async function makeTestClients(userInfos, options) {
         }
         clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
         testClient.client.sendToDevice = sendToDevice;
+        testClient.client.sendEvent = sendEvent;
         clients.push(testClient);
     }
 

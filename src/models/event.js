@@ -24,14 +24,14 @@ limitations under the License.
 import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
-import logger from '../../src/logger';
+import logger from '../logger';
 
 /**
  * Enum for event statuses.
  * @readonly
  * @enum {string}
  */
-module.exports.EventStatus = {
+const EventStatus = {
     /** The event was not sent and will no longer be retried. */
     NOT_SENT: "not_sent",
 
@@ -49,6 +49,7 @@ module.exports.EventStatus = {
     /** The event was cancelled before it was successfully sent. */
     CANCELLED: "cancelled",
 };
+module.exports.EventStatus = EventStatus;
 
 const interns = {};
 function intern(str) {
@@ -124,7 +125,8 @@ module.exports.MatrixEvent = function MatrixEvent(
     this.forwardLooking = true;
     this._pushActions = null;
     this._replacingEvent = null;
-    this._locallyRedacted = false;
+    this._localRedactionEvent = null;
+    this._isCancelled = false;
 
     this._clearEvent = {};
 
@@ -229,7 +231,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getOriginalContent: function() {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return {};
         }
         return this._clearEvent.content || this.event.content || {};
@@ -243,7 +245,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {Object} The event content JSON, or an empty object.
      */
     getContent: function() {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return {};
         } else if (this._replacingEvent) {
             return this._replacingEvent.getContent()["m.new_content"] || {};
@@ -673,20 +675,20 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     unmarkLocallyRedacted: function() {
-        const value = this._locallyRedacted;
-        this._locallyRedacted = false;
+        const value = this._localRedactionEvent;
+        this._localRedactionEvent = null;
         if (this.event.unsigned) {
             this.event.unsigned.redacted_because = null;
         }
-        return value;
+        return !!value;
     },
 
     markLocallyRedacted: function(redactionEvent) {
-        if (this._locallyRedacted) {
+        if (this._localRedactionEvent) {
             return;
         }
         this.emit("Event.beforeRedaction", this, redactionEvent);
-        this._locallyRedacted = true;
+        this._localRedactionEvent = redactionEvent;
         if (!this.event.unsigned) {
             this.event.unsigned = {};
         }
@@ -706,7 +708,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             throw new Error("invalid redaction_event in makeRedacted");
         }
 
-        this._locallyRedacted = false;
+        this._localRedactionEvent = null;
 
         this.emit("Event.beforeRedaction", this, redaction_event);
 
@@ -867,7 +869,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
      */
     makeReplaced(newEvent) {
-        if (this.isRedacted()) {
+        // don't allow redacted events to be replaced.
+        // if newEvent is null we allow to go through though,
+        // as with local redaction, the replacing event might get
+        // cancelled, which should be reflected on the target event.
+        if (this.isRedacted() && newEvent) {
             return;
         }
         if (this._replacingEvent !== newEvent) {
@@ -877,15 +883,25 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
-     * Returns the status of the event, or the replacing event in case `makeReplace` has been called.
+     * Returns the status of any associated edit or redaction
+     * (not for reactions/annotations as their local echo doesn't affect the orignal event),
+     * or else the status of the event.
      *
      * @return {EventStatus}
      */
-    replacementOrOwnStatus() {
+    getAssociatedStatus() {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
-        } else {
-            return this.status;
+        } else if (this._localRedactionEvent) {
+            return this._localRedactionEvent.status;
+        }
+        return this.status;
+    },
+
+    getServerAggregatedRelation(relType) {
+        const relations = this.getUnsigned()["m.relations"];
+        if (relations) {
+            return relations[relType];
         }
     },
 
@@ -895,16 +911,48 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      * @return {string?}
      */
     replacingEventId() {
-        return this._replacingEvent && this._replacingEvent.getId();
+        const replaceRelation = this.getServerAggregatedRelation("m.replace");
+        if (replaceRelation) {
+            return replaceRelation.event_id;
+        } else if (this._replacingEvent) {
+            return this._replacingEvent.getId();
+        }
     },
 
     /**
      * Returns the event replacing the content of this event, if any.
+     * Replacements are aggregated on the server, so this would only
+     * return an event in case it came down the sync, or for local echo of edits.
      *
      * @return {MatrixEvent?}
      */
     replacingEvent() {
         return this._replacingEvent;
+    },
+
+    /**
+     * Returns the origin_server_ts of the event replacing the content of this event, if any.
+     *
+     * @return {Date?}
+     */
+    replacingEventDate() {
+        const replaceRelation = this.getServerAggregatedRelation("m.replace");
+        if (replaceRelation) {
+            const ts = replaceRelation.origin_server_ts;
+            if (Number.isFinite(ts)) {
+                return new Date(ts);
+            }
+        } else if (this._replacingEvent) {
+            return this._replacingEvent.getDate();
+        }
+    },
+
+    /**
+     * Returns the event that wants to redact this event, but hasn't been sent yet.
+     * @return {MatrixEvent} the event
+     */
+    localRedactionEvent() {
+        return this._localRedactionEvent;
     },
 
     /**
@@ -948,6 +996,25 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Flags an event as cancelled due to future conditions. For example, a verification
+     * request event in the same sync transaction may be flagged as cancelled to warn
+     * listeners that a cancellation event is coming down the same pipe shortly.
+     * @param {boolean} cancelled Whether the event is to be cancelled or not.
+     */
+    flagCancelled(cancelled = true) {
+        this._isCancelled = cancelled;
+    },
+
+    /**
+     * Gets whether or not the event is flagged as cancelled. See flagCancelled() for
+     * more information.
+     * @returns {boolean} True if the event is cancelled, false otherwise.
+     */
+    isCancelled() {
+        return this._isCancelled;
+    },
+
+    /**
      * Summarise the event as JSON for debugging. If encrypted, include both the
      * decrypted and encrypted view of the event. This is named `toJSON` for use
      * with `JSON.stringify` which checks objects for functions named `toJSON`
@@ -966,6 +1033,11 @@ utils.extend(module.exports.MatrixEvent.prototype, {
             room_id: this.getRoomId(),
         };
 
+        // if this is a redaction then attach the redacts key
+        if (this.isRedaction()) {
+            event.redacts = this.event.redacts;
+        }
+
         if (!this.isEncrypted()) {
             return event;
         }
@@ -981,7 +1053,7 @@ utils.extend(module.exports.MatrixEvent.prototype, {
 /* _REDACT_KEEP_KEY_MAP gives the keys we keep when an event is redacted
  *
  * This is specified here:
- *  http://matrix.org/speculator/spec/HEAD/client_server/unstable.html#redactions
+ *  http://matrix.org/speculator/spec/HEAD/client_server/latest.html#redactions
  *
  * Also:
  *  - We keep 'unsigned' since that is created by the local server

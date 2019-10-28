@@ -104,7 +104,7 @@ describe("Room", function() {
                     user_ids: [userA],
                 },
             });
-            room.addLiveEvents([typing]);
+            room.addEphemeralEvents([typing]);
             expect(room.currentState.setTypingEvent).toHaveBeenCalledWith(typing);
         });
 

@@ -32,7 +32,8 @@ const Group = require('./models/group');
 const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
-import logger from '../src/logger';
+const PushProcessor = require("./pushprocessor");
+import logger from './logger';
 
 import {InvalidStoreError} from './errors';
 
@@ -1030,8 +1031,9 @@ SyncApi.prototype._processSyncResponse = async function(
                 // honour push rules that were previously cached. Base rules
                 // will be updated when we recieve push rules via getPushRules
                 // (see SyncApi.prototype.sync) before syncing over the network.
-                if (accountDataEvent.getType() == 'm.push_rules') {
-                    client.pushRules = accountDataEvent.getContent();
+                if (accountDataEvent.getType() === 'm.push_rules') {
+                    const rules = accountDataEvent.getContent();
+                    client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
                 client.emit("accountData", accountDataEvent);
                 return accountDataEvent;
@@ -1043,8 +1045,26 @@ SyncApi.prototype._processSyncResponse = async function(
     if (data.to_device && utils.isArray(data.to_device.events) &&
         data.to_device.events.length > 0
        ) {
+        const cancelledKeyVerificationTxns = [];
         data.to_device.events
             .map(client.getEventMapper())
+            .map((toDeviceEvent) => { // map is a cheap inline forEach
+                // We want to flag m.key.verification.start events as cancelled
+                // if there's an accompanying m.key.verification.cancel event, so
+                // we pull out the transaction IDs from the cancellation events
+                // so we can flag the verification events as cancelled in the loop
+                // below.
+                if (toDeviceEvent.getType() === "m.key.verification.cancel") {
+                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    if (txnId) {
+                        cancelledKeyVerificationTxns.push(txnId);
+                    }
+                }
+
+                // as mentioned above, .map is a cheap inline forEach, so return
+                // the unmodified event.
+                return toDeviceEvent;
+            })
             .forEach(
                 function(toDeviceEvent) {
                     const content = toDeviceEvent.getContent();
@@ -1058,6 +1078,14 @@ SyncApi.prototype._processSyncResponse = async function(
                                 toDeviceEvent.getSender(),
                         );
                         return;
+                    }
+
+                    if (toDeviceEvent.getType() === "m.key.verification.start"
+                        || toDeviceEvent.getType() === "m.key.verification.request") {
+                        const txnId = content['transaction_id'];
+                        if (cancelledKeyVerificationTxns.includes(txnId)) {
+                            toDeviceEvent.flagCancelled();
+                        }
                     }
 
                     client.emit("toDeviceEvent", toDeviceEvent);
@@ -1219,10 +1247,8 @@ SyncApi.prototype._processSyncResponse = async function(
             room.setSummary(joinObj.summary);
         }
 
-        // XXX: should we be adding ephemeralEvents to the timeline?
-        // It feels like that for symmetry with room.addAccountData()
-        // there should be a room.addEphemeralEvents() or similar.
-        room.addLiveEvents(ephemeralEvents);
+        // we deliberately don't add ephemeral events to the timeline
+        room.addEphemeralEvents(ephemeralEvents);
 
         // we deliberately don't add accountData to the timeline
         room.addAccountData(accountDataEvents);

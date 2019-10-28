@@ -31,7 +31,7 @@ describe("ContentRepo", function() {
         function() {
             const mxcUri = "mxc://server.name/resourceid";
             expect(ContentRepo.getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
-                baseUrl + "/_matrix/media/v1/download/server.name/resourceid",
+                baseUrl + "/_matrix/media/r0/download/server.name/resourceid",
             );
         });
 
@@ -43,7 +43,7 @@ describe("ContentRepo", function() {
         function() {
             const mxcUri = "mxc://server.name/resourceid";
             expect(ContentRepo.getHttpUriForMxc(baseUrl, mxcUri, 32, 64, "crop")).toEqual(
-                baseUrl + "/_matrix/media/v1/thumbnail/server.name/resourceid" +
+                baseUrl + "/_matrix/media/r0/thumbnail/server.name/resourceid" +
                 "?width=32&height=64&method=crop",
             );
         });
@@ -52,7 +52,7 @@ describe("ContentRepo", function() {
         function() {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(ContentRepo.getHttpUriForMxc(baseUrl, mxcUri, 32)).toEqual(
-                baseUrl + "/_matrix/media/v1/thumbnail/server.name/resourceid" +
+                baseUrl + "/_matrix/media/r0/thumbnail/server.name/resourceid" +
                 "?width=32#automade",
             );
         });
@@ -61,7 +61,7 @@ describe("ContentRepo", function() {
         function() {
             const mxcUri = "mxc://server.name/resourceid#automade";
             expect(ContentRepo.getHttpUriForMxc(baseUrl, mxcUri)).toEqual(
-                baseUrl + "/_matrix/media/v1/download/server.name/resourceid#automade",
+                baseUrl + "/_matrix/media/r0/download/server.name/resourceid#automade",
             );
         });
     });
@@ -73,21 +73,21 @@ describe("ContentRepo", function() {
 
         it("should set w/h by default to 96", function() {
             expect(ContentRepo.getIdenticonUri(baseUrl, "foobar")).toEqual(
-                baseUrl + "/_matrix/media/v1/identicon/foobar" +
+                baseUrl + "/_matrix/media/unstable/identicon/foobar" +
                 "?width=96&height=96",
             );
         });
 
         it("should be able to set custom w/h", function() {
             expect(ContentRepo.getIdenticonUri(baseUrl, "foobar", 32, 64)).toEqual(
-                baseUrl + "/_matrix/media/v1/identicon/foobar" +
+                baseUrl + "/_matrix/media/unstable/identicon/foobar" +
                 "?width=32&height=64",
             );
         });
 
         it("should URL encode the identicon string", function() {
             expect(ContentRepo.getIdenticonUri(baseUrl, "foo#bar", 32, 64)).toEqual(
-                baseUrl + "/_matrix/media/v1/identicon/foo%23bar" +
+                baseUrl + "/_matrix/media/unstable/identicon/foo%23bar" +
                 "?width=32&height=64",
             );
         });

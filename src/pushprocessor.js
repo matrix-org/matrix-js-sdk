@@ -43,6 +43,11 @@ const DEFAULT_OVERRIDE_RULES = [
                 key: "type",
                 pattern: "m.room.tombstone",
             },
+            {
+                kind: "event_match",
+                key: "state_key",
+                pattern: "",
+            },
         ],
         actions: [
             "notify",
@@ -50,6 +55,22 @@ const DEFAULT_OVERRIDE_RULES = [
                 set_tweak: "highlight",
                 value: true,
             },
+        ],
+    },
+    {
+        // For homeservers which don't support MSC2153 yet
+        rule_id: ".m.rule.reaction",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: "event_match",
+                key: "type",
+                pattern: "m.reaction",
+            },
+        ],
+        actions: [
+            "dont_notify",
         ],
     },
 ];
@@ -437,6 +458,38 @@ PushProcessor.actionListToActionsObject = function(actionlist) {
         }
     }
     return actionobj;
+};
+
+/**
+ * Rewrites conditions on a client's push rules to match the defaults
+ * where applicable. Useful for upgrading push rules to more strict
+ * conditions when the server is falling behind on defaults.
+ * @param {object} incomingRules The client's existing push rules
+ * @returns {object} The rewritten rules
+ */
+PushProcessor.rewriteDefaultRules = function(incomingRules) {
+    let newRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
+
+    // These lines are mostly to make the tests happy. We shouldn't run into these
+    // properties missing in practice.
+    if (!newRules) newRules = {};
+    if (!newRules.global) newRules.global = {};
+    if (!newRules.global.override) newRules.global.override = [];
+
+    // Fix default override rules
+    newRules.global.override = newRules.global.override.map(r => {
+        const defaultRule = DEFAULT_OVERRIDE_RULES.find(d => d.rule_id === r.rule_id);
+        if (!defaultRule) return r;
+
+        // Copy over the actions, default, and conditions. Don't touch the user's
+        // preference.
+        r.default = defaultRule.default;
+        r.conditions = defaultRule.conditions;
+        r.actions = defaultRule.actions;
+        return r;
+    });
+
+    return newRules;
 };
 
 /**

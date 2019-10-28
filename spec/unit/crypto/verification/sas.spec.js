@@ -60,6 +60,9 @@ describe("SAS verification", function() {
         await sas.verify()
             .catch(spy);
         expect(spy).toHaveBeenCalled();
+
+        // Cancel the SAS for cleanup (we started a verification, so abort)
+        sas.cancel();
     });
 
     describe("verification", function() {
@@ -369,5 +372,128 @@ describe("SAS verification", function() {
             .toNotHaveBeenCalled();
         expect(bob.client.setDeviceVerified)
             .toNotHaveBeenCalled();
+    });
+
+    describe("verification in DM", function() {
+        let alice;
+        let bob;
+        let aliceSasEvent;
+        let bobSasEvent;
+        let aliceVerifier;
+        let bobPromise;
+
+        beforeEach(async function() {
+            [alice, bob] = await makeTestClients(
+                [
+                    {userId: "@alice:example.com", deviceId: "Osborne2"},
+                    {userId: "@bob:example.com", deviceId: "Dynabook"},
+                ],
+                {
+                    verificationMethods: [verificationMethods.SAS],
+                },
+            );
+
+            alice.setDeviceVerified = expect.createSpy();
+            alice.getDeviceEd25519Key = () => {
+                return "alice+base64+ed25519+key";
+            };
+            alice.getStoredDevice = () => {
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:Dynabook": "bob+base64+ed25519+key",
+                        },
+                    },
+                    "Dynabook",
+                );
+            };
+            alice.downloadKeys = () => {
+                return Promise.resolve();
+            };
+
+            bob.setDeviceVerified = expect.createSpy();
+            bob.getStoredDevice = () => {
+                return DeviceInfo.fromStorage(
+                    {
+                        keys: {
+                            "ed25519:Osborne2": "alice+base64+ed25519+key",
+                        },
+                    },
+                    "Osborne2",
+                );
+            };
+            bob.getDeviceEd25519Key = () => {
+                return "bob+base64+ed25519+key";
+            };
+            bob.downloadKeys = () => {
+                return Promise.resolve();
+            };
+
+            aliceSasEvent = null;
+            bobSasEvent = null;
+
+            bobPromise = new Promise((resolve, reject) => {
+                bob.on("event", async (event) => {
+                    const content = event.getContent();
+                    if (event.getType() === "m.room.message"
+                        && content.msgtype === "m.key.verification.request") {
+                        expect(content.methods).toInclude(SAS.NAME);
+                        expect(content.to).toBe(bob.getUserId());
+                        const verifier = bob.acceptVerificationDM(event, SAS.NAME);
+                        verifier.on("show_sas", (e) => {
+                            if (!e.sas.emoji || !e.sas.decimal) {
+                                e.cancel();
+                            } else if (!aliceSasEvent) {
+                                bobSasEvent = e;
+                            } else {
+                                try {
+                                    expect(e.sas).toEqual(aliceSasEvent.sas);
+                                    e.confirm();
+                                    aliceSasEvent.confirm();
+                                } catch (error) {
+                                    e.mismatch();
+                                    aliceSasEvent.mismatch();
+                                }
+                            }
+                        });
+                        await verifier.verify();
+                        resolve();
+                    }
+                });
+            });
+
+            aliceVerifier = await alice.requestVerificationDM(
+                bob.getUserId(), "!room_id", [verificationMethods.SAS],
+            );
+            aliceVerifier.on("show_sas", (e) => {
+                if (!e.sas.emoji || !e.sas.decimal) {
+                    e.cancel();
+                } else if (!bobSasEvent) {
+                    aliceSasEvent = e;
+                } else {
+                    try {
+                        expect(e.sas).toEqual(bobSasEvent.sas);
+                        e.confirm();
+                        bobSasEvent.confirm();
+                    } catch (error) {
+                        e.mismatch();
+                        bobSasEvent.mismatch();
+                    }
+                }
+            });
+        });
+
+        it("should verify a key", async function() {
+            await Promise.all([
+                aliceVerifier.verify(),
+                bobPromise,
+            ]);
+
+            // make sure Alice and Bob verified each other
+            expect(alice.setDeviceVerified)
+                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
+            expect(bob.setDeviceVerified)
+                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+        });
     });
 });

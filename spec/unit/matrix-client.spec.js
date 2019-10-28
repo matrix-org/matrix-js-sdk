@@ -154,12 +154,9 @@ describe("MatrixClient", function() {
         });
         // FIXME: We shouldn't be yanking _http like this.
         client._http = [
-            "authedRequest", "authedRequestWithPrefix", "getContentUri",
-            "request", "requestWithPrefix", "uploadContent",
+            "authedRequest", "getContentUri", "request", "uploadContent",
         ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         client._http.authedRequest.andCall(httpReq);
-        client._http.authedRequestWithPrefix.andCall(httpReq);
-        client._http.requestWithPrefix.andCall(httpReq);
         client._http.request.andCall(httpReq);
 
         // set reasonable working defaults
@@ -179,9 +176,6 @@ describe("MatrixClient", function() {
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
         client._http.authedRequest.andCall(function() {
-            return Promise.defer().promise;
-        });
-        client._http.authedRequestWithPrefix.andCall(function() {
             return Promise.defer().promise;
         });
     });

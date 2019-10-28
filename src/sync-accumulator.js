@@ -21,7 +21,7 @@ limitations under the License.
  */
 
 import utils from "./utils";
-import logger from '../src/logger';
+import logger from './logger';
 
 
 /**

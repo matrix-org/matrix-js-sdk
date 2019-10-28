@@ -301,8 +301,18 @@ export default class Relations extends EventEmitter {
             // event is known anyway.
             return null;
         }
+
+        // the all-knowning server tells us that the event at some point had
+        // this timestamp for its replacement, so any following replacement should definitely not be less
+        const replaceRelation =
+            this._targetEvent.getServerAggregatedRelation("m.replace");
+        const minTs = replaceRelation && replaceRelation.origin_server_ts;
+
         return this.getRelations().reduce((last, event) => {
             if (event.getSender() !== this._targetEvent.getSender()) {
+                return last;
+            }
+            if (minTs && minTs > event.getTs()) {
                 return last;
             }
             if (last && last.getTs() > event.getTs()) {
