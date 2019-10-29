@@ -27,6 +27,7 @@ import olmlib from '../../../../lib/crypto/olmlib';
 import sdk from '../../../..';
 
 import {verificationMethods} from '../../../../lib/crypto';
+import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 import SAS from '../../../../lib/crypto/verification/SAS';
 
@@ -393,11 +394,11 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.setDeviceVerified = expect.createSpy();
-            alice.getDeviceEd25519Key = () => {
+            alice.client.setDeviceVerified = expect.createSpy();
+            alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
-            alice.getStoredDevice = () => {
+            alice.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
                         keys: {
@@ -407,12 +408,12 @@ describe("SAS verification", function() {
                     "Dynabook",
                 );
             };
-            alice.downloadKeys = () => {
+            alice.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
-            bob.setDeviceVerified = expect.createSpy();
-            bob.getStoredDevice = () => {
+            bob.client.setDeviceVerified = expect.createSpy();
+            bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
                         keys: {
@@ -422,10 +423,10 @@ describe("SAS verification", function() {
                     "Osborne2",
                 );
             };
-            bob.getDeviceEd25519Key = () => {
+            bob.client.getDeviceEd25519Key = () => {
                 return "bob+base64+ed25519+key";
             };
-            bob.downloadKeys = () => {
+            bob.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
@@ -433,13 +434,13 @@ describe("SAS verification", function() {
             bobSasEvent = null;
 
             bobPromise = new Promise((resolve, reject) => {
-                bob.on("event", async (event) => {
+                bob.client.on("event", async (event) => {
                     const content = event.getContent();
                     if (event.getType() === "m.room.message"
                         && content.msgtype === "m.key.verification.request") {
                         expect(content.methods).toInclude(SAS.NAME);
-                        expect(content.to).toBe(bob.getUserId());
-                        const verifier = bob.acceptVerificationDM(event, SAS.NAME);
+                        expect(content.to).toBe(bob.client.getUserId());
+                        const verifier = bob.client.acceptVerificationDM(event, SAS.NAME);
                         verifier.on("show_sas", (e) => {
                             if (!e.sas.emoji || !e.sas.decimal) {
                                 e.cancel();
@@ -462,8 +463,8 @@ describe("SAS verification", function() {
                 });
             });
 
-            aliceVerifier = await alice.requestVerificationDM(
-                bob.getUserId(), "!room_id", [verificationMethods.SAS],
+            aliceVerifier = await alice.client.requestVerificationDM(
+                bob.client.getUserId(), "!room_id", [verificationMethods.SAS],
             );
             aliceVerifier.on("show_sas", (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
@@ -490,10 +491,10 @@ describe("SAS verification", function() {
             ]);
 
             // make sure Alice and Bob verified each other
-            expect(alice.setDeviceVerified)
-                .toHaveBeenCalledWith(bob.getUserId(), bob.deviceId);
-            expect(bob.setDeviceVerified)
-                .toHaveBeenCalledWith(alice.getUserId(), alice.deviceId);
+            expect(alice.client.setDeviceVerified)
+                .toHaveBeenCalledWith(bob.client.getUserId(), bob.client.deviceId);
+            expect(bob.client.setDeviceVerified)
+                .toHaveBeenCalledWith(alice.client.getUserId(), alice.client.deviceId);
         });
     });
 });

@@ -58,9 +58,9 @@ export async function makeTestClients(userInfos, options) {
             room_id: room,
             event_id: eventId,
         });
-        for (const client of clients) {
+        for (const tc of clients) {
             setTimeout(
-                () => client.emit("event", event),
+                () => tc.client.emit("event", event),
                 0,
             );
         }
