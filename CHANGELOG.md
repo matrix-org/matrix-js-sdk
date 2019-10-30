@@ -1,3 +1,20 @@
+Changes in [2.4.3-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.3-rc.1) (2019-10-30)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.2...v2.4.3-rc.1)
+
+ * fix the path in references to logger.js
+   [\#1056](https://github.com/matrix-org/matrix-js-sdk/pull/1056)
+ * verification in DMs
+   [\#1050](https://github.com/matrix-org/matrix-js-sdk/pull/1050)
+ * Properly documented the function possible returns
+   [\#1054](https://github.com/matrix-org/matrix-js-sdk/pull/1054)
+ * Downgrade to Bluebird 3.5.5 to fix Firefox
+   [\#1055](https://github.com/matrix-org/matrix-js-sdk/pull/1055)
+ * Upgrade safe deps to latest major version
+   [\#1053](https://github.com/matrix-org/matrix-js-sdk/pull/1053)
+ * Don't include .js in the import string.
+   [\#1052](https://github.com/matrix-org/matrix-js-sdk/pull/1052)
+
 Changes in [2.4.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.2) (2019-10-18)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.2-rc.1...v2.4.2)
