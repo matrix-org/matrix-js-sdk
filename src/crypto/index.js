@@ -493,7 +493,7 @@ Crypto.prototype.uploadDeviceKeys = function() {
     };
 
     return crypto._signObject(deviceKeys).then(() => {
-        crypto._baseApis.uploadKeysRequest({
+        return crypto._baseApis.uploadKeysRequest({
             device_keys: deviceKeys,
         }, {
             // for now, we set the device id explicitly, as we may not be using the
