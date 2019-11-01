@@ -928,7 +928,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @function module:client~MatrixClient#getStoredCrossSigningForUser
  * @param {string} userId the user ID to get the cross-signing info for.
  *
- * @returns {CrossSigningInfo} the cross signing informmation for the user.
+ * @returns {CrossSigningInfo} the cross signing information for the user.
  */
 
 /**
