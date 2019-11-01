@@ -1340,7 +1340,7 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
         auth_data: info.auth_data,
     };
 
-    // Now sig the backup auth data. Do it as this device first because crypto._signObject
+    // Now sign the backup auth data. Do it as this device first because crypto._signObject
     // is dumb and bluntly replaces the whole signatures block...
     // this can probably go away very soon in favour of just signing with the SSK.
     await this._crypto._signObject(data.auth_data);
