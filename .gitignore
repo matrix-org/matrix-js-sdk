@@ -10,7 +10,6 @@ build/Release
 coverage
 lib-cov
 out
-reports
 /dist
 /lib
 /specbuild
