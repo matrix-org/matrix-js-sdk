@@ -333,7 +333,7 @@ export default class SecretStorage extends EventEmitter {
 
             // and reject the promise so that anyone waiting on it will be
             // notified
-            requestControl.reject(new Error(reason ||"Cancelled"));
+            requestControl.reject(new Error(reason || "Cancelled"));
         };
 
         // send request to devices
