@@ -242,7 +242,7 @@ export default class Relations extends EventEmitter {
 
         redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
 
-        this.emit("Relations.redaction");
+        this.emit("Relations.redaction", redactedEvent);
     }
 
     /**
