@@ -151,6 +151,10 @@ export default class VerificationBase extends EventEmitter {
             this._rejectEvent = undefined;
             this._resetTimer();
             this._resolveEvent(e);
+        } else if (e.getType() === "m.key.verification.cancel") {
+            const reject = this._reject;
+            this._reject = undefined;
+            reject(new Error("Other side cancelled verification"));
         } else {
             const exception = new Error(
                 "Unexpected message: expecting " + this._expectedEvent
