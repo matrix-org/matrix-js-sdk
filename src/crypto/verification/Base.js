@@ -152,11 +152,11 @@ export default class VerificationBase extends EventEmitter {
             this._resetTimer();
             this._resolveEvent(e);
         } else {
-            this._expectedEvent = undefined;
             const exception = new Error(
                 "Unexpected message: expecting " + this._expectedEvent
                     + " but got " + e.getType(),
             );
+            this._expectedEvent = undefined;
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
