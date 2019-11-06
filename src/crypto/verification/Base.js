@@ -222,6 +222,8 @@ export default class VerificationBase extends EventEmitter {
                 // but no reject function. If cancel is called again, we'd error.
                 if (this._reject) this._reject(e);
             } else {
+                // FIXME: this causes an "Uncaught promise" console message
+                // if nothing ends up chaining this promise.
                 this._promise = Promise.reject(e);
             }
             // Also emit a 'cancel' event that the app can listen for to detect cancellation
