@@ -305,7 +305,9 @@ describe("SAS verification", function() {
             const verifyProm = Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => {
-                    bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
+                    bob.httpBackend.when(
+                        'POST', '/keys/signatures/upload',
+                    ).respond(200, {});
                     bob.httpBackend.flush(undefined, 2);
                     return verifier.verify();
                 }),
