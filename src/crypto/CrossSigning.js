@@ -27,38 +27,6 @@ function getPublicKey(keyInfo) {
     return Object.entries(keyInfo.keys)[0];
 }
 
-async function getPrivateKey(self, type, check) {
-    let error;
-    let pubkey;
-    let signing;
-    do {
-        [pubkey, signing] = await new Promise((resolve, reject) => {
-            self.emit("cross-signing.getKey", {
-                type: type,
-                error,
-                done: (key) => {
-                    // FIXME: the key needs to be interpreted?
-                    const signing = new global.Olm.PkSigning();
-                    const pubkey = signing.init_with_seed(key);
-                    // make sure it agrees with the pubkey that we have
-                    if (pubkey !== getPublicKey(self.keys[type])[1]) {
-                        error = "Key does not match";
-                        logger.error(error);
-                        signing.free();
-                        resolve([null, null]);
-                    } else {
-                        resolve([pubkey, signing]);
-                    }
-                },
-                cancel: (error) => {
-                    reject(error || new Error("Cancelled"));
-                },
-            });
-        });
-    } while (!pubkey);
-    return [pubkey, signing];
-}
-
 export class CrossSigningInfo extends EventEmitter {
     /**
      * Information about a user's cross-signing keys
@@ -66,8 +34,10 @@ export class CrossSigningInfo extends EventEmitter {
      * @class
      *
      * @param {string} userId the user that the information is about
+     * @param {object} callbacks Callbacks used to interact with the app
+     *     Requires getPrivateKey and savePrivateKeys
      */
-    constructor(userId) {
+    constructor(userId, callbacks) {
         super();
 
         // you can't change the userId
@@ -75,8 +45,42 @@ export class CrossSigningInfo extends EventEmitter {
             enumerable: true,
             value: userId,
         });
+        this._callbacks = callbacks || {};
         this.keys = {};
-        this.fu = true;
+        this.firstUse = true;
+    }
+
+    /**
+     * Calls the app callback to ask for a private key
+     * @param {string} type The key type ("master", "self_signing", or "user_signing")
+     * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
+     *     the stored public key for the given key type.
+     */
+    async getPrivateKey(type, expectedPubkey) {
+        if (!this._callbacks.getPrivateKey) {
+            throw new Error("No getPrivateKey callback supplied");
+        }
+
+        if (expectedPubkey === undefined) {
+            expectedPubkey = getPublicKey(this.keys[type])[1];
+        }
+
+        const privkey = await this._callbacks.getPrivateKey(type, expectedPubkey);
+        if (!privkey) {
+            throw new Error(
+                "getPrivateKey callback for  " + type + " returned falsey",
+            );
+        }
+        const signing = new global.Olm.PkSigning();
+        const gotPubkey = signing.init_with_seed(privkey);
+        if (gotPubkey !== expectedPubkey) {
+            signing.free();
+            throw new Error(
+                "Key type " + type + " from getPrivateKey callback did not match",
+            );
+        } else {
+            return [gotPubkey, signing];
+        }
     }
 
     static fromStorage(obj, userId) {
@@ -92,7 +96,7 @@ export class CrossSigningInfo extends EventEmitter {
     toStorage() {
         return {
             keys: this.keys,
-            fu: this.fu,
+            firstUse: this.firstUse,
         };
     }
 
@@ -109,6 +113,10 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async resetKeys(level) {
+        if (!this._callbacks.savePrivateKeys) {
+            throw new Error("No savePrivateKeys callback supplied");
+        }
+
         if (level === undefined || level & 4 || !this.keys.master) {
             level = CrossSigningLevel.MASTER;
         } else if (level === 0) {
@@ -133,7 +141,7 @@ export class CrossSigningInfo extends EventEmitter {
                     },
                 };
             } else {
-                [masterPub, masterSigning] = await getPrivateKey(this, "master");
+                [masterPub, masterSigning] = await this.getPrivateKey("master");
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
@@ -173,7 +181,7 @@ export class CrossSigningInfo extends EventEmitter {
             }
 
             Object.assign(this.keys, keys);
-            this.emit("cross-signing.savePrivateKeys", privateKeys);
+            this._callbacks.savePrivateKeys(privateKeys);
         } finally {
             if (masterSigning) {
                 masterSigning.free();
@@ -192,10 +200,10 @@ export class CrossSigningInfo extends EventEmitter {
             }
             if (!this.keys.master) {
                 // this is the first key we've seen, so first-use is true
-                this.fu = true;
+                this.firstUse = true;
             } else if (getPublicKey(keys.master)[1] !== this.getId()) {
                 // this is a different key, so first-use is false
-                this.fu = false;
+                this.firstUse = false;
             } // otherwise, same key, so no change
             signingKeys.master = keys.master;
         } else if (this.keys.master) {
@@ -254,7 +262,7 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async signObject(data, type) {
-        const [pubkey, signing] = await getPrivateKey(this, type);
+        const [pubkey, signing] = await this.getPrivateKey(type);
         try {
             pkSign(data, signing, this.userId, pubkey);
             return data;
@@ -297,12 +305,12 @@ export class CrossSigningInfo extends EventEmitter {
             && this.getId("self_signing")
             && this.getId("self_signing") === userCrossSigning.getId("self_signing")) {
             return CrossSigningVerification.VERIFIED
-                | (this.fu ? CrossSigningVerification.TOFU
+                | (this.firstUse ? CrossSigningVerification.TOFU
                    : CrossSigningVerification.UNVERIFIED);
         }
 
         if (!this.keys.user_signing) {
-            return (userCrossSigning.fu ? CrossSigningVerification.TOFU
+            return (userCrossSigning.firstUse ? CrossSigningVerification.TOFU
                     : CrossSigningVerification.UNVERIFIED);
         }
 
@@ -317,7 +325,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
         return (userTrusted ? CrossSigningVerification.VERIFIED
                 : CrossSigningVerification.UNVERIFIED)
-             | (userCrossSigning.fu ? CrossSigningVerification.TOFU
+             | (userCrossSigning.firstUse ? CrossSigningVerification.TOFU
                 : CrossSigningVerification.UNVERIFIED);
     }
 

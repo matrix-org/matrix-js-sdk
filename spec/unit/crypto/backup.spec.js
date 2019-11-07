@@ -84,6 +84,16 @@ const BACKUP_INFO = {
     },
 };
 
+const keys = {};
+
+function getPrivateKey(type) {
+    return keys[type];
+}
+
+function savePrivateKeys(k) {
+    Object.assign(keys, k);
+}
+
 function makeTestClient(sessionStore, cryptoStore) {
     const scheduler = [
         "getQueueForEvent", "queueEvent", "removeEventFromQueue",
@@ -109,6 +119,7 @@ function makeTestClient(sessionStore, cryptoStore) {
         deviceId: "device",
         sessionStore: sessionStore,
         cryptoStore: cryptoStore,
+        cryptoCallbacks: { getPrivateKey, savePrivateKeys },
     });
 }
 

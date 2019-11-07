@@ -203,11 +203,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._verificationTransactions = new Map();
 
-    this._crossSigningInfo = new CrossSigningInfo(userId);
-    this._reEmitter.reEmit(this._crossSigningInfo, [
-        "cross-signing.savePrivateKeys",
-        "cross-signing.getKey",
-    ]);
+    this._crossSigningInfo = new CrossSigningInfo(
+        userId, this._baseApis._cryptoCallbacks,
+    );
 
     this._secretStorage = new SecretStorage(baseApis);
 }
@@ -234,6 +232,27 @@ Crypto.prototype.requestSecret = function(name, devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(this._userId));
     }
     return this._secretStorage.request(name, devices);
+};
+
+/**
+ * Checks that a given private key matches a given public key
+ * This can be used by the getPrivateKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ *
+ * @param {Uint8Array} privateKey The private key
+ * @param {Uint8Array} expectedPublicKey The public key supplied by the getPrivateKey callback
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
+    let signing = null;
+    try {
+        signing = new global.Olm.PkSigning();
+        const gotPubkey = signing.init_with_seed(privateKey);
+        // make sure it agrees with the given pubkey
+        return gotPubkey === expectedPublicKey;
+    } finally {
+        if (signing) signing.free();
+    }
 };
 
 /**
@@ -346,18 +365,28 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
             users[userId] = upgradeInfo;
         }
     }
-    this.emit("cross-signing.upgradeDeviceVerifications", {
-        users,
-        accept: async (upgradeUsers) => {
-            for (const userId of upgradeUsers) {
-                if (userId in users) {
-                    await this._baseApis.setDeviceVerified(
-                        userId, users[userId].crossSigningInfo.getId(),
-                    );
+
+    const shouldUpgradeCb = (
+        this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
+    );
+    if (Object.keys(users).length > 0 && shouldUpgradeCb) {
+        try {
+            const usersToUpgrade = await shouldUpgradeCb({users: users});
+            if (usersToUpgrade) {
+                for (const userId of usersToUpgrade) {
+                    if (userId in users) {
+                        await this._baseApis.setDeviceVerified(
+                            userId, users[userId].crossSigningInfo.getId(),
+                        );
+                    }
                 }
             }
-        },
-    });
+        } catch (e) {
+            logger.log(
+                "shouldUpgradeDeviceVerifications threw an error: not upgrading", e,
+            );
+        }
+    }
 };
 
 /**
@@ -372,7 +401,7 @@ Crypto.prototype._checkForDeviceVerificationUpgrade = async function(
 ) {
     // only upgrade if this is the first cross-signing key that we've seen for
     // them, and if their cross-signing key isn't already verified
-    if (crossSigningInfo.fu
+    if (crossSigningInfo.firstUse
         && !(this._crossSigningInfo.checkUserTrust(crossSigningInfo) & 2)) {
         const devices = this._deviceList.getRawStoredDevicesForUser(userId);
         const deviceIds = await this._checkForValidDeviceSignature(
@@ -499,9 +528,28 @@ Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
  */
 Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
     if (userId === this._userId) {
-        await this._checkOwnCrossSigningTrust();
+        // An update to our own cross-signing key.
+        // Get the new key first:
+        const newCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
+        const seenPubkey = newCrossSigning ? newCrossSigning.getId() : null;
+        const currentPubkey = this._crossSigningInfo.getId();
+        const changed = currentPubkey !== seenPubkey;
+
+        if (currentPubkey && seenPubkey && !changed) {
+            // If it's not changed, just make sure everything is up to date
+            await this.checkOwnCrossSigningTrust();
+        } else {
+            this.emit("cross-signing.keysChanged", {});
+            // We'll now be in a state where cross-signing on the account is not trusted
+            // because our locally stored cross-signing keys will not match the ones
+            // on the server for our account. The app must call checkOwnCrossSigningTrust()
+            // to fix this.
+            // XXX: Do we need to do something to emit events saying every device has become
+            // untrusted?
+        }
     } else {
         await this._checkDeviceVerifications(userId);
+        this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
     }
 };
 
@@ -509,7 +557,7 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
  * Check the copy of our cross-signing key that we have in the device list and
  * see if we can get the private key. If so, mark it as trusted.
  */
-Crypto.prototype._checkOwnCrossSigningTrust = async function() {
+Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const userId = this._userId;
 
     // If we see an update to our own master key, check it against the master
@@ -527,51 +575,27 @@ Crypto.prototype._checkOwnCrossSigningTrust = async function() {
 
     const seenPubkey = newCrossSigning.getId();
     const changed = this._crossSigningInfo.getId() !== seenPubkey;
-    let privkey;
     if (changed) {
         // try to get the private key if the master key changed
         logger.info("Got new master key", seenPubkey);
 
-        let error;
-        do {
-            privkey = await new Promise((resolve, reject) => {
-                this._baseApis.emit("cross-signing.newKey", {
-                    publicKey: seenPubkey,
-                    type: "master",
-                    error,
-                    done: (key) => {
-                        // check key matches
-                        const signing = new global.Olm.PkSigning();
-                        try {
-                            const pubkey = signing.init_with_seed(key);
-                            if (pubkey !== seenPubkey) {
-                                error = "Key does not match";
-                                logger.info("Key does not match: got " + pubkey
-                                            + " expected " + seenPubkey);
-                                return;
-                            }
-                        } finally {
-                            signing.free();
-                        }
-                        resolve(key);
-                    },
-                    cancel: (error) => {
-                        // FIXME: should we forcibly push our copy of the key
-                        // to the server if the client rejects the server's
-                        // key?
-                        reject(error || new Error("Cancelled by user"));
-                    },
-                });
-            });
-        } while (!privkey);
-        this._baseApis.emit("cross-signing.savePrivateKeys", {master: privkey});
+        let signing = null;
+        try {
+            const ret = await this._crossSigningInfo.getPrivateKey(
+                'master', seenPubkey,
+            );
+            signing = ret[1];
+        } finally {
+            signing.free();
+        }
 
-        logger.info("Got private key");
+        logger.info("Got matching private key from callback for new public master key");
     }
 
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
     const oldUserSigningId = this._crossSigningInfo.getId("user_signing");
 
+    // Update the version of our keys in our cross-siging object and the local store
     this._crossSigningInfo.setKeys(newCrossSigning.keys);
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -599,12 +623,13 @@ Crypto.prototype._checkOwnCrossSigningTrust = async function() {
         await this._signObject(this._crossSigningInfo.keys.master);
         keySignatures[this._crossSigningInfo.getId()]
             = this._crossSigningInfo.keys.master;
-        this._baseApis.emit("cross-signing.keysChanged", {});
     }
 
     if (Object.keys(keySignatures).length) {
         await this._baseApis.uploadKeySignatures({[this._userId]: keySignatures});
     }
+
+    this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
 
     // Now we may be able to trust our key backup
     await this.checkKeyBackup();
@@ -625,19 +650,20 @@ Crypto.prototype._checkDeviceVerifications = async function(userId) {
             const upgradeInfo = await this._checkForDeviceVerificationUpgrade(
                 userId, crossSigningInfo,
             );
-            if (upgradeInfo) {
-                this.emit("cross-signing.upgradeDeviceVerifications", {
+            const shouldUpgradeCb = (
+                this._baseApis._cryptoCallbacks.shouldUpgradeDeviceVerifications
+            );
+            if (upgradeInfo && shouldUpgradeCb) {
+                const usersToUpgrade = await shouldUpgradeCb({
                     users: {
                         [userId]: upgradeInfo,
-                    },
-                    accept: async (users) => {
-                        if (users.includes(userId)) {
-                            await this._baseApis.setDeviceVerified(
-                                userId, crossSigningInfo.getId(),
-                            );
-                        }
-                    },
+                    }
                 });
+                if (usersToUpgrade.includes(userId)) {
+                    await this._baseApis.setDeviceVerified(
+                        userId, crossSigningInfo.getId(),
+                    );
+                }
             }
         }
     }
@@ -1161,12 +1187,14 @@ Crypto.prototype.setDeviceVerification = async function(
         if (verified) {
             const device = await this._crossSigningInfo.signUser(xsk);
             if (device) {
-                this._baseApis.uploadKeySignatures({
+                await this._baseApis.uploadKeySignatures({
                     [userId]: {
                         [deviceId]: device,
                     },
                 });
+                // XXX: we'll need to wait for the device list to be updated
             }
+            this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
             return device;
         } else {
             // FIXME: ???
@@ -1212,15 +1240,18 @@ Crypto.prototype.setDeviceVerification = async function(
             userId, DeviceInfo.fromStorage(dev, deviceId),
         );
         if (device) {
-            this._baseApis.uploadKeySignatures({
+            await this._baseApis.uploadKeySignatures({
                 [userId]: {
                     [deviceId]: device,
                 },
             });
+            // XXX: we'll need to wait for the device list to be updated
         }
     }
 
-    return DeviceInfo.fromStorage(dev, deviceId);
+    const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
+    this.emit("deviceVerificationChanged", userId, deviceId, deviceObj);
+    return deviceObj;
 };
 
 

@@ -175,6 +175,54 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {boolean} [opts.fallbackICEServerAllowed]
  * Optional. Whether to allow a fallback ICE server should be used for negotiating a
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
+ *
+ * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
+ *
+ * @param {function} [opts.cryptoCallbacks.getPrivateKey]
+ * Optional (required for cross-signing). Function to call when a private key is needed.
+ * Args:
+ *    {string} type The type of key needed.  Will be one of "master",
+ *      "self_signing", or "user_signing"
+ *    {Uint8Array} publicKey The public key matching the expected private key.
+ *        This can be passed to checkPrivateKey() along with the private key
+ *        in order to check that a given private key matches what is being
+ *        requested.
+ *   Should return a promise that resolves with the private key as a
+ *   UInt8Array or rejects with an error.
+ *
+ * @param {function} [opts.cryptoCallbacks.savePrivateKeys]
+ * Optional (required for cross-signing). Called when new private keys
+ * for cross-signing need to be saved.
+ * Args:
+ *   {object} keys the private keys to save. Map of key name to private key
+ *       as a UInt8Array. The getPrivateKey callback above will be called
+ *       with the corresponding key name when the keys are required again.
+ *
+ * @param {function} [opts.cryptoCallbacks.shouldUpgradeDeviceVerifications]
+ * Optional. Called when there are device-to-device verifications that can be
+ * upgraded into cross-signing verifications.
+ * Args:
+ *   {object} users The users whose device verifications can be
+ *     upgraded to cross-signing verifications.  This will be a map of user IDs
+ *     to objects with the properties `devices` (array of the user's devices
+ *     that verified their cross-signing key), and `crossSigningInfo` (the
+ *     user's cross-signing information)
+ * Should return a promise which resolves with an array of the user IDs who
+ * should be cross-signed.
+ *
+ * @param {function} [opts.cryptoCallbacks.onSecretRequested]
+ * Optional. Function called when a request for a secret is received from another
+ * device.
+ * Args:
+ *   {string} name The name of the secret being requested.
+ *   {string} user_id (string) The user ID of the client requesting
+ *   {string} device_id The device ID of the client requesting the secret.
+ *   {string} request_id The ID of the request. Used to match a
+ *     corresponding `crypto.secrets.request_cancelled`. The request ID will be
+ *     unique per sender, device pair.
+ *   {int} device_trust: The trust status of the device requesting
+ *     the secret.  Will be a bit mask in the same form as returned by {@link
+ *     module:client~MatrixClient#checkDeviceTrust}.
  */
 function MatrixClient(opts) {
     opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
@@ -235,6 +283,7 @@ function MatrixClient(opts) {
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
     this._verificationMethods = opts.verificationMethods;
+    this._cryptoCallbacks = opts.cryptoCallbacks;
 
     this._forceTURN = opts.forceTURN || false;
     this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
@@ -612,9 +661,9 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.roomKeyRequestCancellation",
         "crypto.warning",
         "crypto.devicesUpdated",
-        "cross-signing.savePrivateKeys",
-        "cross-signing.getKey",
-        "cross-signing.upgradeDeviceVerifications",
+        "deviceVerificationChanged",
+        "userVerificationChanged",
+        "cross-signing.keysChanged",
     ]);
 
     logger.log("Crypto: initialising crypto object...");
@@ -783,10 +832,9 @@ async function _setDeviceVerification(
     if (!client._crypto) {
         throw new Error("End-to-End encryption disabled");
     }
-    const dev = await client._crypto.setDeviceVerification(
+    await client._crypto.setDeviceVerification(
         userId, deviceId, verified, blocked, known,
     );
-    client.emit("deviceVerificationChanged", userId, deviceId, dev);
 }
 
 /**
@@ -970,6 +1018,8 @@ wrapCryptoFuncs(MatrixClient, [
     "getStoredCrossSigningForUser",
     "checkUserTrust",
     "checkDeviceTrust",
+    "checkOwnCrossSigningTrust",
+    "checkPrivateKey",
 ]);
 
 /**
@@ -5041,6 +5091,28 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  */
 
 /**
+ * Fires when the trust status of a user changes
+ * If userId is the userId of the logged in user, this indicated a change
+ * in the trust status of the cross-signing data on the account.
+ *
+ * @event module:client~MatrixClient#"userTrustStatusChanged"
+ * @param {string} userId the userId of the user in question
+ * @param {integer} trustLevel The new trust level of the user
+ */
+
+/**
+ * Fires when the user's cross-signing keys have changed or cross-signing
+ * has been enabled/disabled. The client can use getStoredCrossSigningForUser
+ * with the user ID of the logged in user to check if cross-signing is
+ * enabled on the account. If enabled, it can test whether the current key
+ * is trusted using with checkUserTrust with the user ID of the logged
+ * in user. The checkOwnCrossSigningTrust function may be used to reconcile
+ * the trust in the account key.
+ *
+ * @event module:client~MatrixClient#"cross-signing.keysChanged"
+ */
+
+/**
  * Fires whenever new user-scoped account_data is added.
  * @event module:client~MatrixClient#"accountData"
  * @param {MatrixEvent} event The event describing the account_data just added
@@ -5095,84 +5167,6 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @event module:client~MatrixClient#"crypto.verification.start"
  * @param {module:crypto/verification/Base} verifier a verifier object to
  *     perform the key verification
- */
-
-/**
- * Fires when private keys for cross-signing need to be saved.
- * @event module:client~MatrixClient#"cross-signing.savePrivateKeys"
- * @param {object} keys the private keys to save.
- * @param {UInt8Array} [keys.master] the private master key
- * @param {UInt8Array} [keys.self_signing] the private user-signing key
- * @param {UInt8Array} [keys.user_signing] the private self-signing key
- */
-
-/**
- * Fires when a private key is needed.
- * @event module:client~MatrixClient#"cross-signing.getKey"
- * @param {object} data
- * @param {string} data.type the type of key needed.  Will be one of "master",
- *     "self_signing", or "user_signing"
- * @param {Function} data.done a function to call with the private key as a
- *     `UInt8Array`
- * @param {Function} data.cancel a function to call if the private key cannot
- *     be provided
- * @param {string} [data.error] Error string to display to the user.  Normally
- *     provided if a previously provided key was invalid, to re-prompt the
- *     user.
- */
-
-/**
- * Fires when a new cross-signing key is provided from the server.  The handler
- * must verify the key by providing the private key for the given public key.
- * @event module:client~MatrixClient#"cross-signing.newKey"
- * @param {object} data
- * @param {string} data.publicKey the public key received from the server
- * @param {string} data.type the type of key that was received.  Currently will
- *     only be "master".
- * @param {Function} data.done a function to call with the private key
- *     corresponding to the given public key.
- * @param {Function} data.cancel a function to call if the private key cannot be
- *     provided, indicating that the client does not accept the cross-signing key.
- * @param {string} [data.error] Error string to display to the user.  Normally
- *     provided if a previously provided key was invalid.
- */
-
-/**
- * Fires when a device verification can be upgraded to a cross-signing
- * verification.  The handler should call the `accept` callback in order to
- * perform the upgrade.
- * @event module:client~MatrixClient#"cross-signing.upgradeDeviceVerifications"
- * @param {object} data
- * @param {object} data.users The users whose device verifications can be
- *     upgraded to cross-signing verifications.  This will be a map of user IDs
- *     to objects with the properties `devices` (array of the user's devices
- *     that verified their cross-signing key), and `crossSigningInfo` (the
- *     user's cross-signing information)
- * @param {object} data.accept a function to call to upgrade the device
- *     verifications.  It should be called with an array of the user IDs who
- *     should be cross-signed.
- */
-
-/**
- * Fires when a secret has been requested by another client.  Clients should
- * ensure that the requesting device is allowed to have the secret.  For
- * example, if the device is not already trusted, a verification should be
- * performed before sharing the secret.  The client may also wish to prompt the
- * user before sharing the secret.
- * @event module:client~MatrixClient#"crypto.secrets.request"
- * @param {object} data
- * @param {string} data.name The name of the secret being requested.
- * @param {string} data.user_id (string) The user ID of the client requesting
- *     the secret.  In most cases, this shoud be the same as the client's user.
- * @param {string} data.device_id The device ID of the client requesting the secret.
- * @param {string} data.request_id The ID of the request.  Used to match a
- *     corresponding `crypto.secrets.request_cancelled`.  The request ID will be
- *     unique per sender, device pair.
- * @param {int} data.device_trust: The trust status of the device requesting
- *     the secret.  Will be a bit mask in the same form as returned by {@link
- *     module:client~MatrixClient#checkDeviceTrust}.
- * @param {Function} data.send A function to call to send the secret to the
- *     requester
  */
 
 /**
