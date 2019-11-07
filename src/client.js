@@ -4211,6 +4211,16 @@ MatrixClient.prototype.getVersions = async function() {
 };
 
 /**
+ * Check if a particular spec version is supported by the server.
+ * @param {string} version The spec version (such as "r0.5.0") to check for.
+ * @return {Promise<bool>} Whether it is supported
+ */
+MatrixClient.prototype.isVersionSupported = async function(version) {
+    const { versions } = await this.getVersions();
+    return versions && versions.includes(version);
+};
+
+/**
  * Query the server to see if it support members lazy loading
  * @return {Promise<boolean>} true if server supports lazy loading
  */
