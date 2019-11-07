@@ -493,6 +493,8 @@ Crypto.prototype.checkUserTrust = function(userId) {
     if (!userCrossSigning) {
         return 0;
     }
+    // We shift the result from CrossSigningInfo.checkUserTrust so this
+    // function's return is consistent with checkDeviceTrust
     return this._crossSigningInfo.checkUserTrust(userCrossSigning) << 1;
 };
 

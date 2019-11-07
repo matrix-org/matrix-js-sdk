@@ -358,6 +358,8 @@ function deviceToObject(device, userId) {
 }
 
 export const CrossSigningLevel = {
+    // NB. The actual master key is 4 but you must, by definition, reset all
+    // keys if you reset the master key so this is essentially 'all keys'
     MASTER: 7,
     SELF_SIGNING: 1,
     USER_SIGNING: 2,
