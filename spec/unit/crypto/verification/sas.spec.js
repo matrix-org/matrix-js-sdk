@@ -271,29 +271,15 @@ describe("SAS verification", function() {
         });
 
         it("should verify a cross-signing key", async function() {
-            const privateKeys = {};
             alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
                 200, {},
             );
             alice.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
-            alice.client.on("cross-signing.savePrivateKeys", function(e) {
-                privateKeys.alice = e;
-            });
-            alice.client.on("cross-signing.getKey", function(e) {
-                e.done(privateKeys.alice[e.type]);
-            });
             alice.httpBackend.flush(undefined, 2);
             await alice.client.resetCrossSigningKeys();
-            bob.client.on("cross-signing.savePrivateKeys", function(e) {
-                privateKeys.bob = e;
-            });
             bob.httpBackend.when('POST', '/keys/device_signing/upload').respond(200, {});
             bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
             bob.httpBackend.flush(undefined, 2);
-
-            bob.client.on("cross-signing.getKey", function(e) {
-                e.done(privateKeys.bob[e.type]);
-            });
 
             await bob.client.resetCrossSigningKeys();
 
@@ -316,12 +302,19 @@ describe("SAS verification", function() {
                 },
             });
 
-            await Promise.all([
+            const verifyProm = Promise.all([
                 aliceVerifier.verify(),
-                bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                bobPromise.then((verifier) => {
+                    bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
+                    bob.httpBackend.flush(undefined, 2);
+                    return verifier.verify();
+                }),
             ]);
+
+            await alice.httpBackend.flush(undefined, 1);
+            console.log("alice reqs flushed");
+
+            await verifyProm;
 
             expect(alice.client.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(1);
             expect(bob.client.checkUserTrust("@alice:example.com")).toBe(6);

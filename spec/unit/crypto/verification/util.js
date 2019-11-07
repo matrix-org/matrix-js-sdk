@@ -69,6 +69,13 @@ export async function makeTestClients(userInfos, options) {
     };
 
     for (const userInfo of userInfos) {
+        let keys = {};
+        if (!options) options = {};
+        if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
+        if (!options.cryptoCallbacks.savePrivateKeys) {
+            options.cryptoCallbacks.savePrivateKeys = k => { keys = k; };
+            options.cryptoCallbacks.getPrivateKey = typ => keys[typ];
+        }
         const testClient = new TestClient(
             userInfo.userId, userInfo.deviceId, undefined, undefined,
             options,
