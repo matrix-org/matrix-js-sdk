@@ -657,7 +657,7 @@ Crypto.prototype._checkDeviceVerifications = async function(userId) {
                 const usersToUpgrade = await shouldUpgradeCb({
                     users: {
                         [userId]: upgradeInfo,
-                    }
+                    },
                 });
                 if (usersToUpgrade.includes(userId)) {
                     await this._baseApis.setDeviceVerified(

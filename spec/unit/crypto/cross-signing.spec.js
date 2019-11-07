@@ -689,7 +689,6 @@ describe("Cross Signing", function() {
         const bob = await makeTestClient(
             {userId: "@bob:example.com", deviceId: "Dynabook"},
         );
-        const privateKeys = {};
 
         bob.uploadDeviceSigningKeys = async () => {};
         bob.uploadKeySignatures = async () => {};
