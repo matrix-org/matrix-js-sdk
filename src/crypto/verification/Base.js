@@ -151,12 +151,16 @@ export default class VerificationBase extends EventEmitter {
             this._rejectEvent = undefined;
             this._resetTimer();
             this._resolveEvent(e);
+        } else if (e.getType() === "m.key.verification.cancel") {
+            const reject = this._reject;
+            this._reject = undefined;
+            reject(new Error("Other side cancelled verification"));
         } else {
-            this._expectedEvent = undefined;
             const exception = new Error(
                 "Unexpected message: expecting " + this._expectedEvent
                     + " but got " + e.getType(),
             );
+            this._expectedEvent = undefined;
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -218,6 +222,8 @@ export default class VerificationBase extends EventEmitter {
                 // but no reject function. If cancel is called again, we'd error.
                 if (this._reject) this._reject(e);
             } else {
+                // FIXME: this causes an "Uncaught promise" console message
+                // if nothing ends up chaining this promise.
                 this._promise = Promise.reject(e);
             }
             // Also emit a 'cancel' event that the app can listen for to detect cancellation
