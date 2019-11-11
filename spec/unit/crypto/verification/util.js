@@ -72,9 +72,9 @@ export async function makeTestClients(userInfos, options) {
         let keys = {};
         if (!options) options = {};
         if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
-        if (!options.cryptoCallbacks.savePrivateKeys) {
-            options.cryptoCallbacks.savePrivateKeys = k => { keys = k; };
-            options.cryptoCallbacks.getPrivateKey = typ => keys[typ];
+        if (!options.cryptoCallbacks.saveCrossSigningKeys) {
+            options.cryptoCallbacks.saveCrossSigningKeys = k => { keys = k; };
+            options.cryptoCallbacks.getCrossSigningKey = typ => keys[typ];
         }
         const testClient = new TestClient(
             userInfo.userId, userInfo.deviceId, undefined, undefined,

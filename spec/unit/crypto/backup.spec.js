@@ -86,11 +86,11 @@ const BACKUP_INFO = {
 
 const keys = {};
 
-function getPrivateKey(type) {
+function getCrossSigningKey(type) {
     return keys[type];
 }
 
-function savePrivateKeys(k) {
+function saveCrossSigningKeys(k) {
     Object.assign(keys, k);
 }
 
@@ -119,7 +119,7 @@ function makeTestClient(sessionStore, cryptoStore) {
         deviceId: "device",
         sessionStore: sessionStore,
         cryptoStore: cryptoStore,
-        cryptoCallbacks: { getPrivateKey, savePrivateKeys },
+        cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys },
     });
 }
 
@@ -330,7 +330,7 @@ describe("MegolmBackup", function() {
             let privateKeys;
             client.uploadDeviceSigningKeys = async function(e) {return;};
             client.uploadKeySignatures = async function(e) {return;};
-            client.on("cross-signing.savePrivateKeys", function(e) {
+            client.on("cross-signing.saveCrossSigningKeys", function(e) {
                 privateKeys = e;
             });
             client.on("cross-signing.getKey", function(e) {

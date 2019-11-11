@@ -29,17 +29,17 @@ import {HttpResponse, setHttpResponses} from '../../test-utils';
 async function makeTestClient(userInfo, options, keys) {
     if (!keys) keys = {};
 
-    function getPrivateKey(type) {
+    function getCrossSigningKey(type) {
         return keys[type];
     }
 
-    function savePrivateKeys(k) {
+    function saveCrossSigningKeys(k) {
         Object.assign(keys, k);
     }
 
     if (!options) options = {};
     options.cryptoCallbacks = Object.assign(
-        {}, { getPrivateKey, savePrivateKeys }, options.cryptoCallbacks || {},
+        {}, { getCrossSigningKey, saveCrossSigningKeys }, options.cryptoCallbacks || {},
     );
     const client = (new TestClient(
         userInfo.userId, userInfo.deviceId, undefined, undefined, options,
@@ -127,7 +127,7 @@ describe("Cross Signing", function() {
             {
                 cryptoCallbacks: {
                     // will be called to sign our own device
-                    getPrivateKey: type => {
+                    getCrossSigningKey: type => {
                         if (type === 'master') {
                             return masterKey;
                         } else {
