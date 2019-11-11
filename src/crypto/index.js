@@ -207,7 +207,9 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
         userId, this._baseApis._cryptoCallbacks,
     );
 
-    this._secretStorage = new SecretStorage(baseApis);
+    this._secretStorage = new SecretStorage(
+        baseApis, this._baseApis._cryptoCallbacks,
+    );
 }
 utils.inherits(Crypto, EventEmitter);
 

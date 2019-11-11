@@ -26,11 +26,12 @@ import { encodeRecoveryKey } from './recoverykey';
  * @module crypto/Secrets
  */
 export default class SecretStorage extends EventEmitter {
-    constructor(baseApis) {
+    constructor(baseApis, cryptoCallbacks) {
         super();
         this._baseApis = baseApis;
         this._requests = {};
         this._incomingRequests = {};
+        this._cryptoCallbacks = cryptoCallbacks;
     }
 
     /**
@@ -159,7 +160,7 @@ export default class SecretStorage extends EventEmitter {
         const secretContent = secretInfo.getContent();
 
         if (!secretContent.encrypted) {
-            return;
+            throw new Error("Content is not encrypted!");
         }
 
         // get possible keys to decrypt
@@ -182,63 +183,13 @@ export default class SecretStorage extends EventEmitter {
             }
         }
 
-        // fetch private key from app
-        let decryption;
         let keyName;
-        let cleanUp;
-        let error;
-        do {
-            [keyName, decryption, cleanUp] = await new Promise((resolve, reject) => {
-                this._baseApis.emit("crypto.secrets.getKey", {
-                    keys,
-                    error,
-                    done: function(keyName, key) {
-                        // FIXME: interpret key?
-                        if (!keys[keyName]) {
-                            error = "Unknown key (your app is broken)";
-                            resolve([]);
-                        }
-                        switch (keys[keyName].algorithm) {
-                        case "m.secret_storage.v1.curve25519-aes-sha2":
-                        {
-                            const decryption = new global.Olm.PkDecryption();
-                            try {
-                                const pubkey = decryption.init_with_private_key(key);
-                                if (pubkey !== keys[keyName].pubkey) {
-                                    error = "Key does not match";
-                                    resolve([]);
-                                    return;
-                                }
-                            } catch (e) {
-                                decryption.free();
-                                error = "Invalid key";
-                                resolve([]);
-                                return;
-                            }
-                            resolve([
-                                keyName,
-                                decryption,
-                                decryption.free.bind(decryption),
-                            ]);
-                            break;
-                        }
-                        default:
-                            error = "The universe is broken";
-                            resolve([]);
-                        }
-                    },
-                    cancel: function(e) {
-                        reject(e || new Error("Cancelled"));
-                    },
-                });
-            });
-            if (error) {
-                logger.error("Error getting private key:", error);
-            }
-        } while (!keyName);
-
-        // decrypt secret
+        let decryption;
         try {
+            // fetch private key from app
+            [keyName, decryption] = await this._getSecretStorageKey(keys);
+
+            // decrypt secret
             const encInfo = secretContent.encrypted[keyName];
             switch (keys[keyName].algorithm) {
             case "m.secret_storage.v1.curve25519-aes-sha2":
@@ -247,7 +198,7 @@ export default class SecretStorage extends EventEmitter {
                 );
             }
         } finally {
-            cleanUp();
+            if (decryption) decryption.free();
         }
     }
 
@@ -358,7 +309,7 @@ export default class SecretStorage extends EventEmitter {
         };
     }
 
-    _onRequestReceived(event) {
+    async _onRequestReceived(event) {
         const sender = event.getSender();
         const content = event.getContent();
         if (sender !== this._baseApis.getUserId()
@@ -389,52 +340,55 @@ export default class SecretStorage extends EventEmitter {
             // check if we have the secret
             logger.info("received request for secret (" + sender
                         + ", " + deviceId + ", " + content.request_id + ")");
-            this._baseApis.emit("crypto.secrets.request", {
+            if (!this._cryptoCallbacks.onSecretRequested) {
+                return;
+            }
+            const secret = await this._cryptoCallbacks.onSecretRequested({
                 user_id: sender,
                 device_id: deviceId,
                 request_id: content.request_id,
                 name: content.name,
                 device_trust: this._baseApis.checkDeviceTrust(sender, deviceId),
-                send: async (secret) => {
-                    const payload = {
-                        type: "m.secret.send",
-                        content: {
-                            request_id: content.request_id,
-                            secret: secret,
-                        },
-                    };
-                    const encryptedContent = {
-                        algorithm: olmlib.OLM_ALGORITHM,
-                        sender_key: this._baseApis._crypto._olmDevice.deviceCurve25519Key,
-                        ciphertext: {},
-                    };
-                    await olmlib.ensureOlmSessionsForDevices(
-                        this._baseApis._crypto._olmDevice,
-                        this._baseApis,
-                        {
-                            [sender]: [
-                                await this._baseApis.getStoredDevice(sender, deviceId),
-                            ],
-                        },
-                    );
-                    await olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        this._baseApis.getUserId(),
-                        this._baseApis.deviceId,
-                        this._baseApis._crypto._olmDevice,
-                        sender,
-                        this._baseApis._crypto.getStoredDevice(sender, deviceId),
-                        payload,
-                    );
-                    const contentMap = {
-                        [sender]: {
-                            [deviceId]: encryptedContent,
-                        },
-                    };
-
-                    this._baseApis.sendToDevice("m.room.encrypted", contentMap);
-                },
             });
+            if (secret) {
+                const payload = {
+                    type: "m.secret.send",
+                    content: {
+                        request_id: content.request_id,
+                        secret: secret,
+                    },
+                };
+                const encryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this._baseApis._crypto._olmDevice.deviceCurve25519Key,
+                    ciphertext: {},
+                };
+                await olmlib.ensureOlmSessionsForDevices(
+                    this._baseApis._crypto._olmDevice,
+                    this._baseApis,
+                    {
+                        [sender]: [
+                            await this._baseApis.getStoredDevice(sender, deviceId),
+                        ],
+                    },
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this._baseApis.getUserId(),
+                    this._baseApis.deviceId,
+                    this._baseApis._crypto._olmDevice,
+                    sender,
+                    this._baseApis._crypto.getStoredDevice(sender, deviceId),
+                    payload,
+                );
+                const contentMap = {
+                    [sender]: {
+                        [deviceId]: encryptedContent,
+                    },
+                };
+
+                this._baseApis.sendToDevice("m.room.encrypted", contentMap);
+            }
         }
     }
 
@@ -466,6 +420,51 @@ export default class SecretStorage extends EventEmitter {
             }
 
             requestControl.resolve(content.secret);
+        }
+    }
+
+    async _getSecretStorageKey(keys) {
+        if (!this._cryptoCallbacks.getSecretStorageKey) {
+            throw new Error("No getSecretStorageKey callback supplied");
+        }
+
+        const returned = await Promise.resolve(
+            this._cryptoCallbacks.getSecretStorageKey({keys}),
+        );
+
+        if (!returned) {
+            throw new Error("getSecretStorageKey callback returned falsey");
+        }
+        if (returned.length < 2) {
+            throw new Error("getSecretStorageKey callback returned invalid data");
+        }
+
+        const [keyName, privateKey] = returned;
+        if (!keys[keyName]) {
+            throw new Error("App returned unknown key from getSecretStorageKey!");
+        }
+
+        switch (keys[keyName].algorithm) {
+            case "m.secret_storage.v1.curve25519-aes-sha2":
+            {
+                const decryption = new global.Olm.PkDecryption();
+                let pubkey;
+                try {
+                    pubkey = decryption.init_with_private_key(privateKey);
+                } catch (e) {
+                    decryption.free();
+                    throw new Error("getSecretStorageKey callback returned invalid key");
+                }
+                if (pubkey !== keys[keyName].pubkey) {
+                    decryption.free();
+                    throw new Error(
+                        "getSecretStorageKey callback returned incorrect key",
+                    );
+                }
+                return [keyName, decryption];
+            }
+            default:
+                throw new Error("Unknown key type: " + keys[keyName].algorithm);
         }
     }
 }

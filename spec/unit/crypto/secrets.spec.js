@@ -45,14 +45,24 @@ describe("Secrets", function() {
     });
 
     it("should store and retrieve a secret", async function() {
-        const alice = await makeTestClient(
-            {userId: "@alice:example.com", deviceId: "Osborne2"},
-        );
-        const secretStorage = alice._crypto._secretStorage;
-
         const decryption = new global.Olm.PkDecryption();
         const pubkey = decryption.generate_key();
         const privkey = decryption.get_private_key();
+
+        const getKey = expect.createSpy().andCall(e => {
+            expect(Object.keys(e.keys)).toEqual(["abc"]);
+            return ['abc', privkey];
+        });
+
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+            {
+                cryptoCallbacks: {
+                    getSecretStorageKey: getKey,
+                },
+            },
+        );
+        const secretStorage = alice._crypto._secretStorage;
 
         alice.setAccountData = async function(eventType, contents, callback) {
             alice.store.storeAccountDataEvents([
@@ -81,13 +91,6 @@ describe("Secrets", function() {
         await secretStorage.store("foo", "bar", ["abc"]);
 
         expect(secretStorage.isStored("foo")).toBe(true);
-
-        const getKey = expect.createSpy().andCall(function(e) {
-            expect(Object.keys(e.keys)).toEqual(["abc"]);
-            e.done("abc", privkey);
-        });
-        alice.once("crypto.secrets.getKey", getKey);
-
         expect(await secretStorage.get("foo")).toBe("bar");
 
         expect(getKey).toHaveBeenCalled();
@@ -99,6 +102,14 @@ describe("Secrets", function() {
                 {userId: "@alice:example.com", deviceId: "Osborne2"},
                 {userId: "@alice:example.com", deviceId: "VAX"},
             ],
+            {
+                cryptoCallbacks: {
+                    onSecretRequested: e => {
+                        expect(e.name).toBe("foo");
+                        return "bar";
+                    },
+                },
+            },
         );
 
         const vaxDevice = vax.client._crypto._olmDevice;
@@ -126,11 +137,6 @@ describe("Secrets", function() {
                     "curve25519:Osborne2": osborne2Device.deviceCurve25519Key,
                 },
             },
-        });
-
-        vax.client.once("crypto.secrets.request", function(e) {
-            expect(e.name).toBe("foo");
-            e.send("bar");
         });
 
         await osborne2Device.generateOneTimeKeys(1);

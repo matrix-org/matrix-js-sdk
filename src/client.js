@@ -210,6 +210,20 @@ function keyFromRecoverySession(session, decryptionKey) {
  * Should return a promise which resolves with an array of the user IDs who
  * should be cross-signed.
  *
+ * @param {function} [opts.cryptoCallbacks.getSecretStorageKey]
+ * Optional. Function called when an encryption key for secret storage
+ *     is required. One or more keys will be described in the keys object.
+ *     The callback function should return with an array of:
+ *     [<key name>, <UInt8Array private key>] or null if it cannot provide
+ *     any of the keys.
+ * Args:
+ *   {object} keys Information about the keys:
+ *       {
+ *           <key name>: {
+ *               pubkey: {UInt8Array}
+ *           }
+ *       }
+ *
  * @param {function} [opts.cryptoCallbacks.onSecretRequested]
  * Optional. Function called when a request for a secret is received from another
  * device.
