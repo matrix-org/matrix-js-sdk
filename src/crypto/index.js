@@ -236,11 +236,11 @@ Crypto.prototype.requestSecret = function(name, devices) {
 
 /**
  * Checks that a given private key matches a given public key
- * This can be used by the getPrivateKey callback to verify that the
+ * This can be used by the getCrossSigningKey callback to verify that the
  * private key it is about to supply is the one that was requested.
  *
  * @param {Uint8Array} privateKey The private key
- * @param {Uint8Array} expectedPublicKey The public key supplied by the getPrivateKey callback
+ * @param {Uint8Array} expectedPublicKey The public key supplied by the getCrossSigningKey callback
  * @returns {boolean} true if the key matches, otherwise false
  */
 Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
@@ -583,7 +583,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
 
         let signing = null;
         try {
-            const ret = await this._crossSigningInfo.getPrivateKey(
+            const ret = await this._crossSigningInfo.getCrossSigningKey(
                 'master', seenPubkey,
             );
             signing = ret[1];

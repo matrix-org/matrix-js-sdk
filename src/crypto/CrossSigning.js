@@ -35,7 +35,7 @@ export class CrossSigningInfo extends EventEmitter {
      *
      * @param {string} userId the user that the information is about
      * @param {object} callbacks Callbacks used to interact with the app
-     *     Requires getPrivateKey and savePrivateKeys
+     *     Requires getCrossSigningKey and saveCrossSigningKeys
      */
     constructor(userId, callbacks) {
         super();
@@ -56,19 +56,19 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
      *     the stored public key for the given key type.
      */
-    async getPrivateKey(type, expectedPubkey) {
-        if (!this._callbacks.getPrivateKey) {
-            throw new Error("No getPrivateKey callback supplied");
+    async getCrossSigningKey(type, expectedPubkey) {
+        if (!this._callbacks.getCrossSigningKey) {
+            throw new Error("No getCrossSigningKey callback supplied");
         }
 
         if (expectedPubkey === undefined) {
             expectedPubkey = getPublicKey(this.keys[type])[1];
         }
 
-        const privkey = await this._callbacks.getPrivateKey(type, expectedPubkey);
+        const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
         if (!privkey) {
             throw new Error(
-                "getPrivateKey callback for  " + type + " returned falsey",
+                "getCrossSigningKey callback for  " + type + " returned falsey",
             );
         }
         const signing = new global.Olm.PkSigning();
@@ -76,7 +76,7 @@ export class CrossSigningInfo extends EventEmitter {
         if (gotPubkey !== expectedPubkey) {
             signing.free();
             throw new Error(
-                "Key type " + type + " from getPrivateKey callback did not match",
+                "Key type " + type + " from getCrossSigningKey callback did not match",
             );
         } else {
             return [gotPubkey, signing];
@@ -113,8 +113,8 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async resetKeys(level) {
-        if (!this._callbacks.savePrivateKeys) {
-            throw new Error("No savePrivateKeys callback supplied");
+        if (!this._callbacks.saveCrossSigningKeys) {
+            throw new Error("No saveCrossSigningKeys callback supplied");
         }
 
         if (level === undefined || level & 4 || !this.keys.master) {
@@ -141,7 +141,7 @@ export class CrossSigningInfo extends EventEmitter {
                     },
                 };
             } else {
-                [masterPub, masterSigning] = await this.getPrivateKey("master");
+                [masterPub, masterSigning] = await this.getCrossSigningyKey("master");
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
@@ -181,7 +181,7 @@ export class CrossSigningInfo extends EventEmitter {
             }
 
             Object.assign(this.keys, keys);
-            this._callbacks.savePrivateKeys(privateKeys);
+            this._callbacks.saveCrossSigningKeys(privateKeys);
         } finally {
             if (masterSigning) {
                 masterSigning.free();
@@ -262,7 +262,7 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async signObject(data, type) {
-        const [pubkey, signing] = await this.getPrivateKey(type);
+        const [pubkey, signing] = await this.getCrossSigningKey(type);
         try {
             pkSign(data, signing, this.userId, pubkey);
             return data;

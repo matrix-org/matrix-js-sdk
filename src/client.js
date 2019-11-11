@@ -178,8 +178,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
  *
- * @param {function} [opts.cryptoCallbacks.getPrivateKey]
- * Optional (required for cross-signing). Function to call when a private key is needed.
+ * @param {function} [opts.cryptoCallbacks.getCrossSigningKey]
+ * Optional (required for cross-signing). Function to call when a cross-signing private key is needed.
  * Args:
  *    {string} type The type of key needed.  Will be one of "master",
  *      "self_signing", or "user_signing"
@@ -190,7 +190,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  *   Should return a promise that resolves with the private key as a
  *   UInt8Array or rejects with an error.
  *
- * @param {function} [opts.cryptoCallbacks.savePrivateKeys]
+ * @param {function} [opts.cryptoCallbacks.saveCrossSigningKeys]
  * Optional (required for cross-signing). Called when new private keys
  * for cross-signing need to be saved.
  * Args:
