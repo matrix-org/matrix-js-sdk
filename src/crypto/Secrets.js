@@ -116,7 +116,7 @@ export default class SecretStorage extends EventEmitter {
                 "m.secret_storage.key." + keyName,
             );
             if (!keyInfo) {
-                continue;
+                throw new Error("Unknown key: " +keyName);
             }
             const keyInfoContent = keyInfo.getContent();
             // FIXME: check signature of key info

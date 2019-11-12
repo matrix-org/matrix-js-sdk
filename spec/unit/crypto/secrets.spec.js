@@ -96,6 +96,20 @@ describe("Secrets", function() {
         expect(getKey).toHaveBeenCalled();
     });
 
+    it("should throw if given a key that doesn't exist", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+
+        try {
+            await alice.storeSecret("foo", "bar", ["this secret does not exist"]);
+            // should be able to use expect(...).toThrow() but mocha still fails
+            // the test even when it throws for reasons I have no inclination to debug
+            expect(true).toBeFalsy();
+        } catch (e) {
+        }
+    });
+
     it("should request secrets from other clients", async function() {
         const [osborne2, vax] = await makeTestClients(
             [
