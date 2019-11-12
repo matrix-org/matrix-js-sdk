@@ -214,7 +214,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 utils.inherits(Crypto, EventEmitter);
 
 Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
-    return this._secretStorage.store(algorithm, opts, keyID);
+    return this._secretStorage.addKey(algorithm, opts, keyID);
 };
 
 Crypto.prototype.storeSecret = function(name, secret, keys) {
