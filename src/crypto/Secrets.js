@@ -34,6 +34,19 @@ export default class SecretStorage extends EventEmitter {
         this._cryptoCallbacks = cryptoCallbacks;
     }
 
+    getDefaultKeyId() {
+        const defaultKeyEvent = this._baseApis.getAccountData('m.secret_storage.default_key');
+        if (!defaultKeyEvent) return null;
+        return defaultKeyEvent.getContent().key;
+    }
+
+    setDefaultKeyId(keyId) {
+        return this._baseApis.setAccountData(
+            'm.secret_storage.default_key',
+            { key: keyId },
+        );
+    }
+
     /**
      * Add a key for encrypting secrets.
      *
@@ -48,6 +61,8 @@ export default class SecretStorage extends EventEmitter {
      */
     async addKey(algorithm, opts, keyID) {
         const keyData = {algorithm};
+
+        if (!opts) opts = {};
 
         if (opts.name) {
             keyData.name = opts.name;
@@ -86,7 +101,7 @@ export default class SecretStorage extends EventEmitter {
         if (!keyID) {
             do {
                 keyID = randomString(32);
-            } while (!this._baseApis.getAccountData(`m.secret_storage.key.${keyID}`));
+            } while (this._baseApis.getAccountData(`m.secret_storage.key.${keyID}`));
         }
 
         // FIXME: sign keyData?
@@ -106,9 +121,22 @@ export default class SecretStorage extends EventEmitter {
      * @param {string} name The name of the secret
      * @param {string} secret The secret contents.
      * @param {Array} keys The IDs of the keys to use to encrypt the secret
+     *     or null/undefined to use the default key.
      */
     async store(name, secret, keys) {
         const encrypted = {};
+
+        if (!keys) {
+            const defaultKeyId = this.getDefaultKeyId();
+            if (!defaultKeyId) {
+                throw new Error("No keys specified and no default key present");
+            }
+            keys = [defaultKeyId];
+        }
+
+        if (keys.length === 0) {
+            throw new Error("Zero keys given to encrypt with!");
+        }
 
         for (const keyName of keys) {
             // get key information from key storage

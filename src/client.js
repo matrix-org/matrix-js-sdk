@@ -1113,6 +1113,8 @@ wrapCryptoFuncs(MatrixClient, [
     "getSecret",
     "isSecretStored",
     "requestSecret",
+    "getDefaultKeyId",
+    "setDefaultKeyId",
 ]);
 
 /**

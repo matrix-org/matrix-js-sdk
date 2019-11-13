@@ -236,6 +236,14 @@ Crypto.prototype.requestSecret = function(name, devices) {
     return this._secretStorage.request(name, devices);
 };
 
+Crypto.prototype.getDefaultKeyId = function() {
+    return this._secretStorage.getDefaultKeyId();
+};
+
+Crypto.prototype.setDefaultKeyId = function(k) {
+    return this._secretStorage.setDefaultKeyId(k);
+};
+
 /**
  * Checks that a given private key matches a given public key
  * This can be used by the getCrossSigningKey callback to verify that the

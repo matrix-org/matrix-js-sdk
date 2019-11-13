@@ -110,6 +110,53 @@ describe("Secrets", function() {
         }
     });
 
+    it("should refuse to encrypt with zero keys", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+
+        try {
+            await alice.storeSecret("foo", "bar", []);
+            expect(true).toBeFalsy();
+        } catch (e) {
+        }
+    });
+
+    it("should encrypt with default key if keys is null", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+        alice.setAccountData = async function(eventType, contents, callback) {
+            alice.store.storeAccountDataEvents([
+                new MatrixEvent({
+                    type: eventType,
+                    content: contents,
+                }),
+            ]);
+        };
+
+        const newKeyId = await alice.addSecretKey(
+            'm.secret_storage.v1.curve25519-aes-sha2',
+        );
+        await alice.setDefaultKeyId(newKeyId);
+        await alice.storeSecret("foo", "bar");
+
+        const accountData = alice.getAccountData('foo');
+        expect(accountData.getContent().encrypted).toBeTruthy();
+    });
+
+    it("should refuse to encrypt if no keys given and no default key", async function() {
+        const alice = await makeTestClient(
+            {userId: "@alice:example.com", deviceId: "Osborne2"},
+        );
+
+        try {
+            await alice.storeSecret("foo", "bar");
+            expect(true).toBeFalsy();
+        } catch (e) {
+        }
+    });
+
     it("should request secrets from other clients", async function() {
         const [osborne2, vax] = await makeTestClients(
             [
