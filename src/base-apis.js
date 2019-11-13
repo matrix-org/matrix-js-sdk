@@ -291,6 +291,16 @@ MatrixBaseApis.prototype.loginFlows = function(callback) {
 };
 
 /**
+ * @param {module:client.callback} callback Optional.
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.oauthFlows = function(callback) {
+    console.log("Fetch oauth flows");
+    return this._http.request(callback, "GET", "/oauth");
+};
+
+/**
  * @param {string} loginType
  * @param {Object} data
  * @param {module:client.callback} callback Optional.
