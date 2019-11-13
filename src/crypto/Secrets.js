@@ -20,18 +20,20 @@ import olmlib from './olmlib';
 import { randomString } from '../randomstring';
 import { keyForNewBackup } from './backup_password';
 import { encodeRecoveryKey } from './recoverykey';
+import { pkVerify } from './olmlib';
 
 /**
  * Implements secret storage and sharing (MSC-1946)
  * @module crypto/Secrets
  */
 export default class SecretStorage extends EventEmitter {
-    constructor(baseApis, cryptoCallbacks) {
+    constructor(baseApis, cryptoCallbacks, crossSigningInfo) {
         super();
         this._baseApis = baseApis;
+        this._cryptoCallbacks = cryptoCallbacks;
+        this._crossSigningInfo = crossSigningInfo;
         this._requests = {};
         this._incomingRequests = {};
-        this._cryptoCallbacks = cryptoCallbacks;
     }
 
     getDefaultKeyId() {
@@ -119,7 +121,7 @@ export default class SecretStorage extends EventEmitter {
             } while (this._baseApis.getAccountData(`m.secret_storage.key.${keyID}`));
         }
 
-        // FIXME: sign keyData?
+        await this._crossSigningInfo.signObject(keyData, 'master');
 
         await this._baseApis.setAccountData(
             `m.secret_storage.key.${keyID}`, keyData,
@@ -162,7 +164,14 @@ export default class SecretStorage extends EventEmitter {
                 throw new Error("Unknown key: " +keyName);
             }
             const keyInfoContent = keyInfo.getContent();
-            // FIXME: check signature of key info
+
+            // check signature of key info
+            pkVerify(
+                keyInfoContent,
+                this._crossSigningInfo.getPublicKey('master'),
+                this._crossSigningInfo.userId,
+            );
+
             // encrypt secret, based on the algorithm
             switch (keyInfoContent.algorithm) {
             case "m.secret_storage.v1.curve25519-aes-sha2":
@@ -261,6 +270,8 @@ export default class SecretStorage extends EventEmitter {
             return false;
         }
 
+        if (checkKey === undefined) checkKey = true;
+
         const secretContent = secretInfo.getContent();
 
         if (!secretContent.encrypted) {
@@ -276,7 +287,11 @@ export default class SecretStorage extends EventEmitter {
             ).getContent();
             const encInfo = secretContent.encrypted[keyName];
             if (checkKey) {
-                // FIXME: check signature on key
+                pkVerify(
+                    keyInfo,
+                    this._crossSigningInfo.getPublicKey('master'),
+                    this._crossSigningInfo.userId,
+                );
             }
             switch (keyInfo.algorithm) {
             case "m.secret_storage.v1.curve25519-aes-sha2":

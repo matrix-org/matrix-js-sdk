@@ -23,7 +23,7 @@ import {pkSign, pkVerify} from './olmlib';
 import {EventEmitter} from 'events';
 import logger from '../logger';
 
-function getPublicKey(keyInfo) {
+function publicKeyFromKeyInfo(keyInfo) {
     return Object.entries(keyInfo.keys)[0];
 }
 
@@ -50,6 +50,14 @@ export class CrossSigningInfo extends EventEmitter {
         this.firstUse = true;
     }
 
+    getPublicKey(type) {
+        if (!this.keys[type]) {
+            throw new Error("No " + type + " key present");
+        }
+        const keyInfo = this.keys[type];
+        return publicKeyFromKeyInfo(keyInfo)[1];
+    }
+
     /**
      * Calls the app callback to ask for a private key
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
@@ -62,7 +70,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         if (expectedPubkey === undefined) {
-            expectedPubkey = getPublicKey(this.keys[type])[1];
+            expectedPubkey = this.getPublicKey(type);
         }
 
         const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
@@ -109,7 +117,7 @@ export class CrossSigningInfo extends EventEmitter {
      */
     getId(type) {
         type = type || "master";
-        return this.keys[type] && getPublicKey(this.keys[type])[1];
+        return this.keys[type] && this.getPublicKey(type);
     }
 
     async resetKeys(level) {
@@ -201,7 +209,7 @@ export class CrossSigningInfo extends EventEmitter {
             if (!this.keys.master) {
                 // this is the first key we've seen, so first-use is true
                 this.firstUse = true;
-            } else if (getPublicKey(keys.master)[1] !== this.getId()) {
+            } else if (publicKeyFromKeyInfo(keys.master)[1] !== this.getId()) {
                 // this is a different key, so first-use is false
                 this.firstUse = false;
             } // otherwise, same key, so no change
@@ -211,7 +219,7 @@ export class CrossSigningInfo extends EventEmitter {
         } else {
             throw new Error("Tried to set cross-signing keys without a master key");
         }
-        const masterKey = getPublicKey(signingKeys.master)[1];
+        const masterKey = publicKeyFromKeyInfo(signingKeys.master)[1];
 
         // verify signatures
         if (keys.user_signing) {
@@ -262,6 +270,11 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     async signObject(data, type) {
+        if (!this.keys[type]) {
+            throw new Error(
+                "Attempted to sign with " + type + " key but no such key present",
+            );
+        }
         const [pubkey, signing] = await this.getCrossSigningKey(type);
         try {
             pkSign(data, signing, this.userId, pubkey);
@@ -316,7 +329,7 @@ export class CrossSigningInfo extends EventEmitter {
 
         let userTrusted;
         const userMaster = userCrossSigning.keys.master;
-        const uskId = getPublicKey(this.keys.user_signing)[1];
+        const uskId = this.getPublicKey('user_signing');
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
@@ -339,7 +352,7 @@ export class CrossSigningInfo extends EventEmitter {
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
         try {
             pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
-            pkVerify(deviceObj, getPublicKey(userSSK)[1], userCrossSigning.userId);
+            pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId);
             return userTrust;
         } catch (e) {
             return 0;

@@ -49,6 +49,18 @@ describe("Secrets", function() {
         const pubkey = decryption.generate_key();
         const privkey = decryption.get_private_key();
 
+        const signing = new global.Olm.PkSigning();
+        const signingKey = signing.generate_seed();
+        const signingPubKey = signing.init_with_seed(signingKey);
+
+        const signingkeyInfo = {
+            user_id: "@alice:example.com",
+            usage: ['master'],
+            keys: {
+                ['ed25519:' + signingPubKey]: signingPubKey,
+            },
+        };
+
         const getKey = expect.createSpy().andCall(e => {
             expect(Object.keys(e.keys)).toEqual(["abc"]);
             return ['abc', privkey];
@@ -58,10 +70,15 @@ describe("Secrets", function() {
             {userId: "@alice:example.com", deviceId: "Osborne2"},
             {
                 cryptoCallbacks: {
+                    getCrossSigningKey: t => signingKey,
                     getSecretStorageKey: getKey,
                 },
             },
         );
+        alice._crypto._crossSigningInfo.setKeys({
+            master: signingkeyInfo,
+        });
+
         const secretStorage = alice._crypto._secretStorage;
 
         alice.setAccountData = async function(eventType, contents, callback) {
@@ -76,13 +93,16 @@ describe("Secrets", function() {
             }
         };
 
+        const keyAccountData = {
+            algorithm: "m.secret_storage.v1.curve25519-aes-sha2",
+            pubkey: pubkey,
+        };
+        await alice._crypto._crossSigningInfo.signObject(keyAccountData, 'master');
+
         alice.store.storeAccountDataEvents([
             new MatrixEvent({
                 type: "m.secret_storage.key.abc",
-                content: {
-                    algorithm: "m.secret_storage.v1.curve25519-aes-sha2",
-                    pubkey: pubkey,
-                },
+                content: keyAccountData,
             }),
         ]);
 
@@ -123,8 +143,15 @@ describe("Secrets", function() {
     });
 
     it("should encrypt with default key if keys is null", async function() {
+        let keys = {};
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
+            {
+                cryptoCallbacks: {
+                    getCrossSigningKey: t => keys[t],
+                    saveCrossSigningKeys: k => keys = k,
+                },
+            },
         );
         alice.setAccountData = async function(eventType, contents, callback) {
             alice.store.storeAccountDataEvents([
@@ -134,6 +161,7 @@ describe("Secrets", function() {
                 }),
             ]);
         };
+        alice.resetCrossSigningKeys();
 
         const newKeyId = await alice.addSecretKey(
             'm.secret_storage.v1.curve25519-aes-sha2',
