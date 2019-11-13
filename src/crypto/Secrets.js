@@ -35,7 +35,9 @@ export default class SecretStorage extends EventEmitter {
     }
 
     getDefaultKeyId() {
-        const defaultKeyEvent = this._baseApis.getAccountData('m.secret_storage.default_key');
+        const defaultKeyEvent = this._baseApis.getAccountData(
+            'm.secret_storage.default_key',
+        );
         if (!defaultKeyEvent) return null;
         return defaultKeyEvent.getContent().key;
     }
