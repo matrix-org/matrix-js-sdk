@@ -352,7 +352,9 @@ export class CrossSigningInfo extends EventEmitter {
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
         try {
             pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
-            pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId);
+            pkVerify(
+                deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId,
+            );
             return userTrust;
         } catch (e) {
             return 0;
