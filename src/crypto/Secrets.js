@@ -43,10 +43,23 @@ export default class SecretStorage extends EventEmitter {
     }
 
     setDefaultKeyId(keyId) {
-        return this._baseApis.setAccountData(
-            'm.secret_storage.default_key',
-            { key: keyId },
-        );
+        return new Promise((resolve) => {
+            const listener = (ev) => {
+                if (
+                    ev.getType() === 'm.secret_storage.default_key' &&
+                    ev.getContent().key === keyId
+                ) {
+                    this._baseApis.removeListener('accountData', listener);
+                    resolve();
+                }
+            };
+            this._baseApis.on('accountData', listener);
+
+            this._baseApis.setAccountData(
+                'm.secret_storage.default_key',
+                { key: keyId },
+            );
+        });
     }
 
     /**
