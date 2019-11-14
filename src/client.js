@@ -4021,9 +4021,13 @@ MatrixClient.prototype.isFallbackICEServerAllowed = function() {
  * @return {boolean} true if the user appears to be a Synapse administrator.
  */
 MatrixClient.prototype.isSynapseAdministrator = function() {
-    return this.whoisSynapseUser(this.getUserId())
-        .then(() => true)
-        .catch(() => false);
+    const path = utils.encodeUri(
+        "/_synapse/admin/v1/users/$userId/admin",
+        { $userId: userId },
+    );
+    return this._http.authedRequest(
+        undefined, 'GET', path, undefined, undefined, {prefix: ''},
+    ).then(r => r['admin']); // pull out the specific boolean we want
 };
 
 /**
