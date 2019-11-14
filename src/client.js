@@ -177,6 +177,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * WebRTC connection if the homeserver doesn't provide any servers. Defaults to false.
  *
  * @param {object} opts.cryptoCallbacks Optional. Callbacks for crypto and cross-signing.
+ *     The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {function} [opts.cryptoCallbacks.getCrossSigningKey]
  * Optional (required for cross-signing). Function to call when a cross-signing private key is needed.
@@ -966,6 +967,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Generate new cross-signing keys.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#resetCrossSigningKeys
  * @param {object} authDict Auth data to supply for User-Interactive auth.
@@ -976,6 +978,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Get the user's cross-signing key ID.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getCrossSigningId
  * @param {string} [type=master] The type of key to get the ID of.  One of
@@ -986,6 +989,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Get the cross signing information for a given user.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getStoredCrossSigningForUser
  * @param {string} userId the user ID to get the cross-signing info for.
@@ -995,6 +999,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Check whether a given user is trusted.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkUserTrust
  * @param {string} userId The ID of the user to check.
@@ -1013,6 +1018,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 
 /**
  * Check whether a given device is trusted.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#checkDeviceTrust
  * @param {string} userId The ID of the user whose devices is to be checked.
@@ -1038,6 +1044,7 @@ wrapCryptoFuncs(MatrixClient, [
 
 /**
  * Check if the sender of an event is verified
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {MatrixEvent} event event to be checked
  *
@@ -1056,6 +1063,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 /**
  * Add a key for encrypting secrets.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#addSecretKey
  * @param {string} algorithm the algorithm used by the key
@@ -1070,15 +1078,18 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 /**
  * Store an encrypted secret on the server
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#storeSecret
  * @param {string} name The name of the secret
  * @param {string} secret The secret contents.
- * @param {Array} keys The IDs of the keys to use to encrypt the secret
+ * @param {Array} keys The IDs of the keys to use to encrypt the secret or null/undefined
+ *     to use the default (will throw if no default key is set).
  */
 
 /**
  * Get a secret from storage.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#getSecret
  * @param {string} name the name of the secret
@@ -1088,6 +1099,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 /**
  * Check if a secret is stored on the server.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#isSecretStored
  * @param {string} name the name of the secret
@@ -1099,12 +1111,30 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 /**
  * Request a secret from another device.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#requestSecret
  * @param {string} name the name of the secret to request
  * @param {string[]} devices the devices to request the secret from
  *
  * @return {string} the contents of the secret
+ */
+
+/**
+ * Get the current default key ID for encrypting secrets.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#getDefaultKeyId
+ *
+ * @return {string} The default key ID or null if no default key ID is set
+ */
+
+/**
+ * Set the current default key ID for encrypting secrets.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#setDefaultKeyId
+ * @param {string} keyId The new default key ID
  */
 
 wrapCryptoFuncs(MatrixClient, [
@@ -5111,6 +5141,8 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * If userId is the userId of the logged in user, this indicated a change
  * in the trust status of the cross-signing data on the account.
  *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
  * @event module:client~MatrixClient#"userTrustStatusChanged"
  * @param {string} userId the userId of the user in question
  * @param {integer} trustLevel The new trust level of the user
@@ -5124,6 +5156,8 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * is trusted using with checkUserTrust with the user ID of the logged
  * in user. The checkOwnCrossSigningTrust function may be used to reconcile
  * the trust in the account key.
+ *
+ * The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @event module:client~MatrixClient#"crossSigning.keysChanged"
  */
@@ -5189,6 +5223,9 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * Fires when a secret request has been cancelled.  If the client is prompting
  * the user to ask whether they want to share a secret, the prompt can be
  * dismissed.
+ * 
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
  * @event module:client~MatrixClient#"crypto.secrets.requestCancelled"
  * @param {object} data
  * @param {string} data.user_id The user ID of the client that had requested the secret.
