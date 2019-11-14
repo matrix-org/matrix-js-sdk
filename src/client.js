@@ -5223,7 +5223,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * Fires when a secret request has been cancelled.  If the client is prompting
  * the user to ask whether they want to share a secret, the prompt can be
  * dismissed.
- * 
+ *
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @event module:client~MatrixClient#"crypto.secrets.requestCancelled"
