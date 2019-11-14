@@ -23,7 +23,7 @@ import { encodeRecoveryKey } from './recoverykey';
 import { pkVerify } from './olmlib';
 
 /**
- * Implements secret storage and sharing (MSC-1946)
+ * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/Secrets
  */
 export default class SecretStorage extends EventEmitter {
