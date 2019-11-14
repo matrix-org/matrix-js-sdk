@@ -677,7 +677,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.devicesUpdated",
         "deviceVerificationChanged",
         "userVerificationChanged",
-        "cross-signing.keysChanged",
+        "crossSigning.keysChanged",
     ]);
 
     logger.log("Crypto: initialising crypto object...");
@@ -5125,7 +5125,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * in user. The checkOwnCrossSigningTrust function may be used to reconcile
  * the trust in the account key.
  *
- * @event module:client~MatrixClient#"cross-signing.keysChanged"
+ * @event module:client~MatrixClient#"crossSigning.keysChanged"
  */
 
 /**
@@ -5189,7 +5189,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * Fires when a secret request has been cancelled.  If the client is prompting
  * the user to ask whether they want to share a secret, the prompt can be
  * dismissed.
- * @event module:client~MatrixClient#"crypto.secrets.request_cancelled"
+ * @event module:client~MatrixClient#"crypto.secrets.requestCancelled"
  * @param {object} data
  * @param {string} data.user_id The user ID of the client that had requested the secret.
  * @param {string} data.device_id The device ID of the client that had requested the

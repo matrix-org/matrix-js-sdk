@@ -352,7 +352,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
         keys[name + "_key"] = key;
     }
     await this._baseApis.uploadDeviceSigningKeys(authDict || {}, keys);
-    this._baseApis.emit("cross-signing.keysChanged", {});
+    this._baseApis.emit("crossSigning.keysChanged", {});
 
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
@@ -551,7 +551,7 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
             // If it's not changed, just make sure everything is up to date
             await this.checkOwnCrossSigningTrust();
         } else {
-            this.emit("cross-signing.keysChanged", {});
+            this.emit("crossSigning.keysChanged", {});
             // We'll now be in a state where cross-signing on the account is not trusted
             // because our locally stored cross-signing keys will not match the ones
             // on the server for our account. The app must call checkOwnCrossSigningTrust()

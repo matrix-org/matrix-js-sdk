@@ -383,7 +383,7 @@ export default class SecretStorage extends EventEmitter {
                 && this._incomingRequests[deviceId][content.request_id]) {
                 logger.info("received request cancellation for secret (" + sender
                             + ", " + deviceId + ", " + content.request_id + ")");
-                this.baseApis.emit("crypto.secrets.request_cancelled", {
+                this.baseApis.emit("crypto.secrets.requestCancelled", {
                     user_id: sender,
                     device_id: deviceId,
                     request_id: content.request_id,
