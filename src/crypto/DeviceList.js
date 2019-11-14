@@ -852,7 +852,6 @@ class DeviceListUpdateSerialiser {
 
 async function _updateStoredDeviceKeysForUser(_olmDevice, userId, userStore,
         userResult) {
-    // FIXME: this isn't correct any more
     let updated = false;
 
     // remove any devices in the store which aren't in the response
