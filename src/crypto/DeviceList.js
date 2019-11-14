@@ -346,10 +346,6 @@ export default class DeviceList extends EventEmitter {
         return this._devices[userId];
     }
 
-    getRawStoredCrossSigningForUser(userId) {
-        return this._crossSigningInfo[userId];
-    }
-
     getStoredCrossSigningForUser(userId) {
         if (!this._crossSigningInfo[userId]) return null;
 
