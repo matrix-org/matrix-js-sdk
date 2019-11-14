@@ -1218,9 +1218,9 @@ Crypto.prototype.setDeviceVerification = async function(
                     [deviceId]: device,
                 },
             });
-            // XXX: we'll need to wait for the device list to be updated
+            // This will emit events when it comes back down the sync
+            // (we could do local echo to speed things up)
         }
-        this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
         return device;
     }
 
