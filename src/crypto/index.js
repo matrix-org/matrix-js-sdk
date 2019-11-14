@@ -1194,24 +1194,34 @@ Crypto.prototype.saveDeviceList = function(delay) {
 Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
+    // get rid of any undefined's here so we can just check
+    // for null rather than null or undefined
+    if (verified === undefined) verified = null;
+    if (blocked === undefined) blocked = null;
+    if (known === undefined) known = null;
+
+    // Check if the 'device' is actually a cross signing key
+    // The js-sdk's verification treats cross-signing keys as devices
+    // and so uses this method to mark them verified.
     const xsk = this._deviceList.getStoredCrossSigningForUser(userId);
     if (xsk && xsk.getId() === deviceId) {
-        if (verified) {
-            const device = await this._crossSigningInfo.signUser(xsk);
-            if (device) {
-                await this._baseApis.uploadKeySignatures({
-                    [userId]: {
-                        [deviceId]: device,
-                    },
-                });
-                // XXX: we'll need to wait for the device list to be updated
-            }
-            this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
-            return device;
-        } else {
-            // FIXME: ???
+        if (blocked !== null || known !== null) {
+            throw new Error("Cannot set blocked or known for a cross-signing key");
         }
-        return;
+        if (!verified) {
+            throw new Error("Cannot set a cross-signing key as unverified");
+        }
+        const device = await this._crossSigningInfo.signUser(xsk);
+        if (device) {
+            await this._baseApis.uploadKeySignatures({
+                [userId]: {
+                    [deviceId]: device,
+                },
+            });
+            // XXX: we'll need to wait for the device list to be updated
+        }
+        this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
+        return device;
     }
 
     const devices = this._deviceList.getRawStoredDevicesForUser(userId);
@@ -1235,7 +1245,7 @@ Crypto.prototype.setDeviceVerification = async function(
     }
 
     let knownStatus = dev.known;
-    if (known !== null && known !== undefined) {
+    if (known !== null) {
         knownStatus = known;
     }
 
