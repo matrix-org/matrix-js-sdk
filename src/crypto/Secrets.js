@@ -168,7 +168,7 @@ export default class SecretStorage extends EventEmitter {
             // check signature of key info
             pkVerify(
                 keyInfoContent,
-                this._crossSigningInfo.getPublicKey('master'),
+                this._crossSigningInfo.getId('master'),
                 this._crossSigningInfo.userId,
             );
 
@@ -289,7 +289,7 @@ export default class SecretStorage extends EventEmitter {
             if (checkKey) {
                 pkVerify(
                     keyInfo,
-                    this._crossSigningInfo.getPublicKey('master'),
+                    this._crossSigningInfo.getId('master'),
                     this._crossSigningInfo.userId,
                 );
             }

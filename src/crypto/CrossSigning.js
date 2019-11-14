@@ -51,14 +51,6 @@ export class CrossSigningInfo extends EventEmitter {
         this.firstUse = true;
     }
 
-    getPublicKey(type) {
-        if (!this.keys[type]) {
-            throw new Error("No " + type + " key present");
-        }
-        const keyInfo = this.keys[type];
-        return publicKeyFromKeyInfo(keyInfo)[1];
-    }
-
     /**
      * Calls the app callback to ask for a private key
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
@@ -71,7 +63,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         if (expectedPubkey === undefined) {
-            expectedPubkey = this.getPublicKey(type);
+            expectedPubkey = this.getId(type);
         }
 
         const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
@@ -119,8 +111,11 @@ export class CrossSigningInfo extends EventEmitter {
      */
     getId(type) {
         type = type || "master";
-        return this.keys[type] && this.getPublicKey(type);
+        if (!this.keys[type]) return null;
+        const keyInfo = this.keys[type];
+        return publicKeyFromKeyInfo(keyInfo)[1];
     }
+
 
     async resetKeys(level) {
         if (!this._callbacks.saveCrossSigningKeys) {
@@ -331,7 +326,7 @@ export class CrossSigningInfo extends EventEmitter {
 
         let userTrusted;
         const userMaster = userCrossSigning.keys.master;
-        const uskId = this.getPublicKey('user_signing');
+        const uskId = this.getId('user_signing');
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
