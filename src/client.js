@@ -1442,7 +1442,7 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
     await this._crypto._signObject(data.auth_data);
 
     if (this._crypto._crossSigningInfo.getId()) {
-        // now also sign the auth data with the SSK
+        // now also sign the auth data with the master key
         await this._crypto._crossSigningInfo.signObject(data.auth_data, "master");
     }
 
