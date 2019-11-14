@@ -109,7 +109,8 @@ export class CrossSigningInfo extends EventEmitter {
         };
     }
 
-    /** Get the ID used to identify the user
+    /**
+     * Get the ID used to identify the user
      *
      * @param {string} type The type of key to get the ID of.  One of "master",
      * "self_signing", or "user_signing".  Defaults to "master".
