@@ -4023,7 +4023,7 @@ MatrixClient.prototype.isFallbackICEServerAllowed = function() {
 MatrixClient.prototype.isSynapseAdministrator = function() {
     const path = utils.encodeUri(
         "/_synapse/admin/v1/users/$userId/admin",
-        { $userId: userId },
+        { $userId: this.getUserId() },
     );
     return this._http.authedRequest(
         undefined, 'GET', path, undefined, undefined, {prefix: ''},
