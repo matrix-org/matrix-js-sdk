@@ -330,10 +330,10 @@ describe("MegolmBackup", function() {
             let privateKeys;
             client.uploadDeviceSigningKeys = async function(e) {return;};
             client.uploadKeySignatures = async function(e) {return;};
-            client.on("cross-signing.saveCrossSigningKeys", function(e) {
+            client.on("crossSigning.saveCrossSigningKeys", function(e) {
                 privateKeys = e;
             });
-            client.on("cross-signing.getKey", function(e) {
+            client.on("crossSigning.getKey", function(e) {
                 e.done(privateKeys[e.type]);
             });
             await client.resetCrossSigningKeys();

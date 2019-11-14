@@ -139,7 +139,7 @@ describe("Cross Signing", function() {
         );
 
         const keyChangePromise = new Promise((resolve, reject) => {
-            alice.once("cross-signing.keysChanged", async (e) => {
+            alice.once("crossSigning.keysChanged", async (e) => {
                 resolve(e);
                 await alice.checkOwnCrossSigningTrust();
             });
