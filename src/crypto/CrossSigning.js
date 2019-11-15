@@ -453,7 +453,7 @@ export class DeviceTrustLevel {
     }
 
     /**
-     * @returns {bool} true if this user is verified via any means
+     * @returns {bool} true if this device is verified via any means
      */
     isVerified() {
         return this.isCrossSigningVerified() || this.isLocallyVerified();
