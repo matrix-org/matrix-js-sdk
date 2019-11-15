@@ -1086,7 +1086,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @function module:client~MatrixClient#isSecretStored
  * @param {string} name the name of the secret
  * @param {boolean} checkKey check if the secret is encrypted by a trusted
- *     key (currently unimplemented)
+ *     key
  *
  * @return {boolean} whether or not the secret is stored
  */
