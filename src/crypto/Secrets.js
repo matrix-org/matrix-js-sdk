@@ -18,7 +18,7 @@ import {EventEmitter} from 'events';
 import logger from '../logger';
 import olmlib from './olmlib';
 import { randomString } from '../randomstring';
-import { keyForNewBackup } from './backup_password';
+import { keyFromPassphrase } from './backup_password';
 import { encodeRecoveryKey } from './recoverykey';
 import { pkVerify } from './olmlib';
 
@@ -91,7 +91,7 @@ export default class SecretStorage extends EventEmitter {
             const decryption = new global.Olm.PkDecryption();
             try {
                 if (opts.passphrase) {
-                    const key = await keyForNewBackup(opts.passphrase);
+                    const key = await keyFromPassphrase(opts.passphrase);
                     keyData.passphrase = {
                         algorithm: "m.pbkdf2",
                         iterations: key.iterations,

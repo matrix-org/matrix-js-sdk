@@ -51,7 +51,7 @@ import logger from './logger';
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
 import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
-import { keyForNewBackup, keyForExistingBackup } from './crypto/backup_password';
+import { keyFromPassphrase, keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
 
 // Disable warnings for now: we use deprecated bluebird functions
@@ -1380,7 +1380,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
         let publicKey;
         const authData = {};
         if (password) {
-            const keyInfo = await keyForNewBackup(password);
+            const keyInfo = await keyFromPassphrase(password);
             publicKey = decryption.init_with_private_key(keyInfo.key);
             authData.private_key_salt = keyInfo.salt;
             authData.private_key_iterations = keyInfo.iterations;
@@ -1542,7 +1542,7 @@ MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     password, targetRoomId, targetSessionId, backupInfo,
 ) {
-    const privKey = await keyForExistingBackup(backupInfo, password);
+    const privKey = await keyFromAuthData(backupInfo.auth_data, password);
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, backupInfo,
     );
