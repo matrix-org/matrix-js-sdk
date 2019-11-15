@@ -1178,7 +1178,7 @@ Crypto.prototype.saveDeviceList = function(delay) {
 Crypto.prototype.setDeviceVerification = async function(
     userId, deviceId, verified, blocked, known,
 ) {
-    // get rid of any undefined's here so we can just check
+    // get rid of any `undefined`s here so we can just check
     // for null rather than null or undefined
     if (verified === undefined) verified = null;
     if (blocked === undefined) blocked = null;
