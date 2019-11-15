@@ -794,7 +794,7 @@ describe("Cross Signing", function() {
         await upgradePromise;
 
         const bobTrust3 = alice.checkUserTrust("@bob:example.com");
-        expect(bobTrust.isCrossSigningVerified()).toBeTruthy();
-        expect(bobTrust.isTofu()).toBeTruthy();
+        expect(bobTrust3.isCrossSigningVerified()).toBeTruthy();
+        expect(bobTrust3.isTofu()).toBeTruthy();
     });
 });

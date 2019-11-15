@@ -318,7 +318,9 @@ describe("SAS verification", function() {
 
             await verifyProm;
 
-            const bobDeviceTrust = alice.client.checkDeviceTrust("@bob:example.com", "Dynabook");
+            const bobDeviceTrust = alice.client.checkDeviceTrust(
+                "@bob:example.com", "Dynabook",
+            );
             expect(bobDeviceTrust.isLocallyVerified()).toBeTruthy();
             expect(bobDeviceTrust.isCrossSigningVerified()).toBeFalsy();
 
@@ -326,7 +328,9 @@ describe("SAS verification", function() {
             expect(aliceTrust.isCrossSigningVerified()).toBeTruthy();
             expect(aliceTrust.isTofu()).toBeTruthy();
 
-            const aliceDeviceTrust = bob.client.checkDeviceTrust("@alice:example.com", "Osborne2");
+            const aliceDeviceTrust = bob.client.checkDeviceTrust(
+                "@alice:example.com", "Osborne2",
+            );
             expect(aliceDeviceTrust.isLocallyVerified()).toBeTruthy();
             expect(aliceDeviceTrust.isCrossSigningVerified()).toBeFalsy();
         });

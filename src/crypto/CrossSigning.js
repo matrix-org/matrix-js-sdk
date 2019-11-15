@@ -123,7 +123,11 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         // If we're resetting the master key, we reset all keys
-        if (level === undefined || level & CrossSigningLevel.MASTER || !this.keys.master) {
+        if (
+            level === undefined ||
+            level & CrossSigningLevel.MASTER ||
+            !this.keys.master
+        ) {
             level = (
                 CrossSigningLevel.MASTER |
                 CrossSigningLevel.USER_SIGNING |
@@ -315,7 +319,7 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Check whether a given user is trusted.
      *
-     * @param {string} userId The ID of the user to check.
+     * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
      *
      * @returns {UserTrustLevel}
      */
@@ -351,8 +355,9 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Check whether a given device is trusted.
      *
-     * @param {string} userId The ID of the user whose devices is to be checked.
-     * @param {string} deviceId The ID of the device to check
+     * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
+     * @param {module:crypto/deviceinfo} device The device to check
+     * @param {bool} localTrust Whether the device is trusted locally
      *
      * @returns {DeviceTrustLevel}
      */
@@ -427,7 +432,7 @@ export class UserTrustLevel {
     isTofu() {
         return this._tofu;
     }
-};
+}
 
 /**
  * Represents the ways in which we trust a device
@@ -474,4 +479,4 @@ export class DeviceTrustLevel {
     isTofu() {
         return this._tofu;
     }
-};
+}
