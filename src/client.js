@@ -1014,7 +1014,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @param {string} userId The ID of the user whose devices is to be checked.
  * @param {string} deviceId The ID of the device to check
  *
- * @returns {DeviuceTrustLevel}
+ * @returns {DeviceTrustLevel}
  */
 
 wrapCryptoFuncs(MatrixClient, [
