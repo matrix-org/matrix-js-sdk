@@ -122,8 +122,13 @@ export class CrossSigningInfo extends EventEmitter {
             throw new Error("No saveCrossSigningKeys callback supplied");
         }
 
-        if (level === undefined || level & 4 || !this.keys.master) {
-            level = CrossSigningLevel.MASTER;
+        // If we're resetting the master key, we reset all keys
+        if (level === undefined || level & CrossSigningLevel.MASTER || !this.keys.master) {
+            level = (
+                CrossSigningLevel.MASTER |
+                CrossSigningLevel.USER_SIGNING |
+                CrossSigningLevel.SELF_SIGNING
+            );
         } else if (level === 0) {
             return;
         }
@@ -134,7 +139,7 @@ export class CrossSigningInfo extends EventEmitter {
         let masterPub;
 
         try {
-            if (level & 4) {
+            if (level & CrossSigningLevel.MASTER) {
                 masterSigning = new global.Olm.PkSigning();
                 privateKeys.master = masterSigning.generate_seed();
                 masterPub = masterSigning.init_with_seed(privateKeys.master);
@@ -373,11 +378,9 @@ function deviceToObject(device, userId) {
 }
 
 export const CrossSigningLevel = {
-    // NB. The actual master key is 4 but you must, by definition, reset all
-    // keys if you reset the master key so this is essentially 'all keys'
-    MASTER: 7,
-    SELF_SIGNING: 1,
+    MASTER: 4,
     USER_SIGNING: 2,
+    SELF_SIGNING: 1,
 };
 
 /**
