@@ -235,9 +235,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *   {string} request_id The ID of the request. Used to match a
  *     corresponding `crypto.secrets.request_cancelled`. The request ID will be
  *     unique per sender, device pair.
- *   {int} device_trust: The trust status of the device requesting
- *     the secret.  Will be a bit mask in the same form as returned by {@link
- *     module:client~MatrixClient#checkDeviceTrust}.
+ *   {DeviceTrustLevel} device_trust: The trust status of the device requesting
+ *     the secret as returned by {@link module:client~MatrixClient#checkDeviceTrust}.
  */
 function MatrixClient(opts) {
     opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
@@ -1004,16 +1003,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @function module:client~MatrixClient#checkUserTrust
  * @param {string} userId The ID of the user to check.
  *
- * @returns {integer} a bit mask indicating how the user is trusted (if at all)
- *  - returnValue & 1: unused
- *  - returnValue & 2: trust-on-first-use cross-signing key
- *  - returnValue & 4: user's cross-signing key is verified
- *
- * TODO: is this a good way of representing it?  Or we could return an object
- * with different keys, or a set?  The advantage of doing it this way is that
- * you can define which methods you want to use, "&" with the appopriate mask,
- * then test for truthiness.  Or if you want to just trust everything, then use
- * the value alone.  However, I wonder if bit masks are too obscure...
+ * @returns {UserTrustLevel}
  */
 
 /**
@@ -1024,12 +1014,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @param {string} userId The ID of the user whose devices is to be checked.
  * @param {string} deviceId The ID of the device to check
  *
- * @returns {integer} a bit mask indicating how the user is trusted (if at all)
- *  - returnValue & 1: device marked as verified
- *  - returnValue & 2: trust-on-first-use cross-signing key
- *  - returnValue & 4: user's cross-signing key is verified and device is signed
- *
- * TODO: see checkUserTrust
+ * @returns {DeviuceTrustLevel}
  */
 
 wrapCryptoFuncs(MatrixClient, [

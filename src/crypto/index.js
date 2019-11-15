@@ -36,7 +36,7 @@ const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
-import { CrossSigningInfo } from './CrossSigning';
+import { CrossSigningInfo, UserTrustLevel, DeviceTrustLevel } from './CrossSigning';
 import SecretStorage from './Secrets';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
@@ -411,8 +411,8 @@ Crypto.prototype._checkForDeviceVerificationUpgrade = async function(
 ) {
     // only upgrade if this is the first cross-signing key that we've seen for
     // them, and if their cross-signing key isn't already verified
-    if (crossSigningInfo.firstUse
-        && !(this._crossSigningInfo.checkUserTrust(crossSigningInfo) & 2)) {
+    const trustLevel = this._crossSigningInfo.checkUserTrust(crossSigningInfo);
+    if (crossSigningInfo.firstUse && !trustLevel.verified) {
         const devices = this._deviceList.getRawStoredDevicesForUser(userId);
         const deviceIds = await this._checkForValidDeviceSignature(
             userId, crossSigningInfo.keys.master, devices,
@@ -487,25 +487,14 @@ Crypto.prototype.getStoredCrossSigningForUser = function(userId) {
  *
  * @param {string} userId The ID of the user to check.
  *
- * @returns {integer} a bit mask indicating how the user is trusted (if at all)
- *  - returnValue & 1: unused
- *  - returnValue & 2: trust-on-first-use cross-signing key
- *  - returnValue & 4: user's cross-signing key is verified
- *
- * TODO: is this a good way of representing it?  Or we could return an object
- * with different keys, or a set?  The advantage of doing it this way is that
- * you can define which methods you want to use, "&" with the appopriate mask,
- * then test for truthiness.  Or if you want to just trust everything, then use
- * the value alone.  However, I wonder if bit masks are too obscure...
+ * @returns {UserTrustLevel}
  */
 Crypto.prototype.checkUserTrust = function(userId) {
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (!userCrossSigning) {
-        return 0;
+        return new UserTrustLevel(false, false);
     }
-    // We shift the result from CrossSigningInfo.checkUserTrust so this
-    // function's return is consistent with checkDeviceTrust
-    return this._crossSigningInfo.checkUserTrust(userCrossSigning) << 1;
+    return this._crossSigningInfo.checkUserTrust(userCrossSigning);
 };
 
 /**
@@ -514,25 +503,20 @@ Crypto.prototype.checkUserTrust = function(userId) {
  * @param {string} userId The ID of the user whose devices is to be checked.
  * @param {string} deviceId The ID of the device to check
  *
- * @returns {integer} a bit mask indicating how the user is trusted (if at all)
- *  - returnValue & 1: device marked as verified
- *  - returnValue & 2: trust-on-first-use cross-signing key
- *  - returnValue & 4: user's cross-signing key is verified and device is signed
- *
- * TODO: see checkUserTrust
+ * @returns {DeviceTrustLevel}
  */
 Crypto.prototype.checkDeviceTrust = function(userId, deviceId) {
-    let rv = 0;
-
     const device = this._deviceList.getStoredDevice(userId, deviceId);
-    if (device && device.isVerified()) {
-        rv |= 1;
-    }
+    const trustedLocally = device && device.isVerified();
+
     const userCrossSigning = this._deviceList.getStoredCrossSigningForUser(userId);
     if (device && userCrossSigning) {
-        rv |= this._crossSigningInfo.checkDeviceTrust(userCrossSigning, device) << 1;
+        return this._crossSigningInfo.checkDeviceTrust(
+            userCrossSigning, device, trustedLocally,
+        );
+    } else {
+        return new DeviceTrustLevel(false, false, trustedLocally);
     }
-    return rv;
 };
 
 /*

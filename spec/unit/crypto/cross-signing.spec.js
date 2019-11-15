@@ -259,8 +259,17 @@ describe("Cross Signing", function() {
         // once ssk is confirmed, device key should be trusted
         await keyChangePromise;
         await uploadSigsPromise;
-        expect(alice.checkUserTrust("@alice:example.com")).toBe(6);
-        expect(alice.checkDeviceTrust("@alice:example.com", "Osborne2")).toBe(7);
+
+        const aliceTrust = alice.checkUserTrust("@alice:example.com");
+        expect(aliceTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(aliceTrust.isTofu()).toBeTruthy();
+        expect(aliceTrust.isVerified()).toBeTruthy();
+
+        const aliceDeviceTrust = alice.checkDeviceTrust("@alice:example.com", "Osborne2");
+        expect(aliceDeviceTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(aliceDeviceTrust.isLocallyVerified()).toBeTruthy();
+        expect(aliceDeviceTrust.isTofu()).toBeTruthy();
+        expect(aliceDeviceTrust.isVerified()).toBeTruthy();
     });
 
     it("should use trust chain to determine device verification", async function() {
@@ -324,14 +333,27 @@ describe("Cross Signing", function() {
             Dynabook: bobDevice,
         });
         // Bob's device key should be TOFU
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(2);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(2);
+        const bobTrust = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust.isVerified()).toBeFalsy();
+        expect(bobTrust.isTofu()).toBeTruthy();
+
+        const bobDeviceTrust = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust.isVerified()).toBeFalsy();
+        expect(bobDeviceTrust.isTofu()).toBeTruthy();
+
         // Alice verifies Bob's SSK
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
+
         // Bob's device key should be trusted
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
+        const bobTrust2 = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust2.isCrossSigningVerified()).toBeTruthy();
+        expect(bobTrust2.isTofu()).toBeTruthy();
+
+        const bobDeviceTrust2 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust2.isCrossSigningVerified()).toBeTruthy();
+        expect(bobDeviceTrust2.isLocallyVerified()).toBeFalsy();
+        expect(bobDeviceTrust2.isTofu()).toBeTruthy();
     });
 
     it("should trust signatures received from other devices", async function() {
@@ -487,8 +509,14 @@ describe("Cross Signing", function() {
         await keyChangePromise;
 
         // Bob's device key should be trusted
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
+        const bobTrust = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(bobTrust.isTofu()).toBeTruthy();
+
+        const bobDeviceTrust = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(bobDeviceTrust.isLocallyVerified()).toBeFalsy();
+        expect(bobDeviceTrust.isTofu()).toBeTruthy();
     });
 
     it("should dis-trust an unsigned device", async function() {
@@ -547,11 +575,17 @@ describe("Cross Signing", function() {
             Dynabook: bobDevice,
         });
         // Bob's device key should be untrusted
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
+        const bobDeviceTrust = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust.isVerified()).toBeFalsy();
+        expect(bobDeviceTrust.isTofu()).toBeFalsy();
+
         // Alice verifies Bob's SSK
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
+
         // Bob's device key should be untrusted
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
+        const bobDeviceTrust2 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust2.isVerified()).toBeFalsy();
+        expect(bobDeviceTrust2.isTofu()).toBeFalsy();
     });
 
     it("should dis-trust a user when their ssk changes", async function() {
@@ -615,8 +649,12 @@ describe("Cross Signing", function() {
         // Alice verifies Bob's SSK
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey, true);
+
         // Bob's device key should be trusted
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(6);
+        const bobDeviceTrust = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust.isVerified()).toBeTruthy();
+        expect(bobDeviceTrust.isTofu()).toBeTruthy();
+
         // Alice downloads new SSK for Bob
         const bobMasterSigning2 = new global.Olm.PkSigning();
         const bobMasterPrivkey2 = bobMasterSigning2.generate_seed();
@@ -652,23 +690,38 @@ describe("Cross Signing", function() {
             unsigned: {},
         });
         // Bob's and his device should be untrusted
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(0);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
+        const bobTrust = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust.isVerified()).toBeFalsy();
+        expect(bobTrust.isTofu()).toBeFalsy();
+
+        const bobDeviceTrust2 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust2.isVerified()).toBeFalsy();
+        expect(bobDeviceTrust2.isTofu()).toBeFalsy();
+
         // Alice verifies Bob's SSK
         alice.uploadKeySignatures = () => {};
         await alice.setDeviceVerified("@bob:example.com", bobMasterPubkey2, true);
+
         // Bob should be trusted but not his device
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(4);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(0);
+        const bobTrust2 = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust2.isVerified()).toBeTruthy();
+
+        const bobDeviceTrust3 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust3.isVerified()).toBeFalsy();
+
         // Alice gets new signature for device
         const sig2 = bobSigning2.sign(bobDeviceString);
         bobDevice.signatures["@bob:example.com"]["ed25519:" + bobPubkey2] = sig2;
         alice._crypto._deviceList.storeDevicesForUser("@bob:example.com", {
             Dynabook: bobDevice,
         });
+
         // Bob's device should be trusted again (but not TOFU)
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(4);
-        expect(alice.checkDeviceTrust("@bob:example.com", "Dynabook")).toBe(4);
+        const bobTrust3 = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust3.isVerified()).toBeTruthy();
+
+        const bobDeviceTrust4 = alice.checkDeviceTrust("@bob:example.com", "Dynabook");
+        expect(bobDeviceTrust4.isCrossSigningVerified()).toBeTruthy();
     });
 
     it("should offer to upgrade device verifications to cross-signing", async function() {
@@ -722,13 +775,17 @@ describe("Cross Signing", function() {
         await alice.resetCrossSigningKeys();
         await upgradePromise;
 
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
+        const bobTrust = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(bobTrust.isTofu()).toBeTruthy();
 
         // "forget" that Bob is trusted
         delete alice._crypto._deviceList._crossSigningInfo["@bob:example.com"]
             .keys.master.signatures["@alice:example.com"];
 
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(2);
+        const bobTrust2 = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust2.isCrossSigningVerified()).toBeFalsy();
+        expect(bobTrust2.isTofu()).toBeTruthy();
 
         upgradePromise = new Promise((resolve) => {
             upgradeResolveFunc = resolve;
@@ -736,6 +793,8 @@ describe("Cross Signing", function() {
         alice._crypto._deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
         await upgradePromise;
 
-        expect(alice.checkUserTrust("@bob:example.com")).toBe(6);
+        const bobTrust3 = alice.checkUserTrust("@bob:example.com");
+        expect(bobTrust.isCrossSigningVerified()).toBeTruthy();
+        expect(bobTrust.isTofu()).toBeTruthy();
     });
 });
