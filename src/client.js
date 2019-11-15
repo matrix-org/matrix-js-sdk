@@ -947,7 +947,7 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
- * add methods that call the corresponding method in this._crypto
+ * Add methods that call the corresponding method in this._crypto
  *
  * @param {class} MatrixClient the class to add the method to
  * @param {string} names the names of the methods to call
