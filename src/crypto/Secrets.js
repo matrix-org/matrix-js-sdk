@@ -258,8 +258,7 @@ export default class SecretStorage extends EventEmitter {
      * Check if a secret is stored on the server.
      *
      * @param {string} name the name of the secret
-     * @param {boolean} checkKey check if the secret is encrypted by a trusted
-     *     key (currently unimplemented)
+     * @param {boolean} checkKey check if the secret is encrypted by a trusted key
      *
      * @return {boolean} whether or not the secret is stored
      */
