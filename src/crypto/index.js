@@ -591,7 +591,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const oldSelfSigningId = this._crossSigningInfo.getId("self_signing");
     const oldUserSigningId = this._crossSigningInfo.getId("user_signing");
 
-    // Update the version of our keys in our cross-siging object and the local store
+    // Update the version of our keys in our cross-signing object and the local store
     this._crossSigningInfo.setKeys(newCrossSigning.keys);
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
