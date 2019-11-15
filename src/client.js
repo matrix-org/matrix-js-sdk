@@ -1033,10 +1033,7 @@ wrapCryptoFuncs(MatrixClient, [
  *
  * @param {MatrixEvent} event event to be checked
  *
- * @returns {integer} a bit mask indicating how the user is trusted (if at all)
- *  - returnValue & 1: device marked as verified
- *  - returnValue & 2: trust-on-first-use cross-signing key
- *  - returnValue & 4: user's cross-signing key is verified
+ * @returns {DeviceTrustLevel}
  */
 MatrixClient.prototype.checkEventSenderTrust = async function(event) {
     const device = await this.getEventSenderDeviceInfo(event);
