@@ -1394,7 +1394,6 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
             algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
             auth_data: authData,
             recovery_key: encodeRecoveryKey(decryption.get_private_key()),
-            accountKeys: null,
         };
     } finally {
         decryption.free();
