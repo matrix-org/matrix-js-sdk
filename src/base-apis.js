@@ -1718,6 +1718,15 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     return this._http.authedRequest(callback, "POST", path, undefined, content);
 };
 
+MatrixBaseApis.prototype.uploadKeySignatures = function(content) {
+    return this._http.authedRequest(
+        undefined, "POST", '/keys/signatures/upload', undefined,
+        content, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
+
 /**
  * Download device keys
  *
@@ -1802,6 +1811,14 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
     return this._http.authedRequest(undefined, "GET", path, qps, undefined);
 };
 
+MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
+    const data = Object.assign({}, keys, {auth});
+    return this._http.authedRequest(
+        undefined, "POST", "/keys/device_signing/upload", undefined, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
 
 // Identity Server Operations
 // ==========================

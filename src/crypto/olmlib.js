@@ -328,11 +328,74 @@ const _verifySignature = module.exports.verifySignature = async function(
 
     // prepare the canonical json: remove unsigned and signatures, and stringify with
     // anotherjson
-    delete obj.unsigned;
-    delete obj.signatures;
-    const json = anotherjson.stringify(obj);
+    const mangledObj = Object.assign({}, obj);
+    delete mangledObj.unsigned;
+    delete mangledObj.signatures;
+    const json = anotherjson.stringify(mangledObj);
 
     olmDevice.verifySignature(
         signingKey, json, signature,
     );
+};
+
+/**
+ * Sign a JSON object using public key cryptography
+ * @param {Object} obj Object to sign.  The object will be modified to include
+ *     the new signature
+ * @param {Olm.PkSigning|Uint8Array} key the signing object or the private key
+ * seed
+ * @param {string} userId The user ID who owns the signing key
+ * @param {string} pubkey The public key (ignored if key is a seed)
+ * @returns {string} the signature for the object
+ */
+module.exports.pkSign = function(obj, key, userId, pubkey) {
+    let createdKey = false;
+    if (key instanceof Uint8Array) {
+        const keyObj = new global.Olm.PkSigning();
+        pubkey = keyObj.init_with_seed(key);
+        key = keyObj;
+        createdKey = true;
+    }
+    const sigs = obj.signatures || {};
+    delete obj.signatures;
+    const unsigned = obj.unsigned;
+    if (obj.unsigned) delete obj.unsigned;
+    try {
+        const mysigs = sigs[userId] || {};
+        sigs[userId] = mysigs;
+
+        return mysigs['ed25519:' + pubkey] = key.sign(anotherjson.stringify(obj));
+    } finally {
+        obj.signatures = sigs;
+        if (unsigned) obj.unsigned = unsigned;
+        if (createdKey) {
+            key.free();
+        }
+    }
+};
+
+/**
+ * Verify a signed JSON object
+ * @param {Object} obj Object to verify
+ * @param {string} pubkey The public key to use to verify
+ * @param {string} userId The user ID who signed the object
+ */
+module.exports.pkVerify = function(obj, pubkey, userId) {
+    const keyId = "ed25519:" + pubkey;
+    if (!(obj.signatures && obj.signatures[userId] && obj.signatures[userId][keyId])) {
+        throw new Error("No signature");
+    }
+    const signature = obj.signatures[userId][keyId];
+    const util = new global.Olm.Utility();
+    const sigs = obj.signatures;
+    delete obj.signatures;
+    const unsigned = obj.unsigned;
+    if (obj.unsigned) delete obj.unsigned;
+    try {
+        util.ed25519_verify(pubkey, anotherjson.stringify(obj), signature);
+    } finally {
+        obj.signatures = sigs;
+        if (unsigned) obj.unsigned = unsigned;
+        util.free();
+    }
 };

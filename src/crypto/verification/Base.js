@@ -22,6 +22,7 @@ limitations under the License.
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 import logger from '../../logger';
+import DeviceInfo from '../deviceinfo';
 import {newTimeoutError} from "./Error";
 
 const timeoutException = new Error("Verification timed out");
@@ -277,11 +278,24 @@ export default class VerificationBase extends EventEmitter {
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
             const device = await this._baseApis.getStoredDevice(userId, deviceId);
-            if (!device) {
-                logger.warn(`verification: Could not find device ${deviceId} to verify`);
-            } else {
+            if (device) {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
+            } else {
+                const crossSigningInfo = this._baseApis._crypto._deviceList
+                      .getStoredCrossSigningForUser(userId);
+                if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
+                    await verifier(keyId, DeviceInfo.fromStorage({
+                        keys: {
+                            [keyId]: deviceId,
+                        },
+                    }, deviceId), keyInfo);
+                    verifiedDevices.push(deviceId);
+                } else {
+                    logger.warn(
+                        `verification: Could not find device ${deviceId} to verify`,
+                    );
+                }
             }
         }
 

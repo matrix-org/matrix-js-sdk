@@ -33,6 +33,7 @@ export default class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
+        this._crossSigningKeys = null;
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
@@ -232,6 +233,14 @@ export default class MemoryCryptoStore {
 
     storeAccount(txn, newData) {
         this._account = newData;
+    }
+
+    getCrossSigningKeys(txn, func) {
+        func(this._crossSigningKeys);
+    }
+
+    storeCrossSigningKeys(txn, keys) {
+        this._crossSigningKeys = keys;
     }
 
     // Olm Sessions

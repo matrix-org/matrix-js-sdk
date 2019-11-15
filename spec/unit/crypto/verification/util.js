@@ -33,11 +33,16 @@ export async function makeTestClients(userInfos, options) {
                             type: type,
                             content: msg,
                         });
-                        setTimeout(
-                            () => clientMap[userId][deviceId]
-                                .emit("toDeviceEvent", event),
-                            0,
-                        );
+                        const client = clientMap[userId][deviceId];
+                        if (event.isEncrypted()) {
+                            event.attemptDecryption(client._crypto)
+                                .then(() => client.emit("toDeviceEvent", event));
+                        } else {
+                            setTimeout(
+                                () => client.emit("toDeviceEvent", event),
+                                0,
+                            );
+                        }
                     }
                 }
             }
@@ -53,9 +58,9 @@ export async function makeTestClients(userInfos, options) {
             room_id: room,
             event_id: eventId,
         });
-        for (const client of clients) {
+        for (const tc of clients) {
             setTimeout(
-                () => client.emit("event", event),
+                () => tc.client.emit("event", event),
                 0,
             );
         }
@@ -64,20 +69,27 @@ export async function makeTestClients(userInfos, options) {
     };
 
     for (const userInfo of userInfos) {
-        const client = (new TestClient(
+        let keys = {};
+        if (!options) options = {};
+        if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
+        if (!options.cryptoCallbacks.saveCrossSigningKeys) {
+            options.cryptoCallbacks.saveCrossSigningKeys = k => { keys = k; };
+            options.cryptoCallbacks.getCrossSigningKey = typ => keys[typ];
+        }
+        const testClient = new TestClient(
             userInfo.userId, userInfo.deviceId, undefined, undefined,
             options,
-        )).client;
+        );
         if (!(userInfo.userId in clientMap)) {
             clientMap[userInfo.userId] = {};
         }
-        clientMap[userInfo.userId][userInfo.deviceId] = client;
-        client.sendToDevice = sendToDevice;
-        client.sendEvent = sendEvent;
-        clients.push(client);
+        clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
+        testClient.client.sendToDevice = sendToDevice;
+        testClient.client.sendEvent = sendEvent;
+        clients.push(testClient);
     }
 
-    await Promise.all(clients.map((client) => client.initCrypto()));
+    await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
 
     return clients;
 }

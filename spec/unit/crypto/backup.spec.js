@@ -29,6 +29,7 @@ import testUtils from '../../test-utils';
 import OlmDevice from '../../../lib/crypto/OlmDevice';
 import Crypto from '../../../lib/crypto';
 import logger from '../../../src/logger';
+import olmlib from '../../../lib/crypto/olmlib';
 
 const Olm = global.Olm;
 
@@ -83,6 +84,16 @@ const BACKUP_INFO = {
     },
 };
 
+const keys = {};
+
+function getCrossSigningKey(type) {
+    return keys[type];
+}
+
+function saveCrossSigningKeys(k) {
+    Object.assign(keys, k);
+}
+
 function makeTestClient(sessionStore, cryptoStore) {
     const scheduler = [
         "getQueueForEvent", "queueEvent", "removeEventFromQueue",
@@ -108,6 +119,7 @@ function makeTestClient(sessionStore, cryptoStore) {
         deviceId: "device",
         sessionStore: sessionStore,
         cryptoStore: cryptoStore,
+        cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys },
     });
 }
 
@@ -294,6 +306,71 @@ describe("MegolmBackup", function() {
                         expect(numCalls).toBe(1);
                     });
                 });
+        });
+
+        it('signs backups with the cross-signing master key', async function() {
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+            const ibGroupSession = new Olm.InboundGroupSession();
+            ibGroupSession.create(groupSession.session_key());
+
+            const client = makeTestClient(sessionStore, cryptoStore);
+
+            megolmDecryption = new MegolmDecryption({
+                userId: '@user:id',
+                crypto: mockCrypto,
+                olmDevice: olmDevice,
+                baseApis: client,
+                roomId: ROOM_ID,
+            });
+
+            megolmDecryption.olmlib = mockOlmLib;
+
+            await client.initCrypto();
+            let privateKeys;
+            client.uploadDeviceSigningKeys = async function(e) {return;};
+            client.uploadKeySignatures = async function(e) {return;};
+            client.on("crossSigning.saveCrossSigningKeys", function(e) {
+                privateKeys = e;
+            });
+            client.on("crossSigning.getKey", function(e) {
+                e.done(privateKeys[e.type]);
+            });
+            await client.resetCrossSigningKeys();
+            let numCalls = 0;
+            await new Promise(async (resolve, reject) => {
+                client._http.authedRequest = function(
+                    callback, method, path, queryParams, data, opts,
+                ) {
+                    ++numCalls;
+                    expect(numCalls).toBeLessThanOrEqualTo(1);
+                    if (numCalls >= 2) {
+                        // exit out of retry loop if there's something wrong
+                        reject(new Error("authedRequest called too many timmes"));
+                        return Promise.resolve({});
+                    }
+                    expect(method).toBe("POST");
+                    expect(path).toBe("/room_keys/version");
+                    try {
+                        // make sure auth_data is signed by the master key
+                        olmlib.pkVerify(
+                            data.auth_data, client.getCrossSigningId(), "@alice:bar",
+                        );
+                    } catch (e) {
+                        reject(e);
+                        return Promise.resolve({});
+                    }
+                    resolve();
+                    return Promise.resolve({});
+                };
+                await client.createKeyBackupVersion({
+                    algorithm: "m.megolm_backup.v1",
+                    auth_data: {
+                        public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
+                    },
+                });
+            });
+            expect(numCalls).toBe(1);
         });
 
         it('retries when a backup fails', function() {
