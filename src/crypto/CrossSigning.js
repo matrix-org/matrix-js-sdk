@@ -474,7 +474,8 @@ export class DeviceTrustLevel {
     }
 
     /**
-     * @returns {bool} true if this user's key is trusted on first use
+     * @returns {bool} true if this device is trusted from a user's key
+     * that is trusted on first use
      */
     isTofu() {
         return this._tofu;
