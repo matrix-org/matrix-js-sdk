@@ -5127,7 +5127,7 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  *
  * @event module:client~MatrixClient#"userTrustStatusChanged"
  * @param {string} userId the userId of the user in question
- * @param {integer} trustLevel The new trust level of the user
+ * @param {UserTrustLevel} trustLevel The new trust level of the user
  */
 
 /**
