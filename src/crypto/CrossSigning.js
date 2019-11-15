@@ -312,6 +312,13 @@ export class CrossSigningInfo extends EventEmitter {
         );
     }
 
+    /**
+     * Check whether a given user is trusted.
+     *
+     * @param {string} userId The ID of the user to check.
+     *
+     * @returns {UserTrustLevel}
+     */
     checkUserTrust(userCrossSigning) {
         // if we're checking our own key, then it's trusted if the master key
         // and self-signing key match
@@ -341,6 +348,14 @@ export class CrossSigningInfo extends EventEmitter {
         return new UserTrustLevel(userTrusted, userCrossSigning.firstUse);
     }
 
+    /**
+     * Check whether a given device is trusted.
+     *
+     * @param {string} userId The ID of the user whose devices is to be checked.
+     * @param {string} deviceId The ID of the device to check
+     *
+     * @returns {DeviceTrustLevel}
+     */
     checkDeviceTrust(userCrossSigning, device, localTrust) {
         const userTrust = this.checkUserTrust(userCrossSigning);
 
