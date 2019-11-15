@@ -314,7 +314,7 @@ export default class IndexedDBCryptoStore {
     }
 
     /**
-     * Write the cross-siging keys back to the store
+     * Write the cross-signing keys back to the store
      *
      * @param {*} txn An active transaction. See doTxn().
      * @param {string} keys keys object as getCrossSigningKeys()
