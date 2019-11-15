@@ -18,7 +18,7 @@ import {EventEmitter} from 'events';
 import logger from '../logger';
 import olmlib from './olmlib';
 import { randomString } from '../randomstring';
-import { keyFromPassphrase } from './backup_password';
+import { keyFromPassphrase } from './key_passphrase';
 import { encodeRecoveryKey } from './recoverykey';
 import { pkVerify } from './olmlib';
 
