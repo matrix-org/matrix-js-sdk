@@ -213,58 +213,6 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 }
 utils.inherits(Crypto, EventEmitter);
 
-Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
-    return this._secretStorage.addKey(algorithm, opts, keyID);
-};
-
-Crypto.prototype.storeSecret = function(name, secret, keys) {
-    return this._secretStorage.store(name, secret, keys);
-};
-
-Crypto.prototype.getSecret = function(name) {
-    return this._secretStorage.get(name);
-};
-
-Crypto.prototype.isSecretStored = function(name, checkKey) {
-    return this._secretStorage.isStored(name, checkKey);
-};
-
-Crypto.prototype.requestSecret = function(name, devices) {
-    if (!devices) {
-        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(this._userId));
-    }
-    return this._secretStorage.request(name, devices);
-};
-
-Crypto.prototype.getDefaultKeyId = function() {
-    return this._secretStorage.getDefaultKeyId();
-};
-
-Crypto.prototype.setDefaultKeyId = function(k) {
-    return this._secretStorage.setDefaultKeyId(k);
-};
-
-/**
- * Checks that a given private key matches a given public key
- * This can be used by the getCrossSigningKey callback to verify that the
- * private key it is about to supply is the one that was requested.
- *
- * @param {Uint8Array} privateKey The private key
- * @param {Uint8Array} expectedPublicKey The public key supplied by the getCrossSigningKey callback
- * @returns {boolean} true if the key matches, otherwise false
- */
-Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
-    let signing = null;
-    try {
-        signing = new global.Olm.PkSigning();
-        const gotPubkey = signing.init_with_seed(privateKey);
-        // make sure it agrees with the given pubkey
-        return gotPubkey === expectedPublicKey;
-    } finally {
-        if (signing) signing.free();
-    }
-};
-
 /**
  * Initialise the crypto module so that it is ready for use
  *
@@ -326,6 +274,58 @@ Crypto.prototype.init = async function() {
 
     logger.log("Crypto: checking for key backup...");
     this._checkAndStartKeyBackup();
+};
+
+Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
+    return this._secretStorage.addKey(algorithm, opts, keyID);
+};
+
+Crypto.prototype.storeSecret = function(name, secret, keys) {
+    return this._secretStorage.store(name, secret, keys);
+};
+
+Crypto.prototype.getSecret = function(name) {
+    return this._secretStorage.get(name);
+};
+
+Crypto.prototype.isSecretStored = function(name, checkKey) {
+    return this._secretStorage.isStored(name, checkKey);
+};
+
+Crypto.prototype.requestSecret = function(name, devices) {
+    if (!devices) {
+        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(this._userId));
+    }
+    return this._secretStorage.request(name, devices);
+};
+
+Crypto.prototype.getDefaultKeyId = function() {
+    return this._secretStorage.getDefaultKeyId();
+};
+
+Crypto.prototype.setDefaultKeyId = function(k) {
+    return this._secretStorage.setDefaultKeyId(k);
+};
+
+/**
+ * Checks that a given private key matches a given public key
+ * This can be used by the getCrossSigningKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ *
+ * @param {Uint8Array} privateKey The private key
+ * @param {Uint8Array} expectedPublicKey The public key supplied by the getCrossSigningKey callback
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
+    let signing = null;
+    try {
+        signing = new global.Olm.PkSigning();
+        const gotPubkey = signing.init_with_seed(privateKey);
+        // make sure it agrees with the given pubkey
+        return gotPubkey === expectedPublicKey;
+    } finally {
+        if (signing) signing.free();
+    }
 };
 
 /**
