@@ -792,20 +792,27 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
     }
     let relationsWithEventType = relationsWithRelType[eventType];
 
+    let isNewRelations = false;
+    let relatesToEvent;
     if (!relationsWithEventType) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
             relationType,
             eventType,
             this.room,
         );
-        const relatesToEvent = this.findEventById(relatesToEventId);
+        isNewRelations = true;
+        relatesToEvent = this.findEventById(relatesToEventId);
         if (relatesToEvent) {
             relationsWithEventType.setTargetEvent(relatesToEvent);
-            relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
         }
     }
 
     relationsWithEventType.addEvent(event);
+
+    // only emit once event has been added to relations
+    if (isNewRelations && relatesToEvent) {
+        relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
+    }
 };
 
 /**

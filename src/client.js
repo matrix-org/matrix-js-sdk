@@ -4278,9 +4278,13 @@ MatrixClient.prototype.isFallbackICEServerAllowed = function() {
  * @return {boolean} true if the user appears to be a Synapse administrator.
  */
 MatrixClient.prototype.isSynapseAdministrator = function() {
-    return this.whoisSynapseUser(this.getUserId())
-        .then(() => true)
-        .catch(() => false);
+    const path = utils.encodeUri(
+        "/_synapse/admin/v1/users/$userId/admin",
+        { $userId: this.getUserId() },
+    );
+    return this._http.authedRequest(
+        undefined, 'GET', path, undefined, undefined, {prefix: ''},
+    ).then(r => r['admin']); // pull out the specific boolean we want
 };
 
 /**
@@ -4465,6 +4469,16 @@ MatrixClient.prototype.getVersions = async function() {
         );
     }
     return this._serverVersionsCache;
+};
+
+/**
+ * Check if a particular spec version is supported by the server.
+ * @param {string} version The spec version (such as "r0.5.0") to check for.
+ * @return {Promise<bool>} Whether it is supported
+ */
+MatrixClient.prototype.isVersionSupported = async function(version) {
+    const { versions } = await this.getVersions();
+    return versions && versions.includes(version);
 };
 
 /**
