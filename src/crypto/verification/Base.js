@@ -74,6 +74,7 @@ export default class VerificationBase extends EventEmitter {
         this._done = false;
         this._promise = null;
         this._transactionTimeoutTimer = null;
+        this._eventsSubscription = null;
 
         // At this point, the verification request was received so start the timeout timer.
         this._resetTimer();
@@ -222,6 +223,10 @@ export default class VerificationBase extends EventEmitter {
                 // but no reject function. If cancel is called again, we'd error.
                 if (this._reject) this._reject(e);
             } else {
+                // unsubscribe from events, this happens in _reject usually but we don't have one here
+                if (this._eventsSubscription) {
+                    this._eventsSubscription = this._eventsSubscription();
+                }
                 // FIXME: this causes an "Uncaught promise" console message
                 // if nothing ends up chaining this promise.
                 this._promise = Promise.reject(e);
@@ -246,7 +251,10 @@ export default class VerificationBase extends EventEmitter {
                 this._done = true;
                 this._endTimer();
                 if (this.handler) {
-                    this._baseApis.off("event", this.handler);
+                    // these listeners are attached in Crypto.acceptVerificationDM
+                    if (this._eventsSubscription) {
+                        this._eventsSubscription = this._eventsSubscription();
+                    }
                 }
                 resolve(...args);
             };
@@ -254,7 +262,10 @@ export default class VerificationBase extends EventEmitter {
                 this._done = true;
                 this._endTimer();
                 if (this.handler) {
-                    this._baseApis.off("event", this.handler);
+                    // these listeners are attached in Crypto.acceptVerificationDM
+                    if (this._eventsSubscription) {
+                        this._eventsSubscription = this._eventsSubscription();
+                    }
                 }
                 reject(...args);
             };
@@ -294,5 +305,9 @@ export default class VerificationBase extends EventEmitter {
         for (const deviceId of verifiedDevices) {
             await this._baseApis.setDeviceVerified(userId, deviceId);
         }
+    }
+
+    setEventsSubscription(subscription) {
+        this._eventsSubscription = subscription;
     }
 }
