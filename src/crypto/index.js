@@ -329,6 +329,15 @@ Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
 };
 
 /**
+ * Check whether we already have cross-signing keys for the current user.
+ *
+ * @return {boolean} Whether we have keys.
+ */
+Crypto.prototype.doesCrossSigningHaveKeys = function() {
+    return this._crossSigningInfo.hasKeys();
+};
+
+/**
  * Generate new cross-signing keys.
  *
  * @param {object} authDict Auth data to supply for User-Interactive auth.

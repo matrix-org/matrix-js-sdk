@@ -965,6 +965,14 @@ function wrapCryptoFuncs(MatrixClient, names) {
 }
 
 /**
+ * Check whether we already have cross-signing keys for the current user.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#doesCrossSigningHaveKeys
+ * @return {boolean} Whether we have keys.
+ */
+
+ /**
  * Generate new cross-signing keys.
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
@@ -1018,6 +1026,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "doesCrossSigningHaveKeys",
     "resetCrossSigningKeys",
     "getCrossSigningId",
     "getStoredCrossSigningForUser",
