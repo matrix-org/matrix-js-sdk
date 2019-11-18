@@ -789,13 +789,9 @@ function verificationEventHandler(target, userId, roomId, eventId) {
             || event.getSender() !== userId) {
             return;
         }
-        const content = event.getContent();
-        if (!content["m.relates_to"]) {
-            return;
-        }
-        const relatesTo
-              = content["m.relationship"] || content["m.relates_to"];
-        if (!relatesTo.rel_type
+        const relatesTo = event.getRelation();
+        if (!relatesTo
+            || !relatesTo.rel_type
             || relatesTo.rel_type !== "m.reference"
             || !relatesTo.event_id
             || relatesTo.event_id !== eventId) {
