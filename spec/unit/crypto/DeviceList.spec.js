@@ -22,7 +22,6 @@ import utils from '../../../src/utils';
 import logger from '../../../src/logger';
 
 import expect from 'expect';
-import Promise from 'bluebird';
 
 const signedDeviceList = {
     "failures": {},
