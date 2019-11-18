@@ -80,7 +80,8 @@ describe("MatrixClient", function() {
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).nodeify(done);
+                done();
+            }).catch(done);
 
             httpBackend.flush();
         });
@@ -100,12 +101,13 @@ describe("MatrixClient", function() {
                 rawResponse: false,
             }).then(function(response) {
                 expect(response.content_uri).toEqual("uri");
-            }).nodeify(done);
+                done();
+            }).catch(done);
 
             httpBackend.flush();
         });
 
-        it("should parse errors into a MatrixError", function(done) {
+        it("should parse errors into a MatrixError", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
@@ -116,7 +118,7 @@ describe("MatrixClient", function() {
                 "error": "broken",
             });
 
-            client.uploadContent({
+            const prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
@@ -126,12 +128,12 @@ describe("MatrixClient", function() {
                 expect(error.httpStatus).toEqual(400);
                 expect(error.errcode).toEqual("M_SNAFU");
                 expect(error.message).toEqual("broken");
-            }).nodeify(done);
-
+            });
             httpBackend.flush();
+            return prom;
         });
 
-        it("should return a promise which can be cancelled", function(done) {
+        it("should return a promise which can be cancelled", function() {
             const prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
@@ -143,17 +145,18 @@ describe("MatrixClient", function() {
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            prom.then(function(response) {
+            const r = client.cancelUpload(prom);
+            expect(r).toBe(true);
+
+            // don't overwrite prom as then it loses the .abort hack
+            return prom.then(function(response) {
                 throw Error("request not aborted");
             }, function(error) {
                 expect(error).toEqual("aborted");
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).nodeify(done);
-
-            const r = client.cancelUpload(prom);
-            expect(r).toBe(true);
+            });
         });
     });
 
@@ -180,7 +183,7 @@ describe("MatrixClient", function() {
                 event_format: "client",
             });
             store.storeFilter(filter);
-            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+            client.getFilter(userId, filterId, true).then(function(gotFilter) {
                 expect(gotFilter).toEqual(filter);
                 done();
             });
@@ -201,7 +204,7 @@ describe("MatrixClient", function() {
                 event_format: "client",
             });
             store.storeFilter(storeFilter);
-            client.getFilter(userId, filterId, false).done(function(gotFilter) {
+            client.getFilter(userId, filterId, false).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
                 done();
             });
@@ -219,7 +222,7 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
             ).respond(200, httpFilterDefinition);
-            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+            client.getFilter(userId, filterId, true).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
                 expect(store.getFilter(userId, filterId)).toBeTruthy();
                 done();
@@ -247,7 +250,7 @@ describe("MatrixClient", function() {
                 filter_id: filterId,
             });
 
-            client.createFilter(filterDefinition).done(function(gotFilter) {
+            client.createFilter(filterDefinition).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(filterDefinition);
                 expect(store.getFilter(userId, filterId)).toEqual(gotFilter);
                 done();
@@ -280,7 +283,7 @@ describe("MatrixClient", function() {
             },
         };
 
-        it("searchMessageText should perform a /search for room_events", function(done) {
+        it("searchMessageText should perform a /search for room_events", function() {
             client.searchMessageText({
                 query: "monkeys",
             });
@@ -294,9 +297,7 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            httpBackend.flush().done(function() {
-                done();
-            });
+            return httpBackend.flush();
         });
     });
 
@@ -310,7 +311,7 @@ describe("MatrixClient", function() {
             return client.initCrypto();
         });
 
-        it("should do an HTTP request and then store the keys", function(done) {
+        it("should do an HTTP request and then store the keys", function() {
             const ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
             // ed25519key = client.getDeviceEd25519Key();
             const borisKeys = {
@@ -372,7 +373,7 @@ describe("MatrixClient", function() {
                 },
             });
 
-            client.downloadKeys(["boris", "chaz"]).then(function(res) {
+            const prom = client.downloadKeys(["boris", "chaz"]).then(function(res) {
                 assertObjectContains(res.boris.dev1, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
@@ -386,26 +387,24 @@ describe("MatrixClient", function() {
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
-            }).nodeify(done);
-
+            });
             httpBackend.flush();
+            return prom;
         });
     });
 
     describe("deleteDevice", function() {
         const auth = {a: 1};
-        it("should pass through an auth dict", function(done) {
+        it("should pass through an auth dict", function() {
             httpBackend.when(
                 "DELETE", "/_matrix/client/r0/devices/my_device",
             ).check(function(req) {
                 expect(req.data).toEqual({auth: auth});
             }).respond(200);
 
-            client.deleteDevice(
-                "my_device", auth,
-            ).nodeify(done);
-
+            const prom = client.deleteDevice("my_device", auth);
             httpBackend.flush();
+            return prom;
         });
     });
 });

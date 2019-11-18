@@ -164,7 +164,7 @@ describe("MatrixClient events", function() {
             });
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 expect(fired).toBe(true, "User.presence didn't fire.");
                 done();
             });

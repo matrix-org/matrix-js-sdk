@@ -39,7 +39,7 @@ describe("InteractiveAuth", function() {
         utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
     });
 
-    it("should start an auth stage and complete it", function(done) {
+    it("should start an auth stage and complete it", function() {
         const doRequest = expect.createSpy();
         const stateUpdated = expect.createSpy();
 
@@ -85,11 +85,11 @@ describe("InteractiveAuth", function() {
             return Promise.resolve(requestRes);
         });
 
-        ia.attemptAuth().then(function(res) {
+        return ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(1);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).nodeify(done);
+        });
     });
 
     it("should make a request if no authdata is provided", function(done) {
@@ -152,6 +152,6 @@ describe("InteractiveAuth", function() {
             expect(res).toBe(requestRes);
             expect(doRequest.calls.length).toEqual(2);
             expect(stateUpdated.calls.length).toEqual(1);
-        }).nodeify(done);
+        }).then(done);
     });
 });

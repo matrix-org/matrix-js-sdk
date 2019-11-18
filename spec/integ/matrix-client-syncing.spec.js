@@ -54,7 +54,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 done();
             });
         });
@@ -68,7 +68,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 done();
             });
         });
