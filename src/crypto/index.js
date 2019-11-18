@@ -855,6 +855,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             )
         );
     });
+    ret.usable |= ret.trusted_locally;
     return ret;
 };
 
