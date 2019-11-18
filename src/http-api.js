@@ -24,6 +24,7 @@ const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
 import logger from './logger';
+import {defer} from './utils';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -256,10 +257,10 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         if (global.XMLHttpRequest) {
-            const defer = Promise.defer();
+            const deferred = defer();
             const xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
-            const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
+            const cb = requestCallback(deferred, opts.callback, this.opts.onlyData);
 
             const timeout_fn = function() {
                 xhr.abort();
@@ -327,7 +328,7 @@ module.exports.MatrixHttpApi.prototype = {
             }
             xhr.setRequestHeader("Content-Type", contentType);
             xhr.send(body);
-            promise = defer.promise;
+            promise = deferred.promise;
 
             // dirty hack (as per _request) to allow the upload to be cancelled.
             promise.abort = xhr.abort.bind(xhr);
@@ -418,12 +419,12 @@ module.exports.MatrixHttpApi.prototype = {
             opts.headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
-        const defer = Promise.defer();
+        const deferred = defer();
         this.opts.request(
             opts,
-            requestCallback(defer, callback, this.opts.onlyData),
+            requestCallback(deferred, callback, this.opts.onlyData),
         );
-        return defer.promise;
+        return deferred.promise;
     },
 
     /**
@@ -682,7 +683,7 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        const defer = Promise.defer();
+        const deferred = defer();
 
         let timeoutId;
         let timedOut = false;
@@ -699,7 +700,7 @@ module.exports.MatrixHttpApi.prototype = {
                     if (req && req.abort) {
                         req.abort();
                     }
-                    defer.reject(new module.exports.MatrixError({
+                    deferred.reject(new module.exports.MatrixError({
                         error: "Locally timed out waiting for a response",
                         errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
                         timeout: localTimeoutMs,
@@ -709,7 +710,7 @@ module.exports.MatrixHttpApi.prototype = {
         };
         resetTimeout();
 
-        const reqPromise = defer.promise;
+        const reqPromise = deferred.promise;
 
         try {
             req = this.opts.request(
@@ -735,7 +736,7 @@ module.exports.MatrixHttpApi.prototype = {
                     }
 
                     const handlerFn = requestCallback(
-                        defer, callback, self.opts.onlyData,
+                        deferred, callback, self.opts.onlyData,
                         bodyParser,
                     );
                     handlerFn(err, response, body);
@@ -759,7 +760,7 @@ module.exports.MatrixHttpApi.prototype = {
                 if (req.abort) reqPromise.abort = req.abort.bind(req);
             }
         } catch (ex) {
-            defer.reject(ex);
+            deferred.reject(ex);
             if (callback) {
                 callback(ex);
             }

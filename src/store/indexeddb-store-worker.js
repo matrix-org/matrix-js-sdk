@@ -123,7 +123,7 @@ class IndexedDBStoreWorker {
             return;
         }
 
-        prom.done((ret) => {
+        prom.then((ret) => {
             this.postMessage.call(null, {
                 command: 'cmd_success',
                 seq: msg.seq,

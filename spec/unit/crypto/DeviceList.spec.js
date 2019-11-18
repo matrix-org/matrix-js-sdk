@@ -18,7 +18,7 @@ limitations under the License.
 import DeviceList from '../../../lib/crypto/DeviceList';
 import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
 import testUtils from '../../test-utils';
-import utils from '../../../lib/utils';
+import utils from '../../../src/utils';
 import logger from '../../../src/logger';
 
 import expect from 'expect';
@@ -91,7 +91,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = Promise.defer();
+        const queryDefer1 = utils.defer();
         downloadSpy.andReturn(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -110,7 +110,7 @@ describe('DeviceList', function() {
 
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
-        const queryDefer1 = Promise.defer();
+        const queryDefer1 = utils.defer();
         downloadSpy.andReturn(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
@@ -118,7 +118,7 @@ describe('DeviceList', function() {
         downloadSpy.reset();
 
         // outdated notif arrives while the request is in flight.
-        const queryDefer2 = Promise.defer();
+        const queryDefer2 = utils.defer();
         downloadSpy.andReturn(queryDefer2.promise);
 
         dl.invalidateUserDeviceList('@test1:sw1v.org');
@@ -138,7 +138,7 @@ describe('DeviceList', function() {
             logger.log("Creating new devicelist to simulate app reload");
             downloadSpy.reset();
             const dl2 = createTestDeviceList();
-            const queryDefer3 = Promise.defer();
+            const queryDefer3 = utils.defer();
             downloadSpy.andReturn(queryDefer3.promise);
 
             const prom3 = dl2.refreshOutdatedDeviceLists();

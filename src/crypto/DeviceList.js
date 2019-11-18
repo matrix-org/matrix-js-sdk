@@ -30,6 +30,7 @@ import logger from '../logger';
 import DeviceInfo from './deviceinfo';
 import {CrossSigningInfo} from './CrossSigning';
 import olmlib from './olmlib';
+import {defer, sleep} from '../utils';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
 
@@ -710,7 +711,7 @@ class DeviceListUpdateSerialiser {
         });
 
         if (!this._queuedQueryDeferred) {
-            this._queuedQueryDeferred = Promise.defer();
+            this._queuedQueryDeferred = defer();
         }
 
         // We always take the new sync token and just use the latest one we've
@@ -763,7 +764,7 @@ class DeviceListUpdateSerialiser {
             // this serves as an easy solution for now.
             let prom = Promise.resolve();
             for (const userId of downloadUsers) {
-                prom = prom.delay(5).then(() => {
+                prom = prom.then(sleep(5)).then(() => {
                     return this._processQueryResponseForUser(
                         userId, dk[userId], {
                             master: masterKeys[userId],
@@ -775,7 +776,7 @@ class DeviceListUpdateSerialiser {
             }
 
             return prom;
-        }).done(() => {
+        }).then(() => {
             logger.log('Completed key download for ' + downloadUsers);
 
             this._downloadInProgress = false;

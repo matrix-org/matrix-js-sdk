@@ -22,6 +22,7 @@ limitations under the License.
 const utils = require("./utils");
 import Promise from 'bluebird';
 import logger from './logger';
+import {defer} from './utils';
 
 const DEBUG = false;  // set true to enable console logging.
 
@@ -121,10 +122,10 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    const defer = Promise.defer();
+    const deferred = defer();
     this._queues[queueName].push({
         event: event,
-        defer: defer,
+        defer: deferred,
         attempts: 0,
     });
     debuglog(
@@ -132,7 +133,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
         event.getId(), queueName,
     );
     _startProcessingQueues(this);
-    return defer.promise;
+    return deferred.promise;
 };
 
 /**

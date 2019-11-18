@@ -5,6 +5,7 @@ const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
+import {defer} from '../../src/utils';
 
 import expect from 'expect';
 import Promise from 'bluebird';
@@ -693,11 +694,11 @@ describe("MatrixClient syncing", function() {
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
-            const defer = Promise.defer();
+            const deferred = defer();
 
             httpBackend.when("GET", "/sync").check(function(req) {
                 expect(req.queryParams.filter).toEqual("another_id");
-                defer.resolve();
+                deferred.resolve();
             }).respond(200, {});
 
             client.syncLeftRooms();
@@ -709,7 +710,7 @@ describe("MatrixClient syncing", function() {
                     // flush the syncs
                     return httpBackend.flushAllExpected();
                 }),
-                defer.promise,
+                deferred.promise,
             ]);
         });
 

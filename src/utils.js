@@ -708,3 +708,21 @@ module.exports.ensureNoTrailingSlash = function(url) {
         return url;
     }
 };
+
+// Returns a promise which resolves with a given value after the given number of ms
+module.exports.sleep = (ms, value) => {
+    return new Promise((resolve => { setTimeout(resolve, ms, value); }));
+};
+
+// Returns a Deferred wrapper around a Promise
+module.exports.defer = () => {
+    let resolve;
+    let reject;
+
+    const promise = new Promise((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+    });
+
+    return {resolve, reject, promise};
+};

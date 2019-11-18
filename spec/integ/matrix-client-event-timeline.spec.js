@@ -6,6 +6,7 @@ const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const EventTimeline = sdk.EventTimeline;
 import logger from '../../src/logger';
+import {defer} from '../../src/utils';
 
 const baseUrl = "http://localhost.or.something";
 const userId = "@alice:localhost";
@@ -83,7 +84,7 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    const deferred = Promise.defer();
+    const deferred = defer();
     client.on("sync", function(state) {
         logger.log("sync", state);
         if (state != "SYNCING") {
@@ -349,7 +350,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const deferred = Promise.defer();
+            const deferred = defer();
             client.on("sync", function() {
                 client.getEventTimeline(timelineSet, EVENTS[2].event_id,
                 ).then(function(tl) {

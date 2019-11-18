@@ -49,6 +49,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from './verification/Error';
+import {sleep} from '../utils';
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -1070,7 +1071,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         // it will be set again on the next /sync-response
         crypto._oneTimeKeyCount = undefined;
         crypto._oneTimeKeyCheckInProgress = false;
-    }).done();
+    });
 }
 
 // returns a promise which resolves to the response
@@ -1760,17 +1761,15 @@ Crypto.prototype.exportRoomKeys = async function() {
  * @return {module:client.Promise} a promise which resolves once the keys have been imported
  */
 Crypto.prototype.importRoomKeys = function(keys) {
-    return Promise.map(
-        keys, (key) => {
-            if (!key.room_id || !key.algorithm) {
-                logger.warn("ignoring room key entry with missing fields", key);
-                return null;
-            }
+    return Promise.all(keys.map((key) => {
+        if (!key.room_id || !key.algorithm) {
+            logger.warn("ignoring room key entry with missing fields", key);
+            return null;
+        }
 
-            const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            return alg.importRoomKey(key);
-        },
-    );
+        const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
+        return alg.importRoomKey(key);
+    }));
 };
 
 /**
@@ -1789,7 +1788,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
         // requests from different clients hitting the server all at
         // the same time when a new key is sent
         const delay = Math.random() * maxDelay;
-        await Promise.delay(delay);
+        await sleep(delay);
         let numFailures = 0; // number of consecutive failures
         while (1) {
             if (!this.backupKey) {
@@ -1823,7 +1822,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
             }
             if (numFailures) {
                 // exponential backoff if we have failures
-                await Promise.delay(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
             }
         }
     } finally {
@@ -2074,7 +2073,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false
         logger.error(
             'Error requesting key for event', e,
         );
-    }).done();
+    });
 };
 
 /**
@@ -2087,7 +2086,7 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
     this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
     .catch((e) => {
         logger.warn("Error clearing pending room key requests", e);
-    }).done();
+    });
 };
 
 /**
@@ -2721,14 +2720,10 @@ Crypto.prototype._processReceivedRoomKeyRequests = async function() {
         // cancellation (and end up with a cancelled request), rather than the
         // cancellation before the request (and end up with an outstanding
         // request which should have been cancelled.)
-        await Promise.map(
-            requests, (req) =>
-                this._processReceivedRoomKeyRequest(req),
-        );
-        await Promise.map(
-            cancellations, (cancellation) =>
-                this._processReceivedRoomKeyRequestCancellation(cancellation),
-        );
+        await Promise.all(requests.map((req) =>
+            this._processReceivedRoomKeyRequest(req)));
+        await Promise.all(cancellations.map((cancellation) =>
+                this._processReceivedRoomKeyRequestCancellation(cancellation)));
     } catch (e) {
         logger.error(`Error processing room key requsts: ${e}`);
     } finally {

@@ -132,14 +132,14 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     // feeling snappy.
     //
     if (initialEventId) {
-        const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
-
-        if (prom.isFulfilled()) {
-            initFields(prom.value());
-            return Promise.resolve();
-        } else {
-            return prom.then(initFields);
+        const timeline = this._timelineSet.getTimelineForEvent(initialEventId);
+        if (timeline) {
+            initFields(timeline);
+            return Promise.resolve(timeline);
         }
+
+        const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
+        return prom.then(initFields);
     } else {
         const tl = this._timelineSet.getLiveTimeline();
         initFields(tl);

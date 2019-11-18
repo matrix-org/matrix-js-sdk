@@ -58,7 +58,7 @@ export class Backend {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        const deferred = Promise.defer();
+        const deferred = utils.defer();
         const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
         txn.onerror = deferred.reject;
 
@@ -100,7 +100,7 @@ export class Backend {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        const deferred = Promise.defer();
+        const deferred = utils.defer();
 
         const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
         txn.onerror = deferred.reject;

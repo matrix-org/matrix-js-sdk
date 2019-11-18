@@ -37,6 +37,7 @@ const utils = require("../../lib/utils");
 const testUtils = require("../test-utils");
 const TestClient = require('../TestClient').default;
 import logger from '../../src/logger';
+import {defer} from '../../src/utils';
 
 let aliTestClient;
 const roomId = "!room:localhost";
@@ -280,7 +281,7 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    const deferred = Promise.defer();
+    const deferred = defer();
     httpBackend.when("PUT", path).respond(200, function(path, content) {
         deferred.resolve(content);
         return {

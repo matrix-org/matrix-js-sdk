@@ -47,6 +47,7 @@ const olmlib = require("./crypto/olmlib");
 import ReEmitter from './ReEmitter';
 import RoomList from './crypto/RoomList';
 import logger from './logger';
+import {defer, sleep} from './utils';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
@@ -1862,7 +1863,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
 
     const reqOpts = {qsStringifyOptions: {arrayFormat: 'repeat'}};
 
-    const defer = Promise.defer();
+    const deferred = defer();
 
     const self = this;
     sign_promise.then(function(signed_invite_object) {
@@ -1883,12 +1884,12 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
             // return syncApi.syncRoom(room);
         }
         return Promise.resolve(room);
-    }).done(function(room) {
-        _resolve(callback, defer, room);
+    }).then(function(room) {
+        _resolve(callback, deferred, room);
     }, function(err) {
-        _reject(callback, defer, err);
+        _reject(callback, deferred, err);
     });
-    return defer.promise;
+    return deferred.promise;
 };
 
 /**
@@ -3204,21 +3205,21 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const defer = Promise.defer();
+    const deferred = defer();
     info = {
-        promise: defer.promise,
+        promise: deferred.promise,
         errorTs: null,
     };
     const self = this;
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
-    Promise.delay(timeToWaitMs).then(function() {
+    sleep(timeToWaitMs).then(function() {
         return self._createMessagesRequest(
             room.roomId,
             room.oldState.paginationToken,
             limit,
             'b');
-    }).done(function(res) {
+    }).then(function(res) {
         const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
         if (res.state) {
             const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
@@ -3231,15 +3232,15 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
         }
         self.store.storeEvents(room, matrixEvents, res.end, true);
         self._ongoingScrollbacks[room.roomId] = null;
-        _resolve(callback, defer, room);
+        _resolve(callback, deferred, room);
     }, function(err) {
         self._ongoingScrollbacks[room.roomId] = {
             errorTs: Date.now(),
         };
-        _reject(callback, defer, err);
+        _reject(callback, deferred, err);
     });
     this._ongoingScrollbacks[room.roomId] = info;
-    return defer.promise;
+    return deferred.promise;
 };
 
 /**
@@ -3857,12 +3858,12 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         } else if (!hasDontNotifyRule) {
             // Remove the existing one before setting the mute push rule
             // This is a workaround to SYN-590 (Push rule update fails)
-            deferred = Promise.defer();
+            deferred = defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
-            .done(function() {
+            .then(function() {
                 self.addPushRule(scope, "room", roomId, {
                     actions: ["dont_notify"],
-                }).done(function() {
+                }).then(function() {
                     deferred.resolve();
                 }, function(err) {
                     deferred.reject(err);
@@ -3877,9 +3878,9 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
 
     if (deferred) {
         // Update this.pushRules when the operation completes
-        const ruleRefreshDeferred = Promise.defer();
-        deferred.done(function() {
-            self.getPushRules().done(function(result) {
+        const ruleRefreshDeferred = defer();
+        deferred.then(function() {
+            self.getPushRules().then(function(result) {
                 self.pushRules = result;
                 ruleRefreshDeferred.resolve();
             }, function(err) {
@@ -3888,7 +3889,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         }, function(err) {
             // Update it even if the previous operation fails. This can help the
             // app to recover when push settings has been modifed from another client
-            self.getPushRules().done(function(result) {
+            self.getPushRules().then(function(result) {
                 self.pushRules = result;
                 ruleRefreshDeferred.reject(err);
             }, function(err2) {
@@ -4382,7 +4383,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     if (this._crypto) {
-        this._crypto.uploadDeviceKeys().done();
+        this._crypto.uploadDeviceKeys();
         this._crypto.start();
     }
 
@@ -4824,7 +4825,7 @@ function checkTurnServers(client) {
         return; // guests can't access TURN servers
     }
 
-    client.turnServer().done(function(res) {
+    client.turnServer().then(function(res) {
         if (res.uris) {
             logger.log("Got TURN URIs: " + res.uris + " refresh in " +
                 res.ttl + " secs");

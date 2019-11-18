@@ -34,6 +34,7 @@ const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 const PushProcessor = require("./pushprocessor");
 import logger from './logger';
+import {defer} from './utils';
 
 import {InvalidStoreError} from './errors';
 
@@ -360,7 +361,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         room_id: peekRoom.roomId,
         timeout: 30 * 1000,
         from: token,
-    }, undefined, 50 * 1000).done(function(res) {
+    }, undefined, 50 * 1000).then(function(res) {
         if (self._peekRoomId !== peekRoom.roomId) {
             debuglog("Stopped peeking in room %s", peekRoom.roomId);
             return;
@@ -1149,8 +1150,25 @@ SyncApi.prototype._processSyncResponse = async function(
         room.updateMyMembership("invite");
     });
 
+    async function processRoomEvent(e) {
+        client.emit("event", e);
+        if (e.isState() && e.getType() === "m.room.encryption" && self.opts.crypto) {
+            await self.opts.crypto.onCryptoEvent(e);
+        }
+        if (e.isState() && e.getType() === "im.vector.user_status") {
+            let user = client.store.getUser(e.getStateKey());
+            if (user) {
+                user._unstable_updateStatusMessage(e);
+            } else {
+                user = createNewUser(client, e.getStateKey());
+                user._unstable_updateStatusMessage(e);
+                client.store.storeUser(user);
+            }
+        }
+    }
+
     // Handle joins
-    await Promise.mapSeries(joinRooms, async function(joinObj) {
+    for (const joinObj of joinRooms) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
@@ -1202,7 +1220,7 @@ SyncApi.prototype._processSyncResponse = async function(
                 const eventId = timelineEvents[i].getId();
                 if (room.getTimelineForEvent(eventId)) {
                     debuglog("Already have event " + eventId + " in limited " +
-                             "sync - not resetting");
+                        "sync - not resetting");
                     limited = false;
 
                     // we might still be missing some of the events before i;
@@ -1261,25 +1279,12 @@ SyncApi.prototype._processSyncResponse = async function(
 
         self._processEventsForNotifs(room, timelineEvents);
 
-        async function processRoomEvent(e) {
-            client.emit("event", e);
-            if (e.isState() && e.getType() == "m.room.encryption" && self.opts.crypto) {
-                await self.opts.crypto.onCryptoEvent(e);
-            }
-            if (e.isState() && e.getType() === "im.vector.user_status") {
-                let user = client.store.getUser(e.getStateKey());
-                if (user) {
-                    user._unstable_updateStatusMessage(e);
-                } else {
-                    user = createNewUser(client, e.getStateKey());
-                    user._unstable_updateStatusMessage(e);
-                    client.store.storeUser(user);
-                }
-            }
+        for (const ev of stateEvents) {
+            await processRoomEvent(ev);
         }
-
-        await Promise.mapSeries(stateEvents, processRoomEvent);
-        await Promise.mapSeries(timelineEvents, processRoomEvent);
+        for (const ev of timelineEvents) {
+            await processRoomEvent(ev);
+        }
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
@@ -1288,7 +1293,7 @@ SyncApi.prototype._processSyncResponse = async function(
         });
 
         room.updateMyMembership("join");
-    });
+    }
 
     // Handle leaves (e.g. kicked rooms)
     leaveRooms.forEach(function(leaveObj) {
@@ -1383,7 +1388,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
         self._pokeKeepAlive();
     }
     if (!this._connectionReturnedDefer) {
-        this._connectionReturnedDefer = Promise.defer();
+        this._connectionReturnedDefer = defer();
     }
     return this._connectionReturnedDefer.promise;
 };
@@ -1417,7 +1422,7 @@ SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
             prefix: '',
             localTimeoutMs: 15 * 1000,
         },
-    ).done(function() {
+    ).then(function() {
         success();
     }, function(err) {
         if (err.httpStatus == 400 || err.httpStatus == 404) {
@@ -1541,7 +1546,7 @@ SyncApi.prototype._resolveInvites = function(room) {
         } else {
             promise = client.getProfileInfo(member.userId);
         }
-        promise.done(function(info) {
+        promise.then(function(info) {
             // slightly naughty by doctoring the invite event but this means all
             // the code paths remain the same between invite/join display name stuff
             // which is a worthy trade-off for some minor pollution.
