@@ -80,9 +80,9 @@ export default class VerificationBase extends EventEmitter {
         this._resetTimer();
 
         if (this.roomId) {
-            this._send = this._sendMessage;
+            this._sendWithTxnId = this._sendMessage;
         } else {
-            this._send = this._sendToDevice;
+            this._sendWithTxnId = this._sendToDevice;
         }
     }
 
@@ -106,13 +106,32 @@ export default class VerificationBase extends EventEmitter {
         }
     }
 
+
+    /* creates a content object with the transaction id added to it */
+    _contentWithTxnId(content) {
+        const copy = Object.assign({}, content);
+        if (this.roomId) { // verification as timeline event
+            copy["m.relates_to"] = {
+                rel_type: "m.reference",
+                event_id: this.transactionId,
+            };
+        } else { // verification as to_device event
+            copy.transaction_id = this.transactionId;
+        }
+        return copy;
+    }
+
+    _send(type, contentWithoutTxnId) {
+        const content = this._contentWithTxnId(contentWithoutTxnId);
+        return this._sendWithTxnId(type, content);
+    }
+
     /* send a message to the other participant, using to-device messages
      */
     _sendToDevice(type, content) {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
-        content.transaction_id = this.transactionId;
         return this._baseApis.sendToDevice(type, {
             [this.userId]: { [this.deviceId]: content },
         });
@@ -124,12 +143,6 @@ export default class VerificationBase extends EventEmitter {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
-        // FIXME: if MSC1849 decides to use m.relationship instead of
-        // m.relates_to, we should follow suit here
-        content["m.relates_to"] = {
-            rel_type: "m.reference",
-            event_id: this.transactionId,
-        };
         return this._baseApis.sendEvent(this.roomId, type, content);
     }
 
