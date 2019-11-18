@@ -106,6 +106,17 @@ export default class VerificationBase extends EventEmitter {
         }
     }
 
+    _contentFromEventWithTxnId(event) {
+        if (this.roomId) {  // verification as timeline event
+            // ensure m.related_to is included in e2ee rooms
+            // as the field is excluded from encryption
+            const content = Object.assign({}, event.getContent());
+            content["m.relates_to"] = event.getRelation();
+            return content;
+        } else { // verification as to_device event
+            return event.getContent();
+        }
+    }
 
     /* creates a content object with the transaction id added to it */
     _contentWithTxnId(content) {
