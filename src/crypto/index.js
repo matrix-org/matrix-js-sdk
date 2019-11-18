@@ -299,11 +299,11 @@ Crypto.prototype.requestSecret = function(name, devices) {
     return this._secretStorage.request(name, devices);
 };
 
-Crypto.prototype.getDefaultKeyId = function() {
+Crypto.prototype.getDefaultSecretStorageKeyId = function() {
     return this._secretStorage.getDefaultKeyId();
 };
 
-Crypto.prototype.setDefaultKeyId = function(k) {
+Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
     return this._secretStorage.setDefaultKeyId(k);
 };
 

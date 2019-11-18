@@ -168,7 +168,7 @@ describe("Secrets", function() {
         );
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
-        alice.setDefaultKeyId(newKeyId);
+        alice.setDefaultSecretStorageKeyId(newKeyId);
         await alice.storeSecret("foo", "bar");
 
         const accountData = alice.getAccountData('foo');
