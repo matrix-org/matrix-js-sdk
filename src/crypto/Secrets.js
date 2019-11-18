@@ -22,6 +22,8 @@ import { keyFromPassphrase } from './key_passphrase';
 import { encodeRecoveryKey } from './recoverykey';
 import { pkVerify } from './olmlib';
 
+export const SECRET_STORAGE_ALGORITHM_V1 = "m.secret_storage.v1.curve25519-aes-sha2";
+
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/Secrets
@@ -86,7 +88,7 @@ export default class SecretStorage extends EventEmitter {
         }
 
         switch (algorithm) {
-        case "m.secret_storage.v1.curve25519-aes-sha2":
+        case SECRET_STORAGE_ALGORITHM_V1:
         {
             const decryption = new global.Olm.PkDecryption();
             try {
@@ -174,7 +176,7 @@ export default class SecretStorage extends EventEmitter {
 
             // encrypt secret, based on the algorithm
             switch (keyInfoContent.algorithm) {
-            case "m.secret_storage.v1.curve25519-aes-sha2":
+            case SECRET_STORAGE_ALGORITHM_V1:
             {
                 const encryption = new global.Olm.PkEncryption();
                 try {
@@ -224,7 +226,7 @@ export default class SecretStorage extends EventEmitter {
             ).getContent();
             const encInfo = secretContent.encrypted[keyName];
             switch (keyInfo.algorithm) {
-            case "m.secret_storage.v1.curve25519-aes-sha2":
+            case SECRET_STORAGE_ALGORITHM_V1:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
                     && encInfo.ephemeral) {
                     keys[keyName] = keyInfo;
@@ -244,7 +246,7 @@ export default class SecretStorage extends EventEmitter {
             // decrypt secret
             const encInfo = secretContent.encrypted[keyName];
             switch (keys[keyName].algorithm) {
-            case "m.secret_storage.v1.curve25519-aes-sha2":
+            case SECRET_STORAGE_ALGORITHM_V1:
                 return decryption.decrypt(
                     encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,
                 );
@@ -293,7 +295,7 @@ export default class SecretStorage extends EventEmitter {
                 );
             }
             switch (keyInfo.algorithm) {
-            case "m.secret_storage.v1.curve25519-aes-sha2":
+            case SECRET_STORAGE_ALGORITHM_V1:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
                     && encInfo.ephemeral) {
                     return true;
@@ -502,7 +504,7 @@ export default class SecretStorage extends EventEmitter {
         }
 
         switch (keys[keyName].algorithm) {
-            case "m.secret_storage.v1.curve25519-aes-sha2":
+            case SECRET_STORAGE_ALGORITHM_V1:
             {
                 const decryption = new global.Olm.PkDecryption();
                 let pubkey;
