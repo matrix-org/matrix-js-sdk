@@ -159,7 +159,7 @@ export class CrossSigningInfo extends EventEmitter {
                     },
                 };
             } else {
-                [masterPub, masterSigning] = await this.getCrossSigningyKey("master");
+                [masterPub, masterSigning] = await this.getCrossSigningKey("master");
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
