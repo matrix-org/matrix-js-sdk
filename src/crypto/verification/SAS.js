@@ -205,7 +205,7 @@ export default class SAS extends Base {
     }
 
     async _doSendVerification() {
-        const initialMessage = {
+        const initialMessage = this._contentWithTxnId({
             method: SAS.NAME,
             from_device: this._baseApis.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
@@ -213,10 +213,10 @@ export default class SAS extends Base {
             message_authentication_codes: MAC_LIST,
             // FIXME: allow app to specify what SAS methods can be used
             short_authentication_string: SAS_LIST,
-        };
-        // NOTE: this._send will modify initialMessage to include the
-        // transaction_id field, or the m.relationship/m.relates_to field
-        this._send("m.key.verification.start", initialMessage);
+        });
+        // add the transaction id to the message beforehand because
+        // it needs to be included in the commitment hash later on
+        this._sendWithTxnId("m.key.verification.start", initialMessage);
 
 
         let e = await this._waitForEvent("m.key.verification.accept");
@@ -281,7 +281,10 @@ export default class SAS extends Base {
     }
 
     async _doRespondVerification() {
-        let content = this.startEvent.getContent();
+        // as m.related_to is not included in the encrypted content in e2e rooms,
+        // we need to make sure it is added
+        let content = this._contentFromEventWithTxnId(this.startEvent);
+
         // Note: we intersect using our pre-made lists, rather than the sets,
         // so that the result will be in our order of preference.  Then
         // fetching the first element from the array will give our preferred

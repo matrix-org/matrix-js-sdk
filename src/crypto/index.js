@@ -69,6 +69,30 @@ export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
 
+/* subscribes to timeline events / to_device events for SAS verification */
+function listenForEvents(client, roomId, listener) {
+    let isEncrypted = false;
+    if (roomId) {
+        isEncrypted = client.isRoomEncrypted(roomId);
+    }
+
+    if (isEncrypted) {
+        client.on("Event.decrypted", listener);
+    }
+    client.on("event", listener);
+    let subscribed = true;
+    return function() {
+        if (subscribed) {
+            if (isEncrypted) {
+                client.off("Event.decrypted", listener);
+            }
+            client.off("event", listener);
+            subscribed = false;
+        }
+        return null;
+    };
+}
+
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 
@@ -1278,13 +1302,15 @@ function verificationEventHandler(target, userId, roomId, eventId) {
             || event.getSender() !== userId) {
             return;
         }
-        const content = event.getContent();
-        if (!content["m.relates_to"]) {
+        // ignore events that haven't been decrypted yet.
+        // we also listen for undecrypted events, just in case
+        // the other side would be sending unencrypted events in an e2ee room
+        if (event.getType() === "m.room.encrypted") {
             return;
         }
-        const relatesTo
-              = content["m.relationship"] || content["m.relates_to"];
-        if (!relatesTo.rel_type
+        const relatesTo = event.getRelation();
+        if (!relatesTo
+            || !relatesTo.rel_type
             || relatesTo.rel_type !== "m.reference"
             || !relatesTo.event_id
             || relatesTo.event_id !== eventId) {
@@ -1341,7 +1367,9 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
                 );
                 // this handler gets removed when the verification finishes
                 // (see the verify method of crypto/verification/Base.js)
-                this._baseApis.on("event", verifier.handler);
+                const subscription =
+                    listenForEvents(this._baseApis, roomId, verifier.handler);
+                verifier.setEventsSubscription(subscription);
                 resolve(verifier);
                 break;
             }
@@ -1351,14 +1379,19 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
             }
             }
         };
-        this._baseApis.on("event", listener);
+        let initialResponseSubscription =
+            listenForEvents(this._baseApis, roomId, listener);
 
         const resolve = (...args) => {
-            this._baseApis.off("event", listener);
+            if (initialResponseSubscription) {
+                initialResponseSubscription = initialResponseSubscription();
+            }
             _resolve(...args);
         };
         const reject = (...args) => {
-            this._baseApis.off("event", listener);
+            if (initialResponseSubscription) {
+                initialResponseSubscription = initialResponseSubscription();
+            }
             _reject(...args);
         };
     });
@@ -1393,7 +1426,9 @@ Crypto.prototype.acceptVerificationDM = function(event, Method) {
     verifier.handler = verificationEventHandler(
         verifier, event.getSender(), event.getRoomId(), event.getId(),
     );
-    this._baseApis.on("event", verifier.handler);
+    const subscription = listenForEvents(
+        this._baseApis, event.getRoomId(), verifier.handler);
+    verifier.setEventsSubscription(subscription);
     return verifier;
 };
 
