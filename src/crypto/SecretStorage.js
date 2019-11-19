@@ -26,7 +26,7 @@ export const SECRET_STORAGE_ALGORITHM_V1 = "m.secret_storage.v1.curve25519-aes-s
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
- * @module crypto/Secrets
+ * @module crypto/SecretStorage
  */
 export default class SecretStorage extends EventEmitter {
     constructor(baseApis, cryptoCallbacks, crossSigningInfo) {

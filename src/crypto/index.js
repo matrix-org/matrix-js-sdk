@@ -37,7 +37,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
 import { CrossSigningInfo, UserTrustLevel, DeviceTrustLevel } from './CrossSigning';
-import SecretStorage from './Secrets';
+import SecretStorage from './SecretStorage';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
