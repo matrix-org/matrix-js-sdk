@@ -65,7 +65,7 @@ export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
 
-/* subscribes to timeline events for SAS verification */
+/* subscribes to timeline events / to_device events for SAS verification */
 function listenForEvents(client, roomId, listener) {
     let isEncrypted = false;
     if (roomId) {
@@ -74,17 +74,15 @@ function listenForEvents(client, roomId, listener) {
 
     if (isEncrypted) {
         client.on("Event.decrypted", listener);
-    } else {
-        client.on("event", listener);
     }
+    client.on("event", listener);
     let subscribed = true;
     return function() {
         if (subscribed) {
             if (isEncrypted) {
                 client.off("Event.decrypted", listener);
-            } else {
-                client.off("event", listener);
             }
+            client.off("event", listener);
             subscribed = false;
         }
         return null;
@@ -787,6 +785,12 @@ function verificationEventHandler(target, userId, roomId, eventId) {
         // listen for events related to this verification
         if (event.getRoomId() !== roomId
             || event.getSender() !== userId) {
+            return;
+        }
+        // ignore events that haven't been decrypted yet.
+        // we also listen for undecrypted events, just in case
+        // the other side would be sending unencrypted events in an e2ee room
+        if (event.getType() === "m.room.encrypted") {
             return;
         }
         const relatesTo = event.getRelation();
