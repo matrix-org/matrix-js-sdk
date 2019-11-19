@@ -37,7 +37,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
 import { CrossSigningInfo, UserTrustLevel, DeviceTrustLevel } from './CrossSigning';
-import SecretStorage from './Secrets';
+import SecretStorage from './SecretStorage';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -299,11 +299,11 @@ Crypto.prototype.requestSecret = function(name, devices) {
     return this._secretStorage.request(name, devices);
 };
 
-Crypto.prototype.getDefaultKeyId = function() {
+Crypto.prototype.getDefaultSecretStorageKeyId = function() {
     return this._secretStorage.getDefaultKeyId();
 };
 
-Crypto.prototype.setDefaultKeyId = function(k) {
+Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
     return this._secretStorage.setDefaultKeyId(k);
 };
 
@@ -326,6 +326,15 @@ Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
     } finally {
         if (signing) signing.free();
     }
+};
+
+/**
+ * Check whether we already have cross-signing keys for the current user.
+ *
+ * @return {boolean} Whether we have keys.
+ */
+Crypto.prototype.doesCrossSigningHaveKeys = function() {
+    return this._crossSigningInfo.hasKeys();
 };
 
 /**

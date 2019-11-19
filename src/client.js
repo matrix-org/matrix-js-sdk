@@ -965,6 +965,14 @@ function wrapCryptoFuncs(MatrixClient, names) {
 }
 
 /**
+ * Check whether we already have cross-signing keys for the current user.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#doesCrossSigningHaveKeys
+ * @return {boolean} Whether we have keys.
+ */
+
+ /**
  * Generate new cross-signing keys.
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
@@ -1018,6 +1026,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "doesCrossSigningHaveKeys",
     "resetCrossSigningKeys",
     "getCrossSigningId",
     "getStoredCrossSigningForUser",
@@ -1106,7 +1115,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * Get the current default key ID for encrypting secrets.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#getDefaultKeyId
+ * @function module:client~MatrixClient#getDefaultSecretStorageKeyId
  *
  * @return {string} The default key ID or null if no default key ID is set
  */
@@ -1115,7 +1124,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * Set the current default key ID for encrypting secrets.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#setDefaultKeyId
+ * @function module:client~MatrixClient#setDefaultSecretStorageKeyId
  * @param {string} keyId The new default key ID
  */
 
@@ -1125,8 +1134,8 @@ wrapCryptoFuncs(MatrixClient, [
     "getSecret",
     "isSecretStored",
     "requestSecret",
-    "getDefaultKeyId",
-    "setDefaultKeyId",
+    "getDefaultSecretStorageKeyId",
+    "setDefaultSecretStorageKeyId",
 ]);
 
 /**

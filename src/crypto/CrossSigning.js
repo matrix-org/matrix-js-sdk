@@ -101,6 +101,10 @@ export class CrossSigningInfo extends EventEmitter {
         };
     }
 
+    hasKeys() {
+        return Object.keys(this.keys).length > 0;
+    }
+
     /**
      * Get the ID used to identify the user
      *

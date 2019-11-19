@@ -18,6 +18,7 @@ import '../../olm-loader';
 
 import expect from 'expect';
 import { MatrixEvent } from '../../../lib/models/event';
+import { SECRET_STORAGE_ALGORITHM_V1 } from '../../../lib/crypto/SecretStorage';
 
 import olmlib from '../../../lib/crypto/olmlib';
 
@@ -94,7 +95,7 @@ describe("Secrets", function() {
         };
 
         const keyAccountData = {
-            algorithm: "m.secret_storage.v1.curve25519-aes-sha2",
+            algorithm: SECRET_STORAGE_ALGORITHM_V1,
             pubkey: pubkey,
         };
         await alice._crypto._crossSigningInfo.signObject(keyAccountData, 'master');
@@ -164,11 +165,11 @@ describe("Secrets", function() {
         alice.resetCrossSigningKeys();
 
         const newKeyId = await alice.addSecretKey(
-            'm.secret_storage.v1.curve25519-aes-sha2',
+            SECRET_STORAGE_ALGORITHM_V1,
         );
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
-        alice.setDefaultKeyId(newKeyId);
+        alice.setDefaultSecretStorageKeyId(newKeyId);
         await alice.storeSecret("foo", "bar");
 
         const accountData = alice.getAccountData('foo');
