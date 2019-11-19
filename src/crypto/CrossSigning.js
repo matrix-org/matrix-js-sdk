@@ -25,7 +25,10 @@ import {EventEmitter} from 'events';
 import logger from '../logger';
 
 function publicKeyFromKeyInfo(keyInfo) {
-    return Object.entries(keyInfo.keys)[0];
+    // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+    // We assume only a single key, and we want the bare form without type
+    // prefix, so we select the values.
+    return Object.values(keyInfo.keys)[0];
 }
 
 export class CrossSigningInfo extends EventEmitter {
@@ -117,7 +120,7 @@ export class CrossSigningInfo extends EventEmitter {
         type = type || "master";
         if (!this.keys[type]) return null;
         const keyInfo = this.keys[type];
-        return publicKeyFromKeyInfo(keyInfo)[1];
+        return publicKeyFromKeyInfo(keyInfo);
     }
 
 
@@ -219,7 +222,7 @@ export class CrossSigningInfo extends EventEmitter {
             if (!this.keys.master) {
                 // this is the first key we've seen, so first-use is true
                 this.firstUse = true;
-            } else if (publicKeyFromKeyInfo(keys.master)[1] !== this.getId()) {
+            } else if (publicKeyFromKeyInfo(keys.master) !== this.getId()) {
                 // this is a different key, so first-use is false
                 this.firstUse = false;
             } // otherwise, same key, so no change
@@ -229,7 +232,7 @@ export class CrossSigningInfo extends EventEmitter {
         } else {
             throw new Error("Tried to set cross-signing keys without a master key");
         }
-        const masterKey = publicKeyFromKeyInfo(signingKeys.master)[1];
+        const masterKey = publicKeyFromKeyInfo(signingKeys.master);
 
         // verify signatures
         if (keys.user_signing) {
@@ -381,7 +384,7 @@ export class CrossSigningInfo extends EventEmitter {
             pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
             // ...and this device's key from their SSK...
             pkVerify(
-                deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId,
+                deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId,
             );
             // ...then we trust this device as much as far as we trust the user
             return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust);
