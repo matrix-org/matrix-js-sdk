@@ -73,12 +73,12 @@ export default class SecretStorage extends EventEmitter {
      * @param {object} opts the options for the algorithm.  The properties used
      *     depend on the algorithm given.  This object may be modified to pass
      *     information back about the key.
-     * @param {string} [keyID] the ID of the key.  If not given, a random
+     * @param {string} [keyId] the ID of the key.  If not given, a random
      *     ID will be generated.
      *
      * @return {string} the ID of the key
      */
-    async addKey(algorithm, opts, keyID) {
+    async addKey(algorithm, opts, keyId) {
         const keyData = {algorithm};
 
         if (!opts) opts = {};
@@ -117,19 +117,19 @@ export default class SecretStorage extends EventEmitter {
             throw new Error(`Unknown key algorithm ${opts.algorithm}`);
         }
 
-        if (!keyID) {
+        if (!keyId) {
             do {
-                keyID = randomString(32);
-            } while (this._baseApis.getAccountData(`m.secret_storage.key.${keyID}`));
+                keyId = randomString(32);
+            } while (this._baseApis.getAccountData(`m.secret_storage.key.${keyId}`));
         }
 
         await this._crossSigningInfo.signObject(keyData, 'master');
 
         await this._baseApis.setAccountData(
-            `m.secret_storage.key.${keyID}`, keyData,
+            `m.secret_storage.key.${keyId}`, keyData,
         );
 
-        return keyID;
+        return keyId;
     }
 
     // TODO: need a function to get all the secret keys
@@ -157,13 +157,13 @@ export default class SecretStorage extends EventEmitter {
             throw new Error("Zero keys given to encrypt with!");
         }
 
-        for (const keyName of keys) {
+        for (const keyId of keys) {
             // get key information from key storage
             const keyInfo = this._baseApis.getAccountData(
-                "m.secret_storage.key." + keyName,
+                "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) {
-                throw new Error("Unknown key: " +keyName);
+                throw new Error("Unknown key: " + keyId);
             }
             const keyInfoContent = keyInfo.getContent();
 
@@ -181,14 +181,14 @@ export default class SecretStorage extends EventEmitter {
                 const encryption = new global.Olm.PkEncryption();
                 try {
                     encryption.set_recipient_key(keyInfoContent.pubkey);
-                    encrypted[keyName] = encryption.encrypt(secret);
+                    encrypted[keyId] = encryption.encrypt(secret);
                 } finally {
                     encryption.free();
                 }
                 break;
             }
             default:
-                logger.warn("unknown algorithm for secret storage key " + keyName
+                logger.warn("unknown algorithm for secret storage key " + keyId
                             + ": " + keyInfoContent.algorithm);
                 // do nothing if we don't understand the encryption algorithm
             }
@@ -219,17 +219,17 @@ export default class SecretStorage extends EventEmitter {
 
         // get possible keys to decrypt
         const keys = {};
-        for (const keyName of Object.keys(secretContent.encrypted)) {
+        for (const keyId of Object.keys(secretContent.encrypted)) {
             // get key information from key storage
             const keyInfo = this._baseApis.getAccountData(
-                "m.secret_storage.key." + keyName,
+                "m.secret_storage.key." + keyId,
             ).getContent();
-            const encInfo = secretContent.encrypted[keyName];
+            const encInfo = secretContent.encrypted[keyId];
             switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
                     && encInfo.ephemeral) {
-                    keys[keyName] = keyInfo;
+                    keys[keyId] = keyInfo;
                 }
                 break;
             default:
@@ -237,15 +237,15 @@ export default class SecretStorage extends EventEmitter {
             }
         }
 
-        let keyName;
+        let keyId;
         let decryption;
         try {
             // fetch private key from app
-            [keyName, decryption] = await this._getSecretStorageKey(keys);
+            [keyId, decryption] = await this._getSecretStorageKey(keys);
 
             // decrypt secret
-            const encInfo = secretContent.encrypted[keyName];
-            switch (keys[keyName].algorithm) {
+            const encInfo = secretContent.encrypted[keyId];
+            switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 return decryption.decrypt(
                     encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,
@@ -281,12 +281,12 @@ export default class SecretStorage extends EventEmitter {
 
         // check if secret is encrypted by a known/trusted secret and
         // encryption looks sane
-        for (const keyName of Object.keys(secretContent.encrypted)) {
+        for (const keyId of Object.keys(secretContent.encrypted)) {
             // get key information from key storage
             const keyInfo = this._baseApis.getAccountData(
-                "m.secret_storage.key." + keyName,
+                "m.secret_storage.key." + keyId,
             ).getContent();
-            const encInfo = secretContent.encrypted[keyName];
+            const encInfo = secretContent.encrypted[keyId];
             if (checkKey) {
                 pkVerify(
                     keyInfo,
@@ -498,12 +498,12 @@ export default class SecretStorage extends EventEmitter {
             throw new Error("getSecretStorageKey callback returned invalid data");
         }
 
-        const [keyName, privateKey] = returned;
-        if (!keys[keyName]) {
+        const [keyId, privateKey] = returned;
+        if (!keys[keyId]) {
             throw new Error("App returned unknown key from getSecretStorageKey!");
         }
 
-        switch (keys[keyName].algorithm) {
+        switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
             {
                 const decryption = new global.Olm.PkDecryption();
@@ -514,16 +514,16 @@ export default class SecretStorage extends EventEmitter {
                     decryption.free();
                     throw new Error("getSecretStorageKey callback returned invalid key");
                 }
-                if (pubkey !== keys[keyName].pubkey) {
+                if (pubkey !== keys[keyId].pubkey) {
                     decryption.free();
                     throw new Error(
                         "getSecretStorageKey callback returned incorrect key",
                     );
                 }
-                return [keyName, decryption];
+                return [keyId, decryption];
             }
             default:
-                throw new Error("Unknown key type: " + keys[keyName].algorithm);
+                throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
     }
 }
