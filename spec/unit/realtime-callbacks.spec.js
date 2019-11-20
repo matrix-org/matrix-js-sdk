@@ -3,24 +3,21 @@
 import 'source-map-support/register';
 const callbacks = require("../../src/realtime-callbacks");
 
-import lolex from 'lolex';
+let wallTime = 1234567890;
+jest.useFakeTimers();
 
 describe("realtime-callbacks", function() {
-    let clock;
-
     function tick(millis) {
-        clock.tick(millis);
+        wallTime += millis;
+        jest.advanceTimersByTime(millis);
     }
 
     beforeEach(function() {
-        clock = lolex.install();
-        const fakeDate = clock.Date;
-        callbacks.setNow(fakeDate.now.bind(fakeDate));
+        callbacks.setNow(() => wallTime);
     });
 
     afterEach(function() {
         callbacks.setNow();
-        clock.uninstall();
     });
 
     describe("setTimeout", function() {
@@ -32,7 +29,6 @@ describe("realtime-callbacks", function() {
             tick(100);
             expect(callback).toHaveBeenCalled();
         });
-
 
         it("should default to a zero timeout", function() {
             const callback = jest.fn();
