@@ -9,8 +9,6 @@ const Filter = publicGlobals.Filter;
 const utils = require("../test-utils");
 const MockStorageApi = require("../MockStorageApi");
 
-import expect from 'expect';
-
 describe("MatrixClient", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -21,7 +19,6 @@ describe("MatrixClient", function() {
     const accessToken = "aseukfgwef";
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         store = new MemoryStore();
 

@@ -7,7 +7,6 @@ const TimelineWindow = sdk.TimelineWindow;
 const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
 
 const utils = require("../test-utils");
-import expect from 'expect';
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";
@@ -67,10 +66,6 @@ function createLinkedTimelines() {
 
 
 describe("TimelineIndex", function() {
-    beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-    });
-
     describe("minIndex", function() {
         it("should return the min index relative to BaseIndex", function() {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
@@ -162,10 +157,6 @@ describe("TimelineWindow", function() {
 
         return new TimelineWindow(client, timelineSet, opts);
     }
-
-    beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-    });
 
     describe("load", function() {
         it("should initialise from the live timeline", function(done) {

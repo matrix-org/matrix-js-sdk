@@ -17,17 +17,10 @@ limitations under the License.
 import sdk from '../..';
 const MatrixEvent = sdk.MatrixEvent;
 
-import testUtils from '../test-utils';
-
-import expect from 'expect';
 import Promise from 'bluebird';
 import logger from '../../src/logger';
 
 describe("MatrixEvent", () => {
-    beforeEach(function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-    });
-
     describe(".attemptDecryption", () => {
         let encryptedEvent;
 

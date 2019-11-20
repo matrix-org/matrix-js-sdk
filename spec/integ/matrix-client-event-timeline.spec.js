@@ -103,7 +103,6 @@ describe("getEventTimeline support", function() {
     let client;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
     });
@@ -145,7 +144,7 @@ describe("getEventTimeline support", function() {
             const timelineSet = room.getTimelineSets()[0];
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
-            }).toNotThrow();
+            }).not.toThrow();
         });
     });
 
@@ -221,14 +220,11 @@ describe("getEventTimeline support", function() {
     });
 });
 
-import expect from 'expect';
-
 describe("MatrixClient event timelines", function() {
     let client = null;
     let httpBackend = null;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
 

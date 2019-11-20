@@ -17,7 +17,6 @@ limitations under the License.
 
 import '../../olm-loader';
 
-import expect from 'expect';
 import anotherjson from 'another-json';
 
 import olmlib from '../../../lib/crypto/olmlib';
@@ -64,13 +63,12 @@ describe("Cross Signing", function() {
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
         );
-        alice.uploadDeviceSigningKeys = expect.createSpy()
-            .andCall(async (auth, keys) => {
-                await olmlib.verifySignature(
-                    alice._crypto._olmDevice, keys.master_key, "@alice:example.com",
-                    "Osborne2", alice._crypto._olmDevice.deviceEd25519Key,
-                );
-            });
+        alice.uploadDeviceSigningKeys = jest.fn(async (auth, keys) => {
+            await olmlib.verifySignature(
+                alice._crypto._olmDevice, keys.master_key, "@alice:example.com",
+                "Osborne2", alice._crypto._olmDevice.deviceEd25519Key,
+            );
+        });
         alice.uploadKeySignatures = async () => {};
         // set Alice's cross-signing key
         await alice.resetCrossSigningKeys();
@@ -146,7 +144,7 @@ describe("Cross Signing", function() {
         });
 
         const uploadSigsPromise = new Promise((resolve, reject) => {
-            alice.uploadKeySignatures = expect.createSpy().andCall(async (content) => {
+            alice.uploadKeySignatures = jest.fn(async (content) => {
                 await olmlib.verifySignature(
                     alice._crypto._olmDevice,
                     content["@alice:example.com"][
@@ -732,7 +730,7 @@ describe("Cross Signing", function() {
             {
                 cryptoCallbacks: {
                     shouldUpgradeDeviceVerifications: (verifs) => {
-                        expect(verifs.users["@bob:example.com"]).toExist();
+                        expect(verifs.users["@bob:example.com"]).toBeDefined();
                         upgradeResolveFunc();
                         return ["@bob:example.com"];
                     },

@@ -21,8 +21,6 @@ try {
     logger.warn("unable to run device verification tests: libolm not available");
 }
 
-import expect from 'expect';
-
 import {verificationMethods} from '../../../../lib/crypto';
 
 import SAS from '../../../../lib/crypto/verification/SAS';
@@ -74,7 +72,7 @@ describe("verification request", function() {
             bobVerifier._endTimer();
         });
         const aliceVerifier = await alice.client.requestVerification("@bob:example.com");
-        expect(aliceVerifier).toBeAn(SAS);
+        expect(aliceVerifier).toBeInstanceOf(SAS);
 
         // XXX: Private function access (but it's a test, so we're okay)
         aliceVerifier._endTimer();

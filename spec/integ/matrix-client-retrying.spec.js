@@ -4,10 +4,7 @@ import Promise from 'bluebird';
 
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
 const EventStatus = sdk.EventStatus;
-
-import expect from 'expect';
 
 describe("MatrixClient retrying", function() {
     const baseUrl = "http://localhost.or.something";
@@ -20,7 +17,6 @@ describe("MatrixClient retrying", function() {
     let room;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         scheduler = new sdk.MatrixScheduler();
