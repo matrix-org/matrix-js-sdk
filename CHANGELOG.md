@@ -1,3 +1,28 @@
+Changes in [2.4.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.4-rc.1) (2019-11-20)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.3...v2.4.4-rc.1)
+
+ * Fix SAS verification in encrypted DMs
+   [\#1077](https://github.com/matrix-org/matrix-js-sdk/pull/1077)
+ * Cross-signing / secret storage tweaks
+   [\#1078](https://github.com/matrix-org/matrix-js-sdk/pull/1078)
+ * Fix local trust for key backups
+   [\#1075](https://github.com/matrix-org/matrix-js-sdk/pull/1075)
+ * Add method to get last active timestamp in room
+   [\#1072](https://github.com/matrix-org/matrix-js-sdk/pull/1072)
+ * Check the right Synapse endpoint for determining admin capabilities
+   [\#1071](https://github.com/matrix-org/matrix-js-sdk/pull/1071)
+ * Cross Signing Support
+   [\#832](https://github.com/matrix-org/matrix-js-sdk/pull/832)
+ * Don't double cancel verification request
+   [\#1064](https://github.com/matrix-org/matrix-js-sdk/pull/1064)
+ * Support for verification requests in the timeline
+   [\#1067](https://github.com/matrix-org/matrix-js-sdk/pull/1067)
+ * Use stable API prefix for 3PID APIs when supported
+   [\#1066](https://github.com/matrix-org/matrix-js-sdk/pull/1066)
+ * Remove Jenkins scripts
+   [\#1063](https://github.com/matrix-org/matrix-js-sdk/pull/1063)
+
 Changes in [2.4.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.3) (2019-11-04)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.3-rc.1...v2.4.3)
