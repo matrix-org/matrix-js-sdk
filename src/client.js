@@ -1381,13 +1381,28 @@ MatrixClient.prototype.disableKeyBackup = function() {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
+ * @param {boolean} [opts.secureSecretStorage = false] Whether to use Secure
+ *     Secret Storage (MSC1946) to store the key encrypting key backups.
+ *     Optional, defaults to false.
  *
  * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
  *     additionally has a 'recovery_key' member with the user-facing recovery key string.
  */
-MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
+MatrixClient.prototype.prepareKeyBackupVersion = async function(
+    password,
+    { secureSecretStorage = false } = {},
+) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
+    }
+
+    if (secureSecretStorage) {
+        logger.log("Preparing key backup version with Secure Secret Storage");
+
+        // Ensure Secure Secret Storage is ready for use
+        if (!this._secretStorage.hasKey()) {
+            throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
+        }
     }
 
     const decryption = new global.Olm.PkDecryption();

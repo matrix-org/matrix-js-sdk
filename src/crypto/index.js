@@ -42,7 +42,7 @@ import {
     DeviceTrustLevel,
     CrossSigningLevel,
 } from './CrossSigning';
-import SecretStorage from './SecretStorage';
+import SecretStorage, { SECRET_STORAGE_ALGORITHM_V1 } from './SecretStorage';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
@@ -302,19 +302,29 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // key with the cross-signing master key. The cross-signing master keys is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
+    let crossSigningKeysChanged = false;
     if (!this._crossSigningInfo.getId()) {
         logger.log("Cross-signing keys not found, creating new keys");
         await this.resetCrossSigningKeys(
             CrossSigningLevel.MASTER,
             { doInteractiveAuthFlow },
         );
+        crossSigningKeysChanged = true;
     }
 
-    // Check if Secure Secret Storage has a default key. If so, we should be
-    // ready to store things.
+    // Check if Secure Secret Storage has a default key. If we don't have one, create the
+    // default key (which will also be signed by the cross-signing master key).
     if (!this._secretStorage.hasKey()) {
-        // add key
-        throw new Error("Secret Storage key step unimplemented!");
+        logger.log("Secret storage default key not found, creating new key");
+        const newKeyId = await this.addSecretKey(
+            SECRET_STORAGE_ALGORITHM_V1,
+        );
+        await this.setDefaultSecretStorageKeyId(newKeyId);
+    }
+
+    // If cross-signing keys changed, store them in Secure Secret Storage.
+    if (crossSigningKeysChanged) {
+        throw new Error("Cross-signing keys need to be stored!");
     }
 
     logger.log("Secure Secret Storage ready");
