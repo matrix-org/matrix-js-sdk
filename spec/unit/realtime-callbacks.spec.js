@@ -115,8 +115,7 @@ describe("realtime-callbacks", function() {
 
         it("should not get confused by chained calls", function() {
             const callback2 = jest.fn();
-            const callback1 = jest.fn();
-            callback1.mockImplementation(function() {
+            const callback1 = jest.fn(function() {
                 callbacks.setTimeout(callback2, 0);
                 expect(callback2).not.toHaveBeenCalled();
             });
@@ -133,8 +132,7 @@ describe("realtime-callbacks", function() {
         });
 
         it("should be immune to exceptions", function() {
-            const callback1 = jest.fn();
-            callback1.mockImplementation(function() {
+            const callback1 = jest.fn(function() {
                 throw new Error("prepare to die");
             });
             const callback2 = jest.fn();
