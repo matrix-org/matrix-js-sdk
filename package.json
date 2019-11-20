@@ -4,9 +4,8 @@
   "description": "Matrix Client-Server SDK for Javascript",
   "main": "index.js",
   "scripts": {
-    "test:run": "jest spec/ --coverage --testEnvironment node",
     "test:watch": "jest spec/ --coverage --testEnvironment node --watch",
-    "test": "yarn test:build && yarn test:run",
+    "test": "jest spec/ --coverage --testEnvironment node",
     "check": "yarn test:build && _mocha --recursive specbuild --colors",
     "gendoc": "babel --no-babelrc --plugins transform-class-properties -d .jsdocbuild src && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
     "start": "yarn start:init && yarn start:watch",
