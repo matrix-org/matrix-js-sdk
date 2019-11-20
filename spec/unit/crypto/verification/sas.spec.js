@@ -21,7 +21,6 @@ try {
     logger.warn("unable to run device verification tests: libolm not available");
 }
 
-import expect from 'expect';
 import olmlib from '../../../../lib/crypto/olmlib';
 
 import sdk from '../../../..';
@@ -57,9 +56,8 @@ describe("SAS verification", function() {
             type: "es.inquisition",
             content: {},
         }));
-        const spy = expect.createSpy();
-        await sas.verify()
-            .catch(spy);
+        const spy = jest.fn();
+        await sas.verify().catch(spy);
         expect(spy).toHaveBeenCalled();
 
         // Cancel the SAS for cleanup (we started a verification, so abort)
@@ -346,11 +344,11 @@ describe("SAS verification", function() {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client.setDeviceVerified = expect.createSpy();
+        alice.client.setDeviceVerified = jest.fn();
         alice.client.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.client.setDeviceVerified = expect.createSpy();
+        bob.client.setDeviceVerified = jest.fn();
         bob.client.downloadKeys = () => {
             return Promise.resolve();
         };
@@ -368,8 +366,8 @@ describe("SAS verification", function() {
             verificationMethods.SAS, bob.client.getUserId(), bob.client.deviceId,
         );
 
-        const aliceSpy = expect.createSpy();
-        const bobSpy = expect.createSpy();
+        const aliceSpy = jest.fn();
+        const bobSpy = jest.fn();
         await Promise.all([
             aliceVerifier.verify().catch(aliceSpy),
             bobPromise.then((verifier) => verifier.verify()).catch(bobSpy),
@@ -377,9 +375,9 @@ describe("SAS verification", function() {
         expect(aliceSpy).toHaveBeenCalled();
         expect(bobSpy).toHaveBeenCalled();
         expect(alice.client.setDeviceVerified)
-            .toNotHaveBeenCalled();
+            .not.toHaveBeenCalled();
         expect(bob.client.setDeviceVerified)
-            .toNotHaveBeenCalled();
+            .not.toHaveBeenCalled();
     });
 
     describe("verification in DM", function() {
@@ -401,7 +399,7 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.client.setDeviceVerified = expect.createSpy();
+            alice.client.setDeviceVerified = jest.fn();
             alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
@@ -419,7 +417,7 @@ describe("SAS verification", function() {
                 return Promise.resolve();
             };
 
-            bob.client.setDeviceVerified = expect.createSpy();
+            bob.client.setDeviceVerified = jest.fn();
             bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
@@ -445,7 +443,7 @@ describe("SAS verification", function() {
                     const content = event.getContent();
                     if (event.getType() === "m.room.message"
                         && content.msgtype === "m.key.verification.request") {
-                        expect(content.methods).toInclude(SAS.NAME);
+                        expect(content.methods).toContain(SAS.NAME);
                         expect(content.to).toBe(bob.client.getUserId());
                         const verifier = bob.client.acceptVerificationDM(event, SAS.NAME);
                         verifier.on("show_sas", (e) => {

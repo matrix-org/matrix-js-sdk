@@ -6,7 +6,6 @@ const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
-import expect from 'expect';
 import Promise from 'bluebird';
 
 describe("MatrixClient syncing", function() {
@@ -23,7 +22,6 @@ describe("MatrixClient syncing", function() {
     const roomTwo = "!bar:localhost";
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -528,7 +526,7 @@ describe("MatrixClient syncing", function() {
                 awaitSyncEvent(),
             ]).then(function() {
                 const room = client.getRoom(roomTwo);
-                expect(room).toExist();
+                expect(room).toBeDefined();
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");

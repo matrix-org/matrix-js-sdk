@@ -30,7 +30,6 @@ import 'source-map-support/register';
 // load olm before the sdk if possible
 import '../olm-loader';
 
-import expect from 'expect';
 const sdk = require("../..");
 import Promise from 'bluebird';
 const utils = require("../../lib/utils");
@@ -56,7 +55,7 @@ function bobUploadsDeviceKeys() {
         bobTestClient.client.uploadKeys(),
         bobTestClient.httpBackend.flush(),
     ]).then(() => {
-        expect(Object.keys(bobTestClient.deviceKeys).length).toNotEqual(0);
+        expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
     });
 }
 
@@ -406,8 +405,6 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
         await aliTestClient.client.initCrypto();
 
@@ -548,7 +545,7 @@ describe("MatrixClient crypto", function() {
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
             .then((keys) => {
                 expect(Object.keys(keys).length).toEqual(5);
-                expect(Object.keys(bobTestClient.deviceKeys).length).toNotEqual(0);
+                expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
             });
     });
 
@@ -753,9 +750,9 @@ describe("MatrixClient crypto", function() {
             .then(() => httpBackend.when("POST", "/keys/upload")
                 .respond(200, (path, content) => {
                     expect(content.one_time_keys).toBeTruthy();
-                    expect(content.one_time_keys).toNotEqual({});
+                    expect(content.one_time_keys).not.toEqual({});
                     expect(Object.keys(content.one_time_keys).length)
-                        .toBeGreaterThanOrEqualTo(1);
+                        .toBeGreaterThanOrEqual(1);
                     logger.log('received %i one-time keys',
                                 Object.keys(content.one_time_keys).length);
                     // cancel futher calls by telling the client
