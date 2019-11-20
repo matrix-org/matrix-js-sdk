@@ -36,7 +36,12 @@ const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
 import { randomString } from '../randomstring';
-import { CrossSigningInfo, UserTrustLevel, DeviceTrustLevel } from './CrossSigning';
+import {
+    CrossSigningInfo,
+    UserTrustLevel,
+    DeviceTrustLevel,
+    CrossSigningLevel,
+} from './CrossSigning';
 import SecretStorage from './SecretStorage';
 
 import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
@@ -276,6 +281,45 @@ Crypto.prototype.init = async function() {
     this._checkAndStartKeyBackup();
 };
 
+/**
+ * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
+ * the cross-signing master key. If everything is already set up, then no
+ * changes are made, so this is safe to run to ensure secret storage is ready
+ * for use.
+ *
+ * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
+ * await an interactive auth request.
+ * Args:
+ *     {function} A function that makes the request requiring auth. Receives the
+ *     auth data as an object.
+ */
+Crypto.prototype.bootstrapSecretStorage = async function({
+    doInteractiveAuthFlow,
+} = {}) {
+    logger.log("Bootstrapping Secure Secret Storage");
+
+    // Create cross-signing keys if they don't exist, as we want to sign the SSSS default
+    // key with the cross-signing master key. The cross-signing master keys is also used
+    // to verify the signature on the SSSS default key when adding secrets, so we
+    // effectively need it for both reading and writing secrets.
+    if (!this._crossSigningInfo.getId()) {
+        logger.log("Cross-signing keys not found, creating new keys");
+        await this.resetCrossSigningKeys(
+            CrossSigningLevel.MASTER,
+            { doInteractiveAuthFlow },
+        );
+    }
+
+    // Check if Secure Secret Storage has a default key. If so, we should be
+    // ready to store things.
+    if (!this._secretStorage.hasKey()) {
+        // add key
+        throw new Error("Secret Storage key step unimplemented!");
+    }
+
+    logger.log("Secure Secret Storage ready");
+};
+
 Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
     return this._secretStorage.addKey(algorithm, opts, keyID);
 };
@@ -331,27 +375,46 @@ Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
 /**
  * Generate new cross-signing keys.
  *
- * @param {object} authDict Auth data to supply for User-Interactive auth.
  * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
  * keys will be created for the given level and below.  Defaults to
  * regenerating all keys.
+ * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
+ * await an interactive auth request.
+ * Args:
+ *     {function} A function that makes the request requiring auth. Receives the
+ *     auth data as an object.
  */
-Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
-    await this._crossSigningInfo.resetKeys(level);
-    await this._signObject(this._crossSigningInfo.keys.master);
-    await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
-        (txn) => {
-            this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
-        },
-    );
+Crypto.prototype.resetCrossSigningKeys = async function(level, {
+    doInteractiveAuthFlow = async func => await func(),
+} = {}) {
+    logger.info(`Resetting cross-signing keys at level ${level}`);
+    try {
+        await this._crossSigningInfo.resetKeys(level);
+        await this._signObject(this._crossSigningInfo.keys.master);
 
-    // send keys to server
-    const keys = {};
-    for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
-        keys[name + "_key"] = key;
+        // send keys to server first before caching locally (to ensure upload succeeds)
+        const keys = {};
+        for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
+            keys[name + "_key"] = key;
+        }
+        await doInteractiveAuthFlow(async authDict => {
+            await this._baseApis.uploadDeviceSigningKeys(authDict, keys);
+        });
+
+        // update local cache of public keys
+        await this._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
+            },
+        );
+    } catch (e) {
+        // If anything failed here, remove the keys so we know to try again from the start
+        // next time.
+        logger.error("Resetting cross-signing keys failed, removing keys", e);
+        this._crossSigningInfo.removeKeys(level);
+        throw e;
     }
-    await this._baseApis.uploadDeviceSigningKeys(authDict || {}, keys);
     this._baseApis.emit("crossSigning.keysChanged", {});
 
     // sign the current device with the new key, and upload to the server
@@ -397,6 +460,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(authDict, level) {
             );
         }
     }
+
+    logger.info("Cross-signing key reset complete");
 };
 
 /**

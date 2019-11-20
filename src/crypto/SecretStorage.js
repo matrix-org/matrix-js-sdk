@@ -132,6 +132,24 @@ export default class SecretStorage extends EventEmitter {
         return keyId;
     }
 
+    /**
+     * Check whether we have a key with a given ID.
+     *
+     * @param {string} [keyId = default key's ID] The ID of the key to check
+     *     for. Defaults to the default key ID if not provided.
+     * @return {boolean} Whether we have the key.
+     */
+    hasKey(keyId = this.getDefaultKeyId()) {
+        if (!keyId) {
+            return false;
+        }
+
+        const keyInfo = this._baseApis.getAccountData(
+            "m.secret_storage.key." + keyId,
+        );
+        return keyInfo && keyInfo.getContent();
+    }
+
     // TODO: need a function to get all the secret keys
 
     /**

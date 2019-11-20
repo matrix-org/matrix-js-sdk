@@ -1044,6 +1044,20 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 };
 
 /**
+ * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
+ * the cross-signing master key. If everything is already set up, then no
+ * changes are made, so this is safe to run to ensure secret storage is ready
+ * for use.
+ *
+ * @function module:client~MatrixClient#bootstrapSecretStorage
+ * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
+ * await an interactive auth request.
+ * Args:
+ *     {function} A function that makes the request requiring auth. Receives the
+ *     auth data as an object.
+ */
+
+/**
  * Add a key for encrypting secrets.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
@@ -1120,6 +1134,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "bootstrapSecretStorage",
     "addSecretKey",
     "storeSecret",
     "getSecret",

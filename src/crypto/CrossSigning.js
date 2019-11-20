@@ -268,14 +268,26 @@ export class CrossSigningInfo extends EventEmitter {
             this.keys.master = keys.master;
             // if the master key is set, then the old self-signing and
             // user-signing keys are obsolete
-            delete this.keys.self_signing;
-            delete this.keys.user_signing;
+            this.keys.self_signing = null;
+            this.keys.user_signing = null;
         }
         if (keys.self_signing) {
             this.keys.self_signing = keys.self_signing;
         }
         if (keys.user_signing) {
             this.keys.user_signing = keys.user_signing;
+        }
+    }
+
+    removeKeys(level) {
+        if (level & CrossSigningLevel.MASTER) {
+            this.keys.master = null;
+        }
+        if (level & CrossSigningLevel.SELF_SIGNING) {
+            this.keys.self_signing = null;
+        }
+        if (level & CrossSigningLevel.USER_SIGNING) {
+            this.keys.user_signing = null;
         }
     }
 
