@@ -276,7 +276,7 @@ describe("MegolmBackup", function() {
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
-                            expect(numCalls).toBeLessThanOrEqualTo(1);
+                            expect(numCalls).toBeLessThanOrEqual(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
@@ -340,7 +340,7 @@ describe("MegolmBackup", function() {
                     callback, method, path, queryParams, data, opts,
                 ) {
                     ++numCalls;
-                    expect(numCalls).toBeLessThanOrEqualTo(1);
+                    expect(numCalls).toBeLessThanOrEqual(1);
                     if (numCalls >= 2) {
                         // exit out of retry loop if there's something wrong
                         reject(new Error("authedRequest called too many timmes"));
@@ -446,7 +446,7 @@ describe("MegolmBackup", function() {
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
-                            expect(numCalls).toBeLessThanOrEqualTo(2);
+                            expect(numCalls).toBeLessThanOrEqual(2);
                             if (numCalls >= 3) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
