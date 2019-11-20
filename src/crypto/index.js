@@ -324,7 +324,12 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     // If cross-signing keys changed, store them in Secure Secret Storage.
     if (crossSigningKeysChanged) {
-        throw new Error("Cross-signing keys need to be stored!");
+        logger.log("Storing cross-signing keys in secret storage");
+        // XXX: We need to think about how to re-do this step if it fails.
+        const getKey = this._baseApis._cryptoCallbacks.getCrossSigningKey;
+        for (const name of ["master", "self_signing", "user_signing"]) {
+            await this.storeSecret(`m.cross_signing.${name}`, getKey(name));
+        }
     }
 
     logger.log("Secure Secret Storage ready");
