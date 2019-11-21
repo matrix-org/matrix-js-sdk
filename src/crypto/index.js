@@ -49,6 +49,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from './verification/Error';
+import {sleep} from '../utils';
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -1834,7 +1835,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
         // requests from different clients hitting the server all at
         // the same time when a new key is sent
         const delay = Math.random() * maxDelay;
-        await Promise.delay(delay);
+        await sleep(delay);
         let numFailures = 0; // number of consecutive failures
         while (1) {
             if (!this.backupKey) {
@@ -1868,7 +1869,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
             }
             if (numFailures) {
                 // exponential backoff if we have failures
-                await Promise.delay(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
             }
         }
     } finally {

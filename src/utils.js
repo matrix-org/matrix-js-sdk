@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 const unhomoglyph = require('unhomoglyph');
+import Promise from 'bluebird';
 
 /**
  * Encode a dictionary of query parameters.
@@ -708,3 +709,8 @@ module.exports.ensureNoTrailingSlash = function(url) {
         return url;
     }
 };
+
+// Returns a promise which resolves with a given value after the given number of ms
+module.exports.sleep = (ms, value) => new Promise((resolve => {
+    setTimeout(resolve, ms, value);
+}));

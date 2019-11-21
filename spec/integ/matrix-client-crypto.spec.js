@@ -427,15 +427,14 @@ describe("MatrixClient crypto", function() {
             .then(bobUploadsDeviceKeys);
     });
 
-    it("Ali downloads Bobs device keys", function(done) {
-        Promise.resolve()
+    it("Ali downloads Bobs device keys", function() {
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys)
-            .then(aliDownloadsKeys)
-            .nodeify(done);
+            .then(aliDownloadsKeys);
     });
 
-    it("Ali gets keys with an invalid signature", function(done) {
-        Promise.resolve()
+    it("Ali gets keys with an invalid signature", function() {
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(function() {
                 // tamper bob's keys
@@ -452,11 +451,10 @@ describe("MatrixClient crypto", function() {
             }).then((devices) => {
                 // should get an empty list
                 expect(devices).toEqual([]);
-            })
-            .nodeify(done);
+            });
     });
 
-    it("Ali gets keys with an incorrect userId", function(done) {
+    it("Ali gets keys with an incorrect userId", function() {
         const eveUserId = "@eve:localhost";
 
         const bobDeviceKeys = {
@@ -485,7 +483,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        Promise.all([
+        return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -497,10 +495,10 @@ describe("MatrixClient crypto", function() {
             // should get an empty list
             expect(bobDevices).toEqual([]);
             expect(eveDevices).toEqual([]);
-        }).nodeify(done);
+        });
     });
 
-    it("Ali gets keys with an incorrect deviceId", function(done) {
+    it("Ali gets keys with an incorrect deviceId", function() {
         const bobDeviceKeys = {
             algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
             device_id: 'bad_device',
@@ -527,7 +525,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        Promise.all([
+        return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -535,7 +533,7 @@ describe("MatrixClient crypto", function() {
         }).then((devices) => {
             // should get an empty list
             expect(devices).toEqual([]);
-        }).nodeify(done);
+        });
     });
 
 
@@ -549,15 +547,14 @@ describe("MatrixClient crypto", function() {
             });
     });
 
-    it("Ali sends a message", function(done) {
+    it("Ali sends a message", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(aliEnablesEncryption)
-            .then(aliSendsFirstMessage)
-            .nodeify(done);
+            .then(aliSendsFirstMessage);
     });
 
     it("Bob receives a message", function() {
@@ -625,9 +622,9 @@ describe("MatrixClient crypto", function() {
             });
     });
 
-    it("Ali blocks Bob's device", function(done) {
+    it("Ali blocks Bob's device", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -642,12 +639,12 @@ describe("MatrixClient crypto", function() {
                           expect(sentContent.ciphertext).toEqual({});
                       });
                 return Promise.all([p1, p2]);
-            }).nodeify(done);
+            });
     });
 
-    it("Bob receives two pre-key messages", function(done) {
+    it("Bob receives two pre-key messages", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -655,8 +652,7 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobRecvMessage)
             .then(aliSendsMessage)
-            .then(bobRecvMessage)
-            .nodeify(done);
+            .then(bobRecvMessage);
     });
 
     it("Bob replies to the message", function() {
