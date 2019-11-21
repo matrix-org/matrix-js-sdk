@@ -43,7 +43,7 @@ describe("MatrixClient", function() {
 
     describe("uploadContent", function() {
         const buf = new Buffer('hello world');
-        it("should upload the file", function(done) {
+        it("should upload the file", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
@@ -71,25 +71,26 @@ describe("MatrixClient", function() {
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            prom.then(function(response) {
+            const prom2 = prom.then(function(response) {
                 // for backwards compatibility, we return the raw JSON
                 expect(response).toEqual("content");
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).nodeify(done);
+            });
 
             httpBackend.flush();
+            return prom2;
         });
 
-        it("should parse the response if rawResponse=false", function(done) {
+        it("should parse the response if rawResponse=false", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.opts.json).toBeFalsy();
             }).respond(200, { "content_uri": "uri" });
 
-            client.uploadContent({
+            const prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
@@ -97,12 +98,13 @@ describe("MatrixClient", function() {
                 rawResponse: false,
             }).then(function(response) {
                 expect(response.content_uri).toEqual("uri");
-            }).nodeify(done);
+            });
 
             httpBackend.flush();
+            return prom;
         });
 
-        it("should parse errors into a MatrixError", function(done) {
+        it("should parse errors into a MatrixError", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
@@ -113,7 +115,7 @@ describe("MatrixClient", function() {
                 "error": "broken",
             });
 
-            client.uploadContent({
+            const prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
@@ -123,12 +125,13 @@ describe("MatrixClient", function() {
                 expect(error.httpStatus).toEqual(400);
                 expect(error.errcode).toEqual("M_SNAFU");
                 expect(error.message).toEqual("broken");
-            }).nodeify(done);
+            });
 
             httpBackend.flush();
+            return prom;
         });
 
-        it("should return a promise which can be cancelled", function(done) {
+        it("should return a promise which can be cancelled", function() {
             const prom = client.uploadContent({
                 stream: buf,
                 name: "hi.txt",
@@ -140,17 +143,18 @@ describe("MatrixClient", function() {
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            prom.then(function(response) {
+            const prom2 = prom.then(function(response) {
                 throw Error("request not aborted");
             }, function(error) {
                 expect(error).toEqual("aborted");
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
-            }).nodeify(done);
+            });
 
             const r = client.cancelUpload(prom);
             expect(r).toBe(true);
+            return prom2;
         });
     });
 
@@ -307,7 +311,7 @@ describe("MatrixClient", function() {
             return client.initCrypto();
         });
 
-        it("should do an HTTP request and then store the keys", function(done) {
+        it("should do an HTTP request and then store the keys", function() {
             const ed25519key = "7wG2lzAqbjcyEkOP7O4gU7ItYcn+chKzh5sT/5r2l78";
             // ed25519key = client.getDeviceEd25519Key();
             const borisKeys = {
@@ -369,7 +373,7 @@ describe("MatrixClient", function() {
                 },
             });
 
-            client.downloadKeys(["boris", "chaz"]).then(function(res) {
+            const prom = client.downloadKeys(["boris", "chaz"]).then(function(res) {
                 assertObjectContains(res.boris.dev1, {
                     verified: 0, // DeviceVerification.UNVERIFIED
                     keys: { "ed25519:dev1": ed25519key },
@@ -383,9 +387,10 @@ describe("MatrixClient", function() {
                     algorithms: ["2"],
                     unsigned: { "ghi": "def" },
                 });
-            }).nodeify(done);
+            });
 
             httpBackend.flush();
+            return prom;
         });
     });
 
@@ -398,11 +403,10 @@ describe("MatrixClient", function() {
                 expect(req.data).toEqual({auth: auth});
             }).respond(200);
 
-            client.deleteDevice(
-                "my_device", auth,
-            ).nodeify(done);
+            const prom = client.deleteDevice("my_device", auth);
 
             httpBackend.flush();
+            return prom;
         });
     });
 });

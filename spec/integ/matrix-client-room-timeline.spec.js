@@ -102,7 +102,7 @@ describe("MatrixClient room timelines", function() {
         });
     }
 
-    beforeEach(function(done) {
+    beforeEach(function() {
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -120,9 +120,9 @@ describe("MatrixClient room timelines", function() {
             return NEXT_SYNC_DATA;
         });
         client.startClient();
-        httpBackend.flush("/pushrules").then(function() {
+        return httpBackend.flush("/pushrules").then(function() {
             return httpBackend.flush("/filter");
-        }).nodeify(done);
+        });
     });
 
     afterEach(function() {

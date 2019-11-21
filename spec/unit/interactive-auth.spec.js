@@ -33,7 +33,7 @@ class FakeClient {
 }
 
 describe("InteractiveAuth", function() {
-    it("should start an auth stage and complete it", function(done) {
+    it("should start an auth stage and complete it", function() {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -79,14 +79,14 @@ describe("InteractiveAuth", function() {
             return Promise.resolve(requestRes);
         });
 
-        ia.attemptAuth().then(function(res) {
+        return ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest).toBeCalledTimes(1);
             expect(stateUpdated).toBeCalledTimes(1);
-        }).nodeify(done);
+        });
     });
 
-    it("should make a request if no authdata is provided", function(done) {
+    it("should make a request if no authdata is provided", function() {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -142,10 +142,10 @@ describe("InteractiveAuth", function() {
             });
         });
 
-        ia.attemptAuth().then(function(res) {
+        return ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
             expect(doRequest).toBeCalledTimes(2);
             expect(stateUpdated).toBeCalledTimes(1);
-        }).nodeify(done);
+        });
     });
 });

@@ -114,21 +114,20 @@ describe("getEventTimeline support", function() {
         return httpBackend.stop();
     });
 
-    it("timeline support must be enabled to work", function(done) {
+    it("timeline support must be enabled to work", function() {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
         });
 
-        startClient(httpBackend, client,
-        ).then(function() {
+        return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
             }).toThrow();
-        }).nodeify(done);
+        });
     });
 
     it("timeline support works when enabled", function() {
@@ -150,7 +149,7 @@ describe("getEventTimeline support", function() {
 
 
     it("scrollback should be able to scroll back to before a gappy /sync",
-      function(done) {
+      function() {
         // need a client with timelineSupport disabled to make this work
         client = sdk.createClient({
             baseUrl: baseUrl,
@@ -159,8 +158,7 @@ describe("getEventTimeline support", function() {
         });
         let room;
 
-        startClient(httpBackend, client,
-        ).then(function() {
+        return startClient(httpBackend, client).then(function() {
             room = client.getRoom(roomId);
 
             httpBackend.when("GET", "/sync").respond(200, {
@@ -216,7 +214,7 @@ describe("getEventTimeline support", function() {
             expect(room.timeline[0].event).toEqual(EVENTS[0]);
             expect(room.timeline[1].event).toEqual(EVENTS[1]);
             expect(room.oldState.paginationToken).toEqual("pagin_end");
-        }).nodeify(done);
+        });
     });
 });
 
@@ -693,7 +691,7 @@ describe("MatrixClient event timelines", function() {
     });
 
 
-    it("should handle gappy syncs after redactions", function(done) {
+    it("should handle gappy syncs after redactions", function() {
         // https://github.com/vector-im/vector-web/issues/1389
 
         // a state event, followed by a redaction thereof
@@ -725,7 +723,7 @@ describe("MatrixClient event timelines", function() {
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        Promise.all([
+        return Promise.all([
             httpBackend.flushAllExpected(),
             utils.syncPromise(client),
         ]).then(function() {
@@ -761,6 +759,6 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(1);
-        }).nodeify(done);
+        });
     });
 });
