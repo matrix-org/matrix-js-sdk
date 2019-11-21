@@ -396,7 +396,7 @@ describe("MatrixClient", function() {
 
     describe("deleteDevice", function() {
         const auth = {a: 1};
-        it("should pass through an auth dict", function(done) {
+        it("should pass through an auth dict", function() {
             httpBackend.when(
                 "DELETE", "/_matrix/client/r0/devices/my_device",
             ).check(function(req) {
