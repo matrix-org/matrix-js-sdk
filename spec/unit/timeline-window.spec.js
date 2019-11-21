@@ -148,7 +148,7 @@ describe("TimelineWindow", function() {
     let timelineSet;
     let client;
     function createWindow(timeline, opts) {
-        timelineSet = {};
+        timelineSet = {getTimelineForEvent: () => null};
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
@@ -177,7 +177,7 @@ describe("TimelineWindow", function() {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {};
+            const timelineSet = {getTimelineForEvent: () => null};
             const client = {};
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
@@ -200,7 +200,7 @@ describe("TimelineWindow", function() {
 
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {};
+            const timelineSet = {getTimelineForEvent: () => null};
             const client = {};
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
