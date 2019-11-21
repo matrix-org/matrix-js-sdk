@@ -19,6 +19,7 @@ limitations under the License.
 "use strict";
 
 const PushProcessor = require('./pushprocessor');
+import {sleep} from './utils';
 
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
@@ -3221,7 +3222,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     const self = this;
     // wait for a time before doing this request
     // (which may be 0 in order not to special case the code paths)
-    Promise.delay(timeToWaitMs).then(function() {
+    sleep(timeToWaitMs).then(function() {
         return self._createMessagesRequest(
             room.roomId,
             room.oldState.paginationToken,

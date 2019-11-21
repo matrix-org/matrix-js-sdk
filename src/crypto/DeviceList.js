@@ -31,6 +31,7 @@ import DeviceInfo from './deviceinfo';
 import {CrossSigningInfo} from './CrossSigning';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+import {sleep} from '../utils';
 
 
 /* State transition diagram for DeviceList._deviceTrackingStatus
@@ -763,7 +764,7 @@ class DeviceListUpdateSerialiser {
             // this serves as an easy solution for now.
             let prom = Promise.resolve();
             for (const userId of downloadUsers) {
-                prom = prom.delay(5).then(() => {
+                prom = prom.then(sleep(5)).then(() => {
                     return this._processQueryResponseForUser(
                         userId, dk[userId], {
                             master: masterKeys[userId],
