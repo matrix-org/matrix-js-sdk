@@ -4640,10 +4640,12 @@ function setupCallEventHandler(client) {
     // notifications. It needs to be buffered to correctly determine if an
     // incoming call has had a matching answer/hangup.
     let callEventBuffer = [];
-    let isClientPrepared = false;
-    client.on("sync", function(state) {
-        if (state === "PREPARED") {
-            isClientPrepared = true;
+    let isClientSyncing = false;
+    const onSync = function(state) {
+        if (state === "SYNCING") {
+            isClientSyncing = true;
+            client.removeListener("sync", onSync);
+
             const ignoreCallIds = {}; // Set<String>
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
@@ -4664,7 +4666,8 @@ function setupCallEventHandler(client) {
             });
             callEventBuffer = [];
         }
-    });
+    };
+    client.on("sync", onSync);
 
     client.on("event", onEvent);
 
@@ -4677,7 +4680,7 @@ function setupCallEventHandler(client) {
             }
             return;
         }
-        if (!isClientPrepared) {
+        if (!isClientSyncing) {
             callEventBuffer.push(event);
             return;
         }
