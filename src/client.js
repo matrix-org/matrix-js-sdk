@@ -4635,17 +4635,17 @@ function setupCallEventHandler(client) {
         // callId: [Candidate]
     };
 
-    // Maintain a buffer of events before the client has synced for the first time.
-    // This buffer will be inspected to see if we should send incoming call
-    // notifications. It needs to be buffered to correctly determine if an
-    // incoming call has had a matching answer/hangup.
+    // The sync code always emits one event at a time, so it will patiently
+    // wait for us to finish processing a call invite before delivering the
+    // next event, even if that next event is a hangup. We therefore accumulate
+    // all our call events and then process them on the 'sync' event, ie.
+    // each time a sync has completed. This way, we can avoid emitting incoming
+    // call events if we get both the invite and answer/hangup in the same sync.
+    // This happens quite often, eg. replaying sync from storage, catchup sync
+    // after loading and after we've been offline for a bit.
     let callEventBuffer = [];
-    let isClientSyncing = false;
-    const onSync = function(state) {
+    function onSync(state) {
         if (state === "SYNCING") {
-            isClientSyncing = true;
-            client.removeListener("sync", onSync);
-
             const ignoreCallIds = {}; // Set<String>
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
@@ -4658,18 +4658,19 @@ function setupCallEventHandler(client) {
             }
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
-                if (ignoreCallIds[e.getContent().call_id]) {
-                    // This call has previously been ansered or hung up: ignore it
+                if (
+                    e.getType() === "m.call.invite" &&
+                    ignoreCallIds[e.getContent().call_id]
+                ) {
+                    // This call has previously been answered or hung up: ignore it
                     return;
                 }
                 callEventHandler(e);
             });
             callEventBuffer = [];
         }
-    };
+    }
     client.on("sync", onSync);
-
-    client.on("event", onEvent);
 
     function onEvent(event) {
         if (event.getType().indexOf("m.call.") !== 0) {
@@ -4680,12 +4681,11 @@ function setupCallEventHandler(client) {
             }
             return;
         }
-        if (!isClientSyncing) {
-            callEventBuffer.push(event);
-            return;
-        }
-        callEventHandler(event);
+        // queue up for processing once all events from this sync have been
+        // processed (see above).
+        callEventBuffer.push(event);
     }
+    client.on("event", onEvent);
 
     function callEventHandler(event) {
         const content = event.getContent();
