@@ -4658,7 +4658,10 @@ function setupCallEventHandler(client) {
             }
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
-                if (e.getType() === "m.call.invite" && ignoreCallIds[e.getContent().call_id]) {
+                if (
+                    e.getType() === "m.call.invite" &&
+                    ignoreCallIds[e.getContent().call_id]
+                ) {
                     // This call has previously been answered or hung up: ignore it
                     return;
                 }
@@ -4666,7 +4669,7 @@ function setupCallEventHandler(client) {
             });
             callEventBuffer = [];
         }
-    };
+    }
     client.on("sync", onSync);
 
     function onEvent(event) {
