@@ -930,11 +930,8 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
         crypto._onToDeviceEvent(event);
     });
 
-    // only sync timeline events, not events when backpaginating, loading, ...
     eventEmitter.on("Room.timeline", function(event) {
-        if (event.getRoomId()) {
-            crypto._onTimelineEvent(event);
-        }
+        crypto._onTimelineEvent(event);
     });
 
     eventEmitter.on("Event.decrypted", function(event) {
