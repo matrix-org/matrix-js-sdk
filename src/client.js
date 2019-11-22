@@ -5205,6 +5205,8 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @param {object} data
  * @param {MatrixEvent} data.event the original verification request message
  * @param {Array} data.methods the verification methods that can be used
+ * @param {Number} data.timeout the amount of milliseconds that should be waited
+ *                 before cancelling the request automatically.
  * @param {Function} data.beginKeyVerification a function to call if a key
  *     verification should be performed.  The function takes one argument: the
  *     name of the key verification method (taken from data.methods) to use.

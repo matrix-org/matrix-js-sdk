@@ -298,6 +298,15 @@ utils.extend(module.exports.MatrixEvent.prototype, {
     },
 
     /**
+     * Get the age of the event when this function was called.
+     * Relies on the local clock being in sync with the clock of the original homeserver.
+     * @return {Number} The age of this event in milliseconds.
+     */
+    getLocalAge: function() {
+        return Date.now() - this.getTs();
+    },
+
+    /**
      * Get the event state_key if it has one. This will return <code>undefined
      * </code> for message events.
      * @return {string} The event's <code>state_key</code>.

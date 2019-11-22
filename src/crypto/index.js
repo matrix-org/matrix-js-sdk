@@ -66,6 +66,16 @@ export const verificationMethods = {
     SAS: SAS.NAME,
 };
 
+// the recommended amount of time before a verification request
+// should be (automatically) cancelled without user interaction
+// and ignored.
+const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
+// to avoid almost expired verification notifications
+// from showing a notification and almost immediately
+// disappearing, also ignore verification requests that
+// are this amount of time away from expiring.
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+
 export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
@@ -919,6 +929,14 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
 
     eventEmitter.on("toDeviceEvent", function(event) {
         crypto._onToDeviceEvent(event);
+    });
+
+    eventEmitter.on("Room.timeline", function(event) {
+        crypto._onTimelineEvent(event);
+    });
+
+    eventEmitter.on("Event.decrypted", function(event) {
+        crypto._onTimelineEvent(event);
     });
 };
 
@@ -2344,8 +2362,8 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
 
     const content = event.getContent();
     if (!("from_device" in content) || typeof content.from_device !== "string"
-        || !("transaction_id" in content) || typeof content.from_device !== "string"
-        || !("methods" in content) || !(content.methods instanceof Array)
+        || !("transaction_id" in content)
+        || !("methods" in content) || !Array.isArray(content.methods)
         || !("timestamp" in content) || typeof content.timestamp !== "number") {
         logger.warn("received invalid verification request from " + event.getSender());
         // ignore event if malformed
@@ -2421,6 +2439,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         // notify the application of the verification request, so it can
         // decide what to do with it
         const request = {
+            timeout: VERIFICATION_REQUEST_TIMEOUT,
             event: event,
             methods: methods,
             beginKeyVerification: (method) => {
@@ -2553,6 +2572,31 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
             }
         }
         this._baseApis.emit("crypto.verification.start", verifier);
+
+        // Riot does not implement `m.key.verification.request` while
+        // verifying over to_device messages, but the protocol is made to
+        // work when starting with a `m.key.verification.start` event straight
+        // away as well. Verification over DM *does* start with a request event first,
+        // and to expose a uniform api to monitor verification requests, we mock
+        // the request api here for to_device messages.
+        // "crypto.verification.start" is kept for backwards compatibility.
+
+        // ahh, this will create 2 request notifications for clients that do support the request event
+        // so maybe we should remove emitting the request when actually receiving it *sigh*
+        const requestAdapter = {
+            event,
+            timeout: VERIFICATION_REQUEST_TIMEOUT,
+            methods: [content.method],
+            beginKeyVerification: (method) => {
+                if (content.method === method) {
+                    return verifier;
+                }
+            },
+            cancel: () => {
+                return verifier.cancel("User cancelled");
+            },
+        };
+        this._baseApis.emit("crypto.verification.request", requestAdapter);
     }
 };
 
@@ -2583,6 +2627,53 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             verifier.handleEvent(event);
         }
     }
+};
+
+/**
+ * Handle key verification requests sent as timeline events
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event the timeline event
+ */
+Crypto.prototype._onTimelineEvent = function(event) {
+    if (event.getType() !== "m.room.message") {
+        return;
+    }
+    const content = event.getContent();
+    if (content.msgtype !== "m.key.verification.request") {
+        return;
+    }
+    // ignore event if malformed
+    if (!("from_device" in content) || typeof content.from_device !== "string"
+        || !("methods" in content) || !Array.isArray(content.methods)
+        || !("to" in content) || typeof content.to !== "string") {
+        logger.warn("received invalid verification request over DM from "
+            + event.getSender());
+        return;
+    }
+    // check the request was directed to the syncing user
+    if (content.to !== this._baseApis.getUserId()) {
+        return;
+    }
+
+    const timeout = VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN;
+    if (event.getLocalAge() >= timeout) {
+        return;
+    }
+    const request = {
+        event,
+        timeout: VERIFICATION_REQUEST_TIMEOUT,
+        methods: content.methods,
+        beginKeyVerification: (method) => {
+            const verifier = this.acceptVerificationDM(event, method);
+            return verifier;
+        },
+        cancel: () => {
+            const verifier = this.acceptVerificationDM(event, content.methods[0]);
+            verifier.cancel("User declined");
+        },
+    };
+    this._baseApis.emit("crypto.verification.request", request);
 };
 
 /**
