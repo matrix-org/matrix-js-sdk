@@ -4694,7 +4694,7 @@ function setupCallEventHandler(client) {
                 } else {
                     // This one wasn't buffered so just run the event handler for it
                     // straight away
-                    callEventHandler(e);
+                    callEventHandler(event);
                 }
             });
         }
