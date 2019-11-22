@@ -65,6 +65,9 @@ export const verificationMethods = {
     SAS: SAS.NAME,
 };
 
+const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+
 export function isCryptoAvailable() {
     return Boolean(global.Olm);
 }
@@ -918,6 +921,17 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
 
     eventEmitter.on("toDeviceEvent", function(event) {
         crypto._onToDeviceEvent(event);
+    });
+
+    // only sync timeline events, not events when backpaginating, loading, ...
+    eventEmitter.on("Room.timeline", function(event) {
+        if (event.getRoomId()) {
+            crypto._onTimelineEvent(event);
+        }
+    });
+
+    eventEmitter.on("Event.decrypted", function(event) {
+        crypto._onTimelineEvent(event);
     });
 };
 
@@ -2582,6 +2596,52 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             verifier.handleEvent(event);
         }
     }
+};
+
+/**
+ * Handle key verification requests sent as timeline events
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event the timeline event
+ */
+Crypto.prototype._onTimelineEvent = function(event) {
+    if (event.getType() !== "m.room.message") {
+        return;
+    }
+    const content = event.getContent();
+    if (content.msgtype !== "m.key.verification.request") {
+        return;
+    }
+    // ignore event if malformed
+    if (!("from_device" in content) || typeof content.from_device !== "string"
+        || !("methods" in content) || !Array.isArray(content.methods)
+        || !("to" in content) || typeof content.to !== "string") {
+        logger.warn("received invalid verification request over DM from "
+            + event.getSender());
+        return;
+    }
+    // check the request was directed to the syncing user
+    if (content.to !== this._baseApis.getUserId()) {
+        return;
+    }
+
+    const timeout = VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN;
+    if (event.getLocalAge() >= timeout) {
+        return;
+    }
+    const request = {
+        event,
+        methods: content.methods,
+        beginKeyVerification: (method) => {
+            const verifier = this.acceptVerificationDM(event, method);
+            return verifier;
+        },
+        cancel: () => {
+            const verifier = this.acceptVerificationDM(event, content.methods[0]);
+            verifier.cancel("User declined");
+        },
+    };
+    this._baseApis.emit("crypto.verification.request", request);
 };
 
 /**
