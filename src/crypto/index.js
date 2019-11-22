@@ -65,7 +65,14 @@ export const verificationMethods = {
     SAS: SAS.NAME,
 };
 
+// the recommended amount of time before a verification request
+// should be (automatically) cancelled without user interaction
+// and ignored.
 const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
+// to avoid almost expired verification notifications
+// from showing a notification and almost immediately
+// disappearing, also ignore verification requests that
+// are this amount of time away from expiring.
 const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
 
 export function isCryptoAvailable() {
