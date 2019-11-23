@@ -279,16 +279,17 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    const deferred = Promise.defer();
-    httpBackend.when("PUT", path).respond(200, function(path, content) {
-        deferred.resolve(content);
-        return {
-            event_id: "asdfgh",
-        };
+    const prom = new Promise((resolve) => {
+        httpBackend.when("PUT", path).respond(200, function(path, content) {
+            resolve(content);
+            return {
+                event_id: "asdfgh",
+            };
+        });
     });
 
     // it can take a while to process the key query
-    return httpBackend.flush(path, 1).then(() => deferred.promise);
+    return httpBackend.flush(path, 1).then(() => prom);
 }
 
 function aliRecvMessage() {

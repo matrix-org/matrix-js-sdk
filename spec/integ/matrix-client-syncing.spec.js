@@ -691,12 +691,12 @@ describe("MatrixClient syncing", function() {
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
-            const defer = Promise.defer();
-
-            httpBackend.when("GET", "/sync").check(function(req) {
-                expect(req.queryParams.filter).toEqual("another_id");
-                defer.resolve();
-            }).respond(200, {});
+            const prom = new Promise((resolve) => {
+                httpBackend.when("GET", "/sync").check(function(req) {
+                    expect(req.queryParams.filter).toEqual("another_id");
+                    resolve();
+                }).respond(200, {});
+            });
 
             client.syncLeftRooms();
 
@@ -707,7 +707,7 @@ describe("MatrixClient syncing", function() {
                     // flush the syncs
                     return httpBackend.flushAllExpected();
                 }),
-                defer.promise,
+                prom,
             ]);
         });
 
