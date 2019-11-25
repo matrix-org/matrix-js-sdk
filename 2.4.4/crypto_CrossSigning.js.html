@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: crypto/CrossSigning.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: crypto/CrossSigning.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/*
+Copyright 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+/**
+ * Cross signing methods
+ * @module crypto/CrossSigning
+ */
+
+import { pkSign, pkVerify } from './olmlib';
+import { EventEmitter } from 'events';
+import logger from '../logger';
+
+function publicKeyFromKeyInfo(keyInfo) {
+    return Object.entries(keyInfo.keys)[0];
+}
+
+export class CrossSigningInfo extends EventEmitter {
+    /**
+     * Information about a user's cross-signing keys
+     *
+     * @class
+     *
+     * @param {string} userId the user that the information is about
+     * @param {object} callbacks Callbacks used to interact with the app
+     *     Requires getCrossSigningKey and saveCrossSigningKeys
+     */
+    constructor(userId, callbacks) {
+        super();
+
+        // you can't change the userId
+        Object.defineProperty(this, 'userId', {
+            enumerable: true,
+            value: userId
+        });
+        this._callbacks = callbacks || {};
+        this.keys = {};
+        this.firstUse = true;
+    }
+
+    /**
+     * Calls the app callback to ask for a private key
+     * @param {string} type The key type ("master", "self_signing", or "user_signing")
+     * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
+     *     the stored public key for the given key type.
+     */
+    async getCrossSigningKey(type, expectedPubkey) {
+        if (!this._callbacks.getCrossSigningKey) {
+            throw new Error("No getCrossSigningKey callback supplied");
+        }
+
+        if (expectedPubkey === undefined) {
+            expectedPubkey = this.getId(type);
+        }
+
+        const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
+        if (!privkey) {
+            throw new Error("getCrossSigningKey callback for  " + type + " returned falsey");
+        }
+        const signing = new global.Olm.PkSigning();
+        const gotPubkey = signing.init_with_seed(privkey);
+        if (gotPubkey !== expectedPubkey) {
+            signing.free();
+            throw new Error("Key type " + type + " from getCrossSigningKey callback did not match");
+        } else {
+            return [gotPubkey, signing];
+        }
+    }
+
+    static fromStorage(obj, userId) {
+        const res = new CrossSigningInfo(userId);
+        for (const prop in obj) {
+            if (obj.hasOwnProperty(prop)) {
+                res[prop] = obj[prop];
+            }
+        }
+        return res;
+    }
+
+    toStorage() {
+        return {
+            keys: this.keys,
+            firstUse: this.firstUse
+        };
+    }
+
+    hasKeys() {
+        return Object.keys(this.keys).length > 0;
+    }
+
+    /**
+     * Get the ID used to identify the user
+     *
+     * @param {string} type The type of key to get the ID of.  One of "master",
+     * "self_signing", or "user_signing".  Defaults to "master".
+     *
+     * @return {string} the ID
+     */
+    getId(type) {
+        type = type || "master";
+        if (!this.keys[type]) return null;
+        const keyInfo = this.keys[type];
+        return publicKeyFromKeyInfo(keyInfo)[1];
+    }
+
+    async resetKeys(level) {
+        if (!this._callbacks.saveCrossSigningKeys) {
+            throw new Error("No saveCrossSigningKeys callback supplied");
+        }
+
+        // If we're resetting the master key, we reset all keys
+        if (level === undefined || level &amp; CrossSigningLevel.MASTER || !this.keys.master) {
+            level = CrossSigningLevel.MASTER | CrossSigningLevel.USER_SIGNING | CrossSigningLevel.SELF_SIGNING;
+        } else if (level === 0) {
+            return;
+        }
+
+        const privateKeys = {};
+        const keys = {};
+        let masterSigning;
+        let masterPub;
+
+        try {
+            if (level &amp; CrossSigningLevel.MASTER) {
+                masterSigning = new global.Olm.PkSigning();
+                privateKeys.master = masterSigning.generate_seed();
+                masterPub = masterSigning.init_with_seed(privateKeys.master);
+                keys.master = {
+                    user_id: this.userId,
+                    usage: ['master'],
+                    keys: {
+                        ['ed25519:' + masterPub]: masterPub
+                    }
+                };
+            } else {
+                [masterPub, masterSigning] = await this.getCrossSigningyKey("master");
+            }
+
+            if (level &amp; CrossSigningLevel.SELF_SIGNING) {
+                const sskSigning = new global.Olm.PkSigning();
+                try {
+                    privateKeys.self_signing = sskSigning.generate_seed();
+                    const sskPub = sskSigning.init_with_seed(privateKeys.self_signing);
+                    keys.self_signing = {
+                        user_id: this.userId,
+                        usage: ['self_signing'],
+                        keys: {
+                            ['ed25519:' + sskPub]: sskPub
+                        }
+                    };
+                    pkSign(keys.self_signing, masterSigning, this.userId, masterPub);
+                } finally {
+                    sskSigning.free();
+                }
+            }
+
+            if (level &amp; CrossSigningLevel.USER_SIGNING) {
+                const uskSigning = new global.Olm.PkSigning();
+                try {
+                    privateKeys.user_signing = uskSigning.generate_seed();
+                    const uskPub = uskSigning.init_with_seed(privateKeys.user_signing);
+                    keys.user_signing = {
+                        user_id: this.userId,
+                        usage: ['user_signing'],
+                        keys: {
+                            ['ed25519:' + uskPub]: uskPub
+                        }
+                    };
+                    pkSign(keys.user_signing, masterSigning, this.userId, masterPub);
+                } finally {
+                    uskSigning.free();
+                }
+            }
+
+            Object.assign(this.keys, keys);
+            this._callbacks.saveCrossSigningKeys(privateKeys);
+        } finally {
+            if (masterSigning) {
+                masterSigning.free();
+            }
+        }
+    }
+
+    setKeys(keys) {
+        const signingKeys = {};
+        if (keys.master) {
+            if (keys.master.user_id !== this.userId) {
+                const error = "Mismatched user ID " + keys.master.user_id + " in master key from " + this.userId;
+                logger.error(error);
+                throw new Error(error);
+            }
+            if (!this.keys.master) {
+                // this is the first key we've seen, so first-use is true
+                this.firstUse = true;
+            } else if (publicKeyFromKeyInfo(keys.master)[1] !== this.getId()) {
+                // this is a different key, so first-use is false
+                this.firstUse = false;
+            } // otherwise, same key, so no change
+            signingKeys.master = keys.master;
+        } else if (this.keys.master) {
+            signingKeys.master = this.keys.master;
+        } else {
+            throw new Error("Tried to set cross-signing keys without a master key");
+        }
+        const masterKey = publicKeyFromKeyInfo(signingKeys.master)[1];
+
+        // verify signatures
+        if (keys.user_signing) {
+            if (keys.user_signing.user_id !== this.userId) {
+                const error = "Mismatched user ID " + keys.master.user_id + " in user_signing key from " + this.userId;
+                logger.error(error);
+                throw new Error(error);
+            }
+            try {
+                pkVerify(keys.user_signing, masterKey, this.userId);
+            } catch (e) {
+                logger.error("invalid signature on user-signing key");
+                // FIXME: what do we want to do here?
+                throw e;
+            }
+        }
+        if (keys.self_signing) {
+            if (keys.self_signing.user_id !== this.userId) {
+                const error = "Mismatched user ID " + keys.master.user_id + " in self_signing key from " + this.userId;
+                logger.error(error);
+                throw new Error(error);
+            }
+            try {
+                pkVerify(keys.self_signing, masterKey, this.userId);
+            } catch (e) {
+                logger.error("invalid signature on self-signing key");
+                // FIXME: what do we want to do here?
+                throw e;
+            }
+        }
+
+        // if everything checks out, then save the keys
+        if (keys.master) {
+            this.keys.master = keys.master;
+            // if the master key is set, then the old self-signing and
+            // user-signing keys are obsolete
+            delete this.keys.self_signing;
+            delete this.keys.user_signing;
+        }
+        if (keys.self_signing) {
+            this.keys.self_signing = keys.self_signing;
+        }
+        if (keys.user_signing) {
+            this.keys.user_signing = keys.user_signing;
+        }
+    }
+
+    async signObject(data, type) {
+        if (!this.keys[type]) {
+            throw new Error("Attempted to sign with " + type + " key but no such key present");
+        }
+        const [pubkey, signing] = await this.getCrossSigningKey(type);
+        try {
+            pkSign(data, signing, this.userId, pubkey);
+            return data;
+        } finally {
+            signing.free();
+        }
+    }
+
+    async signUser(key) {
+        if (!this.keys.user_signing) {
+            return;
+        }
+        return this.signObject(key.keys.master, "user_signing");
+    }
+
+    async signDevice(userId, device) {
+        if (userId !== this.userId) {
+            throw new Error(`Trying to sign ${userId}'s device; can only sign our own device`);
+        }
+        if (!this.keys.self_signing) {
+            return;
+        }
+        return this.signObject({
+            algorithms: device.algorithms,
+            keys: device.keys,
+            device_id: device.deviceId,
+            user_id: userId
+        }, "self_signing");
+    }
+
+    /**
+     * Check whether a given user is trusted.
+     *
+     * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
+     *
+     * @returns {UserTrustLevel}
+     */
+    checkUserTrust(userCrossSigning) {
+        // if we're checking our own key, then it's trusted if the master key
+        // and self-signing key match
+        if (this.userId === userCrossSigning.userId &amp;&amp; this.getId() &amp;&amp; this.getId() === userCrossSigning.getId() &amp;&amp; this.getId("self_signing") &amp;&amp; this.getId("self_signing") === userCrossSigning.getId("self_signing")) {
+            return new UserTrustLevel(true, this.firstUse);
+        }
+
+        if (!this.keys.user_signing) {
+            // If there's no user signing key, they can't possibly be verified.
+            // They may be TOFU trusted though.
+            return new UserTrustLevel(false, userCrossSigning.firstUse);
+        }
+
+        let userTrusted;
+        const userMaster = userCrossSigning.keys.master;
+        const uskId = this.getId('user_signing');
+        try {
+            pkVerify(userMaster, uskId, this.userId);
+            userTrusted = true;
+        } catch (e) {
+            userTrusted = false;
+        }
+        return new UserTrustLevel(userTrusted, userCrossSigning.firstUse);
+    }
+
+    /**
+     * Check whether a given device is trusted.
+     *
+     * @param {CrossSigningInfo} userCrossSigning Cross signing info for user
+     * @param {module:crypto/deviceinfo} device The device to check
+     * @param {bool} localTrust Whether the device is trusted locally
+     *
+     * @returns {DeviceTrustLevel}
+     */
+    checkDeviceTrust(userCrossSigning, device, localTrust) {
+        const userTrust = this.checkUserTrust(userCrossSigning);
+
+        const userSSK = userCrossSigning.keys.self_signing;
+        if (!userSSK) {
+            // if the user has no self-signing key then we cannot make any
+            // trust assertions about this device from cross-signing
+            return new DeviceTrustLevel(false, false, localTrust);
+        }
+
+        const deviceObj = deviceToObject(device, userCrossSigning.userId);
+        try {
+            // if we can verify the user's SSK from their master key...
+            pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
+            // ...and this device's key from their SSK...
+            pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId);
+            // ...then we trust this device as much as far as we trust the user
+            return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust);
+        } catch (e) {
+            return new DeviceTrustLevel(false, false, localTrust);
+        }
+    }
+}
+
+function deviceToObject(device, userId) {
+    return {
+        algorithms: device.algorithms,
+        keys: device.keys,
+        device_id: device.deviceId,
+        user_id: userId,
+        signatures: device.signatures
+    };
+}
+
+export const CrossSigningLevel = {
+    MASTER: 4,
+    USER_SIGNING: 2,
+    SELF_SIGNING: 1
+};
+
+/**
+ * Represents the ways in which we trust a user
+ */
+export class UserTrustLevel {
+    constructor(crossSigningVerified, tofu) {
+        this._crossSigningVerified = crossSigningVerified;
+        this._tofu = tofu;
+    }
+
+    /**
+     * @returns {bool} true if this user is verified via any means
+     */
+    isVerified() {
+        return this.isCrossSigningVerified();
+    }
+
+    /**
+     * @returns {bool} true if this user is verified via cross signing
+     */
+    isCrossSigningVerified() {
+        return this._crossSigningVerified;
+    }
+
+    /**
+     * @returns {bool} true if this user's key is trusted on first use
+     */
+    isTofu() {
+        return this._tofu;
+    }
+}
+
+/**
+ * Represents the ways in which we trust a device
+ */
+export class DeviceTrustLevel {
+    constructor(crossSigningVerified, tofu, localVerified) {
+        this._crossSigningVerified = crossSigningVerified;
+        this._tofu = tofu;
+        this._localVerified = localVerified;
+    }
+
+    static fromUserTrustLevel(userTrustLevel, localVerified) {
+        return new DeviceTrustLevel(userTrustLevel._crossSigningVerified, userTrustLevel._tofu, localVerified);
+    }
+
+    /**
+     * @returns {bool} true if this device is verified via any means
+     */
+    isVerified() {
+        return this.isCrossSigningVerified() || this.isLocallyVerified();
+    }
+
+    /**
+     * @returns {bool} true if this device is verified via cross signing
+     */
+    isCrossSigningVerified() {
+        return this._crossSigningVerified;
+    }
+
+    /**
+     * @returns {bool} true if this device is verified locally
+     */
+    isLocallyVerified() {
+        return this._localVerified;
+    }
+
+    /**
+     * @returns {bool} true if this device is trusted from a user's key
+     * that is trusted on first use
+     */
+    isTofu() {
+        return this._tofu;
+    }
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_.html">crypto/DeviceList
+
+Manages the list of other users' devices</a></li><li><a href="crypto_RoomList%250A%250AManages%2520the%2520list%2520of%2520encrypted%2520roomsmodule_.html">crypto/RoomList
+
+Manages the list of encrypted rooms</a></li><li><a href="module-auto-discovery.html">auto-discovery</a></li><li><a href="module-base-apis.html">base-apis</a></li><li><a href="module-client.html">client</a></li><li><a href="module-content-repo.html">content-repo</a></li><li><a href="module-ContentHelpers.html">ContentHelpers</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms.html">crypto/algorithms</a></li><li><a href="module-crypto_algorithms_base.html">crypto/algorithms/base</a></li><li><a href="module-crypto_algorithms_megolm.html">crypto/algorithms/megolm</a></li><li><a href="module-crypto_algorithms_olm.html">crypto/algorithms/olm</a></li><li><a href="module-crypto_CrossSigning.html">crypto/CrossSigning</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_OutgoingRoomKeyRequestManager.html">crypto/OutgoingRoomKeyRequestManager</a></li><li><a href="module-crypto_SecretStorage.html">crypto/SecretStorage</a></li><li><a href="module-crypto_store_base.html">crypto/store/base</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_Error.html">crypto/verification/Error</a></li><li><a href="module-crypto_verification_QRCode.html">crypto/verification/QRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-filter.html">filter</a></li><li><a href="module-filter-component.html">filter-component</a></li><li><a href="module-http-api.html">http-api</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-logger.html">logger</a></li><li><a href="module-models_event.html">models/event</a></li><li><a href="module-models_event-context.html">models/event-context</a></li><li><a href="module-models_event-timeline.html">models/event-timeline</a></li><li><a href="module-models_event-timeline-set.html">models/event-timeline-set</a></li><li><a href="module-models_group.html">models/group</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state.html">models/room-state</a></li><li><a href="module-models_room-summary.html">models/room-summary</a></li><li><a href="module-models_search-result.html">models/search-result</a></li><li><a href="module-models_user.html">models/user</a></li><li><a href="module-pushprocessor.html">pushprocessor</a></li><li><a href="module-ReEmitter.html">ReEmitter</a></li><li><a href="module-scheduler.html">scheduler</a></li><li><a href="module-store_indexeddb.html">store/indexeddb</a></li><li><a href="module-store_memory.html">store/memory</a></li><li><a href="module-store_session_webstorage.html">store/session/webstorage</a></li><li><a href="module-store_stub.html">store/stub</a></li><li><a href="module-sync-accumulator.html">sync-accumulator</a></li><li><a href="module-timeline-window.html">timeline-window</a></li><li><a href="module-utils.html">utils</a></li><li><a href="module-webrtc_call.html">webrtc/call</a></li><li><a href="olmlib%250A%250AUtilities%2520common%2520to%2520olm%2520encryption%2520algorithmsmodule_.html">olmlib
+
+Utilities common to olm encryption algorithms</a></li></ul><h3>Externals</h3><ul><li><a href="external-EventEmitter.html">EventEmitter</a></li></ul><h3>Classes</h3><ul><li><a href="Backend.html">Backend</a></li><li><a href="crypto_DeviceList%250A%250AManages%2520the%2520list%2520of%2520other%2520users_%2520devicesmodule_-DeviceListUpdateSerialiser.html">DeviceListUpdateSerialiser</a></li><li><a href="global.html#IndexedDBStoreWorker">IndexedDBStoreWorker</a></li><li><a href="LocalIndexedDBStoreBackend.html">LocalIndexedDBStoreBackend</a></li><li><a href="module.html#.exports">exports</a></li><li><a href="module-auto-discovery.AutoDiscovery.html">AutoDiscovery</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_ERROR.html">FAIL_ERROR</a></li><li><a href="module-auto-discovery.AutoDiscovery.FAIL_PROMPT.html">FAIL_PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.PROMPT.html">PROMPT</a></li><li><a href="module-auto-discovery.AutoDiscovery.SUCCESS.html">SUCCESS</a></li><li><a href="module-auto-discovery-DiscoveredClientConfig.html">DiscoveredClientConfig</a></li><li><a href="module-base-apis-MatrixBaseApis.html">MatrixBaseApis</a></li><li><a href="module-client-MatrixClient.html">MatrixClient</a></li><li><a href="module-crypto.html">crypto</a></li><li><a href="module-crypto_algorithms_base.DecryptionAlgorithm.html">DecryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.DecryptionError.html">DecryptionError</a></li><li><a href="module-crypto_algorithms_base.EncryptionAlgorithm.html">EncryptionAlgorithm</a></li><li><a href="module-crypto_algorithms_base.UnknownDeviceError.html">UnknownDeviceError</a></li><li><a href="module-crypto_algorithms_megolm-MegolmDecryption.html">MegolmDecryption</a></li><li><a href="module-crypto_algorithms_megolm-MegolmEncryption.html">MegolmEncryption</a></li><li><a href="module-crypto_algorithms_olm-OlmDecryption.html">OlmDecryption</a></li><li><a href="module-crypto_algorithms_olm-OlmEncryption.html">OlmEncryption</a></li><li><a href="module-crypto_CrossSigning.CrossSigningInfo.html">CrossSigningInfo</a></li><li><a href="module-crypto_CrossSigning.DeviceTrustLevel.html">DeviceTrustLevel</a></li><li><a href="module-crypto_CrossSigning.UserTrustLevel.html">UserTrustLevel</a></li><li><a href="module-crypto_deviceinfo.html">crypto/deviceinfo</a></li><li><a href="module-crypto_DeviceList.html">crypto/DeviceList
+
+Manages the list of other users' devicesmodule:</a></li><li><a href="module-crypto_OlmDevice.html">crypto/OlmDevice</a></li><li><a href="module-crypto_RoomList.html">crypto/RoomList
+
+Manages the list of encrypted roomsmodule:</a></li><li><a href="module-crypto_store_indexeddb-crypto-store.html">crypto/store/indexeddb-crypto-store</a></li><li><a href="module-crypto_store_localStorage-crypto-store.html">crypto/store/localStorage-crypto-store</a></li><li><a href="module-crypto_store_memory-crypto-store.html">crypto/store/memory-crypto-store</a></li><li><a href="module-crypto_verification_Base.html">crypto/verification/Base</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ScanQRCode.html">crypto/verification/QRCode/ScanQRCode</a></li><li><a href="module-crypto_verification_QRCode-crypto_verification_QRCode_ShowQRCode.html">crypto/verification/QRCode/ShowQRCode</a></li><li><a href="module-crypto_verification_SAS.html">crypto/verification/SAS</a></li><li><a href="module-crypto-IncomingRoomKeyRequest.html">IncomingRoomKeyRequest</a></li><li><a href="module-crypto-IncomingRoomKeyRequestCancellation.html">IncomingRoomKeyRequestCancellation</a></li><li><a href="module-filter-component-FilterComponent.html">FilterComponent</a></li><li><a href="module-filter-Filter.html">Filter</a></li><li><a href="module-http-api.MatrixError.html">MatrixError</a></li><li><a href="module-http-api.MatrixHttpApi.html">MatrixHttpApi</a></li><li><a href="module-interactive-auth.html">interactive-auth</a></li><li><a href="module-models_event.MatrixEvent.html">MatrixEvent</a></li><li><a href="module-models_event-context-EventContext.html">EventContext</a></li><li><a href="module-models_event-timeline-set-EventTimelineSet.html">EventTimelineSet</a></li><li><a href="module-models_event-timeline-EventTimeline.html">EventTimeline</a></li><li><a href="module-models_room.html">models/room</a></li><li><a href="module-models_room-member.html">models/room-member</a></li><li><a href="module-models_room-state-RoomState.html">RoomState</a></li><li><a href="module-models_room-summary-RoomSummary.html">RoomSummary</a></li><li><a href="module-models_search-result-SearchResult.html">SearchResult</a></li><li><a href="module-models_user-User.html">User</a></li><li><a href="module-pushprocessor-PushProcessor.html">PushProcessor</a></li><li><a href="module-scheduler-MatrixScheduler.html">MatrixScheduler</a></li><li><a href="module-store_indexeddb-IndexedDBStore.html">IndexedDBStore</a></li><li><a href="module-store_memory.MemoryStore.html">MemoryStore</a></li><li><a href="module-store_session_webstorage-WebStorageSessionStore.html">WebStorageSessionStore</a></li><li><a href="module-store_stub-StubStore.html">StubStore</a></li><li><a href="module-sync-accumulator-SyncAccumulator.html">SyncAccumulator</a></li><li><a href="module-timeline-window-TimelineWindow.html">TimelineWindow</a></li><li><a href="module-webrtc_call-MatrixCall.html">MatrixCall</a></li><li><a href="RemoteIndexedDBStoreBackend.html">RemoteIndexedDBStoreBackend</a></li><li><a href="SyncApi.html">SyncApi</a></li></ul><h3>Interfaces</h3><ul><li><a href="module-crypto_store_base-CryptoStore.html">CryptoStore</a></li></ul><h3>Events</h3><ul><li><a href="module-client.html#~event:MatrixClient%2522accountData%2522">MatrixClient"accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Call.incoming%2522">MatrixClient"Call.incoming"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crossSigning.keysChanged%2522">MatrixClient"crossSigning.keysChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.keyBackupStatus%2522">MatrixClient"crypto.keyBackupStatus"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequest%2522">MatrixClient"crypto.roomKeyRequest"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.roomKeyRequestCancellation%2522">MatrixClient"crypto.roomKeyRequestCancellation"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.secrets.requestCancelled%2522">MatrixClient"crypto.secrets.requestCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.suggestKeyRestore%2522">MatrixClient"crypto.suggestKeyRestore"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request.unknown%2522">MatrixClient"crypto.verification.request.unknown"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.request%2522">MatrixClient"crypto.verification.request"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.verification.start%2522">MatrixClient"crypto.verification.start"</a></li><li><a href="module-client.html#~event:MatrixClient%2522crypto.warning%2522">MatrixClient"crypto.warning"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deleteRoom%2522">MatrixClient"deleteRoom"</a></li><li><a href="module-client.html#~event:MatrixClient%2522deviceVerificationChanged%2522">MatrixClient"deviceVerificationChanged"</a></li><li><a href="module-client.html#~event:MatrixClient%2522event%2522">MatrixClient"event"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.myMembership%2522">MatrixClient"Group.myMembership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group.profile%2522">MatrixClient"Group.profile"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Group%2522">MatrixClient"Group"</a></li><li><a href="module-client.html#~event:MatrixClient%2522no_consent%2522">MatrixClient"no_consent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.accountData%2522">MatrixClient"Room.accountData"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.localEchoUpdated%2522">MatrixClient"Room.localEchoUpdated"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.name%2522">MatrixClient"Room.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.receipt%2522">MatrixClient"Room.receipt"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redaction%2522">MatrixClient"Room.redaction"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.redactionCancelled%2522">MatrixClient"Room.redactionCancelled"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.tags%2522">MatrixClient"Room.tags"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timeline%2522">MatrixClient"Room.timeline"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room.timelineReset%2522">MatrixClient"Room.timelineReset"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Room%2522">MatrixClient"Room"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.membership%2522">MatrixClient"RoomMember.membership"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.name%2522">MatrixClient"RoomMember.name"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.powerLevel%2522">MatrixClient"RoomMember.powerLevel"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomMember.typing%2522">MatrixClient"RoomMember.typing"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.events%2522">MatrixClient"RoomState.events"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.members%2522">MatrixClient"RoomState.members"</a></li><li><a href="module-client.html#~event:MatrixClient%2522RoomState.newMember%2522">MatrixClient"RoomState.newMember"</a></li><li><a href="module-client.html#~event:MatrixClient%2522Session.logged_out%2522">MatrixClient"Session.logged_out"</a></li><li><a href="module-client.html#~event:MatrixClient%2522sync%2522">MatrixClient"sync"</a></li><li><a href="module-client.html#~event:MatrixClient%2522toDeviceEvent%2522">MatrixClient"toDeviceEvent"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.avatarUrl%2522">MatrixClient"User.avatarUrl"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.currentlyActive%2522">MatrixClient"User.currentlyActive"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.displayName%2522">MatrixClient"User.displayName"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.lastPresenceTs%2522">MatrixClient"User.lastPresenceTs"</a></li><li><a href="module-client.html#~event:MatrixClient%2522User.presence%2522">MatrixClient"User.presence"</a></li><li><a href="module-client.html#~event:MatrixClient%2522userTrustStatusChanged%2522">MatrixClient"userTrustStatusChanged"</a></li><li><a href="module-models_event.html#.event:MatrixEvent%2522Event.decrypted%2522">MatrixEvent"Event.decrypted"</a></li><li><a href="module-webrtc_call.html#~event:MatrixCall%2522error%2522">MatrixCall"error"</a></li></ul><h3>Global</h3><ul><li><a href="global.html#_removeEvent">_removeEvent</a></li><li><a href="global.html#addEvent">addEvent</a></li><li><a href="global.html#AutoDiscovery">AutoDiscovery</a></li><li><a href="global.html#clearTimeout">clearTimeout</a></li><li><a href="global.html#ContentHelpers">ContentHelpers</a></li><li><a href="global.html#ContentRepo">ContentRepo</a></li><li><a href="global.html#createClient">createClient</a></li><li><a href="global.html#createNewMatrixCall">createNewMatrixCall</a></li><li><a href="global.html#CRYPTO_ENABLED">CRYPTO_ENABLED</a></li><li><a href="global.html#EventStatus">EventStatus</a></li><li><a href="global.html#EventTimeline">EventTimeline</a></li><li><a href="global.html#EventTimelineSet">EventTimelineSet</a></li><li><a href="global.html#exists">exists</a></li><li><a href="global.html#Filter">Filter</a></li><li><a href="global.html#getAnnotationsBySender">getAnnotationsBySender</a></li><li><a href="global.html#getLastReplacement">getLastReplacement</a></li><li><a href="global.html#getRelations">getRelations</a></li><li><a href="global.html#getRequest">getRequest</a></li><li><a href="global.html#getSortedAnnotationsByKey">getSortedAnnotationsByKey</a></li><li><a href="global.html#Group">Group</a></li><li><a href="global.html#IndexedDBStore">IndexedDBStore</a></li><li><a href="global.html#IndexedDBStoreBackend">IndexedDBStoreBackend</a></li><li><a href="global.html#InteractiveAuth">InteractiveAuth</a></li><li><a href="global.html#InvalidStoreError">InvalidStoreError</a></li><li><a href="global.html#MatrixClient">MatrixClient</a></li><li><a href="global.html#MatrixError">MatrixError</a></li><li><a href="global.html#MatrixEvent">MatrixEvent</a></li><li><a href="global.html#MatrixHttpApi">MatrixHttpApi</a></li><li><a href="global.html#MatrixInMemoryStore">MatrixInMemoryStore</a></li><li><a href="global.html#MatrixScheduler">MatrixScheduler</a></li><li><a href="global.html#MemoryStore">MemoryStore</a></li><li><a href="global.html#request">request</a></li><li><a href="global.html#Room">Room</a></li><li><a href="global.html#RoomMember">RoomMember</a></li><li><a href="global.html#RoomState">RoomState</a></li><li><a href="global.html#selectQuery">selectQuery</a></li><li><a href="global.html#setCryptoStoreFactory">setCryptoStoreFactory</a></li><li><a href="global.html#setMatrixCallAudioInput">setMatrixCallAudioInput</a></li><li><a href="global.html#setMatrixCallAudioOutput">setMatrixCallAudioOutput</a></li><li><a href="global.html#setMatrixCallVideoInput">setMatrixCallVideoInput</a></li><li><a href="global.html#setNow">setNow</a></li><li><a href="global.html#setTimeout">setTimeout</a></li><li><a href="global.html#SyncAccumulator">SyncAccumulator</a></li><li><a href="global.html#TimelineWindow">TimelineWindow</a></li><li><a href="global.html#User">User</a></li><li><a href="global.html#WebStorageSessionStore">WebStorageSessionStore</a></li><li><a href="global.html#wrapRequest">wrapRequest</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Mon Nov 25 2019 13:17:16 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
