@@ -40,8 +40,8 @@ describe("Secrets", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await global.Olm.init();
+    beforeAll(function() {
+        return global.Olm.init();
     });
 
     it("should store and retrieve a secret", async function() {

@@ -25,14 +25,16 @@ describe("MegolmDecryption", function() {
         return;
     }
 
+    beforeAll(function() {
+        return Olm.init();
+    });
+
     let megolmDecryption;
     let mockOlmLib;
     let mockCrypto;
     let mockBaseApis;
 
     beforeEach(async function() {
-        await Olm.init();
-
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockBaseApis = {};
 

@@ -33,8 +33,8 @@ describe("QR code verification", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await Olm.init();
+    beforeAll(function() {
+        return Olm.init();
     });
 
     describe("showing", function() {

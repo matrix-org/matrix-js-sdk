@@ -55,8 +55,8 @@ describe("Cross Signing", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await global.Olm.init();
+    beforeAll(function() {
+        return global.Olm.init();
     });
 
     it("should sign the master key with the device key", async function() {

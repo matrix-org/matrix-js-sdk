@@ -45,8 +45,8 @@ describe("SAS verification", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await Olm.init();
+    beforeAll(function() {
+        return Olm.init();
     });
 
     it("should error on an unexpected event", async function() {
@@ -168,6 +168,12 @@ describe("SAS verification", function() {
                     }
                 }
             });
+        });
+        afterEach(async function() {
+            await Promise.all([
+                alice.stop(),
+                bob.stop(),
+            ]);
         });
 
         it("should verify a key", async function() {
