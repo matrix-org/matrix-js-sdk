@@ -1,5 +1,4 @@
 "use strict";
-import expect from 'expect';
 import Promise from 'bluebird';
 
 // load olm before the sdk if possible
@@ -42,18 +41,6 @@ module.exports.syncPromise = function(client, count) {
 };
 
 /**
- * Perform common actions before each test case, e.g. printing the test case
- * name to stdout.
- * @param {Mocha.Context} context  The test context
- */
-module.exports.beforeEach = function(context) {
-    const desc = context.currentTest.fullTitle();
-
-    logger.log(desc);
-    logger.log(new Array(1 + desc.length).join("="));
-};
-
-/**
  * Create a spy for an object and automatically spy its methods.
  * @param {*} constr The class constructor (used with 'new')
  * @param {string} name The name of the class
@@ -71,7 +58,7 @@ module.exports.mock = function(constr, name) {
     for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
-                result[key] = expect.createSpy();
+                result[key] = jest.fn();
             }
         } catch (ex) {
             // Direct access to some non-function fields of DOM prototypes may
@@ -241,4 +228,145 @@ module.exports.awaitDecryption = function(event) {
             resolve(ev);
         });
     });
+};
+
+
+const HttpResponse = module.exports.HttpResponse = function(
+    httpLookups, acceptKeepalives, ignoreUnhandledSync,
+) {
+    this.httpLookups = httpLookups;
+    this.acceptKeepalives = acceptKeepalives === undefined ? true : acceptKeepalives;
+    this.ignoreUnhandledSync = ignoreUnhandledSync;
+    this.pendingLookup = null;
+};
+
+HttpResponse.prototype.request = function HttpResponse(
+    cb, method, path, qp, data, prefix,
+) {
+    if (path === HttpResponse.KEEP_ALIVE_PATH && this.acceptKeepalives) {
+        return Promise.resolve();
+    }
+    const next = this.httpLookups.shift();
+    const logLine = (
+        "MatrixClient[UT] RECV " + method + " " + path + "  " +
+            "EXPECT " + (next ? next.method : next) + " " + (next ? next.path : next)
+    );
+    logger.log(logLine);
+
+    if (!next) { // no more things to return
+        if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
+            logger.log("MatrixClient[UT] Ignoring.");
+            return Promise.defer().promise;
+        }
+        if (this.pendingLookup) {
+            if (this.pendingLookup.method === method
+                && this.pendingLookup.path === path) {
+                return this.pendingLookup.promise;
+            }
+            // >1 pending thing, and they are different, whine.
+            expect(false).toBe(
+                true, ">1 pending request. You should probably handle them. " +
+                    "PENDING: " + JSON.stringify(this.pendingLookup) + " JUST GOT: " +
+                    method + " " + path,
+            );
+        }
+        this.pendingLookup = {
+            promise: Promise.defer().promise,
+            method: method,
+            path: path,
+        };
+        return this.pendingLookup.promise;
+    }
+    if (next.path === path && next.method === method) {
+        logger.log(
+            "MatrixClient[UT] Matched. Returning " +
+                (next.error ? "BAD" : "GOOD") + " response",
+        );
+        if (next.expectBody) {
+            expect(next.expectBody).toEqual(data);
+        }
+        if (next.expectQueryParams) {
+            Object.keys(next.expectQueryParams).forEach(function(k) {
+                expect(qp[k]).toEqual(next.expectQueryParams[k]);
+            });
+        }
+
+        if (next.thenCall) {
+            process.nextTick(next.thenCall, 0); // next tick so we return first.
+        }
+
+        if (next.error) {
+            return Promise.reject({
+                errcode: next.error.errcode,
+                httpStatus: next.error.httpStatus,
+                name: next.error.errcode,
+                message: "Expected testing error",
+                data: next.error,
+            });
+        }
+        return Promise.resolve(next.data);
+    } else if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
+        logger.log("MatrixClient[UT] Ignoring.");
+        this.httpLookups.unshift(next);
+        return Promise.defer().promise;
+    }
+    expect(true).toBe(false, "Expected different request. " + logLine);
+    return Promise.defer().promise;
+};
+
+HttpResponse.KEEP_ALIVE_PATH = "/_matrix/client/versions";
+
+HttpResponse.PUSH_RULES_RESPONSE = {
+    method: "GET",
+    path: "/pushrules/",
+    data: {},
+};
+
+HttpResponse.USER_ID = "@alice:bar";
+
+HttpResponse.filterResponse = function(userId) {
+    const filterPath = "/user/" + encodeURIComponent(userId) + "/filter";
+    return {
+        method: "POST",
+        path: filterPath,
+        data: { filter_id: "f1lt3r" },
+    };
+};
+
+HttpResponse.SYNC_DATA = {
+    next_batch: "s_5_3",
+    presence: { events: [] },
+    rooms: {},
+};
+
+HttpResponse.SYNC_RESPONSE = {
+    method: "GET",
+    path: "/sync",
+    data: HttpResponse.SYNC_DATA,
+};
+
+HttpResponse.defaultResponses = function(userId) {
+    return [
+        HttpResponse.PUSH_RULES_RESPONSE,
+        HttpResponse.filterResponse(userId),
+        HttpResponse.SYNC_RESPONSE,
+    ];
+};
+
+module.exports.setHttpResponses = function setHttpResponses(
+    client, responses, acceptKeepalives, ignoreUnhandledSyncs,
+) {
+    const httpResponseObj = new HttpResponse(
+        responses, acceptKeepalives, ignoreUnhandledSyncs,
+    );
+
+    const httpReq = httpResponseObj.request.bind(httpResponseObj);
+    client._http = [
+        "authedRequest", "authedRequestWithPrefix", "getContentUri",
+        "request", "requestWithPrefix", "uploadContent",
+    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
+    client._http.authedRequest.mockImplementation(httpReq);
+    client._http.authedRequestWithPrefix.mockImplementation(httpReq);
+    client._http.requestWithPrefix.mockImplementation(httpReq);
+    client._http.request.mockImplementation(httpReq);
 };

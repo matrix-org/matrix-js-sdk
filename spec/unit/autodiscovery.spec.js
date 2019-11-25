@@ -18,11 +18,9 @@ limitations under the License.
 import 'source-map-support/register';
 import Promise from 'bluebird';
 const sdk = require("../..");
-const utils = require("../test-utils");
 
 const AutoDiscovery = sdk.AutoDiscovery;
 
-import expect from 'expect';
 import MockHttpBackend from "matrix-mock-request";
 
 
@@ -30,7 +28,6 @@ describe("AutoDiscovery", function() {
     let httpBackend = null;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new MockHttpBackend();
         sdk.request(httpBackend.requestFn);
     });

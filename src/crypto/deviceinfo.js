@@ -56,6 +56,7 @@ function DeviceInfo(deviceId) {
     this.verified = DeviceVerification.UNVERIFIED;
     this.known = false;
     this.unsigned = {};
+    this.signatures = {};
 }
 
 /**
@@ -88,6 +89,7 @@ DeviceInfo.prototype.toStorage = function() {
         verified: this.verified,
         known: this.known,
         unsigned: this.unsigned,
+        signatures: this.signatures,
     };
 };
 

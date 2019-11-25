@@ -380,6 +380,23 @@ Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
 };
 
+
+/**
+ * Get the timestamp of the last message in the room
+ *
+ * @return {number} the timestamp of the last message in the room
+ */
+Room.prototype.getLastActiveTimestamp = function() {
+    const timeline = this.getLiveTimeline();
+    const events = timeline.getEvents();
+    if (events.length) {
+        const lastEvent = events[events.length - 1];
+        return lastEvent.getTs();
+    } else {
+        return Number.MIN_SAFE_INTEGER;
+    }
+};
+
 /**
  * @param {string} myUserId the user id for the logged in member
  * @return {string} the membership type (join | leave | invite) for the logged in user
@@ -878,7 +895,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    return this.currentState.getMember(userId);
+     return this.currentState.getMember(userId);
  };
 
 /**
@@ -886,7 +903,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember[]} A list of currently joined members.
  */
  Room.prototype.getJoinedMembers = function() {
-    return this.getMembersWithMembership("join");
+     return this.getMembersWithMembership("join");
  };
 
 /**

@@ -17,11 +17,9 @@ limitations under the License.
 
 import DeviceList from '../../../lib/crypto/DeviceList';
 import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
-import testUtils from '../../test-utils';
 import utils from '../../../lib/utils';
 import logger from '../../../src/logger';
 
-import expect from 'expect';
 import Promise from 'bluebird';
 
 const signedDeviceList = {
@@ -60,11 +58,9 @@ describe('DeviceList', function() {
     let deviceLists = [];
 
     beforeEach(function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-
         deviceLists = [];
 
-        downloadSpy = expect.createSpy();
+        downloadSpy = jest.fn();
         cryptoStore = new MemoryCryptoStore();
     });
 
@@ -92,7 +88,7 @@ describe('DeviceList', function() {
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
         const queryDefer1 = Promise.defer();
-        downloadSpy.andReturn(queryDefer1.promise);
+        downloadSpy.mockReturnValue(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
         expect(downloadSpy).toHaveBeenCalledWith(['@test1:sw1v.org'], {});
@@ -111,15 +107,15 @@ describe('DeviceList', function() {
         dl.startTrackingDeviceList('@test1:sw1v.org');
 
         const queryDefer1 = Promise.defer();
-        downloadSpy.andReturn(queryDefer1.promise);
+        downloadSpy.mockReturnValue(queryDefer1.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
         expect(downloadSpy).toHaveBeenCalledWith(['@test1:sw1v.org'], {});
-        downloadSpy.reset();
+        downloadSpy.mockReset();
 
         // outdated notif arrives while the request is in flight.
         const queryDefer2 = Promise.defer();
-        downloadSpy.andReturn(queryDefer2.promise);
+        downloadSpy.mockReturnValue(queryDefer2.promise);
 
         dl.invalidateUserDeviceList('@test1:sw1v.org');
         dl.refreshOutdatedDeviceLists();
@@ -136,10 +132,10 @@ describe('DeviceList', function() {
             // uh-oh; user restarts before second request completes. The new instance
             // should know we never got a complete device list.
             logger.log("Creating new devicelist to simulate app reload");
-            downloadSpy.reset();
+            downloadSpy.mockReset();
             const dl2 = createTestDeviceList();
             const queryDefer3 = Promise.defer();
-            downloadSpy.andReturn(queryDefer3.promise);
+            downloadSpy.mockReturnValue(queryDefer3.promise);
 
             const prom3 = dl2.refreshOutdatedDeviceLists();
             expect(downloadSpy).toHaveBeenCalledWith(['@test1:sw1v.org'], {});

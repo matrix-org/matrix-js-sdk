@@ -7,7 +7,7 @@ steps:
       - docker#v3.0.1:
           image: "node:10"
 
-  - label: ":karma: Tests"
+  - label: ":jest: Tests"
     command:
       - "yarn install"
       - "yarn test"
