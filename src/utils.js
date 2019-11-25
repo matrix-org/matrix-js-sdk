@@ -731,3 +731,9 @@ module.exports.defer = () => {
 
     return {resolve, reject, promise};
 };
+
+module.exports.promiseMapSeries = async (promises, fn) => {
+    for (const o of await promises) {
+        await fn(await o);
+    }
+};

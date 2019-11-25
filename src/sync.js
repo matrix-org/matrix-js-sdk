@@ -1150,7 +1150,7 @@ SyncApi.prototype._processSyncResponse = async function(
     });
 
     // Handle joins
-    await Promise.mapSeries(joinRooms, async function(joinObj) {
+    await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
@@ -1278,8 +1278,8 @@ SyncApi.prototype._processSyncResponse = async function(
             }
         }
 
-        await Promise.mapSeries(stateEvents, processRoomEvent);
-        await Promise.mapSeries(timelineEvents, processRoomEvent);
+        await utils.promiseMapSeries(stateEvents, processRoomEvent);
+        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
