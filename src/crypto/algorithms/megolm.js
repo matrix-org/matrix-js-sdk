@@ -1036,7 +1036,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             // TODO: retries
             return this._baseApis.sendToDevice("m.room.encrypted", contentMap);
         });
-    }).done();
+    });
 };
 
 MegolmDecryption.prototype._buildKeyForwardingMessage = async function(

@@ -2,7 +2,6 @@
 /* eslint new-cap: "off" */
 
 import 'source-map-support/register';
-import Promise from 'bluebird';
 import {defer} from '../../src/utils';
 const sdk = require("../..");
 const MatrixScheduler = sdk.MatrixScheduler;

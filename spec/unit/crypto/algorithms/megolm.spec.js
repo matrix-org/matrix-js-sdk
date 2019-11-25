@@ -1,7 +1,5 @@
 import '../../../olm-loader';
 
-import Promise from 'bluebird';
-
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
@@ -136,11 +134,11 @@ describe("MegolmDecryption", function() {
                 const deviceInfo = {};
                 mockCrypto.getStoredDevice.mockReturnValue(deviceInfo);
 
-                mockOlmLib.ensureOlmSessionsForDevices.mockReturnValue(
-                    Promise.resolve({'@alice:foo': {'alidevice': {
+                mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
+                    '@alice:foo': {'alidevice': {
                         sessionId: 'alisession',
-                    }}}),
-                );
+                    }},
+                });
 
                 const awaitEncryptForDevice = new Promise((res, rej) => {
                     mockOlmLib.encryptMessageForDevice.mockImplementation(() => {

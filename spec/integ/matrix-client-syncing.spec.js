@@ -6,8 +6,6 @@ const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
-import Promise from 'bluebird';
-
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -51,7 +49,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 done();
             });
         });
@@ -65,7 +63,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 done();
             });
         });
