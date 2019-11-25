@@ -203,7 +203,7 @@ function aliSendsFirstMessage() {
         expectAliQueryKeys()
             .then(expectAliClaimKeys)
             .then(expectAliSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -218,7 +218,7 @@ function aliSendsMessage() {
     return Promise.all([
         sendMessage(aliTestClient.client),
         expectAliSendMessageRequest(),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -234,7 +234,7 @@ function bobSendsReplyMessage() {
         sendMessage(bobTestClient.client),
         expectBobQueryKeys()
             .then(expectBobSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -492,7 +492,7 @@ describe("MatrixClient crypto", function() {
                 aliTestClient.client.getStoredDevicesForUser(bobUserId),
                 aliTestClient.client.getStoredDevicesForUser(eveUserId),
             ]);
-        }).spread((bobDevices, eveDevices) => {
+        }).then(([bobDevices, eveDevices]) => {
             // should get an empty list
             expect(bobDevices).toEqual([]);
             expect(eveDevices).toEqual([]);
