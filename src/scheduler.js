@@ -121,7 +121,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    const defer = Promise.defer();
+    const defer = utils.defer();
     this._queues[queueName].push({
         event: event,
         defer: defer,

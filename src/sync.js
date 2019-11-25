@@ -1383,7 +1383,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
         self._pokeKeepAlive();
     }
     if (!this._connectionReturnedDefer) {
-        this._connectionReturnedDefer = Promise.defer();
+        this._connectionReturnedDefer = utils.defer();
     }
     return this._connectionReturnedDefer.promise;
 };

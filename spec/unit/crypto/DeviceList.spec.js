@@ -20,8 +20,6 @@ import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js'
 import utils from '../../../lib/utils';
 import logger from '../../../src/logger';
 
-import Promise from 'bluebird';
-
 const signedDeviceList = {
     "failures": {},
     "device_keys": {
