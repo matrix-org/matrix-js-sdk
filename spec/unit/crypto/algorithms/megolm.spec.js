@@ -56,7 +56,7 @@ describe("MegolmDecryption", function() {
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockReturnValue(Promise.resolve());
+            jest.fn().mockResolvedValue(undefined);
         megolmDecryption.olmlib = mockOlmLib;
     });
 
@@ -282,7 +282,7 @@ describe("MegolmDecryption", function() {
                     },
                 },
             }));
-            mockBaseApis.sendToDevice = jest.fn().mockReturnValue(Promise.resolve());
+            mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
 
             mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
                 '@alice:home.server': {

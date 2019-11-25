@@ -157,7 +157,7 @@ describe("MegolmBackup", function() {
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockReturnValue(Promise.resolve());
+            jest.fn().mockResolvedValue(undefined);
     });
 
     describe("backup", function() {
