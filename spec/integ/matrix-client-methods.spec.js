@@ -181,7 +181,7 @@ describe("MatrixClient", function() {
                 event_format: "client",
             });
             store.storeFilter(filter);
-            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+            client.getFilter(userId, filterId, true).then(function(gotFilter) {
                 expect(gotFilter).toEqual(filter);
                 done();
             });
