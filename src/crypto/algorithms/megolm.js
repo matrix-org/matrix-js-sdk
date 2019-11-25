@@ -508,7 +508,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
         userId,
         device,
         payload,
-    ),
+    );
 
     await this._baseApis.sendToDevice("m.room.encrypted", {
         [userId]: {
