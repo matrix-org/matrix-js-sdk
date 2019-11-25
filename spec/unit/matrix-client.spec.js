@@ -83,7 +83,7 @@ describe("MatrixClient", function() {
                 );
             }
             pendingLookup = {
-                promise: Promise.defer().promise,
+                promise: new Promise(() => {}),
                 method: method,
                 path: path,
             };
@@ -119,7 +119,7 @@ describe("MatrixClient", function() {
             return Promise.resolve(next.data);
         }
         expect(true).toBe(false, "Expected different request. " + logLine);
-        return Promise.defer().promise;
+        return new Promise(() => {});
     }
 
     beforeEach(function() {
@@ -171,7 +171,7 @@ describe("MatrixClient", function() {
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
         client._http.authedRequest.mockImplementation(function() {
-            return Promise.defer().promise;
+            return new Promise(() => {});
         });
     });
 
