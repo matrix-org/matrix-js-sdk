@@ -202,7 +202,7 @@ describe("MatrixClient", function() {
                 event_format: "client",
             });
             store.storeFilter(storeFilter);
-            client.getFilter(userId, filterId, false).done(function(gotFilter) {
+            client.getFilter(userId, filterId, false).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
                 done();
             });
@@ -220,7 +220,7 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
             ).respond(200, httpFilterDefinition);
-            client.getFilter(userId, filterId, true).done(function(gotFilter) {
+            client.getFilter(userId, filterId, true).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
                 expect(store.getFilter(userId, filterId)).toBeTruthy();
                 done();
@@ -248,7 +248,7 @@ describe("MatrixClient", function() {
                 filter_id: filterId,
             });
 
-            client.createFilter(filterDefinition).done(function(gotFilter) {
+            client.createFilter(filterDefinition).then(function(gotFilter) {
                 expect(gotFilter.getDefinition()).toEqual(filterDefinition);
                 expect(store.getFilter(userId, filterId)).toEqual(gotFilter);
                 done();
@@ -295,7 +295,7 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            httpBackend.flush().done(function() {
+            httpBackend.flush().then(function() {
                 done();
             });
         });

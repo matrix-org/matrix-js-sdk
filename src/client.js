@@ -3224,7 +3224,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
                 room.oldState.paginationToken,
                 limit,
                 'b');
-        }).done(function(res) {
+        }).then(function(res) {
             const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
             if (res.state) {
                 const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
