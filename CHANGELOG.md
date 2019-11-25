@@ -1,3 +1,9 @@
+Changes in [2.4.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.4) (2019-11-25)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.4-rc.1...v2.4.4)
+
+ * No changes since rc.1
+
 Changes in [2.4.4-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.4-rc.1) (2019-11-20)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.3...v2.4.4-rc.1)
