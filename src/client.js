@@ -3870,7 +3870,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         } else if (!hasDontNotifyRule) {
             // Remove the existing one before setting the mute push rule
             // This is a workaround to SYN-590 (Push rule update fails)
-            deferred = Promise.defer();
+            deferred = utils.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
             .done(function() {
                 self.addPushRule(scope, "room", roomId, {
