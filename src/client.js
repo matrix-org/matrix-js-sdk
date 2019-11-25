@@ -26,7 +26,6 @@ import {sleep} from './utils';
  * @module client
  */
 const EventEmitter = require("events").EventEmitter;
-import Promise from 'bluebird';
 const url = require('url');
 
 const httpApi = require("./http-api");
@@ -54,11 +53,6 @@ import { isCryptoAvailable } from './crypto';
 import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromPassphrase, keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
-
-// Disable warnings for now: we use deprecated bluebird functions
-// and need to migrate, but they spam the console with warnings.
-Promise.config({warnings: false});
-
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();

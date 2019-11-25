@@ -25,7 +25,6 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-import Promise from 'bluebird';
 const User = require("./models/user");
 const Room = require("./models/room");
 const Group = require('./models/group');

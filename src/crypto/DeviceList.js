@@ -23,7 +23,6 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
 import logger from '../logger';

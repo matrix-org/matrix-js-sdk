@@ -20,7 +20,6 @@ limitations under the License.
  * @module scheduler
  */
 const utils = require("./utils");
-import Promise from 'bluebird';
 import logger from './logger';
 
 const DEBUG = false;  // set true to enable console logging.
