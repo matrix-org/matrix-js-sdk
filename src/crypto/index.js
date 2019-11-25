@@ -416,7 +416,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
             await this._baseApis.uploadDeviceSigningKeys(authDict, keys);
         });
 
-        // update local cache of public keys
+        // write a copy locally so we know these are trusted keys
         await this._cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
