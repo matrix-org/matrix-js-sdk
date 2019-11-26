@@ -287,12 +287,12 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
         );
     } catch (e) {
         // possibly a bad key
-        logger.error("Error starting session with device " +
+        logger.error("Error starting olm session with device " +
                       userId + ":" + deviceId + ": " + e);
         return null;
     }
 
-    logger.log("Started new sessionid " + sid +
+    logger.log("Started new olm sessionid " + sid +
                 " for device " + userId + ":" + deviceId);
     return sid;
 }
