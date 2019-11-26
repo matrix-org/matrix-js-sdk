@@ -268,7 +268,7 @@ function PushProcessor(client) {
         }
 
         const val = valueForDottedKey(cond.key, ev);
-        if (isNullOrUndefined(val) || typeof val != 'string') {
+        if (typeof val !== 'string') {
             return false;
         }
 
