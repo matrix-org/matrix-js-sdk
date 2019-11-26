@@ -888,7 +888,9 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                                 <= session.first_known_index()) {
                                 // existing session has lower index (i.e. can
                                 // decrypt more), so keep it
-                                logger.log(`Keeping existing megolm session ${sessionId}`);
+                                logger.log(
+                                    `Keeping existing megolm session ${sessionId}`,
+                                );
                                 return;
                             }
                         }

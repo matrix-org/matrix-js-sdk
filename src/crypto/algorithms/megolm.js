@@ -200,7 +200,8 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
         if (!session) {
             logger.log(`Starting new megolm session for room ${self._roomId}`);
             session = await self._prepareNewSession();
-            logger.log(`Started new megolm session ${session.sessionId} for room ${self._roomId}`);
+            logger.log(`Started new megolm session ${session.sessionId} ` +
+                       `for room ${self._roomId}`);
             self._outboundSessions[session.sessionId] = session;
         }
 
@@ -441,13 +442,13 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
 ) {
     const obSessionInfo = this._outboundSessions[sessionId];
     if (!obSessionInfo) {
-        logger.debug("megolm session ID " + sessionId + " not found: not re-sharing keys");
+        logger.debug(`megolm session ${sessionId} not found: not re-sharing keys`);
         return;
     }
 
     // The chain index of the key we previously sent this device
     if (obSessionInfo.sharedWithDevices[userId] === undefined) {
-        logger.debug("megolm session ID " + sessionId + " never shared with user " + userId);
+        logger.debug(`megolm session ${sessionId} never shared with user ${userId}`);
         return;
     }
     const sentChainIndex = obSessionInfo.sharedWithDevices[userId][device.deviceId];
@@ -467,7 +468,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
 
     if (!key) {
         logger.warn(
-            "No inbound session key found for megolm " + sessionId + ": not re-sharing keys",
+            `No inbound session key found for megolm ${sessionId}: not re-sharing keys`,
         );
         return;
     }
@@ -514,9 +515,8 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
             [device.deviceId]: encryptedContent,
         },
     });
-    logger.debug(
-        `Re-shared key for megolm session ${sessionId}  with ${userId}:${device.deviceId}`,
-    );
+    logger.debug(`Re-shared key for megolm session ${sessionId} ` +
+                 `with ${userId}:${device.deviceId}`);
 };
 
 /**
