@@ -35,8 +35,8 @@ describe("verification request", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await Olm.init();
+    beforeAll(function() {
+        return Olm.init();
     });
 
     it("should request and accept a verification", async function() {

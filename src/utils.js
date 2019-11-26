@@ -718,3 +718,16 @@ module.exports.sleep = (ms, value) => new Promise((resolve => {
 module.exports.isNullOrUndefined = function(val) {
     return val === null || val === undefined;
 };
+
+// Returns a Deferred
+module.exports.defer = () => {
+    let resolve;
+    let reject;
+
+    const promise = new Promise((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+    });
+
+    return {resolve, reject, promise};
+};

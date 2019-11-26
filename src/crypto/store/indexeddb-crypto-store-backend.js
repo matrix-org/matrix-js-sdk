@@ -58,35 +58,34 @@ export class Backend {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        const deferred = Promise.defer();
-        const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
-        txn.onerror = deferred.reject;
+        return new Promise((resolve, reject) => {
+            const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
+            txn.onerror = reject;
 
-        // first see if we already have an entry for this request.
-        this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-            if (existing) {
-                // this entry matches the request - return it.
+            // first see if we already have an entry for this request.
+            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
+                if (existing) {
+                    // this entry matches the request - return it.
+                    logger.log(
+                        `already have key request outstanding for ` +
+                            `${requestBody.room_id} / ${requestBody.session_id}: ` +
+                            `not sending another`,
+                    );
+                    resolve(existing);
+                    return;
+                }
+
+                // we got to the end of the list without finding a match
+                // - add the new request.
                 logger.log(
-                    `already have key request outstanding for ` +
-                        `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                        `not sending another`,
+                    `enqueueing key request for ${requestBody.room_id} / ` +
+                        requestBody.session_id,
                 );
-                deferred.resolve(existing);
-                return;
-            }
-
-            // we got to the end of the list without finding a match
-            // - add the new request.
-            logger.log(
-                `enqueueing key request for ${requestBody.room_id} / ` +
-                    requestBody.session_id,
-            );
-            txn.oncomplete = () => { deferred.resolve(request); };
-            const store = txn.objectStore("outgoingRoomKeyRequests");
-            store.add(request);
+                txn.oncomplete = () => { resolve(request); };
+                const store = txn.objectStore("outgoingRoomKeyRequests");
+                store.add(request);
+            });
         });
-
-        return deferred.promise;
     }
 
     /**
@@ -100,15 +99,14 @@ export class Backend {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        const deferred = Promise.defer();
+        return new Promise((resolve, reject) => {
+            const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+            txn.onerror = reject;
 
-        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
-        txn.onerror = deferred.reject;
-
-        this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-            deferred.resolve(existing);
+            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
+                resolve(existing);
+            });
         });
-        return deferred.promise;
     }
 
     /**

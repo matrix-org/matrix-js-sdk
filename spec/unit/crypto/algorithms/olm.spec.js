@@ -48,12 +48,14 @@ describe("OlmDecryption", function() {
         return;
     }
 
+    beforeAll(function() {
+        return global.Olm.init();
+    });
+
     let aliceOlmDevice;
     let bobOlmDevice;
 
     beforeEach(async function() {
-        await global.Olm.init();
-
         aliceOlmDevice = makeOlmDevice();
         bobOlmDevice = makeOlmDevice();
         await aliceOlmDevice.init();

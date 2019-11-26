@@ -1638,7 +1638,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // It would otherwise just throw later as an unknown algorithm would, but we may
     // as well catch this here
     if (!config.algorithm) {
-        console.log("Ignoring setRoomEncryption with no algorithm");
+        logger.log("Ignoring setRoomEncryption with no algorithm");
         return;
     }
 
@@ -1824,17 +1824,15 @@ Crypto.prototype.exportRoomKeys = async function() {
  * @return {module:client.Promise} a promise which resolves once the keys have been imported
  */
 Crypto.prototype.importRoomKeys = function(keys) {
-    return Promise.map(
-        keys, (key) => {
-            if (!key.room_id || !key.algorithm) {
-                logger.warn("ignoring room key entry with missing fields", key);
-                return null;
-            }
+    return Promise.all(keys.map((key) => {
+        if (!key.room_id || !key.algorithm) {
+            logger.warn("ignoring room key entry with missing fields", key);
+            return null;
+        }
 
-            const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            return alg.importRoomKey(key);
-        },
-    );
+        const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
+        return alg.importRoomKey(key);
+    }));
 };
 
 /**
@@ -2296,6 +2294,9 @@ Crypto.prototype._getTrackedE2eRooms = function() {
 
 Crypto.prototype._onToDeviceEvent = function(event) {
     try {
+        logger.log(`received to_device ${event.getType()} from: ` +
+                    `${event.getSender()} id: ${event.getId()}`);
+
         if (event.getType() == "m.room_key"
             || event.getType() == "m.forwarded_room_key") {
             this._onRoomKeyEvent(event);
@@ -2858,14 +2859,10 @@ Crypto.prototype._processReceivedRoomKeyRequests = async function() {
         // cancellation (and end up with a cancelled request), rather than the
         // cancellation before the request (and end up with an outstanding
         // request which should have been cancelled.)
-        await Promise.map(
-            requests, (req) =>
-                this._processReceivedRoomKeyRequest(req),
-        );
-        await Promise.map(
-            cancellations, (cancellation) =>
-                this._processReceivedRoomKeyRequestCancellation(cancellation),
-        );
+        await Promise.all(requests.map((req) =>
+            this._processReceivedRoomKeyRequest(req)));
+        await Promise.all(cancellations.map((cancellation) =>
+            this._processReceivedRoomKeyRequestCancellation(cancellation)));
     } catch (e) {
         logger.error(`Error processing room key requsts: ${e}`);
     } finally {
