@@ -110,6 +110,7 @@ describe("Crypto", function() {
             });
 
             fakeEmitter.emit('toDeviceEvent', {
+                getId: jest.fn().mockReturnValue("$wedged"),
                 getType: jest.fn().mockReturnValue('m.room.message'),
                 getContent: jest.fn().mockReturnValue({
                     msgtype: 'm.bad.encrypted',
