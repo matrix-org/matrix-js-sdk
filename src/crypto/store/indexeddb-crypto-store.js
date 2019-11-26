@@ -389,7 +389,7 @@ export default class IndexedDBCryptoStore {
         );
     }
 
-    // Inbound group saessions
+    // Inbound group sessions
 
     /**
      * Retrieve the end-to-end inbound group session for a given
