@@ -551,10 +551,10 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
             await this._encryptAndSendKeysToDevices(
                 session, key.chain_index, userDeviceMaps[i], payload,
             );
-            logger.log(`Completed megolm keyshare in ${this._roomId} `
-                + `(slice ${i + 1}/${userDeviceMaps.length})`);
+            logger.log(`Completed megolm keyshare for ${session.sessionId} `
+                + `in ${this._roomId} (slice ${i + 1}/${userDeviceMaps.length})`);
         } catch (e) {
-            logger.log(`megolm keyshare in ${this._roomId} `
+            logger.log(`megolm keyshare for ${session.sessionId} in ${this._roomId} `
                 + `(slice ${i + 1}/${userDeviceMaps.length}) failed`);
 
             throw e;
