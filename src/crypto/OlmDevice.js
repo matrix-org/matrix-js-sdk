@@ -595,7 +595,7 @@ OlmDevice.prototype.encryptMessage = async function(
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                 const sessionDesc = sessionInfo.session.describe();
-                console.log(
+                logger.log(
                     "encryptMessage: Olm Session ID " + sessionId + " to " +
                     theirDeviceIdentityKey + ": " + sessionDesc,
                 );
@@ -627,7 +627,7 @@ OlmDevice.prototype.decryptMessage = async function(
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                 const sessionDesc = sessionInfo.session.describe();
-                console.log(
+                logger.log(
                     "decryptMessage: Olm Session ID " + sessionId + " from " +
                     theirDeviceIdentityKey + ": " + sessionDesc,
                 );
@@ -740,7 +740,7 @@ OlmDevice.prototype.createOutboundGroupSession = function() {
 OlmDevice.prototype.encryptGroupMessage = function(sessionId, payloadString) {
     const self = this;
 
-    console.log(`encrypting msg with megolm session ${sessionId}`);
+    logger.log(`encrypting msg with megolm session ${sessionId}`);
 
     checkPayloadLength(payloadString);
 
