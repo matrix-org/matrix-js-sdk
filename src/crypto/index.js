@@ -1619,7 +1619,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // It would otherwise just throw later as an unknown algorithm would, but we may
     // as well catch this here
     if (!config.algorithm) {
-        console.log("Ignoring setRoomEncryption with no algorithm");
+        logger.log("Ignoring setRoomEncryption with no algorithm");
         return;
     }
 
@@ -2277,7 +2277,7 @@ Crypto.prototype._getTrackedE2eRooms = function() {
 
 Crypto.prototype._onToDeviceEvent = function(event) {
     try {
-        console.log(`received to_device ${event.getType()} from: ` +
+        logger.log(`received to_device ${event.getType()} from: ` +
                     `${event.getSender()} id: ${event.getId()}`);
 
         if (event.getType() == "m.room_key"
