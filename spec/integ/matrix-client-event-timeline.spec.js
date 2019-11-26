@@ -83,18 +83,19 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    const deferred = Promise.defer();
-    client.on("sync", function(state) {
-        logger.log("sync", state);
-        if (state != "SYNCING") {
-            return;
-        }
-        deferred.resolve();
+    const prom = new Promise((resolve) => {
+        client.on("sync", function(state) {
+            logger.log("sync", state);
+            if (state != "SYNCING") {
+                return;
+            }
+            resolve();
+        });
     });
 
     return Promise.all([
         httpBackend.flushAllExpected(),
-        deferred.promise,
+        prom,
     ]);
 }
 
@@ -343,25 +344,25 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const deferred = Promise.defer();
-            client.on("sync", function() {
-                client.getEventTimeline(timelineSet, EVENTS[2].event_id,
-                ).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(4);
-                    expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
-                    expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                    expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
-                        .toEqual("start_token");
-                    // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
-                    //    .toEqual("s_5_4");
-                }).done(() => deferred.resolve(),
-                        (e) => deferred.reject(e));
+            const prom = new Promise((resolve, reject) => {
+                client.on("sync", function() {
+                    client.getEventTimeline(timelineSet, EVENTS[2].event_id,
+                    ).then(function(tl) {
+                        expect(tl.getEvents().length).toEqual(4);
+                        expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
+                        expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
+                        expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
+                        expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                            .toEqual("start_token");
+                        // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                        //    .toEqual("s_5_4");
+                    }).done(resolve, reject);
+                });
             });
 
             return Promise.all([
                 httpBackend.flushAllExpected(),
-                deferred.promise,
+                prom,
             ]);
         });
 

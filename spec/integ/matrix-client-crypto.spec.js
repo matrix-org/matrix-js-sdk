@@ -203,7 +203,7 @@ function aliSendsFirstMessage() {
         expectAliQueryKeys()
             .then(expectAliClaimKeys)
             .then(expectAliSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -218,7 +218,7 @@ function aliSendsMessage() {
     return Promise.all([
         sendMessage(aliTestClient.client),
         expectAliSendMessageRequest(),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -234,7 +234,7 @@ function bobSendsReplyMessage() {
         sendMessage(bobTestClient.client),
         expectBobQueryKeys()
             .then(expectBobSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -279,16 +279,17 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    const deferred = Promise.defer();
-    httpBackend.when("PUT", path).respond(200, function(path, content) {
-        deferred.resolve(content);
-        return {
-            event_id: "asdfgh",
-        };
+    const prom = new Promise((resolve) => {
+        httpBackend.when("PUT", path).respond(200, function(path, content) {
+            resolve(content);
+            return {
+                event_id: "asdfgh",
+            };
+        });
     });
 
     // it can take a while to process the key query
-    return httpBackend.flush(path, 1).then(() => deferred.promise);
+    return httpBackend.flush(path, 1).then(() => prom);
 }
 
 function aliRecvMessage() {
@@ -491,7 +492,7 @@ describe("MatrixClient crypto", function() {
                 aliTestClient.client.getStoredDevicesForUser(bobUserId),
                 aliTestClient.client.getStoredDevicesForUser(eveUserId),
             ]);
-        }).spread((bobDevices, eveDevices) => {
+        }).then(([bobDevices, eveDevices]) => {
             // should get an empty list
             expect(bobDevices).toEqual([]);
             expect(eveDevices).toEqual([]);

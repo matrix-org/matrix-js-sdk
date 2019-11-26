@@ -128,6 +128,10 @@ describe("MegolmBackup", function() {
         return;
     }
 
+    beforeAll(function() {
+        return Olm.init();
+    });
+
     let olmDevice;
     let mockOlmLib;
     let mockCrypto;
@@ -136,7 +140,6 @@ describe("MegolmBackup", function() {
     let cryptoStore;
     let megolmDecryption;
     beforeEach(async function() {
-        await Olm.init();
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(

@@ -25,8 +25,8 @@ describe("Crypto", function() {
         return;
     }
 
-    beforeEach(function(done) {
-        Olm.init().then(done);
+    beforeAll(function() {
+        return Olm.init();
     });
 
     it("Crypto exposes the correct olm library version", function() {
