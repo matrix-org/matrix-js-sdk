@@ -299,7 +299,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     logger.log("Bootstrapping Secure Secret Storage");
 
     // Create cross-signing keys if they don't exist, as we want to sign the SSSS default
-    // key with the cross-signing master key. The cross-signing master keys is also used
+    // key with the cross-signing master key. The cross-signing master key is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
     let crossSigningKeysChanged = false;
