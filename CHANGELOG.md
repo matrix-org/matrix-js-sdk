@@ -1,3 +1,10 @@
+Changes in [2.4.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.5) (2019-11-27)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.4...v2.4.5)
+
+* Relax identity server discovery checks to FAIL_PROMPT
+* Expand E2EE debug logging to diagnose "unable to decrypt" errors
+
 Changes in [2.4.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.4) (2019-11-25)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.4-rc.1...v2.4.4)
