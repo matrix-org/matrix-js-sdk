@@ -407,7 +407,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
         await this._crossSigningInfo.resetKeys(level);
         await this._signObject(this._crossSigningInfo.keys.master);
 
-        // send keys to server first before caching locally (to ensure upload succeeds)
+        // send keys to server first before storing as trusted locally
+        // to ensure upload succeeds
         const keys = {};
         for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
             keys[name + "_key"] = key;
