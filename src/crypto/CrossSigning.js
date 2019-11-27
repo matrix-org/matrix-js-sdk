@@ -105,6 +105,20 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     /**
+     * Store private keys in secret storage for use by other devices. This is
+     * typically called in conjunction with the creation of new cross-signing
+     * keys.
+     *
+     * @param {SecretStorage} secretStorage The secret store using account data
+     */
+    async storeInSecretStorage(secretStorage) {
+        const getKey = this._callbacks.getCrossSigningKey;
+        for (const name of ["master", "self_signing", "user_signing"]) {
+            await secretStorage.store(`m.cross_signing.${name}`, getKey(name));
+        }
+    }
+
+    /**
      * Get the ID used to identify the user. This can also be used to test for
      * the existence of a given key type.
      *
