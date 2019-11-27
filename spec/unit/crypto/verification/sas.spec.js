@@ -64,7 +64,7 @@ describe("SAS verification", function() {
         sas.cancel();
     });
 
-    describe("verification", function() {
+    describe("verification", () => {
         let alice;
         let bob;
         let aliceSasEvent;
@@ -72,7 +72,7 @@ describe("SAS verification", function() {
         let aliceVerifier;
         let bobPromise;
 
-        beforeEach(async function() {
+        beforeEach(async () => {
             [alice, bob] = await makeTestClients(
                 [
                     {userId: "@alice:example.com", deviceId: "Osborne2"},
@@ -113,14 +113,14 @@ describe("SAS verification", function() {
             alice.client._crypto._deviceList.storeDevicesForUser(
                 "@bob:example.com", BOB_DEVICES,
             );
-            alice.downloadKeys = () => {
+            alice.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
             bob.client._crypto._deviceList.storeDevicesForUser(
                 "@alice:example.com", ALICE_DEVICES,
             );
-            bob.downloadKeys = () => {
+            bob.client.downloadKeys = () => {
                 return Promise.resolve();
             };
 
@@ -169,22 +169,22 @@ describe("SAS verification", function() {
                 }
             });
         });
-        afterEach(async function() {
+        afterEach(async () => {
             await Promise.all([
                 alice.stop(),
                 bob.stop(),
             ]);
         });
 
-        it("should verify a key", async function() {
+        it("should verify a key", async () => {
             let macMethod;
-            const origSendToDevice = alice.client.sendToDevice;
+            const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.accept") {
                     macMethod = map[alice.client.getUserId()][alice.client.deviceId]
                         .message_authentication_code;
                 }
-                return origSendToDevice.call(this, type, map);
+                return origSendToDevice(type, map);
             };
 
             alice.httpBackend.when('POST', '/keys/query').respond(200, {
