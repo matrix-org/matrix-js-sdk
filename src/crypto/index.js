@@ -2294,7 +2294,8 @@ Crypto.prototype._getTrackedE2eRooms = function() {
 
 Crypto.prototype._onToDeviceEvent = function(event) {
     try {
-        logger.log(`received to_device ${event.getType()} from: ${event.getSender()}`);
+        logger.log(`received to_device ${event.getType()} from: ` +
+                    `${event.getSender()} id: ${event.getId()}`);
 
         if (event.getType() == "m.room_key"
             || event.getType() == "m.forwarded_room_key") {
