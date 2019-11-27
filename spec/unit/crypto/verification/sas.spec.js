@@ -219,12 +219,12 @@ describe("SAS verification", function() {
             expect(aliceDevice.isVerified()).toBeTruthy();
         });
 
-        it("should be able to verify using the old MAC", async function() {
+        it("should be able to verify using the old MAC", async () => {
             // pretend that Alice can only understand the old (incorrect) MAC,
             // and make sure that she can still verify with Bob
             let macMethod;
-            const origSendToDevice = alice.client.sendToDevice;
-            alice.client.sendToDevice = function(type, map) {
+            const aliceOrigSendToDevice = alice.client.sendToDevice.bind(alice.client);
+            alice.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.start") {
                     // Note: this modifies not only the message that Bob
                     // receives, but also the copy of the message that Alice
@@ -234,14 +234,15 @@ describe("SAS verification", function() {
                     map[bob.client.getUserId()][bob.client.deviceId]
                         .message_authentication_codes = ['hmac-sha256'];
                 }
-                return origSendToDevice.call(this, type, map);
+                return aliceOrigSendToDevice(type, map);
             };
-            bob.client.sendToDevice = function(type, map) {
+            const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
+            bob.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.accept") {
                     macMethod = map[alice.client.getUserId()][alice.client.deviceId]
                         .message_authentication_code;
                 }
-                return origSendToDevice.call(this, type, map);
+                return bobOrigSendToDevice(type, map);
             };
 
             alice.httpBackend.when('POST', '/keys/query').respond(200, {
@@ -274,7 +275,7 @@ describe("SAS verification", function() {
             expect(aliceDevice.isVerified()).toBeTruthy();
         });
 
-        it("should verify a cross-signing key", async function() {
+        it("should verify a cross-signing key", async () => {
             alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
                 200, {},
             );
