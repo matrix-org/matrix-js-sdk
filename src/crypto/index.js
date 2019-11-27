@@ -403,6 +403,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
     doInteractiveAuthFlow = async func => await func(),
 } = {}) {
     logger.info(`Resetting cross-signing keys at level ${level}`);
+    // Copy old keys (usually empty) in case we need to revert
+    const oldKeys = Object.assign({}, this._crossSigningInfo.keys);
     try {
         await this._crossSigningInfo.resetKeys(level);
         await this._signObject(this._crossSigningInfo.keys.master);
@@ -427,8 +429,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
     } catch (e) {
         // If anything failed here, remove the keys so we know to try again from the start
         // next time.
-        logger.error("Resetting cross-signing keys failed, removing keys", e);
-        this._crossSigningInfo.removeKeys(level);
+        logger.error("Resetting cross-signing keys failed, revert to previous keys", e);
+        this._crossSigningInfo.keys = oldKeys;
         throw e;
     }
     this._baseApis.emit("crossSigning.keysChanged", {});

@@ -279,18 +279,6 @@ export class CrossSigningInfo extends EventEmitter {
         }
     }
 
-    removeKeys(level) {
-        if (level & CrossSigningLevel.MASTER) {
-            this.keys.master = null;
-        }
-        if (level & CrossSigningLevel.SELF_SIGNING) {
-            this.keys.self_signing = null;
-        }
-        if (level & CrossSigningLevel.USER_SIGNING) {
-            this.keys.user_signing = null;
-        }
-    }
-
     async signObject(data, type) {
         if (!this.keys[type]) {
             throw new Error(
