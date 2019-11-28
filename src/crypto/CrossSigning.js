@@ -135,7 +135,13 @@ export class CrossSigningInfo extends EventEmitter {
         return publicKeyFromKeyInfo(keyInfo);
     }
 
-
+    /**
+     * Create new cross-signing keys for the given key types. The public keys
+     * will be held in this class, while the private keys are passed off to the
+     * `saveCrossSigningKeys` application callback.
+     *
+     * @param {CrossSigningLevel} level The key types to reset
+     */
     async resetKeys(level) {
         if (!this._callbacks.saveCrossSigningKeys) {
             throw new Error("No saveCrossSigningKeys callback supplied");
