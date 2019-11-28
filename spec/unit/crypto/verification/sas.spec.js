@@ -275,9 +275,7 @@ describe("SAS verification", function() {
             expect(aliceDevice.isVerified()).toBeTruthy();
         });
 
-        // TODO: Turn this test back on by fixing it.
-        // See https://github.com/vector-im/riot-web/issues/11545 and related issues.
-        xit("should verify a cross-signing key", async () => {
+        it("should verify a cross-signing key", async () => {
             alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
                 200, {},
             );
@@ -296,32 +294,16 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.httpBackend.when('POST', '/keys/query').respond(200, {
-                failures: {},
-                device_keys: {
-                    "@bob:example.com": BOB_DEVICES,
-                },
-            });
-            bob.httpBackend.when('POST', '/keys/query').respond(200, {
-                failures: {},
-                device_keys: {
-                    "@alice:example.com": ALICE_DEVICES,
-                },
-            });
-
             const verifyProm = Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => {
                     bob.httpBackend.when(
                         'POST', '/keys/signatures/upload',
                     ).respond(200, {});
-                    bob.httpBackend.flush(undefined, 2);
+                    bob.httpBackend.flush(undefined, 1, 2000);
                     return verifier.verify();
                 }),
             ]);
-
-            await alice.httpBackend.flush(undefined, 1);
-            console.log("alice reqs flushed");
 
             await verifyProm;
 
