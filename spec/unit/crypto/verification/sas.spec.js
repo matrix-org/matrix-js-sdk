@@ -276,6 +276,7 @@ describe("SAS verification", function() {
         });
 
         // TODO: Turn this test back on by fixing it.
+        // See https://github.com/vector-im/riot-web/issues/11545 and related issues.
         // it("should verify a cross-signing key", async () => {
         //     alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
         //         200, {},
