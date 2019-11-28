@@ -282,10 +282,10 @@ Crypto.prototype.init = async function() {
 };
 
 /**
- * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
- * the cross-signing master key. If everything is already set up, then no
- * changes are made, so this is safe to run to ensure secret storage is ready
- * for use.
+ * Bootstrap Secure Secret Storage if needed by creating a default key and
+ * signing it with the cross-signing master key. If everything is already set
+ * up, then no changes are made, so this is safe to run to ensure secret storage
+ * is ready for use.
  *
  * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
  * await an interactive auth request.
