@@ -59,6 +59,7 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
      * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
      *     the stored public key for the given key type.
+     * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
         if (!this._callbacks.getCrossSigningKey) {
