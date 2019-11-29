@@ -31,12 +31,16 @@ import {
 
 export class ToDeviceMedium {
     // userId and devices of user we're about to verify
-    constructor(client, userId, devices) {
+    constructor(client, userId, devices, transactionId = null, deviceId = null) {
         this._client = client;
         this._userId = userId;
         this._devices = devices;
-        this._deviceId = null;
-        this.transactionId = null;
+        this.transactionId = transactionId;
+        this._deviceId = deviceId;
+    }
+
+    static getEventType(event) {
+        return event.getType();
     }
 
     static getTransactionId(event) {
@@ -148,7 +152,7 @@ export class ToDeviceMedium {
     send(type, uncompletedContent = {}) {
         // create transaction id when sending request
         if (type === REQUEST_TYPE && !this.transactionId) {
-            this.transactionId = randomString(32);
+            this.transactionId = ToDeviceMedium.makeTransactionId();
         }
         const content = this.completeContent(type, uncompletedContent);
         return this.sendCompleted(type, content);
@@ -169,5 +173,9 @@ export class ToDeviceMedium {
         }
 
         return this._client.sendToDevice(type, {[this._userId]: msgMap});
+    }
+
+    static makeTransactionId() {
+        return randomString(32);
     }
 }

@@ -240,7 +240,8 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // }
     this._lastNewSessionForced = {};
 
-    this._verificationTransactions = new Map();
+    this._toDeviceVerificationRequests = new Map();
+    this._inRoomVerificationRequests = new Map();
 
     this._crossSigningInfo = new CrossSigningInfo(
         userId, this._baseApis._cryptoCallbacks,
@@ -1317,203 +1318,92 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
-
-function verificationEventHandler(target, userId, roomId, eventId) {
-    return function(event) {
-        // listen for events related to this verification
-        if (event.getRoomId() !== roomId
-            || event.getSender() !== userId) {
-            return;
-        }
-        // ignore events that haven't been decrypted yet.
-        // we also listen for undecrypted events, just in case
-        // the other side would be sending unencrypted events in an e2ee room
-        if (event.getType() === "m.room.encrypted") {
-            return;
-        }
-        const relatesTo = event.getRelation();
-        if (!relatesTo
-            || !relatesTo.rel_type
-            || relatesTo.rel_type !== "m.reference"
-            || !relatesTo.event_id
-            || relatesTo.event_id !== eventId) {
-            return;
-        }
-
-        // the event seems to be related to this verification, so pass it on to
-        // the verification handler
-        target.handleEvent(event);
-    };
-}
-
 Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
-    let methodMap;
-    if (methods) {
-        methodMap = new Map();
-        for (const method of methods) {
-            if (typeof method === "string") {
-                methodMap.set(method, defaultVerificationMethods[method]);
-            } else if (method.NAME) {
-                methodMap.set(method.NAME, method);
-            }
-        }
-    } else {
-        methodMap = this._baseApis._crypto._verificationMethods;
-    }
-
-    let eventId = undefined;
-    const listenPromise = new Promise((_resolve, _reject) => {
-        const listener = (event) => {
-            // listen for events related to this verification
-            if (event.getRoomId() !== roomId
-                || event.getSender() !== userId) {
-                return;
-            }
-            const relatesTo = event.getRelation();
-            if (!relatesTo || !relatesTo.rel_type
-                || relatesTo.rel_type !== "m.reference"
-                || !relatesTo.event_id
-                || relatesTo.event_id !== eventId) {
-                return;
-            }
-
-            const content = event.getContent();
-            // the event seems to be related to this verification
-            switch (event.getType()) {
-            case "m.key.verification.start": {
-                const verifier = new (methodMap.get(content.method))(
-                    this._baseApis, userId, content.from_device, eventId,
-                    roomId, event,
-                );
-                verifier.handler = verificationEventHandler(
-                    verifier, userId, roomId, eventId,
-                );
-                // this handler gets removed when the verification finishes
-                // (see the verify method of crypto/verification/Base.js)
-                const subscription =
-                    listenForEvents(this._baseApis, roomId, verifier.handler);
-                verifier.setEventsSubscription(subscription);
-                resolve(verifier);
-                break;
-            }
-            case "m.key.verification.cancel": {
-                reject(event);
-                break;
-            }
-            }
-        };
-        let initialResponseSubscription =
-            listenForEvents(this._baseApis, roomId, listener);
-
-        const resolve = (...args) => {
-            if (initialResponseSubscription) {
-                initialResponseSubscription = initialResponseSubscription();
-            }
-            _resolve(...args);
-        };
-        const reject = (...args) => {
-            if (initialResponseSubscription) {
-                initialResponseSubscription = initialResponseSubscription();
-            }
-            _reject(...args);
-        };
-    });
-
-    const res = await this._baseApis.sendEvent(
-        roomId, "m.room.message",
-        {
-            body: this._baseApis.getUserId() + " is requesting to verify " +
-                "your key, but your client does not support in-chat key " +
-                "verification.  You will need to use legacy key " +
-                "verification to verify keys.",
-            msgtype: "m.key.verification.request",
-            to: userId,
-            from_device: this._baseApis.getDeviceId(),
-            methods: [...methodMap.keys()],
-        },
+    const medium = new InRoomMedium(this._baseApis, roomId, userId);
+    return this._requestVerificationWithMedium(
+        userId,
+        methods,
+        medium,
+        this._inRoomVerificationRequests,
     );
-    eventId = res.event_id;
-
-    return listenPromise;
 };
 
-Crypto.prototype.acceptVerificationDM = function(event, Method) {
-    if (typeof(Method) === "string") {
-        Method = defaultVerificationMethods[Method];
+Crypto.prototype.acceptVerificationDM = function(event, method) {
+    if(!InRoomMedium.validateEvent(event)) {
+        return;
     }
-    const content = event.getContent();
-    const verifier = new Method(
-        this._baseApis, event.getSender(), content.from_device, event.getId(),
-        event.getRoomId(),
-    );
-    verifier.handler = verificationEventHandler(
-        verifier, event.getSender(), event.getRoomId(), event.getId(),
-    );
-    const subscription = listenForEvents(
-        this._baseApis, event.getRoomId(), verifier.handler);
-    verifier.setEventsSubscription(subscription);
-    return verifier;
+
+    const sender = event.getSender();
+    const requestsByTxnId = this._inRoomVerificationRequests.get(sender);
+    if (!requestsByTxnId) {
+        return;
+    }
+    const transactionId = InRoomMedium.getTransactionId(event);
+    const request = requestsByTxnId.get(transactionId);
+    if (!request) {
+        return;
+    }
+
+    request.beginKeyVerification(method).catch(console.error);
+
+    return request.verifier;
 };
 
-Crypto.prototype.requestVerification = function(userId, methods, devices) {
+Crypto.prototype.requestVerification = async function(userId, methods, devices) {
+    if (!devices) {
+        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
+    }
+    const medium = new ToDeviceMedium(this._baseApis, userId, devices);
+    return this._requestVerificationWithMedium(
+        userId,
+        methods,
+        medium,
+        this._toDeviceVerificationRequests,
+    );
+};
+
+Crypto.prototype._requestVerificationWithMedium = async function(userId, methods, medium, requestsMap) {
     if (!methods) {
         // .keys() returns an iterator, so we need to explicitly turn it into an array
         methods = [...this._verificationMethods.keys()];
     }
-    if (!devices) {
-        devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
+    // TODO: filter by given methods
+    const request = new VerificationRequest(medium, this._verificationMethods);
+    await request.sendRequest();
+
+    let requestsByTxnId = requestsMap.get(userId);
+    if (!requestsByTxnId) {
+        requestsByTxnId = new Map();
+        requestsMap.set(userId, requestsByTxnId);
     }
-    if (!this._verificationTransactions.has(userId)) {
-        this._verificationTransactions.set(userId, new Map);
-    }
+    // TODO: we're only adding the request to the map once it has been sent
+    // but if the other party is really fast they could potentially respond to the
+    // request before the server tells us the event got sent, and we would probably
+    // create a new request object
+    requestsByTxnId.set(medium.transactionId, request);
 
-    const transactionId = randomString(32);
-
-    const promise = new Promise((resolve, reject) => {
-        this._verificationTransactions.get(userId).set(transactionId, {
-            request: {
-                methods: methods,
-                devices: devices,
-                resolve: resolve,
-                reject: reject,
-            },
-        });
-    });
-
-    const message = {
-        transaction_id: transactionId,
-        from_device: this._baseApis.deviceId,
-        methods: methods,
-        timestamp: Date.now(),
-    };
-    const msgMap = {};
-    for (const deviceId of devices) {
-        msgMap[deviceId] = message;
-    }
-    this._baseApis.sendToDevice("m.key.verification.request", {[userId]: msgMap});
-
-    return promise;
+    return request;
 };
 
 Crypto.prototype.beginKeyVerification = function(
-    method, userId, deviceId, transactionId,
+    method, userId, deviceId, transactionId = null,
 ) {
-    if (!this._verificationTransactions.has(userId)) {
-        this._verificationTransactions.set(userId, new Map());
+    let requestsByTxnId = this._toDeviceVerificationRequests.get(userId);
+    if (!requestsByTxnId) {
+        requestsByTxnId = new Map();
+        this._toDeviceVerificationRequests.set(userId, requestsByTxnId);
     }
-    transactionId = transactionId || randomString(32);
-    if (this._verificationMethods.has(method)) {
-        const verifier = new (this._verificationMethods.get(method))(
-            this._baseApis, userId, deviceId, transactionId,
-        );
-        if (!this._verificationTransactions.get(userId).has(transactionId)) {
-            this._verificationTransactions.get(userId).set(transactionId, {});
-        }
-        this._verificationTransactions.get(userId).get(transactionId).verifier = verifier;
-        return verifier;
+    let request;
+    if (transactionId) {
+        request = requestsByTxnId.get(transactionId);
     } else {
-        throw newUnknownMethodError();
+        transactionId = ToDeviceMedium.makeTransactionId();
+        const medium = new ToDeviceMedium(
+            this._baseApis, userId, [deviceId], transactionId, deviceId);
+        request = new VerificationRequest(medium, this._verificationMethods);
+        requestsByTxnId.set(transactionId, request);
     }
+    return request.beginKeyVerification(method);
 };
 
 
@@ -2310,10 +2200,6 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
-        } else if (event.getType() === "m.key.verification.request") {
-            this._onKeyVerificationRequest(event);
-        } else if (event.getType() === "m.key.verification.start") {
-            this._onKeyVerificationStart(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
@@ -2364,14 +2250,16 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
         return;
     }
     const transactionId = ToDeviceMedium.getTransactionId(event);
-    this._onKeyVerificationMessage(event, transactionId, this._toDeviceVerificationRequests, event => {
+    const createRequest = event => {
         const medium = new ToDeviceMedium(
             this._baseApis,
             event.getRoomId(),
             event.getSender(),
         );
         return new VerificationRequest(medium, this._verificationMethods);
-    });
+    };
+    this._handleVerificationEvent(event, transactionId,
+        this._toDeviceVerificationRequests, createRequest);
 };
 
 /**
@@ -2385,22 +2273,24 @@ Crypto.prototype._onTimelineEvent = function(event) {
         return;
     }
     const transactionId = InRoomMedium.getTransactionId(event);
-    this._onKeyVerificationMessage(event, transactionId, this._inRoomVerificationRequests, event => {
+    const createRequest = event => {
         const medium = new InRoomMedium(
             this._baseApis,
             event.getRoomId(),
             event.getSender(),
         );
         return new VerificationRequest(medium, this._verificationMethods);
-    });
+    };
+    this._handleVerificationEvent(event, transactionId,
+        this._inRoomVerificationRequests, createRequest);
 };
 
-Crypto.prototype._onKeyVerificationMessage = async function(event, transactionId, requestsMap, createRequest) {
+Crypto.prototype._handleVerificationEvent = async function(event, transactionId, requestsMap, createRequest) {
     const sender = event.getSender();
-    let requestsByTxnId = this.requestsMap.get(sender);
+    let requestsByTxnId = requestsMap.get(sender);
     if (!requestsByTxnId) {
         requestsByTxnId = new Map();
-        this.requestsMap.set(sender, requestsByTxnId);
+        requestsMap.set(sender, requestsByTxnId);
     }
     let isNewRequest = false;
     let request = requestsByTxnId.get(transactionId);
@@ -2417,7 +2307,7 @@ Crypto.prototype._onKeyVerificationMessage = async function(event, transactionId
     if (!request.inProgress) {
         requestsByTxnId.delete(transactionId);
         if (requestsByTxnId.size === 0) {
-            this.requestsMap.delete(sender);
+            requestsMap.delete(sender);
         }
     } else if (isNewRequest) {
         this._baseApis.emit("crypto.verification.request", request);

@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { CANCEL_TYPE } from "./VerificationRequest";
+import { CANCEL_TYPE, START_TYPE } from "./VerificationRequest";
 
 // ideally the verifier would be part of the VerificationRequest,
 // or at least the scope of the verifier would be smaller
@@ -60,7 +60,9 @@ export class ProxyMedium {
 
     _onSend(type, content) {
         if (type === CANCEL_TYPE) {
-            this._request._handleCancel(type);
+            this._request._handleCancel();
+        } else if (type === START_TYPE) {
+            this._request._handleVerifierStart();
         }
     }
 }

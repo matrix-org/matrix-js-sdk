@@ -39,6 +39,7 @@ export const EVENT_PREFIX = "m.key.verification.";
 export const REQUEST_TYPE = EVENT_PREFIX + "request";
 export const START_TYPE = EVENT_PREFIX + "start";
 export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
+export const DONE_TYPE = EVENT_PREFIX + "done";
 
 export const PHASE_UNSENT = 1;
 export const PHASE_REQUESTED = 2;
@@ -59,7 +60,7 @@ export class VerificationRequest extends EventEmitter {
         this.medium = medium;
         this._verificationMethods = verificationMethods;
         this._commonMethods = [];
-        this.phase = PHASE_UNSENT;
+        this._phase = PHASE_UNSENT;
         // .request event from other side, only set if this is the receiving end.
         this._requestEvent = null;
     }
@@ -102,54 +103,59 @@ export class VerificationRequest extends EventEmitter {
         return this._requestEvent;
     }
 
-    get isPending() {
-        return this.phase !== PHASE_UNSENT
-            && this.phase !== PHASE_DONE
-            && this.phase !== PHASE_CANCELLED;
+    get phase() {
+        return this._phase;
+    }
+
+    get verifier() {
+        return this._verifier;
+    }
+
+    get inProgress() {
+        return this._phase !== PHASE_UNSENT
+            && this._phase !== PHASE_DONE
+            && this._phase !== PHASE_CANCELLED;
     }
 
     async beginKeyVerification(method) {
+        // need to allow also when unsent in case of to_device
+        if (this._phase === PHASE_UNSENT && this.medium)
         if (
-            this.phase === PHASE_REQUESTED &&
+            this._phase === PHASE_REQUESTED || () &&
             this._commonMethods &&
             this._commonMethods.includes(method)
         ) {
-            this.phase = PHASE_REQUESTED;
             this._verifier = this._createVerifier(method);
-            // to keep old api that returns verifier sync,
-            // run send in fire and forget fashion for now
-            (async () => {
-                try {
-                    //TODO: add from_device here, as it is handled here as well?
-                    await this.medium.send(START_TYPE, {method: method});
-                } catch (err) {
-                    logger.error("error sending " + START_TYPE, err);
-                }
-                this.emit("change");
-            })();
+            if (!this._verifier) {
+                throw newUnknownMethodError();
+            }
             return this._verifier;
         }
     }
 
     async sendRequest() {
-        if (this.phase === PHASE_UNSENT) {
+        if (this._phase === PHASE_UNSENT) {
             //TODO: add from_device here, as it is handled here as well?
-            this.phase = PHASE_REQUESTED;
+            this._phase = PHASE_REQUESTED;
             await this.medium.send(REQUEST_TYPE, {methods: this._methods});
             this.emit("change");
         }
     }
 
     async cancel({reason = "User declined", code = "m.user"}) {
-        if (this.phase !== PHASE_CANCELLED) {
-            this.phase = PHASE_CANCELLED;
-            await this.medium.send(CANCEL_TYPE, {code, reason});
+        if (this._phase !== PHASE_CANCELLED) {
+            if (this._verifier) {
+                return this._verifier.cancel(errorFactory(code, reason));
+            } else {
+                this._phase = PHASE_CANCELLED;
+                await this.medium.send(CANCEL_TYPE, {code, reason});
+            }
             this.emit("change");
         }
     }
 
     _setPhase(phase) {
-        this.phase = phase;
+        this._phase = phase;
         this.emit("change");
     }
 
@@ -159,8 +165,6 @@ export class VerificationRequest extends EventEmitter {
             this._handleRequest(content, event);
         } else if (type === START_TYPE) {
             this._handleStart(content, event);
-        } else if (type === CANCEL_TYPE) {
-            this._handleCancel();
         }
 
         if (type.startsWith(EVENT_PREFIX) && this._verifier) {
@@ -173,10 +177,16 @@ export class VerificationRequest extends EventEmitter {
                 this._verifier.handleEvent(event);
             }
         }
+
+        if (type === CANCEL_TYPE) {
+            this._handleCancel();
+        } else if (type === DONE_TYPE) {
+            this._handleDone();
+        }
     }
 
     async _handleRequest(content, event) {
-        if (this.phase === PHASE_UNSENT) {
+        if (this._phase === PHASE_UNSENT) {
             const otherMethods = content.methods;
             this._commonMethods = otherMethods.
                 filter(m => this._verificationMethods.has(m));
@@ -190,9 +200,9 @@ export class VerificationRequest extends EventEmitter {
     }
 
     async _handleStart(content, event) {
-        if (this.phase === PHASE_REQUESTED ||
-            (this._medium.requestIsOptional &&
-                this.phase === PHASE_UNSENT)
+        if (this._phase === PHASE_REQUESTED ||
+            (this.medium.requestIsOptional &&
+                this._phase === PHASE_UNSENT)
         ) {
             const {method} = content;
             if (!this._verificationMethods.has(method)) {
@@ -206,13 +216,22 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
+    _handleVerifierStart() {
+        if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
+            this._setPhase(PHASE_STARTED);
+        }
+    }
+
+    // also called from verifier through ProxyMedium
     _handleCancel() {
-        if (this.phase !== PHASE_CANCELLED) {
-            // TODO: also cancel verifier if one is present?
-            // if (this._verifier) {
-            //     this._verifier.cancel();
-            // }
+        if (this._phase !== PHASE_CANCELLED) {
             this._setPhase(PHASE_CANCELLED);
+        }
+    }
+
+    _handleDone() {
+        if (this._phase === PHASE_STARTED) {
+            this._setPhase(PHASE_DONE);
         }
     }
 
@@ -226,7 +245,7 @@ export class VerificationRequest extends EventEmitter {
         if (!VerifierCtor) {
             return;
         }
-        const proxyMedium = new ProxyMedium(this, this._medium);
+        const proxyMedium = new ProxyMedium(this, this.medium);
         return new VerifierCtor(
             proxyMedium,
             sender,

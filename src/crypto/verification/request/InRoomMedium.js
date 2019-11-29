@@ -39,9 +39,13 @@ export class InRoomMedium {
     }
 
     static getTransactionId(event) {
-        const relation = event.getRelation();
-        if (relation && relation.rel_type === "m.reference") {
-            return relation.event_id;
+        if (InRoomMedium.getEventType(event) === REQUEST_TYPE) {
+            return event.getId();
+        } else {
+            const relation = event.getRelation();
+            if (relation && relation.rel_type === "m.reference") {
+                return relation.event_id;
+            }
         }
     }
 
