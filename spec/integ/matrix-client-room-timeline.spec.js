@@ -6,7 +6,6 @@ const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
 import Promise from 'bluebird';
-import expect from 'expect';
 
 describe("MatrixClient room timelines", function() {
     const baseUrl = "http://localhost.or.something";
@@ -103,8 +102,7 @@ describe("MatrixClient room timelines", function() {
         });
     }
 
-    beforeEach(function(done) {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+    beforeEach(function() {
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -122,9 +120,9 @@ describe("MatrixClient room timelines", function() {
             return NEXT_SYNC_DATA;
         });
         client.startClient();
-        httpBackend.flush("/pushrules").then(function() {
+        return httpBackend.flush("/pushrules").then(function() {
             return httpBackend.flush("/filter");
-        }).nodeify(done);
+        });
     });
 
     afterEach(function() {

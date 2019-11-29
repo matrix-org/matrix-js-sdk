@@ -12,10 +12,12 @@ module.exports = {
         // babel's transform-runtime converts references to ES6 globals such as
         // Promise and Map to core-js polyfills, so we can use ES6 globals.
         es6: true,
+        jest: true,
     },
     extends: ["eslint:recommended", "google"],
     plugins: [
         "babel",
+        "jest",
     ],
     rules: {
         // rules we've always adhered to or now do

@@ -8,11 +8,9 @@ const MatrixScheduler = sdk.MatrixScheduler;
 const MatrixError = sdk.MatrixError;
 const utils = require("../test-utils");
 
-import expect from 'expect';
-import lolex from 'lolex';
+jest.useFakeTimers();
 
 describe("MatrixScheduler", function() {
-    let clock;
     let scheduler;
     let retryFn;
     let queueFn;
@@ -26,8 +24,6 @@ describe("MatrixScheduler", function() {
     });
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-        clock = lolex.install();
         scheduler = new MatrixScheduler(function(ev, attempts, err) {
             if (retryFn) {
                 return retryFn(ev, attempts, err);
@@ -42,10 +38,6 @@ describe("MatrixScheduler", function() {
         retryFn = null;
         queueFn = null;
         defer = Promise.defer();
-    });
-
-    afterEach(function() {
-        clock.uninstall();
     });
 
     it("should process events in a queue in a FIFO manner", async function() {
@@ -112,7 +104,7 @@ describe("MatrixScheduler", function() {
         defer.reject({});
         await retryDefer.promise;
         expect(procCount).toEqual(1);
-        clock.tick(waitTimeMs);
+        jest.advanceTimersByTime(waitTimeMs);
         await Promise.resolve();
         expect(procCount).toEqual(2);
     });
@@ -203,7 +195,7 @@ describe("MatrixScheduler", function() {
         setTimeout(function() {
             deferA.resolve({});
         }, 1000);
-        clock.tick(1000);
+        jest.advanceTimersByTime(1000);
     });
 
     describe("queueEvent", function() {

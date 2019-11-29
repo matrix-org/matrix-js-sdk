@@ -139,7 +139,7 @@ OlmEncryption.prototype.encryptMessage = async function(room, eventType, content
         }
     }
 
-    return await Promise.all(promises).return(encryptedContent);
+    return await Promise.all(promises).then(() => encryptedContent);
 };
 
 /**

@@ -895,7 +895,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    return this.currentState.getMember(userId);
+     return this.currentState.getMember(userId);
  };
 
 /**
@@ -903,7 +903,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember[]} A list of currently joined members.
  */
  Room.prototype.getJoinedMembers = function() {
-    return this.getMembersWithMembership("join");
+     return this.getMembersWithMembership("join");
  };
 
 /**

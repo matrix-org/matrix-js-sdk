@@ -4,8 +4,6 @@ const sdk = require("../..");
 const RoomMember = sdk.RoomMember;
 const utils = require("../test-utils");
 
-import expect from 'expect';
-
 describe("RoomMember", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
@@ -14,7 +12,6 @@ describe("RoomMember", function() {
     let member;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         member = new RoomMember(roomId, userA);
     });
 
@@ -36,7 +33,7 @@ describe("RoomMember", function() {
             const url = member.getAvatarUrl(hsUrl);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
-            expect(url.indexOf("flibble/wibble")).toNotEqual(-1);
+            expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
         });
 
         it("should return an identicon HTTP URL if allowDefault was set and there " +
@@ -255,9 +252,9 @@ describe("RoomMember", function() {
             member.setMembershipEvent(joinEvent);
             expect(member.name).toEqual("Alice"); // prefer displayname
             member.setMembershipEvent(joinEvent, roomState);
-            expect(member.name).toNotEqual("Alice"); // it should disambig.
+            expect(member.name).not.toEqual("Alice"); // it should disambig.
             // user_id should be there somewhere
-            expect(member.name.indexOf(userA)).toNotEqual(-1);
+            expect(member.name.indexOf(userA)).not.toEqual(-1);
         });
 
         it("should emit 'RoomMember.membership' if the membership changes", function() {
@@ -328,9 +325,9 @@ describe("RoomMember", function() {
             };
             expect(member.name).toEqual(userA); // default = user_id
             member.setMembershipEvent(joinEvent, roomState);
-            expect(member.name).toNotEqual("Alíce"); // it should disambig.
+            expect(member.name).not.toEqual("Alíce"); // it should disambig.
             // user_id should be there somewhere
-            expect(member.name.indexOf(userA)).toNotEqual(-1);
+            expect(member.name.indexOf(userA)).not.toEqual(-1);
         });
     });
 });

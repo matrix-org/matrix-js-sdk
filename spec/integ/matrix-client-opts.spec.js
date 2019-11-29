@@ -5,7 +5,6 @@ const MatrixClient = sdk.MatrixClient;
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
-import expect from 'expect';
 import Promise from 'bluebird';
 
 describe("MatrixClient opts", function() {
@@ -58,7 +57,6 @@ describe("MatrixClient opts", function() {
     };
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
     });
 
@@ -101,7 +99,7 @@ describe("MatrixClient opts", function() {
                 "m.room.create",
             ];
             client.on("event", function(event) {
-                expect(expectedEventTypes.indexOf(event.getType())).toNotEqual(
+                expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
                     -1, "Recv unexpected event type: " + event.getType(),
                 );
                 expectedEventTypes.splice(

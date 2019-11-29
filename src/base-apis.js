@@ -2333,6 +2333,12 @@ MatrixBaseApis.prototype.sendToDevice = function(
         messages: contentMap,
     };
 
+    const targets = Object.keys(contentMap).reduce((obj, key) => {
+        obj[key] = Object.keys(contentMap[key]);
+        return obj;
+    }, {});
+    logger.log(`PUT ${path}`, targets);
+
     return this._http.authedRequest(undefined, "PUT", path, undefined, body);
 };
 

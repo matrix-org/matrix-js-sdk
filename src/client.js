@@ -19,6 +19,7 @@ limitations under the License.
 "use strict";
 
 const PushProcessor = require('./pushprocessor');
+import {sleep} from './utils';
 
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
@@ -72,7 +73,7 @@ function keysFromRecoverySession(sessions, decryptionKey, roomId) {
             decrypted.room_id = roomId;
             keys.push(decrypted);
         } catch (e) {
-            logger.log("Failed to decrypt session from backup");
+            logger.log("Failed to decrypt megolm session from backup", e);
         }
     }
     return keys;
@@ -1646,7 +1647,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
                 key.session_id = targetSessionId;
                 keys.push(key);
             } catch (e) {
-                logger.log("Failed to decrypt session from backup");
+                logger.log("Failed to decrypt megolm session from backup", e);
             }
         }
 
@@ -1892,33 +1893,33 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
 
     const reqOpts = {qsStringifyOptions: {arrayFormat: 'repeat'}};
 
-    const defer = Promise.defer();
-
     const self = this;
-    sign_promise.then(function(signed_invite_object) {
-        const data = {};
-        if (signed_invite_object) {
-            data.third_party_signed = signed_invite_object;
-        }
+    const prom = new Promise((resolve, reject) => {
+        sign_promise.then(function(signed_invite_object) {
+            const data = {};
+            if (signed_invite_object) {
+                data.third_party_signed = signed_invite_object;
+            }
 
-        const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
-        return self._http.authedRequest(
-            undefined, "POST", path, queryString, data, reqOpts);
-    }).then(function(res) {
-        const roomId = res.room_id;
-        const syncApi = new SyncApi(self, self._clientOpts);
-        const room = syncApi.createRoom(roomId);
-        if (opts.syncRoom) {
-            // v2 will do this for us
-            // return syncApi.syncRoom(room);
-        }
-        return Promise.resolve(room);
-    }).done(function(room) {
-        _resolve(callback, defer, room);
-    }, function(err) {
-        _reject(callback, defer, err);
+            const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias});
+            return self._http.authedRequest(
+                undefined, "POST", path, queryString, data, reqOpts);
+        }).then(function(res) {
+            const roomId = res.room_id;
+            const syncApi = new SyncApi(self, self._clientOpts);
+            const room = syncApi.createRoom(roomId);
+            if (opts.syncRoom) {
+                // v2 will do this for us
+                // return syncApi.syncRoom(room);
+            }
+            return Promise.resolve(room);
+        }).done(function(room) {
+            _resolve(callback, resolve, room);
+        }, function(err) {
+            _reject(callback, reject, err);
+        });
     });
-    return defer.promise;
+    return prom;
 };
 
 /**
@@ -3234,42 +3235,45 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
     // reduce the required number of events appropriately
     limit = limit - numAdded;
 
-    const defer = Promise.defer();
+    const self = this;
+    const prom = new Promise((resolve, reject) => {
+        // wait for a time before doing this request
+        // (which may be 0 in order not to special case the code paths)
+        sleep(timeToWaitMs).then(function() {
+            return self._createMessagesRequest(
+                room.roomId,
+                room.oldState.paginationToken,
+                limit,
+                'b');
+        }).done(function(res) {
+            const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
+            if (res.state) {
+                const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
+                room.currentState.setUnknownStateEvents(stateEvents);
+            }
+            room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
+            room.oldState.paginationToken = res.end;
+            if (res.chunk.length === 0) {
+                room.oldState.paginationToken = null;
+            }
+            self.store.storeEvents(room, matrixEvents, res.end, true);
+            self._ongoingScrollbacks[room.roomId] = null;
+            _resolve(callback, resolve, room);
+        }, function(err) {
+            self._ongoingScrollbacks[room.roomId] = {
+                errorTs: Date.now(),
+            };
+            _reject(callback, reject, err);
+        });
+    });
+
     info = {
-        promise: defer.promise,
+        promise: prom,
         errorTs: null,
     };
-    const self = this;
-    // wait for a time before doing this request
-    // (which may be 0 in order not to special case the code paths)
-    Promise.delay(timeToWaitMs).then(function() {
-        return self._createMessagesRequest(
-            room.roomId,
-            room.oldState.paginationToken,
-            limit,
-            'b');
-    }).done(function(res) {
-        const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
-        if (res.state) {
-            const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
-            room.currentState.setUnknownStateEvents(stateEvents);
-        }
-        room.addEventsToTimeline(matrixEvents, true, room.getLiveTimeline());
-        room.oldState.paginationToken = res.end;
-        if (res.chunk.length === 0) {
-            room.oldState.paginationToken = null;
-        }
-        self.store.storeEvents(room, matrixEvents, res.end, true);
-        self._ongoingScrollbacks[room.roomId] = null;
-        _resolve(callback, defer, room);
-    }, function(err) {
-        self._ongoingScrollbacks[room.roomId] = {
-            errorTs: Date.now(),
-        };
-        _reject(callback, defer, err);
-    });
+
     this._ongoingScrollbacks[room.roomId] = info;
-    return defer.promise;
+    return prom;
 };
 
 /**
@@ -3887,7 +3891,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
         } else if (!hasDontNotifyRule) {
             // Remove the existing one before setting the mute push rule
             // This is a workaround to SYN-590 (Push rule update fails)
-            deferred = Promise.defer();
+            deferred = utils.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
             .done(function() {
                 self.addPushRule(scope, "room", roomId, {
@@ -3906,26 +3910,26 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     }
 
     if (deferred) {
-        // Update this.pushRules when the operation completes
-        const ruleRefreshDeferred = Promise.defer();
-        deferred.done(function() {
-            self.getPushRules().done(function(result) {
-                self.pushRules = result;
-                ruleRefreshDeferred.resolve();
+        return new Promise((resolve, reject) => {
+            // Update this.pushRules when the operation completes
+            deferred.done(function() {
+                self.getPushRules().done(function(result) {
+                    self.pushRules = result;
+                    resolve();
+                }, function(err) {
+                    reject(err);
+                });
             }, function(err) {
-                ruleRefreshDeferred.reject(err);
-            });
-        }, function(err) {
-            // Update it even if the previous operation fails. This can help the
-            // app to recover when push settings has been modifed from another client
-            self.getPushRules().done(function(result) {
-                self.pushRules = result;
-                ruleRefreshDeferred.reject(err);
-            }, function(err2) {
-                ruleRefreshDeferred.reject(err);
+                // Update it even if the previous operation fails. This can help the
+                // app to recover when push settings has been modifed from another client
+                self.getPushRules().done(function(result) {
+                    self.pushRules = result;
+                    reject(err);
+                }, function(err2) {
+                    reject(err);
+                });
             });
         });
-        return ruleRefreshDeferred.promise;
     }
 };
 
@@ -4655,15 +4659,20 @@ function setupCallEventHandler(client) {
         // callId: [Candidate]
     };
 
-    // Maintain a buffer of events before the client has synced for the first time.
-    // This buffer will be inspected to see if we should send incoming call
-    // notifications. It needs to be buffered to correctly determine if an
-    // incoming call has had a matching answer/hangup.
+    // The sync code always emits one event at a time, so it will patiently
+    // wait for us to finish processing a call invite before delivering the
+    // next event, even if that next event is a hangup. We therefore accumulate
+    // all our call events and then process them on the 'sync' event, ie.
+    // each time a sync has completed. This way, we can avoid emitting incoming
+    // call events if we get both the invite and answer/hangup in the same sync.
+    // This happens quite often, eg. replaying sync from storage, catchup sync
+    // after loading and after we've been offline for a bit.
     let callEventBuffer = [];
-    let isClientPrepared = false;
-    client.on("sync", function(state) {
-        if (state === "PREPARED") {
-            isClientPrepared = true;
+    function evaluateEventBuffer() {
+        if (client.getSyncState() === "SYNCING") {
+            // don't process any events until they are all decrypted
+            if (callEventBuffer.some((e) => e.isBeingDecrypted())) return;
+
             const ignoreCallIds = {}; // Set<String>
             // inspect the buffer and mark all calls which have been answered
             // or hung up before passing them to the call event handler.
@@ -4676,39 +4685,51 @@ function setupCallEventHandler(client) {
             }
             // now loop through the buffer chronologically and inject them
             callEventBuffer.forEach(function(e) {
-                if (ignoreCallIds[e.getContent().call_id]) {
-                    // This call has previously been ansered or hung up: ignore it
+                if (
+                    e.getType() === "m.call.invite" &&
+                    ignoreCallIds[e.getContent().call_id]
+                ) {
+                    // This call has previously been answered or hung up: ignore it
                     return;
                 }
                 callEventHandler(e);
             });
             callEventBuffer = [];
         }
-    });
-
-    client.on("event", onEvent);
+    }
+    client.on("sync", evaluateEventBuffer);
 
     function onEvent(event) {
-        if (event.getType().indexOf("m.call.") !== 0) {
-            // not a call event
-            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-                // not *yet* a call event, but might become one...
-                event.once("Event.decrypted", onEvent);
-            }
-            return;
-        }
-        if (!isClientPrepared) {
+        // any call events or ones that might be once they're decrypted
+        if (event.getType().indexOf("m.call.") === 0 || event.isBeingDecrypted()) {
+            // queue up for processing once all events from this sync have been
+            // processed (see above).
             callEventBuffer.push(event);
-            return;
         }
-        callEventHandler(event);
+
+        if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+            // add an event listener for once the event is decrypted.
+            event.once("Event.decrypted", () => {
+                if (event.getType().indexOf("m.call.") === -1) return;
+
+                if (callEventBuffer.includes(event)) {
+                    // we were waiting for that event to decrypt, so recheck the buffer
+                    evaluateEventBuffer();
+                } else {
+                    // This one wasn't buffered so just run the event handler for it
+                    // straight away
+                    callEventHandler(event);
+                }
+            });
+        }
     }
+    client.on("event", onEvent);
 
     function callEventHandler(event) {
         const content = event.getContent();
         let call = content.call_id ? client.callList[content.call_id] : undefined;
         let i;
-        //console.log("RECV %s content=%s", event.getType(), JSON.stringify(content));
+        //console.info("RECV %s content=%s", event.getType(), JSON.stringify(content));
 
         if (event.getType() === "m.call.invite") {
             if (event.getSender() === client.credentials.userId) {
@@ -4879,18 +4900,18 @@ function checkTurnServers(client) {
     });
 }
 
-function _reject(callback, defer, err) {
+function _reject(callback, reject, err) {
     if (callback) {
         callback(err);
     }
-    defer.reject(err);
+    reject(err);
 }
 
-function _resolve(callback, defer, res) {
+function _resolve(callback, resolve, res) {
     if (callback) {
         callback(null, res);
     }
-    defer.resolve(res);
+    resolve(res);
 }
 
 function _PojoToMatrixEventMapper(client) {
@@ -5222,6 +5243,8 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
  * @param {object} data
  * @param {MatrixEvent} data.event the original verification request message
  * @param {Array} data.methods the verification methods that can be used
+ * @param {Number} data.timeout the amount of milliseconds that should be waited
+ *                 before cancelling the request automatically.
  * @param {Function} data.beginKeyVerification a function to call if a key
  *     verification should be performed.  The function takes one argument: the
  *     name of the key verification method (taken from data.methods) to use.

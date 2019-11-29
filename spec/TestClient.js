@@ -24,7 +24,6 @@ import './olm-loader';
 import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
-import expect from 'expect';
 import Promise from 'bluebird';
 import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
 import logger from '../src/logger';
@@ -159,7 +158,7 @@ TestClient.prototype.awaitOneTimeKeyUpload = function() {
           .respond(200, (path, content) => {
               expect(content.device_keys).toBe(undefined);
               expect(content.one_time_keys).toBeTruthy();
-              expect(content.one_time_keys).toNotEqual({});
+              expect(content.one_time_keys).not.toEqual({});
               logger.log('%s: received %i one-time keys', this,
                           Object.keys(content.one_time_keys).length);
               this.oneTimeKeys = content.one_time_keys;

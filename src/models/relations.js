@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import EventEmitter from 'events';
-import { EventStatus } from '../../lib/models/event';
+import { EventStatus } from '../models/event';
 
 /**
  * A container for relation events that supports easy access to common ways of

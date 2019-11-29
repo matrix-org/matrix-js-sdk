@@ -1,5 +1,4 @@
 "use strict";
-import expect from 'expect';
 import Promise from 'bluebird';
 
 // load olm before the sdk if possible
@@ -42,18 +41,6 @@ module.exports.syncPromise = function(client, count) {
 };
 
 /**
- * Perform common actions before each test case, e.g. printing the test case
- * name to stdout.
- * @param {Mocha.Context} context  The test context
- */
-module.exports.beforeEach = function(context) {
-    const desc = context.currentTest.fullTitle();
-
-    logger.log(desc);
-    logger.log(new Array(1 + desc.length).join("="));
-};
-
-/**
  * Create a spy for an object and automatically spy its methods.
  * @param {*} constr The class constructor (used with 'new')
  * @param {string} name The name of the class
@@ -71,7 +58,7 @@ module.exports.mock = function(constr, name) {
     for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
-                result[key] = expect.createSpy();
+                result[key] = jest.fn();
             }
         } catch (ex) {
             // Direct access to some non-function fields of DOM prototypes may
@@ -377,9 +364,9 @@ module.exports.setHttpResponses = function setHttpResponses(
     client._http = [
         "authedRequest", "authedRequestWithPrefix", "getContentUri",
         "request", "requestWithPrefix", "uploadContent",
-    ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
-    client._http.authedRequest.andCall(httpReq);
-    client._http.authedRequestWithPrefix.andCall(httpReq);
-    client._http.requestWithPrefix.andCall(httpReq);
-    client._http.request.andCall(httpReq);
+    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
+    client._http.authedRequest.mockImplementation(httpReq);
+    client._http.authedRequestWithPrefix.mockImplementation(httpReq);
+    client._http.requestWithPrefix.mockImplementation(httpReq);
+    client._http.request.mockImplementation(httpReq);
 };

@@ -16,7 +16,6 @@ limitations under the License.
 
 import '../../olm-loader';
 
-import expect from 'expect';
 import { MatrixEvent } from '../../../lib/models/event';
 import { SECRET_STORAGE_ALGORITHM_V1 } from '../../../lib/crypto/SecretStorage';
 
@@ -41,8 +40,8 @@ describe("Secrets", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await global.Olm.init();
+    beforeAll(function() {
+        return global.Olm.init();
     });
 
     it("should store and retrieve a secret", async function() {
@@ -62,7 +61,7 @@ describe("Secrets", function() {
             },
         };
 
-        const getKey = expect.createSpy().andCall(e => {
+        const getKey = jest.fn(e => {
             expect(Object.keys(e.keys)).toEqual(["abc"]);
             return ['abc', privkey];
         });

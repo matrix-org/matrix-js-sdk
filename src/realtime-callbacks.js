@@ -48,7 +48,7 @@ const debuglog = function() {};
  *
  * Intended for use by the unit tests.
  *
- * @param {function} f function which should return a millisecond counter
+ * @param {function} [f] function which should return a millisecond counter
  *
  * @internal
  */

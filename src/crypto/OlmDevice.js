@@ -462,7 +462,7 @@ OlmDevice.prototype.createInboundSession = async function(
  */
 OlmDevice.prototype.getSessionIdsForDevice = async function(theirDeviceIdentityKey) {
     if (this._sessionsInProgress[theirDeviceIdentityKey]) {
-        logger.log("waiting for session to be created");
+        logger.log("waiting for olm session to be created");
         try {
             await this._sessionsInProgress[theirDeviceIdentityKey];
         } catch (e) {
@@ -543,7 +543,7 @@ OlmDevice.prototype.getSessionIdForDevice = async function(
  */
 OlmDevice.prototype.getSessionInfoForDevice = async function(deviceIdentityKey, nowait) {
     if (this._sessionsInProgress[deviceIdentityKey] && !nowait) {
-        logger.log("waiting for session to be created");
+        logger.log("waiting for olm session to be created");
         try {
             await this._sessionsInProgress[deviceIdentityKey];
         } catch (e) {
@@ -595,8 +595,8 @@ OlmDevice.prototype.encryptMessage = async function(
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                 const sessionDesc = sessionInfo.session.describe();
-                console.log(
-                    "Session ID " + sessionId + " to " +
+                logger.log(
+                    "encryptMessage: Olm Session ID " + sessionId + " to " +
                     theirDeviceIdentityKey + ": " + sessionDesc,
                 );
                 res = sessionInfo.session.encrypt(payloadString);
@@ -627,8 +627,8 @@ OlmDevice.prototype.decryptMessage = async function(
         (txn) => {
             this._getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                 const sessionDesc = sessionInfo.session.describe();
-                console.log(
-                    "Session ID " + sessionId + " to " +
+                logger.log(
+                    "decryptMessage: Olm Session ID " + sessionId + " from " +
                     theirDeviceIdentityKey + ": " + sessionDesc,
                 );
                 payloadString = sessionInfo.session.decrypt(messageType, ciphertext);
@@ -739,6 +739,8 @@ OlmDevice.prototype.createOutboundGroupSession = function() {
  */
 OlmDevice.prototype.encryptGroupMessage = function(sessionId, payloadString) {
     const self = this;
+
+    logger.log(`encrypting msg with megolm session ${sessionId}`);
 
     checkPayloadLength(payloadString);
 
@@ -886,7 +888,9 @@ OlmDevice.prototype.addInboundGroupSession = async function(
                                 <= session.first_known_index()) {
                                 // existing session has lower index (i.e. can
                                 // decrypt more), so keep it
-                                logger.log("Keeping existing session");
+                                logger.log(
+                                    `Keeping existing megolm session ${sessionId}`,
+                                );
                                 return;
                             }
                         }

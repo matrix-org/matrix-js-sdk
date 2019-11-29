@@ -54,6 +54,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from './verification/Error';
+import {sleep} from '../utils';
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -70,8 +71,42 @@ export const verificationMethods = {
     SAS: SAS.NAME,
 };
 
+// the recommended amount of time before a verification request
+// should be (automatically) cancelled without user interaction
+// and ignored.
+const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
+// to avoid almost expired verification notifications
+// from showing a notification and almost immediately
+// disappearing, also ignore verification requests that
+// are this amount of time away from expiring.
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+
 export function isCryptoAvailable() {
     return Boolean(global.Olm);
+}
+
+/* subscribes to timeline events / to_device events for SAS verification */
+function listenForEvents(client, roomId, listener) {
+    let isEncrypted = false;
+    if (roomId) {
+        isEncrypted = client.isRoomEncrypted(roomId);
+    }
+
+    if (isEncrypted) {
+        client.on("Event.decrypted", listener);
+    }
+    client.on("event", listener);
+    let subscribed = true;
+    return function() {
+        if (subscribed) {
+            if (isEncrypted) {
+                client.off("Event.decrypted", listener);
+            }
+            client.off("event", listener);
+            subscribed = false;
+        }
+        return null;
+    };
 }
 
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
@@ -979,6 +1014,14 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
     eventEmitter.on("toDeviceEvent", function(event) {
         crypto._onToDeviceEvent(event);
     });
+
+    eventEmitter.on("Room.timeline", function(event) {
+        crypto._onTimelineEvent(event);
+    });
+
+    eventEmitter.on("Event.decrypted", function(event) {
+        crypto._onTimelineEvent(event);
+    });
 };
 
 
@@ -1362,13 +1405,15 @@ function verificationEventHandler(target, userId, roomId, eventId) {
             || event.getSender() !== userId) {
             return;
         }
-        const content = event.getContent();
-        if (!content["m.relates_to"]) {
+        // ignore events that haven't been decrypted yet.
+        // we also listen for undecrypted events, just in case
+        // the other side would be sending unencrypted events in an e2ee room
+        if (event.getType() === "m.room.encrypted") {
             return;
         }
-        const relatesTo
-              = content["m.relationship"] || content["m.relates_to"];
-        if (!relatesTo.rel_type
+        const relatesTo = event.getRelation();
+        if (!relatesTo
+            || !relatesTo.rel_type
             || relatesTo.rel_type !== "m.reference"
             || !relatesTo.event_id
             || relatesTo.event_id !== eventId) {
@@ -1425,7 +1470,9 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
                 );
                 // this handler gets removed when the verification finishes
                 // (see the verify method of crypto/verification/Base.js)
-                this._baseApis.on("event", verifier.handler);
+                const subscription =
+                    listenForEvents(this._baseApis, roomId, verifier.handler);
+                verifier.setEventsSubscription(subscription);
                 resolve(verifier);
                 break;
             }
@@ -1435,14 +1482,19 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
             }
             }
         };
-        this._baseApis.on("event", listener);
+        let initialResponseSubscription =
+            listenForEvents(this._baseApis, roomId, listener);
 
         const resolve = (...args) => {
-            this._baseApis.off("event", listener);
+            if (initialResponseSubscription) {
+                initialResponseSubscription = initialResponseSubscription();
+            }
             _resolve(...args);
         };
         const reject = (...args) => {
-            this._baseApis.off("event", listener);
+            if (initialResponseSubscription) {
+                initialResponseSubscription = initialResponseSubscription();
+            }
             _reject(...args);
         };
     });
@@ -1477,7 +1529,9 @@ Crypto.prototype.acceptVerificationDM = function(event, Method) {
     verifier.handler = verificationEventHandler(
         verifier, event.getSender(), event.getRoomId(), event.getId(),
     );
-    this._baseApis.on("event", verifier.handler);
+    const subscription = listenForEvents(
+        this._baseApis, event.getRoomId(), verifier.handler);
+    verifier.setEventsSubscription(subscription);
     return verifier;
 };
 
@@ -1668,7 +1722,7 @@ Crypto.prototype.setRoomEncryption = async function(roomId, config, inhibitDevic
     // It would otherwise just throw later as an unknown algorithm would, but we may
     // as well catch this here
     if (!config.algorithm) {
-        console.log("Ignoring setRoomEncryption with no algorithm");
+        logger.log("Ignoring setRoomEncryption with no algorithm");
         return;
     }
 
@@ -1854,17 +1908,15 @@ Crypto.prototype.exportRoomKeys = async function() {
  * @return {module:client.Promise} a promise which resolves once the keys have been imported
  */
 Crypto.prototype.importRoomKeys = function(keys) {
-    return Promise.map(
-        keys, (key) => {
-            if (!key.room_id || !key.algorithm) {
-                logger.warn("ignoring room key entry with missing fields", key);
-                return null;
-            }
+    return Promise.all(keys.map((key) => {
+        if (!key.room_id || !key.algorithm) {
+            logger.warn("ignoring room key entry with missing fields", key);
+            return null;
+        }
 
-            const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
-            return alg.importRoomKey(key);
-        },
-    );
+        const alg = this._getRoomDecryptor(key.room_id, key.algorithm);
+        return alg.importRoomKey(key);
+    }));
 };
 
 /**
@@ -1883,7 +1935,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
         // requests from different clients hitting the server all at
         // the same time when a new key is sent
         const delay = Math.random() * maxDelay;
-        await Promise.delay(delay);
+        await sleep(delay);
         let numFailures = 0; // number of consecutive failures
         while (1) {
             if (!this.backupKey) {
@@ -1917,7 +1969,7 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
             }
             if (numFailures) {
                 // exponential backoff if we have failures
-                await Promise.delay(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
             }
         }
     } finally {
@@ -2326,6 +2378,9 @@ Crypto.prototype._getTrackedE2eRooms = function() {
 
 Crypto.prototype._onToDeviceEvent = function(event) {
     try {
+        logger.log(`received to_device ${event.getType()} from: ` +
+                    `${event.getSender()} id: ${event.getId()}`);
+
         if (event.getType() == "m.room_key"
             || event.getType() == "m.forwarded_room_key") {
             this._onRoomKeyEvent(event);
@@ -2392,8 +2447,8 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
 
     const content = event.getContent();
     if (!("from_device" in content) || typeof content.from_device !== "string"
-        || !("transaction_id" in content) || typeof content.from_device !== "string"
-        || !("methods" in content) || !(content.methods instanceof Array)
+        || !("transaction_id" in content)
+        || !("methods" in content) || !Array.isArray(content.methods)
         || !("timestamp" in content) || typeof content.timestamp !== "number") {
         logger.warn("received invalid verification request from " + event.getSender());
         // ignore event if malformed
@@ -2469,6 +2524,7 @@ Crypto.prototype._onKeyVerificationRequest = function(event) {
         // notify the application of the verification request, so it can
         // decide what to do with it
         const request = {
+            timeout: VERIFICATION_REQUEST_TIMEOUT,
             event: event,
             methods: methods,
             beginKeyVerification: (method) => {
@@ -2601,6 +2657,31 @@ Crypto.prototype._onKeyVerificationStart = function(event) {
             }
         }
         this._baseApis.emit("crypto.verification.start", verifier);
+
+        // Riot does not implement `m.key.verification.request` while
+        // verifying over to_device messages, but the protocol is made to
+        // work when starting with a `m.key.verification.start` event straight
+        // away as well. Verification over DM *does* start with a request event first,
+        // and to expose a uniform api to monitor verification requests, we mock
+        // the request api here for to_device messages.
+        // "crypto.verification.start" is kept for backwards compatibility.
+
+        // ahh, this will create 2 request notifications for clients that do support the request event
+        // so maybe we should remove emitting the request when actually receiving it *sigh*
+        const requestAdapter = {
+            event,
+            timeout: VERIFICATION_REQUEST_TIMEOUT,
+            methods: [content.method],
+            beginKeyVerification: (method) => {
+                if (content.method === method) {
+                    return verifier;
+                }
+            },
+            cancel: () => {
+                return verifier.cancel("User cancelled");
+            },
+        };
+        this._baseApis.emit("crypto.verification.request", requestAdapter);
     }
 };
 
@@ -2631,6 +2712,53 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             verifier.handleEvent(event);
         }
     }
+};
+
+/**
+ * Handle key verification requests sent as timeline events
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event the timeline event
+ */
+Crypto.prototype._onTimelineEvent = function(event) {
+    if (event.getType() !== "m.room.message") {
+        return;
+    }
+    const content = event.getContent();
+    if (content.msgtype !== "m.key.verification.request") {
+        return;
+    }
+    // ignore event if malformed
+    if (!("from_device" in content) || typeof content.from_device !== "string"
+        || !("methods" in content) || !Array.isArray(content.methods)
+        || !("to" in content) || typeof content.to !== "string") {
+        logger.warn("received invalid verification request over DM from "
+            + event.getSender());
+        return;
+    }
+    // check the request was directed to the syncing user
+    if (content.to !== this._baseApis.getUserId()) {
+        return;
+    }
+
+    const timeout = VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN;
+    if (event.getLocalAge() >= timeout) {
+        return;
+    }
+    const request = {
+        event,
+        timeout: VERIFICATION_REQUEST_TIMEOUT,
+        methods: content.methods,
+        beginKeyVerification: (method) => {
+            const verifier = this.acceptVerificationDM(event, method);
+            return verifier;
+        },
+        cancel: () => {
+            const verifier = this.acceptVerificationDM(event, content.methods[0]);
+            verifier.cancel("User declined");
+        },
+    };
+    this._baseApis.emit("crypto.verification.request", request);
 };
 
 /**
@@ -2815,14 +2943,10 @@ Crypto.prototype._processReceivedRoomKeyRequests = async function() {
         // cancellation (and end up with a cancelled request), rather than the
         // cancellation before the request (and end up with an outstanding
         // request which should have been cancelled.)
-        await Promise.map(
-            requests, (req) =>
-                this._processReceivedRoomKeyRequest(req),
-        );
-        await Promise.map(
-            cancellations, (cancellation) =>
-                this._processReceivedRoomKeyRequestCancellation(cancellation),
-        );
+        await Promise.all(requests.map((req) =>
+            this._processReceivedRoomKeyRequest(req)));
+        await Promise.all(cancellations.map((cancellation) =>
+            this._processReceivedRoomKeyRequestCancellation(cancellation)));
     } catch (e) {
         logger.error(`Error processing room key requsts: ${e}`);
     } finally {
