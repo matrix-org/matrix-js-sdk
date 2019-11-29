@@ -139,7 +139,7 @@ export class CrossSigningInfo extends EventEmitter {
      *
      * @param {SecretStorage} secretStorage The secret store using account data
      */
-    getFromSecretStorage(secretStorage) {
+    async getFromSecretStorage(secretStorage) {
         if (!this._callbacks.saveCrossSigningKeys) {
             throw new Error("No saveCrossSigningKeys callback supplied");
         }
@@ -147,7 +147,7 @@ export class CrossSigningInfo extends EventEmitter {
         // Retrieve private keys from secret storage
         const privateKeys = {};
         for (const name of ["master", "self_signing", "user_signing"]) {
-            privateKeys[name] = secretStorage.get(`m.cross_signing.${name}`);
+            privateKeys[name] = await secretStorage.get(`m.cross_signing.${name}`);
         }
 
         // Regenerate public keys from private keys

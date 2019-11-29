@@ -346,7 +346,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         );
         if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
             logger.log("Cross-signing private keys found in secret storage");
-            this._crossSigningInfo.getFromSecretStorage(this._secretStorage);
+            await this._getCrossSigningKeysFromSecretStorage();
         } else {
             logger.log(
                 "Cross-signing private keys not found in secret storage, " +
@@ -474,14 +474,57 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
             },
         );
     } catch (e) {
-        // If anything failed here, remove the keys so we know to try again from the start
+        // If anything failed here, revert the keys so we know to try again from the start
         // next time.
         logger.error("Resetting cross-signing keys failed, revert to previous keys", e);
         this._crossSigningInfo.keys = oldKeys;
         throw e;
     }
     this._baseApis.emit("crossSigning.keysChanged", {});
+    await this._afterCrossSigningKeyChange();
+    logger.info("Cross-signing key reset complete");
+};
 
+/**
+ * If cross-signing keys are known to exist in secret storage, this will get
+ * them and store them on this device as trusted.
+ */
+Crypto.prototype._getCrossSigningKeysFromSecretStorage = async function() {
+    logger.info("Getting cross-signing keys from secret storage");
+    // Copy old keys (usually empty) in case we need to revert
+    const oldKeys = Object.assign({}, this._crossSigningInfo.keys);
+    try {
+        await this._crossSigningInfo.getFromSecretStorage(this._secretStorage);
+        // XXX: Do we also need to sign the cross-signing master key with the
+        // device key as in `resetCrossSigningKeys`?
+
+        // write a copy locally so we know these are trusted keys
+        await this._cryptoStore.doTxn(
+            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
+            },
+        );
+    } catch (e) {
+        // If anything failed here, revert the keys so we know to try again from the start
+        // next time.
+        logger.error(
+            "Getting cross-signing keys from secret storage failed, " +
+            "revert to previous keys", e,
+        );
+        this._crossSigningInfo.keys = oldKeys;
+        throw e;
+    }
+    this._baseApis.emit("crossSigning.keysChanged", {});
+    await this._afterCrossSigningKeyChange();
+    logger.info("Cross-signing keys restored from secret storage");
+};
+
+/**
+ * Run various follow-up actions after cross-signing keys have changed, such as
+ * signing the current device, upgrading device verifications, etc.
+ */
+Crypto.prototype._afterCrossSigningKeyChange = async function() {
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
@@ -525,8 +568,6 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
             );
         }
     }
-
-    logger.info("Cross-signing key reset complete");
 };
 
 /**
