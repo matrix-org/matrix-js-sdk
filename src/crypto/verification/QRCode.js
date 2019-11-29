@@ -39,11 +39,11 @@ const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 export class ShowQRCode extends Base {
     _doVerification() {
         if (!this._done) {
-            const url = "https://matrix.to/#/" + this._baseApis.getUserId()
-                  + "?device=" + encodeURIComponent(this._baseApis.deviceId)
+            const url = "https://matrix.to/#/" + this._ownCredentials.getUserId()
+                  + "?device=" + encodeURIComponent(this._ownCredentials.deviceId)
                   + "&action=verify&key_ed25519%3A"
-                  + encodeURIComponent(this._baseApis.deviceId) + "="
-                  + encodeURIComponent(this._baseApis.getDeviceEd25519Key());
+                  + encodeURIComponent(this._ownCredentials.deviceId) + "="
+                  + encodeURIComponent(this._ownCredentials.getDeviceEd25519Key());
             this.emit("show_qr_code", {
                 url: url,
             });

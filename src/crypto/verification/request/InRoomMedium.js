@@ -25,6 +25,10 @@ export class InRoomMedium {
         this._requestEventId = null;
     }
 
+    get needsDoneMessage() {
+        return true;
+    }
+
     // why did we need this again?
     // to get the transaction id for the verifier ...
     // but we shouldn't need it anymore since it is only used

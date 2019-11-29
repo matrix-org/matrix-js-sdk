@@ -46,31 +46,21 @@ export default class VerificationBase extends EventEmitter {
      *
      * @param {string} deviceId the device ID that is being verified
      *
-     * @param {string} transactionId the transaction ID to be used when sending events
-     *
-     * @param {string} [roomId] the room to use for verification
-     *
      * @param {object} [startEvent] the m.key.verification.start event that
      * initiated this verification, if any
      *
      * @param {object} [request] the key verification request object related to
      * this verification, if any
      */
-    constructor(baseApis, userId, deviceId, transactionId, roomId, startEvent, request) {
+    constructor(medium, ownCredentials, userId, deviceId, startEvent, request) {
         super();
-        this._baseApis = baseApis;
+        this._medium = medium;
+        this._ownCredentials = ownCredentials;
         this.userId = userId;
         this.deviceId = deviceId;
-        this.transactionId = transactionId;
-        if (typeof(roomId) === "string" || roomId instanceof String) {
-            this.roomId = roomId;
-            this.startEvent = startEvent;
-            this.request = request;
-        } else {
-            // if room ID was omitted, but start event and request were not
-            this.startEvent= roomId;
-            this.request = startEvent;
-        }
+        this.startEvent = startEvent;
+        this.request = request;
+
         this.cancelled = false;
         this._done = false;
         this._promise = null;
@@ -79,12 +69,6 @@ export default class VerificationBase extends EventEmitter {
 
         // At this point, the verification request was received so start the timeout timer.
         this._resetTimer();
-
-        if (this.roomId) {
-            this._sendWithTxnId = this._sendMessage;
-        } else {
-            this._sendWithTxnId = this._sendToDevice;
-        }
     }
 
     _resetTimer() {
@@ -108,54 +92,20 @@ export default class VerificationBase extends EventEmitter {
     }
 
     _contentFromEventWithTxnId(event) {
-        if (this.roomId) {  // verification as timeline event
-            // ensure m.related_to is included in e2ee rooms
-            // as the field is excluded from encryption
-            const content = Object.assign({}, event.getContent());
-            content["m.relates_to"] = event.getRelation();
-            return content;
-        } else { // verification as to_device event
-            return event.getContent();
-        }
+        return this._medium.contentFromEventWithTxnId(event);
     }
 
     /* creates a content object with the transaction id added to it */
     _contentWithTxnId(content) {
-        const copy = Object.assign({}, content);
-        if (this.roomId) { // verification as timeline event
-            copy["m.relates_to"] = {
-                rel_type: "m.reference",
-                event_id: this.transactionId,
-            };
-        } else { // verification as to_device event
-            copy.transaction_id = this.transactionId;
-        }
-        return copy;
+        return this._medium.contentWithTxnId(content);
     }
 
     _send(type, contentWithoutTxnId) {
-        const content = this._contentWithTxnId(contentWithoutTxnId);
-        return this._sendWithTxnId(type, content);
+        return this._medium.send(type, contentWithoutTxnId);
     }
 
-    /* send a message to the other participant, using to-device messages
-     */
-    _sendToDevice(type, content) {
-        if (this._done) {
-            return Promise.reject(new Error("Verification is already done"));
-        }
-        return this._baseApis.sendToDevice(type, {
-            [this.userId]: { [this.deviceId]: content },
-        });
-    }
-
-    /* send a message to the other participant, using in-roomm messages
-     */
-    _sendMessage(type, content) {
-        if (this._done) {
-            return Promise.reject(new Error("Verification is already done"));
-        }
-        return this._baseApis.sendEvent(this.roomId, type, content);
+    _sendWithTxnId(type, contentWithTxnId) {
+        return this._medium.sendWithTxnId(type, contentWithTxnId);
     }
 
     _waitForEvent(type) {
@@ -199,7 +149,7 @@ export default class VerificationBase extends EventEmitter {
     done() {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
-            if (this.roomId) {
+            if (this._medium.needsDoneMessage) {
                 // verification in DM requires a done message
                 this._send("m.key.verification.done", {});
             }
@@ -211,7 +161,7 @@ export default class VerificationBase extends EventEmitter {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
             this.cancelled = true;
-            if (this.userId && this.deviceId && this.transactionId) {
+            if (this.userId && this.deviceId) {
                 // send a cancellation to the other user (if it wasn't
                 // cancelled by the other user)
                 if (e === timeoutException) {
@@ -225,13 +175,11 @@ export default class VerificationBase extends EventEmitter {
                             content.code = content.code || "m.unknown";
                             content.reason = content.reason || content.body
                                 || "Unknown reason";
-                            content.transaction_id = this.transactionId;
                             this._send("m.key.verification.cancel", content);
                         } else {
                             this._send("m.key.verification.cancel", {
                                 code: "m.unknown",
                                 reason: content.body || "Unknown reason",
-                                transaction_id: this.transactionId,
                             });
                         }
                     }
@@ -239,7 +187,6 @@ export default class VerificationBase extends EventEmitter {
                     this._send("m.key.verification.cancel", {
                         code: "m.unknown",
                         reason: e.toString(),
-                        transaction_id: this.transactionId,
                     });
                 }
             }
