@@ -153,6 +153,7 @@ export class CrossSigningInfo extends EventEmitter {
         // Regenerate public keys from private keys
         // XXX: Do we want to _also_ download public keys from the homeserver to
         // verify they agree...?
+        // See also https://github.com/vector-im/riot-web/issues/11558
         const signings = {};
         const publicKeys = {};
         const keys = {};
