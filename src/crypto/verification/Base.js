@@ -91,21 +91,8 @@ export default class VerificationBase extends EventEmitter {
         }
     }
 
-    _contentFromEventWithTxnId(event) {
-        return this._medium.contentFromEventWithTxnId(event);
-    }
-
-    /* creates a content object with the transaction id added to it */
-    _contentWithTxnId(content) {
-        return this._medium.contentWithTxnId(content);
-    }
-
-    _send(type, contentWithoutTxnId) {
-        return this._medium.send(type, contentWithoutTxnId);
-    }
-
-    _sendWithTxnId(type, contentWithTxnId) {
-        return this._medium.sendWithTxnId(type, contentWithTxnId);
+    _send(type, uncompletedContent) {
+        return this._medium.send(type, uncompletedContent);
     }
 
     _waitForEvent(type) {

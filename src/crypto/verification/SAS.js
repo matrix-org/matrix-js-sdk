@@ -205,7 +205,8 @@ export default class SAS extends Base {
     }
 
     async _doSendVerification() {
-        const initialMessage = this._contentWithTxnId({
+        const type = "m.key.verification.start";
+        const initialMessage = this._medium.completeContent(type, {
             method: SAS.NAME,
             from_device: this._ownCredentials.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
@@ -216,8 +217,7 @@ export default class SAS extends Base {
         });
         // add the transaction id to the message beforehand because
         // it needs to be included in the commitment hash later on
-        this._sendWithTxnId("m.key.verification.start", initialMessage);
-
+        this._medium.sendCompleted(type, initialMessage);
 
         let e = await this._waitForEvent("m.key.verification.accept");
         let content = e.getContent();
@@ -283,7 +283,7 @@ export default class SAS extends Base {
     async _doRespondVerification() {
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
-        let content = this._contentFromEventWithTxnId(this.startEvent);
+        let content = this._medium.completedContentFromEvent(this.startEvent);
 
         // Note: we intersect using our pre-made lists, rather than the sets,
         // so that the result will be in our order of preference.  Then

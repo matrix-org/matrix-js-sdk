@@ -39,7 +39,7 @@ export class ToDeviceMedium {
         this.transactionId = null;
     }
 
-    static getTxnId(event) {
+    static getTransactionId(event) {
         const content = event.getContent();
         return content && content.transaction_id;
     }
@@ -76,7 +76,7 @@ export class ToDeviceMedium {
 
         return VerificationRequest.validateEvent(event, client);
     }
-
+    // .request event is optional
     get requestIsOptional() {
         return true;
     }
@@ -86,9 +86,11 @@ export class ToDeviceMedium {
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
             const deviceId = content.from_device;
+            // adopt deviceId if not set before and valid
             if (!this._deviceId && this._devices.includes(deviceId)) {
                 this._deviceId = deviceId;
             }
+            // if no device id or different from addopted one, cancel with sender
             if (!this._deviceId || this._deviceId !== deviceId) {
                 // also check that message came from the device we sent the request to earlier on
                 // and do send a cancel message to that device
@@ -114,40 +116,45 @@ export class ToDeviceMedium {
         }
     }
 
-    contentFromEventWithTxnId(event) {
+    // SAS verification need the event as received
+    // as a data-point to hash on both ends.
+    // but we also don't want to modify the content argument in the send method
+    // as it's unclear where fields get added from the verification code that way.
+    // for this reason there is a completed content (as sent/received)
+    // and uncompleted content, with only fields the VerificationRequest
+    // and VerifierBase should care about to send.
+    // This is put in the medium as some of these fields are different
+    // for to_device and in-room verification
+    completedContentFromEvent(event) {
         return event.getContent();
     }
 
     /* creates a content object with the transaction id added to it */
-    contentWithTxnId(content) {
+    completeContent(type, content) {
+        // make a copy
+        content = Object.assign({}, content);
         if (this.transactionId) {
-            const copy = Object.assign({}, content);
-            copy.transaction_id = this.transactionId;
-            return copy;
-        } else {
-            return content;
+            content.transaction_id = this.transactionId;
         }
-    }
-
-    send(type, contentWithoutTxnId = {}) {
-        // create transaction id when sending request
-        if (type === REQUEST_TYPE && !this.transactionId) {
-            this.transactionId = randomString(32);
-        }
-        const content = this.contentWithTxnId(contentWithoutTxnId);
-        return this.sendWithTxnId(type, content);
-    }
-
-    sendWithTxnId(type, content) {
-        // TODO: we should be consistent about modifying the arguments,
-        // perhaps we should add these fields in contentWithTxnId or something...
         if (type === REQUEST_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
         if (type === REQUEST_TYPE) {
             content.timestamp = Date.now();
         }
+        return content;
+    }
 
+    send(type, uncompletedContent = {}) {
+        // create transaction id when sending request
+        if (type === REQUEST_TYPE && !this.transactionId) {
+            this.transactionId = randomString(32);
+        }
+        const content = this.completeContent(type, uncompletedContent);
+        return this.sendCompleted(type, content);
+    }
+
+    sendCompleted(type, content) {
         if (type === REQUEST_TYPE) {
             return this._sendToDevices(type, content, this._devices);
         } else {

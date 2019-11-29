@@ -37,7 +37,7 @@ export class InRoomMedium {
         return this._requestEventId;
     }
 
-    static getTxnId(event) {
+    static getTransactionId(event) {
         const relation = event.getRelation();
         if (relation && relation.rel_type === "m.reference") {
             return relation.event_id;
@@ -84,7 +84,7 @@ export class InRoomMedium {
         return await request.handleEvent(type, event);
     }
 
-    contentFromEventWithTxnId(event) {
+    completedContentFromEvent(event) {
         // ensure m.related_to is included in e2ee rooms
         // as the field is excluded from encryption
         const content = Object.assign({}, event.getContent());
@@ -93,25 +93,8 @@ export class InRoomMedium {
     }
 
     /* creates a content object with the transaction id added to it */
-    contentWithTxnId(content) {
-        if (this._requestEventId) {
-            const copy = Object.assign({}, content);
-            copy["m.relates_to"] = {
-                rel_type: "m.reference",
-                event_id: this._requestEventId,
-            };
-            return copy;
-        } else {
-            return content;
-        }
-    }
-
-    send(type, contentWithoutTxnId) {
-        const content = this.contentWithTxnId(contentWithoutTxnId);
-        return this.sendWithTxnId(type, content);
-    }
-
-    async sendWithTxnId(type, content) {
+    completeContent(type, content) {
+        content = Object.assign({}, content);
         if (type === REQUEST_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
@@ -126,6 +109,21 @@ export class InRoomMedium {
                 from_device: content.from_device,
                 methods: content.methods,
             };
+        } else {
+            content["m.relates_to"] = {
+                rel_type: "m.reference",
+                event_id: this._requestEventId,
+            };
+        }
+    }
+
+    send(type, uncompletedContent) {
+        const content = this.completeContent(type, uncompletedContent);
+        return this.sendCompleted(type, content);
+    }
+
+    async sendCompleted(type, content) {
+        if (type === REQUEST_TYPE) {
             type = "m.room.message";
         }
         const res = await this._client.sendEvent(this._roomId, type, content);

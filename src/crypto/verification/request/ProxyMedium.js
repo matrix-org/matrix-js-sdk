@@ -37,13 +37,13 @@ export class ProxyMedium {
         return this._medium.handleEvent(event, request);
     }
 
-    contentFromEventWithTxnId(event) {
-        return this._medium.contentFromEventWithTxnId(event);
+    completedContentFromEvent(event) {
+        return this._medium.completedContentFromEvent(event);
     }
 
     /* creates a content object with the transaction id added to it */
-    contentWithTxnId(content) {
-        return this._medium.contentWithTxnId(content);
+    completeContent(content) {
+        return this._medium.completeContent(content);
     }
 
     async send(type, contentWithoutTxnId) {
@@ -52,8 +52,8 @@ export class ProxyMedium {
         return result;
     }
 
-    async sendWithTxnId(type, content) {
-        const result = await this._medium.sendWithTxnId(type, content);
+    async sendCompleted(type, content) {
+        const result = await this._medium.sendCompleted(type, content);
         this._onSend(type, content);
         return result;
     }
