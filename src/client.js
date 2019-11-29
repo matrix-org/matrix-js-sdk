@@ -1051,8 +1051,8 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * for use.
  *
  * @function module:client~MatrixClient#bootstrapSecretStorage
- * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
- * await an interactive auth request.
+ * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
+ * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
  *     auth data as an object.

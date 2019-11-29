@@ -323,14 +323,14 @@ Crypto.prototype.init = async function() {
  * up, then no changes are made, so this is safe to run to ensure secret storage
  * is ready for use.
  *
- * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
- * await an interactive auth request.
+ * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
+ * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
  *     auth data as an object.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
-    doInteractiveAuthFlow,
+    authUploadDeviceSigningKeys,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -354,7 +354,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             );
             await this.resetCrossSigningKeys(
                 CrossSigningLevel.MASTER,
-                { doInteractiveAuthFlow },
+                { authUploadDeviceSigningKeys },
             );
             crossSigningKeysReset = true;
         }
@@ -440,14 +440,14 @@ Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
  * @param {CrossSigningLevel} [level] the level of cross-signing to reset.  New
  * keys will be created for the given level and below.  Defaults to
  * regenerating all keys.
- * @param {function} [opts.doInteractiveAuthFlow] Optional. Function called to
- * await an interactive auth request.
+ * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
+ * called to await an interactive auth flow when uploading device signing keys.
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
  *     auth data as an object.
  */
 Crypto.prototype.resetCrossSigningKeys = async function(level, {
-    doInteractiveAuthFlow = async func => await func(),
+    authUploadDeviceSigningKeys = async func => await func(),
 } = {}) {
     logger.info(`Resetting cross-signing keys at level ${level}`);
     // Copy old keys (usually empty) in case we need to revert
@@ -462,7 +462,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
         for (const [name, key] of Object.entries(this._crossSigningInfo.keys)) {
             keys[name + "_key"] = key;
         }
-        await doInteractiveAuthFlow(async authDict => {
+        await authUploadDeviceSigningKeys(async authDict => {
             await this._baseApis.uploadDeviceSigningKeys(authDict, keys);
         });
 
