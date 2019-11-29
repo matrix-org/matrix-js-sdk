@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import VerificationRequest, {REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
+const MESSAGE_TYPE = "m.room.message";
 
 export class InRoomMedium {
     constructor(client, roomId, userId) {
@@ -45,12 +46,16 @@ export class InRoomMedium {
     }
 
     static validateEvent(event, client) {
-        const type = event.getType();
+        let type = event.getType();
+        const content = event.getContent();
+        if (type === MESSAGE_TYPE) {
+            type = content && content.msgtype;
+        }
         // any event but the .request event needs to have a relation set
         if (type !== REQUEST_TYPE && !event.isRelation("m.reference")) {
             return false;
         }
-        return VerificationRequest.validateEvent(event, client);
+        return VerificationRequest.validateEvent(type, event, client);
     }
 
     static getEventType(event) {
@@ -124,7 +129,7 @@ export class InRoomMedium {
 
     async sendCompleted(type, content) {
         if (type === REQUEST_TYPE) {
-            type = "m.room.message";
+            type = MESSAGE_TYPE;
         }
         const res = await this._client.sendEvent(this._roomId, type, content);
         if (type === REQUEST_TYPE) {

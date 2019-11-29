@@ -74,7 +74,7 @@ export class ToDeviceMedium {
             }
         }
 
-        return VerificationRequest.validateEvent(event, client);
+        return VerificationRequest.validateEvent(type, event, client);
     }
     // .request event is optional
     get requestIsOptional() {

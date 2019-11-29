@@ -44,7 +44,9 @@ export const PHASE_UNSENT = 1;
 export const PHASE_REQUESTED = 2;
 // const PHASE_ACCEPTED = 3;
 export const PHASE_STARTED = 4;
-export const PHASE_CANCELLED = 6;
+export const PHASE_CANCELLED = 5;
+export const PHASE_DONE = 6;
+
 
 // TODO: after doing request.medium.handleEvent(event, request)
 // from crypto/index, we need to check whether it should be deleted from _verificationTransactions
@@ -62,9 +64,12 @@ export class VerificationRequest extends EventEmitter {
         this._requestEvent = null;
     }
 
-    static validateEvent(event, client) {
-        const type = event.getType();
+    static validateEvent(type, event, client) {
         const content = event.getContent();
+
+        if (!type.startsWith(EVENT_PREFIX)) {
+            return false;
+        }
 
         if (type === REQUEST_TYPE || type === START_TYPE) {
             if (!Array.isArray(content.methods)) {
@@ -83,7 +88,6 @@ export class VerificationRequest extends EventEmitter {
                 return false;
             }
         }
-        return true;
     }
 
     get methods() {
@@ -98,47 +102,50 @@ export class VerificationRequest extends EventEmitter {
         return this._requestEvent;
     }
 
+    get isPending() {
+        return this.phase !== PHASE_UNSENT
+            && this.phase !== PHASE_DONE
+            && this.phase !== PHASE_CANCELLED;
+    }
+
     async beginKeyVerification(method) {
         if (
             this.phase === PHASE_REQUESTED &&
             this._commonMethods &&
             this._commonMethods.includes(method)
         ) {
+            this.phase = PHASE_REQUESTED;
             this._verifier = this._createVerifier(method);
             // to keep old api that returns verifier sync,
             // run send in fire and forget fashion for now
             (async () => {
                 try {
+                    //TODO: add from_device here, as it is handled here as well?
                     await this.medium.send(START_TYPE, {method: method});
                 } catch (err) {
                     logger.error("error sending " + START_TYPE, err);
                 }
+                this.emit("change");
             })();
-            this._setPhase(PHASE_STARTED);
             return this._verifier;
         }
     }
 
     async sendRequest() {
         if (this.phase === PHASE_UNSENT) {
+            //TODO: add from_device here, as it is handled here as well?
+            this.phase = PHASE_REQUESTED;
             await this.medium.send(REQUEST_TYPE, {methods: this._methods});
-            this._setPhase(PHASE_REQUESTED);
+            this.emit("change");
         }
     }
 
     async cancel({reason = "User declined", code = "m.user"}) {
         if (this.phase !== PHASE_CANCELLED) {
+            this.phase = PHASE_CANCELLED;
             await this.medium.send(CANCEL_TYPE, {code, reason});
-            this._applyCancel();
+            this.emit("change");
         }
-    }
-
-    _applyCancel() {
-        // TODO: also cancel verifier if one is present?
-        if (this._verifier) {
-            this._verifier.cancel();
-        }
-        this._setPhase(PHASE_CANCELLED);
     }
 
     _setPhase(phase) {
@@ -201,7 +208,11 @@ export class VerificationRequest extends EventEmitter {
 
     _handleCancel() {
         if (this.phase !== PHASE_CANCELLED) {
-            this._applyCancel();
+            // TODO: also cancel verifier if one is present?
+            // if (this._verifier) {
+            //     this._verifier.cancel();
+            // }
+            this._setPhase(PHASE_CANCELLED);
         }
     }
 
