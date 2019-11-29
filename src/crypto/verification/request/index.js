@@ -47,6 +47,7 @@ const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
 
 
 export class ToDeviceMedium {
+    // userId and devices of user we're about to verify
     constructor(client, userId, devices) {
         this._client = client;
         this._userId = userId;
@@ -60,7 +61,7 @@ export class ToDeviceMedium {
         return content && content.transaction_id;
     }
 
-    static validateEvent(event) {
+    static validateEvent(event, client) {
         if (event.isCancelled()) {
             logger.warn("Ignoring flagged verification request from "
                  + event.getSender());
@@ -72,13 +73,6 @@ export class ToDeviceMedium {
         }
 
         if (!content.transaction_id) {
-            return false;
-        }
-
-        const sender = event.getSender();
-        if (sender === this._userId) {
-            // ignore requests from ourselves, because it doesn't make sense for a
-            // device to verify itself
             return false;
         }
 
@@ -97,18 +91,7 @@ export class ToDeviceMedium {
             }
         }
 
-        if (type === REQUEST_TYPE || type === START_TYPE) {
-            if (typeof content.from_device !== "string" ||
-                content.from_device.length === 0
-            ) {
-                return false;
-            }
-            if (!Array.isArray(content.methods)) {
-                return false;
-            }
-        }
-
-        return true;
+        return VerificationRequest.validateEvent(event, client);
     }
 
     get requestIsOptional() {
@@ -178,7 +161,7 @@ export class ToDeviceMedium {
         if (type === REQUEST_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
-        if (type === REQUEST_TYPE ) {
+        if (type === REQUEST_TYPE) {
             content.timestamp = Date.now();
         }
 
@@ -208,6 +191,9 @@ export class InRoomMedium {
     }
 
     // why did we need this again?
+    // to get the transaction id for the verifier ...
+    // but we shouldn't need it anymore since it is only used
+    // for sending there which will now happen through the medium
     get transactionId() {
         return this._requestEventId;
     }
@@ -219,13 +205,13 @@ export class InRoomMedium {
         }
     }
 
-    static validateEvent(event) {
+    static validateEvent(event, client) {
         const type = event.getType();
         // any event but the .request event needs to have a relation set
         if (type !== REQUEST_TYPE && !event.isRelation("m.reference")) {
             return false;
         }
-        return true;
+        return VerificationRequest.validateEvent(event, client);
     }
 
     static getEventType(event) {
@@ -375,14 +361,28 @@ export class VerificationRequest extends EventEmitter {
         this._verificationMethods = verificationMethods;
         this._commonMethods = [];
         this.phase = PHASE_UNSENT;
+        // .request event from other side, only set if this is the receiving end.
         this._requestEvent = null;
     }
 
-    static validateEvent(event) {
+    static validateEvent(event, client) {
         const type = event.getType();
         const content = event.getContent();
+
         if (type === REQUEST_TYPE || type === START_TYPE) {
             if (!Array.isArray(content.methods)) {
+                return false;
+            }
+            if (typeof content.from_device !== "string" ||
+                content.from_device.length === 0
+            ) {
+                return false;
+            }
+            if (event.getSender() === client.getUserId() &&
+                    content.from_device == client.getDeviceId()
+            ) {
+                // ignore requests from ourselves, because it doesn't make sense for a
+                // device to verify itself
                 return false;
             }
         }
@@ -402,14 +402,23 @@ export class VerificationRequest extends EventEmitter {
     }
 
     async beginKeyVerification(method) {
-        // TODO: verify that the request wasn't sent by us, but received rather (check _commonMethods sort of does that)
         if (
             this.phase === PHASE_REQUESTED &&
             this._commonMethods &&
             this._commonMethods.includes(method)
         ) {
-            await this.medium.send(START_TYPE, {method: method});
+            this._verifier = this._createVerifier(method);
+            // to keep old api that returns verifier sync,
+            // run send in fire and forget fashion for now
+            (async () => {
+                try {
+                    await this.medium.send(START_TYPE, {method: method});
+                } catch (err) {
+                    logger.error("error sending " + START_TYPE, err);
+                }
+            })();
             this._setPhase(PHASE_STARTED);
+            return this._verifier;
         }
     }
 
@@ -485,14 +494,7 @@ export class VerificationRequest extends EventEmitter {
             if (!this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));
             } else {
-                const VerifierCtor = this._verificationMethods.get(method);
-                const proxyMedium = new ProxyMedium(this, this._medium);
-                this._verifier = new VerifierCtor(
-                    proxyMedium,
-                    event.getSender(),
-                    content.from_device,
-                    event,
-                );
+                this._verifier = this._createVerifier(method, event);
                 this._setPhase(PHASE_STARTED);
             }
         } else {
@@ -504,5 +506,24 @@ export class VerificationRequest extends EventEmitter {
         if (this.phase !== PHASE_CANCELLED) {
             this._applyCancel();
         }
+    }
+
+    _createVerifier(method, startEvent = null) {
+        const requestOrStartEvent = startEvent || this._requestEvent;
+        const sender = requestOrStartEvent.getSender();
+        const content = requestOrStartEvent.getContent();
+        const device = content && content.from_device;
+
+        const VerifierCtor = this._verificationMethods.get(method);
+        if (!VerifierCtor) {
+            return;
+        }
+        const proxyMedium = new ProxyMedium(this, this._medium);
+        return new VerifierCtor(
+            proxyMedium,
+            sender,
+            device,
+            startEvent,
+        );
     }
 }
