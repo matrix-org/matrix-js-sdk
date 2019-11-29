@@ -338,7 +338,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // key with the cross-signing master key. The cross-signing master key is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
-    let crossSigningKeysChanged = false;
+    let crossSigningKeysReset = false;
     if (!this._crossSigningInfo.getId()) {
         logger.log(
             "Cross-signing public keys not found on device, " +
@@ -356,7 +356,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 CrossSigningLevel.MASTER,
                 { doInteractiveAuthFlow },
             );
-            crossSigningKeysChanged = true;
+            crossSigningKeysReset = true;
         }
     }
 
@@ -370,8 +370,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         await this.setDefaultSecretStorageKeyId(newKeyId);
     }
 
-    // If cross-signing keys changed, store them in Secure Secret Storage.
-    if (crossSigningKeysChanged) {
+    // If cross-signing keys were reset, store them in Secure Secret Storage.
+    // This is done in a separate step so we can ensure secret storage has its
+    // own key first.
+    if (crossSigningKeysReset) {
         logger.log("Storing cross-signing private keys in secret storage");
         // XXX: We need to think about how to re-do this step if it fails.
         await this._crossSigningInfo.storeInSecretStorage(this._secretStorage);
