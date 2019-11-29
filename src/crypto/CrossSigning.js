@@ -106,6 +106,20 @@ export class CrossSigningInfo extends EventEmitter {
     }
 
     /**
+     * Check whether the private keys exist in secret storage.
+     *
+     * @param {SecretStorage} secretStorage The secret store using account data
+     * @returns {boolean} Whether all private keys were found in storage
+     */
+    isStoredInSecretStorage(secretStorage) {
+        let stored = true;
+        for (const name of ["master", "self_signing", "user_signing"]) {
+            stored &= secretStorage.isStored(`m.cross_signing.${name}`, false);
+        }
+        return stored;
+    }
+
+    /**
      * Store private keys in secret storage for use by other devices. This is
      * typically called in conjunction with the creation of new cross-signing
      * keys.
@@ -117,6 +131,58 @@ export class CrossSigningInfo extends EventEmitter {
         for (const name of ["master", "self_signing", "user_signing"]) {
             await secretStorage.store(`m.cross_signing.${name}`, getKey(name));
         }
+    }
+
+    /**
+     * Get private keys from secret storage created by some other device. This
+     * also passes the private keys to the app-specific callback.
+     *
+     * @param {SecretStorage} secretStorage The secret store using account data
+     */
+    getFromSecretStorage(secretStorage) {
+        if (!this._callbacks.saveCrossSigningKeys) {
+            throw new Error("No saveCrossSigningKeys callback supplied");
+        }
+
+        // Retrieve private keys from secret storage
+        const privateKeys = {};
+        for (const name of ["master", "self_signing", "user_signing"]) {
+            privateKeys[name] = secretStorage.get(`m.cross_signing.${name}`);
+        }
+
+        // Regenerate public keys from private keys
+        // XXX: Do we want to _also_ download public keys from the homeserver to
+        // verify they agree...?
+        const signings = {};
+        const publicKeys = {};
+        const keys = {};
+        try {
+            for (const name of ["master", "self_signing", "user_signing"]) {
+                signings[name] = new global.Olm.PkSigning();
+                publicKeys[name] = signings[name].init_with_seed(privateKeys[name]);
+                keys[name] = {
+                    user_id: this.userId,
+                    usage: [name],
+                    keys: {
+                        ['ed25519:' + publicKeys[name]]: publicKeys[name],
+                    },
+                };
+                if (name !== "master") {
+                    pkSign(
+                        keys[name], signings["master"],
+                        this.userId, publicKeys["master"],
+                    );
+                }
+            }
+        } finally {
+            for (const signing of signings) {
+                signing.free();
+            }
+        }
+
+        // Save public keys locally and private keys via app callback
+        Object.assign(this.keys, keys);
+        this._callbacks.saveCrossSigningKeys(privateKeys);
     }
 
     /**

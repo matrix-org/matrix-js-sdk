@@ -268,6 +268,7 @@ Crypto.prototype.init = async function() {
         (txn) => {
             this._cryptoStore.getCrossSigningKeys(txn, (keys) => {
                 if (keys) {
+                    logger.log("Loaded cross-signing public keys from crypto store");
                     this._crossSigningInfo.setKeys(keys);
                 }
             });
@@ -304,12 +305,24 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // effectively need it for both reading and writing secrets.
     let crossSigningKeysChanged = false;
     if (!this._crossSigningInfo.getId()) {
-        logger.log("Cross-signing keys not found, creating new keys");
-        await this.resetCrossSigningKeys(
-            CrossSigningLevel.MASTER,
-            { doInteractiveAuthFlow },
+        logger.log(
+            "Cross-signing public keys not found on device, " +
+            "checking secret storage for private keys",
         );
-        crossSigningKeysChanged = true;
+        if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
+            logger.log("Cross-signing private keys found in secret storage");
+            this._crossSigningInfo.getFromSecretStorage(this._secretStorage);
+        } else {
+            logger.log(
+                "Cross-signing private keys not found in secret storage, " +
+                "creating new keys",
+            );
+            await this.resetCrossSigningKeys(
+                CrossSigningLevel.MASTER,
+                { doInteractiveAuthFlow },
+            );
+            crossSigningKeysChanged = true;
+        }
     }
 
     // Check if Secure Secret Storage has a default key. If we don't have one, create the
@@ -324,7 +337,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     // If cross-signing keys changed, store them in Secure Secret Storage.
     if (crossSigningKeysChanged) {
-        logger.log("Storing cross-signing keys in secret storage");
+        logger.log("Storing cross-signing private keys in secret storage");
         // XXX: We need to think about how to re-do this step if it fails.
         await this._crossSigningInfo.storeInSecretStorage(this._secretStorage);
     }
