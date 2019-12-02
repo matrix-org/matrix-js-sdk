@@ -373,9 +373,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // If cross-signing keys were reset, store them in Secure Secret Storage.
     // This is done in a separate step so we can ensure secret storage has its
     // own key first.
+    // XXX: We need to think about how to re-do these steps if they fail.
     if (crossSigningKeysReset) {
         logger.log("Storing cross-signing private keys in secret storage");
-        // XXX: We need to think about how to re-do this step if it fails.
+        // SSSS expects its keys to be signed by cross-signing master key.
+        // Since we have just reset cross-signing keys, we need to re-sign the
+        // SSSS default key with the new cross-signing master key so that the
+        // following storage step can proceed.
+        await this._secretStorage.signKey();
         await this._crossSigningInfo.storeInSecretStorage(this._secretStorage);
     }
 

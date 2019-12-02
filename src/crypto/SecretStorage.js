@@ -133,6 +133,31 @@ export default class SecretStorage extends EventEmitter {
     }
 
     /**
+     * Signs a given secret storage key with the cross-signing master key.
+     *
+     * @param {string} [keyId = default key's ID] The ID of the key to sign.
+     *     Defaults to the default key ID if not provided.
+     */
+    async signKey(keyId = this.getDefaultKeyId()) {
+        if (!keyId) {
+            throw new Error("signKey requires a key ID");
+        }
+
+        const keyInfoEvent = this._baseApis.getAccountData(
+            `m.secret_storage.key.${keyId}`,
+        );
+        if (!keyInfoEvent) {
+            throw new Error(`Key ${keyId} does not exist in account data`);
+        }
+        const keyInfo = keyInfoEvent.getContent();
+
+        await this._crossSigningInfo.signObject(keyInfo, 'master');
+        await this._baseApis.setAccountData(
+            `m.secret_storage.key.${keyId}`, keyInfo,
+        );
+    }
+
+    /**
      * Check whether we have a key with a given ID.
      *
      * @param {string} [keyId = default key's ID] The ID of the key to check
