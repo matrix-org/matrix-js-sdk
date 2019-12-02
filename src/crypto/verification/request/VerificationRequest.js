@@ -22,6 +22,7 @@ import {
     newUnknownMethodError,
     newUnexpectedMessageError,
     errorFromEvent,
+    errorFactory,
 } from "../Error";
 
 // the recommended amount of time before a verification request
@@ -32,7 +33,7 @@ const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
 // from showing a notification and almost immediately
 // disappearing, also ignore verification requests that
 // are this amount of time away from expiring.
-const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+// const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
 
 
 export const EVENT_PREFIX = "m.key.verification.";
@@ -47,10 +48,6 @@ export const PHASE_REQUESTED = 2;
 export const PHASE_STARTED = 4;
 export const PHASE_CANCELLED = 5;
 export const PHASE_DONE = 6;
-
-
-// TODO: after doing request.medium.handleEvent(event, request)
-// from crypto/index, we need to check whether it should be deleted from _verificationTransactions
 
 // also !validateEvent, if it happens on a .request, ignore, otherwise, cancel
 
@@ -119,18 +116,19 @@ export class VerificationRequest extends EventEmitter {
 
     async beginKeyVerification(method) {
         // need to allow also when unsent in case of to_device
-        if (this._phase === PHASE_UNSENT && this.medium)
-        if (
-            this._phase === PHASE_REQUESTED || () &&
-            this._commonMethods &&
-            this._commonMethods.includes(method)
-        ) {
-            this._verifier = this._createVerifier(method);
-            if (!this._verifier) {
-                throw newUnknownMethodError();
+        if (!this._verifier) {
+            if ((this._phase === PHASE_UNSENT && this.medium.requestIsOptional) || (
+                this._phase === PHASE_REQUESTED &&
+                this._commonMethods &&
+                this._commonMethods.includes(method)
+            )) {
+                this._verifier = this._createVerifier(method);
+                if (!this._verifier) {
+                    throw newUnknownMethodError();
+                }
             }
-            return this._verifier;
         }
+        return this._verifier;
     }
 
     async sendRequest() {

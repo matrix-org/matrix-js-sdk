@@ -35,7 +35,6 @@ const algorithms = require("./algorithms");
 const DeviceInfo = require("./deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
 const DeviceList = require('./DeviceList').default;
-import { randomString } from '../randomstring';
 import { CrossSigningInfo, UserTrustLevel, DeviceTrustLevel } from './CrossSigning';
 import SecretStorage from './SecretStorage';
 
@@ -44,11 +43,6 @@ import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
 import {ShowQRCode, ScanQRCode} from './verification/QRCode';
 import SAS from './verification/SAS';
-import {
-    newUserCancelledError,
-    newUnexpectedMessageError,
-    newUnknownMethodError,
-} from './verification/Error';
 import {sleep} from '../utils';
 
 import VerificationRequest from "./verification/request/VerificationRequest";
@@ -70,42 +64,8 @@ export const verificationMethods = {
     SAS: SAS.NAME,
 };
 
-// the recommended amount of time before a verification request
-// should be (automatically) cancelled without user interaction
-// and ignored.
-const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
-// to avoid almost expired verification notifications
-// from showing a notification and almost immediately
-// disappearing, also ignore verification requests that
-// are this amount of time away from expiring.
-const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
-
 export function isCryptoAvailable() {
     return Boolean(global.Olm);
-}
-
-/* subscribes to timeline events / to_device events for SAS verification */
-function listenForEvents(client, roomId, listener) {
-    let isEncrypted = false;
-    if (roomId) {
-        isEncrypted = client.isRoomEncrypted(roomId);
-    }
-
-    if (isEncrypted) {
-        client.on("Event.decrypted", listener);
-    }
-    client.on("event", listener);
-    let subscribed = true;
-    return function() {
-        if (subscribed) {
-            if (isEncrypted) {
-                client.off("Event.decrypted", listener);
-            }
-            client.off("event", listener);
-            subscribed = false;
-        }
-        return null;
-    };
 }
 
 const MIN_FORCE_SESSION_INTERVAL_MS = 60 * 60 * 1000;
@@ -2285,7 +2245,9 @@ Crypto.prototype._onTimelineEvent = function(event) {
         this._inRoomVerificationRequests, createRequest);
 };
 
-Crypto.prototype._handleVerificationEvent = async function(event, transactionId, requestsMap, createRequest) {
+Crypto.prototype._handleVerificationEvent = async function(
+    event, transactionId, requestsMap, createRequest,
+) {
     const sender = event.getSender();
     let requestsByTxnId = requestsMap.get(sender);
     if (!requestsByTxnId) {
@@ -2300,7 +2262,12 @@ Crypto.prototype._handleVerificationEvent = async function(event, transactionId,
         requestsByTxnId.set(transactionId, request);
     }
     try {
+        const hadVerifier = !!request.verifier;
         await request.medium.handleEvent(event, request);
+        // emit start event when verifier got set
+        if (!hadVerifier && request.verifier) {
+            this._baseApis.emit("crypto.verification.start", request.verifier);
+        }
     } catch (err) {
         console.error("error while handling verification event", event, err);
     }

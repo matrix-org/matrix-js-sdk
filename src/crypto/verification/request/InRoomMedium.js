@@ -50,11 +50,7 @@ export class InRoomMedium {
     }
 
     static validateEvent(event, client) {
-        let type = event.getType();
-        const content = event.getContent();
-        if (type === MESSAGE_TYPE) {
-            type = content && content.msgtype;
-        }
+        const type = InRoomMedium.getEventType(event);
         // any event but the .request event needs to have a relation set
         if (type !== REQUEST_TYPE && !event.isRelation("m.reference")) {
             return false;
@@ -64,12 +60,16 @@ export class InRoomMedium {
 
     static getEventType(event) {
         const type = event.getType();
-        if (type === "m.room.message") {
+        if (type === MESSAGE_TYPE) {
             const content = event.getContent();
-            return content && content.msgtype;
-        } else {
-            return type;
+            if (content) {
+                const {msgtype} = content;
+                if (msgtype === REQUEST_TYPE) {
+                    return REQUEST_TYPE;
+                }
+            }
         }
+        return type;
     }
 
     async handleEvent(event, request) {
