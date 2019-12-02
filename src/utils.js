@@ -738,11 +738,5 @@ module.exports.promiseMapSeries = async (promises, fn) => {
 };
 
 module.exports.promiseTry = (fn) => {
-    return new Promise((resolve, reject) => {
-        try {
-            fn().then(resolve, reject);
-        } catch (e) {
-            reject(e);
-        }
-    });
+    return new Promise((resolve) => resolve(fn()));
 };
