@@ -4848,7 +4848,7 @@ function checkTurnServers(client) {
         return; // guests can't access TURN servers
     }
 
-    client.turnServer().done(function(res) {
+    client.turnServer().then(function(res) {
         if (res.uris) {
             logger.log("Got TURN URIs: " + res.uris + " refresh in " +
                 res.ttl + " secs");
