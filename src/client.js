@@ -1886,7 +1886,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
                 // return syncApi.syncRoom(room);
             }
             return Promise.resolve(room);
-        }).done(function(room) {
+        }).then(function(room) {
             _resolve(callback, resolve, room);
         }, function(err) {
             _reject(callback, reject, err);
