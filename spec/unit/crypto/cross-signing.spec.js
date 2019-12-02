@@ -790,6 +790,9 @@ describe("Cross Signing", function() {
         });
         alice._crypto._deviceList.emit("userCrossSigningUpdated", "@bob:example.com");
         await upgradePromise;
+        await new Promise((resolve) => {
+            alice._crypto.on("userTrustStatusChanged", resolve);
+        });
 
         const bobTrust3 = alice.checkUserTrust("@bob:example.com");
         expect(bobTrust3.isCrossSigningVerified()).toBeTruthy();
