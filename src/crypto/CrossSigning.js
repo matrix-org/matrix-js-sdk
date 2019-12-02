@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import {pkSign, pkVerify} from './olmlib';
+import {pkSign, pkVerify, encodeBase64, decodeBase64} from './olmlib';
 import {EventEmitter} from 'events';
 import logger from '../logger';
 
@@ -129,7 +129,8 @@ export class CrossSigningInfo extends EventEmitter {
     async storeInSecretStorage(secretStorage) {
         const getKey = this._callbacks.getCrossSigningKey;
         for (const name of ["master", "self_signing", "user_signing"]) {
-            await secretStorage.store(`m.cross_signing.${name}`, getKey(name));
+            const encodedKey = encodeBase64(await getKey(name));
+            await secretStorage.store(`m.cross_signing.${name}`, encodedKey);
         }
     }
 
@@ -147,7 +148,8 @@ export class CrossSigningInfo extends EventEmitter {
         // Retrieve private keys from secret storage
         const privateKeys = {};
         for (const name of ["master", "self_signing", "user_signing"]) {
-            privateKeys[name] = await secretStorage.get(`m.cross_signing.${name}`);
+            const encodedKey = await secretStorage.get(`m.cross_signing.${name}`);
+            privateKeys[name] = decodeBase64(encodedKey);
         }
 
         // Regenerate public keys from private keys

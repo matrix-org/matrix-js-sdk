@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -398,4 +399,33 @@ module.exports.pkVerify = function(obj, pubkey, userId) {
         if (unsigned) obj.unsigned = unsigned;
         util.free();
     }
+};
+
+/**
+ * Encode a typed array of uint8 as base64.
+ * @param {Uint8Array} uint8Array The data to encode.
+ * @return {string} The base64.
+ */
+module.exports.encodeBase64 = function(uint8Array) {
+    // Misinterpt the Uint8Array as Latin-1.
+    // window.btoa expects a unicode string with codepoints in the range 0-255.
+    const latin1String = String.fromCharCode.apply(null, uint8Array);
+    // Use the builtin base64 encoder.
+    return window.btoa(latin1String);
+};
+
+/**
+ * Decode a base64 string to a typed array of uint8.
+ * @param {string} base64 The base64 to decode.
+ * @return {Uint8Array} The decoded data.
+ */
+module.exports.decodeBase64 = function(base64) {
+    // window.atob returns a unicode string with codepoints in the range 0-255.
+    const latin1String = window.atob(base64);
+    // Encode the string as a Uint8Array
+    const uint8Array = new Uint8Array(latin1String.length);
+    for (let i = 0; i < latin1String.length; i++) {
+        uint8Array[i] = latin1String.charCodeAt(i);
+    }
+    return uint8Array;
 };
