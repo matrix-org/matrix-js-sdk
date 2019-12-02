@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 const unhomoglyph = require('unhomoglyph');
+import Promise from 'bluebird';
 
 /**
  * Encode a dictionary of query parameters.
