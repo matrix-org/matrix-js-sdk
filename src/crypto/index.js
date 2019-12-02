@@ -481,7 +481,7 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
         throw e;
     }
     this._baseApis.emit("crossSigning.keysChanged", {});
-    await this._afterCrossSigningKeyChange();
+    await this._afterCrossSigningLocalKeyChange();
     logger.info("Cross-signing key reset complete");
 };
 
@@ -516,15 +516,17 @@ Crypto.prototype._getCrossSigningKeysFromSecretStorage = async function() {
         throw e;
     }
     this._baseApis.emit("crossSigning.keysChanged", {});
-    await this._afterCrossSigningKeyChange();
+    await this._afterCrossSigningLocalKeyChange();
     logger.info("Cross-signing keys restored from secret storage");
 };
 
 /**
- * Run various follow-up actions after cross-signing keys have changed, such as
- * signing the current device, upgrading device verifications, etc.
+ * Run various follow-up actions after cross-signing keys have changed locally
+ * (either by resetting the keys for the account or bye getting them from secret
+ * storaoge), such as signing the current device, upgrading device
+ * verifications, etc.
  */
-Crypto.prototype._afterCrossSigningKeyChange = async function() {
+Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
     // sign the current device with the new key, and upload to the server
     const device = this._deviceList.getStoredDevice(this._userId, this._deviceId);
     const signedDevice = await this._crossSigningInfo.signDevice(this._userId, device);
