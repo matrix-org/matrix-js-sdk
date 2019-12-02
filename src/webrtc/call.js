@@ -85,11 +85,10 @@ function MatrixCall(opts) {
     // assumption that multiple matrix calls will never compete for control of the
     // same DOM elements.
     this.mediaPromises = Object.create(null);
-
     this.screenSharingStream = null;
-
     this._answerContent = null;
 }
+
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
 /** The fallback ICE server to use for STUN or TURN protocols. */
