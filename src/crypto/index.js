@@ -1280,16 +1280,18 @@ Crypto.prototype.setDeviceVerification = async function(
 
 Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
     const medium = new InRoomMedium(this._baseApis, roomId, userId);
-    return this._requestVerificationWithMedium(
+    const request = await this._requestVerificationWithMedium(
         userId,
         methods,
         medium,
         this._inRoomVerificationRequests,
     );
+    return await request.waitForVerifier();
 };
 
 Crypto.prototype.acceptVerificationDM = function(event, method) {
-    if(!InRoomMedium.validateEvent(event)) {
+    if(!InRoomMedium.validateEvent(event, this._baseApis)) {
+        console.log("ignoring invalid verification event", event);
         return;
     }
 
@@ -1304,9 +1306,7 @@ Crypto.prototype.acceptVerificationDM = function(event, method) {
         return;
     }
 
-    request.beginKeyVerification(method).catch(console.error);
-
-    return request.verifier;
+    return request.beginKeyVerification(method);
 };
 
 Crypto.prototype.requestVerification = async function(userId, methods, devices) {
@@ -1314,21 +1314,25 @@ Crypto.prototype.requestVerification = async function(userId, methods, devices) 
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
     const medium = new ToDeviceMedium(this._baseApis, userId, devices);
-    return this._requestVerificationWithMedium(
+    const request = await this._requestVerificationWithMedium(
         userId,
         methods,
         medium,
         this._toDeviceVerificationRequests,
     );
+    return await request.waitForVerifier();
 };
 
-Crypto.prototype._requestVerificationWithMedium = async function(userId, methods, medium, requestsMap) {
+Crypto.prototype._requestVerificationWithMedium = async function(
+    userId, methods, medium, requestsMap,
+) {
     if (!methods) {
         // .keys() returns an iterator, so we need to explicitly turn it into an array
         methods = [...this._verificationMethods.keys()];
     }
     // TODO: filter by given methods
-    const request = new VerificationRequest(medium, this._verificationMethods);
+    const request = new VerificationRequest(
+        medium, this._verificationMethods, this._baseApis);
     await request.sendRequest();
 
     let requestsByTxnId = requestsMap.get(userId);
@@ -1360,7 +1364,8 @@ Crypto.prototype.beginKeyVerification = function(
         transactionId = ToDeviceMedium.makeTransactionId();
         const medium = new ToDeviceMedium(
             this._baseApis, userId, [deviceId], transactionId, deviceId);
-        request = new VerificationRequest(medium, this._verificationMethods);
+        request = new VerificationRequest(
+            medium, this._verificationMethods, this._baseApis);
         requestsByTxnId.set(transactionId, request);
     }
     return request.beginKeyVerification(method);
@@ -2216,7 +2221,7 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             event.getRoomId(),
             event.getSender(),
         );
-        return new VerificationRequest(medium, this._verificationMethods);
+        return new VerificationRequest(medium, this._verificationMethods, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._toDeviceVerificationRequests, createRequest);
@@ -2230,16 +2235,19 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  */
 Crypto.prototype._onTimelineEvent = function(event) {
     if (!InRoomMedium.validateEvent(event, this._baseApis)) {
+        console.log("Crypto: _onTimelineEvent: INVALID event", event);
         return;
     }
+    console.log("Crypto: _onTimelineEvent: VALID event", event);
     const transactionId = InRoomMedium.getTransactionId(event);
     const createRequest = event => {
+        console.log("Crypto: _onTimelineEvent: creating new request");
         const medium = new InRoomMedium(
             this._baseApis,
             event.getRoomId(),
             event.getSender(),
         );
-        return new VerificationRequest(medium, this._verificationMethods);
+        return new VerificationRequest(medium, this._verificationMethods, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._inRoomVerificationRequests, createRequest);

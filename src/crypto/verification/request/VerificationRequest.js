@@ -51,11 +51,12 @@ export const PHASE_DONE = 6;
 
 // also !validateEvent, if it happens on a .request, ignore, otherwise, cancel
 
-export class VerificationRequest extends EventEmitter {
-    constructor(medium, verificationMethods) {
+export default class VerificationRequest extends EventEmitter {
+    constructor(medium, verificationMethods, client) {
         super();
         this.medium = medium;
         this._verificationMethods = verificationMethods;
+        this._client = client;
         this._commonMethods = [];
         this._phase = PHASE_UNSENT;
         // .request event from other side, only set if this is the receiving end.
@@ -66,26 +67,33 @@ export class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
         if (!type.startsWith(EVENT_PREFIX)) {
+            console.log("invalid " + type + " event because wrong prefix");
             return false;
         }
 
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+        if (type === REQUEST_TYPE) {
             if (!Array.isArray(content.methods)) {
+                console.log("invalid " + type + " event because methods");
                 return false;
             }
+        }
+        if (type === REQUEST_TYPE || type === START_TYPE) {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
+                console.log("invalid " + type + " event because from_device");
                 return false;
             }
             if (event.getSender() === client.getUserId() &&
                     content.from_device == client.getDeviceId()
             ) {
+                console.log("invalid " + type + " event because from self");
                 // ignore requests from ourselves, because it doesn't make sense for a
                 // device to verify itself
                 return false;
             }
         }
+        return true;
     }
 
     get methods() {
@@ -114,7 +122,7 @@ export class VerificationRequest extends EventEmitter {
             && this._phase !== PHASE_CANCELLED;
     }
 
-    async beginKeyVerification(method) {
+    beginKeyVerification(method) {
         // need to allow also when unsent in case of to_device
         if (!this._verifier) {
             if ((this._phase === PHASE_UNSENT && this.medium.requestIsOptional) || (
@@ -135,7 +143,8 @@ export class VerificationRequest extends EventEmitter {
         if (this._phase === PHASE_UNSENT) {
             //TODO: add from_device here, as it is handled here as well?
             this._phase = PHASE_REQUESTED;
-            await this.medium.send(REQUEST_TYPE, {methods: this._methods});
+            const methods = [...this._verificationMethods.keys()];
+            await this.medium.send(REQUEST_TYPE, {methods});
             this.emit("change");
         }
     }
@@ -152,6 +161,22 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
+    waitForVerifier() {
+        if (this.verifier) {
+            return Promise.resolve(this.verifier);
+        } else {
+            return new Promise(resolve => {
+                const checkVerifier = () => {
+                    if (this.verifier) {
+                        this.off("change", checkVerifier);
+                        resolve(this.verifier);
+                    }
+                };
+                this.on("change", checkVerifier);
+            });
+        }
+    }
+
     _setPhase(phase) {
         this._phase = phase;
         this.emit("change");
@@ -165,7 +190,7 @@ export class VerificationRequest extends EventEmitter {
             this._handleStart(content, event);
         }
 
-        if (type.startsWith(EVENT_PREFIX) && this._verifier) {
+        if (this._verifier) {
             // TODO: how will the phase change here once the verifier sends .done?
             // maybe we shouldn't handle .done here?
             // but also, how will this class know about cancel?
@@ -191,6 +216,8 @@ export class VerificationRequest extends EventEmitter {
             this._requestEvent = event;
             this._setPhase(PHASE_REQUESTED);
         } else {
+            console.log("VerificationRequest: Ignoring flagged verification request from " +
+                event.getSender());
             logger.warn("Ignoring flagged verification request from " +
                 event.getSender());
             this.cancel(errorFromEvent(newUnexpectedMessageError()));
@@ -198,6 +225,8 @@ export class VerificationRequest extends EventEmitter {
     }
 
     async _handleStart(content, event) {
+        console.log("VerificationRequest: got a start back!!");
+        console.log("VerificationRequest: got a start back!!");
         if (this._phase === PHASE_REQUESTED ||
             (this.medium.requestIsOptional &&
                 this._phase === PHASE_UNSENT)
@@ -206,10 +235,12 @@ export class VerificationRequest extends EventEmitter {
             if (!this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));
             } else {
+                console.log("VerificationRequest: created a verifier and going to PHASE_STARTED");
                 this._verifier = this._createVerifier(method, event);
                 this._setPhase(PHASE_STARTED);
             }
         } else {
+            console.log("VerificationRequest: currently in phase " + this._phase + ", not expecting a .start");
             // TODO: cancel?
         }
     }
@@ -246,6 +277,7 @@ export class VerificationRequest extends EventEmitter {
         const proxyMedium = new ProxyMedium(this, this.medium);
         return new VerifierCtor(
             proxyMedium,
+            this._client,
             sender,
             device,
             startEvent,

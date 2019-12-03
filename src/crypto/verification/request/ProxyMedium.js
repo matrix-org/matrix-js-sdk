@@ -22,7 +22,7 @@ import { CANCEL_TYPE, START_TYPE } from "./VerificationRequest";
 // but we need to know from the request when the verifier cancels,
 // so we can clean up and update the UI.
 // TBD if this will be needed
-export class ProxyMedium {
+export default class ProxyMedium {
     constructor(request, medium) {
         this._request = request;
         this._medium = medium;
@@ -42,8 +42,8 @@ export class ProxyMedium {
     }
 
     /* creates a content object with the transaction id added to it */
-    completeContent(content) {
-        return this._medium.completeContent(content);
+    completeContent(type, content) {
+        return this._medium.completeContent(type, content);
     }
 
     async send(type, contentWithoutTxnId) {

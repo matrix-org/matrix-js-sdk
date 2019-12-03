@@ -29,7 +29,7 @@ import {
     errorFromEvent,
 } from "../Error";
 
-export class ToDeviceMedium {
+export default class ToDeviceMedium {
     // userId and devices of user we're about to verify
     constructor(client, userId, devices, transactionId = null, deviceId = null) {
         this._client = client;

@@ -208,7 +208,7 @@ export default class SAS extends Base {
         const type = "m.key.verification.start";
         const initialMessage = this._medium.completeContent(type, {
             method: SAS.NAME,
-            from_device: this._ownCredentials.deviceId,
+            from_device: this._baseApis.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
             hashes: HASHES_LIST,
             message_authentication_codes: MAC_LIST,
@@ -252,7 +252,7 @@ export default class SAS extends Base {
             olmSAS.set_their_key(content.key);
 
             const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
-                  + this._ownCredentials.getUserId() + this._ownCredentials.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this.userId + this.deviceId
                   + this._medium.transactionId;
             const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
@@ -330,7 +330,7 @@ export default class SAS extends Base {
 
             const sasInfo = "MATRIX_KEY_VERIFICATION_SAS"
                   + this.userId + this.deviceId
-                  + this._ownCredentials.getUserId() + this._ownCredentials.deviceId
+                  + this._baseApis.getUserId() + this._baseApis.deviceId
                   + this._medium.transactionId;
             const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
             const verifySAS = new Promise((resolve, reject) => {
@@ -361,11 +361,11 @@ export default class SAS extends Base {
         const mac = {};
         const keyList = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
-              + this._ownCredentials.getUserId() + this._ownCredentials.deviceId
+              + this._baseApis.getUserId() + this._baseApis.deviceId
               + this.userId + this.deviceId
               + this._medium.transactionId;
 
-        const deviceKeyId = `ed25519:${this._ownCredentials.deviceId}`;
+        const deviceKeyId = `ed25519:${this._baseApis.deviceId}`;
         mac[deviceKeyId] = olmSAS[macMethods[method]](
             this._baseApis.getDeviceEd25519Key(),
             baseInfo + deviceKeyId,
@@ -392,7 +392,7 @@ export default class SAS extends Base {
     async _checkMAC(olmSAS, content, method) {
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.userId + this.deviceId
-              + this._ownCredentials.getUserId() + this._ownCredentials.deviceId
+              + this._baseApis.getUserId() + this._baseApis.deviceId
               + this._medium.transactionId;
 
         if (content.keys !== olmSAS[macMethods[method]](

@@ -52,10 +52,10 @@ export default class VerificationBase extends EventEmitter {
      * @param {object} [request] the key verification request object related to
      * this verification, if any
      */
-    constructor(medium, ownCredentials, userId, deviceId, startEvent, request) {
+    constructor(medium, baseApis, userId, deviceId, startEvent, request) {
         super();
         this._medium = medium;
-        this._ownCredentials = ownCredentials;
+        this._baseApis = baseApis;
         this.userId = userId;
         this.deviceId = deviceId;
         this.startEvent = startEvent;

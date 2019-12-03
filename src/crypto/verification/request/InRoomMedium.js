@@ -18,7 +18,7 @@ limitations under the License.
 import VerificationRequest, {REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
 const MESSAGE_TYPE = "m.room.message";
 
-export class InRoomMedium {
+export default class InRoomMedium {
     constructor(client, roomId, userId) {
         this._client = client;
         this._roomId = roomId;
@@ -74,6 +74,7 @@ export class InRoomMedium {
 
     async handleEvent(event, request) {
         const type = InRoomMedium.getEventType(event);
+        console.log("InRoomMedium: handling event ", type, event);
         // do validations that need state (roomId, userId, transactionId),
         // ignore if invalid
         if (this._requestEventId) {
@@ -86,7 +87,8 @@ export class InRoomMedium {
             return;
         }
         // set transactionId when receiving a .request
-        if (!this._requestEventId && event.getType() === REQUEST_TYPE) {
+        if (!this._requestEventId && type === REQUEST_TYPE) {
+            console.log("InRoomMedium: setting _requestEventId", event.getId());
             this._requestEventId = event.getId();
         }
 
@@ -109,7 +111,7 @@ export class InRoomMedium {
         }
         if (type === REQUEST_TYPE) {
             content = {
-                body: this._baseApis.getUserId() + " is requesting to verify " +
+                body: this._client.getUserId() + " is requesting to verify " +
                     "your key, but your client does not support in-chat key " +
                     "verification.  You will need to use legacy key " +
                     "verification to verify keys.",
@@ -124,6 +126,7 @@ export class InRoomMedium {
                 event_id: this._requestEventId,
             };
         }
+        return content;
     }
 
     send(type, uncompletedContent) {
