@@ -407,11 +407,7 @@ module.exports.pkVerify = function(obj, pubkey, userId) {
  * @return {string} The base64.
  */
 module.exports.encodeBase64 = function(uint8Array) {
-    // Misinterpt the Uint8Array as Latin-1.
-    // window.btoa expects a unicode string with codepoints in the range 0-255.
-    const latin1String = String.fromCharCode.apply(null, uint8Array);
-    // Use the builtin base64 encoder.
-    return window.btoa(latin1String);
+    return Buffer.from(uint8Array).toString("base64");
 };
 
 /**
@@ -420,12 +416,5 @@ module.exports.encodeBase64 = function(uint8Array) {
  * @return {Uint8Array} The decoded data.
  */
 module.exports.decodeBase64 = function(base64) {
-    // window.atob returns a unicode string with codepoints in the range 0-255.
-    const latin1String = window.atob(base64);
-    // Encode the string as a Uint8Array
-    const uint8Array = new Uint8Array(latin1String.length);
-    for (let i = 0; i < latin1String.length; i++) {
-        uint8Array[i] = latin1String.charCodeAt(i);
-    }
-    return uint8Array;
+    return Buffer.from(base64, "base64");
 };
