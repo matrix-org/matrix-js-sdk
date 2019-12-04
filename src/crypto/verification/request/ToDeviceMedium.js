@@ -48,6 +48,10 @@ export default class ToDeviceMedium {
         return content && content.transaction_id;
     }
 
+    static canCreateRequest(event) {
+        return event.getType() === REQUEST_TYPE || event.getType() === START_TYPE;
+    }
+
     static validateEvent(event, client) {
         if (event.isCancelled()) {
             logger.warn("Ignoring flagged verification request from "
@@ -76,13 +80,17 @@ export default class ToDeviceMedium {
                 logger.log("received verification that is too old or from the future");
                 return false;
             }
+
+            if (event.getSender() === this._client.getUserId() &&
+                    content.from_device == this._client.getDeviceId()
+            ) {
+                // ignore requests from ourselves, because it doesn't make sense for a
+                // device to verify itself
+                return false;
+            }
         }
 
         return VerificationRequest.validateEvent(type, event, client);
-    }
-    // .request event is optional
-    get requestIsOptional() {
-        return true;
     }
 
     async handleEvent(event, request) {

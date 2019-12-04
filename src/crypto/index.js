@@ -1368,7 +1368,11 @@ Crypto.prototype.beginKeyVerification = function(
             medium, this._verificationMethods, this._baseApis);
         requestsByTxnId.set(transactionId, request);
     }
-    return request.beginKeyVerification(method);
+    if (!request) {
+        throw new Error(
+            `No request found for user ${userId} with transactionId ${transactionId}`);
+    }
+    return request.beginKeyVerification(method, {userId, deviceId});
 };
 
 
@@ -2216,6 +2220,9 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     }
     const transactionId = ToDeviceMedium.getTransactionId(event);
     const createRequest = event => {
+        if (!ToDeviceMedium.canCreateRequest(event)) {
+            return;
+        }
         const medium = new ToDeviceMedium(
             this._baseApis,
             event.getRoomId(),
@@ -2241,6 +2248,9 @@ Crypto.prototype._onTimelineEvent = function(event) {
     console.log("Crypto: _onTimelineEvent: VALID event", event);
     const transactionId = InRoomMedium.getTransactionId(event);
     const createRequest = event => {
+        if (!InRoomMedium.canCreateRequest(event)) {
+            return;
+        }
         console.log("Crypto: _onTimelineEvent: creating new request");
         const medium = new InRoomMedium(
             this._baseApis,
@@ -2258,15 +2268,19 @@ Crypto.prototype._handleVerificationEvent = async function(
 ) {
     const sender = event.getSender();
     let requestsByTxnId = requestsMap.get(sender);
-    if (!requestsByTxnId) {
-        requestsByTxnId = new Map();
-        requestsMap.set(sender, requestsByTxnId);
-    }
     let isNewRequest = false;
-    let request = requestsByTxnId.get(transactionId);
+    let request = requestsByTxnId && requestsByTxnId.get(transactionId);
     if (!request) {
         request = createRequest(event);
+        // a request could not be made from this event, so ignore event
+        if (!request) {
+            return;
+        }
         isNewRequest = true;
+        if (!requestsByTxnId) {
+            requestsByTxnId = new Map();
+            requestsMap.set(sender, requestsByTxnId);
+        }
         requestsByTxnId.set(transactionId, request);
     }
     try {

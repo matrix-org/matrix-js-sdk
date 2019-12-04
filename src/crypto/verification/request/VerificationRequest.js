@@ -41,10 +41,11 @@ export const REQUEST_TYPE = EVENT_PREFIX + "request";
 export const START_TYPE = EVENT_PREFIX + "start";
 export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
+// export const READY_TYPE = EVENT_PREFIX + "ready";
 
 export const PHASE_UNSENT = 1;
 export const PHASE_REQUESTED = 2;
-// const PHASE_ACCEPTED = 3;
+// const PHASE_READY = 3;
 export const PHASE_STARTED = 4;
 export const PHASE_CANCELLED = 5;
 export const PHASE_DONE = 6;
@@ -58,7 +59,7 @@ export default class VerificationRequest extends EventEmitter {
         this._verificationMethods = verificationMethods;
         this._client = client;
         this._commonMethods = [];
-        this._phase = PHASE_UNSENT;
+        this._setPhase(PHASE_UNSENT, false);
         // .request event from other side, only set if this is the receiving end.
         this._requestEvent = null;
     }
@@ -67,13 +68,13 @@ export default class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
         if (!type.startsWith(EVENT_PREFIX)) {
-            console.log("invalid " + type + " event because wrong prefix");
+            console.log("VerificationRequest: invalid " + type + " event because wrong prefix");
             return false;
         }
 
         if (type === REQUEST_TYPE) {
             if (!Array.isArray(content.methods)) {
-                console.log("invalid " + type + " event because methods");
+                console.log("VerificationRequest: invalid " + type + " event because methods");
                 return false;
             }
         }
@@ -81,15 +82,7 @@ export default class VerificationRequest extends EventEmitter {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
-                console.log("invalid " + type + " event because from_device");
-                return false;
-            }
-            if (event.getSender() === client.getUserId() &&
-                    content.from_device == client.getDeviceId()
-            ) {
-                console.log("invalid " + type + " event because from self");
-                // ignore requests from ourselves, because it doesn't make sense for a
-                // device to verify itself
+                console.log("VerificationRequest: invalid " + type + " event because from_device");
                 return false;
             }
         }
@@ -122,15 +115,22 @@ export default class VerificationRequest extends EventEmitter {
             && this._phase !== PHASE_CANCELLED;
     }
 
-    beginKeyVerification(method) {
+    get initiatedBy() {
+        // TODO
+        return null;
+    }
+
+    // @param deviceId only needed if there is no .request event
+    beginKeyVerification(method, targetDevice = null) {
         // need to allow also when unsent in case of to_device
         if (!this._verifier) {
-            if ((this._phase === PHASE_UNSENT && this.medium.requestIsOptional) || (
-                this._phase === PHASE_REQUESTED &&
-                this._commonMethods &&
-                this._commonMethods.includes(method)
-            )) {
-                this._verifier = this._createVerifier(method);
+            if (this._hasValidPreStartPhase(event)) {
+                // when called on a request that was initiated with .request event
+                // check the method is supported by both sides
+                if (this._commonMethods && !this._commonMethods.includes(method)) {
+                    throw newUnknownMethodError();
+                }
+                this._verifier = this._createVerifier(method, null, targetDevice);
                 if (!this._verifier) {
                     throw newUnknownMethodError();
                 }
@@ -142,19 +142,19 @@ export default class VerificationRequest extends EventEmitter {
     async sendRequest() {
         if (this._phase === PHASE_UNSENT) {
             //TODO: add from_device here, as it is handled here as well?
-            this._phase = PHASE_REQUESTED;
+            this._setPhase(PHASE_REQUESTED, false);
             const methods = [...this._verificationMethods.keys()];
             await this.medium.send(REQUEST_TYPE, {methods});
             this.emit("change");
         }
     }
 
-    async cancel({reason = "User declined", code = "m.user"}) {
+    async cancel({reason = "User declined", code = "m.user"} = {}) {
         if (this._phase !== PHASE_CANCELLED) {
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason));
             } else {
-                this._phase = PHASE_CANCELLED;
+                this._setPhase(PHASE_CANCELLED, false);
                 await this.medium.send(CANCEL_TYPE, {code, reason});
             }
             this.emit("change");
@@ -177,9 +177,12 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _setPhase(phase) {
+    _setPhase(phase, notify = true) {
+        console.trace(`VerificationRequest: setting phase from ${this._phase} to ${phase}`);
         this._phase = phase;
-        this.emit("change");
+        if (notify) {
+            this.emit("change");
+        }
     }
 
     handleEvent(type, event) {
@@ -222,20 +225,27 @@ export default class VerificationRequest extends EventEmitter {
                 event.getSender());
             this.cancel(errorFromEvent(newUnexpectedMessageError()));
         }
+        // store remote echo in case this event was sent by us
+        if (!this._requestEvent) {
+            this._requestEvent = event;
+        }
+    }
+
+    _hasValidPreStartPhase(startEvent) {
+        return this._phase === PHASE_REQUESTED ||
+            (
+                this.medium.constructor.canCreateRequest(startEvent) &&
+                this._phase === PHASE_UNSENT
+            );
     }
 
     async _handleStart(content, event) {
         console.log("VerificationRequest: got a start back!!");
-        console.log("VerificationRequest: got a start back!!");
-        if (this._phase === PHASE_REQUESTED ||
-            (this.medium.requestIsOptional &&
-                this._phase === PHASE_UNSENT)
-        ) {
+        if (this._hasValidPreStartPhase(event)) {
             const {method} = content;
             if (!this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));
             } else {
-                console.log("VerificationRequest: created a verifier and going to PHASE_STARTED");
                 this._verifier = this._createVerifier(method, event);
                 this._setPhase(PHASE_STARTED);
             }
@@ -264,11 +274,10 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _createVerifier(method, startEvent = null) {
-        const requestOrStartEvent = startEvent || this._requestEvent;
-        const sender = requestOrStartEvent.getSender();
-        const content = requestOrStartEvent.getContent();
-        const device = content && content.from_device;
+
+    _createVerifier(method, startEvent = null, targetDevice = null) {
+        const startSentByMe = startEvent && this._wasSentByMe(startEvent);
+        const {userId, deviceId} = this._getVerifierTarget(startEvent, targetDevice);
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {
@@ -278,9 +287,47 @@ export default class VerificationRequest extends EventEmitter {
         return new VerifierCtor(
             proxyMedium,
             this._client,
-            sender,
-            device,
-            startEvent,
+            userId,
+            deviceId,
+            startSentByMe ? null : startEvent,
         );
+    }
+
+    _getVerifierTarget(startEvent, targetDevice) {
+        // creating a verifier for to_device before the .start event has been sent,
+        // so the userId and deviceId are provided
+        if (targetDevice) {
+            console.log("VerificationRequest: _getVerifierTarget: choosing targetDevice");
+            return targetDevice;
+        } else {
+            let targetEvent;
+            if (startEvent && !this._wasSentByMe(startEvent)) {
+                console.log("VerificationRequest: _getVerifierTarget: choosing startEvent");
+                targetEvent = startEvent;
+            } else if (this._requestEvent && !this._wasSentByMe(this._requestEvent)) {
+                console.log("VerificationRequest: _getVerifierTarget: choosing this._requestEvent");
+                targetEvent = this._requestEvent;
+            } else {
+                throw new Error(
+                    "can't determine who the verifier should be targeted at. " +
+                    "No .request or .start event and no targetDevice");
+            }
+            const userId = targetEvent.getSender();
+            const content = targetEvent.getContent();
+            const deviceId = content && content.from_device;
+            return {userId, deviceId};
+        }
+    }
+
+    // only for .request and .start
+    _wasSentByMe(event) {
+        if (event.getSender() !== this._client.getUserId()) {
+            return false;
+        }
+        const content = event.getContent();
+        if (!content || content.from_device !== this._client.getDeviceId()) {
+            return false;
+        }
+        return true;
     }
 }

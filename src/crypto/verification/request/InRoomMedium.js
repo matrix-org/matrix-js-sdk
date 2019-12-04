@@ -38,6 +38,10 @@ export default class InRoomMedium {
         return this._requestEventId;
     }
 
+    static canCreateRequest(event) {
+        return InRoomMedium.getEventType(event) === REQUEST_TYPE;
+    }
+
     static getTransactionId(event) {
         if (InRoomMedium.getEventType(event) === REQUEST_TYPE) {
             return event.getId();
@@ -50,11 +54,26 @@ export default class InRoomMedium {
     }
 
     static validateEvent(event, client) {
-        const type = InRoomMedium.getEventType(event);
-        // any event but the .request event needs to have a relation set
-        if (type !== REQUEST_TYPE && !event.isRelation("m.reference")) {
+        const txnId = InRoomMedium.getTransactionId(event);
+        if (typeof txnId !== "string" || txnId.length === 0) {
+            console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because of transactionId");
             return false;
         }
+        const type = InRoomMedium.getEventType(event);
+        const content = event.getContent();
+        if (type === REQUEST_TYPE) {
+            if (typeof content.to !== "string" || !content.to.length) {
+                console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because of content.to empty");
+                return false;
+            }
+            const ownUserId = client.getUserId();
+            // ignore requests that are not direct to or sent by the syncing user
+            if (event.getSender() !== ownUserId && content.to !== ownUserId) {
+                console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because I don't have anything to do with request");
+                return false;
+            }
+        }
+
         return VerificationRequest.validateEvent(type, event, client);
     }
 
@@ -73,16 +92,13 @@ export default class InRoomMedium {
     }
 
     async handleEvent(event, request) {
+
+        // TODO: verify that event is not sent by anyone but me or other user
+
         const type = InRoomMedium.getEventType(event);
         console.log("InRoomMedium: handling event ", type, event);
-        // do validations that need state (roomId, userId, transactionId),
+        // do validations that need state (roomId, userId),
         // ignore if invalid
-        if (this._requestEventId) {
-            const relation = event.getRelation();
-            if (!relation || relation.event_id !== this._requestEventId) {
-                return;
-            }
-        }
         if (event.getRoomId() !== this._roomId || event.getSender() !== this._userId) {
             return;
         }
@@ -123,7 +139,7 @@ export default class InRoomMedium {
         } else {
             content["m.relates_to"] = {
                 rel_type: "m.reference",
-                event_id: this._requestEventId,
+                event_id: this.transactionId,
             };
         }
         return content;
@@ -135,12 +151,13 @@ export default class InRoomMedium {
     }
 
     async sendCompleted(type, content) {
+        let sendType = type;
         if (type === REQUEST_TYPE) {
-            type = MESSAGE_TYPE;
+            sendType = MESSAGE_TYPE;
         }
-        const res = await this._client.sendEvent(this._roomId, type, content);
+        const response = await this._client.sendEvent(this._roomId, sendType, content);
         if (type === REQUEST_TYPE) {
-            this._requestEventId = res.event_id;
+            this._requestEventId = response.event_id;
         }
     }
 }
