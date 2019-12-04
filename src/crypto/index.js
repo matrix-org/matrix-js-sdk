@@ -332,7 +332,8 @@ Crypto.prototype.init = async function() {
  * called to await a secret storage key creation flow.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
- *     `addSecretKey`: an object with either `passphrase` or `privkey` fields.
+ *     SecretStorage#addKey: an object with either `passphrase` or `privkey`
+ *     fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
@@ -371,7 +372,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     if (!this._secretStorage.hasKey()) {
         logger.log("Secret storage default key not found, creating new key");
         const keyOptions = await createSecretStorageKey();
-        const newKeyId = await this.addSecretKey(
+        const newKeyId = await this.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1,
             keyOptions,
         );
@@ -395,7 +396,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     logger.log("Secure Secret Storage ready");
 };
 
-Crypto.prototype.addSecretKey = function(algorithm, opts, keyID) {
+Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
     return this._secretStorage.addKey(algorithm, opts, keyID);
 };
 

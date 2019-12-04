@@ -1062,7 +1062,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * Add a key for encrypting secrets.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#addSecretKey
+ * @function module:client~MatrixClient#addSecretStorageKey
  * @param {string} algorithm the algorithm used by the key
  * @param {object} opts the options for the algorithm.  The properties used
  *     depend on the algorithm given.  This object may be modified to pass
@@ -1136,7 +1136,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 wrapCryptoFuncs(MatrixClient, [
     "bootstrapSecretStorage",
-    "addSecretKey",
+    "addSecretStorageKey",
     "storeSecret",
     "getSecret",
     "isSecretStored",

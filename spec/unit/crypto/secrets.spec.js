@@ -163,7 +163,7 @@ describe("Secrets", function() {
         };
         alice.resetCrossSigningKeys();
 
-        const newKeyId = await alice.addSecretKey(
+        const newKeyId = await alice.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1,
         );
         // we don't await on this because it waits for the event to come down the sync
