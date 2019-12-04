@@ -11,14 +11,13 @@ import TestClient from '../TestClient';
 import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
+import {sleep} from "../../src/utils";
 
 const EventEmitter = require("events").EventEmitter;
 
 const sdk = require("../..");
 
 const Olm = global.Olm;
-
-jest.useFakeTimers();
 
 describe("Crypto", function() {
     if (!sdk.CRYPTO_ENABLED) {
@@ -270,7 +269,8 @@ describe("Crypto", function() {
                 await bobDecryptor.onRoomKeyEvent(ksEvent);
                 await eventPromise;
                 expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
-                // the room key request should be gone since we've now decypted everything
+                await sleep(1);
+                // the room key request should be gone since we've now decrypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                     .toBeFalsy();
             },
@@ -301,6 +301,8 @@ describe("Crypto", function() {
         });
 
         it("uses a new txnid for re-requesting keys", async function() {
+            jest.useFakeTimers();
+
             const event = new MatrixEvent({
                 sender: "@bob:example.com",
                 room_id: "!someroom",
