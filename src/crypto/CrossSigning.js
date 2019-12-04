@@ -178,7 +178,7 @@ export class CrossSigningInfo extends EventEmitter {
                 }
             }
         } finally {
-            for (const signing of signings) {
+            for (const signing of Object.values(signings)) {
                 signing.free();
             }
         }

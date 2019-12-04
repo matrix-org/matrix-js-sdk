@@ -281,4 +281,58 @@ describe("Secrets", function() {
         expect(crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
         expect(secretStorage.hasKey()).toBeTruthy();
     });
+
+    it("bootstraps when cross-signing keys in secret storage", async function() {
+        const decryption = new global.Olm.PkDecryption();
+        decryption.generate_key();
+        const storagePrivateKey = decryption.get_private_key();
+
+        let crossSigningKeys = {};
+        const bob = await makeTestClient(
+            {
+                userId: "@bob:example.com",
+                deviceId: "bob1",
+            },
+            {
+                cryptoCallbacks: {
+                    getCrossSigningKey: t => crossSigningKeys[t],
+                    saveCrossSigningKeys: k => crossSigningKeys = k,
+                    getSecretStorageKey: request => {
+                        const defaultKeyId = bob.getDefaultSecretStorageKeyId();
+                        expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
+                        return [defaultKeyId, storagePrivateKey];
+                    },
+                },
+            },
+        );
+
+        bob.uploadDeviceSigningKeys = async () => {};
+        bob.uploadKeySignatures = async () => {};
+        bob.setAccountData = async function(eventType, contents, callback) {
+            const event = new MatrixEvent({
+                type: eventType,
+                content: contents,
+            });
+            this.store.storeAccountDataEvents([
+                event,
+            ]);
+            this.emit("accountData", event);
+        };
+
+        const crossSigning = bob._crypto._crossSigningInfo;
+        const secretStorage = bob._crypto._secretStorage;
+
+        // Set up cross-signing keys from scratch with specific storage key
+        await bob.bootstrapSecretStorage({
+            createSecretStorageKey: async () => ({ privkey: storagePrivateKey }),
+        });
+
+        // Clear local cross-signing keys and read from secret storage
+        crossSigning.keys = {};
+        await bob.bootstrapSecretStorage();
+
+        expect(crossSigning.getId()).toBeTruthy();
+        expect(crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
+        expect(secretStorage.hasKey()).toBeTruthy();
+    });
 });

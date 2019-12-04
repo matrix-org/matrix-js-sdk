@@ -328,9 +328,15 @@ Crypto.prototype.init = async function() {
  * Args:
  *     {function} A function that makes the request requiring auth. Receives the
  *     auth data as an object.
+ * @param {function} [opts.createSecretStorageKey] Optional. Function
+ * called to await a secret storage key creation flow.
+ * Returns:
+ *     {Promise} A promise which resolves to key creation data for
+ *     `addSecretKey`: an object with either `passphrase` or `privkey` fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
+    createSecretStorageKey = async () => { },
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -364,8 +370,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // default key (which will also be signed by the cross-signing master key).
     if (!this._secretStorage.hasKey()) {
         logger.log("Secret storage default key not found, creating new key");
+        const keyOptions = await createSecretStorageKey();
         const newKeyId = await this.addSecretKey(
             SECRET_STORAGE_ALGORITHM_V1,
+            keyOptions,
         );
         await this.setDefaultSecretStorageKeyId(newKeyId);
     }
