@@ -244,4 +244,41 @@ describe("Secrets", function() {
 
         expect(secret).toBe("bar");
     });
+
+    it("bootstraps when no storage or cross-signing keys locally", async function() {
+        let keys = {};
+        const bob = await makeTestClient(
+            {
+                userId: "@bob:example.com",
+                deviceId: "bob1",
+            },
+            {
+                cryptoCallbacks: {
+                    getCrossSigningKey: t => keys[t],
+                    saveCrossSigningKeys: k => keys = k,
+                },
+            },
+        );
+        bob.uploadDeviceSigningKeys = async () => {};
+        bob.uploadKeySignatures = async () => {};
+        bob.setAccountData = async function(eventType, contents, callback) {
+            const event = new MatrixEvent({
+                type: eventType,
+                content: contents,
+            });
+            this.store.storeAccountDataEvents([
+                event,
+            ]);
+            this.emit("accountData", event);
+        };
+
+        await bob.bootstrapSecretStorage();
+
+        const crossSigning = bob._crypto._crossSigningInfo;
+        const secretStorage = bob._crypto._secretStorage;
+
+        expect(crossSigning.getId()).toBeTruthy();
+        expect(crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
+        expect(secretStorage.hasKey()).toBeTruthy();
+    });
 });
