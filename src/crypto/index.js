@@ -55,6 +55,8 @@ import {
     newUnknownMethodError,
 } from './verification/Error';
 import {sleep} from '../utils';
+import { keyFromPassphrase } from './key_passphrase';
+import { encodeRecoveryKey } from './recoverykey';
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -315,6 +317,29 @@ Crypto.prototype.init = async function() {
 
     logger.log("Crypto: checking for key backup...");
     this._checkAndStartKeyBackup();
+};
+
+/**
+ * Create a recovery key from a user-supplied passphrase.
+ *
+ * @param {string} password Passphrase string that can be entered by the user
+ *     when restoring the backup as an alternative to entering the recovery key.
+ *     Optional.
+ * @returns {Promise<String>} The user-facing recovery key string.
+ */
+Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
+    const decryption = new global.Olm.PkDecryption();
+    try {
+        if (password) {
+            const keyInfo = await keyFromPassphrase(password);
+            decryption.init_with_private_key(keyInfo.key);
+        } else {
+            decryption.generate_key();
+        }
+        return encodeRecoveryKey(decryption.get_private_key());
+    } finally {
+        decryption.free();
+    }
 };
 
 /**

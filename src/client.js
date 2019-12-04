@@ -1045,6 +1045,16 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 };
 
 /**
+ * Create a recovery key from a user-supplied passphrase.
+ *
+ * @function module:client~MatrixClient#createRecoveryKeyFromPassphrase
+ * @param {string} password Passphrase string that can be entered by the user
+ *     when restoring the backup as an alternative to entering the recovery key.
+ *     Optional.
+ * @returns {Promise<String>} The user-facing recovery key string.
+ */
+
+/**
  * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
  * the cross-signing master key. If everything is already set up, then no
  * changes are made, so this is safe to run to ensure secret storage is ready
@@ -1145,6 +1155,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  */
 
 wrapCryptoFuncs(MatrixClient, [
+    "createRecoveryKeyFromPassphrase",
     "bootstrapSecretStorage",
     "addSecretStorageKey",
     "hasSecretStorageKey",
