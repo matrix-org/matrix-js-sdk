@@ -369,7 +369,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     // Check if Secure Secret Storage has a default key. If we don't have one, create the
     // default key (which will also be signed by the cross-signing master key).
-    if (!this._secretStorage.hasKey()) {
+    if (!this.hasSecretStorageKey()) {
         logger.log("Secret storage default key not found, creating new key");
         const keyOptions = await createSecretStorageKey();
         const newKeyId = await this.addSecretStorageKey(
@@ -398,6 +398,10 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
 Crypto.prototype.addSecretStorageKey = function(algorithm, opts, keyID) {
     return this._secretStorage.addKey(algorithm, opts, keyID);
+};
+
+Crypto.prototype.hasSecretStorageKey = function(keyID) {
+    return this._secretStorage.hasKey(keyID);
 };
 
 Crypto.prototype.storeSecret = function(name, secret, keys) {

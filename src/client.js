@@ -1074,6 +1074,16 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  */
 
 /**
+ * Check whether we have a key with a given ID.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#hasSecretStorageKey
+ * @param {string} [keyId = default key's ID] The ID of the key to check
+ *     for. Defaults to the default key ID if not provided.
+ * @return {boolean} Whether we have the key.
+ */
+
+/**
  * Store an encrypted secret on the server
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
@@ -1137,6 +1147,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 wrapCryptoFuncs(MatrixClient, [
     "bootstrapSecretStorage",
     "addSecretStorageKey",
+    "hasSecretStorageKey",
     "storeSecret",
     "getSecret",
     "isSecretStored",
@@ -1401,7 +1412,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         logger.log("Preparing key backup version with Secure Secret Storage");
 
         // Ensure Secure Secret Storage is ready for use
-        if (!this._secretStorage.hasKey()) {
+        if (!this.hasSecretStorageKey()) {
             throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
         }
     }
