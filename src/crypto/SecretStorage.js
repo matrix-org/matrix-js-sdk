@@ -326,9 +326,12 @@ export default class SecretStorage extends EventEmitter {
         // encryption looks sane
         for (const keyId of Object.keys(secretContent.encrypted)) {
             // get key information from key storage
-            const keyInfo = this._baseApis.getAccountData(
+            const keyEvent = this._baseApis.getAccountData(
                 "m.secret_storage.key." + keyId,
-            ).getContent();
+            );
+            if (!keyEvent) return false;
+            const keyInfo = keyEvent.getContent();
+            if (!keyInfo) return false;
             const encInfo = secretContent.encrypted[keyId];
             if (checkKey) {
                 pkVerify(
