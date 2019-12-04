@@ -215,7 +215,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {function} [opts.cryptoCallbacks.getSecretStorageKey]
  * Optional. Function called when an encryption key for secret storage
  *     is required. One or more keys will be described in the keys object.
- *     The callback function should return with an array of:
+ *     The callback function should return a promise with an array of:
  *     [<key name>, <UInt8Array private key>] or null if it cannot provide
  *     any of the keys.
  * Args:

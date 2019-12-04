@@ -533,9 +533,7 @@ export default class SecretStorage extends EventEmitter {
             throw new Error("No getSecretStorageKey callback supplied");
         }
 
-        const returned = await Promise.resolve(
-            this._cryptoCallbacks.getSecretStorageKey({keys}),
-        );
+        const returned = await this._cryptoCallbacks.getSecretStorageKey({ keys });
 
         if (!returned) {
             throw new Error("getSecretStorageKey callback returned falsey");
