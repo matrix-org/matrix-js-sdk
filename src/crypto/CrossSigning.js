@@ -73,7 +73,7 @@ export class CrossSigningInfo extends EventEmitter {
         const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
         if (!privkey) {
             throw new Error(
-                "getCrossSigningKey callback for  " + type + " returned falsey",
+                "getCrossSigningKey callback for " + type + " returned falsey",
             );
         }
         const signing = new global.Olm.PkSigning();
