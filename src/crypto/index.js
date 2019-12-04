@@ -346,9 +346,12 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
     let crossSigningKeysReset = false;
-    if (!this._crossSigningInfo.getId()) {
+    if (
+        !this._crossSigningInfo.getId() ||
+        !await this._baseApis._cryptoCallbacks.getCrossSigningKey("master")
+    ) {
         logger.log(
-            "Cross-signing public keys not found on device, " +
+            "Cross-signing public and/or private keys not found on device, " +
             "checking secret storage for private keys",
         );
         if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
