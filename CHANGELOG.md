@@ -1,3 +1,42 @@
+Changes in [2.4.6-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.6-rc.1) (2019-12-04)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.5...v2.4.6-rc.1)
+
+ * Update alias handling
+   [\#1102](https://github.com/matrix-org/matrix-js-sdk/pull/1102)
+ * increase timeout on flush to fix failing unit test
+   [\#1096](https://github.com/matrix-org/matrix-js-sdk/pull/1096)
+ * Disable broken cross-signing test
+   [\#1095](https://github.com/matrix-org/matrix-js-sdk/pull/1095)
+ * Fix a couple SAS tests
+   [\#1094](https://github.com/matrix-org/matrix-js-sdk/pull/1094)
+ * Fix Olm unwedging test
+   [\#1093](https://github.com/matrix-org/matrix-js-sdk/pull/1093)
+ * Fix empty string handling in push notifications
+   [\#1089](https://github.com/matrix-org/matrix-js-sdk/pull/1089)
+ * expand e2ee logging to better debug UISIs
+   [\#1090](https://github.com/matrix-org/matrix-js-sdk/pull/1090)
+ * Remove Bluebird: phase 2
+   [\#1087](https://github.com/matrix-org/matrix-js-sdk/pull/1087)
+ * Relax identity server discovery checks to FAIL_PROMPT
+   [\#1062](https://github.com/matrix-org/matrix-js-sdk/pull/1062)
+ * Fix incorrect return value of MatrixClient.prototype.uploadKeys
+   [\#1061](https://github.com/matrix-org/matrix-js-sdk/pull/1061)
+ * Fix calls in e2e rooms
+   [\#1086](https://github.com/matrix-org/matrix-js-sdk/pull/1086)
+ * Monitor verification request over DM as well
+   [\#1085](https://github.com/matrix-org/matrix-js-sdk/pull/1085)
+ * Remove 'check' npm script
+   [\#1084](https://github.com/matrix-org/matrix-js-sdk/pull/1084)
+ * Always process call events in batches
+   [\#1083](https://github.com/matrix-org/matrix-js-sdk/pull/1083)
+ * Fix ringing chirp on loading
+   [\#1082](https://github.com/matrix-org/matrix-js-sdk/pull/1082)
+ * Remove *most* bluebird specific things
+   [\#1081](https://github.com/matrix-org/matrix-js-sdk/pull/1081)
+ * Switch to Jest
+   [\#1080](https://github.com/matrix-org/matrix-js-sdk/pull/1080)
+
 Changes in [2.4.5](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.5) (2019-11-27)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.4...v2.4.5)
