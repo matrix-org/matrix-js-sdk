@@ -49,7 +49,7 @@ export async function keyFromPassphrase(password) {
     return { key, salt, iterations: DEFAULT_ITERATIONS };
 }
 
-async function deriveKey(password, salt, iterations) {
+export async function deriveKey(password, salt, iterations) {
     const subtleCrypto = global.crypto.subtle;
     const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {
