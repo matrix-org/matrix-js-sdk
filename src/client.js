@@ -1425,6 +1425,8 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         if (!this.hasSecretStorageKey()) {
             throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
         }
+
+        throw new Error("Not yet implemented");
     }
 
     const [keyInfo, encodedPrivateKey] =
