@@ -1075,8 +1075,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @function module:client~MatrixClient#addSecretStorageKey
  * @param {string} algorithm the algorithm used by the key
  * @param {object} opts the options for the algorithm.  The properties used
- *     depend on the algorithm given.  This object may be modified to pass
- *     information back about the key.
+ *     depend on the algorithm given.
  * @param {string} [keyName] the name of the key.  If not given, a random
  *     name will be generated.
  *

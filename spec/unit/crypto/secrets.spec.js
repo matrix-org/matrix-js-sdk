@@ -284,7 +284,7 @@ describe("Secrets", function() {
 
     it("bootstraps when cross-signing keys in secret storage", async function() {
         const decryption = new global.Olm.PkDecryption();
-        decryption.generate_key();
+        const storagePublicKey = decryption.generate_key();
         const storagePrivateKey = decryption.get_private_key();
 
         let crossSigningKeys = {};
@@ -324,7 +324,7 @@ describe("Secrets", function() {
 
         // Set up cross-signing keys from scratch with specific storage key
         await bob.bootstrapSecretStorage({
-            createSecretStorageKey: async () => ({ privkey: storagePrivateKey }),
+            createSecretStorageKey: async () => ({ pubkey: storagePublicKey }),
         });
 
         // Clear local cross-signing keys and read from secret storage

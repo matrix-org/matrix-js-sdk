@@ -365,8 +365,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  * called to await a secret storage key creation flow.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
- *     SecretStorage#addKey: an object with either `passphrase` or `privkey`
- *     fields.
+ *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
  */
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
