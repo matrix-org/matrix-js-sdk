@@ -270,7 +270,14 @@ export default class SAS extends Base {
 
 
             [e] = await Promise.all([
-                this._waitForEvent("m.key.verification.mac"),
+                this._waitForEvent("m.key.verification.mac")
+                    .then((e) => {
+                        // we don't expect any more messages from the other
+                        // party, and they may send a m.key.verification.done
+                        // when they're done on their end
+                        this._expectedEvent = "m.key.verification.done";
+                        return e;
+                    }),
                 verifySAS,
             ]);
             content = e.getContent();
@@ -347,7 +354,14 @@ export default class SAS extends Base {
 
 
             [e] = await Promise.all([
-                this._waitForEvent("m.key.verification.mac"),
+                this._waitForEvent("m.key.verification.mac")
+                    .then((e) => {
+                        // we don't expect any more messages from the other
+                        // party, and they may send a m.key.verification.done
+                        // when they're done on their end
+                        this._expectedEvent = "m.key.verification.done";
+                        return e;
+                    }),
                 verifySAS,
             ]);
             content = e.getContent();
