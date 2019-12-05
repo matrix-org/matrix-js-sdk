@@ -51,8 +51,8 @@ import logger from './logger';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
-import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
-import { keyFromPassphrase, keyFromAuthData } from './crypto/key_passphrase';
+import { decodeRecoveryKey } from './crypto/recoverykey';
+import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
 
 // Disable warnings for now: we use deprecated bluebird functions
@@ -1428,29 +1428,19 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         }
     }
 
-    const decryption = new global.Olm.PkDecryption();
-    try {
-        let publicKey;
-        const authData = {};
-        if (password) {
-            const keyInfo = await keyFromPassphrase(password);
-            publicKey = decryption.init_with_private_key(keyInfo.key);
-            authData.private_key_salt = keyInfo.salt;
-            authData.private_key_iterations = keyInfo.iterations;
-        } else {
-            publicKey = decryption.generate_key();
-        }
+    const [keyInfo, encodedPrivateKey] =
+        await this.createRecoveryKeyFromPassphrase(password);
 
-        authData.public_key = publicKey;
-
-        return {
-            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-            auth_data: authData,
-            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
-        };
-    } finally {
-        decryption.free();
-    }
+    // Reshape objects into form expected for key backup
+    return {
+        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+        auth_data: {
+            public_key: keyInfo.pubkey,
+            private_key_salt: keyInfo.passphrase.salt,
+            private_key_iterations: keyInfo.passphrase.iterations,
+        },
+        recovery_key: encodedPrivateKey,
+    };
 };
 
 /**
