@@ -1018,6 +1018,26 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @returns {DeviceTrustLevel}
  */
 
+/**
+ * Check the copy of our cross-signing key that we have in the device list and
+ * see if we can get the private key. If so, mark it as trusted.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkOwnCrossSigningTrust
+ */
+
+/**
+ * Checks that a given private key matches a given public key
+ * This can be used by the getCrossSigningKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkPrivateKey
+ * @param {Uint8Array} privateKey The private key
+ * @param {Uint8Array} expectedPublicKey The public key supplied by the getCrossSigningKey callback
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+
 wrapCryptoFuncs(MatrixClient, [
     "resetCrossSigningKeys",
     "getCrossSigningId",

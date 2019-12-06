@@ -775,7 +775,7 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
     }
 };
 
-/*
+/**
  * Check the copy of our cross-signing key that we have in the device list and
  * see if we can get the private key. If so, mark it as trusted.
  */
