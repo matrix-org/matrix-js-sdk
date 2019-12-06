@@ -1046,6 +1046,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 
 /**
  * Create a recovery key from a user-supplied passphrase.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#createRecoveryKeyFromPassphrase
  * @param {string} password Passphrase string that can be entered by the user
@@ -1059,6 +1060,7 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * the cross-signing master key. If everything is already set up, then no
  * changes are made, so this is safe to run to ensure secret storage is ready
  * for use.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
  * @function module:client~MatrixClient#bootstrapSecretStorage
  * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
