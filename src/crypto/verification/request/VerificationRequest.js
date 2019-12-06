@@ -255,6 +255,14 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    handleVerifierSend(type, content) {
+        if (type === CANCEL_TYPE) {
+            this._handleCancel();
+        } else if (type === START_TYPE) {
+            this._handleVerifierStart();
+        }
+    }
+
     _handleVerifierStart() {
         if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
             this._setPhase(PHASE_STARTED);

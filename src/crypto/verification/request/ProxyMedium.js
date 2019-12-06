@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { CANCEL_TYPE, START_TYPE } from "./VerificationRequest";
-
 // ideally the verifier would be part of the VerificationRequest,
 // or at least the scope of the verifier would be smaller
 // but we need to know from the request when the verifier cancels,
@@ -50,23 +48,15 @@ export default class ProxyMedium {
         return this._medium.completeContent(type, content);
     }
 
-    async send(type, contentWithoutTxnId) {
-        const result = await this._medium.send(type, contentWithoutTxnId);
-        this._onSend(type, contentWithoutTxnId);
+    async send(type, uncompletedContent) {
+        this._request.handleVerifierSend(type, uncompletedContent);
+        const result = await this._medium.send(type, uncompletedContent);
         return result;
     }
 
     async sendCompleted(type, content) {
+        this._request.handleVerifierSend(type, content);
         const result = await this._medium.sendCompleted(type, content);
-        this._onSend(type, content);
         return result;
-    }
-
-    _onSend(type, content) {
-        if (type === CANCEL_TYPE) {
-            this._request._handleCancel();
-        } else if (type === START_TYPE) {
-            this._request._handleVerifierStart();
-        }
     }
 }
