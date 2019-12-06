@@ -1027,13 +1027,12 @@ function wrapCryptoFuncs(MatrixClient, names) {
  */
 
 /**
- * Checks that a given private key matches a given public key.
- * This can be used by the getCrossSigningKey or getSecretStorageKey callbacks
- * to verify that the private key it is about to supply is the one that was
- * requested.
+ * Checks that a given cross-signing private key matches a given public key.
+ * This can be used by the getCrossSigningKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#checkPrivateKey
+ * @function module:client~MatrixClient#checkCrossSigningPrivateKey
  * @param {Uint8Array} privateKey The private key
  * @param {string} expectedPublicKey The public key
  * @returns {boolean} true if the key matches, otherwise false
@@ -1046,7 +1045,7 @@ wrapCryptoFuncs(MatrixClient, [
     "checkUserTrust",
     "checkDeviceTrust",
     "checkOwnCrossSigningTrust",
-    "checkPrivateKey",
+    "checkCrossSigningPrivateKey",
 ]);
 
 /**
@@ -1176,6 +1175,18 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {string} keyId The new default key ID
  */
 
+/**
+ * Checks that a given secret storage private key matches a given public key.
+ * This can be used by the getSecretStorageKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkSecretStoragePrivateKey
+ * @param {Uint8Array} privateKey The private key
+ * @param {string} expectedPublicKey The public key
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+
 wrapCryptoFuncs(MatrixClient, [
     "createRecoveryKeyFromPassphrase",
     "bootstrapSecretStorage",
@@ -1187,6 +1198,7 @@ wrapCryptoFuncs(MatrixClient, [
     "requestSecret",
     "getDefaultSecretStorageKeyId",
     "setDefaultSecretStorageKeyId",
+    "checkSecretStoragePrivateKey",
 ]);
 
 /**

@@ -467,16 +467,36 @@ Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
 };
 
 /**
- * Checks that a given private key matches a given public key.
- * This can be used by the getCrossSigningKey or getSecretStorageKey callbacks
- * to verify that the private key it is about to supply is the one that was
- * requested.
+ * Checks that a given secret storage private key matches a given public key.
+ * This can be used by the getSecretStorageKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
  *
  * @param {Uint8Array} privateKey The private key
  * @param {string} expectedPublicKey The public key
  * @returns {boolean} true if the key matches, otherwise false
  */
-Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
+Crypto.prototype.checkSecretStoragePrivateKey = function(privateKey, expectedPublicKey) {
+    let decryption = null;
+    try {
+        decryption = new global.Olm.PkDecryption();
+        const gotPubkey = decryption.init_with_private_key(privateKey);
+        // make sure it agrees with the given pubkey
+        return gotPubkey === expectedPublicKey;
+    } finally {
+        if (decryption) decryption.free();
+    }
+};
+
+/**
+ * Checks that a given cross-signing private key matches a given public key.
+ * This can be used by the getCrossSigningKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ *
+ * @param {Uint8Array} privateKey The private key
+ * @param {string} expectedPublicKey The public key
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+Crypto.prototype.checkCrossSigningPrivateKey = function(privateKey, expectedPublicKey) {
     let signing = null;
     try {
         signing = new global.Olm.PkSigning();
