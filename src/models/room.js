@@ -839,9 +839,15 @@ Room.prototype.getAliases = function() {
         for (let i = 0; i < aliasEvents.length; ++i) {
             const aliasEvent = aliasEvents[i];
             if (utils.isArray(aliasEvent.getContent().aliases)) {
-                Array.prototype.push.apply(
-                    aliasStrings, aliasEvent.getContent().aliases,
-                );
+                const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
+                    if (typeof(a) !== "string") return false;
+                    if (a[0] !== '#') return false;
+                    if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
+
+                    // It's probably valid by here.
+                    return true;
+                });
+                Array.prototype.push.apply(aliasStrings, filteredAliases);
             }
         }
     }
