@@ -56,20 +56,17 @@ export default class InRoomMedium {
     static validateEvent(event, client) {
         const txnId = InRoomMedium.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
-            console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because of transactionId");
             return false;
         }
         const type = InRoomMedium.getEventType(event);
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
             if (typeof content.to !== "string" || !content.to.length) {
-                console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because of content.to empty");
                 return false;
             }
             const ownUserId = client.getUserId();
             // ignore requests that are not direct to or sent by the syncing user
             if (event.getSender() !== ownUserId && content.to !== ownUserId) {
-                console.log("VerificationRequest: validateEvent in InRoomMedium rejecting because I don't have anything to do with request");
                 return false;
             }
         }
@@ -96,7 +93,6 @@ export default class InRoomMedium {
         // TODO: verify that event is not sent by anyone but me or other user
 
         const type = InRoomMedium.getEventType(event);
-        console.log("InRoomMedium: handling event ", type, event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
         if (event.getRoomId() !== this._roomId || event.getSender() !== this._userId) {
@@ -104,7 +100,6 @@ export default class InRoomMedium {
         }
         // set transactionId when receiving a .request
         if (!this._requestEventId && type === REQUEST_TYPE) {
-            console.log("InRoomMedium: setting _requestEventId", event.getId());
             this._requestEventId = event.getId();
         }
 

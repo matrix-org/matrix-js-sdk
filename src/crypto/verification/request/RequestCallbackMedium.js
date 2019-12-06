@@ -1,5 +1,4 @@
 /*
-Copyright 2018 New Vector Ltd
 Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// ideally the verifier would be part of the VerificationRequest,
-// or at least the scope of the verifier would be smaller
-// but we need to know from the request when the verifier cancels,
-// so we can clean up and update the UI.
-// TBD if this will be needed
-export default class ProxyMedium {
+export default class RequestCallbackMedium {
     constructor(request, medium) {
         this._request = request;
         this._medium = medium;

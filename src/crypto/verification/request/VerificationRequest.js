@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import logger from '../../../logger';
-import ProxyMedium from "./ProxyMedium";
+import RequestCallbackMedium from "./RequestCallbackMedium";
 import {EventEmitter} from 'events';
 import {
     newUnknownMethodError,
@@ -70,13 +70,11 @@ export default class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
         if (!type.startsWith(EVENT_PREFIX)) {
-            console.log("VerificationRequest: invalid " + type + " event because wrong prefix");
             return false;
         }
 
         if (type === REQUEST_TYPE) {
             if (!Array.isArray(content.methods)) {
-                console.log("VerificationRequest: invalid " + type + " event because methods");
                 return false;
             }
         }
@@ -84,7 +82,6 @@ export default class VerificationRequest extends EventEmitter {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
-                console.log("VerificationRequest: invalid " + type + " event because from_device");
                 return false;
             }
         }
@@ -196,7 +193,6 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     _setPhase(phase, notify = true) {
-        console.trace(`VerificationRequest: setting phase from ${this._phase} to ${phase}`);
         this._phase = phase;
         if (notify) {
             this.emit("change");
@@ -212,10 +208,6 @@ export default class VerificationRequest extends EventEmitter {
         }
 
         if (this._verifier) {
-            // TODO: how will the phase change here once the verifier sends .done?
-            // maybe we shouldn't handle .done here?
-            // but also, how will this class know about cancel?
-            // wrap the medium?
             if (this._verifier.events
                 && this._verifier.events.includes(type)) {
                 this._verifier.handleEvent(event);
@@ -238,10 +230,10 @@ export default class VerificationRequest extends EventEmitter {
             this._initiatedByMe = this._wasSentByMe(event);
             this._setPhase(PHASE_REQUESTED);
         } else {
-            console.log("VerificationRequest: Ignoring flagged verification request from " +
-                event.getSender());
             logger.warn("Ignoring flagged verification request from " +
                 event.getSender());
+            // TODO: should this be awaited?
+            // TODO: could be triggered inadvertently if events arrive out of order after refresh?
             this.cancel(errorFromEvent(newUnexpectedMessageError()));
         }
     }
@@ -255,7 +247,6 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     async _handleStart(content, event) {
-        console.log("VerificationRequest: got a start back!!");
         if (this._hasValidPreStartPhase()) {
             const {method} = content;
             if (!this._verificationMethods.has(method)) {
@@ -268,9 +259,6 @@ export default class VerificationRequest extends EventEmitter {
                 this._verifier = this._createVerifier(method, event);
                 this._setPhase(PHASE_STARTED);
             }
-        } else {
-            console.log("VerificationRequest: currently in phase " + this._phase + ", not expecting a .start");
-            // TODO: cancel?
         }
     }
 
@@ -278,20 +266,15 @@ export default class VerificationRequest extends EventEmitter {
         if (type === CANCEL_TYPE) {
             this._handleCancel();
         } else if (type === START_TYPE) {
-            this._handleVerifierStart();
+            if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
+                // if unsent, we're sending a (first) .start event and hence requesting the verification
+                // in any other situation, the request was initiated by the other party.
+                this._initiatedByMe = this.phase === PHASE_UNSENT;
+                this._setPhase(PHASE_STARTED);
+            }
         }
     }
 
-    _handleVerifierStart() {
-        if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
-            // if unsent, we're sending a (first) .start event and hence requesting the verification
-            // in any other situation, the request was initiated by the other party.
-            this._initiatedByMe = this.phase === PHASE_UNSENT;
-            this._setPhase(PHASE_STARTED);
-        }
-    }
-
-    // also called from verifier through ProxyMedium
     _handleCancel() {
         if (this._phase !== PHASE_CANCELLED) {
             this._setPhase(PHASE_CANCELLED);
@@ -304,18 +287,19 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-
     _createVerifier(method, startEvent = null, targetDevice = null) {
         const startSentByMe = startEvent && this._wasSentByMe(startEvent);
         const {userId, deviceId} = this._getVerifierTarget(startEvent, targetDevice);
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {
+            console.warn("could not find verifier constructor for method", method);
             return;
         }
-        const proxyMedium = new ProxyMedium(this, this.medium);
+        // invokes handleVerifierSend when verifier sends something
+        const callbackMedium = new RequestCallbackMedium(this, this.medium);
         return new VerifierCtor(
-            proxyMedium,
+            callbackMedium,
             this._client,
             userId,
             deviceId,
@@ -327,15 +311,12 @@ export default class VerificationRequest extends EventEmitter {
         // creating a verifier for to_device before the .start event has been sent,
         // so the userId and deviceId are provided
         if (targetDevice) {
-            console.log("VerificationRequest: _getVerifierTarget: choosing targetDevice");
             return targetDevice;
         } else {
             let targetEvent;
             if (startEvent && !this._wasSentByMe(startEvent)) {
-                console.log("VerificationRequest: _getVerifierTarget: choosing startEvent");
                 targetEvent = startEvent;
             } else if (this._requestEvent && !this._wasSentByMe(this._requestEvent)) {
-                console.log("VerificationRequest: _getVerifierTarget: choosing this._requestEvent");
                 targetEvent = this._requestEvent;
             } else {
                 throw new Error(
