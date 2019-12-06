@@ -33,6 +33,10 @@ export default class ProxyMedium {
         return this._medium.transactionId;
     }
 
+    get needsDoneMessage() {
+        return this._medium.needsDoneMessage;
+    }
+
     handleEvent(event, request) {
         return this._medium.handleEvent(event, request);
     }
