@@ -2223,10 +2223,15 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
         if (!ToDeviceMedium.canCreateRequest(event)) {
             return;
         }
+        const content = event.getContent();
+        const deviceId = content && content.from_device;
+        if (!deviceId) {
+            return;
+        }
         const medium = new ToDeviceMedium(
             this._baseApis,
-            event.getRoomId(),
             event.getSender(),
+            [deviceId],
         );
         return new VerificationRequest(medium, this._verificationMethods, this._baseApis);
     };

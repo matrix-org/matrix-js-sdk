@@ -124,10 +124,10 @@ export default class VerificationRequest extends EventEmitter {
     beginKeyVerification(method, targetDevice = null) {
         // need to allow also when unsent in case of to_device
         if (!this._verifier) {
-            if (this._hasValidPreStartPhase(event)) {
+            if (this._hasValidPreStartPhase({getType: () => START_TYPE})) {
                 // when called on a request that was initiated with .request event
                 // check the method is supported by both sides
-                if (this._commonMethods && !this._commonMethods.includes(method)) {
+                if (this._commonMethods.length && !this._commonMethods.includes(method)) {
                     throw newUnknownMethodError();
                 }
                 this._verifier = this._createVerifier(method, null, targetDevice);

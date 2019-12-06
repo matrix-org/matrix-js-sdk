@@ -97,6 +97,9 @@ export default class ToDeviceMedium {
         const type = event.getType();
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
+            if (!this.transactionId) {
+                this.transactionId = content.transaction_id;
+            }
             const deviceId = content.from_device;
             // adopt deviceId if not set before and valid
             if (!this._deviceId && this._devices.includes(deviceId)) {
@@ -108,7 +111,7 @@ export default class ToDeviceMedium {
                 // and do send a cancel message to that device
                 // (but don't cancel the request for the device we should be talking to)
                 const cancelContent =
-                    this.contentWithTxnId(errorFromEvent(newUnexpectedMessageError()));
+                    this.completeContent(errorFromEvent(newUnexpectedMessageError()));
                 return this._sendToDevices(CANCEL_TYPE, cancelContent, [deviceId]);
             }
         }
@@ -120,11 +123,13 @@ export default class ToDeviceMedium {
         // the request has picked a start event, tell the other devices about it
         if (type === START_TYPE && !wasStarted && isStarted && this._deviceId) {
             const nonChosenDevices = this._devices.filter(d => d !== this._deviceId);
-            const message = this.contentWithTxnId({
-                code: "m.accepted",
-                reason: "Verification request accepted by another device",
-            });
-            await this._sendToDevices(CANCEL_TYPE, message, nonChosenDevices);
+            if (nonChosenDevices.length) {
+                const message = this.completeContent({
+                    code: "m.accepted",
+                    reason: "Verification request accepted by another device",
+                });
+                await this._sendToDevices(CANCEL_TYPE, message, nonChosenDevices);
+            }
         }
     }
 
@@ -159,7 +164,7 @@ export default class ToDeviceMedium {
 
     send(type, uncompletedContent = {}) {
         // create transaction id when sending request
-        if (type === REQUEST_TYPE && !this.transactionId) {
+        if ((type === REQUEST_TYPE || type === START_TYPE) && !this.transactionId) {
             this.transactionId = ToDeviceMedium.makeTransactionId();
         }
         const content = this.completeContent(type, uncompletedContent);
@@ -175,12 +180,16 @@ export default class ToDeviceMedium {
     }
 
     _sendToDevices(type, content, devices) {
-        const msgMap = {};
-        for (const deviceId of devices) {
-            msgMap[deviceId] = content;
-        }
+        if (devices.length) {
+            const msgMap = {};
+            for (const deviceId of devices) {
+                msgMap[deviceId] = content;
+            }
 
-        return this._client.sendToDevice(type, {[this._userId]: msgMap});
+            return this._client.sendToDevice(type, {[this._userId]: msgMap});
+        } else {
+            return Promise.resolve();
+        }
     }
 
     static makeTransactionId() {
