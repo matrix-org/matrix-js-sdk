@@ -38,8 +38,8 @@ export default class InRoomMedium {
         return this._requestEventId;
     }
 
-    static canCreateRequest(event) {
-        return InRoomMedium.getEventType(event) === REQUEST_TYPE;
+    static canCreateRequest(type) {
+        return type === REQUEST_TYPE;
     }
 
     static getTransactionId(event) {

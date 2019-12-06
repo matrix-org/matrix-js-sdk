@@ -2220,7 +2220,7 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     }
     const transactionId = ToDeviceMedium.getTransactionId(event);
     const createRequest = event => {
-        if (!ToDeviceMedium.canCreateRequest(event)) {
+        if (!ToDeviceMedium.canCreateRequest(ToDeviceMedium.getEventType(event))) {
             return;
         }
         const content = event.getContent();
@@ -2253,7 +2253,7 @@ Crypto.prototype._onTimelineEvent = function(event) {
     console.log("Crypto: _onTimelineEvent: VALID event", event);
     const transactionId = InRoomMedium.getTransactionId(event);
     const createRequest = event => {
-        if (!InRoomMedium.canCreateRequest(event)) {
+        if (!InRoomMedium.canCreateRequest(InRoomMedium.getEventType(event))) {
             return;
         }
         console.log("Crypto: _onTimelineEvent: creating new request");

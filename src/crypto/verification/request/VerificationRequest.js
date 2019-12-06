@@ -124,7 +124,7 @@ export default class VerificationRequest extends EventEmitter {
     beginKeyVerification(method, targetDevice = null) {
         // need to allow also when unsent in case of to_device
         if (!this._verifier) {
-            if (this._hasValidPreStartPhase({getType: () => START_TYPE})) {
+            if (this._hasValidPreStartPhase()) {
                 // when called on a request that was initiated with .request event
                 // check the method is supported by both sides
                 if (this._commonMethods.length && !this._commonMethods.includes(method)) {
@@ -231,17 +231,17 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _hasValidPreStartPhase(startEvent) {
+    _hasValidPreStartPhase() {
         return this._phase === PHASE_REQUESTED ||
             (
-                this.medium.constructor.canCreateRequest(startEvent) &&
+                this.medium.constructor.canCreateRequest(START_TYPE) &&
                 this._phase === PHASE_UNSENT
             );
     }
 
     async _handleStart(content, event) {
         console.log("VerificationRequest: got a start back!!");
-        if (this._hasValidPreStartPhase(event)) {
+        if (this._hasValidPreStartPhase()) {
             const {method} = content;
             if (!this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));

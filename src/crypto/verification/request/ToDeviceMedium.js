@@ -48,8 +48,8 @@ export default class ToDeviceMedium {
         return content && content.transaction_id;
     }
 
-    static canCreateRequest(event) {
-        return event.getType() === REQUEST_TYPE || event.getType() === START_TYPE;
+    static canCreateRequest(type) {
+        return type === REQUEST_TYPE || type === START_TYPE;
     }
 
     static validateEvent(event, client) {
