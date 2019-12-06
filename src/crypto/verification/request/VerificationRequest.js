@@ -53,7 +53,7 @@ export const PHASE_DONE = 6;
 // also !validateEvent, if it happens on a .request, ignore, otherwise, cancel
 
 export default class VerificationRequest extends EventEmitter {
-    constructor(medium, verificationMethods, client) {
+    constructor(medium, verificationMethods, userId, client) {
         super();
         this.medium = medium;
         this._verificationMethods = verificationMethods;
@@ -62,6 +62,8 @@ export default class VerificationRequest extends EventEmitter {
         this._setPhase(PHASE_UNSENT, false);
         // .request event from other side, only set if this is the receiving end.
         this._requestEvent = null;
+        this._otherUserId = userId;
+        this._initiatedByMe = null;
     }
 
     static validateEvent(type, event, client) {
@@ -115,9 +117,24 @@ export default class VerificationRequest extends EventEmitter {
             && this._phase !== PHASE_CANCELLED;
     }
 
-    get initiatedBy() {
-        // TODO
-        return null;
+    get initiatedByMe() {
+        return this._initiatedByMe;
+    }
+
+    get requestingUserId() {
+        if (this.initiatedByMe) {
+            return this._client.getUserId();
+        } else {
+            return this._otherUserId;
+        }
+    }
+
+    get receivingUserId() {
+        if (this.initiatedByMe) {
+            return this._otherUserId;
+        } else {
+            return this._client.getUserId();
+        }
     }
 
     // @param deviceId only needed if there is no .request event
@@ -142,6 +159,7 @@ export default class VerificationRequest extends EventEmitter {
     async sendRequest() {
         if (this._phase === PHASE_UNSENT) {
             //TODO: add from_device here, as it is handled here as well?
+            this._initiatedByMe = true;
             this._setPhase(PHASE_REQUESTED, false);
             const methods = [...this._verificationMethods.keys()];
             await this.medium.send(REQUEST_TYPE, {methods});
@@ -217,6 +235,7 @@ export default class VerificationRequest extends EventEmitter {
             this._commonMethods = otherMethods.
                 filter(m => this._verificationMethods.has(m));
             this._requestEvent = event;
+            this._initiatedByMe = this._wasSentByMe(event);
             this._setPhase(PHASE_REQUESTED);
         } else {
             console.log("VerificationRequest: Ignoring flagged verification request from " +
@@ -224,10 +243,6 @@ export default class VerificationRequest extends EventEmitter {
             logger.warn("Ignoring flagged verification request from " +
                 event.getSender());
             this.cancel(errorFromEvent(newUnexpectedMessageError()));
-        }
-        // store remote echo in case this event was sent by us
-        if (!this._requestEvent) {
-            this._requestEvent = event;
         }
     }
 
@@ -246,6 +261,10 @@ export default class VerificationRequest extends EventEmitter {
             if (!this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));
             } else {
+                // if not in requested phase
+                if (this.phase === PHASE_UNSENT) {
+                    this._initiatedByMe = this._wasSentByMe(event);
+                }
                 this._verifier = this._createVerifier(method, event);
                 this._setPhase(PHASE_STARTED);
             }
@@ -265,6 +284,9 @@ export default class VerificationRequest extends EventEmitter {
 
     _handleVerifierStart() {
         if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
+            // if unsent, we're sending a (first) .start event and hence requesting the verification
+            // in any other situation, the request was initiated by the other party.
+            this._initiatedByMe = this.phase === PHASE_UNSENT;
             this._setPhase(PHASE_STARTED);
         }
     }

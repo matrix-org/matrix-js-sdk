@@ -1332,7 +1332,7 @@ Crypto.prototype._requestVerificationWithMedium = async function(
     }
     // TODO: filter by given methods
     const request = new VerificationRequest(
-        medium, this._verificationMethods, this._baseApis);
+        medium, this._verificationMethods, userId, this._baseApis);
     await request.sendRequest();
 
     let requestsByTxnId = requestsMap.get(userId);
@@ -1365,7 +1365,7 @@ Crypto.prototype.beginKeyVerification = function(
         const medium = new ToDeviceMedium(
             this._baseApis, userId, [deviceId], transactionId, deviceId);
         request = new VerificationRequest(
-            medium, this._verificationMethods, this._baseApis);
+            medium, this._verificationMethods, userId, this._baseApis);
         requestsByTxnId.set(transactionId, request);
     }
     if (!request) {
@@ -2228,12 +2228,13 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
         if (!deviceId) {
             return;
         }
+        const userId = event.getSender();
         const medium = new ToDeviceMedium(
             this._baseApis,
-            event.getSender(),
+            userId,
             [deviceId],
         );
-        return new VerificationRequest(medium, this._verificationMethods, this._baseApis);
+        return new VerificationRequest(medium, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._toDeviceVerificationRequests, createRequest);
@@ -2257,12 +2258,13 @@ Crypto.prototype._onTimelineEvent = function(event) {
             return;
         }
         console.log("Crypto: _onTimelineEvent: creating new request");
+        const userId = event.getSender();
         const medium = new InRoomMedium(
             this._baseApis,
             event.getRoomId(),
-            event.getSender(),
+            userId,
         );
-        return new VerificationRequest(medium, this._verificationMethods, this._baseApis);
+        return new VerificationRequest(medium, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._inRoomVerificationRequests, createRequest);
@@ -2303,7 +2305,7 @@ Crypto.prototype._handleVerificationEvent = async function(
         if (requestsByTxnId.size === 0) {
             requestsMap.delete(sender);
         }
-    } else if (isNewRequest) {
+    } else if (isNewRequest && !request.initiatedByMe) {
         this._baseApis.emit("crypto.verification.request", request);
     }
 };
