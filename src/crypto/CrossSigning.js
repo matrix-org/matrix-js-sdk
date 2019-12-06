@@ -57,7 +57,7 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Calls the app callback to ask for a private key
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
-     * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
+     * @param {string} expectedPubkey The matching public key or undefined to use
      *     the stored public key for the given key type.
      * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */

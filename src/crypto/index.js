@@ -467,12 +467,13 @@ Crypto.prototype.setDefaultSecretStorageKeyId = function(k) {
 };
 
 /**
- * Checks that a given private key matches a given public key
- * This can be used by the getCrossSigningKey callback to verify that the
- * private key it is about to supply is the one that was requested.
+ * Checks that a given private key matches a given public key.
+ * This can be used by the getCrossSigningKey or getSecretStorageKey callbacks
+ * to verify that the private key it is about to supply is the one that was
+ * requested.
  *
  * @param {Uint8Array} privateKey The private key
- * @param {Uint8Array} expectedPublicKey The public key supplied by the getCrossSigningKey callback
+ * @param {string} expectedPublicKey The public key
  * @returns {boolean} true if the key matches, otherwise false
  */
 Crypto.prototype.checkPrivateKey = function(privateKey, expectedPublicKey) {
