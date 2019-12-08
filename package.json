@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test:watch": "jest spec/ --coverage --testEnvironment node --watch",
-    "test": "jest spec/ --coverage --testEnvironment node",,
+    "test": "jest spec/ --coverage --testEnvironment node",
     "gendoc": "babel src --no-babelrc --plugins @babel/plugin-proposal-class-properties -d .jsdocbuild --verbose --extensions \".ts,.js\" && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
     "start": "yarn start:init && yarn start:watch",
     "start:watch": "babel src -s -w --skip-initial-build -d lib --verbose --extensions \".ts,.js\"",
