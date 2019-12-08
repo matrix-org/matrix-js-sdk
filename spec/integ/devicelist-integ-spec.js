@@ -15,7 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import expect from 'expect';
 import Promise from 'bluebird';
 
 import TestClient from '../TestClient';
@@ -88,8 +87,6 @@ describe("DeviceList management:", function() {
     }
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-
         // we create our own sessionStoreBackend so that we can use it for
         // another TestClient.
         sessionStoreBackend = new testUtils.MockStorageApi();

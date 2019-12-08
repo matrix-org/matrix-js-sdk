@@ -16,12 +16,9 @@ limitations under the License.
 
 import '../../../olm-loader';
 
-import expect from 'expect';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
-import testUtils from '../../../test-utils';
 import logger from '../../../../lib/logger';
-import Promise from 'bluebird';
 
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import olmlib from '../../../../lib/crypto/olmlib';
@@ -51,14 +48,14 @@ describe("OlmDecryption", function() {
         return;
     }
 
+    beforeAll(function() {
+        return global.Olm.init();
+    });
+
     let aliceOlmDevice;
     let bobOlmDevice;
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-
-        await global.Olm.init();
-
         aliceOlmDevice = makeOlmDevice();
         bobOlmDevice = makeOlmDevice();
         await aliceOlmDevice.init();

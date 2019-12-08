@@ -22,7 +22,7 @@ limitations under the License.
 import Promise from 'bluebird';
 const utils = require("../utils");
 const EventEmitter = require("events").EventEmitter;
-import logger from '../../src/logger';
+import logger from '../logger';
 const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
@@ -62,9 +62,9 @@ function MatrixCall(opts) {
     this.URL = opts.URL;
     // Array of Objects with urls, username, credential keys
     this.turnServers = opts.turnServers || [];
-    if (this.turnServers.length === 0) {
+    if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
         this.turnServers.push({
-            urls: [MatrixCall.FALLBACK_STUN_SERVER],
+            urls: [MatrixCall.FALLBACK_ICE_SERVER],
         });
     }
     utils.forEach(this.turnServers, function(server) {
@@ -93,8 +93,8 @@ function MatrixCall(opts) {
 }
 /** The length of time a call can be ringing for. */
 MatrixCall.CALL_TIMEOUT_MS = 60000;
-/** The fallback server to use for STUN. */
-MatrixCall.FALLBACK_STUN_SERVER = 'stun:stun.l.google.com:19302';
+/** The fallback ICE server to use for STUN or TURN protocols. */
+MatrixCall.FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** An error code when the local client failed to create an offer. */
 MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
 /**
@@ -666,7 +666,7 @@ MatrixCall.prototype._maybeGotUserMediaForAnswer = function(stream) {
         },
     };
     self.peerConn.createAnswer(function(description) {
-        debuglog("Created answer: " + description);
+        debuglog("Created answer: ", description);
         self.peerConn.setLocalDescription(description, function() {
             self._answerContent = {
                 version: 0,
@@ -755,7 +755,7 @@ MatrixCall.prototype._receivedAnswer = function(msg) {
  */
 MatrixCall.prototype._gotLocalOffer = function(description) {
     const self = this;
-    debuglog("Created offer: " + description);
+    debuglog("Created offer: ", description);
 
     if (self.state == 'ended') {
         debuglog("Ignoring newly created offer on call ID " + self.callId +
@@ -1218,24 +1218,9 @@ const _placeCallWithConstraints = function(self, constraints) {
 };
 
 const _createPeerConnection = function(self) {
-    let servers = self.turnServers;
-    if (self.webRtc.vendor === "mozilla") {
-        // modify turnServers struct to match what mozilla expects.
-        servers = [];
-        for (let i = 0; i < self.turnServers.length; i++) {
-            for (let j = 0; j < self.turnServers[i].urls.length; j++) {
-                servers.push({
-                    url: self.turnServers[i].urls[j],
-                    username: self.turnServers[i].username,
-                    credential: self.turnServers[i].credential,
-                });
-            }
-        }
-    }
-
     const pc = new self.webRtc.RtcPeerConnection({
         iceTransportPolicy: self.forceTURN ? 'relay' : undefined,
-        iceServers: servers,
+        iceServers: self.turnServers,
     });
     pc.oniceconnectionstatechange = hookCallback(self, self._onIceConnectionStateChanged);
     pc.onsignalingstatechange = hookCallback(self, self._onSignallingStateChanged);
@@ -1353,7 +1338,9 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * @param {MatrixClient} client The client instance to use.
  * @param {string} roomId The room the call is in.
  * @param {Object?} options DEPRECATED optional options map.
- * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be forced. This option is deprecated - use opts.forceTURN when creating the matrix client since it's only possible to set this option on outbound calls.
+ * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be
+ * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
+ * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
 module.exports.createNewMatrixCall = function(client, roomId, options) {
@@ -1384,24 +1371,36 @@ module.exports.createNewMatrixCall = function(client, roomId, options) {
             return getUserMedia.apply(w.navigator, arguments);
         };
     }
-    webRtc.RtcPeerConnection = (
-        w.RTCPeerConnection || w.webkitRTCPeerConnection || w.mozRTCPeerConnection
-    );
-    webRtc.RtcSessionDescription = (
-        w.RTCSessionDescription || w.webkitRTCSessionDescription ||
-        w.mozRTCSessionDescription
-    );
-    webRtc.RtcIceCandidate = (
-        w.RTCIceCandidate || w.webkitRTCIceCandidate || w.mozRTCIceCandidate
-    );
-    webRtc.vendor = null;
-    if (w.mozRTCPeerConnection) {
-        webRtc.vendor = "mozilla";
-    } else if (w.webkitRTCPeerConnection) {
-        webRtc.vendor = "webkit";
-    } else if (w.RTCPeerConnection) {
-        webRtc.vendor = "generic";
+
+    // Firefox throws on so little as accessing the RTCPeerConnection when operating in
+    // a secure mode. There's some information at https://bugzilla.mozilla.org/show_bug.cgi?id=1542616
+    // though the concern is that the browser throwing a SecurityError will brick the
+    // client creation process.
+    try {
+        webRtc.RtcPeerConnection = (
+            w.RTCPeerConnection || w.webkitRTCPeerConnection || w.mozRTCPeerConnection
+        );
+        webRtc.RtcSessionDescription = (
+            w.RTCSessionDescription || w.webkitRTCSessionDescription ||
+            w.mozRTCSessionDescription
+        );
+        webRtc.RtcIceCandidate = (
+            w.RTCIceCandidate || w.webkitRTCIceCandidate || w.mozRTCIceCandidate
+        );
+        webRtc.vendor = null;
+        if (w.mozRTCPeerConnection) {
+            webRtc.vendor = "mozilla";
+        } else if (w.webkitRTCPeerConnection) {
+            webRtc.vendor = "webkit";
+        } else if (w.RTCPeerConnection) {
+            webRtc.vendor = "generic";
+        }
+    } catch (e) {
+        logger.error("Failed to set up WebRTC object: possible browser interference?");
+        logger.error(e);
+        return null;
     }
+
     if (!webRtc.RtcIceCandidate || !webRtc.RtcSessionDescription ||
             !webRtc.RtcPeerConnection || !webRtc.getUserMedia) {
         return null; // WebRTC is not supported.

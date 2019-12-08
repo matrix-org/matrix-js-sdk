@@ -4,14 +4,11 @@ const sdk = require("../..");
 const User = sdk.User;
 import utils from "../test-utils";
 
-import expect from 'expect';
-
 describe("User", function() {
     const userId = "@alice:bar";
     let user;
 
     beforeEach(function() {
-        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         user = new User(userId);
     });
 

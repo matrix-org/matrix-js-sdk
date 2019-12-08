@@ -21,7 +21,7 @@ const EventEmitter = require("events").EventEmitter;
 const utils = require("../utils");
 const EventTimeline = require("./event-timeline");
 import {EventStatus} from "./event";
-import logger from '../../src/logger';
+import logger from '../logger';
 import Relations from './relations';
 
 // var DEBUG = false;
@@ -92,6 +92,13 @@ function EventTimelineSet(room, opts) {
 }
 utils.inherits(EventTimelineSet, EventEmitter);
 
+/**
+ * Get all the timelines in this set
+ * @return {module:models/event-timeline~EventTimeline[]} the timelines in this set
+ */
+EventTimelineSet.prototype.getTimelines = function() {
+    return this._timelines;
+};
 /**
  * Get the filter object this timeline set is filtered on, if any
  * @return {?Filter} the optional filter for this timelineSet
@@ -688,9 +695,12 @@ EventTimelineSet.prototype.compareEventOrdering = function(eventId1, eventId2) {
  * The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
  * @param {String} eventType
  * The relation event's type, such as "m.reaction", etc.
+ * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
+ * are not valid.
  *
- * @returns {Relations}
- * A container for relation events.
+ * @returns {?Relations}
+ * A container for relation events or undefined if there are no relation events for
+ * the relationType.
  */
 EventTimelineSet.prototype.getRelationsForEvent = function(
     eventId, relationType, eventType,
@@ -782,20 +792,27 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
     }
     let relationsWithEventType = relationsWithRelType[eventType];
 
+    let isNewRelations = false;
+    let relatesToEvent;
     if (!relationsWithEventType) {
         relationsWithEventType = relationsWithRelType[eventType] = new Relations(
             relationType,
             eventType,
             this.room,
         );
-        const relatesToEvent = this.findEventById(relatesToEventId);
+        isNewRelations = true;
+        relatesToEvent = this.findEventById(relatesToEventId);
         if (relatesToEvent) {
             relationsWithEventType.setTargetEvent(relatesToEvent);
-            relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
         }
     }
 
     relationsWithEventType.addEvent(event);
+
+    // only emit once event has been added to relations
+    if (isNewRelations && relatesToEvent) {
+        relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
+    }
 };
 
 /**

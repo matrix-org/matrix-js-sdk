@@ -33,7 +33,7 @@ const utils = require("./utils");
 const Filter = require("./filter");
 const EventTimeline = require("./models/event-timeline");
 const PushProcessor = require("./pushprocessor");
-import logger from '../src/logger';
+import logger from './logger';
 
 import {InvalidStoreError} from './errors';
 

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import EventEmitter from 'events';
-import { EventStatus } from '../../lib/models/event';
+import { EventStatus } from '../models/event';
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -242,7 +242,7 @@ export default class Relations extends EventEmitter {
 
         redactedEvent.removeListener("Event.beforeRedaction", this._onBeforeRedaction);
 
-        this.emit("Relations.redaction");
+        this.emit("Relations.redaction", redactedEvent);
     }
 
     /**

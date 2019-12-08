@@ -63,6 +63,15 @@ function termsUrlForService(serviceType, baseUrl) {
  *
  * @param {string} opts.accessToken The access_token for this user.
  *
+ * @param {IdentityServerProvider} [opts.identityServer]
+ * Optional. A provider object with one function `getAccessToken`, which is a
+ * callback that returns a Promise<String> of an identity access token to supply
+ * with identity requests. If the object is unset, no access token will be
+ * supplied.
+ * See also https://github.com/vector-im/riot-web/issues/10615 which seeks to
+ * replace the previous approach of manual access tokens params with this
+ * callback throughout the SDK.
+ *
  * @param {Number=} opts.localTimeoutMs Optional. The default maximum amount of
  * time to wait before timing out HTTP requests. If not specified, there is no
  * timeout.
@@ -79,6 +88,7 @@ function MatrixBaseApis(opts) {
 
     this.baseUrl = opts.baseUrl;
     this.idBaseUrl = opts.idBaseUrl;
+    this.identityServer = opts.identityServer;
 
     const httpOpts = {
         baseUrl: opts.baseUrl,
@@ -123,7 +133,7 @@ MatrixBaseApis.prototype.getIdentityServerUrl = function(stripProto=false) {
  */
 MatrixBaseApis.prototype.setIdentityServerUrl = function(url) {
     this.idBaseUrl = utils.ensureNoTrailingSlash(url);
-    this._http.setIdBaseUrl(this._idBaseUrl);
+    this._http.setIdBaseUrl(this.idBaseUrl);
 };
 
 /**
@@ -983,10 +993,13 @@ MatrixBaseApis.prototype.roomInitialSync = function(roomId, limit, callback) {
  * @param {string} rrEventId ID of the event tracked by the read receipt. This is here
  * for convenience because the RR and the RM are commonly updated at the same time as
  * each other. Optional.
+ * @param {object} opts Options for the read markers.
+ * @param {object} opts.hidden True to hide the read receipt from other users. <b>This
+ * property is currently unstable and may change in the future.</b>
  * @return {module:client.Promise} Resolves: the empty object, {}.
  */
 MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
-                                function(roomId, rmEventId, rrEventId) {
+                                function(roomId, rmEventId, rrEventId, opts) {
     const path = utils.encodeUri("/rooms/$roomId/read_markers", {
         $roomId: roomId,
     });
@@ -994,6 +1007,7 @@ MatrixBaseApis.prototype.setRoomReadMarkersHttpRequest =
     const content = {
         "m.fully_read": rmEventId,
         "m.read": rrEventId,
+        "m.hidden": Boolean(opts ? opts.hidden : false),
     };
 
     return this._http.authedRequest(
@@ -1325,10 +1339,16 @@ MatrixBaseApis.prototype.getThreePids = function(callback) {
 };
 
 /**
+ * Add a 3PID to your homeserver account and optionally bind it to an identity
+ * server as well. An identity server is required as part of the `creds` object.
+ *
+ * This API is deprecated, and you should instead use `addThreePidOnly`
+ * for homeservers that support it.
+ *
  * @param {Object} creds
  * @param {boolean} bind
  * @param {module:client.callback} callback Optional.
- * @return {module:client.Promise} Resolves: TODO
+ * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
 MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
@@ -1339,6 +1359,75 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
     };
     return this._http.authedRequest(
         callback, "POST", path, null, data,
+    );
+};
+
+/**
+ * Add a 3PID to your homeserver account. This API does not use an identity
+ * server, as the homeserver is expected to handle 3PID ownership validation.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `account/3pid/<medium>/requestToken` on the homeserver.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.addThreePidOnly = async function(data) {
+    const path = "/account/3pid/add";
+    const prefix = await this.isVersionSupported("r0.6.0") ?
+        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, { prefix },
+    );
+};
+
+/**
+ * Bind a 3PID for discovery onto an identity server via the homeserver. The
+ * identity server handles 3PID ownership validation and the homeserver records
+ * the new binding to track where all 3PIDs for the account are bound.
+ *
+ * You can check whether a homeserver supports this API via
+ * `doesServerSupportSeparateAddAndBind`.
+ *
+ * @param {Object} data A object with 3PID validation data from having called
+ * `validate/<medium>/requestToken` on the identity server. It should also
+ * contain `id_server` and `id_access_token` fields as well.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.bindThreePid = async function(data) {
+    const path = "/account/3pid/bind";
+    const prefix = await this.isVersionSupported("r0.6.0") ?
+        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, { prefix },
+    );
+};
+
+/**
+ * Unbind a 3PID for discovery on an identity server via the homeserver. The
+ * homeserver removes its record of the binding to keep an updated record of
+ * where all 3PIDs for the account are bound.
+ *
+ * @param {string} medium The threepid medium (eg. 'email')
+ * @param {string} address The threepid address (eg. 'bob@example.com')
+ *        this must be as returned by getThreePids.
+ * @return {module:client.Promise} Resolves: on success
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.unbindThreePid = async function(medium, address) {
+    const path = "/account/3pid/unbind";
+    const data = {
+        medium,
+        address,
+        id_server: this.getIdentityServerUrl(true),
+    };
+    const prefix = await this.isVersionSupported("r0.6.0") ?
+        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+    return this._http.authedRequest(
+        undefined, "POST", path, null, data, { prefix },
     );
 };
 
@@ -1629,6 +1718,15 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     return this._http.authedRequest(callback, "POST", path, undefined, content);
 };
 
+MatrixBaseApis.prototype.uploadKeySignatures = function(content) {
+    return this._http.authedRequest(
+        undefined, "POST", '/keys/signatures/upload', undefined,
+        content, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
+
 /**
  * Download device keys
  *
@@ -1713,6 +1811,14 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
     return this._http.authedRequest(undefined, "GET", path, qps, undefined);
 };
 
+MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
+    const data = Object.assign({}, keys, {auth});
+    return this._http.authedRequest(
+        undefined, "POST", "/keys/device_signing/upload", undefined, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
+    );
+};
 
 // Identity Server Operations
 // ==========================
@@ -1743,10 +1849,11 @@ MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
 };
 
 /**
- * Requests an email verification token directly from an Identity Server.
+ * Requests an email verification token directly from an identity server.
  *
- * Note that the Homeserver offers APIs to proxy this API for specific
- * situations, allowing for better feedback to the user.
+ * This API is used as part of binding an email for discovery on an identity
+ * server. The validation data that results should be passed to the
+ * `bindThreePid` method to complete the binding process.
  *
  * @param {string} email The email address to request a token for
  * @param {string} clientSecret A secret binary string generated by the client.
@@ -1758,12 +1865,12 @@ MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
  * @param {string} nextLink Optional If specified, the client will be redirected
  *                 to this link after validation.
  * @param {module:client.callback} callback Optional.
- * @param {string} identityAccessToken The `access_token` field of the Identity
- * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ * @param {string} identityAccessToken The `access_token` field of the identity
+ * server `/account/register` response (see {@link registerWithIdentityServer}).
  *
  * @return {module:client.Promise} Resolves: TODO
  * @return {module:http-api.MatrixError} Rejects: with an error response.
- * @throws Error if no Identity Server is set
+ * @throws Error if no identity server is set
  */
 MatrixBaseApis.prototype.requestEmailToken = async function(
     email,
@@ -1783,8 +1890,7 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
     try {
         const response = await this._http.idServerRequest(
             undefined, "POST", "/validate/email/requestToken",
-            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
-            identityAccessToken,
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
         );
         // TODO: Fold callback into above call once v1 path below is removed
         if (callback) callback(null, response);
@@ -1806,7 +1912,75 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
 };
 
 /**
- * Submits an MSISDN token to the identity server
+ * Requests a MSISDN verification token directly from an identity server.
+ *
+ * This API is used as part of binding a MSISDN for discovery on an identity
+ * server. The validation data that results should be passed to the
+ * `bindThreePid` method to complete the binding process.
+ *
+ * @param {string} phoneCountry The ISO 3166-1 alpha-2 code for the country in
+ *                 which phoneNumber should be parsed relative to.
+ * @param {string} phoneNumber The phone number, in national or international
+ *                 format
+ * @param {string} clientSecret A secret binary string generated by the client.
+ *                 It is recommended this be around 16 ASCII characters.
+ * @param {number} sendAttempt If an identity server sees a duplicate request
+ *                 with the same sendAttempt, it will not send another SMS.
+ *                 To request another SMS to be sent, use a larger value for
+ *                 the sendAttempt param as was used in the previous request.
+ * @param {string} nextLink Optional If specified, the client will be redirected
+ *                 to this link after validation.
+ * @param {module:client.callback} callback Optional.
+ * @param {string} identityAccessToken The `access_token` field of the Identity
+ * Server `/account/register` response (see {@link registerWithIdentityServer}).
+ *
+ * @return {module:client.Promise} Resolves: TODO
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ * @throws Error if no identity server is set
+ */
+MatrixBaseApis.prototype.requestMsisdnToken = async function(
+    phoneCountry,
+    phoneNumber,
+    clientSecret,
+    sendAttempt,
+    nextLink,
+    callback,
+    identityAccessToken,
+) {
+    const params = {
+        client_secret: clientSecret,
+        country: phoneCountry,
+        phone_number: phoneNumber,
+        send_attempt: sendAttempt,
+        next_link: nextLink,
+    };
+
+    try {
+        const response = await this._http.idServerRequest(
+            undefined, "POST", "/validate/msisdn/requestToken",
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        );
+        // TODO: Fold callback into above call once v1 path below is removed
+        if (callback) callback(null, response);
+        return response;
+    } catch (err) {
+        if (err.cors === "rejected" || err.httpStatus === 404) {
+            // Fall back to deprecated v1 API for now
+            // TODO: Remove this path once v2 is only supported version
+            // See https://github.com/vector-im/riot-web/issues/10443
+            logger.warn("IS doesn't support v2, falling back to deprecated v1");
+            return await this._http.idServerRequest(
+                callback, "POST", "/validate/msisdn/requestToken",
+                params, httpApi.PREFIX_IDENTITY_V1,
+            );
+        }
+        if (callback) callback(err);
+        throw err;
+    }
+};
+
+/**
+ * Submits a MSISDN token to the identity server
  *
  * This is used when submitting the code sent by SMS to a phone number.
  * The ID server has an equivalent API for email but the js-sdk does
@@ -1839,8 +2013,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
     try {
         return await this._http.idServerRequest(
             undefined, "POST", "/validate/msisdn/submitToken",
-            JSON.stringify(params), httpApi.PREFIX_IDENTITY_V2,
-            identityAccessToken,
+            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
         );
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
@@ -1855,6 +2028,137 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
         }
         throw err;
     }
+};
+
+/**
+ * Submits a MSISDN token to an arbitrary URL.
+ *
+ * This is used when submitting the code sent by SMS to a phone number in the
+ * newer 3PID flow where the homeserver validates 3PID ownership (as part of
+ * `requestAdd3pidMsisdnToken`). The homeserver response may include a
+ * `submit_url` to specify where the token should be sent, and this helper can
+ * be used to pass the token to this URL.
+ *
+ * @param {string} url The URL to submit the token to
+ * @param {string} sid The sid given in the response to requestToken
+ * @param {string} clientSecret A secret binary string generated by the client.
+ *                 This must be the same value submitted in the requestToken call.
+ * @param {string} msisdnToken The MSISDN token, as enetered by the user.
+ *
+ * @return {module:client.Promise} Resolves: Object, currently with no parameters.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.submitMsisdnTokenOtherUrl = function(
+    url,
+    sid,
+    clientSecret,
+    msisdnToken,
+) {
+    const params = {
+        sid: sid,
+        client_secret: clientSecret,
+        token: msisdnToken,
+    };
+
+    return this._http.requestOtherUrl(
+        undefined, "POST", url, undefined, params,
+    );
+};
+
+/**
+ * Gets the V2 hashing information from the identity server. Primarily useful for
+ * lookups.
+ * @param {string} identityAccessToken The access token for the identity server.
+ * @returns {Promise<object>} The hashing information for the identity server.
+ */
+MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) {
+    return this._http.idServerRequest(
+        undefined, "GET", "/hash_details",
+        null, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+    );
+};
+
+/**
+ * Performs a hashed lookup of addresses against the identity server. This is
+ * only supported on identity servers which have at least the version 2 API.
+ * @param {Array<Array<string,string>>} addressPairs An array of 2 element arrays.
+ * The first element of each pair is the address, the second is the 3PID medium.
+ * Eg: ["email@example.org", "email"]
+ * @param {string} identityAccessToken The access token for the identity server.
+ * @returns {Promise<Array<{address, mxid}>>} A collection of address mappings to
+ * found MXIDs. Results where no user could be found will not be listed.
+ */
+MatrixBaseApis.prototype.identityHashedLookup = async function(
+    addressPairs, // [["email@example.org", "email"], ["10005550000", "msisdn"]]
+    identityAccessToken,
+) {
+    const params = {
+        // addresses: ["email@example.org", "10005550000"],
+        // algorithm: "sha256",
+        // pepper: "abc123"
+    };
+
+    // Get hash information first before trying to do a lookup
+    const hashes = await this.getIdentityHashDetails(identityAccessToken);
+    if (!hashes || !hashes['lookup_pepper'] || !hashes['algorithms']) {
+        throw new Error("Unsupported identity server: bad response");
+    }
+
+    params['pepper'] = hashes['lookup_pepper'];
+
+    const localMapping = {
+        // hashed identifier => plain text address
+        // For use in this function's return format
+    };
+
+    // When picking an algorithm, we pick the hashed over no hashes
+    if (hashes['algorithms'].includes('sha256')) {
+        // Abuse the olm hashing
+        const olmutil = new global.Olm.Utility();
+        params["addresses"] = addressPairs.map(p => {
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const hashed = olmutil.sha256(`${addr} ${med} ${params['pepper']}`)
+                .replace(/\+/g, '-').replace(/\//g, '_'); // URL-safe base64
+            // Map the hash to a known (case-sensitive) address. We use the case
+            // sensitive version because the caller might be expecting that.
+            localMapping[hashed] = p[0];
+            return hashed;
+        });
+        params["algorithm"] = "sha256";
+    } else if (hashes['algorithms'].includes('none')) {
+        params["addresses"] = addressPairs.map(p => {
+            const addr = p[0].toLowerCase(); // lowercase to get consistent hashes
+            const med = p[1].toLowerCase();
+            const unhashed = `${addr} ${med}`;
+            // Map the unhashed values to a known (case-sensitive) address. We use
+            // the case sensitive version because the caller might be expecting that.
+            localMapping[unhashed] = p[0];
+            return unhashed;
+        });
+        params["algorithm"] = "none";
+    } else {
+        throw new Error("Unsupported identity server: unknown hash algorithm");
+    }
+
+    const response = await this._http.idServerRequest(
+        undefined, "POST", "/lookup",
+        params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+    );
+
+    if (!response || !response['mappings']) return []; // no results
+
+    const foundAddresses = [/* {address: "plain@example.org", mxid} */];
+    for (const hashed of Object.keys(response['mappings'])) {
+        const mxid = response['mappings'][hashed];
+        const plainAddress = localMapping[hashed];
+        if (!plainAddress) {
+            throw new Error("Identity server returned more results than expected");
+        }
+
+        foundAddresses.push({address: plainAddress, mxid});
+    }
+    return foundAddresses;
 };
 
 /**
@@ -1878,31 +2182,51 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
     callback,
     identityAccessToken,
 ) {
-    const params = {
-        medium: medium,
-        address: address,
-    };
-
     try {
-        const response = await this._http.idServerRequest(
-            undefined, "GET", "/lookup",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            [[address, medium]], identityAccessToken,
         );
+        const result = response.find(p => p.address === address);
+        if (!result) {
+            // TODO: Fold callback into above call once v1 path below is removed
+            if (callback) callback(null, {});
+            return {};
+        }
+
+        const mapping = {
+            address,
+            medium,
+            mxid: result.mxid,
+
+            // We can't reasonably fill these parameters:
+            // not_before
+            // not_after
+            // ts
+            // signatures
+        };
+
         // TODO: Fold callback into above call once v1 path below is removed
-        if (callback) callback(null, response);
-        return response;
+        if (callback) callback(null, mapping);
+        return mapping;
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
             // See https://github.com/vector-im/riot-web/issues/10443
+            const params = {
+                medium: medium,
+                address: address,
+            };
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "GET", "/lookup",
                 params, httpApi.PREFIX_IDENTITY_V1,
             );
         }
-        if (callback) callback(err);
+        if (callback) callback(err, undefined);
         throw err;
     }
 };
@@ -1922,23 +2246,41 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
     query,
     identityAccessToken,
 ) {
-    const params = {
-        threepids: query,
-    };
-
     try {
-        return await this._http.idServerRequest(
-            undefined, "POST", "/bulk_lookup", JSON.stringify(params),
-            httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        // Note: we're using the V2 API by calling this function, but our
+        // function contract requires a V1 response. We therefore have to
+        // convert it manually.
+        const response = await this.identityHashedLookup(
+            // We have to reverse the query order to get [address, medium] pairs
+            query.map(p => [p[1], p[0]]), identityAccessToken,
         );
+
+        const v1results = [];
+        for (const mapping of response) {
+            const originalQuery = query.find(p => p[1] === mapping.address);
+            if (!originalQuery) {
+                throw new Error("Identity sever returned unexpected results");
+            }
+
+            v1results.push([
+                originalQuery[0], // medium
+                mapping.address,
+                mapping.mxid,
+            ]);
+        }
+
+        return {threepids: v1results};
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
             // Fall back to deprecated v1 API for now
             // TODO: Remove this path once v2 is only supported version
             // See https://github.com/vector-im/riot-web/issues/10443
+            const params = {
+                threepids: query,
+            };
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
-                undefined, "POST", "/bulk_lookup", JSON.stringify(params),
+                undefined, "POST", "/bulk_lookup", params,
                 httpApi.PREFIX_IDENTITY_V1, identityAccessToken,
             );
         }
@@ -1990,6 +2332,12 @@ MatrixBaseApis.prototype.sendToDevice = function(
     const body = {
         messages: contentMap,
     };
+
+    const targets = Object.keys(contentMap).reduce((obj, key) => {
+        obj[key] = Object.keys(contentMap[key]);
+        return obj;
+    }, {});
+    logger.log(`PUT ${path}`, targets);
 
     return this._http.authedRequest(undefined, "PUT", path, undefined, body);
 };

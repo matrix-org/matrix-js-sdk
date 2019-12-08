@@ -21,7 +21,7 @@ limitations under the License.
  */
 const utils = require("./utils");
 import Promise from 'bluebird';
-import logger from '../src/logger';
+import logger from './logger';
 
 const DEBUG = false;  // set true to enable console logging.
 

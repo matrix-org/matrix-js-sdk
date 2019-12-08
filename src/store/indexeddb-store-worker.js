@@ -17,7 +17,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
-import logger from '../../src/logger';
+import logger from '../logger';
 
 /**
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend

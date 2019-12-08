@@ -30,7 +30,6 @@ import 'source-map-support/register';
 // load olm before the sdk if possible
 import '../olm-loader';
 
-import expect from 'expect';
 const sdk = require("../..");
 import Promise from 'bluebird';
 const utils = require("../../lib/utils");
@@ -56,7 +55,7 @@ function bobUploadsDeviceKeys() {
         bobTestClient.client.uploadKeys(),
         bobTestClient.httpBackend.flush(),
     ]).then(() => {
-        expect(Object.keys(bobTestClient.deviceKeys).length).toNotEqual(0);
+        expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
     });
 }
 
@@ -204,7 +203,7 @@ function aliSendsFirstMessage() {
         expectAliQueryKeys()
             .then(expectAliClaimKeys)
             .then(expectAliSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -219,7 +218,7 @@ function aliSendsMessage() {
     return Promise.all([
         sendMessage(aliTestClient.client),
         expectAliSendMessageRequest(),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -235,7 +234,7 @@ function bobSendsReplyMessage() {
         sendMessage(bobTestClient.client),
         expectBobQueryKeys()
             .then(expectBobSendMessageRequest),
-    ]).spread(function(_, ciphertext) {
+    ]).then(function([_, ciphertext]) {
         return ciphertext;
     });
 }
@@ -280,16 +279,17 @@ function sendMessage(client) {
 
 function expectSendMessageRequest(httpBackend) {
     const path = "/send/m.room.encrypted/";
-    const deferred = Promise.defer();
-    httpBackend.when("PUT", path).respond(200, function(path, content) {
-        deferred.resolve(content);
-        return {
-            event_id: "asdfgh",
-        };
+    const prom = new Promise((resolve) => {
+        httpBackend.when("PUT", path).respond(200, function(path, content) {
+            resolve(content);
+            return {
+                event_id: "asdfgh",
+            };
+        });
     });
 
     // it can take a while to process the key query
-    return httpBackend.flush(path, 1).then(() => deferred.promise);
+    return httpBackend.flush(path, 1).then(() => prom);
 }
 
 function aliRecvMessage() {
@@ -406,8 +406,6 @@ describe("MatrixClient crypto", function() {
     }
 
     beforeEach(async function() {
-        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
-
         aliTestClient = new TestClient(aliUserId, aliDeviceId, aliAccessToken);
         await aliTestClient.client.initCrypto();
 
@@ -430,15 +428,14 @@ describe("MatrixClient crypto", function() {
             .then(bobUploadsDeviceKeys);
     });
 
-    it("Ali downloads Bobs device keys", function(done) {
-        Promise.resolve()
+    it("Ali downloads Bobs device keys", function() {
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys)
-            .then(aliDownloadsKeys)
-            .nodeify(done);
+            .then(aliDownloadsKeys);
     });
 
-    it("Ali gets keys with an invalid signature", function(done) {
-        Promise.resolve()
+    it("Ali gets keys with an invalid signature", function() {
+        return Promise.resolve()
             .then(bobUploadsDeviceKeys)
             .then(function() {
                 // tamper bob's keys
@@ -455,11 +452,10 @@ describe("MatrixClient crypto", function() {
             }).then((devices) => {
                 // should get an empty list
                 expect(devices).toEqual([]);
-            })
-            .nodeify(done);
+            });
     });
 
-    it("Ali gets keys with an incorrect userId", function(done) {
+    it("Ali gets keys with an incorrect userId", function() {
         const eveUserId = "@eve:localhost";
 
         const bobDeviceKeys = {
@@ -488,7 +484,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        Promise.all([
+        return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId, eveUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -496,14 +492,14 @@ describe("MatrixClient crypto", function() {
                 aliTestClient.client.getStoredDevicesForUser(bobUserId),
                 aliTestClient.client.getStoredDevicesForUser(eveUserId),
             ]);
-        }).spread((bobDevices, eveDevices) => {
+        }).then(([bobDevices, eveDevices]) => {
             // should get an empty list
             expect(bobDevices).toEqual([]);
             expect(eveDevices).toEqual([]);
-        }).nodeify(done);
+        });
     });
 
-    it("Ali gets keys with an incorrect deviceId", function(done) {
+    it("Ali gets keys with an incorrect deviceId", function() {
         const bobDeviceKeys = {
             algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
             device_id: 'bad_device',
@@ -530,7 +526,7 @@ describe("MatrixClient crypto", function() {
             return {device_keys: result};
         });
 
-        Promise.all([
+        return Promise.all([
             aliTestClient.client.downloadKeys([bobUserId]),
             aliTestClient.httpBackend.flush("/keys/query", 1),
         ]).then(function() {
@@ -538,7 +534,7 @@ describe("MatrixClient crypto", function() {
         }).then((devices) => {
             // should get an empty list
             expect(devices).toEqual([]);
-        }).nodeify(done);
+        });
     });
 
 
@@ -548,19 +544,18 @@ describe("MatrixClient crypto", function() {
             .then(() => bobTestClient.awaitOneTimeKeyUpload())
             .then((keys) => {
                 expect(Object.keys(keys).length).toEqual(5);
-                expect(Object.keys(bobTestClient.deviceKeys).length).toNotEqual(0);
+                expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
             });
     });
 
-    it("Ali sends a message", function(done) {
+    it("Ali sends a message", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
             .then(aliEnablesEncryption)
-            .then(aliSendsFirstMessage)
-            .nodeify(done);
+            .then(aliSendsFirstMessage);
     });
 
     it("Bob receives a message", function() {
@@ -628,9 +623,9 @@ describe("MatrixClient crypto", function() {
             });
     });
 
-    it("Ali blocks Bob's device", function(done) {
+    it("Ali blocks Bob's device", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -645,12 +640,12 @@ describe("MatrixClient crypto", function() {
                           expect(sentContent.ciphertext).toEqual({});
                       });
                 return Promise.all([p1, p2]);
-            }).nodeify(done);
+            });
     });
 
-    it("Bob receives two pre-key messages", function(done) {
+    it("Bob receives two pre-key messages", function() {
         aliTestClient.expectKeyQuery({device_keys: {[aliUserId]: {}}});
-        Promise.resolve()
+        return Promise.resolve()
             .then(() => aliTestClient.start())
             .then(() => bobTestClient.start())
             .then(() => firstSync(aliTestClient))
@@ -658,8 +653,7 @@ describe("MatrixClient crypto", function() {
             .then(aliSendsFirstMessage)
             .then(bobRecvMessage)
             .then(aliSendsMessage)
-            .then(bobRecvMessage)
-            .nodeify(done);
+            .then(bobRecvMessage);
     });
 
     it("Bob replies to the message", function() {
@@ -753,9 +747,9 @@ describe("MatrixClient crypto", function() {
             .then(() => httpBackend.when("POST", "/keys/upload")
                 .respond(200, (path, content) => {
                     expect(content.one_time_keys).toBeTruthy();
-                    expect(content.one_time_keys).toNotEqual({});
+                    expect(content.one_time_keys).not.toEqual({});
                     expect(Object.keys(content.one_time_keys).length)
-                        .toBeGreaterThanOrEqualTo(1);
+                        .toBeGreaterThanOrEqual(1);
                     logger.log('received %i one-time keys',
                                 Object.keys(content.one_time_keys).length);
                     // cancel futher calls by telling the client

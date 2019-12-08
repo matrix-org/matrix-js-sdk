@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 const unhomoglyph = require('unhomoglyph');
+import Promise from 'bluebird';
 
 /**
  * Encode a dictionary of query parameters.
@@ -707,4 +708,26 @@ module.exports.ensureNoTrailingSlash = function(url) {
     } else {
         return url;
     }
+};
+
+// Returns a promise which resolves with a given value after the given number of ms
+module.exports.sleep = (ms, value) => new Promise((resolve => {
+    setTimeout(resolve, ms, value);
+}));
+
+module.exports.isNullOrUndefined = function(val) {
+    return val === null || val === undefined;
+};
+
+// Returns a Deferred
+module.exports.defer = () => {
+    let resolve;
+    let reject;
+
+    const promise = new Promise((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+    });
+
+    return {resolve, reject, promise};
 };

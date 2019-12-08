@@ -22,8 +22,6 @@ try {
     logger.warn("unable to run device verification tests: libolm not available");
 }
 
-import expect from 'expect';
-
 import {verificationMethods} from '../../../../lib/crypto';
 
 import SAS from '../../../../lib/crypto/verification/SAS';
@@ -38,8 +36,8 @@ describe("verification request", function() {
         return;
     }
 
-    beforeEach(async function() {
-        await Olm.init();
+    beforeAll(function() {
+        return Olm.init();
     });
 
     it("should request and accept a verification", async function() {
@@ -52,7 +50,7 @@ describe("verification request", function() {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice._crypto._deviceList.getRawStoredDevicesForUser = function() {
+        alice.client._crypto._deviceList.getRawStoredDevicesForUser = function() {
             return {
                 Dynabook: {
                     keys: {
@@ -61,21 +59,21 @@ describe("verification request", function() {
                 },
             };
         };
-        alice.downloadKeys = () => {
+        alice.client.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.downloadKeys = () => {
+        bob.client.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.on("crypto.verification.request", (request) => {
+        bob.client.on("crypto.verification.request", (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();
 
             // XXX: Private function access (but it's a test, so we're okay)
             bobVerifier._endTimer();
         });
-        const aliceVerifier = await alice.requestVerification("@bob:example.com");
-        expect(aliceVerifier).toBeAn(SAS);
+        const aliceVerifier = await alice.client.requestVerification("@bob:example.com");
+        expect(aliceVerifier).toBeInstanceOf(SAS);
 
         // XXX: Private function access (but it's a test, so we're okay)
         aliceVerifier._endTimer();

@@ -195,6 +195,11 @@ if [ $dodist -eq 0 ]; then
     pushd "$builddir"
     git clone "$projdir" .
     git checkout "$rel_branch"
+    # We use Git branch / commit dependencies for some packages, and Yarn seems
+    # to have a hard time getting that right. See also
+    # https://github.com/yarnpkg/yarn/issues/4734. As a workaround, we clean the
+    # global cache here to ensure we get the right thing.
+    yarn cache clean
     yarn install
     # We haven't tagged yet, so tell the dist script what version
     # it's building

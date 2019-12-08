@@ -19,7 +19,7 @@ limitations under the License.
 
 import Promise from 'bluebird';
 const EventTimeline = require("./models/event-timeline");
-import logger from '../src/logger';
+import logger from './logger';
 
 /**
  * @private
@@ -132,14 +132,15 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     // feeling snappy.
     //
     if (initialEventId) {
-        const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
-
-        if (prom.isFulfilled()) {
-            initFields(prom.value());
-            return Promise.resolve();
-        } else {
-            return prom.then(initFields);
+        const timeline = this._timelineSet.getTimelineForEvent(initialEventId);
+        if (timeline) {
+            // hot-path optimization to save a reactor tick by replicating the sync check getTimelineForEvent does.
+            initFields(timeline);
+            return Promise.resolve(timeline);
         }
+
+        const prom = this._client.getEventTimeline(this._timelineSet, initialEventId);
+        return prom.then(initFields);
     } else {
         const tl = this._timelineSet.getLiveTimeline();
         initFields(tl);

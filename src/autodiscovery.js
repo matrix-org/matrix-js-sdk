@@ -1,5 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -275,21 +276,11 @@ export class AutoDiscovery {
         let isUrl = "";
         if (wellknown["m.identity_server"]) {
             // We prepare a failing identity server response to save lines later
-            // in this branch. Note that we also fail the homeserver check in the
-            // object because according to the spec we're supposed to FAIL_ERROR
-            // if *anything* goes wrong with the IS validation, including invalid
-            // format. This means we're supposed to stop discovery completely.
+            // in this branch.
             const failingClientConfig = {
-                "m.homeserver": {
-                    state: AutoDiscovery.FAIL_ERROR,
-                    error: AutoDiscovery.ERROR_INVALID_IS,
-
-                    // We'll provide the base_url that was previously valid for
-                    // debugging purposes.
-                    base_url: clientConfig["m.homeserver"].base_url,
-                },
+                "m.homeserver": clientConfig["m.homeserver"],
                 "m.identity_server": {
-                    state: AutoDiscovery.FAIL_ERROR,
+                    state: AutoDiscovery.FAIL_PROMPT,
                     error: AutoDiscovery.ERROR_INVALID_IS,
                     base_url: null,
                 },
@@ -427,6 +418,26 @@ export class AutoDiscovery {
 
         // Step 2: Validate and parse the config
         return AutoDiscovery.fromDiscoveryConfig(wellknown.raw);
+    }
+
+    /**
+     * Gets the raw discovery client configuration for the given domain name.
+     * Should only be used if there's no validation to be done on the resulting
+     * object, otherwise use findClientConfig().
+     * @param {string} domain The domain to get the client config for.
+     * @returns {Promise<object>} Resolves to the domain's client config. Can
+     * be an empty object.
+     */
+    static async getRawClientConfig(domain) {
+        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+            throw new Error("'domain' must be a string of non-zero length");
+        }
+
+        const response = await this._fetchWellKnownObject(
+            `https://${domain}/.well-known/matrix/client`,
+        );
+        if (!response) return {};
+        return response.raw || {};
     }
 
     /**

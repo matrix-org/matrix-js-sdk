@@ -23,7 +23,7 @@ import Promise from 'bluebird';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
-import logger from '../src/logger';
+import logger from './logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -405,18 +405,14 @@ module.exports.MatrixHttpApi.prototype = {
             uri: fullUri,
             method: method,
             withCredentials: false,
-            json: false,
+            json: true, // we want a JSON response if we can
             _matrix_opts: this.opts,
             headers: {},
         };
-        if (method == 'GET') {
+        if (method === 'GET') {
             opts.qs = params;
         } else if (typeof params === "object") {
-            opts.form = params;
-        } else if (typeof params === "string") {
-            // Assume the caller has serialised the body to JSON
-            opts.body = params;
-            opts.headers['Content-Type'] = "application/json";
+            opts.json = params;
         }
         if (accessToken) {
             opts.headers['Authorization'] = `Bearer ${accessToken}`;
@@ -427,12 +423,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts,
             requestCallback(defer, callback, this.opts.onlyData),
         );
-        // ID server does not always take JSON, so we can't use requests' 'json'
-        // option as we do with the home server, but it does return JSON, so
-        // parse it manually
-        return defer.promise.then(function(response) {
-            return JSON.parse(response);
-        });
+        return defer.promise;
     },
 
     /**
@@ -845,7 +836,8 @@ function parseErrorResponse(response, body) {
     let err;
     if (contentType) {
         if (contentType.type === 'application/json') {
-            err = new module.exports.MatrixError(JSON.parse(body));
+            const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
+            err = new module.exports.MatrixError(jsonBody);
         } else if (contentType.type === 'text/plain') {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
         }

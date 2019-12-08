@@ -22,6 +22,7 @@ limitations under the License.
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
 import logger from '../../logger';
+import DeviceInfo from '../deviceinfo';
 import {newTimeoutError} from "./Error";
 import Promise from 'bluebird';
 
@@ -48,42 +49,55 @@ export default class VerificationBase extends EventEmitter {
      *
      * @param {string} transactionId the transaction ID to be used when sending events
      *
-     * @param {object} startEvent the m.key.verification.start event that
+     * @param {string} [roomId] the room to use for verification
+     *
+     * @param {object} [startEvent] the m.key.verification.start event that
      * initiated this verification, if any
      *
-     * @param {object} request the key verification request object related to
+     * @param {object} [request] the key verification request object related to
      * this verification, if any
-     *
-     * @param {object} parent parent verification for this verification, if any
      */
-    constructor(baseApis, userId, deviceId, transactionId, startEvent, request, parent) {
+    constructor(baseApis, userId, deviceId, transactionId, roomId, startEvent, request) {
         super();
         this._baseApis = baseApis;
         this.userId = userId;
         this.deviceId = deviceId;
         this.transactionId = transactionId;
-        this.startEvent = startEvent;
-        this.request = request;
+        if (typeof(roomId) === "string" || roomId instanceof String) {
+            this.roomId = roomId;
+            this.startEvent = startEvent;
+            this.request = request;
+        } else {
+            // if room ID was omitted, but start event and request were not
+            this.startEvent= roomId;
+            this.request = startEvent;
+        }
         this.cancelled = false;
-        this._parent = parent;
         this._done = false;
         this._promise = null;
         this._transactionTimeoutTimer = null;
+        this._eventsSubscription = null;
 
         // At this point, the verification request was received so start the timeout timer.
         this._resetTimer();
+
+        if (this.roomId) {
+            this._sendWithTxnId = this._sendMessage;
+        } else {
+            this._sendWithTxnId = this._sendToDevice;
+        }
     }
 
     _resetTimer() {
-        console.log("Refreshing/starting the verification transaction timeout timer");
+        logger.info("Refreshing/starting the verification transaction timeout timer");
         if (this._transactionTimeoutTimer !== null) {
             clearTimeout(this._transactionTimeoutTimer);
         }
         this._transactionTimeoutTimer = setTimeout(() => {
-           if (!this._done && !this.cancelled) {
-               console.log("Triggering verification timeout");
-               this.cancel(timeoutException);
-           }
+            if (!this._done && !this.cancelled) {
+                logger.info("Triggering verification timeout");
+                this.cancel(timeoutException);
+            }
         }, 10 * 60 * 1000); // 10 minutes
     }
 
@@ -94,14 +108,55 @@ export default class VerificationBase extends EventEmitter {
         }
     }
 
+    _contentFromEventWithTxnId(event) {
+        if (this.roomId) {  // verification as timeline event
+            // ensure m.related_to is included in e2ee rooms
+            // as the field is excluded from encryption
+            const content = Object.assign({}, event.getContent());
+            content["m.relates_to"] = event.getRelation();
+            return content;
+        } else { // verification as to_device event
+            return event.getContent();
+        }
+    }
+
+    /* creates a content object with the transaction id added to it */
+    _contentWithTxnId(content) {
+        const copy = Object.assign({}, content);
+        if (this.roomId) { // verification as timeline event
+            copy["m.relates_to"] = {
+                rel_type: "m.reference",
+                event_id: this.transactionId,
+            };
+        } else { // verification as to_device event
+            copy.transaction_id = this.transactionId;
+        }
+        return copy;
+    }
+
+    _send(type, contentWithoutTxnId) {
+        const content = this._contentWithTxnId(contentWithoutTxnId);
+        return this._sendWithTxnId(type, content);
+    }
+
+    /* send a message to the other participant, using to-device messages
+     */
     _sendToDevice(type, content) {
         if (this._done) {
             return Promise.reject(new Error("Verification is already done"));
         }
-        content.transaction_id = this.transactionId;
         return this._baseApis.sendToDevice(type, {
             [this.userId]: { [this.deviceId]: content },
         });
+    }
+
+    /* send a message to the other participant, using in-roomm messages
+     */
+    _sendMessage(type, content) {
+        if (this._done) {
+            return Promise.reject(new Error("Verification is already done"));
+        }
+        return this._baseApis.sendEvent(this.roomId, type, content);
     }
 
     _waitForEvent(type) {
@@ -123,12 +178,16 @@ export default class VerificationBase extends EventEmitter {
             this._rejectEvent = undefined;
             this._resetTimer();
             this._resolveEvent(e);
+        } else if (e.getType() === "m.key.verification.cancel") {
+            const reject = this._reject;
+            this._reject = undefined;
+            reject(new Error("Other side cancelled verification"));
         } else {
-            this._expectedEvent = undefined;
             const exception = new Error(
                 "Unexpected message: expecting " + this._expectedEvent
                     + " but got " + e.getType(),
             );
+            this._expectedEvent = undefined;
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
@@ -141,6 +200,10 @@ export default class VerificationBase extends EventEmitter {
     done() {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
+            if (this.roomId) {
+                // verification in DM requires a done message
+                this._send("m.key.verification.done", {});
+            }
             this._resolve();
         }
     }
@@ -154,7 +217,7 @@ export default class VerificationBase extends EventEmitter {
                 // cancelled by the other user)
                 if (e === timeoutException) {
                     const timeoutEvent = newTimeoutError();
-                    this._sendToDevice(timeoutEvent.getType(), timeoutEvent.getContent());
+                    this._send(timeoutEvent.getType(), timeoutEvent.getContent());
                 } else if (e instanceof MatrixEvent) {
                     const sender = e.getSender();
                     if (sender !== this.userId) {
@@ -164,9 +227,9 @@ export default class VerificationBase extends EventEmitter {
                             content.reason = content.reason || content.body
                                 || "Unknown reason";
                             content.transaction_id = this.transactionId;
-                            this._sendToDevice("m.key.verification.cancel", content);
+                            this._send("m.key.verification.cancel", content);
                         } else {
-                            this._sendToDevice("m.key.verification.cancel", {
+                            this._send("m.key.verification.cancel", {
                                 code: "m.unknown",
                                 reason: content.body || "Unknown reason",
                                 transaction_id: this.transactionId,
@@ -174,7 +237,7 @@ export default class VerificationBase extends EventEmitter {
                         }
                     }
                 } else {
-                    this._sendToDevice("m.key.verification.cancel", {
+                    this._send("m.key.verification.cancel", {
                         code: "m.unknown",
                         reason: e.toString(),
                         transaction_id: this.transactionId,
@@ -186,6 +249,12 @@ export default class VerificationBase extends EventEmitter {
                 // but no reject function. If cancel is called again, we'd error.
                 if (this._reject) this._reject(e);
             } else {
+                // unsubscribe from events, this happens in _reject usually but we don't have one here
+                if (this._eventsSubscription) {
+                    this._eventsSubscription = this._eventsSubscription();
+                }
+                // FIXME: this causes an "Uncaught promise" console message
+                // if nothing ends up chaining this promise.
                 this._promise = Promise.reject(e);
             }
             // Also emit a 'cancel' event that the app can listen for to detect cancellation
@@ -207,11 +276,23 @@ export default class VerificationBase extends EventEmitter {
             this._resolve = (...args) => {
                 this._done = true;
                 this._endTimer();
+                if (this.handler) {
+                    // these listeners are attached in Crypto.acceptVerificationDM
+                    if (this._eventsSubscription) {
+                        this._eventsSubscription = this._eventsSubscription();
+                    }
+                }
                 resolve(...args);
             };
             this._reject = (...args) => {
                 this._done = true;
                 this._endTimer();
+                if (this.handler) {
+                    // these listeners are attached in Crypto.acceptVerificationDM
+                    if (this._eventsSubscription) {
+                        this._eventsSubscription = this._eventsSubscription();
+                    }
+                }
                 reject(...args);
             };
         });
@@ -234,11 +315,24 @@ export default class VerificationBase extends EventEmitter {
             const deviceId = keyId.split(':', 2)[1];
             // HACK: Wrapping the promise with bluebird fixes the tests.
             const device = await Promise.resolve(this._baseApis.getStoredDevice(userId, deviceId));
-            if (!device) {
-                logger.warn(`verification: Could not find device ${deviceId} to verify`);
-            } else {
-                await Promise.resolve(verifier(keyId, device, keyInfo));
+            if (device) {
+                await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);
+            } else {
+                const crossSigningInfo = this._baseApis._crypto._deviceList
+                      .getStoredCrossSigningForUser(userId);
+                if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
+                    await Promise.resolve(verifier(keyId, DeviceInfo.fromStorage({
+                        keys: {
+                            [keyId]: deviceId,
+                        },
+                    }, deviceId), keyInfo));
+                    verifiedDevices.push(deviceId);
+                } else {
+                    logger.warn(
+                        `verification: Could not find device ${deviceId} to verify`,
+                    );
+                }
             }
         }
 
@@ -252,5 +346,9 @@ export default class VerificationBase extends EventEmitter {
             // HACK: Wrapping the promise with bluebird fixes the tests.
             await Promise.resolve(this._baseApis.setDeviceVerified(userId, deviceId));
         }
+    }
+
+    setEventsSubscription(subscription) {
+        this._eventsSubscription = subscription;
     }
 }

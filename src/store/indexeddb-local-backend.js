@@ -19,7 +19,7 @@ import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import logger from '../../src/logger';
+import logger from '../logger';
 
 const VERSION = 3;
 

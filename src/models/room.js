@@ -30,8 +30,7 @@ const ContentRepo = require("../content-repo");
 const EventTimeline = require("./event-timeline");
 const EventTimelineSet = require("./event-timeline-set");
 
-import Promise from 'bluebird';
-import logger from '../../src/logger';
+import logger from '../logger';
 import ReEmitter from '../ReEmitter';
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -379,6 +378,23 @@ Room.prototype.hasPendingEvent = function(eventId) {
  */
 Room.prototype.getLiveTimeline = function() {
     return this.getUnfilteredTimelineSet().getLiveTimeline();
+};
+
+
+/**
+ * Get the timestamp of the last message in the room
+ *
+ * @return {number} the timestamp of the last message in the room
+ */
+Room.prototype.getLastActiveTimestamp = function() {
+    const timeline = this.getLiveTimeline();
+    const events = timeline.getEvents();
+    if (events.length) {
+        const lastEvent = events[events.length - 1];
+        return lastEvent.getTs();
+    } else {
+        return Number.MIN_SAFE_INTEGER;
+    }
 };
 
 /**
@@ -823,9 +839,15 @@ Room.prototype.getAliases = function() {
         for (let i = 0; i < aliasEvents.length; ++i) {
             const aliasEvent = aliasEvents[i];
             if (utils.isArray(aliasEvent.getContent().aliases)) {
-                Array.prototype.push.apply(
-                    aliasStrings, aliasEvent.getContent().aliases,
-                );
+                const filteredAliases = aliasEvent.getContent().aliases.filter(a => {
+                    if (typeof(a) !== "string") return false;
+                    if (a[0] !== '#') return false;
+                    if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
+
+                    // It's probably valid by here.
+                    return true;
+                });
+                Array.prototype.push.apply(aliasStrings, filteredAliases);
             }
         }
     }
@@ -879,7 +901,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember} The member or <code>null</code>.
  */
  Room.prototype.getMember = function(userId) {
-    return this.currentState.getMember(userId);
+     return this.currentState.getMember(userId);
  };
 
 /**
@@ -887,7 +909,7 @@ Room.prototype.addEventsToTimeline = function(events, toStartOfTimeline,
  * @return {RoomMember[]} A list of currently joined members.
  */
  Room.prototype.getJoinedMembers = function() {
-    return this.getMembersWithMembership("join");
+     return this.getMembersWithMembership("join");
  };
 
 /**
@@ -1058,6 +1080,18 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
         const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
         if (redactedEvent) {
             redactedEvent.makeRedacted(event);
+
+            // If this is in the current state, replace it with the redacted version
+            if (redactedEvent.getStateKey()) {
+                const currentStateEvent = this.currentState.getStateEvents(
+                    redactedEvent.getType(),
+                    redactedEvent.getStateKey(),
+                );
+                if (currentStateEvent.getId() === redactedEvent.getId()) {
+                    this.currentState.setStateEvents([redactedEvent]);
+                }
+            }
+
             this.emit("Room.redaction", event, this);
 
             // TODO: we stash user displaynames (among other things) in
@@ -1176,7 +1210,7 @@ Room.prototype.addPendingEvent = function(event, txnId) {
         for (let i = 0; i < this._timelineSets.length; i++) {
             const timelineSet = this._timelineSets[i];
             if (timelineSet.getFilter()) {
-                if (this._filter.filterRoomTimeline([event]).length) {
+                if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                     timelineSet.addEventToTimeline(event,
                         timelineSet.getLiveTimeline(), false);
                 }
@@ -1205,7 +1239,7 @@ Room.prototype._aggregateNonLiveRelation = function(event) {
     for (let i = 0; i < this._timelineSets.length; i++) {
         const timelineSet = this._timelineSets[i];
         if (timelineSet.getFilter()) {
-            if (this._filter.filterRoomTimeline([event]).length) {
+            if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
                 timelineSet.aggregateRelations(event);
             }
         } else {
