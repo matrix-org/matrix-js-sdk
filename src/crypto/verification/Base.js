@@ -314,7 +314,8 @@ export default class VerificationBase extends EventEmitter {
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
             // HACK: Wrapping the promise with bluebird fixes the tests.
-            const device = await Promise.resolve(this._baseApis.getStoredDevice(userId, deviceId));
+            const device =
+                await Promise.resolve(this._baseApis.getStoredDevice(userId, deviceId));
             if (device) {
                 await verifier(keyId, device, keyInfo);
                 verifiedDevices.push(deviceId);

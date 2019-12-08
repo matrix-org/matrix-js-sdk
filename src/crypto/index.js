@@ -1859,9 +1859,9 @@ Crypto.prototype.scheduleKeyBackupSend = async function(maxDelay = 10000) {
                 return;
             }
             try {
+                const backupProm = this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST);
                 // HACK: Wrapping the promise with bluebird fixes the tests.
-                const numBackedUp =
-                    await Promise.resolve(this._backupPendingKeys(KEY_BACKUP_KEYS_PER_REQUEST));
+                const numBackedUp = await Promise.resolve(backupProm);
                 if (numBackedUp === 0) {
                     // no sessions left needing backup: we're done
                     return;

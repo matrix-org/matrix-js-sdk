@@ -369,7 +369,7 @@ function setHttpResponses(
     client._http.authedRequestWithPrefix.mockImplementation(httpReq);
     client._http.requestWithPrefix.mockImplementation(httpReq);
     client._http.request.mockImplementation(httpReq);
-};
+}
 
 const utils = {
     syncPromise,
