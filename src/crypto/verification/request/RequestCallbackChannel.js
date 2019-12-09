@@ -14,13 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/** a key verification channel that wraps over an actual channel to pass it to a verifier,
+ * to notify the VerificationRequest when the verifier tries to send anything over the channel.
+ * This way, the VerificationRequest can update its state based on events sent by the verifier.
+ * Anything that is not sending is just routing through to the wrapped channel.
+ */
 export default class RequestCallbackChannel {
     constructor(request, channel) {
         this._request = request;
         this._channel = channel;
     }
 
-    // why did we need this again?
     get transactionId() {
         return this._channel.transactionId;
     }
@@ -37,7 +41,6 @@ export default class RequestCallbackChannel {
         return this._channel.completedContentFromEvent(event);
     }
 
-    /* creates a content object with the transaction id added to it */
     completeContent(type, content) {
         return this._channel.completeContent(type, content);
     }

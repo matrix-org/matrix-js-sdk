@@ -50,8 +50,13 @@ export const PHASE_STARTED = 4;
 export const PHASE_CANCELLED = 5;
 export const PHASE_DONE = 6;
 
-// also !validateEvent, if it happens on a .request, ignore, otherwise, cancel
 
+/**
+ * State machine for verification requests.
+ * Things that differ based on what channel is used to
+ * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
+ * @event "change" whenever the state of the request object has changed.
+ */
 export default class VerificationRequest extends EventEmitter {
     constructor(channel, verificationMethods, userId, client) {
         super();
@@ -60,12 +65,19 @@ export default class VerificationRequest extends EventEmitter {
         this._client = client;
         this._commonMethods = [];
         this._setPhase(PHASE_UNSENT, false);
-        // .request event from other side, only set if this is the receiving end.
         this._requestEvent = null;
         this._otherUserId = userId;
         this._initiatedByMe = null;
     }
 
+    /**
+     * Stateless validation logic not specific to the channel.
+     * Invoked by the same static method in either channel.
+     * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
+     * @param {MatrixEvent} event the event to validate. Don't call getType() on it but use the `type` parameter instead.
+     * @param {MatrixClient} client the client to get the current user and device id from
+     * @returns {bool} whether the event is valid and should be passed to handleEvent
+     */
     static validateEvent(type, event, client) {
         const content = event.getContent();
 
@@ -88,36 +100,47 @@ export default class VerificationRequest extends EventEmitter {
         return true;
     }
 
+    /** once the phase is PHASE_STARTED, common methods supported by both sides */
     get methods() {
         return this._commonMethods;
     }
 
+    /** the timeout of the request, provided for compatibility with previous verification code */
     get timeout() {
         return VERIFICATION_REQUEST_TIMEOUT;
     }
 
+    /** the m.key.verification.request event that started this request, provided for compatibility with previous verification code */
     get event() {
         return this._requestEvent;
     }
 
+    /** current phase of the request. Some properties might only be defined in a current phase. */
     get phase() {
         return this._phase;
     }
 
+    /** The verifier to do the actual verification, once the method has been established. Only defined when the `phase` is PHASE_STARTED. */
     get verifier() {
         return this._verifier;
     }
 
+    /** whether this request has sent it's initial event and needs more events to complete */
     get inProgress() {
         return this._phase !== PHASE_UNSENT
             && this._phase !== PHASE_DONE
             && this._phase !== PHASE_CANCELLED;
     }
 
+    /** Whether this request was initiated by the syncing user.
+     * For InRoomChannel, this is who sent the .request event.
+     * For ToDeviceChannel, this is who sent the .start event
+     */
     get initiatedByMe() {
         return this._initiatedByMe;
     }
 
+    /** the id of the user that initiated the request */
     get requestingUserId() {
         if (this.initiatedByMe) {
             return this._client.getUserId();
@@ -126,6 +149,7 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /** the id of the user that (will) receive(d) the request */
     get receivingUserId() {
         if (this.initiatedByMe) {
             return this._otherUserId;
@@ -134,7 +158,13 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    // @param deviceId only needed if there is no .request event
+    /* Start the key verification, creating a verifier and sending a .start event.
+     * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
+     * @param {string} method the name of the verification method to use.
+     * @param {string?} targetDevice.userId the id of the user to direct this request to
+     * @param {string?} targetDevice.deviceId the id of the device to direct this request to
+     * @returns {VerifierBase} the verifier of the given method
+     */
     beginKeyVerification(method, targetDevice = null) {
         // need to allow also when unsent in case of to_device
         if (!this._verifier) {
@@ -153,9 +183,12 @@ export default class VerificationRequest extends EventEmitter {
         return this._verifier;
     }
 
+    /**
+     * sends the initial .request event.
+     * @returns {Promise} resolves when the event has been sent.
+     */
     async sendRequest() {
         if (this._phase === PHASE_UNSENT) {
-            //TODO: add from_device here, as it is handled here as well?
             this._initiatedByMe = true;
             this._setPhase(PHASE_REQUESTED, false);
             const methods = [...this._verificationMethods.keys()];
@@ -164,6 +197,12 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /**
+     * Cancels the request, sending a cancellation to the other party
+     * @param {string?} error.reason the error reason to send the cancellation with
+     * @param {string?} error.code the error code to send the cancellation with
+     * @returns {Promise} resolves when the event has been sent.
+     */
     async cancel({reason = "User declined", code = "m.user"} = {}) {
         if (this._phase !== PHASE_CANCELLED) {
             if (this._verifier) {
@@ -176,6 +215,7 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /** @returns {Promise} with the verifier once it becomes available. Can be used after calling `sendRequest`. */
     waitForVerifier() {
         if (this.verifier) {
             return Promise.resolve(this.verifier);
@@ -199,12 +239,18 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    handleEvent(type, event) {
+    /**
+     * Changes the state of the request and verifier in response to a key verification event.
+     * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
+     * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
+     * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
+     */
+    async handleEvent(type, event) {
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
-            this._handleRequest(content, event);
+            await this._handleRequest(content, event);
         } else if (type === START_TYPE) {
-            this._handleStart(content, event);
+            await this._handleStart(content, event);
         }
 
         if (this._verifier) {
@@ -232,9 +278,7 @@ export default class VerificationRequest extends EventEmitter {
         } else {
             logger.warn("Ignoring flagged verification request from " +
                 event.getSender());
-            // TODO: should this be awaited?
-            // TODO: could be triggered inadvertently if events arrive out of order after refresh?
-            this.cancel(errorFromEvent(newUnexpectedMessageError()));
+            await this.cancel(errorFromEvent(newUnexpectedMessageError()));
         }
     }
 
@@ -262,12 +306,17 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /**
+     * Called by RequestCallbackChannel when the verifier sends an event
+     * @param {string} type the "symbolic" event type
+     * @param {object} content the completed or uncompleted content for the event to be sent
+     */
     handleVerifierSend(type, content) {
         if (type === CANCEL_TYPE) {
             this._handleCancel();
         } else if (type === START_TYPE) {
             if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
-                // if unsent, we're sending a (first) .start event and hence requesting the verification
+                // if unsent, we're sending a (first) .start event and hence requesting the verification.
                 // in any other situation, the request was initiated by the other party.
                 this._initiatedByMe = this.phase === PHASE_UNSENT;
                 this._setPhase(PHASE_STARTED);
@@ -308,7 +357,7 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     _getVerifierTarget(startEvent, targetDevice) {
-        // creating a verifier for to_device before the .start event has been sent,
+        // targetDevice should be set when creating a verifier for to_device before the .start event has been sent,
         // so the userId and deviceId are provided
         if (targetDevice) {
             return targetDevice;
