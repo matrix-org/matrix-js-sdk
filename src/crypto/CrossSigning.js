@@ -107,6 +107,8 @@ export class CrossSigningInfo extends EventEmitter {
 
     /**
      * Check whether the private keys exist in secret storage.
+     * XXX: This could be static, be we often seem to have an instance when we
+     * want to know this anyway...
      *
      * @param {SecretStorage} secretStorage The secret store using account data
      * @returns {boolean} Whether all private keys were found in storage
