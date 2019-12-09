@@ -2298,7 +2298,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     } catch (err) {
         console.error("error while handling verification event", event, err);
     }
-    if (!request.inProgress) {
+    if (!request.pending) {
         requestsByTxnId.delete(transactionId);
         if (requestsByTxnId.size === 0) {
             requestsMap.delete(sender);

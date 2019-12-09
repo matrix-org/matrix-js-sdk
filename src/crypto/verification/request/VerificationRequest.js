@@ -28,12 +28,12 @@ import {
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction
 // and ignored.
-const VERIFICATION_REQUEST_TIMEOUT = 5 * 60 * 1000; //5m
+const VERIFICATION_REQUEST_TIMEOUT = 10 * 60 * 1000; //10m
 // to avoid almost expired verification notifications
 // from showing a notification and almost immediately
 // disappearing, also ignore verification requests that
 // are this amount of time away from expiring.
-// const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
+const VERIFICATION_REQUEST_MARGIN = 3 * 1000; //3s
 
 
 export const EVENT_PREFIX = "m.key.verification.";
@@ -68,6 +68,7 @@ export default class VerificationRequest extends EventEmitter {
         this._requestEvent = null;
         this._otherUserId = userId;
         this._initiatedByMe = null;
+        this._startTimestamp = null;
     }
 
     /**
@@ -75,10 +76,11 @@ export default class VerificationRequest extends EventEmitter {
      * Invoked by the same static method in either channel.
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
      * @param {MatrixEvent} event the event to validate. Don't call getType() on it but use the `type` parameter instead.
+     * @param {number} timestamp the timestamp in milliseconds when this event was sent.
      * @param {MatrixClient} client the client to get the current user and device id from
      * @returns {bool} whether the event is valid and should be passed to handleEvent
      */
-    static validateEvent(type, event, client) {
+    static validateEvent(type, event, timestamp, client) {
         const content = event.getContent();
 
         if (!type.startsWith(EVENT_PREFIX)) {
@@ -97,6 +99,18 @@ export default class VerificationRequest extends EventEmitter {
                 return false;
             }
         }
+
+        // a timestamp is not provided on all to_device events
+        if (Number.isFinite(timestamp)) {
+            const elapsed = Date.now() - timestamp;
+            // ignore if event is too far in the past or too far in the future
+            if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
+                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)) {
+                logger.log("received verification that is too old or from the future");
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -107,7 +121,8 @@ export default class VerificationRequest extends EventEmitter {
 
     /** the timeout of the request, provided for compatibility with previous verification code */
     get timeout() {
-        return VERIFICATION_REQUEST_TIMEOUT;
+        const elapsed = Date.now() - this._startTimestamp;
+        return Math.max(0, VERIFICATION_REQUEST_TIMEOUT - elapsed);
     }
 
     /** the m.key.verification.request event that started this request, provided for compatibility with previous verification code */
@@ -126,7 +141,7 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     /** whether this request has sent it's initial event and needs more events to complete */
-    get inProgress() {
+    get pending() {
         return this._phase !== PHASE_UNSENT
             && this._phase !== PHASE_DONE
             && this._phase !== PHASE_CANCELLED;
@@ -243,10 +258,16 @@ export default class VerificationRequest extends EventEmitter {
      * Changes the state of the request and verifier in response to a key verification event.
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
      * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
+     * @param {number} timestamp the timestamp in milliseconds when this event was sent.
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(type, event) {
+    async handleEvent(type, event, timestamp) {
         const content = event.getContent();
+        if (type === REQUEST_TYPE || type === START_TYPE) {
+            if (this._startTimestamp === null) {
+                this._startTimestamp = timestamp;
+            }
+        }
         if (type === REQUEST_TYPE) {
             await this._handleRequest(content, event);
         } else if (type === START_TYPE) {

@@ -95,14 +95,6 @@ export default class ToDeviceChannel {
             if (!Number.isFinite(content.timestamp)) {
                 return false;
             }
-            const now = Date.now();
-            if (now < content.timestamp - (5 * 60 * 1000)
-                || now > content.timestamp + (10 * 60 * 1000)) {
-                // ignore if event is too far in the past or too far in the future
-                logger.log("received verification that is too old or from the future");
-                return false;
-            }
-
             if (event.getSender() === client.getUserId() &&
                     content.from_device == client.getDeviceId()
             ) {
@@ -112,7 +104,17 @@ export default class ToDeviceChannel {
             }
         }
 
-        return VerificationRequest.validateEvent(type, event, client);
+        return VerificationRequest.validateEvent(
+            type, event, ToDeviceChannel.getTimestamp(event), client);
+    }
+
+    /**
+     * @param {MatrixEvent} event the event to get the timestamp of
+     * @return {number} the timestamp when the event was sent
+     */
+    static getTimestamp(event) {
+        const content = event.getContent();
+        return content && content.timestamp;
     }
 
     /**
@@ -145,7 +147,8 @@ export default class ToDeviceChannel {
         }
 
         const wasStarted = request.phase === PHASE_STARTED;
-        await request.handleEvent(event.getType(), event);
+        await request.handleEvent(
+            event.getType(), event, ToDeviceChannel.getTimestamp(event));
         const isStarted = request.phase === PHASE_STARTED;
 
         // the request has picked a start event, tell the other devices about it

@@ -48,6 +48,14 @@ export default class InRoomChannel {
     }
 
     /**
+     * @param {MatrixEvent} event the event to get the timestamp of
+     * @return {number} the timestamp when the event was sent
+     */
+    static getTimestamp(event) {
+        return event.getTs();
+    }
+
+    /**
      * Checks whether the given event type should be allowed to initiate a new VerificationRequest over this channel
      * @param {string} type the event type to check
      * @returns {bool} boolean flag
@@ -99,7 +107,8 @@ export default class InRoomChannel {
             }
         }
 
-        return VerificationRequest.validateEvent(type, event, client);
+        return VerificationRequest.validateEvent(
+            type, event, InRoomChannel.getTimestamp(event), client);
     }
 
     /**
@@ -141,7 +150,7 @@ export default class InRoomChannel {
             this._requestEventId = event.getId();
         }
 
-        return await request.handleEvent(type, event);
+        return await request.handleEvent(type, event, InRoomChannel.getTimestamp(event));
     }
 
     /**
