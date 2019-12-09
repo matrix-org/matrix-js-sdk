@@ -1418,7 +1418,8 @@ Crypto.prototype.saveDeviceList = function(delay) {
  * Update the blocked/verified state of the given device
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {?boolean} verified whether to mark the device as verified. Null to
  *     leave unchanged.

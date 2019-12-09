@@ -777,7 +777,8 @@ MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
  * Mark the given device as verified
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} verified whether to mark the device as verified. defaults
  *   to 'true'.
@@ -805,7 +806,8 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
  * Mark the given device as blocked/unblocked
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} blocked whether to mark the device as blocked. defaults
  *   to 'true'.
@@ -825,7 +827,8 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
  * Mark the given device as known/unknown
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} known whether to mark the device as known. defaults
  *   to 'true'.
