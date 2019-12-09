@@ -1291,7 +1291,6 @@ Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods)
 
 Crypto.prototype.acceptVerificationDM = function(event, method) {
     if(!InRoomMedium.validateEvent(event, this._baseApis)) {
-        console.log("ignoring invalid verification event", event);
         return;
     }
 
@@ -2249,16 +2248,13 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  */
 Crypto.prototype._onTimelineEvent = function(event) {
     if (!InRoomMedium.validateEvent(event, this._baseApis)) {
-        console.log("Crypto: _onTimelineEvent: INVALID event", event);
         return;
     }
-    console.log("Crypto: _onTimelineEvent: VALID event", event);
     const transactionId = InRoomMedium.getTransactionId(event);
     const createRequest = event => {
         if (!InRoomMedium.canCreateRequest(InRoomMedium.getEventType(event))) {
             return;
         }
-        console.log("Crypto: _onTimelineEvent: creating new request");
         const userId = event.getSender();
         const medium = new InRoomMedium(
             this._baseApis,
