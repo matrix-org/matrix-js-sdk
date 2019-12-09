@@ -89,9 +89,7 @@ export default class InRoomMedium {
     }
 
     async handleEvent(event, request) {
-
         // TODO: verify that event is not sent by anyone but me or other user
-
         const type = InRoomMedium.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
