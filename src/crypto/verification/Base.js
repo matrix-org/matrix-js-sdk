@@ -40,6 +40,8 @@ export default class VerificationBase extends EventEmitter {
      *
      * @class
      *
+     * @param {module:base-apis~Medium} medium the verification medium to send verification messages over.
+     *
      * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
      *
      * @param {string} userId the user ID that is being verified

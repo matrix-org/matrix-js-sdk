@@ -2234,7 +2234,8 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             userId,
             [deviceId],
         );
-        return new VerificationRequest(medium, this._verificationMethods, userId, this._baseApis);
+        return new VerificationRequest(
+            medium, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._toDeviceVerificationRequests, createRequest);
@@ -2264,7 +2265,8 @@ Crypto.prototype._onTimelineEvent = function(event) {
             event.getRoomId(),
             userId,
         );
-        return new VerificationRequest(medium, this._verificationMethods, userId, this._baseApis);
+        return new VerificationRequest(
+            medium, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._inRoomVerificationRequests, createRequest);
