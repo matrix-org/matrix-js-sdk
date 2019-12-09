@@ -81,8 +81,8 @@ export default class ToDeviceMedium {
                 return false;
             }
 
-            if (event.getSender() === this._client.getUserId() &&
-                    content.from_device == this._client.getDeviceId()
+            if (event.getSender() === client.getUserId() &&
+                    content.from_device == client.getDeviceId()
             ) {
                 // ignore requests from ourselves, because it doesn't make sense for a
                 // device to verify itself
