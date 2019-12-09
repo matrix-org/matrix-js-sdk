@@ -208,8 +208,8 @@ export default class VerificationRequest extends EventEmitter {
         }
 
         if (this._verifier) {
-            if (this._verifier.events
-                && this._verifier.events.includes(type)) {
+            if (type === CANCEL_TYPE || (this._verifier.events
+                && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
             }
         }
