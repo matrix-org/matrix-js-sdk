@@ -430,32 +430,26 @@ describe("SAS verification", function() {
             bobSasEvent = null;
 
             bobPromise = new Promise((resolve, reject) => {
-                bob.client.on("event", async (event) => {
-                    const content = event.getContent();
-                    if (event.getType() === "m.room.message"
-                        && content.msgtype === "m.key.verification.request") {
-                        expect(content.methods).toContain(SAS.NAME);
-                        expect(content.to).toBe(bob.client.getUserId());
-                        const verifier = bob.client.acceptVerificationDM(event, SAS.NAME);
-                        verifier.on("show_sas", (e) => {
-                            if (!e.sas.emoji || !e.sas.decimal) {
-                                e.cancel();
-                            } else if (!aliceSasEvent) {
-                                bobSasEvent = e;
-                            } else {
-                                try {
-                                    expect(e.sas).toEqual(aliceSasEvent.sas);
-                                    e.confirm();
-                                    aliceSasEvent.confirm();
-                                } catch (error) {
-                                    e.mismatch();
-                                    aliceSasEvent.mismatch();
-                                }
+                bob.client.on("crypto.verification.request", async (request) => {
+                    const verifier = request.beginKeyVerification(SAS.NAME);
+                    verifier.on("show_sas", (e) => {
+                        if (!e.sas.emoji || !e.sas.decimal) {
+                            e.cancel();
+                        } else if (!aliceSasEvent) {
+                            bobSasEvent = e;
+                        } else {
+                            try {
+                                expect(e.sas).toEqual(aliceSasEvent.sas);
+                                e.confirm();
+                                aliceSasEvent.confirm();
+                            } catch (error) {
+                                e.mismatch();
+                                aliceSasEvent.mismatch();
                             }
-                        });
-                        await verifier.verify();
-                        resolve();
-                    }
+                        }
+                    });
+                    await verifier.verify();
+                    resolve();
                 });
             });
 
