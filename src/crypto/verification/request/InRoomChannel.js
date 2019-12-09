@@ -18,7 +18,7 @@ limitations under the License.
 import VerificationRequest, {REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
 const MESSAGE_TYPE = "m.room.message";
 
-export default class InRoomMedium {
+export default class InRoomChannel {
     constructor(client, roomId, userId) {
         this._client = client;
         this._roomId = roomId;
@@ -33,7 +33,7 @@ export default class InRoomMedium {
     // why did we need this again?
     // to get the transaction id for the verifier ...
     // but we shouldn't need it anymore since it is only used
-    // for sending there which will now happen through the medium
+    // for sending there which will now happen through the channel
     get transactionId() {
         return this._requestEventId;
     }
@@ -43,7 +43,7 @@ export default class InRoomMedium {
     }
 
     static getTransactionId(event) {
-        if (InRoomMedium.getEventType(event) === REQUEST_TYPE) {
+        if (InRoomChannel.getEventType(event) === REQUEST_TYPE) {
             return event.getId();
         } else {
             const relation = event.getRelation();
@@ -54,11 +54,11 @@ export default class InRoomMedium {
     }
 
     static validateEvent(event, client) {
-        const txnId = InRoomMedium.getTransactionId(event);
+        const txnId = InRoomChannel.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
             return false;
         }
-        const type = InRoomMedium.getEventType(event);
+        const type = InRoomChannel.getEventType(event);
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
             if (typeof content.to !== "string" || !content.to.length) {
@@ -90,7 +90,7 @@ export default class InRoomMedium {
 
     async handleEvent(event, request) {
         // TODO: verify that event is not sent by anyone but me or other user
-        const type = InRoomMedium.getEventType(event);
+        const type = InRoomChannel.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
         if (event.getRoomId() !== this._roomId || event.getSender() !== this._userId) {

@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import logger from '../../../logger';
-import RequestCallbackMedium from "./RequestCallbackMedium";
+import RequestCallbackChannel from "./RequestCallbackChannel";
 import {EventEmitter} from 'events';
 import {
     newUnknownMethodError,
@@ -53,9 +53,9 @@ export const PHASE_DONE = 6;
 // also !validateEvent, if it happens on a .request, ignore, otherwise, cancel
 
 export default class VerificationRequest extends EventEmitter {
-    constructor(medium, verificationMethods, userId, client) {
+    constructor(channel, verificationMethods, userId, client) {
         super();
-        this.medium = medium;
+        this.channel = channel;
         this._verificationMethods = verificationMethods;
         this._client = client;
         this._commonMethods = [];
@@ -159,7 +159,7 @@ export default class VerificationRequest extends EventEmitter {
             this._initiatedByMe = true;
             this._setPhase(PHASE_REQUESTED, false);
             const methods = [...this._verificationMethods.keys()];
-            await this.medium.send(REQUEST_TYPE, {methods});
+            await this.channel.send(REQUEST_TYPE, {methods});
             this.emit("change");
         }
     }
@@ -170,7 +170,7 @@ export default class VerificationRequest extends EventEmitter {
                 return this._verifier.cancel(errorFactory(code, reason));
             } else {
                 this._setPhase(PHASE_CANCELLED, false);
-                await this.medium.send(CANCEL_TYPE, {code, reason});
+                await this.channel.send(CANCEL_TYPE, {code, reason});
             }
             this.emit("change");
         }
@@ -241,7 +241,7 @@ export default class VerificationRequest extends EventEmitter {
     _hasValidPreStartPhase() {
         return this._phase === PHASE_REQUESTED ||
             (
-                this.medium.constructor.canCreateRequest(START_TYPE) &&
+                this.channel.constructor.canCreateRequest(START_TYPE) &&
                 this._phase === PHASE_UNSENT
             );
     }
@@ -297,7 +297,7 @@ export default class VerificationRequest extends EventEmitter {
             return;
         }
         // invokes handleVerifierSend when verifier sends something
-        const callbackMedium = new RequestCallbackMedium(this, this.medium);
+        const callbackMedium = new RequestCallbackChannel(this, this.channel);
         return new VerifierCtor(
             callbackMedium,
             this._client,

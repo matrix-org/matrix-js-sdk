@@ -14,43 +14,43 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export default class RequestCallbackMedium {
-    constructor(request, medium) {
+export default class RequestCallbackChannel {
+    constructor(request, channel) {
         this._request = request;
-        this._medium = medium;
+        this._channel = channel;
     }
 
     // why did we need this again?
     get transactionId() {
-        return this._medium.transactionId;
+        return this._channel.transactionId;
     }
 
     get needsDoneMessage() {
-        return this._medium.needsDoneMessage;
+        return this._channel.needsDoneMessage;
     }
 
     handleEvent(event, request) {
-        return this._medium.handleEvent(event, request);
+        return this._channel.handleEvent(event, request);
     }
 
     completedContentFromEvent(event) {
-        return this._medium.completedContentFromEvent(event);
+        return this._channel.completedContentFromEvent(event);
     }
 
     /* creates a content object with the transaction id added to it */
     completeContent(type, content) {
-        return this._medium.completeContent(type, content);
+        return this._channel.completeContent(type, content);
     }
 
     async send(type, uncompletedContent) {
         this._request.handleVerifierSend(type, uncompletedContent);
-        const result = await this._medium.send(type, uncompletedContent);
+        const result = await this._channel.send(type, uncompletedContent);
         return result;
     }
 
     async sendCompleted(type, content) {
         this._request.handleVerifierSend(type, content);
-        const result = await this._medium.sendCompleted(type, content);
+        const result = await this._channel.sendCompleted(type, content);
         return result;
     }
 }

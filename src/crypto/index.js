@@ -46,8 +46,8 @@ import SAS from './verification/SAS';
 import {sleep} from '../utils';
 
 import VerificationRequest from "./verification/request/VerificationRequest";
-import InRoomMedium from "./verification/request/InRoomMedium";
-import ToDeviceMedium from "./verification/request/ToDeviceMedium";
+import InRoomChannel from "./verification/request/InRoomChannel";
+import ToDeviceChannel from "./verification/request/ToDeviceChannel";
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -1279,18 +1279,18 @@ Crypto.prototype.setDeviceVerification = async function(
 };
 
 Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
-    const medium = new InRoomMedium(this._baseApis, roomId, userId);
-    const request = await this._requestVerificationWithMedium(
+    const channel = new InRoomChannel(this._baseApis, roomId, userId);
+    const request = await this._requestVerificationWithChannel(
         userId,
         methods,
-        medium,
+        channel,
         this._inRoomVerificationRequests,
     );
     return await request.waitForVerifier();
 };
 
 Crypto.prototype.acceptVerificationDM = function(event, method) {
-    if(!InRoomMedium.validateEvent(event, this._baseApis)) {
+    if(!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
     }
 
@@ -1299,7 +1299,7 @@ Crypto.prototype.acceptVerificationDM = function(event, method) {
     if (!requestsByTxnId) {
         return;
     }
-    const transactionId = InRoomMedium.getTransactionId(event);
+    const transactionId = InRoomChannel.getTransactionId(event);
     const request = requestsByTxnId.get(transactionId);
     if (!request) {
         return;
@@ -1312,18 +1312,18 @@ Crypto.prototype.requestVerification = async function(userId, methods, devices) 
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
-    const medium = new ToDeviceMedium(this._baseApis, userId, devices);
-    const request = await this._requestVerificationWithMedium(
+    const channel = new ToDeviceChannel(this._baseApis, userId, devices);
+    const request = await this._requestVerificationWithChannel(
         userId,
         methods,
-        medium,
+        channel,
         this._toDeviceVerificationRequests,
     );
     return await request.waitForVerifier();
 };
 
-Crypto.prototype._requestVerificationWithMedium = async function(
-    userId, methods, medium, requestsMap,
+Crypto.prototype._requestVerificationWithChannel = async function(
+    userId, methods, channel, requestsMap,
 ) {
     if (!methods) {
         // .keys() returns an iterator, so we need to explicitly turn it into an array
@@ -1331,7 +1331,7 @@ Crypto.prototype._requestVerificationWithMedium = async function(
     }
     // TODO: filter by given methods
     const request = new VerificationRequest(
-        medium, this._verificationMethods, userId, this._baseApis);
+        channel, this._verificationMethods, userId, this._baseApis);
     await request.sendRequest();
 
     let requestsByTxnId = requestsMap.get(userId);
@@ -1343,7 +1343,7 @@ Crypto.prototype._requestVerificationWithMedium = async function(
     // but if the other party is really fast they could potentially respond to the
     // request before the server tells us the event got sent, and we would probably
     // create a new request object
-    requestsByTxnId.set(medium.transactionId, request);
+    requestsByTxnId.set(channel.transactionId, request);
 
     return request;
 };
@@ -1360,11 +1360,11 @@ Crypto.prototype.beginKeyVerification = function(
     if (transactionId) {
         request = requestsByTxnId.get(transactionId);
     } else {
-        transactionId = ToDeviceMedium.makeTransactionId();
-        const medium = new ToDeviceMedium(
+        transactionId = ToDeviceChannel.makeTransactionId();
+        const channel = new ToDeviceChannel(
             this._baseApis, userId, [deviceId], transactionId, deviceId);
         request = new VerificationRequest(
-            medium, this._verificationMethods, userId, this._baseApis);
+            channel, this._verificationMethods, userId, this._baseApis);
         requestsByTxnId.set(transactionId, request);
     }
     if (!request) {
@@ -2214,12 +2214,12 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
  * @param {module:models/event.MatrixEvent} event verification start event
  */
 Crypto.prototype._onKeyVerificationMessage = function(event) {
-    if (!ToDeviceMedium.validateEvent(event, this._baseApis)) {
+    if (!ToDeviceChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = ToDeviceMedium.getTransactionId(event);
+    const transactionId = ToDeviceChannel.getTransactionId(event);
     const createRequest = event => {
-        if (!ToDeviceMedium.canCreateRequest(ToDeviceMedium.getEventType(event))) {
+        if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
             return;
         }
         const content = event.getContent();
@@ -2228,13 +2228,13 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             return;
         }
         const userId = event.getSender();
-        const medium = new ToDeviceMedium(
+        const channel = new ToDeviceChannel(
             this._baseApis,
             userId,
             [deviceId],
         );
         return new VerificationRequest(
-            medium, this._verificationMethods, userId, this._baseApis);
+            channel, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._toDeviceVerificationRequests, createRequest);
@@ -2247,22 +2247,22 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  * @param {module:models/event.MatrixEvent} event the timeline event
  */
 Crypto.prototype._onTimelineEvent = function(event) {
-    if (!InRoomMedium.validateEvent(event, this._baseApis)) {
+    if (!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = InRoomMedium.getTransactionId(event);
+    const transactionId = InRoomChannel.getTransactionId(event);
     const createRequest = event => {
-        if (!InRoomMedium.canCreateRequest(InRoomMedium.getEventType(event))) {
+        if (!InRoomChannel.canCreateRequest(InRoomChannel.getEventType(event))) {
             return;
         }
         const userId = event.getSender();
-        const medium = new InRoomMedium(
+        const channel = new InRoomChannel(
             this._baseApis,
             event.getRoomId(),
             userId,
         );
         return new VerificationRequest(
-            medium, this._verificationMethods, userId, this._baseApis);
+            channel, this._verificationMethods, userId, this._baseApis);
     };
     this._handleVerificationEvent(event, transactionId,
         this._inRoomVerificationRequests, createRequest);
@@ -2290,7 +2290,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     }
     try {
         const hadVerifier = !!request.verifier;
-        await request.medium.handleEvent(event, request);
+        await request.channel.handleEvent(event, request);
         // emit start event when verifier got set
         if (!hadVerifier && request.verifier) {
             this._baseApis.emit("crypto.verification.start", request.verifier);

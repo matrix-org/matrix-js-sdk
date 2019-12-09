@@ -40,7 +40,7 @@ export default class VerificationBase extends EventEmitter {
      *
      * @class
      *
-     * @param {module:base-apis~Medium} medium the verification medium to send verification messages over.
+     * @param {module:base-apis~Channel} channel the verification channel to send verification messages over.
      *
      * @param {module:base-apis~MatrixBaseApis} baseApis base matrix api interface
      *
@@ -54,9 +54,9 @@ export default class VerificationBase extends EventEmitter {
      * @param {object} [request] the key verification request object related to
      * this verification, if any
      */
-    constructor(medium, baseApis, userId, deviceId, startEvent, request) {
+    constructor(channel, baseApis, userId, deviceId, startEvent, request) {
         super();
-        this._medium = medium;
+        this._channel = channel;
         this._baseApis = baseApis;
         this.userId = userId;
         this.deviceId = deviceId;
@@ -93,7 +93,7 @@ export default class VerificationBase extends EventEmitter {
     }
 
     _send(type, uncompletedContent) {
-        return this._medium.send(type, uncompletedContent);
+        return this._channel.send(type, uncompletedContent);
     }
 
     _waitForEvent(type) {
@@ -137,7 +137,7 @@ export default class VerificationBase extends EventEmitter {
     done() {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
-            if (this._medium.needsDoneMessage) {
+            if (this._channel.needsDoneMessage) {
                 // verification in DM requires a done message
                 this._send("m.key.verification.done", {});
             }

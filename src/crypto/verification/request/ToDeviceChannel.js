@@ -29,7 +29,7 @@ import {
     errorFromEvent,
 } from "../Error";
 
-export default class ToDeviceMedium {
+export default class ToDeviceChannel {
     // userId and devices of user we're about to verify
     constructor(client, userId, devices, transactionId = null, deviceId = null) {
         this._client = client;
@@ -140,7 +140,7 @@ export default class ToDeviceMedium {
     // for this reason there is a completed content (as sent/received)
     // and uncompleted content, with only fields the VerificationRequest
     // and VerifierBase should care about to send.
-    // This is put in the medium as some of these fields are different
+    // This is put in the channel as some of these fields are different
     // for to_device and in-room verification
     completedContentFromEvent(event) {
         return event.getContent();
@@ -165,7 +165,7 @@ export default class ToDeviceMedium {
     send(type, uncompletedContent = {}) {
         // create transaction id when sending request
         if ((type === REQUEST_TYPE || type === START_TYPE) && !this.transactionId) {
-            this.transactionId = ToDeviceMedium.makeTransactionId();
+            this.transactionId = ToDeviceChannel.makeTransactionId();
         }
         const content = this.completeContent(type, uncompletedContent);
         return this.sendCompleted(type, content);
