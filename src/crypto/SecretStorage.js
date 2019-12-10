@@ -167,8 +167,6 @@ export default class SecretStorage extends EventEmitter {
         return keyInfo && keyInfo.getContent();
     }
 
-    // TODO: need a function to get all the secret keys
-
     /**
      * Store an encrypted secret on the server
      *

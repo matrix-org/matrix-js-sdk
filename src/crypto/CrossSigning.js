@@ -115,8 +115,8 @@ export class CrossSigningInfo extends EventEmitter {
      */
     isStoredInSecretStorage(secretStorage) {
         let stored = true;
-        for (const name of ["master", "self_signing", "user_signing"]) {
-            stored &= secretStorage.isStored(`m.cross_signing.${name}`, false);
+        for (const type of ["master", "self_signing", "user_signing"]) {
+            stored &= secretStorage.isStored(`m.cross_signing.${type}`, false);
         }
         return stored;
     }
@@ -126,13 +126,13 @@ export class CrossSigningInfo extends EventEmitter {
      * typically called in conjunction with the creation of new cross-signing
      * keys.
      *
+     * @param {object} keys The keys to store
      * @param {SecretStorage} secretStorage The secret store using account data
      */
-    async storeInSecretStorage(secretStorage) {
-        const getKey = this._callbacks.getCrossSigningKey;
-        for (const name of ["master", "self_signing", "user_signing"]) {
-            const encodedKey = encodeBase64(await getKey(name));
-            await secretStorage.store(`m.cross_signing.${name}`, encodedKey);
+    static async storeInSecretStorage(keys, secretStorage) {
+        for (const type of Object.keys(keys)) {
+            const encodedKey = encodeBase64(keys[type]);
+            await secretStorage.store(`m.cross_signing.${type}`, encodedKey);
         }
     }
 
@@ -140,54 +140,14 @@ export class CrossSigningInfo extends EventEmitter {
      * Get private keys from secret storage created by some other device. This
      * also passes the private keys to the app-specific callback.
      *
+     * @param {string} type The type of key to get.  One of "master",
+     * "self_signing", or "user_signing".
      * @param {SecretStorage} secretStorage The secret store using account data
+     * @return {Uint8Array} The private key
      */
-    async getFromSecretStorage(secretStorage) {
-        if (!this._callbacks.saveCrossSigningKeys) {
-            throw new Error("No saveCrossSigningKeys callback supplied");
-        }
-
-        // Retrieve private keys from secret storage
-        const privateKeys = {};
-        for (const name of ["master", "self_signing", "user_signing"]) {
-            const encodedKey = await secretStorage.get(`m.cross_signing.${name}`);
-            privateKeys[name] = decodeBase64(encodedKey);
-        }
-
-        // Regenerate public keys from private keys
-        // XXX: Do we want to _also_ download public keys from the homeserver to
-        // verify they agree...?
-        // See also https://github.com/vector-im/riot-web/issues/11558
-        const signings = {};
-        const publicKeys = {};
-        const keys = {};
-        try {
-            for (const name of ["master", "self_signing", "user_signing"]) {
-                signings[name] = new global.Olm.PkSigning();
-                publicKeys[name] = signings[name].init_with_seed(privateKeys[name]);
-                keys[name] = {
-                    user_id: this.userId,
-                    usage: [name],
-                    keys: {
-                        ['ed25519:' + publicKeys[name]]: publicKeys[name],
-                    },
-                };
-                if (name !== "master") {
-                    pkSign(
-                        keys[name], signings["master"],
-                        this.userId, publicKeys["master"],
-                    );
-                }
-            }
-        } finally {
-            for (const signing of Object.values(signings)) {
-                signing.free();
-            }
-        }
-
-        // Save public keys locally and private keys via app callback
-        Object.assign(this.keys, keys);
-        this._callbacks.saveCrossSigningKeys(privateKeys);
+    static async getFromSecretStorage(type, secretStorage) {
+        const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
+        return decodeBase64(encodedKey);
     }
 
     /**

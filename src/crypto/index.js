@@ -245,13 +245,20 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
 
     this._verificationTransactions = new Map();
 
-    this._crossSigningInfo = new CrossSigningInfo(
-        userId, this._baseApis._cryptoCallbacks,
-    );
+    const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+
+    this._crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks);
 
     this._secretStorage = new SecretStorage(
-        baseApis, this._baseApis._cryptoCallbacks, this._crossSigningInfo,
+        baseApis, cryptoCallbacks, this._crossSigningInfo,
     );
+
+    // Assuming no app-supplied callback, default to getting from SSSS.
+    if (!cryptoCallbacks.getCrossSigningKey) {
+        cryptoCallbacks.getCrossSigningKey = async (type) => {
+            return CrossSigningInfo.getFromSecretStorage(type, this._secretStorage);
+        };
+    }
 }
 utils.inherits(Crypto, EventEmitter);
 
@@ -377,55 +384,75 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // key with the cross-signing master key. The cross-signing master key is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
-    let crossSigningKeysReset = false;
-    if (
-        !this._crossSigningInfo.getId() ||
-        !await this._baseApis._cryptoCallbacks.getCrossSigningKey("master")
-    ) {
-        logger.log(
-            "Cross-signing public and/or private keys not found on device, " +
-            "checking secret storage for private keys",
-        );
-        if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
-            logger.log("Cross-signing private keys found in secret storage");
-            await this._getCrossSigningKeysFromSecretStorage();
-        } else {
+    let crossSigningPrivateKeys = {};
+
+    // If we happen to reset cross-signing keys here, then we want access to the
+    // cross-signing private keys, but only for the scope of this method, so we
+    // use temporary callbacks to weave the them through the various APIs.
+    const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
+
+    try {
+        if (
+            !this._crossSigningInfo.getId() ||
+            !this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)
+        ) {
             logger.log(
-                "Cross-signing private keys not found in secret storage, " +
-                "creating new keys",
+                "Cross-signing public and/or private keys not found, " +
+                "checking secret storage for private keys",
             );
-            await this.resetCrossSigningKeys(
-                CrossSigningLevel.MASTER,
-                { authUploadDeviceSigningKeys },
-            );
-            crossSigningKeysReset = true;
+            if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
+                logger.log("Cross-signing private keys found in secret storage");
+                await this.checkOwnCrossSigningTrust();
+            } else {
+                logger.log(
+                    "Cross-signing private keys not found in secret storage, " +
+                    "creating new keys",
+                );
+                this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
+                    keys => crossSigningPrivateKeys = keys;
+                this._baseApis._cryptoCallbacks.getCrossSigningKey =
+                    name => crossSigningPrivateKeys[name];
+                await this.resetCrossSigningKeys(
+                    CrossSigningLevel.MASTER,
+                    { authUploadDeviceSigningKeys },
+                );
+            }
         }
-    }
 
-    // Check if Secure Secret Storage has a default key. If we don't have one, create the
-    // default key (which will also be signed by the cross-signing master key).
-    if (!this.hasSecretStorageKey()) {
-        logger.log("Secret storage default key not found, creating new key");
-        const keyOptions = await createSecretStorageKey();
-        const newKeyId = await this.addSecretStorageKey(
-            SECRET_STORAGE_ALGORITHM_V1,
-            keyOptions,
-        );
-        await this.setDefaultSecretStorageKeyId(newKeyId);
-    }
+        // Check if Secure Secret Storage has a default key. If we don't have one, create
+        // the default key (which will also be signed by the cross-signing master key).
+        if (!this.hasSecretStorageKey()) {
+            logger.log("Secret storage default key not found, creating new key");
+            const keyOptions = await createSecretStorageKey();
+            const newKeyId = await this.addSecretStorageKey(
+                SECRET_STORAGE_ALGORITHM_V1,
+                keyOptions,
+            );
+            await this.setDefaultSecretStorageKeyId(newKeyId);
+        }
 
-    // If cross-signing keys were reset, store them in Secure Secret Storage.
-    // This is done in a separate step so we can ensure secret storage has its
-    // own key first.
-    // XXX: We need to think about how to re-do these steps if they fail.
-    if (crossSigningKeysReset) {
-        logger.log("Storing cross-signing private keys in secret storage");
-        // SSSS expects its keys to be signed by cross-signing master key.
-        // Since we have just reset cross-signing keys, we need to re-sign the
-        // SSSS default key with the new cross-signing master key so that the
-        // following storage step can proceed.
-        await this._secretStorage.signKey();
-        await this._crossSigningInfo.storeInSecretStorage(this._secretStorage);
+        // If cross-signing keys were reset, store them in Secure Secret Storage.
+        // This is done in a separate step so we can ensure secret storage has its
+        // own key first.
+        // XXX: We need to think about how to re-do these steps if they fail.
+        // See also https://github.com/vector-im/riot-web/issues/11635
+        if (crossSigningPrivateKeys) {
+            logger.log("Storing cross-signing private keys in secret storage");
+            // SSSS expects its keys to be signed by cross-signing master key.
+            // Since we have just reset cross-signing keys, we need to re-sign the
+            // SSSS default key with the new cross-signing master key so that the
+            // following storage step can proceed.
+            await this._secretStorage.signKey();
+            // Assuming no app-supplied callback, default to storing in SSSS.
+            if (!appCallbacks.saveCrossSigningKeys) {
+                await CrossSigningInfo.storeInSecretStorage(
+                    crossSigningPrivateKeys,
+                    this._secretStorage,
+                );
+            }
+        }
+    } finally {
+        this._baseApis._cryptoCallbacks = appCallbacks;
     }
 
     logger.log("Secure Secret Storage ready");
@@ -557,41 +584,6 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
     this._baseApis.emit("crossSigning.keysChanged", {});
     await this._afterCrossSigningLocalKeyChange();
     logger.info("Cross-signing key reset complete");
-};
-
-/**
- * If cross-signing keys are known to exist in secret storage, this will get
- * them and store them on this device as trusted.
- */
-Crypto.prototype._getCrossSigningKeysFromSecretStorage = async function() {
-    logger.info("Getting cross-signing keys from secret storage");
-    // Copy old keys (usually empty) in case we need to revert
-    const oldKeys = Object.assign({}, this._crossSigningInfo.keys);
-    try {
-        await this._crossSigningInfo.getFromSecretStorage(this._secretStorage);
-        // XXX: Do we also need to sign the cross-signing master key with the
-        // device key as in `resetCrossSigningKeys`?
-
-        // write a copy locally so we know these are trusted keys
-        await this._cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
-            (txn) => {
-                this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
-            },
-        );
-    } catch (e) {
-        // If anything failed here, revert the keys so we know to try again from the start
-        // next time.
-        logger.error(
-            "Getting cross-signing keys from secret storage failed, " +
-            "revert to previous keys", e,
-        );
-        this._crossSigningInfo.keys = oldKeys;
-        throw e;
-    }
-    this._baseApis.emit("crossSigning.keysChanged", {});
-    await this._afterCrossSigningLocalKeyChange();
-    logger.info("Cross-signing keys restored from secret storage");
 };
 
 /**
@@ -817,10 +809,10 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
 
     const seenPubkey = newCrossSigning.getId();
-    const changed = this._crossSigningInfo.getId() !== seenPubkey;
-    if (changed) {
+    const masterChanged = this._crossSigningInfo.getId() !== seenPubkey;
+    if (masterChanged) {
         // try to get the private key if the master key changed
-        logger.info("Got new master key", seenPubkey);
+        logger.info("Got new master public key", seenPubkey);
 
         let signing = null;
         try {
@@ -828,6 +820,9 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                 'master', seenPubkey,
             );
             signing = ret[1];
+            if (!signing) {
+                throw new Error("Cross-signing master private key not available");
+            }
         } finally {
             signing.free();
         }
@@ -862,7 +857,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
         logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
     }
 
-    if (changed) {
+    if (masterChanged) {
         await this._signObject(this._crossSigningInfo.keys.master);
         keySignatures[this._crossSigningInfo.getId()]
             = this._crossSigningInfo.keys.master;
@@ -873,6 +868,11 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     }
 
     this.emit("userTrustStatusChanged", userId, this.checkUserTrust(userId));
+
+    if (masterChanged) {
+        this._baseApis.emit("crossSigning.keysChanged", {});
+        await this._afterCrossSigningLocalKeyChange();
+    }
 
     // Now we may be able to trust our key backup
     await this.checkKeyBackup();

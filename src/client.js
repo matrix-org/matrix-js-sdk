@@ -181,7 +181,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *     The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {function} [opts.cryptoCallbacks.getCrossSigningKey]
- * Optional (required for cross-signing). Function to call when a cross-signing private key is needed.
+ * Optional. Function to call when a cross-signing private key is needed.
+ * Secure Secret Storage will be used by default if this is unset.
  * Args:
  *    {string} type The type of key needed.  Will be one of "master",
  *      "self_signing", or "user_signing"
@@ -193,8 +194,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *   UInt8Array or rejects with an error.
  *
  * @param {function} [opts.cryptoCallbacks.saveCrossSigningKeys]
- * Optional (required for cross-signing). Called when new private keys
- * for cross-signing need to be saved.
+ * Optional. Called when new private keys for cross-signing need to be saved.
+ * Secure Secret Storage will be used by default if this is unset.
  * Args:
  *   {object} keys the private keys to save. Map of key name to private key
  *       as a UInt8Array. The getPrivateKey callback above will be called
@@ -298,7 +299,7 @@ function MatrixClient(opts) {
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
     this._verificationMethods = opts.verificationMethods;
-    this._cryptoCallbacks = opts.cryptoCallbacks;
+    this._cryptoCallbacks = opts.cryptoCallbacks || {};
 
     this._forceTURN = opts.forceTURN || false;
     this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;

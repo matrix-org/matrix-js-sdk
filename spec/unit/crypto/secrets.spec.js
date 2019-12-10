@@ -246,17 +246,10 @@ describe("Secrets", function() {
     });
 
     it("bootstraps when no storage or cross-signing keys locally", async function() {
-        let keys = {};
         const bob = await makeTestClient(
             {
                 userId: "@bob:example.com",
                 deviceId: "bob1",
-            },
-            {
-                cryptoCallbacks: {
-                    getCrossSigningKey: t => keys[t],
-                    saveCrossSigningKeys: k => keys = k,
-                },
             },
         );
         bob.uploadDeviceSigningKeys = async () => {};
@@ -287,7 +280,6 @@ describe("Secrets", function() {
         const storagePublicKey = decryption.generate_key();
         const storagePrivateKey = decryption.get_private_key();
 
-        let crossSigningKeys = {};
         const bob = await makeTestClient(
             {
                 userId: "@bob:example.com",
@@ -295,8 +287,6 @@ describe("Secrets", function() {
             },
             {
                 cryptoCallbacks: {
-                    getCrossSigningKey: t => crossSigningKeys[t],
-                    saveCrossSigningKeys: k => crossSigningKeys = k,
                     getSecretStorageKey: request => {
                         const defaultKeyId = bob.getDefaultSecretStorageKeyId();
                         expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
@@ -318,6 +308,7 @@ describe("Secrets", function() {
             ]);
             this.emit("accountData", event);
         };
+        bob._crypto.checkKeyBackup = async () => {};
 
         const crossSigning = bob._crypto._crossSigningInfo;
         const secretStorage = bob._crypto._secretStorage;
@@ -328,6 +319,10 @@ describe("Secrets", function() {
         });
 
         // Clear local cross-signing keys and read from secret storage
+        bob._crypto._deviceList.storeCrossSigningForUser(
+            "@bob:example.com",
+            crossSigning.toStorage(),
+        );
         crossSigning.keys = {};
         await bob.bootstrapSecretStorage();
 
