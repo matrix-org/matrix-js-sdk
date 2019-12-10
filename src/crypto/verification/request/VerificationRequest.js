@@ -41,11 +41,11 @@ export const REQUEST_TYPE = EVENT_PREFIX + "request";
 export const START_TYPE = EVENT_PREFIX + "start";
 export const CANCEL_TYPE = EVENT_PREFIX + "cancel";
 export const DONE_TYPE = EVENT_PREFIX + "done";
-// export const READY_TYPE = EVENT_PREFIX + "ready";
+export const READY_TYPE = EVENT_PREFIX + "ready";
 
 export const PHASE_UNSENT = 1;
 export const PHASE_REQUESTED = 2;
-// const PHASE_READY = 3;
+export const PHASE_READY = 3;
 export const PHASE_STARTED = 4;
 export const PHASE_CANCELLED = 5;
 export const PHASE_DONE = 6;
@@ -87,12 +87,13 @@ export default class VerificationRequest extends EventEmitter {
             return false;
         }
 
-        if (type === REQUEST_TYPE) {
+        if (type === REQUEST_TYPE || type === READY_TYPE) {
             if (!Array.isArray(content.methods)) {
                 return false;
             }
         }
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
@@ -114,7 +115,7 @@ export default class VerificationRequest extends EventEmitter {
         return true;
     }
 
-    /** once the phase is PHASE_STARTED, common methods supported by both sides */
+    /** once the phase is PHASE_STARTED (and !initiatedByMe) or PHASE_READY: common methods supported by both sides */
     get methods() {
         return this._commonMethods;
     }
@@ -230,7 +231,23 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    /** @returns {Promise} with the verifier once it becomes available. Can be used after calling `sendRequest`. */
+    /**
+     * Accepts the request, sending a .ready event to the other party
+     * @returns {Promise} resolves when the event has been sent.
+     */
+    async accept() {
+        if (this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
+            const methods = [...this._verificationMethods.keys()];
+            this._setPhase(PHASE_READY, false);
+            await this.channel.send(READY_TYPE, {methods});
+            this.emit("change");
+        }
+    }
+
+    /**
+     * @returns {Promise} with the verifier once it becomes available.
+     * Can be used after calling `accept` to wait for the other party to start verification.
+     */
     waitForVerifier() {
         if (this.verifier) {
             return Promise.resolve(this.verifier);
@@ -270,6 +287,8 @@ export default class VerificationRequest extends EventEmitter {
         }
         if (type === REQUEST_TYPE) {
             await this._handleRequest(content, event);
+        } else if (type === READY_TYPE) {
+            await this._handleReady(content);
         } else if (type === START_TYPE) {
             await this._handleStart(content, event);
         }
@@ -291,8 +310,7 @@ export default class VerificationRequest extends EventEmitter {
     async _handleRequest(content, event) {
         if (this._phase === PHASE_UNSENT) {
             const otherMethods = content.methods;
-            this._commonMethods = otherMethods.
-                filter(m => this._verificationMethods.has(m));
+            this._commonMethods = this._filterMethods(otherMethods);
             this._requestEvent = event;
             this._initiatedByMe = this._wasSentByMe(event);
             this._setPhase(PHASE_REQUESTED);
@@ -303,8 +321,20 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    async _handleReady(content) {
+        if (this._phase === PHASE_REQUESTED) {
+            const otherMethods = content.methods;
+            this._commonMethods = this._filterMethods(otherMethods);
+            this._setPhase(PHASE_READY);
+        } else {
+            logger.warn("Ignoring flagged verification ready event from " +
+                event.getSender());
+            await this.cancel(errorFromEvent(newUnexpectedMessageError()));
+        }
+    }
+
     _hasValidPreStartPhase() {
-        return this._phase === PHASE_REQUESTED ||
+        return this._phase === PHASE_REQUESTED || this._phase === PHASE_READY ||
             (
                 this.channel.constructor.canCreateRequest(START_TYPE) &&
                 this._phase === PHASE_UNSENT
@@ -398,6 +428,10 @@ export default class VerificationRequest extends EventEmitter {
             const deviceId = content && content.from_device;
             return {userId, deviceId};
         }
+    }
+
+    _filterMethods(methodNames) {
+        return methodNames.filter(m => this._verificationMethods.has(m));
     }
 
     // only for .request and .start

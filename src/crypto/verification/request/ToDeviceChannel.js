@@ -19,7 +19,9 @@ import { randomString } from '../../../randomstring';
 import logger from '../../../logger';
 import VerificationRequest, {
     PHASE_STARTED,
+    PHASE_READY,
     REQUEST_TYPE,
+    READY_TYPE,
     START_TYPE,
     CANCEL_TYPE,
 } from "./VerificationRequest";
@@ -145,14 +147,18 @@ export default class ToDeviceChannel {
                 return this._sendToDevices(CANCEL_TYPE, cancelContent, [deviceId]);
             }
         }
+        const wasStarted = request.phase === PHASE_STARTED ||
+                           request.phase === PHASE_READY;
 
-        const wasStarted = request.phase === PHASE_STARTED;
         await request.handleEvent(
             event.getType(), event, ToDeviceChannel.getTimestamp(event));
-        const isStarted = request.phase === PHASE_STARTED;
 
-        // the request has picked a start event, tell the other devices about it
-        if (type === START_TYPE && !wasStarted && isStarted && this._deviceId) {
+        const isStarted = request.phase === PHASE_STARTED ||
+                          request.phase === PHASE_READY;
+
+        const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
+        // the request has picked a ready or start event, tell the other devices about it
+        if (isAcceptingEvent && !wasStarted && isStarted && this._deviceId) {
             const nonChosenDevices = this._devices.filter(d => d !== this._deviceId);
             if (nonChosenDevices.length) {
                 const message = this.completeContent({
@@ -188,7 +194,7 @@ export default class ToDeviceChannel {
         if (this.transactionId) {
             content.transaction_id = this.transactionId;
         }
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
         if (type === REQUEST_TYPE) {

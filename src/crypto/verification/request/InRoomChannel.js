@@ -15,7 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import VerificationRequest, {REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
+import VerificationRequest, {
+    REQUEST_TYPE,
+    READY_TYPE,
+    START_TYPE,
+} from "./VerificationRequest";
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
 const M_RELATES_TO = "m.relates_to";
@@ -179,7 +183,7 @@ export default class InRoomChannel {
      */
     completeContent(type, content) {
         content = Object.assign({}, content);
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
         if (type === REQUEST_TYPE) {
