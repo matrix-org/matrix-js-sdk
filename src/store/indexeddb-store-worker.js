@@ -15,7 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import Promise from 'bluebird';
 import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import logger from '../logger';
 
@@ -123,7 +122,7 @@ class IndexedDBStoreWorker {
             return;
         }
 
-        prom.done((ret) => {
+        prom.then((ret) => {
             this.postMessage.call(null, {
                 command: 'cmd_success',
                 seq: msg.seq,

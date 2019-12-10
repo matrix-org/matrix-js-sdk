@@ -23,7 +23,6 @@ limitations under the License.
  */
 
 const anotherjson = require('another-json');
-import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import ReEmitter from '../ReEmitter';
 
@@ -1088,7 +1087,7 @@ function _maybeUploadOneTimeKeys(crypto) {
         // it will be set again on the next /sync-response
         crypto._oneTimeKeyCount = undefined;
         crypto._oneTimeKeyCheckInProgress = false;
-    }).done();
+    });
 }
 
 // returns a promise which resolves to the response
@@ -1998,7 +1997,7 @@ Crypto.prototype.requestRoomKey = function(requestBody, recipients, resend=false
         logger.error(
             'Error requesting key for event', e,
         );
-    }).done();
+    });
 };
 
 /**
@@ -2011,7 +2010,7 @@ Crypto.prototype.cancelRoomKeyRequest = function(requestBody) {
     this._outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)
     .catch((e) => {
         logger.warn("Error clearing pending room key requests", e);
-    }).done();
+    });
 };
 
 /**

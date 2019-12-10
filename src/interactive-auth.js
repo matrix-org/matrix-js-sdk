@@ -18,7 +18,6 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");

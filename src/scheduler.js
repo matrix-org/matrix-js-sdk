@@ -20,7 +20,6 @@ limitations under the License.
  * @module scheduler
  */
 const utils = require("./utils");
-import Promise from 'bluebird';
 import logger from './logger';
 
 const DEBUG = false;  // set true to enable console logging.
@@ -121,7 +120,7 @@ MatrixScheduler.prototype.queueEvent = function(event) {
     if (!this._queues[queueName]) {
         this._queues[queueName] = [];
     }
-    const defer = Promise.defer();
+    const defer = utils.defer();
     this._queues[queueName].push({
         event: event,
         defer: defer,

@@ -1,6 +1,4 @@
 "use strict";
-import Promise from 'bluebird';
-
 // load olm before the sdk if possible
 import './olm-loader';
 
@@ -256,7 +254,7 @@ HttpResponse.prototype.request = function HttpResponse(
     if (!next) { // no more things to return
         if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
             logger.log("MatrixClient[UT] Ignoring.");
-            return Promise.defer().promise;
+            return new Promise(() => {});
         }
         if (this.pendingLookup) {
             if (this.pendingLookup.method === method
@@ -271,7 +269,7 @@ HttpResponse.prototype.request = function HttpResponse(
             );
         }
         this.pendingLookup = {
-            promise: Promise.defer().promise,
+            promise: new Promise(() => {}),
             method: method,
             path: path,
         };
@@ -308,10 +306,10 @@ HttpResponse.prototype.request = function HttpResponse(
     } else if (method === "GET" && path === "/sync" && this.ignoreUnhandledSync) {
         logger.log("MatrixClient[UT] Ignoring.");
         this.httpLookups.unshift(next);
-        return Promise.defer().promise;
+        return new Promise(() => {});
     }
     expect(true).toBe(false, "Expected different request. " + logLine);
-    return Promise.defer().promise;
+    return new Promise(() => {});
 };
 
 HttpResponse.KEEP_ALIVE_PATH = "/_matrix/client/versions";

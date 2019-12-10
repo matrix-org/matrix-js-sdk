@@ -17,7 +17,6 @@ limitations under the License.
 
 /* eslint-disable babel/no-invalid-this */
 
-import Promise from 'bluebird';
 import {MemoryStore} from "./memory";
 import utils from "../utils";
 import {EventEmitter} from 'events';

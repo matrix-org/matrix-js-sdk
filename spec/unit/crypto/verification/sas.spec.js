@@ -473,6 +473,12 @@ describe("SAS verification", function() {
                 }
             });
         });
+        afterEach(async function() {
+            await Promise.all([
+                alice.stop(),
+                bob.stop(),
+            ]);
+        });
 
         it("should verify a key", async function() {
             await Promise.all([
