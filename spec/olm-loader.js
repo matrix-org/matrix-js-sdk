@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../lib/logger';
+import logger from '../src/logger';
 
 // try to load the olm library.
 try {

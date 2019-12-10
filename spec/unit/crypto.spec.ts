@@ -1,26 +1,36 @@
-import 'source-map-support/register';
+/*
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import "../test-init";
 import '../olm-loader';
+import TestClient from "../TestClient";
+import MockStorageApi from "../MockStorageApi";
+import Crypto from "../../src/crypto";
+// @ts-ignore // TODO#TS: olmlib needs conversion to TS
+import {MEGOLM_ALGORITHM} from "../../src/crypto/olmlib";
+import {sleep} from "../../src/utils";
+// @ts-ignore // TODO#TS: Room+WebStorageSessionStore needs conversion to TS
+import { CRYPTO_ENABLED, MemoryCryptoStore, MatrixEvent, Room, WebStorageSessionStore } from "../../src";
+import {EventEmitter} from "events";
 
-import Crypto from '../../lib/crypto';
-
-import WebStorageSessionStore from '../../lib/store/session/webstorage';
-import MemoryCryptoStore from '../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../MockStorageApi';
-import TestClient from '../TestClient';
-import {MatrixEvent} from '../../lib/models/event';
-import Room from '../../lib/models/room';
-import olmlib from '../../lib/crypto/olmlib';
-import {sleep} from "../../lib/utils";
-
-const EventEmitter = require("events").EventEmitter;
-
-const sdk = require("../..");
-
+// @ts-ignore // TODO#TS: Define the browser typings
 const Olm = global.Olm;
 
 describe("Crypto", function() {
-    if (!sdk.CRYPTO_ENABLED) {
+    if (!CRYPTO_ENABLED) {
         return;
     }
 
@@ -31,7 +41,6 @@ describe("Crypto", function() {
     it("Crypto exposes the correct olm library version", function() {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
-
 
     describe('Session management', function() {
         const otkResponse = {
@@ -59,7 +68,7 @@ describe("Crypto", function() {
         beforeEach(async function() {
             const mockStorage = new MockStorageApi();
             const sessionStore = new WebStorageSessionStore(mockStorage);
-            const cryptoStore = new MemoryCryptoStore(mockStorage);
+            const cryptoStore = new MemoryCryptoStore();
 
             cryptoStore.storeEndToEndDeviceData({
                 devices: {
@@ -91,6 +100,7 @@ describe("Crypto", function() {
                 sessionStore,
                 cryptoStore,
                 mockRoomList,
+                undefined,
             );
             crypto.registerEventHandlers(fakeEmitter);
             await crypto.init();
@@ -131,10 +141,10 @@ describe("Crypto", function() {
 
         beforeEach(async function() {
             aliceClient = (new TestClient(
-                "@alice:example.com", "alicedevice",
+                "@alice:example.com", "alicedevice", undefined, undefined, undefined,
             )).client;
             bobClient = (new TestClient(
-                "@bob:example.com", "bobdevice",
+                "@bob:example.com", "bobdevice", undefined, undefined, undefined,
             )).client;
             await aliceClient.initCrypto();
             await bobClient.initCrypto();
@@ -167,7 +177,7 @@ describe("Crypto", function() {
                         type: "m.forwarded_room_key",
                         sender: "@alice:example.com",
                         content: {
-                            algorithm: olmlib.MEGOLM_ALGORITHM,
+                            algorithm: MEGOLM_ALGORITHM,
                             room_id: roomId,
                             sender_key: eventContent.sender_key,
                             sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
@@ -231,10 +241,10 @@ describe("Crypto", function() {
                 }));
 
                 const bobDecryptor = bobClient._crypto._getRoomDecryptor(
-                    roomId, olmlib.MEGOLM_ALGORITHM,
+                    roomId, MEGOLM_ALGORITHM,
                 );
 
-                let eventPromise = Promise.all(events.map((ev) => {
+                let eventPromise: Promise<any> = Promise.all(events.map((ev) => {
                     return awaitEvent(ev, "Event.decrypted");
                 }));
 
@@ -252,7 +262,7 @@ describe("Crypto", function() {
                 const senderKey = eventContent.sender_key;
                 const sessionId = eventContent.session_id;
                 const roomKeyRequestBody = {
-                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    algorithm: MEGOLM_ALGORITHM,
                     room_id: roomId,
                     sender_key: senderKey,
                     session_id: sessionId,
@@ -283,7 +293,7 @@ describe("Crypto", function() {
                 sender: "@bob:example.com",
                 room_id: "!someroom",
                 content: {
-                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    algorithm: MEGOLM_ALGORITHM,
                     session_id: "sessionid",
                     sender_key: "senderkey",
                 },
@@ -291,7 +301,7 @@ describe("Crypto", function() {
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
             const cryptoStore = aliceClient._cryptoStore;
             const roomKeyRequestBody = {
-                algorithm: olmlib.MEGOLM_ALGORITHM,
+                algorithm: MEGOLM_ALGORITHM,
                 room_id: "!someroom",
                 session_id: "sessionid",
                 sender_key: "senderkey",
@@ -307,7 +317,7 @@ describe("Crypto", function() {
                 sender: "@bob:example.com",
                 room_id: "!someroom",
                 content: {
-                    algorithm: olmlib.MEGOLM_ALGORITHM,
+                    algorithm: MEGOLM_ALGORITHM,
                     session_id: "sessionid",
                     sender_key: "senderkey",
                 },

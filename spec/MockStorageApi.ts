@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,30 +17,37 @@ limitations under the License.
 
 /**
  * A mock implementation of the webstorage api
- * @constructor
  */
-function MockStorageApi() {
-    this.data = {};
-    this.keys = [];
-    this.length = 0;
-}
+export default class MockStorageApi {
+    public data = {};
+    public keys = [];
 
-MockStorageApi.prototype = {
-    setItem: function(k, v) {
+    constructor() {
+    }
+
+    get length(): number {
+        return this.keys.length;
+    }
+
+    public setItem(k, v) {
         this.data[k] = v;
-        this._recalc();
-    },
-    getItem: function(k) {
+        this.recalc();
+    }
+
+    public getItem(k) {
         return this.data[k] || null;
-    },
-    removeItem: function(k) {
+    }
+
+    public removeItem(k) {
         delete this.data[k];
-        this._recalc();
-    },
-    key: function(index) {
+        this.recalc();
+    }
+
+    public key(index: number) {
         return this.keys[index];
-    },
-    _recalc: function() {
+    }
+
+    private recalc() {
         const keys = [];
         for (const k in this.data) {
             if (!this.data.hasOwnProperty(k)) {
@@ -48,9 +56,5 @@ MockStorageApi.prototype = {
             keys.push(k);
         }
         this.keys = keys;
-        this.length = keys.length;
-    },
-};
-
-/** */
-module.exports = MockStorageApi;
+    }
+}

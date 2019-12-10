@@ -36,7 +36,7 @@ const DEBUG = false;  // set true to enable console logging.
  * algorithm to apply when determining which events should be sent before the
  * given event. Defaults to {@link module:scheduler~MatrixScheduler.QUEUE_MESSAGES}.
  */
-function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
+export function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
     this.retryAlgorithm = retryAlgorithm || MatrixScheduler.RETRY_BACKOFF_RATELIMIT;
     this.queueAlgorithm = queueAlgorithm || MatrixScheduler.QUEUE_MESSAGES;
     this._queues = {
@@ -318,7 +318,5 @@ function debuglog() {
  * @return {Promise} Resolved/rejected depending on the outcome of the request.
  */
 
-/**
- * The MatrixScheduler class.
- */
-module.exports = MatrixScheduler;
+// For older require() statements
+export default MatrixScheduler;

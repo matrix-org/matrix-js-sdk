@@ -21,11 +21,11 @@ limitations under the License.
 // load olm before the sdk if possible
 import './olm-loader';
 
-import sdk from '..';
+import {WebStorageSessionStore, createClient} from '../src';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
-import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
-import logger from '../lib/logger';
+import LocalStorageCryptoStore from '../src/crypto/store/localStorage-crypto-store';
+import logger from '../src/logger';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -48,7 +48,7 @@ export default function TestClient(
     if (sessionStoreBackend === undefined) {
         sessionStoreBackend = new testUtils.MockStorageApi();
     }
-    const sessionStore = new sdk.WebStorageSessionStore(sessionStoreBackend);
+    const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
 
     this.httpBackend = new MockHttpBackend();
 
@@ -65,7 +65,7 @@ export default function TestClient(
         this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
         options.cryptoStore = this.cryptoStore;
     }
-    this.client = sdk.createClient(options);
+    this.client = createClient(options);
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};

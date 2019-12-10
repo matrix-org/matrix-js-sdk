@@ -2,8 +2,8 @@
 // load olm before the sdk if possible
 import './olm-loader';
 
-import logger from '../lib/logger';
-import sdk from '..';
+import logger from '../src/logger';
+import sdk from '../src';
 const MatrixEvent = sdk.MatrixEvent;
 
 /**

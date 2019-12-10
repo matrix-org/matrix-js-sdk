@@ -120,7 +120,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-function Room(roomId, client, myUserId, opts) {
+export function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -1911,10 +1911,8 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
     }
 }
 
-/**
- * The Room class.
- */
-module.exports = Room;
+// For older require() statements
+export default Room;
 
 /**
  * Fires when an event we had previously received is redacted.
