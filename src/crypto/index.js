@@ -1541,13 +1541,19 @@ Crypto.prototype.requestVerification = function(userId, methods, devices) {
 Crypto.prototype._requestVerificationWithChannel = async function(
     userId, methods, channel, requestsMap,
 ) {
-    if (!methods) {
-        // .keys() returns an iterator, so we need to explicitly turn it into an array
-        methods = [...this._verificationMethods.keys()];
+    let verificationMethods = this._verificationMethods;
+    if (methods) {
+        verificationMethods = methods.reduce((map, name) => {
+            const method = this._verificationMethods.get(name);
+            if (!method) {
+                throw new Error(`Verification method ${name} is not supported.`);
+            } else {
+                map.set(name, method);
+            }
+        }, new Map());
     }
-    // TODO: filter by given methods
     const request = new VerificationRequest(
-        channel, this._verificationMethods, userId, this._baseApis);
+        channel, verificationMethods, userId, this._baseApis);
     await request.sendRequest();
 
     let requestsByTxnId = requestsMap.get(userId);
