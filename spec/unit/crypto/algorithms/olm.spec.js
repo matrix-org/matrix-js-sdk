@@ -18,7 +18,7 @@ import '../../../olm-loader';
 
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
-import logger from '../../../../src/logger';
+import logger from '../../../../lib/logger';
 
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import olmlib from '../../../../lib/crypto/olmlib';

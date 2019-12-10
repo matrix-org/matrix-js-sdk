@@ -18,7 +18,7 @@ limitations under the License.
 import DeviceList from '../../../lib/crypto/DeviceList';
 import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
 import utils from '../../../lib/utils';
-import logger from '../../../src/logger';
+import logger from '../../../lib/logger';
 
 const signedDeviceList = {
     "failures": {},

@@ -17,7 +17,7 @@ limitations under the License.
 import sdk from '../..';
 const MatrixEvent = sdk.MatrixEvent;
 
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {

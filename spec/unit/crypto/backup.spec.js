@@ -25,7 +25,7 @@ import testUtils from '../../test-utils';
 
 import OlmDevice from '../../../lib/crypto/OlmDevice';
 import Crypto from '../../../lib/crypto';
-import logger from '../../../src/logger';
+import logger from '../../../lib/logger';
 import olmlib from '../../../lib/crypto/olmlib';
 
 const Olm = global.Olm;

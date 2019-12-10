@@ -21,7 +21,7 @@ const sdk = require("../..");
 const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
