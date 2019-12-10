@@ -1,10 +1,21 @@
 {
-    "presets": ["es2015", "es2016"],
-    "plugins": [
-        "transform-class-properties",
-
-        // This makes sure that the regenerator runtime is available to
-        // the transpiled code.
-        "transform-runtime",
+    "presets": [
+        ["@babel/preset-env", {
+            "targets": {
+                "browsers": [
+                    "last 2 versions"
+                ],
+                "node": 12
+            },
+            "modules": "commonjs"
+        }],
+        "@babel/preset-typescript"
     ],
+    "plugins": [
+        "@babel/plugin-proposal-numeric-separator",
+        "@babel/plugin-proposal-class-properties",
+        "@babel/plugin-proposal-object-rest-spread",
+        "@babel/plugin-syntax-dynamic-import",
+        "@babel/plugin-transform-runtime"
+    ]
 }

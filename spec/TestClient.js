@@ -25,7 +25,7 @@ import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
 import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
-import logger from '../src/logger';
+import logger from '../lib/logger';
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient

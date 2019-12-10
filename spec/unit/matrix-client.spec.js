@@ -3,7 +3,7 @@ import 'source-map-support/register';
 const sdk = require("../..");
 const MatrixClient = sdk.MatrixClient;
 
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 jest.useFakeTimers();
 
