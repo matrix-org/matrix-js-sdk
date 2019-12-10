@@ -115,6 +115,31 @@ export default class VerificationRequest extends EventEmitter {
         return true;
     }
 
+    /** returns whether the phase is PHASE_REQUESTED */
+    get requested() {
+        return this.phase === PHASE_REQUESTED;
+    }
+
+    /** returns whether the phase is PHASE_CANCELLED */
+    get cancelled() {
+        return this.phase === PHASE_CANCELLED;
+    }
+
+    /** returns whether the phase is PHASE_READY */
+    get ready() {
+        return this.phase === PHASE_READY;
+    }
+
+    /** returns whether the phase is PHASE_STARTED */
+    get started() {
+        return this.phase === PHASE_STARTED;
+    }
+
+    /** returns whether the phase is PHASE_DONE */
+    get done() {
+        return this.phase === PHASE_DONE;
+    }
+
     /** once the phase is PHASE_STARTED (and !initiatedByMe) or PHASE_READY: common methods supported by both sides */
     get methods() {
         return this._commonMethods;
