@@ -121,7 +121,8 @@ export default class DeviceList extends EventEmitter {
             'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this._cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
                     this._devices = deviceData ? deviceData.devices : {},
-                    this._ssks = deviceData ? deviceData.self_signing_keys || {} : {};
+                    this._crossSigningInfo = deviceData ?
+                        deviceData.crossSigningInfo || {} : {};
                     this._deviceTrackingStatus = deviceData ?
                         deviceData.trackingStatus : {};
                     this._syncToken = deviceData ? deviceData.syncToken : null;
@@ -212,7 +213,7 @@ export default class DeviceList extends EventEmitter {
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
                             devices: this._devices,
-                            self_signing_keys: this._ssks,
+                            crossSigningInfo: this._crossSigningInfo,
                             trackingStatus: this._deviceTrackingStatus,
                             syncToken: this._syncToken,
                         }, txn);
