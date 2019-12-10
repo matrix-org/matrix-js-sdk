@@ -17,7 +17,6 @@ limitations under the License.
 
 /** @module timeline-window */
 
-import Promise from 'bluebird';
 const EventTimeline = require("./models/event-timeline");
 import logger from './logger';
 

@@ -26,7 +26,6 @@ import {sleep} from './utils';
  * @module client
  */
 const EventEmitter = require("events").EventEmitter;
-import Promise from 'bluebird';
 const url = require('url');
 
 const httpApi = require("./http-api");
@@ -54,11 +53,6 @@ import { isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
-
-// Disable warnings for now: we use deprecated bluebird functions
-// and need to migrate, but they spam the console with warnings.
-Promise.config({warnings: false});
-
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
@@ -1965,7 +1959,7 @@ MatrixClient.prototype.joinRoom = function(roomIdOrAlias, opts, callback) {
                 // return syncApi.syncRoom(room);
             }
             return Promise.resolve(room);
-        }).done(function(room) {
+        }).then(function(room) {
             _resolve(callback, resolve, room);
         }, function(err) {
             _reject(callback, reject, err);
@@ -3297,7 +3291,7 @@ MatrixClient.prototype.scrollback = function(room, limit, callback) {
                 room.oldState.paginationToken,
                 limit,
                 'b');
-        }).done(function(res) {
+        }).then(function(res) {
             const matrixEvents = utils.map(res.chunk, _PojoToMatrixEventMapper(self));
             if (res.state) {
                 const stateEvents = utils.map(res.state, _PojoToMatrixEventMapper(self));
@@ -3945,10 +3939,10 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
             // This is a workaround to SYN-590 (Push rule update fails)
             deferred = utils.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
-            .done(function() {
+            .then(function() {
                 self.addPushRule(scope, "room", roomId, {
                     actions: ["dont_notify"],
-                }).done(function() {
+                }).then(function() {
                     deferred.resolve();
                 }, function(err) {
                     deferred.reject(err);
@@ -3964,8 +3958,8 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     if (deferred) {
         return new Promise((resolve, reject) => {
             // Update this.pushRules when the operation completes
-            deferred.done(function() {
-                self.getPushRules().done(function(result) {
+            deferred.then(function() {
+                self.getPushRules().then(function(result) {
                     self.pushRules = result;
                     resolve();
                 }, function(err) {
@@ -3974,7 +3968,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
             }, function(err) {
                 // Update it even if the previous operation fails. This can help the
                 // app to recover when push settings has been modifed from another client
-                self.getPushRules().done(function(result) {
+                self.getPushRules().then(function(result) {
                     self.pushRules = result;
                     reject(err);
                 }, function(err2) {
@@ -4468,7 +4462,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     if (this._crypto) {
-        this._crypto.uploadDeviceKeys().done();
+        this._crypto.uploadDeviceKeys();
         this._crypto.start();
     }
 
@@ -4927,7 +4921,7 @@ function checkTurnServers(client) {
         return; // guests can't access TURN servers
     }
 
-    client.turnServer().done(function(res) {
+    client.turnServer().then(function(res) {
         if (res.uris) {
             logger.log("Got TURN URIs: " + res.uris + " refresh in " +
                 res.ttl + " secs");
@@ -5427,5 +5421,4 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
   * @property {Function} then promise.then(onFulfilled, onRejected, onProgress)
   * @property {Function} catch promise.catch(onRejected)
   * @property {Function} finally promise.finally(callback)
-  * @property {Function} done promise.done(onFulfilled, onRejected, onProgress)
   */

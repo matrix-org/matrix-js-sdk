@@ -17,7 +17,6 @@ limitations under the License.
 import sdk from '../..';
 const MatrixEvent = sdk.MatrixEvent;
 
-import Promise from 'bluebird';
 import logger from '../../src/logger';
 
 describe("MatrixEvent", () => {

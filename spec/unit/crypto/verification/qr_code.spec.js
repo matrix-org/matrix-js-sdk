@@ -39,7 +39,10 @@ describe("QR code verification", function() {
 
     describe("showing", function() {
         it("should emit an event to show a QR code", async function() {
-            const qrCode = new ShowQRCode({
+            const channel = {
+                send: jest.fn(),
+            };
+            const qrCode = new ShowQRCode(channel, {
                 getUserId: () => "@alice:example.com",
                 deviceId: "ABCDEFG",
                 getDeviceEd25519Key: function() {
@@ -79,7 +82,10 @@ describe("QR code verification", function() {
                 getStoredDevice: jest.fn().mockReturnValue(device),
                 setDeviceVerified: jest.fn(),
             };
-            const qrCode = new ScanQRCode(client);
+            const channel = {
+                send: jest.fn(),
+            };
+            const qrCode = new ScanQRCode(channel, client);
             qrCode.on("confirm_user_id", ({userId, confirm}) => {
                 if (userId === "@alice:example.com") {
                     confirm();
@@ -102,13 +108,17 @@ describe("QR code verification", function() {
                 getStoredDevice: jest.fn(),
                 setDeviceVerified: jest.fn(),
             };
-            const qrCode = new ScanQRCode(client, "@bob:example.com", "ABCDEFG");
+            const channel = {
+                send: jest.fn(),
+            };
+            const qrCode = new ScanQRCode(channel, client, "@bob:example.com", "ABCDEFG");
             qrCode.on("scan", ({done}) => {
                 done(QR_CODE_URL);
             });
             const spy = jest.fn();
             await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
+            expect(channel.send).toHaveBeenCalled();
             expect(client.getStoredDevice).not.toHaveBeenCalled();
             expect(client.setDeviceVerified).not.toHaveBeenCalled();
         });
@@ -131,13 +141,18 @@ describe("QR code verification", function() {
                 getStoredDevice: jest.fn().mockReturnValue(device),
                 setDeviceVerified: jest.fn(),
             };
-            const qrCode = new ScanQRCode(client, "@alice:example.com", "ABCDEFG");
+            const channel = {
+                send: jest.fn(),
+            };
+            const qrCode = new ScanQRCode(
+                channel, client, "@alice:example.com", "ABCDEFG");
             qrCode.on("scan", ({done}) => {
                 done(QR_CODE_URL);
             });
             const spy = jest.fn();
             await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
+            expect(channel.send).toHaveBeenCalled();
             expect(client.getStoredDevice).toHaveBeenCalled();
             expect(client.setDeviceVerified).not.toHaveBeenCalled();
         });

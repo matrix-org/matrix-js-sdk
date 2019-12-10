@@ -24,7 +24,6 @@ import './olm-loader';
 import sdk from '..';
 import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
-import Promise from 'bluebird';
 import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
 import logger from '../src/logger';
 

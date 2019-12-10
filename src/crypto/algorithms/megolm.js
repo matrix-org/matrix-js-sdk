@@ -22,7 +22,6 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import Promise from 'bluebird';
 import logger from '../../logger';
 
 const utils = require("../../utils");
@@ -508,7 +507,7 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
         userId,
         device,
         payload,
-    ),
+    );
 
     await this._baseApis.sendToDevice("m.room.encrypted", {
         [userId]: {
@@ -1036,7 +1035,7 @@ MegolmDecryption.prototype.shareKeysWithDevice = function(keyRequest) {
             // TODO: retries
             return this._baseApis.sendToDevice("m.room.encrypted", contentMap);
         });
-    }).done();
+    });
 };
 
 MegolmDecryption.prototype._buildKeyForwardingMessage = async function(

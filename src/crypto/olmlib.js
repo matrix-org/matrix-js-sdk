@@ -22,7 +22,6 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-import Promise from 'bluebird';
 const anotherjson = require('another-json');
 
 import logger from '../logger';
