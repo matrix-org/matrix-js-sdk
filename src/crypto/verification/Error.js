@@ -85,3 +85,13 @@ export const newUserMismatchError = errorFactory("m.user_error", "User mismatch"
 export const newInvalidMessageError = errorFactory(
     "m.invalid_message", "Invalid message",
 );
+
+export function errorFromEvent(event) {
+    const content = event.getContent();
+    if (content) {
+        const {code, reason} = content;
+        return {code, reason};
+    } else {
+        return {code: "Unknown error", reason: "m.unknown"};
+    }
+}

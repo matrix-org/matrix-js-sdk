@@ -60,7 +60,7 @@ export async function makeTestClients(userInfos, options) {
         });
         for (const tc of clients) {
             setTimeout(
-                () => tc.client.emit("event", event),
+                () => tc.client.emit("Room.timeline", event),
                 0,
             );
         }
