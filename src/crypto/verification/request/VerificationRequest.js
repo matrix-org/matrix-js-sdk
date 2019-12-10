@@ -296,7 +296,7 @@ export default class VerificationRequest extends EventEmitter {
             this._requestEvent = event;
             this._initiatedByMe = this._wasSentByMe(event);
             this._setPhase(PHASE_REQUESTED);
-        } else {
+        } else if (this._phase !== PHASE_REQUESTED) {
             logger.warn("Ignoring flagged verification request from " +
                 event.getSender());
             await this.cancel(errorFromEvent(newUnexpectedMessageError()));
