@@ -24,7 +24,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./index.js",
+  "main": "./lib/index.js",
   "typings": "./lib/index.d.ts",
   "browser": "browser-index.js",
   "author": "matrix.org",
