@@ -894,8 +894,8 @@ MatrixClient.prototype.acceptVerificationDM = function(event, method) {
  * @param {Array} devices array of device IDs to send requests to.  Defaults to
  *    all devices owned by the user
  *
- * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
- *    when the request is accepted by the other user
+ * @returns {Promise<module:crypto/verification/request/VerificationRequest>} resolves to a VerificationRequest
+ *    when the request has been sent to the other party.
  */
 MatrixClient.prototype.requestVerification = function(userId, methods, devices) {
     if (this._crypto === null) {

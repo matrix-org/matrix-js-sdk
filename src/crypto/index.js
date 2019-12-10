@@ -1515,48 +1515,27 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
-Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
+Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
-    const request = await this._requestVerificationWithChannel(
+    return this._requestVerificationWithChannel(
         userId,
         methods,
         channel,
         this._inRoomVerificationRequests,
     );
-    return await request.waitForVerifier();
 };
 
-Crypto.prototype.acceptVerificationDM = function(event, method) {
-    if(!InRoomChannel.validateEvent(event, this._baseApis)) {
-        return;
-    }
-
-    const sender = event.getSender();
-    const requestsByTxnId = this._inRoomVerificationRequests.get(sender);
-    if (!requestsByTxnId) {
-        return;
-    }
-    const transactionId = InRoomChannel.getTransactionId(event);
-    const request = requestsByTxnId.get(transactionId);
-    if (!request) {
-        return;
-    }
-
-    return request.beginKeyVerification(method);
-};
-
-Crypto.prototype.requestVerification = async function(userId, methods, devices) {
+Crypto.prototype.requestVerification = function(userId, methods, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
-    const request = await this._requestVerificationWithChannel(
+    return this._requestVerificationWithChannel(
         userId,
         methods,
         channel,
         this._toDeviceVerificationRequests,
     );
-    return await request.waitForVerifier();
 };
 
 Crypto.prototype._requestVerificationWithChannel = async function(
