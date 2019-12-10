@@ -6,7 +6,7 @@
   "scripts": {
     "test:watch": "jest spec/ --coverage --testEnvironment node --watch",
     "test": "jest spec/ --coverage --testEnvironment node",
-    "gendoc": "babel src --no-babelrc --plugins @babel/plugin-proposal-class-properties -d .jsdocbuild --verbose --extensions \".ts,.js\" && jsdoc -r .jsdocbuild -P package.json -R README.md -d .jsdoc",
+    "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "start": "yarn start:init && yarn start:watch",
     "start:watch": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
     "start:init": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
@@ -71,6 +71,7 @@
     "@babel/runtime": "^7.7.6",
     "babel-eslint": "^10.0.3",
     "babel-jest": "^24.9.0",
+    "better-docs": "^1.4.7",
     "browserify": "^16.2.3",
     "browserify-shim": "^3.8.13",
     "eslint": "^5.12.0",
