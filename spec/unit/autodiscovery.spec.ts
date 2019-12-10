@@ -1,5 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,14 +14,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
-import 'source-map-support/register';
-const sdk = require("../..");
-
-const AutoDiscovery = sdk.AutoDiscovery;
-
-import MockHttpBackend from "matrix-mock-request";
+import "../test-init";
+import {request, AutoDiscovery} from "../../src";
+import * as MockHttpBackend from "matrix-mock-request";
 
 
 describe("AutoDiscovery", function() {
@@ -28,12 +25,12 @@ describe("AutoDiscovery", function() {
 
     beforeEach(function() {
         httpBackend = new MockHttpBackend();
-        sdk.request(httpBackend.requestFn);
+        request(httpBackend.requestFn);
     });
 
     it("should throw an error when no domain is specified", function() {
         return Promise.all([
-            AutoDiscovery.findClientConfig(/* no args */).then(() => {
+            AutoDiscovery.findClientConfig(undefined).then(() => {
                 throw new Error("Expected a failure, not success with no args");
             }, () => {
                 return true;
@@ -51,7 +48,7 @@ describe("AutoDiscovery", function() {
                 return true;
             }),
 
-            AutoDiscovery.findClientConfig(true).then(() => {
+            AutoDiscovery.findClientConfig(<any>true).then(() => {
                 throw new Error("Expected a failure, not success with a non-string");
             }, () => {
                 return true;

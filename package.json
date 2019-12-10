@@ -14,8 +14,9 @@
     "lint:js": "eslint --max-warnings 93 src spec",
     "lint:types": "tsc --noEmit",
     "lint:ts": "tslint --project ./tsconfig.json -t stylish",
-    "test": "jest spec/ --coverage --testEnvironment node",
-    "test:watch": "jest spec/ --coverage --testEnvironment node --watch"
+    "test": "jest --config jest.config.js",
+    "test:watch": "jest --config jest.config.js --watch",
+    "tmp": "jest --config jest.config.js crypto"
   },
   "repository": {
     "type": "git",
@@ -63,6 +64,7 @@
     "@babel/preset-typescript": "^7.7.4",
     "@babel/register": "^7.7.4",
     "@babel/runtime": "^7.7.6",
+    "@types/jest": "^24.0.23",
     "@types/node": "12",
     "babel-eslint": "^10.0.3",
     "babel-jest": "^24.9.0",
@@ -79,6 +81,7 @@
     "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
     "rimraf": "^3.0.0",
     "source-map-support": "^0.5.13",
+    "ts-jest": "^24.2.0",
     "tslint": "^5.20.1",
     "typescript": "^3.7.3"
   }
