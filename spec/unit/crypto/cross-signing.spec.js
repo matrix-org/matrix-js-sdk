@@ -19,7 +19,7 @@ import '../../olm-loader';
 
 import anotherjson from 'another-json';
 
-import olmlib from '../../../lib/crypto/olmlib';
+import olmlib from '../../../src/crypto/olmlib';
 
 import TestClient from '../../TestClient';
 

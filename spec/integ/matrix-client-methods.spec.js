@@ -2,7 +2,7 @@
 import 'source-map-support/register';
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
-const publicGlobals = require("../../lib/matrix");
+const publicGlobals = require("../../src/matrix");
 const Room = publicGlobals.Room;
 const MemoryStore = publicGlobals.MemoryStore;
 const Filter = publicGlobals.Filter;

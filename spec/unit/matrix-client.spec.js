@@ -1,9 +1,9 @@
 "use strict";
 import 'source-map-support/register';
-const sdk = require("../..");
+import * as sdk from "../../src";
 const MatrixClient = sdk.MatrixClient;
 
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 jest.useFakeTimers();
 

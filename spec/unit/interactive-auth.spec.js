@@ -16,12 +16,12 @@ limitations under the License.
 "use strict";
 
 import 'source-map-support/register';
-const sdk = require("../..");
+import * as sdk from "../../src";
 
 const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)

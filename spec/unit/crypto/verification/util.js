@@ -16,7 +16,7 @@ limitations under the License.
 
 import TestClient from '../../../TestClient';
 
-import sdk from '../../../..';
+import * as sdk from "../../../../src";
 const MatrixEvent = sdk.MatrixEvent;
 
 export async function makeTestClients(userInfos, options) {

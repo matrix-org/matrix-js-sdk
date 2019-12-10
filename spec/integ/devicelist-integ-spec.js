@@ -17,7 +17,7 @@ limitations under the License.
 
 import TestClient from '../TestClient';
 import testUtils from '../test-utils';
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 const ROOM_ID = "!room:id";
 

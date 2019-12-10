@@ -15,10 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import DeviceList from '../../../lib/crypto/DeviceList';
-import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
-import utils from '../../../lib/utils';
-import logger from '../../../lib/logger';
+import DeviceList from '../../../src/crypto/DeviceList';
+import MemoryCryptoStore from '../../../src/crypto/store/memory-crypto-store.js';
+import utils from '../../../src/utils';
+import logger from '../../../src/logger';
 
 const signedDeviceList = {
     "failures": {},

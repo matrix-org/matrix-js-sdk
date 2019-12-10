@@ -1,9 +1,9 @@
 "use strict";
 import 'source-map-support/register';
-const sdk = require("../..");
+import * as sdk from "../../src";
 const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;
-const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
+const TimelineIndex = require("../../src/timeline-window").TimelineIndex;
 
 const utils = require("../test-utils");
 

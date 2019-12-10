@@ -1,13 +1,13 @@
 import '../../../olm-loader';
 
-import sdk from '../../../..';
-import algorithms from '../../../../lib/crypto/algorithms';
-import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
+import * as sdk from "../../../../src";
+import algorithms from '../../../../src/crypto/algorithms';
+import MemoryCryptoStore from '../../../../src/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
-import OlmDevice from '../../../../lib/crypto/OlmDevice';
-import Crypto from '../../../../lib/crypto';
-import logger from '../../../../lib/logger';
+import OlmDevice from '../../../../src/crypto/OlmDevice';
+import Crypto from '../../../../src/crypto';
+import logger from '../../../../src/logger';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];

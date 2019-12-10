@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const PushProcessor = require("../../lib/pushprocessor");
+const PushProcessor = require("../../src/pushprocessor");
 const utils = require("../test-utils");
 
 describe('NotificationService', function() {

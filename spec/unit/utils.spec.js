@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const utils = require("../../lib/utils");
+const utils = require("../../src/utils");
 
 describe("utils", function() {
     describe("encodeParams", function() {

@@ -18,10 +18,10 @@ limitations under the License.
 
 const anotherjson = require('another-json');
 
-const utils = require('../../lib/utils');
+const utils = require('../../src/utils');
 const testUtils = require('../test-utils');
-const TestClient = require('../TestClient').default;
-import logger from '../../lib/logger';
+import TestClient from "../TestClient";
+import logger from '../../src/logger';
 
 const ROOM_ID = "!room:id";
 

@@ -16,13 +16,13 @@ limitations under the License.
 
 import '../../../olm-loader';
 
-import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
+import MemoryCryptoStore from '../../../../src/crypto/store/memory-crypto-store.js';
 import MockStorageApi from '../../../MockStorageApi';
-import logger from '../../../../lib/logger';
+import logger from '../../../../src/logger';
 
-import OlmDevice from '../../../../lib/crypto/OlmDevice';
-import olmlib from '../../../../lib/crypto/olmlib';
-import DeviceInfo from '../../../../lib/crypto/deviceinfo';
+import OlmDevice from '../../../../src/crypto/OlmDevice';
+import olmlib from '../../../../src/crypto/olmlib';
+import DeviceInfo from '../../../../src/crypto/deviceinfo';
 
 function makeOlmDevice() {
     const mockStorage = new MockStorageApi();

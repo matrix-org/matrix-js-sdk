@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const sdk = require("../..");
+import * as sdk from "../../src";
 const User = sdk.User;
 const utils = require("../test-utils");
 

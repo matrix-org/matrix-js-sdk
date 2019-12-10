@@ -3,7 +3,7 @@
 
 import 'source-map-support/register';
 import {defer} from '../../src/utils';
-const sdk = require("../..");
+import * as sdk from "../../src";
 const MatrixScheduler = sdk.MatrixScheduler;
 const MatrixError = sdk.MatrixError;
 const utils = require("../test-utils");

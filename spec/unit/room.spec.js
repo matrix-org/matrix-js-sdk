@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const sdk = require("../..");
+import * as sdk from "../../src";
 const Room = sdk.Room;
 const RoomState = sdk.RoomState;
 const MatrixEvent = sdk.MatrixEvent;

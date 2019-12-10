@@ -31,10 +31,10 @@ import 'source-map-support/register';
 import '../olm-loader';
 
 const sdk = require("../..");
-const utils = require("../../lib/utils");
+const utils = require("../../src/utils");
 const testUtils = require("../test-utils");
 const TestClient = require('../TestClient').default;
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 let aliTestClient;
 const roomId = "!room:localhost";

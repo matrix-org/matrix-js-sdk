@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import logger from '../../../../lib/logger';
+import logger from '../../../../src/logger';
 
 try {
     global.Olm = require('olm');
@@ -21,9 +21,9 @@ try {
     logger.warn("unable to run device verification tests: libolm not available");
 }
 
-import {verificationMethods} from '../../../../lib/crypto';
+import {verificationMethods} from '../../../../src/crypto';
 
-import SAS from '../../../../lib/crypto/verification/SAS';
+import SAS from '../../../../src/crypto/verification/SAS';
 
 const Olm = global.Olm;
 

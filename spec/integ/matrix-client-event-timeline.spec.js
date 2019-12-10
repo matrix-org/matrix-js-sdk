@@ -4,7 +4,7 @@ const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const EventTimeline = sdk.EventTimeline;
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 const baseUrl = "http://localhost.or.something";
 const userId = "@alice:localhost";

@@ -16,7 +16,7 @@ limitations under the License.
 
 "use strict";
 import 'source-map-support/register';
-import sdk from "../..";
+import * as sdk from "../../src";
 
 const SyncAccumulator = sdk.SyncAccumulator;
 
