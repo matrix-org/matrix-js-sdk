@@ -21,7 +21,6 @@ limitations under the License.
  * @module models/event
  */
 
-import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
 import logger from '../logger';

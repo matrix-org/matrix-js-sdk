@@ -1,6 +1,4 @@
 "use strict";
-import Promise from 'bluebird';
-
 // load olm before the sdk if possible
 import './olm-loader';
 

@@ -3866,10 +3866,10 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
             // This is a workaround to SYN-590 (Push rule update fails)
             deferred = utils.defer();
             this.deletePushRule(scope, "room", roomPushRule.rule_id)
-            .done(function() {
+            .then(function() {
                 self.addPushRule(scope, "room", roomId, {
                     actions: ["dont_notify"],
-                }).done(function() {
+                }).then(function() {
                     deferred.resolve();
                 }, function(err) {
                     deferred.reject(err);
@@ -3885,8 +3885,8 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
     if (deferred) {
         return new Promise((resolve, reject) => {
             // Update this.pushRules when the operation completes
-            deferred.done(function() {
-                self.getPushRules().done(function(result) {
+            deferred.then(function() {
+                self.getPushRules().then(function(result) {
                     self.pushRules = result;
                     resolve();
                 }, function(err) {
@@ -3895,7 +3895,7 @@ MatrixClient.prototype.setRoomMutePushRule = function(scope, roomId, mute) {
             }, function(err) {
                 // Update it even if the previous operation fails. This can help the
                 // app to recover when push settings has been modifed from another client
-                self.getPushRules().done(function(result) {
+                self.getPushRules().then(function(result) {
                     self.pushRules = result;
                     reject(err);
                 }, function(err2) {
@@ -4389,7 +4389,7 @@ MatrixClient.prototype.startClient = async function(opts) {
     }
 
     if (this._crypto) {
-        this._crypto.uploadDeviceKeys().done();
+        this._crypto.uploadDeviceKeys();
         this._crypto.start();
     }
 
@@ -5348,5 +5348,4 @@ module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
   * @property {Function} then promise.then(onFulfilled, onRejected, onProgress)
   * @property {Function} catch promise.catch(onRejected)
   * @property {Function} finally promise.finally(callback)
-  * @property {Function} done promise.done(onFulfilled, onRejected, onProgress)
   */
