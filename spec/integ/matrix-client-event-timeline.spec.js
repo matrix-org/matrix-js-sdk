@@ -1,6 +1,5 @@
 "use strict";
 import 'source-map-support/register';
-import Promise from 'bluebird';
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 import utils from "../test-utils";
@@ -356,7 +355,7 @@ describe("MatrixClient event timelines", function() {
                             .toEqual("start_token");
                         // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                         //    .toEqual("s_5_4");
-                    }).done(resolve, reject);
+                    }).then(resolve, reject);
                 });
             });
 

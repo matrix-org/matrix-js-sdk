@@ -20,14 +20,11 @@ limitations under the License.
  *
  * @module crypto/algorithms/olm
  */
-import Promise from 'bluebird';
-
 import logger from '../../logger';
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const DeviceInfo = require("../deviceinfo");
 const DeviceVerification = DeviceInfo.DeviceVerification;
-
 
 const base = require("./base");
 

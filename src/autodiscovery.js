@@ -17,7 +17,6 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import Promise from 'bluebird';
 import logger from './logger';
 import { URL as NodeURL } from "url";
 

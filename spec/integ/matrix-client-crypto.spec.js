@@ -31,7 +31,6 @@ import 'source-map-support/register';
 import '../olm-loader';
 
 const sdk = require("../..");
-import Promise from 'bluebird';
 const utils = require("../../lib/utils");
 import testUtils from "../test-utils";
 const TestClient = require('../TestClient').default;

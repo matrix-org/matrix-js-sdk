@@ -4,8 +4,6 @@ const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 import utils from "../test-utils";
 
-import Promise from 'bluebird';
-
 describe("MatrixClient events", function() {
     const baseUrl = "http://localhost.or.something";
     let client;
@@ -162,7 +160,7 @@ describe("MatrixClient events", function() {
             });
             client.startClient();
 
-            httpBackend.flushAllExpected().done(function() {
+            httpBackend.flushAllExpected().then(function() {
                 expect(fired).toBe(true, "User.presence didn't fire.");
                 done();
             });

@@ -16,8 +16,6 @@ limitations under the License.
 
 import '../../olm-loader';
 
-import Promise from 'bluebird';
-
 import sdk from '../../..';
 import algorithms from '../../../lib/crypto/algorithms';
 import WebStorageSessionStore from '../../../lib/store/session/webstorage';
@@ -157,7 +155,7 @@ describe("MegolmBackup", function() {
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockReturnValue(Promise.resolve());
+            jest.fn().mockResolvedValue(undefined);
     });
 
     describe("backup", function() {

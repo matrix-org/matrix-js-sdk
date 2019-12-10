@@ -1,7 +1,5 @@
 import '../../../olm-loader';
 
-import Promise from 'bluebird';
-
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
@@ -56,7 +54,7 @@ describe("MegolmDecryption", function() {
         mockOlmLib = {};
         mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockReturnValue(Promise.resolve());
+            jest.fn().mockResolvedValue(undefined);
         megolmDecryption.olmlib = mockOlmLib;
     });
 
@@ -136,11 +134,11 @@ describe("MegolmDecryption", function() {
                 const deviceInfo = {};
                 mockCrypto.getStoredDevice.mockReturnValue(deviceInfo);
 
-                mockOlmLib.ensureOlmSessionsForDevices.mockReturnValue(
-                    Promise.resolve({'@alice:foo': {'alidevice': {
+                mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
+                    '@alice:foo': {'alidevice': {
                         sessionId: 'alisession',
-                    }}}),
-                );
+                    }},
+                });
 
                 const awaitEncryptForDevice = new Promise((res, rej) => {
                     mockOlmLib.encryptMessageForDevice.mockImplementation(() => {
@@ -282,7 +280,7 @@ describe("MegolmDecryption", function() {
                     },
                 },
             }));
-            mockBaseApis.sendToDevice = jest.fn().mockReturnValue(Promise.resolve());
+            mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
 
             mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
                 '@alice:home.server': {

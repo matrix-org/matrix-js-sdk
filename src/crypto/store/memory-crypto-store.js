@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import Promise from 'bluebird';
-
 import logger from '../../logger';
 import utils from '../../utils';
 
@@ -69,7 +67,7 @@ export default class MemoryCryptoStore {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        return Promise.try(() => {
+        return utils.promiseTry(() => {
             // first see if we already have an entry for this request.
             const existing = this._getOutgoingRoomKeyRequest(requestBody);
 

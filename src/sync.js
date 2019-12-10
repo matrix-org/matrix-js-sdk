@@ -25,7 +25,6 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-import Promise from 'bluebird';
 const User = require("./models/user");
 const Room = require("./models/room");
 const Group = require('./models/group');
@@ -360,7 +359,7 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         room_id: peekRoom.roomId,
         timeout: 30 * 1000,
         from: token,
-    }, undefined, 50 * 1000).done(function(res) {
+    }, undefined, 50 * 1000).then(function(res) {
         if (self._peekRoomId !== peekRoom.roomId) {
             debuglog("Stopped peeking in room %s", peekRoom.roomId);
             return;
@@ -1150,7 +1149,7 @@ SyncApi.prototype._processSyncResponse = async function(
     });
 
     // Handle joins
-    await Promise.mapSeries(joinRooms, async function(joinObj) {
+    await utils.promiseMapSeries(joinRooms, async function(joinObj) {
         const room = joinObj.room;
         const stateEvents = self._mapSyncEventsFormat(joinObj.state, room);
         const timelineEvents = self._mapSyncEventsFormat(joinObj.timeline, room);
@@ -1278,8 +1277,8 @@ SyncApi.prototype._processSyncResponse = async function(
             }
         }
 
-        await Promise.mapSeries(stateEvents, processRoomEvent);
-        await Promise.mapSeries(timelineEvents, processRoomEvent);
+        await utils.promiseMapSeries(stateEvents, processRoomEvent);
+        await utils.promiseMapSeries(timelineEvents, processRoomEvent);
         ephemeralEvents.forEach(function(e) {
             client.emit("event", e);
         });
@@ -1383,7 +1382,7 @@ SyncApi.prototype._startKeepAlives = function(delay) {
         self._pokeKeepAlive();
     }
     if (!this._connectionReturnedDefer) {
-        this._connectionReturnedDefer = Promise.defer();
+        this._connectionReturnedDefer = utils.defer();
     }
     return this._connectionReturnedDefer.promise;
 };
@@ -1417,7 +1416,7 @@ SyncApi.prototype._pokeKeepAlive = function(connDidFail) {
             prefix: '',
             localTimeoutMs: 15 * 1000,
         },
-    ).done(function() {
+    ).then(function() {
         success();
     }, function(err) {
         if (err.httpStatus == 400 || err.httpStatus == 404) {
@@ -1541,7 +1540,7 @@ SyncApi.prototype._resolveInvites = function(room) {
         } else {
             promise = client.getProfileInfo(member.userId);
         }
-        promise.done(function(info) {
+        promise.then(function(info) {
             // slightly naughty by doctoring the invite event but this means all
             // the code paths remain the same between invite/join display name stuff
             // which is a worthy trade-off for some minor pollution.

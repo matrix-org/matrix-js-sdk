@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import Promise from 'bluebird';
-
 /**
  * Check if an IndexedDB database exists. The only way to do so is to try opening it, so
  * we do that and then delete it did not exist before.

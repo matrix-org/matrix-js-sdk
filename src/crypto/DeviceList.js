@@ -23,7 +23,6 @@ limitations under the License.
  * Manages the list of other users' devices
  */
 
-import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 
 import logger from '../logger';
@@ -31,7 +30,7 @@ import DeviceInfo from './deviceinfo';
 import {CrossSigningInfo} from './CrossSigning';
 import olmlib from './olmlib';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
-import {sleep} from '../utils';
+import {defer, sleep} from '../utils';
 
 
 /* State transition diagram for DeviceList._deviceTrackingStatus
@@ -712,7 +711,7 @@ class DeviceListUpdateSerialiser {
         });
 
         if (!this._queuedQueryDeferred) {
-            this._queuedQueryDeferred = Promise.defer();
+            this._queuedQueryDeferred = defer();
         }
 
         // We always take the new sync token and just use the latest one we've
@@ -777,7 +776,7 @@ class DeviceListUpdateSerialiser {
             }
 
             return prom;
-        }).done(() => {
+        }).then(() => {
             logger.log('Completed key download for ' + downloadUsers);
 
             this._downloadInProgress = false;

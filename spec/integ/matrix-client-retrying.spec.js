@@ -1,6 +1,5 @@
 "use strict";
 import 'source-map-support/register';
-import Promise from 'bluebird';
 
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");

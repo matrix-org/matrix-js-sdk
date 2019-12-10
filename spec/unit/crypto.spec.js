@@ -11,14 +11,13 @@ import TestClient from '../TestClient';
 import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
+import {sleep} from "../../src/utils";
 
 const EventEmitter = require("events").EventEmitter;
 
 const sdk = require("../..");
 
 const Olm = global.Olm;
-
-jest.useFakeTimers();
 
 describe("Crypto", function() {
     if (!sdk.CRYPTO_ENABLED) {
@@ -270,7 +269,8 @@ describe("Crypto", function() {
                 await bobDecryptor.onRoomKeyEvent(ksEvent);
                 await eventPromise;
                 expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
-                // the room key request should be gone since we've now decypted everything
+                await sleep(1);
+                // the room key request should be gone since we've now decrypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
                     .toBeFalsy();
             },
@@ -301,6 +301,8 @@ describe("Crypto", function() {
         });
 
         it("uses a new txnid for re-requesting keys", async function() {
+            jest.useFakeTimers();
+
             const event = new MatrixEvent({
                 sender: "@bob:example.com",
                 room_id: "!someroom",
@@ -310,52 +312,31 @@ describe("Crypto", function() {
                     sender_key: "senderkey",
                 },
             });
-            /* return a promise and a function. When the function is called,
-             * the promise will be resolved.
-             */
-            function awaitFunctionCall() {
-                let func;
-                const promise = new Promise((resolve, reject) => {
-                    func = function(...args) {
-                        resolve(args);
-                        return new Promise((resolve, reject) => {
-                            // give us some time to process the result before
-                            // continuing
-                            global.setTimeout(resolve, 1);
-                        });
-                    };
-                });
-                return {func, promise};
-            }
-
+            // replace Alice's sendToDevice function with a mock
+            aliceClient.sendToDevice = jest.fn().mockResolvedValue(undefined);
             aliceClient.startClient();
 
-            let promise;
             // make a room key request, and record the transaction ID for the
             // sendToDevice call
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
             jest.runAllTimers();
-            let args = await promise;
-            const txnId = args[2];
-            jest.runAllTimers();
+            await Promise.resolve();
+            expect(aliceClient.sendToDevice).toBeCalledTimes(1);
+            const txnId = aliceClient.sendToDevice.mock.calls[0][2];
 
             // give the room key request manager time to update the state
             // of the request
             await Promise.resolve();
 
             // cancel and resend the room key request
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
             jest.runAllTimers();
+            await Promise.resolve();
+            // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
-            args = await promise;
             // the second call to sendToDevice will be the key request
-            ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
-            jest.runAllTimers();
-            args = await promise;
-            jest.runAllTimers();
-            expect(args[2]).not.toBe(txnId);
+            expect(aliceClient.sendToDevice).toBeCalledTimes(3);
+            expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
     });
 });
