@@ -31,5 +31,5 @@ if (indexedDB) {
     );
 }
 
-module.exports = matrixcs; // keep export for browserify package deps
+export default matrixcs; // keep export for browserify package deps
 global.matrixcs = matrixcs;

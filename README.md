@@ -15,6 +15,9 @@ https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
 attached to ``window`` through which you can access the SDK. See below for how to
 include libolm to enable end-to-end-encryption.
 
+Note that your application will be required to minify the JS if desired - the js-sdk
+doesn't guarantee that the output will be minified. 
+
 Please check [the working browser example](examples/browser) for more information.
 
 In Node.js
@@ -349,11 +352,6 @@ Building
 To build a browser version from scratch when developing::
 ```
  $ yarn build
-```
-
-To constantly do builds when files are modified (using ``watchify``)::
-```
- $ yarn watch
 ```
 
 To run tests (Jasmine)::
