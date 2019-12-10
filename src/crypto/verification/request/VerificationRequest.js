@@ -245,23 +245,32 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     /**
-     * @returns {Promise} with the verifier once it becomes available.
-     * Can be used after calling `accept` to wait for the other party to start verification.
+     * Can be used to listen for state changes until the callback returns true.
+     * @param {Function} fn callback to evaluate whether the request is in the desired state.
+     *                      Takes the request as an argument.
+     * @returns {Promise} that resolves once the callback returns true
+     * @throws {Error} when the request is cancelled
      */
-    waitForVerifier() {
-        if (this.verifier) {
-            return Promise.resolve(this.verifier);
-        } else {
-            return new Promise(resolve => {
-                const checkVerifier = () => {
-                    if (this.verifier) {
-                        this.off("change", checkVerifier);
-                        resolve(this.verifier);
-                    }
-                };
-                this.on("change", checkVerifier);
-            });
-        }
+    waitFor(fn) {
+        return new Promise((resolve, reject) => {
+            const check = () => {
+                let handled = false;
+                if (fn(this)) {
+                    resolve(this);
+                    handled = true;
+                } else if (this.cancelled) {
+                    reject(new Error("cancelled"));
+                    handled = true;
+                }
+                if (handled) {
+                    this.off("change", check);
+                }
+                return handled;
+            };
+            if (!check()) {
+                this.on("change", check);
+            }
+        });
     }
 
     _setPhase(phase, notify = true) {
