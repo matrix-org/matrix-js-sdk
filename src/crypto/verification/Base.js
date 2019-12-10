@@ -111,10 +111,14 @@ export default class VerificationBase extends EventEmitter {
         if (this._done) {
             return;
         } else if (e.getType() === this._expectedEvent) {
-            this._expectedEvent = undefined;
-            this._rejectEvent = undefined;
-            this._resetTimer();
-            this._resolveEvent(e);
+            // if we receive an expected m.key.verification.done, then just
+            // ignore it, since we don't need to do anything about it
+            if (this._expectedEvent !== "m.key.verification.done") {
+                this._expectedEvent = undefined;
+                this._rejectEvent = undefined;
+                this._resetTimer();
+                this._resolveEvent(e);
+            }
         } else if (e.getType() === "m.key.verification.cancel") {
             const reject = this._reject;
             this._reject = undefined;
