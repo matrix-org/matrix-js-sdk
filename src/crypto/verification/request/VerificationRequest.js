@@ -66,9 +66,12 @@ export default class VerificationRequest extends EventEmitter {
         this._commonMethods = [];
         this._setPhase(PHASE_UNSENT, false);
         this._requestEvent = null;
+        // TODO: this can also be ourselves, we need to fish .to out of content on a .request
         this._otherUserId = userId;
         this._initiatedByMe = null;
         this._startTimestamp = null;
+        this._cancellingUserId = null;
+        this._readyEvent = null;
     }
 
     /**
@@ -83,12 +86,18 @@ export default class VerificationRequest extends EventEmitter {
     static validateEvent(type, event, timestamp, client) {
         const content = event.getContent();
 
+        if (!content) {
+            console.log("VerificationRequest: validateEvent: no content", type);
+        }
+
         if (!type.startsWith(EVENT_PREFIX)) {
+            console.log("VerificationRequest: validateEvent: fail because type doesnt start with " + EVENT_PREFIX, type);
             return false;
         }
 
         if (type === REQUEST_TYPE || type === READY_TYPE) {
             if (!Array.isArray(content.methods)) {
+                console.log("VerificationRequest: validateEvent: fail because methods", type);
                 return false;
             }
         }
@@ -97,6 +106,7 @@ export default class VerificationRequest extends EventEmitter {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
+                console.log("VerificationRequest: validateEvent: fail because from_device", type);
                 return false;
             }
         }
@@ -106,7 +116,9 @@ export default class VerificationRequest extends EventEmitter {
             const elapsed = Date.now() - timestamp;
             // ignore if event is too far in the past or too far in the future
             if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
-                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)) {
+                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)
+            ) {
+                console.log("VerificationRequest: validateEvent: verification event to far in future or past", type, elapsed);
                 logger.log("received verification that is too old or from the future");
                 return false;
             }
@@ -199,6 +211,14 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /**
+     * the id of the user that cancelled the request,
+     * only defined when phase is PHASE_CANCELLED
+     */
+    get cancellingUserId() {
+        return this._cancellingUserId;
+    }
+
     /* Start the key verification, creating a verifier and sending a .start event.
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
      * @param {string} method the name of the verification method to use.
@@ -249,6 +269,7 @@ export default class VerificationRequest extends EventEmitter {
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason));
             } else {
+                this._cancellingUserId = this._client.getUserId();
                 this._setPhase(PHASE_CANCELLED, false);
                 await this.channel.send(CANCEL_TYPE, {code, reason});
             }
@@ -262,8 +283,8 @@ export default class VerificationRequest extends EventEmitter {
      */
     async accept() {
         if (this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
-            const methods = [...this._verificationMethods.keys()];
             this._setPhase(PHASE_READY, false);
+            const methods = [...this._verificationMethods.keys()];
             await this.channel.send(READY_TYPE, {methods});
             this.emit("change");
         }
@@ -322,7 +343,7 @@ export default class VerificationRequest extends EventEmitter {
         if (type === REQUEST_TYPE) {
             await this._handleRequest(content, event);
         } else if (type === READY_TYPE) {
-            await this._handleReady(content);
+            await this._handleReady(event);
         } else if (type === START_TYPE) {
             await this._handleStart(content, event);
         }
@@ -335,7 +356,7 @@ export default class VerificationRequest extends EventEmitter {
         }
 
         if (type === CANCEL_TYPE) {
-            this._handleCancel();
+            this._handleCancel(event);
         } else if (type === DONE_TYPE) {
             this._handleDone();
         }
@@ -349,19 +370,22 @@ export default class VerificationRequest extends EventEmitter {
             this._initiatedByMe = this._wasSentByMe(event);
             this._setPhase(PHASE_REQUESTED);
         } else if (this._phase !== PHASE_REQUESTED) {
-            logger.warn("Ignoring flagged verification request from " +
+            logger.warn("Cancelling, unexpected .request verification event from " +
                 event.getSender());
             await this.cancel(errorFromEvent(newUnexpectedMessageError()));
         }
     }
 
-    async _handleReady(content) {
-        if (this._phase === PHASE_REQUESTED) {
+    async _handleReady(event) {
+        const content = event.getContent();
+        console.log("handling ready event", content, this._phase);
+        if (this.phase === PHASE_REQUESTED || this.phase === PHASE_READY) {
+            this._readyEvent = event;
             const otherMethods = content.methods;
             this._commonMethods = this._filterMethods(otherMethods);
             this._setPhase(PHASE_READY);
         } else {
-            logger.warn("Ignoring flagged verification ready event from " +
+            logger.warn("Cancelling, unexpected .ready verification event from " +
                 event.getSender());
             await this.cancel(errorFromEvent(newUnexpectedMessageError()));
         }
@@ -385,7 +409,9 @@ export default class VerificationRequest extends EventEmitter {
                 if (this.phase === PHASE_UNSENT) {
                     this._initiatedByMe = this._wasSentByMe(event);
                 }
-                this._verifier = this._createVerifier(method, event);
+                if (!this._verifier) {
+                    this._verifier = this._createVerifier(method, event);
+                }
                 this._setPhase(PHASE_STARTED);
             }
         }
@@ -409,8 +435,9 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _handleCancel() {
+    _handleCancel(event = null) {
         if (this._phase !== PHASE_CANCELLED) {
+            this._cancellingUserId = event ? event.getSender() : this._client.getUserId();
             this._setPhase(PHASE_CANCELLED);
         }
     }
@@ -450,6 +477,8 @@ export default class VerificationRequest extends EventEmitter {
             let targetEvent;
             if (startEvent && !this._wasSentByMe(startEvent)) {
                 targetEvent = startEvent;
+            } else if (this._readyEvent && !this._wasSentByMe(this._readyEvent)) {
+                targetEvent = this._readyEvent;
             } else if (this._requestEvent && !this._wasSentByMe(this._requestEvent)) {
                 targetEvent = this._requestEvent;
             } else {
@@ -468,7 +497,7 @@ export default class VerificationRequest extends EventEmitter {
         return methodNames.filter(m => this._verificationMethods.has(m));
     }
 
-    // only for .request and .start
+    // only for .request, .ready or .start
     _wasSentByMe(event) {
         if (event.getSender() !== this._client.getUserId()) {
             return false;

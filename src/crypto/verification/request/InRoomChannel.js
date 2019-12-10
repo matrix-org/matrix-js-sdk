@@ -46,6 +46,10 @@ export default class InRoomChannel {
         return true;
     }
 
+    get roomId() {
+        return this._roomId;
+    }
+
     /** The transaction id generated/used by this verification channel */
     get transactionId() {
         return this._requestEventId;
@@ -96,17 +100,20 @@ export default class InRoomChannel {
     static validateEvent(event, client) {
         const txnId = InRoomChannel.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
+            console.log("InRoomChannel: validateEvent: no valid txnId", type, txnId);
             return false;
         }
         const type = InRoomChannel.getEventType(event);
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
-            if (typeof content.to !== "string" || !content.to.length) {
+            if (!content || typeof content.to !== "string" || !content.to.length) {
+                console.log("InRoomChannel: validateEvent: no valid to", type, content.to);
                 return false;
             }
             const ownUserId = client.getUserId();
             // ignore requests that are not direct to or sent by the syncing user
             if (event.getSender() !== ownUserId && content.to !== ownUserId) {
+                console.log("InRoomChannel: validateEvent: not directed or sent my me", type, event.getSender(), content.to);
                 return false;
             }
         }
