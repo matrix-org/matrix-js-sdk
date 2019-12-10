@@ -69,6 +69,7 @@
     "@babel/preset-typescript": "^7.7.4",
     "@babel/register": "^7.7.4",
     "@babel/runtime": "^7.7.6",
+    "babel-eslint": "^10.0.3",
     "babel-jest": "^24.9.0",
     "browserify": "^16.2.3",
     "browserify-shim": "^3.8.13",
