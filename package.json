@@ -8,7 +8,7 @@
     "test": "jest spec/ --coverage --testEnvironment node",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "start": "yarn start:init && yarn start:watch",
-    "start:watch": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
+    "start:watch": "babel src -s -w --skip-initial-build -d lib --verbose --extensions \".ts,.js\"",
     "start:init": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
     "clean": "rimraf lib dist",
     "build": "babel src -s -d lib --verbose --extensions \".ts,.js\" && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && terser -c -m -o dist/browser-matrix.min.js --source-map \"content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
