@@ -20,12 +20,15 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import {pkSign, pkVerify} from './olmlib';
+import {pkSign, pkVerify, encodeBase64, decodeBase64} from './olmlib';
 import {EventEmitter} from 'events';
 import logger from '../logger';
 
 function publicKeyFromKeyInfo(keyInfo) {
-    return Object.entries(keyInfo.keys)[0];
+    // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
+    // We assume only a single key, and we want the bare form without type
+    // prefix, so we select the values.
+    return Object.values(keyInfo.keys)[0];
 }
 
 export class CrossSigningInfo extends EventEmitter {
@@ -54,8 +57,9 @@ export class CrossSigningInfo extends EventEmitter {
     /**
      * Calls the app callback to ask for a private key
      * @param {string} type The key type ("master", "self_signing", or "user_signing")
-     * @param {Uint8Array} expectedPubkey The matching public key or undefined to use
+     * @param {string} expectedPubkey The matching public key or undefined to use
      *     the stored public key for the given key type.
+     * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
         if (!this._callbacks.getCrossSigningKey) {
@@ -69,7 +73,7 @@ export class CrossSigningInfo extends EventEmitter {
         const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
         if (!privkey) {
             throw new Error(
-                "getCrossSigningKey callback for  " + type + " returned falsey",
+                "getCrossSigningKey callback for " + type + " returned falsey",
             );
         }
         const signing = new global.Olm.PkSigning();
@@ -101,12 +105,54 @@ export class CrossSigningInfo extends EventEmitter {
         };
     }
 
-    hasKeys() {
-        return Object.keys(this.keys).length > 0;
+    /**
+     * Check whether the private keys exist in secret storage.
+     * XXX: This could be static, be we often seem to have an instance when we
+     * want to know this anyway...
+     *
+     * @param {SecretStorage} secretStorage The secret store using account data
+     * @returns {boolean} Whether all private keys were found in storage
+     */
+    isStoredInSecretStorage(secretStorage) {
+        let stored = true;
+        for (const type of ["master", "self_signing", "user_signing"]) {
+            stored &= secretStorage.isStored(`m.cross_signing.${type}`, false);
+        }
+        return stored;
     }
 
     /**
-     * Get the ID used to identify the user
+     * Store private keys in secret storage for use by other devices. This is
+     * typically called in conjunction with the creation of new cross-signing
+     * keys.
+     *
+     * @param {object} keys The keys to store
+     * @param {SecretStorage} secretStorage The secret store using account data
+     */
+    static async storeInSecretStorage(keys, secretStorage) {
+        for (const type of Object.keys(keys)) {
+            const encodedKey = encodeBase64(keys[type]);
+            await secretStorage.store(`m.cross_signing.${type}`, encodedKey);
+        }
+    }
+
+    /**
+     * Get private keys from secret storage created by some other device. This
+     * also passes the private keys to the app-specific callback.
+     *
+     * @param {string} type The type of key to get.  One of "master",
+     * "self_signing", or "user_signing".
+     * @param {SecretStorage} secretStorage The secret store using account data
+     * @return {Uint8Array} The private key
+     */
+    static async getFromSecretStorage(type, secretStorage) {
+        const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
+        return decodeBase64(encodedKey);
+    }
+
+    /**
+     * Get the ID used to identify the user. This can also be used to test for
+     * the existence of a given key type.
      *
      * @param {string} type The type of key to get the ID of.  One of "master",
      * "self_signing", or "user_signing".  Defaults to "master".
@@ -117,10 +163,16 @@ export class CrossSigningInfo extends EventEmitter {
         type = type || "master";
         if (!this.keys[type]) return null;
         const keyInfo = this.keys[type];
-        return publicKeyFromKeyInfo(keyInfo)[1];
+        return publicKeyFromKeyInfo(keyInfo);
     }
 
-
+    /**
+     * Create new cross-signing keys for the given key types. The public keys
+     * will be held in this class, while the private keys are passed off to the
+     * `saveCrossSigningKeys` application callback.
+     *
+     * @param {CrossSigningLevel} level The key types to reset
+     */
     async resetKeys(level) {
         if (!this._callbacks.saveCrossSigningKeys) {
             throw new Error("No saveCrossSigningKeys callback supplied");
@@ -159,7 +211,7 @@ export class CrossSigningInfo extends EventEmitter {
                     },
                 };
             } else {
-                [masterPub, masterSigning] = await this.getCrossSigningyKey("master");
+                [masterPub, masterSigning] = await this.getCrossSigningKey("master");
             }
 
             if (level & CrossSigningLevel.SELF_SIGNING) {
@@ -219,7 +271,7 @@ export class CrossSigningInfo extends EventEmitter {
             if (!this.keys.master) {
                 // this is the first key we've seen, so first-use is true
                 this.firstUse = true;
-            } else if (publicKeyFromKeyInfo(keys.master)[1] !== this.getId()) {
+            } else if (publicKeyFromKeyInfo(keys.master) !== this.getId()) {
                 // this is a different key, so first-use is false
                 this.firstUse = false;
             } // otherwise, same key, so no change
@@ -229,7 +281,7 @@ export class CrossSigningInfo extends EventEmitter {
         } else {
             throw new Error("Tried to set cross-signing keys without a master key");
         }
-        const masterKey = publicKeyFromKeyInfo(signingKeys.master)[1];
+        const masterKey = publicKeyFromKeyInfo(signingKeys.master);
 
         // verify signatures
         if (keys.user_signing) {
@@ -268,8 +320,8 @@ export class CrossSigningInfo extends EventEmitter {
             this.keys.master = keys.master;
             // if the master key is set, then the old self-signing and
             // user-signing keys are obsolete
-            delete this.keys.self_signing;
-            delete this.keys.user_signing;
+            this.keys.self_signing = null;
+            this.keys.user_signing = null;
         }
         if (keys.self_signing) {
             this.keys.self_signing = keys.self_signing;
@@ -381,7 +433,7 @@ export class CrossSigningInfo extends EventEmitter {
             pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
             // ...and this device's key from their SSK...
             pkVerify(
-                deviceObj, publicKeyFromKeyInfo(userSSK)[1], userCrossSigning.userId,
+                deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId,
             );
             // ...then we trust this device as much as far as we trust the user
             return DeviceTrustLevel.fromUserTrustLevel(userTrust, localTrust);

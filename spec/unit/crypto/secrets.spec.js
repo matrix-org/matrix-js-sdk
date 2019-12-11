@@ -163,7 +163,7 @@ describe("Secrets", function() {
         };
         alice.resetCrossSigningKeys();
 
-        const newKeyId = await alice.addSecretKey(
+        const newKeyId = await alice.addSecretStorageKey(
             SECRET_STORAGE_ALGORITHM_V1,
         );
         // we don't await on this because it waits for the event to come down the sync
@@ -243,5 +243,91 @@ describe("Secrets", function() {
         const secret = await request.promise;
 
         expect(secret).toBe("bar");
+    });
+
+    it("bootstraps when no storage or cross-signing keys locally", async function() {
+        const bob = await makeTestClient(
+            {
+                userId: "@bob:example.com",
+                deviceId: "bob1",
+            },
+        );
+        bob.uploadDeviceSigningKeys = async () => {};
+        bob.uploadKeySignatures = async () => {};
+        bob.setAccountData = async function(eventType, contents, callback) {
+            const event = new MatrixEvent({
+                type: eventType,
+                content: contents,
+            });
+            this.store.storeAccountDataEvents([
+                event,
+            ]);
+            this.emit("accountData", event);
+        };
+
+        await bob.bootstrapSecretStorage();
+
+        const crossSigning = bob._crypto._crossSigningInfo;
+        const secretStorage = bob._crypto._secretStorage;
+
+        expect(crossSigning.getId()).toBeTruthy();
+        expect(crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
+        expect(secretStorage.hasKey()).toBeTruthy();
+    });
+
+    it("bootstraps when cross-signing keys in secret storage", async function() {
+        const decryption = new global.Olm.PkDecryption();
+        const storagePublicKey = decryption.generate_key();
+        const storagePrivateKey = decryption.get_private_key();
+
+        const bob = await makeTestClient(
+            {
+                userId: "@bob:example.com",
+                deviceId: "bob1",
+            },
+            {
+                cryptoCallbacks: {
+                    getSecretStorageKey: request => {
+                        const defaultKeyId = bob.getDefaultSecretStorageKeyId();
+                        expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
+                        return [defaultKeyId, storagePrivateKey];
+                    },
+                },
+            },
+        );
+
+        bob.uploadDeviceSigningKeys = async () => {};
+        bob.uploadKeySignatures = async () => {};
+        bob.setAccountData = async function(eventType, contents, callback) {
+            const event = new MatrixEvent({
+                type: eventType,
+                content: contents,
+            });
+            this.store.storeAccountDataEvents([
+                event,
+            ]);
+            this.emit("accountData", event);
+        };
+        bob._crypto.checkKeyBackup = async () => {};
+
+        const crossSigning = bob._crypto._crossSigningInfo;
+        const secretStorage = bob._crypto._secretStorage;
+
+        // Set up cross-signing keys from scratch with specific storage key
+        await bob.bootstrapSecretStorage({
+            createSecretStorageKey: async () => ({ pubkey: storagePublicKey }),
+        });
+
+        // Clear local cross-signing keys and read from secret storage
+        bob._crypto._deviceList.storeCrossSigningForUser(
+            "@bob:example.com",
+            crossSigning.toStorage(),
+        );
+        crossSigning.keys = {};
+        await bob.bootstrapSecretStorage();
+
+        expect(crossSigning.getId()).toBeTruthy();
+        expect(crossSigning.isStoredInSecretStorage(secretStorage)).toBeTruthy();
+        expect(secretStorage.hasKey()).toBeTruthy();
     });
 });

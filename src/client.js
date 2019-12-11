@@ -50,8 +50,8 @@ import logger from './logger';
 
 import Crypto from './crypto';
 import { isCryptoAvailable } from './crypto';
-import { encodeRecoveryKey, decodeRecoveryKey } from './crypto/recoverykey';
-import { keyFromPassphrase, keyFromAuthData } from './crypto/key_passphrase';
+import { decodeRecoveryKey } from './crypto/recoverykey';
+import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
 
 const SCROLLBACK_DELAY_MS = 3000;
@@ -175,7 +175,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *     The cross-signing API is currently UNSTABLE and may change without notice.
  *
  * @param {function} [opts.cryptoCallbacks.getCrossSigningKey]
- * Optional (required for cross-signing). Function to call when a cross-signing private key is needed.
+ * Optional. Function to call when a cross-signing private key is needed.
+ * Secure Secret Storage will be used by default if this is unset.
  * Args:
  *    {string} type The type of key needed.  Will be one of "master",
  *      "self_signing", or "user_signing"
@@ -187,8 +188,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  *   UInt8Array or rejects with an error.
  *
  * @param {function} [opts.cryptoCallbacks.saveCrossSigningKeys]
- * Optional (required for cross-signing). Called when new private keys
- * for cross-signing need to be saved.
+ * Optional. Called when new private keys for cross-signing need to be saved.
+ * Secure Secret Storage will be used by default if this is unset.
  * Args:
  *   {object} keys the private keys to save. Map of key name to private key
  *       as a UInt8Array. The getPrivateKey callback above will be called
@@ -209,7 +210,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {function} [opts.cryptoCallbacks.getSecretStorageKey]
  * Optional. Function called when an encryption key for secret storage
  *     is required. One or more keys will be described in the keys object.
- *     The callback function should return with an array of:
+ *     The callback function should return a promise with an array of:
  *     [<key name>, <UInt8Array private key>] or null if it cannot provide
  *     any of the keys.
  * Args:
@@ -292,7 +293,7 @@ function MatrixClient(opts) {
     this._cryptoStore = opts.cryptoStore;
     this._sessionStore = opts.sessionStore;
     this._verificationMethods = opts.verificationMethods;
-    this._cryptoCallbacks = opts.cryptoCallbacks;
+    this._cryptoCallbacks = opts.cryptoCallbacks || {};
 
     this._forceTURN = opts.forceTURN || false;
     this._fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
@@ -771,7 +772,8 @@ MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
  * Mark the given device as verified
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} verified whether to mark the device as verified. defaults
  *   to 'true'.
@@ -799,7 +801,8 @@ MatrixClient.prototype.setDeviceVerified = function(userId, deviceId, verified) 
  * Mark the given device as blocked/unblocked
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} blocked whether to mark the device as blocked. defaults
  *   to 'true'.
@@ -819,7 +822,8 @@ MatrixClient.prototype.setDeviceBlocked = function(userId, deviceId, blocked) {
  * Mark the given device as known/unknown
  *
  * @param {string} userId owner of the device
- * @param {string} deviceId unique identifier for the device
+ * @param {string} deviceId unique identifier for the device or user's
+ * cross-signing public key ID.
  *
  * @param {boolean=} known whether to mark the device as known. defaults
  *   to 'true'.
@@ -959,14 +963,6 @@ function wrapCryptoFuncs(MatrixClient, names) {
     }
 }
 
-/**
- * Check whether we already have cross-signing keys for the current user.
- * The cross-signing API is currently UNSTABLE and may change without notice.
- *
- * @function module:client~MatrixClient#doesCrossSigningHaveKeys
- * @return {boolean} Whether we have keys.
- */
-
  /**
  * Generate new cross-signing keys.
  * The cross-signing API is currently UNSTABLE and may change without notice.
@@ -1020,15 +1016,34 @@ function wrapCryptoFuncs(MatrixClient, names) {
  * @returns {DeviceTrustLevel}
  */
 
+/**
+ * Check the copy of our cross-signing key that we have in the device list and
+ * see if we can get the private key. If so, mark it as trusted.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkOwnCrossSigningTrust
+ */
+
+/**
+ * Checks that a given cross-signing private key matches a given public key.
+ * This can be used by the getCrossSigningKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkCrossSigningPrivateKey
+ * @param {Uint8Array} privateKey The private key
+ * @param {string} expectedPublicKey The public key
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+
 wrapCryptoFuncs(MatrixClient, [
-    "doesCrossSigningHaveKeys",
     "resetCrossSigningKeys",
     "getCrossSigningId",
     "getStoredCrossSigningForUser",
     "checkUserTrust",
     "checkDeviceTrust",
     "checkOwnCrossSigningTrust",
-    "checkPrivateKey",
+    "checkCrossSigningPrivateKey",
 ]);
 
 /**
@@ -1048,18 +1063,53 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
 };
 
 /**
+ * Create a recovery key from a user-supplied passphrase.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#createRecoveryKeyFromPassphrase
+ * @param {string} password Passphrase string that can be entered by the user
+ *     when restoring the backup as an alternative to entering the recovery key.
+ *     Optional.
+ * @returns {Promise<String>} The user-facing recovery key string.
+ */
+
+/**
+ * Bootstrap Secure Secret Storage if needed by creating a default key and signing it with
+ * the cross-signing master key. If everything is already set up, then no
+ * changes are made, so this is safe to run to ensure secret storage is ready
+ * for use.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#bootstrapSecretStorage
+ * @param {function} [opts.authUploadDeviceSigningKeys] Optional. Function
+ * called to await an interactive auth flow when uploading device signing keys.
+ * Args:
+ *     {function} A function that makes the request requiring auth. Receives the
+ *     auth data as an object.
+ */
+
+/**
  * Add a key for encrypting secrets.
  * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
  *
- * @function module:client~MatrixClient#addSecretKey
+ * @function module:client~MatrixClient#addSecretStorageKey
  * @param {string} algorithm the algorithm used by the key
  * @param {object} opts the options for the algorithm.  The properties used
- *     depend on the algorithm given.  This object may be modified to pass
- *     information back about the key.
+ *     depend on the algorithm given.
  * @param {string} [keyName] the name of the key.  If not given, a random
  *     name will be generated.
  *
  * @return {string} the name of the key
+ */
+
+/**
+ * Check whether we have a key with a given ID.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#hasSecretStorageKey
+ * @param {string} [keyId = default key's ID] The ID of the key to check
+ *     for. Defaults to the default key ID if not provided.
+ * @return {boolean} Whether we have the key.
  */
 
 /**
@@ -1123,14 +1173,30 @@ MatrixClient.prototype.checkEventSenderTrust = async function(event) {
  * @param {string} keyId The new default key ID
  */
 
+/**
+ * Checks that a given secret storage private key matches a given public key.
+ * This can be used by the getSecretStorageKey callback to verify that the
+ * private key it is about to supply is the one that was requested.
+ * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#checkSecretStoragePrivateKey
+ * @param {Uint8Array} privateKey The private key
+ * @param {string} expectedPublicKey The public key
+ * @returns {boolean} true if the key matches, otherwise false
+ */
+
 wrapCryptoFuncs(MatrixClient, [
-    "addSecretKey",
+    "createRecoveryKeyFromPassphrase",
+    "bootstrapSecretStorage",
+    "addSecretStorageKey",
+    "hasSecretStorageKey",
     "storeSecret",
     "getSecret",
     "isSecretStored",
     "requestSecret",
     "getDefaultSecretStorageKeyId",
     "setDefaultSecretStorageKeyId",
+    "checkSecretStoragePrivateKey",
 ]);
 
 /**
@@ -1370,38 +1436,45 @@ MatrixClient.prototype.disableKeyBackup = function() {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
+ * @param {boolean} [opts.secureSecretStorage = false] Whether to use Secure
+ *     Secret Storage (MSC1946) to store the key encrypting key backups.
+ *     Optional, defaults to false.
  *
  * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
  *     additionally has a 'recovery_key' member with the user-facing recovery key string.
  */
-MatrixClient.prototype.prepareKeyBackupVersion = async function(password) {
+MatrixClient.prototype.prepareKeyBackupVersion = async function(
+    password,
+    { secureSecretStorage = false } = {},
+) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
 
-    const decryption = new global.Olm.PkDecryption();
-    try {
-        let publicKey;
-        const authData = {};
-        if (password) {
-            const keyInfo = await keyFromPassphrase(password);
-            publicKey = decryption.init_with_private_key(keyInfo.key);
-            authData.private_key_salt = keyInfo.salt;
-            authData.private_key_iterations = keyInfo.iterations;
-        } else {
-            publicKey = decryption.generate_key();
+    if (secureSecretStorage) {
+        logger.log("Preparing key backup version with Secure Secret Storage");
+
+        // Ensure Secure Secret Storage is ready for use
+        if (!this.hasSecretStorageKey()) {
+            throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
         }
 
-        authData.public_key = publicKey;
-
-        return {
-            algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-            auth_data: authData,
-            recovery_key: encodeRecoveryKey(decryption.get_private_key()),
-        };
-    } finally {
-        decryption.free();
+        throw new Error("Not yet implemented");
     }
+
+    const [keyInfo, encodedPrivateKey] =
+        await this.createRecoveryKeyFromPassphrase(password);
+
+    // Reshape objects into form expected for key backup
+    return {
+        algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
+        auth_data: {
+            public_key: keyInfo.pubkey,
+            private_key_salt: keyInfo.passphrase.salt,
+            private_key_iterations: keyInfo.passphrase.iterations,
+        },
+        recovery_key: encodedPrivateKey,
+    };
 };
 
 /**

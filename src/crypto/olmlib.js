@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -397,4 +398,22 @@ module.exports.pkVerify = function(obj, pubkey, userId) {
         if (unsigned) obj.unsigned = unsigned;
         util.free();
     }
+};
+
+/**
+ * Encode a typed array of uint8 as base64.
+ * @param {Uint8Array} uint8Array The data to encode.
+ * @return {string} The base64.
+ */
+module.exports.encodeBase64 = function(uint8Array) {
+    return Buffer.from(uint8Array).toString("base64");
+};
+
+/**
+ * Decode a base64 string to a typed array of uint8.
+ * @param {string} base64 The base64 to decode.
+ * @return {Uint8Array} The decoded data.
+ */
+module.exports.decodeBase64 = function(base64) {
+    return Buffer.from(base64, "base64");
 };
