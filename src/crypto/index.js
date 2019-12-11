@@ -400,7 +400,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // own key first.
         // XXX: We need to think about how to re-do these steps if they fail.
         // See also https://github.com/vector-im/riot-web/issues/11635
-        if (crossSigningPrivateKeys) {
+        if (Object.keys(crossSigningPrivateKeys).length) {
             logger.log("Storing cross-signing private keys in secret storage");
             // SSSS expects its keys to be signed by cross-signing master key.
             // Since we have just reset cross-signing keys, we need to re-sign the
