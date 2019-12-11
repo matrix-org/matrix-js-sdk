@@ -21,7 +21,7 @@ const anotherjson = require('another-json');
 const utils = require('../../lib/utils');
 const testUtils = require('../test-utils');
 const TestClient = require('../TestClient').default;
-import logger from '../../src/logger';
+import logger from '../../lib/logger';
 
 const ROOM_ID = "!room:id";
 
