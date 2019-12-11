@@ -352,7 +352,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
     // If we happen to reset cross-signing keys here, then we want access to the
     // cross-signing private keys, but only for the scope of this method, so we
-    // use temporary callbacks to weave the them through the various APIs.
+    // use temporary callbacks to weave them through the various APIs.
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
 
     try {
