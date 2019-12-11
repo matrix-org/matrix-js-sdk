@@ -53,6 +53,7 @@ import { isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
+import { encodeBase64 } from '../lib/crypto/olmlib';
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
@@ -1437,7 +1438,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
  * @param {boolean} [opts.secureSecretStorage = false] Whether to use Secure
- *     Secret Storage (MSC1946) to store the key encrypting key backups.
+ *     Secret Storage to store the key encrypting key backups.
  *     Optional, defaults to false.
  *
  * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
@@ -1451,28 +1452,25 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         throw new Error("End-to-end encryption disabled");
     }
 
-    if (secureSecretStorage) {
-        logger.log("Preparing key backup version with Secure Secret Storage");
-
-        // Ensure Secure Secret Storage is ready for use
-        if (!this.hasSecretStorageKey()) {
-            throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
-        }
-
-        throw new Error("Not yet implemented");
-    }
-
-    const [keyInfo, encodedPrivateKey] =
+    const [keyInfo, encodedPrivateKey, privateKey] =
         await this.createRecoveryKeyFromPassphrase(password);
 
+    if (secureSecretStorage) {
+        await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
+        logger.info("Key backup private key stored in secret storage");
+    }
+
     // Reshape objects into form expected for key backup
+    const authData = {
+        public_key: keyInfo.pubkey,
+    };
+    if (keyInfo.passphrase) {
+        authData.private_key_salt = keyInfo.passphrase.salt;
+        authData.private_key_iterations = keyInfo.passphrase.iterations;
+    }
     return {
         algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-        auth_data: {
-            public_key: keyInfo.pubkey,
-            private_key_salt: keyInfo.passphrase.salt,
-            private_key_iterations: keyInfo.passphrase.iterations,
-        },
+        auth_data: authData,
         recovery_key: encodedPrivateKey,
     };
 };

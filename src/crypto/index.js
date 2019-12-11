@@ -296,8 +296,9 @@ Crypto.prototype.init = async function() {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<Array>} Array with public key metadata and encoded private
- *     recovery key which should be disposed of after displaying to the user.
+ * @returns {Promise<Array>} Array with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  */
 Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
     const decryption = new global.Olm.PkDecryption();
@@ -314,8 +315,9 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         } else {
             keyInfo.pubkey = decryption.generate_key();
         }
-        const encodedPrivateKey = encodeRecoveryKey(decryption.get_private_key());
-        return [keyInfo, encodedPrivateKey];
+        const privateKey = decryption.get_private_key();
+        const encodedPrivateKey = encodeRecoveryKey(privateKey);
+        return [keyInfo, encodedPrivateKey, privateKey];
     } finally {
         decryption.free();
     }
