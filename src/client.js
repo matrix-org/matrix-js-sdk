@@ -1477,6 +1477,7 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
 
 /**
  * Check whether the key backup private key is stored in secret storage.
+ * @return {Promise<boolean>} Whether the backup key is stored.
  */
 MatrixClient.prototype.isKeyBackupKeyStored = async function() {
     return this.isSecretStored("m.megolm_backup.v1", false /* checkKey */);
@@ -1625,6 +1626,18 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
 
 MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
+/**
+ * Restore from an existing key backup via a passphrase.
+ *
+ * @param {string} password Passphrase
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     password, targetRoomId, targetSessionId, backupInfo,
 ) {
@@ -1634,6 +1647,18 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     );
 };
 
+/**
+ * Restore from an existing key backup via a private key stored in secret
+ * storage.
+ *
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
 MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
     backupInfo, targetRoomId, targetSessionId,
 ) {
@@ -1643,6 +1668,18 @@ MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
     );
 };
 
+/**
+ * Restore from an existing key backup via an encoded recovery key.
+ *
+ * @param {string} recoveryKey Encoded recovery key
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
 MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
     recoveryKey, targetRoomId, targetSessionId, backupInfo,
 ) {
