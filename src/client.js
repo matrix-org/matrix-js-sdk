@@ -673,6 +673,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.warning",
         "crypto.devicesUpdated",
         "deviceVerificationChanged",
+        "userTrustStatusChanged",
         "crossSigning.keysChanged",
     ]);
 
