@@ -1506,11 +1506,15 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
         undefined, "POST", "/room_keys/version", undefined, data,
         {prefix: httpApi.PREFIX_UNSTABLE},
     );
-    this.enableKeyBackup({
-        algorithm: info.algorithm,
-        auth_data: info.auth_data,
-        version: res.version,
-    });
+
+    // We could assume everything's okay and enable directly, but this ensures
+    // we run the same signature verification that will be used for future
+    // sessions.
+    await this.checkKeyBackup();
+    if (!this.getKeyBackupEnabled()) {
+        throw new Error("Key backup not usable even though we just created it");
+    }
+
     return res;
 };
 

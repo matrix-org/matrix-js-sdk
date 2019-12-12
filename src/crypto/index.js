@@ -952,8 +952,7 @@ Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
  */
 Crypto.prototype.checkKeyBackup = async function() {
     this._checkedForBackup = false;
-    const returnInfo = await this._checkAndStartKeyBackup();
-    return returnInfo;
+    return this._checkAndStartKeyBackup();
 };
 
 /**
