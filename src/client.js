@@ -1492,13 +1492,13 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
         auth_data: info.auth_data,
     };
 
-    // Now sign the backup auth data. Do it as this device first because crypto._signObject
-    // is dumb and bluntly replaces the whole signatures block...
-    // this can probably go away very soon in favour of just signing with the SSK.
+    // Sign the backup auth data with the device key for backwards compat with
+    // older devices with cross-signing. This can probably go away very soon in
+    // favour of just signing with the cross-singing master key.
     await this._crypto._signObject(data.auth_data);
 
     if (this._crypto._crossSigningInfo.getId()) {
-        // now also sign the auth data with the master key
+        // now also sign the auth data with the cross-signing master key
         await this._crypto._crossSigningInfo.signObject(data.auth_data, "master");
     }
 

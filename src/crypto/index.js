@@ -999,12 +999,13 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
             continue;
         }
-        // Could be an SSK but just say this is the device ID for backwards compat
-        const sigInfo = { deviceId: keyIdParts[1] }; // XXX: is this how we're supposed to get the device ID?
+        // Could be a cross-signing master key, but just say this is the device
+        // ID for backwards compat
+        const sigInfo = { deviceId: keyIdParts[1] };
 
         // first check to see if it's from our cross-signing key
         const crossSigningId = this._crossSigningInfo.getId();
-        if (crossSigningId === keyId) {
+        if (crossSigningId === sigInfo.deviceId) {
             sigInfo.cross_signing_key = crossSigningId;
             try {
                 await olmlib.verifySignature(
@@ -1027,7 +1028,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
 
         // Now look for a sig from a device
         // At some point this can probably go away and we'll just support
-        // it being signed by the SSK
+        // it being signed by the cross-signing master key
         const device = this._deviceList.getStoredDevice(
             this._userId, sigInfo.deviceId,
         );
@@ -1036,9 +1037,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
-                    // verifySignature modifies the object so we need to copy
-                    // if we verify more than one sig
-                    Object.assign({}, backupInfo.auth_data),
+                    backupInfo.auth_data,
                     this._userId,
                     device.deviceId,
                     device.getFingerprint(),
