@@ -296,8 +296,9 @@ Crypto.prototype.init = async function() {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<Array>} Array with public key metadata and encoded private
- *     recovery key which should be disposed of after displaying to the user.
+ * @returns {Promise<Array>} Array with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  */
 Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
     const decryption = new global.Olm.PkDecryption();
@@ -314,10 +315,11 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         } else {
             keyInfo.pubkey = decryption.generate_key();
         }
-        const encodedPrivateKey = encodeRecoveryKey(decryption.get_private_key());
-        return [keyInfo, encodedPrivateKey];
+        const privateKey = decryption.get_private_key();
+        const encodedPrivateKey = encodeRecoveryKey(privateKey);
+        return [keyInfo, encodedPrivateKey, privateKey];
     } finally {
-        decryption.free();
+        if (decryption) decryption.free();
     }
 };
 
@@ -788,7 +790,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                 throw new Error("Cross-signing master private key not available");
             }
         } finally {
-            signing.free();
+            if (signing) signing.free();
         }
 
         logger.info("Got matching private key from callback for new public master key");
@@ -950,8 +952,7 @@ Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
  */
 Crypto.prototype.checkKeyBackup = async function() {
     this._checkedForBackup = false;
-    const returnInfo = await this._checkAndStartKeyBackup();
-    return returnInfo;
+    return this._checkAndStartKeyBackup();
 };
 
 /**
@@ -998,13 +999,14 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
             continue;
         }
-        // Could be an SSK but just say this is the device ID for backwards compat
-        const sigInfo = { deviceId: keyIdParts[1] }; // XXX: is this how we're supposed to get the device ID?
+        // Could be a cross-signing master key, but just say this is the device
+        // ID for backwards compat
+        const sigInfo = { deviceId: keyIdParts[1] };
 
         // first check to see if it's from our cross-signing key
         const crossSigningId = this._crossSigningInfo.getId();
-        if (crossSigningId === keyId) {
-            sigInfo.cross_signing_key = crossSigningId;
+        if (crossSigningId === sigInfo.deviceId) {
+            sigInfo.crossSigningId = true;
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
@@ -1026,7 +1028,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
 
         // Now look for a sig from a device
         // At some point this can probably go away and we'll just support
-        // it being signed by the SSK
+        // it being signed by the cross-signing master key
         const device = this._deviceList.getStoredDevice(
             this._userId, sigInfo.deviceId,
         );
@@ -1035,9 +1037,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
-                    // verifySignature modifies the object so we need to copy
-                    // if we verify more than one sig
-                    Object.assign({}, backupInfo.auth_data),
+                    backupInfo.auth_data,
                     this._userId,
                     device.deviceId,
                     device.getFingerprint(),
@@ -1062,7 +1062,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         return (
             s.valid && (
                 (s.device && s.device.isVerified()) ||
-                (s.cross_signing_key)
+                (s.crossSigningId)
             )
         );
     });

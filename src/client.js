@@ -53,6 +53,7 @@ import { isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
+import { encodeBase64, decodeBase64 } from '../lib/crypto/olmlib';
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
@@ -672,6 +673,7 @@ MatrixClient.prototype.initCrypto = async function() {
         "crypto.warning",
         "crypto.devicesUpdated",
         "deviceVerificationChanged",
+        "userTrustStatusChanged",
         "crossSigning.keysChanged",
     ]);
 
@@ -1436,7 +1438,7 @@ MatrixClient.prototype.disableKeyBackup = function() {
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
  * @param {boolean} [opts.secureSecretStorage = false] Whether to use Secure
- *     Secret Storage (MSC1946) to store the key encrypting key backups.
+ *     Secret Storage to store the key encrypting key backups.
  *     Optional, defaults to false.
  *
  * @returns {Promise<object>} Object that can be passed to createKeyBackupVersion and
@@ -1450,30 +1452,35 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
         throw new Error("End-to-end encryption disabled");
     }
 
-    if (secureSecretStorage) {
-        logger.log("Preparing key backup version with Secure Secret Storage");
-
-        // Ensure Secure Secret Storage is ready for use
-        if (!this.hasSecretStorageKey()) {
-            throw new Error("Secure Secret Storage has no keys, needs bootstrapping");
-        }
-
-        throw new Error("Not yet implemented");
-    }
-
-    const [keyInfo, encodedPrivateKey] =
+    const [keyInfo, encodedPrivateKey, privateKey] =
         await this.createRecoveryKeyFromPassphrase(password);
 
+    if (secureSecretStorage) {
+        await this.storeSecret("m.megolm_backup.v1", encodeBase64(privateKey));
+        logger.info("Key backup private key stored in secret storage");
+    }
+
     // Reshape objects into form expected for key backup
+    const authData = {
+        public_key: keyInfo.pubkey,
+    };
+    if (keyInfo.passphrase) {
+        authData.private_key_salt = keyInfo.passphrase.salt;
+        authData.private_key_iterations = keyInfo.passphrase.iterations;
+    }
     return {
         algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-        auth_data: {
-            public_key: keyInfo.pubkey,
-            private_key_salt: keyInfo.passphrase.salt,
-            private_key_iterations: keyInfo.passphrase.iterations,
-        },
+        auth_data: authData,
         recovery_key: encodedPrivateKey,
     };
+};
+
+/**
+ * Check whether the key backup private key is stored in secret storage.
+ * @return {Promise<boolean>} Whether the backup key is stored.
+ */
+MatrixClient.prototype.isKeyBackupKeyStored = async function() {
+    return this.isSecretStored("m.megolm_backup.v1", false /* checkKey */);
 };
 
 /**
@@ -1493,13 +1500,13 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
         auth_data: info.auth_data,
     };
 
-    // Now sign the backup auth data. Do it as this device first because crypto._signObject
-    // is dumb and bluntly replaces the whole signatures block...
-    // this can probably go away very soon in favour of just signing with the SSK.
+    // Sign the backup auth data with the device key for backwards compat with
+    // older devices with cross-signing. This can probably go away very soon in
+    // favour of just signing with the cross-singing master key.
     await this._crypto._signObject(data.auth_data);
 
     if (this._crypto._crossSigningInfo.getId()) {
-        // now also sign the auth data with the master key
+        // now also sign the auth data with the cross-signing master key
         await this._crypto._crossSigningInfo.signObject(data.auth_data, "master");
     }
 
@@ -1507,11 +1514,15 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
         undefined, "POST", "/room_keys/version", undefined, data,
         {prefix: httpApi.PREFIX_UNSTABLE},
     );
-    this.enableKeyBackup({
-        algorithm: info.algorithm,
-        auth_data: info.auth_data,
-        version: res.version,
-    });
+
+    // We could assume everything's okay and enable directly, but this ensures
+    // we run the same signature verification that will be used for future
+    // sessions.
+    await this.checkKeyBackup();
+    if (!this.getKeyBackupEnabled()) {
+        logger.error("Key backup not usable even though we just created it");
+    }
+
     return res;
 };
 
@@ -1615,6 +1626,18 @@ MatrixClient.prototype.isValidRecoveryKey = function(recoveryKey) {
 
 MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
+/**
+ * Restore from an existing key backup via a passphrase.
+ *
+ * @param {string} password Passphrase
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
 MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     password, targetRoomId, targetSessionId, backupInfo,
 ) {
@@ -1624,6 +1647,39 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     );
 };
 
+/**
+ * Restore from an existing key backup via a private key stored in secret
+ * storage.
+ *
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
+MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
+    backupInfo, targetRoomId, targetSessionId,
+) {
+    const privKey = decodeBase64(await this.getSecret("m.megolm_backup.v1"));
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, backupInfo,
+    );
+};
+
+/**
+ * Restore from an existing key backup via an encoded recovery key.
+ *
+ * @param {string} recoveryKey Encoded recovery key
+ * @param {string} [targetRoomId] Room ID to target a specific room.
+ * Restores all rooms if omitted.
+ * @param {string} [targetSessionId] Session ID to target a specific session.
+ * Restores all sessions if omitted.
+ * @param {object} backupInfo Backup metadata from `checkKeyBackup`
+ * @return {Promise<object>} Status of restoration with `total` and `imported`
+ * key counts.
+ */
 MatrixClient.prototype.restoreKeyBackupWithRecoveryKey = function(
     recoveryKey, targetRoomId, targetSessionId, backupInfo,
 ) {
