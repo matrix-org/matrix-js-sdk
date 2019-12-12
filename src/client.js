@@ -1476,6 +1476,13 @@ MatrixClient.prototype.prepareKeyBackupVersion = async function(
 };
 
 /**
+ * Check whether the key backup private key is stored in secret storage.
+ */
+MatrixClient.prototype.isKeyBackupKeyStored = async function() {
+    return this.isSecretStored("m.megolm_backup.v1", false /* checkKey */);
+};
+
+/**
  * Create a new key backup version and enable it, using the information return
  * from prepareKeyBackupVersion.
  *
