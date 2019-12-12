@@ -1,19 +1,44 @@
 steps:
-  - label: ":eslint: Lint"
+  - label: ":eslint: JS Lint"
     command:
       - "yarn install"
-      - "yarn lint"
+      - "yarn lint:js"
     plugins:
       - docker#v3.0.1:
-          image: "node:10"
+          image: "node:12"
+
+  - label: ":tslint: TS Lint"
+    command:
+      - "yarn install"
+      - "yarn lint:ts"
+    plugins:
+      - docker#v3.0.1:
+          image: "node:12"
+
+  - label: ":typescript: Types Lint"
+    command:
+      - "yarn install"
+      - "yarn lint:types"
+    plugins:
+      - docker#v3.0.1:
+          image: "node:12"
+
+  - label: "🛠 Build"
+    command:
+      - "yarn install"
+      - "yarn build"
+    plugins:
+      - docker#v3.0.1:
+          image: "node:12"
 
   - label: ":jest: Tests"
     command:
       - "yarn install"
+      - "yarn build" # Needed for the tests to run - we don't build on install
       - "yarn test"
     plugins:
       - docker#v3.0.1:
-          image: "node:10"
+          image: "node:12"
 
   - label: "📃 Docs"
     command:
@@ -21,7 +46,7 @@ steps:
       - "yarn gendoc"
     plugins:
       - docker#v3.0.1:
-          image: "node:10"
+          image: "node:12"
 
   - wait
 

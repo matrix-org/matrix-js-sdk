@@ -201,9 +201,7 @@ if [ $dodist -eq 0 ]; then
     # global cache here to ensure we get the right thing.
     yarn cache clean
     yarn install
-    # We haven't tagged yet, so tell the dist script what version
-    # it's building
-    DIST_VERSION="$tag" yarn dist
+    yarn build
 
     popd
 
