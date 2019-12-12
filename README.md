@@ -9,7 +9,7 @@ Quickstart
 
 In a browser
 ------------
-Download either the full or minified version from
+Download the browser version from
 https://github.com/matrix-org/matrix-js-sdk/releases/latest and add that as a
 ``<script>`` to your page. There will be a global variable ``matrixcs``
 attached to ``window`` through which you can access the SDK. See below for how to
