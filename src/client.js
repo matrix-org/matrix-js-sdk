@@ -1519,7 +1519,7 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
     // sessions.
     await this.checkKeyBackup();
     if (!this.getKeyBackupEnabled()) {
-        throw new Error("Key backup not usable even though we just created it");
+        logger.error("Key backup not usable even though we just created it");
     }
 
     return res;
