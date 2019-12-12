@@ -53,7 +53,7 @@ import { isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
-import { encodeBase64 } from '../lib/crypto/olmlib';
+import { encodeBase64, decodeBase64 } from '../lib/crypto/olmlib';
 
 const SCROLLBACK_DELAY_MS = 3000;
 const CRYPTO_ENABLED = isCryptoAvailable();
@@ -1629,6 +1629,15 @@ MatrixClient.prototype.restoreKeyBackupWithPassword = async function(
     password, targetRoomId, targetSessionId, backupInfo,
 ) {
     const privKey = await keyFromAuthData(backupInfo.auth_data, password);
+    return this._restoreKeyBackup(
+        privKey, targetRoomId, targetSessionId, backupInfo,
+    );
+};
+
+MatrixClient.prototype.restoreKeyBackupWithSecretStorage = async function(
+    backupInfo, targetRoomId, targetSessionId,
+) {
+    const privKey = decodeBase64(await this.getSecret("m.megolm_backup.v1"));
     return this._restoreKeyBackup(
         privKey, targetRoomId, targetSessionId, backupInfo,
     );
