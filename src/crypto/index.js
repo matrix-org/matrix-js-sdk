@@ -319,7 +319,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         const encodedPrivateKey = encodeRecoveryKey(privateKey);
         return [keyInfo, encodedPrivateKey, privateKey];
     } finally {
-        decryption.free();
+        if (decryption) decryption.free();
     }
 };
 
@@ -790,7 +790,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                 throw new Error("Cross-signing master private key not available");
             }
         } finally {
-            signing.free();
+            if (signing) signing.free();
         }
 
         logger.info("Got matching private key from callback for new public master key");
