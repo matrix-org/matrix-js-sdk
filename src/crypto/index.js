@@ -1006,7 +1006,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         // first check to see if it's from our cross-signing key
         const crossSigningId = this._crossSigningInfo.getId();
         if (crossSigningId === sigInfo.deviceId) {
-            sigInfo.cross_signing_key = crossSigningId;
+            sigInfo.crossSigningId = true;
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
@@ -1062,7 +1062,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         return (
             s.valid && (
                 (s.device && s.device.isVerified()) ||
-                (s.cross_signing_key)
+                (s.crossSigningId)
             )
         );
     });
