@@ -11,7 +11,7 @@ import TestClient from '../TestClient';
 import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
-import {sleep} from "../../lib/utils";
+import {sleep} from "../../src/utils";
 
 const EventEmitter = require("events").EventEmitter;
 
