@@ -19,7 +19,7 @@ limitations under the License.
  * This way, the VerificationRequest can update its state based on events sent by the verifier.
  * Anything that is not sending is just routing through to the wrapped channel.
  */
-export default class RequestCallbackChannel {
+export class RequestCallbackChannel {
     constructor(request, channel) {
         this._request = request;
         this._channel = channel;

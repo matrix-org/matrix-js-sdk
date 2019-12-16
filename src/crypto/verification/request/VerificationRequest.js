@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../../logger';
-import RequestCallbackChannel from "./RequestCallbackChannel";
+import {logger} from '../../../logger';
+import {RequestCallbackChannel} from "./RequestCallbackChannel";
 import {EventEmitter} from 'events';
 import {
     newUnknownMethodError,
@@ -57,7 +57,7 @@ export const PHASE_DONE = 6;
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
  * @event "change" whenever the state of the request object has changed.
  */
-export default class VerificationRequest extends EventEmitter {
+export class VerificationRequest extends EventEmitter {
     constructor(channel, verificationMethods, userId, client) {
         super();
         this.channel = channel;

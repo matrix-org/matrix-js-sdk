@@ -16,7 +16,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * This is an internal module. MatrixBaseApis is currently only meant to be used
@@ -26,16 +25,15 @@ limitations under the License.
  */
 
 import { SERVICE_TYPES } from './service-types';
-import logger from './logger';
-
-const httpApi = require("./http-api");
-const utils = require("./utils");
-const PushProcessor = require("./pushprocessor");
+import {logger} from './logger';
+import {PushProcessor} from "./pushprocessor";
+import * as utils from "./utils";
+import {MatrixHttpApi, PREFIX_IDENTITY_V1, PREFIX_IDENTITY_V2, PREFIX_R0, PREFIX_UNSTABLE} from "./http-api";
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {
         case SERVICE_TYPES.IS:
-            return baseUrl + httpApi.PREFIX_IDENTITY_V2 + '/terms';
+            return baseUrl + PREFIX_IDENTITY_V2 + '/terms';
         case SERVICE_TYPES.IM:
             return baseUrl + '/_matrix/integrations/v1/terms';
         default:
@@ -83,7 +81,7 @@ function termsUrlForService(serviceType, baseUrl) {
  * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
  * Authorization header instead of query param to send the access token to the server.
  */
-function MatrixBaseApis(opts) {
+export function MatrixBaseApis(opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request"]);
 
     this.baseUrl = opts.baseUrl;
@@ -95,13 +93,13 @@ function MatrixBaseApis(opts) {
         idBaseUrl: opts.idBaseUrl,
         accessToken: opts.accessToken,
         request: opts.request,
-        prefix: httpApi.PREFIX_R0,
+        prefix: PREFIX_R0,
         onlyData: true,
         extraParams: opts.queryParams,
         localTimeoutMs: opts.localTimeoutMs,
         useAuthorizationHeader: opts.useAuthorizationHeader,
     };
-    this._http = new httpApi.MatrixHttpApi(this, httpOpts);
+    this._http = new MatrixHttpApi(this, httpOpts);
 
     this._txnCtr = 0;
 }
@@ -369,7 +367,7 @@ MatrixBaseApis.prototype.getSsoLoginUrl = function(redirectUrl, loginType) {
     }
     return this._http.getUrl("/login/"+loginType+"/redirect", {
         "redirectUrl": redirectUrl,
-    }, httpApi.PREFIX_R0);
+    }, PREFIX_R0);
 };
 
 /**
@@ -447,7 +445,7 @@ MatrixBaseApis.prototype.getFallbackAuthUrl = function(loginType, authSessionId)
 
     return this._http.getUrl(path, {
         session: authSessionId,
-    }, httpApi.PREFIX_R0);
+    }, PREFIX_R0);
 };
 
 // Room operations
@@ -499,7 +497,7 @@ MatrixBaseApis.prototype.fetchRelations =
         });
     const response = await this._http.authedRequest(
         undefined, "GET", path, null, null, {
-            prefix: httpApi.PREFIX_UNSTABLE,
+            prefix: PREFIX_UNSTABLE,
         },
     );
     return response;
@@ -1377,7 +1375,7 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
 MatrixBaseApis.prototype.addThreePidOnly = async function(data) {
     const path = "/account/3pid/add";
     const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+        PREFIX_R0 : PREFIX_UNSTABLE;
     return this._http.authedRequest(
         undefined, "POST", path, null, data, { prefix },
     );
@@ -1400,7 +1398,7 @@ MatrixBaseApis.prototype.addThreePidOnly = async function(data) {
 MatrixBaseApis.prototype.bindThreePid = async function(data) {
     const path = "/account/3pid/bind";
     const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+        PREFIX_R0 : PREFIX_UNSTABLE;
     return this._http.authedRequest(
         undefined, "POST", path, null, data, { prefix },
     );
@@ -1425,7 +1423,7 @@ MatrixBaseApis.prototype.unbindThreePid = async function(medium, address) {
         id_server: this.getIdentityServerUrl(true),
     };
     const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
+        PREFIX_R0 : PREFIX_UNSTABLE;
     return this._http.authedRequest(
         undefined, "POST", path, null, data, { prefix },
     );
@@ -1722,7 +1720,7 @@ MatrixBaseApis.prototype.uploadKeySignatures = function(content) {
     return this._http.authedRequest(
         undefined, "POST", '/keys/signatures/upload', undefined,
         content, {
-            prefix: httpApi.PREFIX_UNSTABLE,
+            prefix: PREFIX_UNSTABLE,
         },
     );
 };
@@ -1815,7 +1813,7 @@ MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
     const data = Object.assign({}, keys, {auth});
     return this._http.authedRequest(
         undefined, "POST", "/keys/device_signing/upload", undefined, data, {
-            prefix: httpApi.PREFIX_UNSTABLE,
+            prefix: PREFIX_UNSTABLE,
         },
     );
 };
@@ -1841,7 +1839,7 @@ MatrixBaseApis.prototype.registerWithIdentityServer = function(hsOpenIdToken) {
         throw new Error("No Identity Server base URL set");
     }
 
-    const uri = this.idBaseUrl + httpApi.PREFIX_IDENTITY_V2 + "/account/register";
+    const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
     return this._http.requestOtherUrl(
         undefined, "POST", uri,
         null, hsOpenIdToken,
@@ -1890,7 +1888,7 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
     try {
         const response = await this._http.idServerRequest(
             undefined, "POST", "/validate/email/requestToken",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
         // TODO: Fold callback into above call once v1 path below is removed
         if (callback) callback(null, response);
@@ -1903,7 +1901,7 @@ MatrixBaseApis.prototype.requestEmailToken = async function(
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "POST", "/validate/email/requestToken",
-                params, httpApi.PREFIX_IDENTITY_V1,
+                params, PREFIX_IDENTITY_V1,
             );
         }
         if (callback) callback(err);
@@ -1958,7 +1956,7 @@ MatrixBaseApis.prototype.requestMsisdnToken = async function(
     try {
         const response = await this._http.idServerRequest(
             undefined, "POST", "/validate/msisdn/requestToken",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
         // TODO: Fold callback into above call once v1 path below is removed
         if (callback) callback(null, response);
@@ -1971,7 +1969,7 @@ MatrixBaseApis.prototype.requestMsisdnToken = async function(
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "POST", "/validate/msisdn/requestToken",
-                params, httpApi.PREFIX_IDENTITY_V1,
+                params, PREFIX_IDENTITY_V1,
             );
         }
         if (callback) callback(err);
@@ -2013,7 +2011,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
     try {
         return await this._http.idServerRequest(
             undefined, "POST", "/validate/msisdn/submitToken",
-            params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+            params, PREFIX_IDENTITY_V2, identityAccessToken,
         );
     } catch (err) {
         if (err.cors === "rejected" || err.httpStatus === 404) {
@@ -2023,7 +2021,7 @@ MatrixBaseApis.prototype.submitMsisdnToken = async function(
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 undefined, "POST", "/validate/msisdn/submitToken",
-                params, httpApi.PREFIX_IDENTITY_V1,
+                params, PREFIX_IDENTITY_V1,
             );
         }
         throw err;
@@ -2074,7 +2072,7 @@ MatrixBaseApis.prototype.submitMsisdnTokenOtherUrl = function(
 MatrixBaseApis.prototype.getIdentityHashDetails = function(identityAccessToken) {
     return this._http.idServerRequest(
         undefined, "GET", "/hash_details",
-        null, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        null, PREFIX_IDENTITY_V2, identityAccessToken,
     );
 };
 
@@ -2143,7 +2141,7 @@ MatrixBaseApis.prototype.identityHashedLookup = async function(
 
     const response = await this._http.idServerRequest(
         undefined, "POST", "/lookup",
-        params, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        params, PREFIX_IDENTITY_V2, identityAccessToken,
     );
 
     if (!response || !response['mappings']) return []; // no results
@@ -2223,7 +2221,7 @@ MatrixBaseApis.prototype.lookupThreePid = async function(
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 callback, "GET", "/lookup",
-                params, httpApi.PREFIX_IDENTITY_V1,
+                params, PREFIX_IDENTITY_V1,
             );
         }
         if (callback) callback(err, undefined);
@@ -2281,7 +2279,7 @@ MatrixBaseApis.prototype.bulkLookupThreePids = async function(
             logger.warn("IS doesn't support v2, falling back to deprecated v1");
             return await this._http.idServerRequest(
                 undefined, "POST", "/bulk_lookup", params,
-                httpApi.PREFIX_IDENTITY_V1, identityAccessToken,
+                PREFIX_IDENTITY_V1, identityAccessToken,
             );
         }
         throw err;
@@ -2304,7 +2302,7 @@ MatrixBaseApis.prototype.getIdentityAccount = function(
 ) {
     return this._http.idServerRequest(
         undefined, "GET", "/account",
-        undefined, httpApi.PREFIX_IDENTITY_V2, identityAccessToken,
+        undefined, PREFIX_IDENTITY_V2, identityAccessToken,
     );
 };
 
@@ -2432,7 +2430,3 @@ MatrixBaseApis.prototype.reportEvent = function(roomId, eventId, score, reason) 
     return this._http.authedRequest(undefined, "POST", path, null, {score, reason});
 };
 
-/**
- * MatrixBaseApis object
- */
-module.exports = MatrixBaseApis;

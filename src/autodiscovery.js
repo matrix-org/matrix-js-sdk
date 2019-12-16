@@ -17,7 +17,7 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import logger from './logger';
+import {logger} from './logger';
 import { URL as NodeURL } from "url";
 
 // Dev note: Auto discovery is part of the spec.

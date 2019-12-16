@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,28 +14,11 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * @module crypto/algorithms
  */
 
-const base = require("./base");
-
-require("./olm");
-require("./megolm");
-
-/**
- * @see module:crypto/algorithms/base.ENCRYPTION_CLASSES
- */
-module.exports.ENCRYPTION_CLASSES = base.ENCRYPTION_CLASSES;
-
-/**
- * @see module:crypto/algorithms/base.DECRYPTION_CLASSES
- */
-module.exports.DECRYPTION_CLASSES = base.DECRYPTION_CLASSES;
-
-/**
- * @see module:crypto/algorithms/base.DecryptionError
- */
-module.exports.DecryptionError = base.DecryptionError;
+import "./olm";
+import "./megolm";
+export * from "./base";

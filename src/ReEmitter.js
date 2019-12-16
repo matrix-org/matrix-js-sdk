@@ -20,7 +20,7 @@ limitations under the License.
  * @module
  */
 
-export default class Reemitter {
+export class ReEmitter {
     constructor(target) {
         this.target = target;
 

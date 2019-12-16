@@ -15,10 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import LocalStorageCryptoStore from './localStorage-crypto-store';
-import MemoryCryptoStore from './memory-crypto-store';
-import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
+import {logger} from '../../logger';
+import {LocalStorageCryptoStore} from './localStorage-crypto-store';
+import {MemoryCryptoStore} from './memory-crypto-store';
+import {Backend as IndexedDBCryptoStoreBackend} from './indexeddb-crypto-store-backend';
 import {InvalidCryptoStoreError} from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 
@@ -34,7 +34,7 @@ import * as IndexedDBHelpers from "../../indexeddb-helpers";
  *
  * @implements {module:crypto/store/base~CryptoStore}
  */
-export default class IndexedDBCryptoStore {
+export class IndexedDBCryptoStore {
     /**
      * Create a new IndexedDBCryptoStore
      *

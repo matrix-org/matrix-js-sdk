@@ -1,5 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,5 +21,5 @@ limitations under the License.
  */
 
 /** The {@link module:indexeddb-store-worker~IndexedDBStoreWorker} class. */
-module.exports.IndexedDBStoreWorker = require("./store/indexeddb-store-worker.js");
+export {IndexedDBStoreWorker} from "./store/indexeddb-store-worker";
 

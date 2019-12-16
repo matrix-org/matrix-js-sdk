@@ -1,5 +1,6 @@
 /*
 Copyright 2017 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +18,9 @@ limitations under the License.
 /**
  * @module models/group
  */
-const EventEmitter = require("events").EventEmitter;
 
-const utils = require("../utils");
+import * as utils from "../utils";
+import {EventEmitter} from "events";
 
 /**
  * Construct a new Group.
@@ -34,7 +35,7 @@ const utils = require("../utils");
  *       to the group, if myMembership is 'invite'.
  * @prop {string} inviter.userId The user ID of the inviter
  */
-function Group(groupId) {
+export function Group(groupId) {
     this.groupId = groupId;
     this.name = null;
     this.avatarUrl = null;
@@ -69,8 +70,6 @@ Group.prototype.setMyMembership = function(membership) {
 Group.prototype.setInviter = function(inviter) {
     this.inviter = inviter;
 };
-
-module.exports = Group;
 
 /**
  * Fires whenever a group's profile information is updated.

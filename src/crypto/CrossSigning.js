@@ -22,7 +22,7 @@ limitations under the License.
 
 import {pkSign, pkVerify, encodeBase64, decodeBase64} from './olmlib';
 import {EventEmitter} from 'events';
-import logger from '../logger';
+import {logger} from '../logger';
 
 function publicKeyFromKeyInfo(keyInfo) {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }

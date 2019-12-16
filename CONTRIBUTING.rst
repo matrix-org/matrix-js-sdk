@@ -36,8 +36,15 @@ minutes.
 Code style
 ~~~~~~~~~~
 
-The code-style for matrix-js-sdk is not formally documented, but contributors
-are encouraged to read the code style document for matrix-react-sdk
+The js-sdk aims to target TypeScript/ES6. All new files should be written in
+TypeScript and existing files should use ES6 principles where possible.
+
+Members should not be exported as a default export - this is to prevent problems
+down the line when importing various bits of code in other layers and in the
+index for this project. In short, don't use `export default`.
+
+The remaining code-style for matrix-js-sdk is not formally documented, but
+contributors are encouraged to read the code style document for matrix-react-sdk
 (`<https://github.com/matrix-org/matrix-react-sdk/blob/master/code_style.md>`_)
 and follow the principles set out there.
 

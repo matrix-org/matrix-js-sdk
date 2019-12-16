@@ -14,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * Defines m.olm encryption/decryption
@@ -22,11 +21,10 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import logger from '../../logger';
-
-const utils = require("../../utils");
-const olmlib = require("../olmlib");
-const base = require("./base");
+import {logger} from '../../logger';
+import * as utils from "../../utils";
+import * as olmlib from "../olmlib";
+import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm, UnknownDeviceError} from "./base";
 
 /**
  * @private
@@ -128,13 +126,13 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
  * Megolm encryption implementation
  *
  * @constructor
- * @extends {module:crypto/algorithms/base.EncryptionAlgorithm}
+ * @extends {module:crypto/algorithms/EncryptionAlgorithm}
  *
  * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/base.EncryptionAlgorithm}
+ *     {@link module:crypto/algorithms/EncryptionAlgorithm}
  */
 function MegolmEncryption(params) {
-    base.EncryptionAlgorithm.call(this, params);
+    EncryptionAlgorithm.call(this, params);
 
     // the most recent attempt to set up a session. This is used to serialise
     // the session setups, so that we have a race-free view of which session we
@@ -160,7 +158,7 @@ function MegolmEncryption(params) {
         this._sessionRotationPeriodMsgs = params.config.rotation_period_msgs;
     }
 }
-utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
+utils.inherits(MegolmEncryption, EncryptionAlgorithm);
 
 /**
  * @private
@@ -643,7 +641,7 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
 
     if (Object.keys(unknownDevices).length) {
         // it'd be kind to pass unknownDevices up to the user in this error
-        throw new base.UnknownDeviceError(
+        throw new UnknownDeviceError(
             "This room contains unknown devices which have not been verified. " +
             "We strongly recommend you verify them before continuing.", unknownDevices);
     }
@@ -703,13 +701,13 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
  * Megolm decryption implementation
  *
  * @constructor
- * @extends {module:crypto/algorithms/base.DecryptionAlgorithm}
+ * @extends {module:crypto/algorithms/DecryptionAlgorithm}
  *
  * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/base.DecryptionAlgorithm}
+ *     {@link module:crypto/algorithms/DecryptionAlgorithm}
  */
 function MegolmDecryption(params) {
-    base.DecryptionAlgorithm.call(this, params);
+    DecryptionAlgorithm.call(this, params);
 
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
     // senderKey|sessionId to Set of MatrixEvents
@@ -718,7 +716,7 @@ function MegolmDecryption(params) {
     // this gets stubbed out by the unit tests.
     this.olmlib = olmlib;
 }
-utils.inherits(MegolmDecryption, base.DecryptionAlgorithm);
+utils.inherits(MegolmDecryption, DecryptionAlgorithm);
 
 /**
  * @inheritdoc
@@ -736,7 +734,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     if (!content.sender_key || !content.session_id ||
         !content.ciphertext
        ) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "MEGOLM_MISSING_FIELDS",
             "Missing fields in input",
         );
@@ -764,7 +762,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
         }
 
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             errorCode,
             e ? e.toString() : "Unknown Error: Error is undefined", {
                 session: content.sender_key + '|' + content.session_id,
@@ -781,7 +779,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         // event is still in the pending list; if not, a retry will have been
         // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
             "The sender's device has not sent us the keys for this message.",
             {
@@ -800,7 +798,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
     // (this is somewhat redundant, since the megolm session is scoped to the
     // room, so neither the sender nor a MITM can lie about the room_id).
     if (payload.room_id !== event.getRoomId()) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "MEGOLM_BAD_ROOM",
             "Message intended for room " + payload.room_id,
         );
@@ -1125,6 +1123,6 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
     return !this._pendingEvents[k];
 };
 
-base.registerAlgorithm(
+registerAlgorithm(
     olmlib.MEGOLM_ALGORITHM, MegolmEncryption, MegolmDecryption,
 );

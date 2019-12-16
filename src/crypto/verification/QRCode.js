@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/QRCode
  */
 
-import Base from "./Base";
+import {VerificationBase as Base} from "./Base";
 import {
     errorFactory,
     newUserCancelledError,

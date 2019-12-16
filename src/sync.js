@@ -2,6 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +16,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /*
  * TODO:
@@ -25,15 +25,15 @@ limitations under the License.
  * an alternative syncing API, we may want to have a proper syncing interface
  * for HTTP and WS at some point.
  */
-const User = require("./models/user");
-const Room = require("./models/room");
-const Group = require('./models/group');
-const utils = require("./utils");
-const Filter = require("./filter");
-const EventTimeline = require("./models/event-timeline");
-const PushProcessor = require("./pushprocessor");
-import logger from './logger';
 
+import {User} from "./models/user";
+import {Room} from "./models/room";
+import {Group} from "./models/group";
+import * as utils from "./utils";
+import {Filter} from "./filter";
+import {EventTimeline} from "./models/event-timeline";
+import {PushProcessor} from "./pushprocessor";
+import {logger} from './logger';
 import {InvalidStoreError} from './errors';
 
 const DEBUG = true;
@@ -78,7 +78,7 @@ function debuglog(...params) {
  * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
  * updating presence.
  */
-function SyncApi(client, opts) {
+export function SyncApi(client, opts) {
     this.client = client;
     opts = opts || {};
     opts.initialSyncLimit = (
@@ -1697,5 +1697,3 @@ function createNewUser(client, userId) {
     return user;
 }
 
-/** */
-module.exports = SyncApi;

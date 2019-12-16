@@ -15,23 +15,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * @module models/room
  */
-const EventEmitter = require("events").EventEmitter;
 
-const EventStatus = require("./event").EventStatus;
-const RoomSummary = require("./room-summary");
-const RoomMember = require("./room-member");
-const MatrixEvent = require("./event").MatrixEvent;
-const utils = require("../utils");
-const ContentRepo = require("../content-repo");
-const EventTimeline = require("./event-timeline");
-const EventTimelineSet = require("./event-timeline-set");
-
-import logger from '../logger';
-import ReEmitter from '../ReEmitter';
+import {EventEmitter} from "events";
+import {EventTimelineSet} from "./event-timeline-set";
+import {EventTimeline} from "./event-timeline";
+import * as ContentRepo from "../content-repo";
+import * as utils from "../utils";
+import {MatrixEvent} from "./event";
+import {RoomMember} from "./room-member";
+import {RoomSummary} from "./room-summary";
+import {EventStatus} from "./event";
+import {logger} from '../logger';
+import {ReEmitter} from '../ReEmitter';
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -120,7 +119,7 @@ function synthesizeReceipt(userId, event, receiptType) {
  * @prop {*} storageToken A token which a data store can use to remember
  * the state of the room.
  */
-function Room(roomId, client, myUserId, opts) {
+export function Room(roomId, client, myUserId, opts) {
     opts = opts || {};
     opts.pendingEventOrdering = opts.pendingEventOrdering || "chronological";
 
@@ -1910,11 +1909,6 @@ function memberNamesToRoomName(names, count = (names.length + 1)) {
         }
     }
 }
-
-/**
- * The Room class.
- */
-module.exports = Room;
 
 /**
  * Fires when an event we had previously received is redacted.
