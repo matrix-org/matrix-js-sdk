@@ -16,6 +16,9 @@ limitations under the License.
 
 import '../../olm-loader';
 
+import expect from 'expect';
+import Promise from 'bluebird';
+
 import sdk from '../../..';
 import algorithms from '../../../lib/crypto/algorithms';
 import WebStorageSessionStore from '../../../lib/store/session/webstorage';
@@ -25,8 +28,7 @@ import testUtils from '../../test-utils';
 
 import OlmDevice from '../../../lib/crypto/OlmDevice';
 import Crypto from '../../../lib/crypto';
-import logger from '../../../lib/logger';
-import olmlib from '../../../lib/crypto/olmlib';
+import logger from '../../../src/logger';
 
 const Olm = global.Olm;
 
@@ -81,30 +83,20 @@ const BACKUP_INFO = {
     },
 };
 
-const keys = {};
-
-function getCrossSigningKey(type) {
-    return keys[type];
-}
-
-function saveCrossSigningKeys(k) {
-    Object.assign(keys, k);
-}
-
 function makeTestClient(sessionStore, cryptoStore) {
     const scheduler = [
         "getQueueForEvent", "queueEvent", "removeEventFromQueue",
         "setProcessFunction",
-    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
+    ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
     const store = [
         "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
         "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
         "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
         "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
-    store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
-    store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
-    store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
+    ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
+    store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+    store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+    store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
     return new MatrixClient({
         baseUrl: "https://my.home.server",
         idBaseUrl: "https://identity.server",
@@ -116,7 +108,6 @@ function makeTestClient(sessionStore, cryptoStore) {
         deviceId: "device",
         sessionStore: sessionStore,
         cryptoStore: cryptoStore,
-        cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys },
     });
 }
 
@@ -126,10 +117,6 @@ describe("MegolmBackup", function() {
         return;
     }
 
-    beforeAll(function() {
-        return Olm.init();
-    });
-
     let olmDevice;
     let mockOlmLib;
     let mockCrypto;
@@ -138,6 +125,9 @@ describe("MegolmBackup", function() {
     let cryptoStore;
     let megolmDecryption;
     beforeEach(async function() {
+        await Olm.init();
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
@@ -153,9 +143,9 @@ describe("MegolmBackup", function() {
 
         // we stub out the olm encryption bits
         mockOlmLib = {};
-        mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
+        mockOlmLib.ensureOlmSessionsForDevices = expect.createSpy();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockResolvedValue(undefined);
+            expect.createSpy().andReturn(Promise.resolve());
     });
 
     describe("backup", function() {
@@ -216,7 +206,7 @@ describe("MegolmBackup", function() {
             };
             mockCrypto.cancelRoomKeyRequest = function() {};
 
-            mockCrypto.backupGroupSession = jest.fn();
+            mockCrypto.backupGroupSession = expect.createSpy();
 
             return event.attemptDecryption(mockCrypto).then(() => {
                 return megolmDecryption.onRoomKeyEvent(event);
@@ -277,7 +267,7 @@ describe("MegolmBackup", function() {
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
-                            expect(numCalls).toBeLessThanOrEqual(1);
+                            expect(numCalls).toBeLessThanOrEqualTo(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
@@ -286,8 +276,8 @@ describe("MegolmBackup", function() {
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe(1);
-                            expect(data.rooms[ROOM_ID].sessions).toBeDefined();
-                            expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                            expect(data.rooms[ROOM_ID].sessions).toExist();
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(
                                 groupSession.session_id(),
                             );
                             resolve();
@@ -306,71 +296,6 @@ describe("MegolmBackup", function() {
                 });
         });
 
-        it('signs backups with the cross-signing master key', async function() {
-            const groupSession = new Olm.OutboundGroupSession();
-            groupSession.create();
-            const ibGroupSession = new Olm.InboundGroupSession();
-            ibGroupSession.create(groupSession.session_key());
-
-            const client = makeTestClient(sessionStore, cryptoStore);
-
-            megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
-                crypto: mockCrypto,
-                olmDevice: olmDevice,
-                baseApis: client,
-                roomId: ROOM_ID,
-            });
-
-            megolmDecryption.olmlib = mockOlmLib;
-
-            await client.initCrypto();
-            let privateKeys;
-            client.uploadDeviceSigningKeys = async function(e) {return;};
-            client.uploadKeySignatures = async function(e) {return;};
-            client.on("crossSigning.saveCrossSigningKeys", function(e) {
-                privateKeys = e;
-            });
-            client.on("crossSigning.getKey", function(e) {
-                e.done(privateKeys[e.type]);
-            });
-            await client.resetCrossSigningKeys();
-            let numCalls = 0;
-            await new Promise((resolve, reject) => {
-                client._http.authedRequest = function(
-                    callback, method, path, queryParams, data, opts,
-                ) {
-                    ++numCalls;
-                    expect(numCalls).toBeLessThanOrEqual(1);
-                    if (numCalls >= 2) {
-                        // exit out of retry loop if there's something wrong
-                        reject(new Error("authedRequest called too many timmes"));
-                        return Promise.resolve({});
-                    }
-                    expect(method).toBe("POST");
-                    expect(path).toBe("/room_keys/version");
-                    try {
-                        // make sure auth_data is signed by the master key
-                        olmlib.pkVerify(
-                            data.auth_data, client.getCrossSigningId(), "@alice:bar",
-                        );
-                    } catch (e) {
-                        reject(e);
-                        return Promise.resolve({});
-                    }
-                    resolve();
-                    return Promise.resolve({});
-                };
-                client.createKeyBackupVersion({
-                    algorithm: "m.megolm_backup.v1",
-                    auth_data: {
-                        public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-                    },
-                });
-            });
-            expect(numCalls).toBe(1);
-        });
-
         it('retries when a backup fails', function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
@@ -380,16 +305,16 @@ describe("MegolmBackup", function() {
             const scheduler = [
                 "getQueueForEvent", "queueEvent", "removeEventFromQueue",
                 "setProcessFunction",
-            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
             const store = [
                 "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
                 "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom",
                 "storeUser", "getFilterIdByName", "setFilterIdByName", "getFilter",
                 "storeFilter", "getSyncAccumulator", "startup", "deleteAllData",
-            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {});
-            store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
-            store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
-            store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
+            ].reduce((r, k) => {r[k] = expect.createSpy(); return r;}, {});
+            store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+            store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+            store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
             const client = new MatrixClient({
                 baseUrl: "https://my.home.server",
                 idBaseUrl: "https://identity.server",
@@ -447,7 +372,7 @@ describe("MegolmBackup", function() {
                             callback, method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
-                            expect(numCalls).toBeLessThanOrEqual(2);
+                            expect(numCalls).toBeLessThanOrEqualTo(2);
                             if (numCalls >= 3) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
@@ -456,8 +381,8 @@ describe("MegolmBackup", function() {
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe(1);
-                            expect(data.rooms[ROOM_ID].sessions).toBeDefined();
-                            expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                            expect(data.rooms[ROOM_ID].sessions).toExist();
+                            expect(data.rooms[ROOM_ID].sessions).toIncludeKey(
                                 groupSession.session_id(),
                             );
                             if (numCalls > 1) {

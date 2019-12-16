@@ -6,6 +6,9 @@ const utils = require("../test-utils");
 const MatrixEvent = sdk.MatrixEvent;
 const EventTimeline = sdk.EventTimeline;
 
+import expect from 'expect';
+import Promise from 'bluebird';
+
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
     let client = null;
@@ -20,6 +23,7 @@ describe("MatrixClient syncing", function() {
     const roomTwo = "!bar:localhost";
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -49,7 +53,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().then(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -63,7 +67,7 @@ describe("MatrixClient syncing", function() {
 
             client.startClient();
 
-            httpBackend.flushAllExpected().then(function() {
+            httpBackend.flushAllExpected().done(function() {
                 done();
             });
         });
@@ -524,7 +528,7 @@ describe("MatrixClient syncing", function() {
                 awaitSyncEvent(),
             ]).then(function() {
                 const room = client.getRoom(roomTwo);
-                expect(room).toBeDefined();
+                expect(room).toExist();
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("roomtwotok");
@@ -689,12 +693,12 @@ describe("MatrixClient syncing", function() {
                             include_leave: true }});
             }).respond(200, { filter_id: "another_id" });
 
-            const prom = new Promise((resolve) => {
-                httpBackend.when("GET", "/sync").check(function(req) {
-                    expect(req.queryParams.filter).toEqual("another_id");
-                    resolve();
-                }).respond(200, {});
-            });
+            const defer = Promise.defer();
+
+            httpBackend.when("GET", "/sync").check(function(req) {
+                expect(req.queryParams.filter).toEqual("another_id");
+                defer.resolve();
+            }).respond(200, {});
 
             client.syncLeftRooms();
 
@@ -705,7 +709,7 @@ describe("MatrixClient syncing", function() {
                     // flush the syncs
                     return httpBackend.flushAllExpected();
                 }),
-                prom,
+                defer.promise,
             ]);
         });
 

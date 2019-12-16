@@ -5,6 +5,8 @@ const RoomState = sdk.RoomState;
 const RoomMember = sdk.RoomMember;
 const utils = require("../test-utils");
 
+import expect from 'expect';
+
 describe("RoomState", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
@@ -15,6 +17,7 @@ describe("RoomState", function() {
     let state;
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         state = new RoomState(roomId);
         state.setStateEvents([
             utils.mkMembership({  // userA joined
@@ -46,8 +49,8 @@ describe("RoomState", function() {
             const members = state.getMembers();
             expect(members.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(members[0].userId)).not.toEqual(-1);
-            expect([userA, userB].indexOf(members[1].userId)).not.toEqual(-1);
+            expect([userA, userB].indexOf(members[0].userId)).toNotEqual(-1);
+            expect([userA, userB].indexOf(members[1].userId)).toNotEqual(-1);
         });
     });
 
@@ -117,8 +120,8 @@ describe("RoomState", function() {
             const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(events[0].getStateKey())).not.toEqual(-1);
-            expect([userA, userB].indexOf(events[1].getStateKey())).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[0].getStateKey())).toNotEqual(-1);
+            expect([userA, userB].indexOf(events[1].getStateKey())).toNotEqual(-1);
         });
 
         it("should return a single MatrixEvent if a state_key was specified",
@@ -255,7 +258,7 @@ describe("RoomState", function() {
             });
             state.setStateEvents([memberEvent]);
 
-            expect(state.members[userA].setMembershipEvent).not.toHaveBeenCalled();
+            expect(state.members[userA].setMembershipEvent).toNotHaveBeenCalled();
             expect(state.members[userB].setMembershipEvent).toHaveBeenCalledWith(
                 memberEvent, state,
             );
@@ -303,7 +306,7 @@ describe("RoomState", function() {
             state.markOutOfBandMembersStarted();
             state.setOutOfBandMembers([oobMemberEvent]);
             const memberA = state.getMember(userA);
-            expect(memberA.events.member.getId()).not.toEqual(oobMemberEvent.getId());
+            expect(memberA.events.member.getId()).toNotEqual(oobMemberEvent.getId());
             expect(memberA.isOutOfBand()).toEqual(false);
         });
 

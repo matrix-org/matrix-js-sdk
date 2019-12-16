@@ -19,10 +19,11 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  * @module http-api
  */
+import Promise from 'bluebird';
 const parseContentType = require('content-type').parse;
 
 const utils = require("./utils");
-import logger from './logger';
+import logger from '../src/logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -255,7 +256,7 @@ module.exports.MatrixHttpApi.prototype = {
         }
 
         if (global.XMLHttpRequest) {
-            const defer = utils.defer();
+            const defer = Promise.defer();
             const xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
@@ -417,7 +418,7 @@ module.exports.MatrixHttpApi.prototype = {
             opts.headers['Authorization'] = `Bearer ${accessToken}`;
         }
 
-        const defer = utils.defer();
+        const defer = Promise.defer();
         this.opts.request(
             opts,
             requestCallback(defer, callback, this.opts.onlyData),
@@ -681,7 +682,7 @@ module.exports.MatrixHttpApi.prototype = {
             }
         }
 
-        const defer = utils.defer();
+        const defer = Promise.defer();
 
         let timeoutId;
         let timedOut = false;

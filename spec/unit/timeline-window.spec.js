@@ -1,11 +1,13 @@
 "use strict";
 import 'source-map-support/register';
+import Promise from 'bluebird';
 const sdk = require("../..");
 const EventTimeline = sdk.EventTimeline;
 const TimelineWindow = sdk.TimelineWindow;
 const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
 
 const utils = require("../test-utils");
+import expect from 'expect';
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";
@@ -65,6 +67,10 @@ function createLinkedTimelines() {
 
 
 describe("TimelineIndex", function() {
+    beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+    });
+
     describe("minIndex", function() {
         it("should return the min index relative to BaseIndex", function() {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
@@ -147,7 +153,7 @@ describe("TimelineWindow", function() {
     let timelineSet;
     let client;
     function createWindow(timeline, opts) {
-        timelineSet = {getTimelineForEvent: () => null};
+        timelineSet = {};
         client = {};
         client.getEventTimeline = function(timelineSet0, eventId0) {
             expect(timelineSet0).toBe(timelineSet);
@@ -157,8 +163,12 @@ describe("TimelineWindow", function() {
         return new TimelineWindow(client, timelineSet, opts);
     }
 
+    beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+    });
+
     describe("load", function() {
-        it("should initialise from the live timeline", function() {
+        it("should initialise from the live timeline", function(done) {
             const liveTimeline = createTimeline();
             const room = {};
             room.getLiveTimeline = function() {
@@ -166,17 +176,17 @@ describe("TimelineWindow", function() {
             };
 
             const timelineWindow = new TimelineWindow(undefined, room);
-            return timelineWindow.load(undefined, 2).then(function() {
+            timelineWindow.load(undefined, 2).then(function() {
                 const expectedEvents = liveTimeline.getEvents().slice(1);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            });
+            }).nodeify(done);
         });
 
-        it("should initialise from a specific event", function() {
+        it("should initialise from a specific event", function(done) {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {getTimelineForEvent: () => null};
+            const timelineSet = {};
             const client = {};
             client.getEventTimeline = function(timelineSet0, eventId0) {
                 expect(timelineSet0).toBe(timelineSet);
@@ -185,20 +195,21 @@ describe("TimelineWindow", function() {
             };
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            });
+            }).nodeify(done);
         });
 
-        it("canPaginate should return false until load has returned", function() {
+        it("canPaginate should return false until load has returned",
+           function(done) {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok1", EventTimeline.BACKWARDS);
             timeline.setPaginationToken("toktok2", EventTimeline.FORWARDS);
 
             const eventId = timeline.getEvents()[1].getId();
 
-            const timelineSet = {getTimelineForEvent: () => null};
+            const timelineSet = {};
             const client = {};
 
             const timelineWindow = new TimelineWindow(client, timelineSet);
@@ -211,24 +222,25 @@ describe("TimelineWindow", function() {
                 return Promise.resolve(timeline);
             };
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
                 expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
                     .toBe(true);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(true);
-            });
+            }).nodeify(done);
         });
     });
 
     describe("pagination", function() {
-        it("should be able to advance across the initial timeline", function() {
+        it("should be able to advance across the initial timeline",
+           function(done) {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
             const timelineWindow = createWindow(timeline);
 
-            return timelineWindow.load(eventId, 1).then(function() {
+            timelineWindow.load(eventId, 1).then(function() {
                 const expectedEvents = [timeline.getEvents()[1]];
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -265,15 +277,15 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.BACKWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            });
+            }).nodeify(done);
         });
 
-        it("should advance into next timeline", function() {
+        it("should advance into next timeline", function(done) {
             const tls = createLinkedTimelines();
             const eventId = tls[0].getEvents()[1].getId();
             const timelineWindow = createWindow(tls[0], {windowLimit: 5});
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = tls[0].getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -310,15 +322,15 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.FORWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            });
+            }).nodeify(done);
         });
 
-        it("should retreat into previous timeline", function() {
+        it("should retreat into previous timeline", function(done) {
             const tls = createLinkedTimelines();
             const eventId = tls[1].getEvents()[1].getId();
             const timelineWindow = createWindow(tls[1], {windowLimit: 5});
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = tls[1].getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -355,10 +367,10 @@ describe("TimelineWindow", function() {
                 return timelineWindow.paginate(EventTimeline.BACKWARDS, 2);
             }).then(function(success) {
                 expect(success).toBe(false);
-            });
+            }).nodeify(done);
         });
 
-        it("should make forward pagination requests", function() {
+        it("should make forward pagination requests", function(done) {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
@@ -374,7 +386,7 @@ describe("TimelineWindow", function() {
                 return Promise.resolve(true);
             };
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -387,11 +399,11 @@ describe("TimelineWindow", function() {
                 expect(success).toBe(true);
                 const expectedEvents = timeline.getEvents().slice(0, 5);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            });
+            }).nodeify(done);
         });
 
 
-        it("should make backward pagination requests", function() {
+        it("should make backward pagination requests", function(done) {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.BACKWARDS);
 
@@ -407,7 +419,7 @@ describe("TimelineWindow", function() {
                 return Promise.resolve(true);
             };
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -420,10 +432,11 @@ describe("TimelineWindow", function() {
                 expect(success).toBe(true);
                 const expectedEvents = timeline.getEvents().slice(1, 6);
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
-            });
+            }).nodeify(done);
         });
 
-        it("should limit the number of unsuccessful pagination requests", function() {
+        it("should limit the number of unsuccessful pagination requests",
+        function(done) {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
@@ -439,7 +452,7 @@ describe("TimelineWindow", function() {
                 return Promise.resolve(true);
             };
 
-            return timelineWindow.load(eventId, 3).then(function() {
+            timelineWindow.load(eventId, 3).then(function() {
                 const expectedEvents = timeline.getEvents();
                 expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
@@ -458,7 +471,7 @@ describe("TimelineWindow", function() {
                     .toBe(false);
                 expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
                     .toBe(true);
-            });
+            }).nodeify(done);
         });
     });
 });

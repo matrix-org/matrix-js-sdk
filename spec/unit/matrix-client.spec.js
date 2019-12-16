@@ -1,11 +1,13 @@
 "use strict";
 import 'source-map-support/register';
+import Promise from 'bluebird';
 const sdk = require("../..");
 const MatrixClient = sdk.MatrixClient;
+const utils = require("../test-utils");
 
-import logger from '../../lib/logger';
-
-jest.useFakeTimers();
+import expect from 'expect';
+import lolex from 'lolex';
+import logger from '../../src/logger';
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
@@ -14,6 +16,7 @@ describe("MatrixClient", function() {
     let client;
     let store;
     let scheduler;
+    let clock;
 
     const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
@@ -82,7 +85,7 @@ describe("MatrixClient", function() {
                 );
             }
             pendingLookup = {
-                promise: new Promise(() => {}),
+                promise: Promise.defer().promise,
                 method: method,
                 path: path,
             };
@@ -118,26 +121,28 @@ describe("MatrixClient", function() {
             return Promise.resolve(next.data);
         }
         expect(true).toBe(false, "Expected different request. " + logLine);
-        return new Promise(() => {});
+        return Promise.defer().promise;
     }
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+        clock = lolex.install();
         scheduler = [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
             "setProcessFunction",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
         store = [
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
             "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
             "getSyncAccumulator", "startup", "deleteAllData",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+        store.getSavedSync = expect.createSpy().andReturn(Promise.resolve(null));
+        store.getSavedSyncToken = expect.createSpy().andReturn(Promise.resolve(null));
+        store.setSyncData = expect.createSpy().andReturn(Promise.resolve(null));
+        store.getClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
+        store.storeClientOptions = expect.createSpy().andReturn(Promise.resolve(null));
+        store.isNewlyCreated = expect.createSpy().andReturn(Promise.resolve(true));
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -150,9 +155,9 @@ describe("MatrixClient", function() {
         // FIXME: We shouldn't be yanking _http like this.
         client._http = [
             "authedRequest", "getContentUri", "request", "uploadContent",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        client._http.authedRequest.mockImplementation(httpReq);
-        client._http.request.mockImplementation(httpReq);
+        ].reduce((r, k) => { r[k] = expect.createSpy(); return r; }, {});
+        client._http.authedRequest.andCall(httpReq);
+        client._http.request.andCall(httpReq);
 
         // set reasonable working defaults
         acceptKeepalives = true;
@@ -164,13 +169,14 @@ describe("MatrixClient", function() {
     });
 
     afterEach(function() {
+        clock.uninstall();
         // need to re-stub the requests with NOPs because there are no guarantees
         // clients from previous tests will be GC'd before the next test. This
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client._http.authedRequest.mockImplementation(function() {
-            return new Promise(() => {});
+        client._http.authedRequest.andCall(function() {
+            return Promise.defer().promise;
         });
     });
 
@@ -179,10 +185,10 @@ describe("MatrixClient", function() {
         httpLookups.push(PUSH_RULES_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
         const filterId = "ehfewf";
-        store.getFilterIdByName.mockReturnValue(filterId);
+        store.getFilterIdByName.andReturn(filterId);
         const filter = new sdk.Filter(0, filterId);
         filter.setDefinition({"room": {"timeline": {"limit": 8}}});
-        store.getFilter.mockReturnValue(filter);
+        store.getFilter.andReturn(filter);
         const syncPromise = new Promise((resolve, reject) => {
             client.on("sync", function syncListener(state) {
                 if (state === "SYNCING") {
@@ -243,7 +249,7 @@ describe("MatrixClient", function() {
                 },
             });
             httpLookups.push(FILTER_RESPONSE);
-            store.getFilterIdByName.mockReturnValue(invalidFilterId);
+            store.getFilterIdByName.andReturn(invalidFilterId);
 
             const filterName = getFilterName(client.credentials.userId);
             client.store.setFilterIdByName(filterName, invalidFilterId);
@@ -275,7 +281,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
-                    jest.advanceTimersByTime(1);
+                    clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -301,9 +307,9 @@ describe("MatrixClient", function() {
                     expect(client.retryImmediately()).toBe(
                         true, "retryImmediately returned false",
                     );
-                    jest.advanceTimersByTime(1);
+                    clock.tick(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
-                    jest.advanceTimersByTime(10000);
+                    clock.tick(10000);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -325,7 +331,7 @@ describe("MatrixClient", function() {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
-                    jest.advanceTimersByTime(1);
+                    clock.tick(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
                     client.removeListener("sync", syncListener);
                     done();
@@ -356,7 +362,7 @@ describe("MatrixClient", function() {
                     done();
                 }
                 // standard retry time is 5 to 10 seconds
-                jest.advanceTimersByTime(10000);
+                clock.tick(10000);
             };
         }
 

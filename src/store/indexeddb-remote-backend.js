@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../logger';
-import {defer} from '../utils';
+import Promise from 'bluebird';
+import logger from '../../src/logger';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web
@@ -152,7 +152,7 @@ RemoteIndexedDBStoreBackend.prototype = {
         // the promise automatically gets rejected
         return Promise.resolve().then(() => {
             const seq = this._nextSeq++;
-            const def = defer();
+            const def = Promise.defer();
 
             this._inFlight[seq] = def;
 

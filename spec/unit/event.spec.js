@@ -17,9 +17,17 @@ limitations under the License.
 import sdk from '../..';
 const MatrixEvent = sdk.MatrixEvent;
 
-import logger from '../../lib/logger';
+import testUtils from '../test-utils';
+
+import expect from 'expect';
+import Promise from 'bluebird';
+import logger from '../../src/logger';
 
 describe("MatrixEvent", () => {
+    beforeEach(function() {
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+    });
+
     describe(".attemptDecryption", () => {
         let encryptedEvent;
 
@@ -37,7 +45,6 @@ describe("MatrixEvent", () => {
             let callCount = 0;
 
             let prom2;
-            let prom2Fulfilled = false;
 
             const crypto = {
                 decryptEvent: function() {
@@ -47,13 +54,12 @@ describe("MatrixEvent", () => {
                         // schedule a second decryption attempt while
                         // the first one is still running.
                         prom2 = encryptedEvent.attemptDecryption(crypto);
-                        prom2.then(() => prom2Fulfilled = true);
 
                         const error = new Error("nope");
                         error.name = 'DecryptionError';
                         return Promise.reject(error);
                     } else {
-                        expect(prom2Fulfilled).toBe(
+                        expect(prom2.isFulfilled()).toBe(
                             false, 'second attemptDecryption resolved too soon');
 
                         return Promise.resolve({

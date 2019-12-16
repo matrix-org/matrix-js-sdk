@@ -17,6 +17,7 @@ limitations under the License.
 
 /* eslint-disable babel/no-invalid-this */
 
+import Promise from 'bluebird';
 import {MemoryStore} from "./memory";
 import utils from "../utils";
 import {EventEmitter} from 'events';
@@ -24,7 +25,7 @@ import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
 import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
 import User from "../models/user";
 import {MatrixEvent} from "../models/event";
-import logger from '../logger';
+import logger from '../../src/logger';
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.

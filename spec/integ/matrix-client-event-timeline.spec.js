@@ -1,10 +1,11 @@
 "use strict";
 import 'source-map-support/register';
+import Promise from 'bluebird';
 const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 const EventTimeline = sdk.EventTimeline;
-import logger from '../../lib/logger';
+import logger from '../../src/logger';
 
 const baseUrl = "http://localhost.or.something";
 const userId = "@alice:localhost";
@@ -82,19 +83,18 @@ function startClient(httpBackend, client) {
     client.startClient();
 
     // set up a promise which will resolve once the client is initialised
-    const prom = new Promise((resolve) => {
-        client.on("sync", function(state) {
-            logger.log("sync", state);
-            if (state != "SYNCING") {
-                return;
-            }
-            resolve();
-        });
+    const deferred = Promise.defer();
+    client.on("sync", function(state) {
+        logger.log("sync", state);
+        if (state != "SYNCING") {
+            return;
+        }
+        deferred.resolve();
     });
 
     return Promise.all([
         httpBackend.flushAllExpected(),
-        prom,
+        deferred.promise,
     ]);
 }
 
@@ -103,6 +103,7 @@ describe("getEventTimeline support", function() {
     let client;
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
     });
@@ -114,20 +115,21 @@ describe("getEventTimeline support", function() {
         return httpBackend.stop();
     });
 
-    it("timeline support must be enabled to work", function() {
+    it("timeline support must be enabled to work", function(done) {
         client = sdk.createClient({
             baseUrl: baseUrl,
             userId: userId,
             accessToken: accessToken,
         });
 
-        return startClient(httpBackend, client).then(function() {
+        startClient(httpBackend, client,
+        ).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
             }).toThrow();
-        });
+        }).nodeify(done);
     });
 
     it("timeline support works when enabled", function() {
@@ -143,13 +145,13 @@ describe("getEventTimeline support", function() {
             const timelineSet = room.getTimelineSets()[0];
             expect(function() {
                 client.getEventTimeline(timelineSet, "event");
-            }).not.toThrow();
+            }).toNotThrow();
         });
     });
 
 
     it("scrollback should be able to scroll back to before a gappy /sync",
-      function() {
+      function(done) {
         // need a client with timelineSupport disabled to make this work
         client = sdk.createClient({
             baseUrl: baseUrl,
@@ -158,7 +160,8 @@ describe("getEventTimeline support", function() {
         });
         let room;
 
-        return startClient(httpBackend, client).then(function() {
+        startClient(httpBackend, client,
+        ).then(function() {
             room = client.getRoom(roomId);
 
             httpBackend.when("GET", "/sync").respond(200, {
@@ -214,15 +217,18 @@ describe("getEventTimeline support", function() {
             expect(room.timeline[0].event).toEqual(EVENTS[0]);
             expect(room.timeline[1].event).toEqual(EVENTS[1]);
             expect(room.oldState.paginationToken).toEqual("pagin_end");
-        });
+        }).nodeify(done);
     });
 });
+
+import expect from 'expect';
 
 describe("MatrixClient event timelines", function() {
     let client = null;
     let httpBackend = null;
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
 
@@ -343,25 +349,25 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const prom = new Promise((resolve, reject) => {
-                client.on("sync", function() {
-                    client.getEventTimeline(timelineSet, EVENTS[2].event_id,
-                    ).then(function(tl) {
-                        expect(tl.getEvents().length).toEqual(4);
-                        expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
-                        expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                        expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
-                        expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
-                            .toEqual("start_token");
-                        // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
-                        //    .toEqual("s_5_4");
-                    }).then(resolve, reject);
-                });
+            const deferred = Promise.defer();
+            client.on("sync", function() {
+                client.getEventTimeline(timelineSet, EVENTS[2].event_id,
+                ).then(function(tl) {
+                    expect(tl.getEvents().length).toEqual(4);
+                    expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
+                    expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
+                    expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
+                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    //    .toEqual("s_5_4");
+                }).done(() => deferred.resolve(),
+                        (e) => deferred.reject(e));
             });
 
             return Promise.all([
                 httpBackend.flushAllExpected(),
-                prom,
+                deferred.promise,
             ]);
         });
 
@@ -691,7 +697,7 @@ describe("MatrixClient event timelines", function() {
     });
 
 
-    it("should handle gappy syncs after redactions", function() {
+    it("should handle gappy syncs after redactions", function(done) {
         // https://github.com/vector-im/vector-web/issues/1389
 
         // a state event, followed by a redaction thereof
@@ -723,7 +729,7 @@ describe("MatrixClient event timelines", function() {
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        return Promise.all([
+        Promise.all([
             httpBackend.flushAllExpected(),
             utils.syncPromise(client),
         ]).then(function() {
@@ -759,6 +765,6 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const tl = room.getLiveTimeline();
             expect(tl.getEvents().length).toEqual(1);
-        });
+        }).nodeify(done);
     });
 });

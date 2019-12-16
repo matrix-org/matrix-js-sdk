@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import logger from '../../../../lib/logger';
+import logger from '../../../../src/logger';
 
 try {
     global.Olm = require('olm');
@@ -21,6 +21,7 @@ try {
     logger.warn("unable to run device verification tests: libolm not available");
 }
 
+import expect from 'expect';
 import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 import {ShowQRCode, ScanQRCode} from '../../../../lib/crypto/verification/QRCode';
@@ -33,23 +34,20 @@ describe("QR code verification", function() {
         return;
     }
 
-    beforeAll(function() {
-        return Olm.init();
+    beforeEach(async function() {
+        await Olm.init();
     });
 
     describe("showing", function() {
         it("should emit an event to show a QR code", async function() {
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ShowQRCode(channel, {
+            const qrCode = new ShowQRCode({
                 getUserId: () => "@alice:example.com",
                 deviceId: "ABCDEFG",
                 getDeviceEd25519Key: function() {
                     return "device+ed25519+key";
                 },
             });
-            const spy = jest.fn((e) => {
+            const spy = expect.createSpy().andCall((e) => {
                 qrCode.done();
             });
             qrCode.on("show_qr_code", spy);
@@ -79,13 +77,10 @@ describe("QR code verification", function() {
                 "ABCDEFG",
             );
             const client = {
-                getStoredDevice: jest.fn().mockReturnValue(device),
-                setDeviceVerified: jest.fn(),
+                getStoredDevice: expect.createSpy().andReturn(device),
+                setDeviceVerified: expect.createSpy(),
             };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(channel, client);
+            const qrCode = new ScanQRCode(client);
             qrCode.on("confirm_user_id", ({userId, confirm}) => {
                 if (userId === "@alice:example.com") {
                     confirm();
@@ -105,22 +100,18 @@ describe("QR code verification", function() {
 
         it("should error when the user ID doesn't match", async function() {
             const client = {
-                getStoredDevice: jest.fn(),
-                setDeviceVerified: jest.fn(),
+                getStoredDevice: expect.createSpy(),
+                setDeviceVerified: expect.createSpy(),
             };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(channel, client, "@bob:example.com", "ABCDEFG");
+            const qrCode = new ScanQRCode(client, "@bob:example.com", "ABCDEFG");
             qrCode.on("scan", ({done}) => {
                 done(QR_CODE_URL);
             });
-            const spy = jest.fn();
+            const spy = expect.createSpy();
             await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
-            expect(channel.send).toHaveBeenCalled();
-            expect(client.getStoredDevice).not.toHaveBeenCalled();
-            expect(client.setDeviceVerified).not.toHaveBeenCalled();
+            expect(client.getStoredDevice).toNotHaveBeenCalled();
+            expect(client.setDeviceVerified).toNotHaveBeenCalled();
         });
 
         it("should error if the key doesn't match", async function() {
@@ -138,23 +129,18 @@ describe("QR code verification", function() {
                 "ABCDEFG",
             );
             const client = {
-                getStoredDevice: jest.fn().mockReturnValue(device),
-                setDeviceVerified: jest.fn(),
+                getStoredDevice: expect.createSpy().andReturn(device),
+                setDeviceVerified: expect.createSpy(),
             };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(
-                channel, client, "@alice:example.com", "ABCDEFG");
+            const qrCode = new ScanQRCode(client, "@alice:example.com", "ABCDEFG");
             qrCode.on("scan", ({done}) => {
                 done(QR_CODE_URL);
             });
-            const spy = jest.fn();
+            const spy = expect.createSpy();
             await qrCode.verify().catch(spy);
             expect(spy).toHaveBeenCalled();
-            expect(channel.send).toHaveBeenCalled();
             expect(client.getStoredDevice).toHaveBeenCalled();
-            expect(client.setDeviceVerified).not.toHaveBeenCalled();
+            expect(client.setDeviceVerified).toNotHaveBeenCalled();
         });
     });
 });

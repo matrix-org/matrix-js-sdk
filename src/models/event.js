@@ -21,9 +21,10 @@ limitations under the License.
  * @module models/event
  */
 
+import Promise from 'bluebird';
 import {EventEmitter} from 'events';
 import utils from '../utils.js';
-import logger from '../logger';
+import logger from '../../src/logger';
 
 /**
  * Enum for event statuses.
@@ -294,15 +295,6 @@ utils.extend(module.exports.MatrixEvent.prototype, {
      */
     getAge: function() {
         return this.getUnsigned().age || this.event.age; // v2 / v1
-    },
-
-    /**
-     * Get the age of the event when this function was called.
-     * Relies on the local clock being in sync with the clock of the original homeserver.
-     * @return {Number} The age of this event in milliseconds.
-     */
-    getLocalAge: function() {
-        return Date.now() - this.getTs();
     },
 
     /**

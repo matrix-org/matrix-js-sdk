@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import Promise from 'bluebird';
+
 import logger from '../../logger';
-import MemoryCryptoStore from './memory-crypto-store';
+import MemoryCryptoStore from './memory-crypto-store.js';
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -29,7 +31,6 @@ import MemoryCryptoStore from './memory-crypto-store';
 
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
-const KEY_CROSS_SIGNING_KEYS = E2E_PREFIX + "cross_signing_keys";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
@@ -280,17 +281,6 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     storeAccount(txn, newData) {
         setJsonItem(
             this.store, KEY_END_TO_END_ACCOUNT, newData,
-        );
-    }
-
-    getCrossSigningKeys(txn, func) {
-        const keys = getJsonItem(this.store, KEY_CROSS_SIGNING_KEYS);
-        func(keys);
-    }
-
-    storeCrossSigningKeys(txn, keys) {
-        setJsonItem(
-            this.store, KEY_CROSS_SIGNING_KEYS, keys,
         );
     }
 

@@ -3,6 +3,7 @@ import 'source-map-support/register';
 import '../olm-loader';
 
 import Crypto from '../../lib/crypto';
+import expect from 'expect';
 
 import WebStorageSessionStore from '../../lib/store/session/webstorage';
 import MemoryCryptoStore from '../../lib/crypto/store/memory-crypto-store.js';
@@ -11,7 +12,7 @@ import TestClient from '../TestClient';
 import {MatrixEvent} from '../../lib/models/event';
 import Room from '../../lib/models/room';
 import olmlib from '../../lib/crypto/olmlib';
-import {sleep} from "../../src/utils";
+import lolex from 'lolex';
 
 const EventEmitter = require("events").EventEmitter;
 
@@ -24,8 +25,8 @@ describe("Crypto", function() {
         return;
     }
 
-    beforeAll(function() {
-        return Olm.init();
+    beforeEach(function(done) {
+        Olm.init().then(done);
     });
 
     it("Crypto exposes the correct olm library version", function() {
@@ -75,9 +76,9 @@ describe("Crypto", function() {
             });
 
             mockBaseApis = {
-                sendToDevice: jest.fn(),
-                getKeyBackupVersion: jest.fn(),
-                isGuest: jest.fn(),
+                sendToDevice: expect.createSpy(),
+                getKeyBackupVersion: expect.createSpy(),
+                isGuest: expect.createSpy(),
             };
             mockRoomList = {};
 
@@ -109,16 +110,15 @@ describe("Crypto", function() {
             });
 
             fakeEmitter.emit('toDeviceEvent', {
-                getId: jest.fn().mockReturnValue("$wedged"),
-                getType: jest.fn().mockReturnValue('m.room.message'),
-                getContent: jest.fn().mockReturnValue({
+                getType: expect.createSpy().andReturn('m.room.message'),
+                getContent: expect.createSpy().andReturn({
                     msgtype: 'm.bad.encrypted',
                 }),
-                getWireContent: jest.fn().mockReturnValue({
+                getWireContent: expect.createSpy().andReturn({
                     algorithm: 'm.olm.v1.curve25519-aes-sha2',
                     sender_key: 'this is a key',
                 }),
-                getSender: jest.fn().mockReturnValue('@bob:home.server'),
+                getSender: expect.createSpy().andReturn('@bob:home.server'),
             });
 
             await prom;
@@ -245,7 +245,7 @@ describe("Crypto", function() {
                 await bobDecryptor.onRoomKeyEvent(ksEvent);
                 await eventPromise;
                 expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
-                expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
+                expect(events[1].getContent().msgtype).toNotBe("m.bad.encrypted");
 
                 const cryptoStore = bobClient._cryptoStore;
                 const eventContent = events[0].getWireContent();
@@ -260,7 +260,7 @@ describe("Crypto", function() {
                 // the room key request should still be there, since we haven't
                 // decrypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                    .toBeDefined();
+                    .toExist();
 
                 // keyshare the session key starting at the first message, so
                 // that it can now be decrypted
@@ -268,11 +268,10 @@ describe("Crypto", function() {
                 ksEvent = await keyshareEventForEvent(events[0], 0);
                 await bobDecryptor.onRoomKeyEvent(ksEvent);
                 await eventPromise;
-                expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
-                await sleep(1);
-                // the room key request should be gone since we've now decrypted everything
+                expect(events[0].getContent().msgtype).toNotBe("m.bad.encrypted");
+                // the room key request should be gone since we've now decypted everything
                 expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                    .toBeFalsy();
+                    .toNotExist();
             },
         );
 
@@ -297,12 +296,10 @@ describe("Crypto", function() {
                 sender_key: "senderkey",
             };
             expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                .toBeDefined();
+                .toExist();
         });
 
         it("uses a new txnid for re-requesting keys", async function() {
-            jest.useFakeTimers();
-
             const event = new MatrixEvent({
                 sender: "@bob:example.com",
                 room_id: "!someroom",
@@ -312,31 +309,58 @@ describe("Crypto", function() {
                     sender_key: "senderkey",
                 },
             });
-            // replace Alice's sendToDevice function with a mock
-            aliceClient.sendToDevice = jest.fn().mockResolvedValue(undefined);
+            /* return a promise and a function. When the function is called,
+             * the promise will be resolved.
+             */
+            function awaitFunctionCall() {
+                let func;
+                const promise = new Promise((resolve, reject) => {
+                    func = function(...args) {
+                        resolve(args);
+                        return new Promise((resolve, reject) => {
+                            // give us some time to process the result before
+                            // continuing
+                            global.setTimeout(resolve, 1);
+                        });
+                    };
+                });
+                return {func, promise};
+            }
+
             aliceClient.startClient();
 
-            // make a room key request, and record the transaction ID for the
-            // sendToDevice call
-            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            jest.runAllTimers();
-            await Promise.resolve();
-            expect(aliceClient.sendToDevice).toBeCalledTimes(1);
-            const txnId = aliceClient.sendToDevice.mock.calls[0][2];
+            const clock = lolex.install();
 
-            // give the room key request manager time to update the state
-            // of the request
-            await Promise.resolve();
+            try {
+                let promise;
+                // make a room key request, and record the transaction ID for the
+                // sendToDevice call
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+                clock.runToLast();
+                let args = await promise;
+                const txnId = args[2];
+                clock.runToLast();
 
-            // cancel and resend the room key request
-            await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            jest.runAllTimers();
-            await Promise.resolve();
-            // cancelAndResend will call sendToDevice twice:
-            // the first call to sendToDevice will be the cancellation
-            // the second call to sendToDevice will be the key request
-            expect(aliceClient.sendToDevice).toBeCalledTimes(3);
-            expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
+                // give the room key request manager time to update the state
+                // of the request
+                await Promise.resolve();
+
+                // cancel and resend the room key request
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                await aliceClient.cancelAndResendEventRoomKeyRequest(event);
+                clock.runToLast();
+                // the first call to sendToDevice will be the cancellation
+                args = await promise;
+                // the second call to sendToDevice will be the key request
+                ({promise, func: aliceClient.sendToDevice} = awaitFunctionCall());
+                clock.runToLast();
+                args = await promise;
+                clock.runToLast();
+                expect(args[2]).toNotBe(txnId);
+            } finally {
+                clock.uninstall();
+            }
         });
     });
 });

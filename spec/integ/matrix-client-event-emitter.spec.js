@@ -4,6 +4,9 @@ const sdk = require("../..");
 const HttpBackend = require("matrix-mock-request");
 const utils = require("../test-utils");
 
+import expect from 'expect';
+import Promise from 'bluebird';
+
 describe("MatrixClient events", function() {
     const baseUrl = "http://localhost.or.something";
     let client;
@@ -12,6 +15,7 @@ describe("MatrixClient events", function() {
     const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         httpBackend = new HttpBackend();
         sdk.request(httpBackend.requestFn);
         client = sdk.createClient({
@@ -160,7 +164,7 @@ describe("MatrixClient events", function() {
             });
             client.startClient();
 
-            httpBackend.flushAllExpected().then(function() {
+            httpBackend.flushAllExpected().done(function() {
                 expect(fired).toBe(true, "User.presence didn't fire.");
                 done();
             });
@@ -215,7 +219,7 @@ describe("MatrixClient events", function() {
             client.on("RoomState.events", function(event, state) {
                 eventsInvokeCount++;
                 const index = roomStateEventTypes.indexOf(event.getType());
-                expect(index).not.toEqual(
+                expect(index).toNotEqual(
                     -1, "Unexpected room state event type: " + event.getType(),
                 );
                 if (index >= 0) {

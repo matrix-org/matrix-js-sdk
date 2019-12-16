@@ -1,3 +1,4 @@
+import expect from 'expect';
 import TestClient from '../TestClient';
 
 describe('Login request', function() {

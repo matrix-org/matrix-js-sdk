@@ -1,6 +1,5 @@
 /*
 Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +16,7 @@ limitations under the License.
 
 /** @module auto-discovery */
 
+import Promise from 'bluebird';
 import logger from './logger';
 import { URL as NodeURL } from "url";
 
@@ -275,11 +275,21 @@ export class AutoDiscovery {
         let isUrl = "";
         if (wellknown["m.identity_server"]) {
             // We prepare a failing identity server response to save lines later
-            // in this branch.
+            // in this branch. Note that we also fail the homeserver check in the
+            // object because according to the spec we're supposed to FAIL_ERROR
+            // if *anything* goes wrong with the IS validation, including invalid
+            // format. This means we're supposed to stop discovery completely.
             const failingClientConfig = {
-                "m.homeserver": clientConfig["m.homeserver"],
+                "m.homeserver": {
+                    state: AutoDiscovery.FAIL_ERROR,
+                    error: AutoDiscovery.ERROR_INVALID_IS,
+
+                    // We'll provide the base_url that was previously valid for
+                    // debugging purposes.
+                    base_url: clientConfig["m.homeserver"].base_url,
+                },
                 "m.identity_server": {
-                    state: AutoDiscovery.FAIL_PROMPT,
+                    state: AutoDiscovery.FAIL_ERROR,
                     error: AutoDiscovery.ERROR_INVALID_IS,
                     base_url: null,
                 },

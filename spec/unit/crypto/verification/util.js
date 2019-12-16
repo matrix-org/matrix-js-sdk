@@ -33,63 +33,31 @@ export async function makeTestClients(userInfos, options) {
                             type: type,
                             content: msg,
                         });
-                        const client = clientMap[userId][deviceId];
-                        if (event.isEncrypted()) {
-                            event.attemptDecryption(client._crypto)
-                                .then(() => client.emit("toDeviceEvent", event));
-                        } else {
-                            setTimeout(
-                                () => client.emit("toDeviceEvent", event),
-                                0,
-                            );
-                        }
+                        setTimeout(
+                            () => clientMap[userId][deviceId]
+                                .emit("toDeviceEvent", event),
+                            0,
+                        );
                     }
                 }
             }
         }
     };
-    const sendEvent = function(room, type, content) {
-        // make up a unique ID as the event ID
-        const eventId = "$" + this.makeTxnId(); // eslint-disable-line babel/no-invalid-this
-        const event = new MatrixEvent({
-            sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
-            type: type,
-            content: content,
-            room_id: room,
-            event_id: eventId,
-        });
-        for (const tc of clients) {
-            setTimeout(
-                () => tc.client.emit("Room.timeline", event),
-                0,
-            );
-        }
-
-        return {event_id: eventId};
-    };
 
     for (const userInfo of userInfos) {
-        let keys = {};
-        if (!options) options = {};
-        if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
-        if (!options.cryptoCallbacks.saveCrossSigningKeys) {
-            options.cryptoCallbacks.saveCrossSigningKeys = k => { keys = k; };
-            options.cryptoCallbacks.getCrossSigningKey = typ => keys[typ];
-        }
-        const testClient = new TestClient(
+        const client = (new TestClient(
             userInfo.userId, userInfo.deviceId, undefined, undefined,
             options,
-        );
+        )).client;
         if (!(userInfo.userId in clientMap)) {
             clientMap[userInfo.userId] = {};
         }
-        clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
-        testClient.client.sendToDevice = sendToDevice;
-        testClient.client.sendEvent = sendEvent;
-        clients.push(testClient);
+        clientMap[userInfo.userId][userInfo.deviceId] = client;
+        client.sendToDevice = sendToDevice;
+        clients.push(client);
     }
 
-    await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
+    await Promise.all(clients.map((client) => client.initCrypto()));
 
     return clients;
 }

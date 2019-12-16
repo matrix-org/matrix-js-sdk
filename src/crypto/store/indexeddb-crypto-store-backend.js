@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import Promise from 'bluebird';
+
 import logger from '../../logger';
 import utils from '../../utils';
 
@@ -56,34 +58,35 @@ export class Backend {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        return new Promise((resolve, reject) => {
-            const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
-            txn.onerror = reject;
+        const deferred = Promise.defer();
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readwrite");
+        txn.onerror = deferred.reject;
 
-            // first see if we already have an entry for this request.
-            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-                if (existing) {
-                    // this entry matches the request - return it.
-                    logger.log(
-                        `already have key request outstanding for ` +
-                            `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                            `not sending another`,
-                    );
-                    resolve(existing);
-                    return;
-                }
-
-                // we got to the end of the list without finding a match
-                // - add the new request.
+        // first see if we already have an entry for this request.
+        this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
+            if (existing) {
+                // this entry matches the request - return it.
                 logger.log(
-                    `enqueueing key request for ${requestBody.room_id} / ` +
-                        requestBody.session_id,
+                    `already have key request outstanding for ` +
+                        `${requestBody.room_id} / ${requestBody.session_id}: ` +
+                        `not sending another`,
                 );
-                txn.oncomplete = () => { resolve(request); };
-                const store = txn.objectStore("outgoingRoomKeyRequests");
-                store.add(request);
-            });
+                deferred.resolve(existing);
+                return;
+            }
+
+            // we got to the end of the list without finding a match
+            // - add the new request.
+            logger.log(
+                `enqueueing key request for ${requestBody.room_id} / ` +
+                    requestBody.session_id,
+            );
+            txn.oncomplete = () => { deferred.resolve(request); };
+            const store = txn.objectStore("outgoingRoomKeyRequests");
+            store.add(request);
         });
+
+        return deferred.promise;
     }
 
     /**
@@ -97,14 +100,15 @@ export class Backend {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        return new Promise((resolve, reject) => {
-            const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
-            txn.onerror = reject;
+        const deferred = Promise.defer();
 
-            this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
-                resolve(existing);
-            });
+        const txn = this._db.transaction("outgoingRoomKeyRequests", "readonly");
+        txn.onerror = deferred.reject;
+
+        this._getOutgoingRoomKeyRequest(txn, requestBody, (existing) => {
+            deferred.resolve(existing);
         });
+        return deferred.promise;
     }
 
     /**
@@ -326,23 +330,6 @@ export class Backend {
     storeAccount(txn, newData) {
         const objectStore = txn.objectStore("account");
         objectStore.put(newData, "-");
-    }
-
-    getCrossSigningKeys(txn, func) {
-        const objectStore = txn.objectStore("account");
-        const getReq = objectStore.get("crossSigningKeys");
-        getReq.onsuccess = function() {
-            try {
-                func(getReq.result || null);
-            } catch (e) {
-                abortWithException(txn, e);
-            }
-        };
-    }
-
-    storeCrossSigningKeys(txn, keys) {
-        const objectStore = txn.objectStore("account");
-        objectStore.put(keys, "crossSigningKeys");
     }
 
     // Olm Sessions

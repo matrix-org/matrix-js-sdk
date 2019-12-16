@@ -1374,12 +1374,12 @@ MatrixBaseApis.prototype.addThreePid = function(creds, bind, callback) {
  * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.addThreePidOnly = async function(data) {
+MatrixBaseApis.prototype.addThreePidOnly = function(data) {
     const path = "/account/3pid/add";
-    const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
     return this._http.authedRequest(
-        undefined, "POST", path, null, data, { prefix },
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
@@ -1397,12 +1397,12 @@ MatrixBaseApis.prototype.addThreePidOnly = async function(data) {
  * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.bindThreePid = async function(data) {
+MatrixBaseApis.prototype.bindThreePid = function(data) {
     const path = "/account/3pid/bind";
-    const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
     return this._http.authedRequest(
-        undefined, "POST", path, null, data, { prefix },
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
@@ -1417,17 +1417,17 @@ MatrixBaseApis.prototype.bindThreePid = async function(data) {
  * @return {module:client.Promise} Resolves: on success
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixBaseApis.prototype.unbindThreePid = async function(medium, address) {
+MatrixBaseApis.prototype.unbindThreePid = function(medium, address) {
     const path = "/account/3pid/unbind";
     const data = {
         medium,
         address,
         id_server: this.getIdentityServerUrl(true),
     };
-    const prefix = await this.isVersionSupported("r0.6.0") ?
-        httpApi.PREFIX_R0 : httpApi.PREFIX_UNSTABLE;
     return this._http.authedRequest(
-        undefined, "POST", path, null, data, { prefix },
+        undefined, "POST", path, null, data, {
+            prefix: httpApi.PREFIX_UNSTABLE,
+        },
     );
 };
 
@@ -1718,15 +1718,6 @@ MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
     return this._http.authedRequest(callback, "POST", path, undefined, content);
 };
 
-MatrixBaseApis.prototype.uploadKeySignatures = function(content) {
-    return this._http.authedRequest(
-        undefined, "POST", '/keys/signatures/upload', undefined,
-        content, {
-            prefix: httpApi.PREFIX_UNSTABLE,
-        },
-    );
-};
-
 /**
  * Download device keys
  *
@@ -1811,14 +1802,6 @@ MatrixBaseApis.prototype.getKeyChanges = function(oldToken, newToken) {
     return this._http.authedRequest(undefined, "GET", path, qps, undefined);
 };
 
-MatrixBaseApis.prototype.uploadDeviceSigningKeys = function(auth, keys) {
-    const data = Object.assign({}, keys, {auth});
-    return this._http.authedRequest(
-        undefined, "POST", "/keys/device_signing/upload", undefined, data, {
-            prefix: httpApi.PREFIX_UNSTABLE,
-        },
-    );
-};
 
 // Identity Server Operations
 // ==========================
@@ -2332,12 +2315,6 @@ MatrixBaseApis.prototype.sendToDevice = function(
     const body = {
         messages: contentMap,
     };
-
-    const targets = Object.keys(contentMap).reduce((obj, key) => {
-        obj[key] = Object.keys(contentMap[key]);
-        return obj;
-    }, {});
-    logger.log(`PUT ${path}`, targets);
 
     return this._http.authedRequest(undefined, "PUT", path, undefined, body);
 };

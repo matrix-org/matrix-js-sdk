@@ -1,5 +1,8 @@
 import '../../../olm-loader';
 
+import expect from 'expect';
+import Promise from 'bluebird';
+
 import sdk from '../../../..';
 import algorithms from '../../../../lib/crypto/algorithms';
 import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
@@ -7,7 +10,7 @@ import MockStorageApi from '../../../MockStorageApi';
 import testUtils from '../../../test-utils';
 import OlmDevice from '../../../../lib/crypto/OlmDevice';
 import Crypto from '../../../../lib/crypto';
-import logger from '../../../../lib/logger';
+import logger from '../../../../src/logger';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
@@ -23,16 +26,16 @@ describe("MegolmDecryption", function() {
         return;
     }
 
-    beforeAll(function() {
-        return Olm.init();
-    });
-
     let megolmDecryption;
     let mockOlmLib;
     let mockCrypto;
     let mockBaseApis;
 
     beforeEach(async function() {
+        testUtils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+
+        await Olm.init();
+
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
         mockBaseApis = {};
 
@@ -52,9 +55,9 @@ describe("MegolmDecryption", function() {
 
         // we stub out the olm encryption bits
         mockOlmLib = {};
-        mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
+        mockOlmLib.ensureOlmSessionsForDevices = expect.createSpy();
         mockOlmLib.encryptMessageForDevice =
-            jest.fn().mockResolvedValue(undefined);
+            expect.createSpy().andReturn(Promise.resolve());
         megolmDecryption.olmlib = mockOlmLib;
     });
 
@@ -132,22 +135,22 @@ describe("MegolmDecryption", function() {
 
                 // set up some pre-conditions for the share call
                 const deviceInfo = {};
-                mockCrypto.getStoredDevice.mockReturnValue(deviceInfo);
+                mockCrypto.getStoredDevice.andReturn(deviceInfo);
 
-                mockOlmLib.ensureOlmSessionsForDevices.mockResolvedValue({
-                    '@alice:foo': {'alidevice': {
+                mockOlmLib.ensureOlmSessionsForDevices.andReturn(
+                    Promise.resolve({'@alice:foo': {'alidevice': {
                         sessionId: 'alisession',
-                    }},
-                });
+                    }}}),
+                );
 
                 const awaitEncryptForDevice = new Promise((res, rej) => {
-                    mockOlmLib.encryptMessageForDevice.mockImplementation(() => {
+                    mockOlmLib.encryptMessageForDevice.andCall(() => {
                         res();
                         return Promise.resolve();
                     });
                 });
 
-                mockBaseApis.sendToDevice = jest.fn();
+                mockBaseApis.sendToDevice = expect.createSpy();
 
                 // do the share
                 megolmDecryption.shareKeysWithDevice(keyRequest);
@@ -157,20 +160,21 @@ describe("MegolmDecryption", function() {
             }).then(() => {
                 // check that it called encryptMessageForDevice with
                 // appropriate args.
-                expect(mockOlmLib.encryptMessageForDevice).toBeCalledTimes(1);
+                expect(mockOlmLib.encryptMessageForDevice.calls.length)
+                    .toEqual(1);
 
-                const call = mockOlmLib.encryptMessageForDevice.mock.calls[0];
-                const payload = call[6];
+                const call = mockOlmLib.encryptMessageForDevice.calls[0];
+                const payload = call.arguments[6];
 
                 expect(payload.type).toEqual("m.forwarded_room_key");
-                expect(payload.content).toMatchObject({
+                expect(payload.content).toInclude({
                     sender_key: "SENDER_CURVE25519",
                     sender_claimed_ed25519_key: "SENDER_ED25519",
                     session_id: groupSession.session_id(),
                     chain_index: 0,
                     forwarding_curve25519_key_chain: [],
                 });
-                expect(payload.content.session_key).toBeDefined();
+                expect(payload.content.session_key).toExist();
             });
         });
 
@@ -197,12 +201,13 @@ describe("MegolmDecryption", function() {
                 origin_server_ts: 1507753886000,
             });
 
-            const successHandler = jest.fn();
-            const failureHandler = jest.fn((err) => {
-                expect(err.toString()).toMatch(
-                    /Duplicate message index, possible replay attack/,
-                );
-            });
+            const successHandler = expect.createSpy();
+            const failureHandler = expect.createSpy()
+                .andCall((err) => {
+                    expect(err.toString()).toMatch(
+                        /Duplicate message index, possible replay attack/,
+                    );
+                });
 
             return megolmDecryption.decryptEvent(event1).then((res) => {
                 const event2 = new MatrixEvent({
@@ -223,7 +228,7 @@ describe("MegolmDecryption", function() {
                 successHandler,
                 failureHandler,
             ).then(() => {
-                expect(successHandler).not.toHaveBeenCalled();
+                expect(successHandler).toNotHaveBeenCalled();
                 expect(failureHandler).toHaveBeenCalled();
             });
         });
@@ -261,10 +266,10 @@ describe("MegolmDecryption", function() {
             const cryptoStore = new MemoryCryptoStore(mockStorage);
 
             const olmDevice = new OlmDevice(cryptoStore);
-            olmDevice.verifySignature = jest.fn();
+            olmDevice.verifySignature = expect.createSpy();
             await olmDevice.init();
 
-            mockBaseApis.claimOneTimeKeys = jest.fn().mockReturnValue(Promise.resolve({
+            mockBaseApis.claimOneTimeKeys = expect.createSpy().andReturn(Promise.resolve({
                 one_time_keys: {
                     '@alice:home.server': {
                         aliceDevice: {
@@ -280,18 +285,18 @@ describe("MegolmDecryption", function() {
                     },
                 },
             }));
-            mockBaseApis.sendToDevice = jest.fn().mockResolvedValue(undefined);
+            mockBaseApis.sendToDevice = expect.createSpy().andReturn(Promise.resolve());
 
-            mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
+            mockCrypto.downloadKeys.andReturn(Promise.resolve({
                 '@alice:home.server': {
                     aliceDevice: {
                         deviceId: 'aliceDevice',
-                        isBlocked: jest.fn().mockReturnValue(false),
-                        isUnverified: jest.fn().mockReturnValue(false),
-                        getIdentityKey: jest.fn().mockReturnValue(
+                        isBlocked: expect.createSpy().andReturn(false),
+                        isUnverified: expect.createSpy().andReturn(false),
+                        getIdentityKey: expect.createSpy().andReturn(
                             'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE',
                         ),
-                        getFingerprint: jest.fn().mockReturnValue(''),
+                        getFingerprint: expect.createSpy().andReturn(''),
                     },
                 },
             }));
@@ -307,10 +312,10 @@ describe("MegolmDecryption", function() {
                 },
             });
             const mockRoom = {
-                getEncryptionTargetMembers: jest.fn().mockReturnValue(
+                getEncryptionTargetMembers: expect.createSpy().andReturn(
                     [{userId: "@alice:home.server"}],
                 ),
-                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
+                getBlacklistUnverifiedDevices: expect.createSpy().andReturn(false),
             };
             const ct1 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
                 body: "Some text",
@@ -318,25 +323,25 @@ describe("MegolmDecryption", function() {
             expect(mockRoom.getEncryptionTargetMembers).toHaveBeenCalled();
 
             // this should have claimed a key for alice as it's starting a new session
-            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalled(
                 [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
             );
             expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
                 ['@alice:home.server'], false,
             );
             expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
-            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
+            expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalled(
                 [['@alice:home.server', 'aliceDevice']], 'signed_curve25519',
             );
 
-            mockBaseApis.claimOneTimeKeys.mockReset();
+            mockBaseApis.claimOneTimeKeys.reset();
 
             const ct2 = await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
                 body: "Some more text",
             });
 
             // this should *not* have claimed a key as it should be using the same session
-            expect(mockBaseApis.claimOneTimeKeys).not.toHaveBeenCalled();
+            expect(mockBaseApis.claimOneTimeKeys).toNotHaveBeenCalled();
 
             // likewise they should show the same session ID
             expect(ct2.session_id).toEqual(ct1.session_id);

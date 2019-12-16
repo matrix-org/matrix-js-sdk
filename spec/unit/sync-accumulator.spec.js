@@ -16,7 +16,9 @@ limitations under the License.
 
 "use strict";
 import 'source-map-support/register';
+import utils from "../test-utils";
 import sdk from "../..";
+import expect from 'expect';
 
 const SyncAccumulator = sdk.SyncAccumulator;
 
@@ -24,6 +26,7 @@ describe("SyncAccumulator", function() {
     let sa;
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
         sa = new SyncAccumulator({
             maxTimelineEntries: 10,
         });

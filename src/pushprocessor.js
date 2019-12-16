@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {escapeRegExp, globToRegexp, isNullOrUndefined} from "./utils";
+import {escapeRegExp, globToRegexp} from "./utils";
 
 /**
  * @module pushprocessor
@@ -268,7 +268,7 @@ function PushProcessor(client) {
         }
 
         const val = valueForDottedKey(cond.key, ev);
-        if (typeof val !== 'string') {
+        if (!val || typeof val != 'string') {
             return false;
         }
 
@@ -304,10 +304,10 @@ function PushProcessor(client) {
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
-        if (firstPart === 'content') {
+        if (firstPart == 'content') {
             val = ev.getContent();
             parts.shift();
-        } else if (firstPart === 'type') {
+        } else if (firstPart == 'type') {
             val = ev.getType();
             parts.shift();
         } else {
@@ -316,11 +316,11 @@ function PushProcessor(client) {
         }
 
         while (parts.length > 0) {
-            const thisPart = parts.shift();
-            if (isNullOrUndefined(val[thisPart])) {
+            const thispart = parts.shift();
+            if (!val[thispart]) {
                 return null;
             }
-            val = val[thisPart];
+            val = val[thispart];
         }
         return val;
     };

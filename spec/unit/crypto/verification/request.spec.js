@@ -13,13 +13,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import logger from '../../../../lib/logger';
+import logger from '../../../../src/logger';
 
 try {
     global.Olm = require('olm');
 } catch (e) {
     logger.warn("unable to run device verification tests: libolm not available");
 }
+
+import expect from 'expect';
 
 import {verificationMethods} from '../../../../lib/crypto';
 
@@ -35,8 +37,8 @@ describe("verification request", function() {
         return;
     }
 
-    beforeAll(function() {
-        return Olm.init();
+    beforeEach(async function() {
+        await Olm.init();
     });
 
     it("should request and accept a verification", async function() {
@@ -49,7 +51,7 @@ describe("verification request", function() {
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client._crypto._deviceList.getRawStoredDevicesForUser = function() {
+        alice._crypto._deviceList.getRawStoredDevicesForUser = function() {
             return {
                 Dynabook: {
                     keys: {
@@ -58,21 +60,21 @@ describe("verification request", function() {
                 },
             };
         };
-        alice.client.downloadKeys = () => {
+        alice.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.client.downloadKeys = () => {
+        bob.downloadKeys = () => {
             return Promise.resolve();
         };
-        bob.client.on("crypto.verification.request", (request) => {
+        bob.on("crypto.verification.request", (request) => {
             const bobVerifier = request.beginKeyVerification(verificationMethods.SAS);
             bobVerifier.verify();
 
             // XXX: Private function access (but it's a test, so we're okay)
             bobVerifier._endTimer();
         });
-        const aliceVerifier = await alice.client.requestVerification("@bob:example.com");
-        expect(aliceVerifier).toBeInstanceOf(SAS);
+        const aliceVerifier = await alice.requestVerification("@bob:example.com");
+        expect(aliceVerifier).toBeAn(SAS);
 
         // XXX: Private function access (but it's a test, so we're okay)
         aliceVerifier._endTimer();

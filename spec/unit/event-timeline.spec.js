@@ -9,6 +9,8 @@ function mockRoomStates(timeline) {
     timeline._endState = utils.mock(sdk.RoomState, "endState");
 }
 
+import expect from 'expect';
+
 describe("EventTimeline", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
@@ -16,6 +18,8 @@ describe("EventTimeline", function() {
     let timeline;
 
     beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+
         // XXX: this is a horrid hack; should use sinon or something instead to mock
         const timelineSet = { room: { roomId: roomId }};
         timelineSet.room.getUnfilteredTimelineSet = function() {
@@ -74,7 +78,7 @@ describe("EventTimeline", function() {
 
             expect(function() {
                 timeline.initialiseState(state);
-            }).not.toThrow();
+            }).toNotThrow();
             timeline.addEvent(event, false);
             expect(function() {
                 timeline.initialiseState(state);
@@ -117,7 +121,7 @@ describe("EventTimeline", function() {
             const next = {b: "b"};
             expect(function() {
                 timeline.setNeighbouringTimeline(prev, EventTimeline.BACKWARDS);
-            }).not.toThrow();
+            }).toNotThrow();
             expect(timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS))
                 .toBe(prev);
             expect(function() {
@@ -126,7 +130,7 @@ describe("EventTimeline", function() {
 
             expect(function() {
                 timeline.setNeighbouringTimeline(next, EventTimeline.FORWARDS);
-            }).not.toThrow();
+            }).toNotThrow();
             expect(timeline.getNeighbouringTimeline(EventTimeline.FORWARDS))
                 .toBe(next);
             expect(function() {
@@ -183,14 +187,14 @@ describe("EventTimeline", function() {
                 name: "Old Alice",
             };
             timeline.getState(EventTimeline.FORWARDS).getSentinelMember
-                .mockImplementation(function(uid) {
+                .andCall(function(uid) {
                     if (uid === userA) {
                         return sentinel;
                     }
                     return null;
                 });
             timeline.getState(EventTimeline.BACKWARDS).getSentinelMember
-                .mockImplementation(function(uid) {
+                .andCall(function(uid) {
                     if (uid === userA) {
                         return oldSentinel;
                     }
@@ -225,14 +229,14 @@ describe("EventTimeline", function() {
                 name: "Old Alice",
             };
             timeline.getState(EventTimeline.FORWARDS).getSentinelMember
-                .mockImplementation(function(uid) {
+                .andCall(function(uid) {
                     if (uid === userA) {
                         return sentinel;
                     }
                     return null;
                 });
             timeline.getState(EventTimeline.BACKWARDS).getSentinelMember
-                .mockImplementation(function(uid) {
+                .andCall(function(uid) {
                     if (uid === userA) {
                         return oldSentinel;
                     }
@@ -277,7 +281,7 @@ describe("EventTimeline", function() {
             expect(events[1].forwardLooking).toBe(true);
 
             expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
-                not.toHaveBeenCalled();
+                toNotHaveBeenCalled();
         });
 
 
@@ -307,7 +311,7 @@ describe("EventTimeline", function() {
             expect(events[1].forwardLooking).toBe(false);
 
             expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
-                not.toHaveBeenCalled();
+                toNotHaveBeenCalled();
         });
     });
 

@@ -20,6 +20,8 @@ limitations under the License.
  * @module
  */
 
+import Promise from 'bluebird';
+
 /**
  * map of registered encryption algorithm classes. A map from string to {@link
  * module:crypto/algorithms/base.EncryptionAlgorithm|EncryptionAlgorithm} class

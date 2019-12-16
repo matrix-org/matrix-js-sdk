@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import Promise from 'bluebird';
+
 import logger from '../../logger';
 import LocalStorageCryptoStore from './localStorage-crypto-store';
 import MemoryCryptoStore from './memory-crypto-store';
@@ -285,12 +287,10 @@ export default class IndexedDBCryptoStore {
      * @param {function(string)} func Called with the account pickle
      */
     getAccount(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAccount(txn, func);
-        });
+        this._backendPromise.value().getAccount(txn, func);
     }
 
-    /**
+    /*
      * Write the account pickle to the store.
      * This requires an active transaction. See doTxn().
      *
@@ -298,35 +298,7 @@ export default class IndexedDBCryptoStore {
      * @param {string} newData The new account pickle to store.
      */
     storeAccount(txn, newData) {
-        this._backendPromise.then(backend => {
-            backend.storeAccount(txn, newData);
-        });
-    }
-
-    /**
-     * Get the public part of the cross-signing keys (eg. self-signing key,
-     * user signing key).
-     *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(string)} func Called with the account keys object:
-     *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
-     */
-    getCrossSigningKeys(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getCrossSigningKeys(txn, func);
-        });
-    }
-
-    /**
-     * Write the cross-signing keys back to the store
-     *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {string} keys keys object as getCrossSigningKeys()
-     */
-    storeCrossSigningKeys(txn, keys) {
-        this._backendPromise.then(backend => {
-            backend.storeCrossSigningKeys(txn, keys);
-        });
+        this._backendPromise.value().storeAccount(txn, newData);
     }
 
     // Olm sessions
@@ -337,9 +309,7 @@ export default class IndexedDBCryptoStore {
      * @param {function(int)} func Called with the count of sessions
      */
     countEndToEndSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.countEndToEndSessions(txn, func);
-        });
+        this._backendPromise.value().countEndToEndSessions(txn, func);
     }
 
     /**
@@ -355,9 +325,7 @@ export default class IndexedDBCryptoStore {
      *     a message.
      */
     getEndToEndSession(deviceKey, sessionId, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndSession(deviceKey, sessionId, txn, func);
-        });
+        this._backendPromise.value().getEndToEndSession(deviceKey, sessionId, txn, func);
     }
 
     /**
@@ -372,9 +340,7 @@ export default class IndexedDBCryptoStore {
      *     a message.
      */
     getEndToEndSessions(deviceKey, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndSessions(deviceKey, txn, func);
-        });
+        this._backendPromise.value().getEndToEndSessions(deviceKey, txn, func);
     }
 
     /**
@@ -385,9 +351,7 @@ export default class IndexedDBCryptoStore {
      *     and session keys.
      */
     getAllEndToEndSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAllEndToEndSessions(txn, func);
-        });
+        this._backendPromise.value().getAllEndToEndSessions(txn, func);
     }
 
     /**
@@ -398,14 +362,12 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndSession(
-                deviceKey, sessionId, sessionInfo, txn,
-            );
-        });
+        this._backendPromise.value().storeEndToEndSession(
+            deviceKey, sessionId, sessionInfo, txn,
+        );
     }
 
-    // Inbound group sessions
+    // Inbound group saessions
 
     /**
      * Retrieve the end-to-end inbound group session for a given
@@ -417,11 +379,9 @@ export default class IndexedDBCryptoStore {
      *     to Base64 end-to-end session.
      */
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, txn, func,
-            );
-        });
+        this._backendPromise.value().getEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, txn, func,
+        );
     }
 
     /**
@@ -432,9 +392,7 @@ export default class IndexedDBCryptoStore {
      *     sessionData}, then once with null to indicate the end of the list.
      */
     getAllEndToEndInboundGroupSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAllEndToEndInboundGroupSessions(txn, func);
-        });
+        this._backendPromise.value().getAllEndToEndInboundGroupSessions(txn, func);
     }
 
     /**
@@ -447,11 +405,9 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
-        this._backendPromise.then(backend => {
-            backend.addEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, sessionData, txn,
-            );
-        });
+        this._backendPromise.value().addEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
     }
 
     /**
@@ -464,11 +420,9 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, sessionData, txn,
-            );
-        });
+        this._backendPromise.value().storeEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
     }
 
     // End-to-end device tracking
@@ -484,9 +438,7 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndDeviceData(deviceData, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndDeviceData(deviceData, txn);
-        });
+        this._backendPromise.value().storeEndToEndDeviceData(deviceData, txn);
     }
 
     /**
@@ -497,9 +449,7 @@ export default class IndexedDBCryptoStore {
      *     device data
      */
     getEndToEndDeviceData(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndDeviceData(txn, func);
-        });
+        this._backendPromise.value().getEndToEndDeviceData(txn, func);
     }
 
     // End to End Rooms
@@ -511,9 +461,7 @@ export default class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndRoom(roomId, roomInfo, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndRoom(roomId, roomInfo, txn);
-        });
+        this._backendPromise.value().storeEndToEndRoom(roomId, roomInfo, txn);
     }
 
     /**
@@ -522,9 +470,7 @@ export default class IndexedDBCryptoStore {
      * @param {function(Object)} func Function called with the end to end encrypted rooms
      */
     getEndToEndRooms(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndRooms(txn, func);
-        });
+        this._backendPromise.value().getEndToEndRooms(txn, func);
     }
 
     // session backups

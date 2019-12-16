@@ -18,10 +18,11 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
+import Promise from 'bluebird';
 const url = require("url");
 
 const utils = require("./utils");
-import logger from './logger';
+import logger from '../src/logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";

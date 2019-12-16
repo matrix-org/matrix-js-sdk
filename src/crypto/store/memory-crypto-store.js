@@ -15,6 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import Promise from 'bluebird';
+
 import logger from '../../logger';
 import utils from '../../utils';
 
@@ -31,7 +33,6 @@ export default class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
-        this._crossSigningKeys = null;
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
@@ -67,7 +68,7 @@ export default class MemoryCryptoStore {
     getOrAddOutgoingRoomKeyRequest(request) {
         const requestBody = request.requestBody;
 
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             // first see if we already have an entry for this request.
             const existing = this._getOutgoingRoomKeyRequest(requestBody);
 
@@ -231,14 +232,6 @@ export default class MemoryCryptoStore {
 
     storeAccount(txn, newData) {
         this._account = newData;
-    }
-
-    getCrossSigningKeys(txn, func) {
-        func(this._crossSigningKeys);
-    }
-
-    storeCrossSigningKeys(txn, keys) {
-        this._crossSigningKeys = keys;
     }
 
     // Olm Sessions

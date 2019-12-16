@@ -16,12 +16,15 @@ limitations under the License.
 "use strict";
 
 import 'source-map-support/register';
+import Promise from 'bluebird';
 const sdk = require("../..");
+const utils = require("../test-utils");
 
 const InteractiveAuth = sdk.InteractiveAuth;
 const MatrixError = sdk.MatrixError;
 
-import logger from '../../lib/logger';
+import expect from 'expect';
+import logger from '../../src/logger';
 
 // Trivial client object to test interactive auth
 // (we do not need TestClient here)
@@ -32,9 +35,13 @@ class FakeClient {
 }
 
 describe("InteractiveAuth", function() {
-    it("should start an auth stage and complete it", function() {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+    beforeEach(function() {
+        utils.beforeEach(this); // eslint-disable-line babel/no-invalid-this
+    });
+
+    it("should start an auth stage and complete it", function(done) {
+        const doRequest = expect.createSpy();
+        const stateUpdated = expect.createSpy();
 
         const ia = new InteractiveAuth({
             matrixClient: new FakeClient(),
@@ -57,7 +64,7 @@ describe("InteractiveAuth", function() {
         });
 
         // first we expect a call here
-        stateUpdated.mockImplementation(function(stage) {
+        stateUpdated.andCall(function(stage) {
             logger.log('aaaa');
             expect(stage).toEqual("logintype");
             ia.submitAuthDict({
@@ -68,7 +75,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should trigger a call here
         const requestRes = {"a": "b"};
-        doRequest.mockImplementation(function(authData) {
+        doRequest.andCall(function(authData) {
             logger.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
@@ -78,16 +85,16 @@ describe("InteractiveAuth", function() {
             return Promise.resolve(requestRes);
         });
 
-        return ia.attemptAuth().then(function(res) {
+        ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
-            expect(doRequest).toBeCalledTimes(1);
-            expect(stateUpdated).toBeCalledTimes(1);
-        });
+            expect(doRequest.calls.length).toEqual(1);
+            expect(stateUpdated.calls.length).toEqual(1);
+        }).nodeify(done);
     });
 
-    it("should make a request if no authdata is provided", function() {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
+    it("should make a request if no authdata is provided", function(done) {
+        const doRequest = expect.createSpy();
+        const stateUpdated = expect.createSpy();
 
         const ia = new InteractiveAuth({
             matrixClient: new FakeClient(),
@@ -99,7 +106,7 @@ describe("InteractiveAuth", function() {
         expect(ia.getStageParams("logintype")).toBe(undefined);
 
         // first we expect a call to doRequest
-        doRequest.mockImplementation(function(authData) {
+        doRequest.andCall(function(authData) {
             logger.log("request1", authData);
             expect(authData).toEqual({});
             const err = new MatrixError({
@@ -117,7 +124,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should be followed by a call to stateUpdated
         const requestRes = {"a": "b"};
-        stateUpdated.mockImplementation(function(stage) {
+        stateUpdated.andCall(function(stage) {
             expect(stage).toEqual("logintype");
             expect(ia.getSessionId()).toEqual("sessionId");
             expect(ia.getStageParams("logintype")).toEqual({
@@ -125,7 +132,7 @@ describe("InteractiveAuth", function() {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation(function(authData) {
+            doRequest.andCall(function(authData) {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
@@ -141,10 +148,10 @@ describe("InteractiveAuth", function() {
             });
         });
 
-        return ia.attemptAuth().then(function(res) {
+        ia.attemptAuth().then(function(res) {
             expect(res).toBe(requestRes);
-            expect(doRequest).toBeCalledTimes(2);
-            expect(stateUpdated).toBeCalledTimes(1);
-        });
+            expect(doRequest.calls.length).toEqual(2);
+            expect(stateUpdated.calls.length).toEqual(1);
+        }).nodeify(done);
     });
 });

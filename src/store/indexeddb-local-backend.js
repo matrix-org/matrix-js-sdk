@@ -15,10 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import Promise from 'bluebird';
 import SyncAccumulator from "../sync-accumulator";
 import utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import logger from '../logger';
+import logger from '../../src/logger';
 
 const VERSION = 3;
 
@@ -435,7 +436,7 @@ LocalIndexedDBStoreBackend.prototype = {
      */
     _persistSyncData: function(nextBatch, roomsData, groupsData) {
         logger.log("Persisting sync data up to ", nextBatch);
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
@@ -455,7 +456,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the events were persisted.
      */
     _persistAccountData: function(accountData) {
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
@@ -474,7 +475,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise} Resolves if the users were persisted.
      */
     _persistUserPresenceEvents: function(tuples) {
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
@@ -494,7 +495,7 @@ LocalIndexedDBStoreBackend.prototype = {
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
     getUserPresenceEvents: function() {
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
@@ -511,7 +512,7 @@ LocalIndexedDBStoreBackend.prototype = {
         logger.log(
             `LocalIndexedDBStoreBackend: loading account data...`,
         );
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
@@ -533,7 +534,7 @@ LocalIndexedDBStoreBackend.prototype = {
         logger.log(
             `LocalIndexedDBStoreBackend: loading sync data...`,
         );
-        return utils.promiseTry(() => {
+        return Promise.try(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
