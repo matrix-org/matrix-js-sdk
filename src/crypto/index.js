@@ -33,7 +33,12 @@ import * as olmlib from "./olmlib";
 import {DeviceList} from "./DeviceList";
 import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
-import {CrossSigningInfo, CrossSigningLevel, DeviceTrustLevel, UserTrustLevel} from './CrossSigning';
+import {
+    CrossSigningInfo,
+    CrossSigningLevel,
+    DeviceTrustLevel,
+    UserTrustLevel,
+} from './CrossSigning';
 import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';

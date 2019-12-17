@@ -18,7 +18,12 @@ limitations under the License.
 import {logger} from '../../../logger';
 import {RequestCallbackChannel} from "./RequestCallbackChannel";
 import {EventEmitter} from 'events';
-import {errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError} from "../Error";
+import {
+    errorFactory,
+    errorFromEvent,
+    newUnexpectedMessageError,
+    newUnknownMethodError,
+} from "../Error";
 
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction

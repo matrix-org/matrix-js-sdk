@@ -17,7 +17,13 @@ limitations under the License.
 
 import {randomString} from '../../../randomstring';
 import {logger} from '../../../logger';
-import {CANCEL_TYPE, PHASE_STARTED, REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
+import {
+    CANCEL_TYPE,
+    PHASE_STARTED,
+    REQUEST_TYPE,
+    START_TYPE,
+    VerificationRequest,
+} from "./VerificationRequest";
 import {errorFromEvent, newUnexpectedMessageError} from "../Error";
 
 /**
