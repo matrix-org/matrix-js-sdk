@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import utils from '../../utils';
+import {logger} from '../../logger';
+import * as utils from "../../utils";
 
 export const VERSION = 7;
 

@@ -15,24 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
-import logger from '../../../logger';
-import VerificationRequest, {
-    PHASE_STARTED,
-    REQUEST_TYPE,
-    START_TYPE,
-    CANCEL_TYPE,
-} from "./VerificationRequest";
+import {randomString} from '../../../randomstring';
+import {logger} from '../../../logger';
+import {CANCEL_TYPE, PHASE_STARTED, REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
+import {errorFromEvent, newUnexpectedMessageError} from "../Error";
 
-import {
-    newUnexpectedMessageError,
-    errorFromEvent,
-} from "../Error";
 /**
  * A key verification channel that sends verification events over to_device messages.
  * Generates its own transaction ids.
  */
-export default class ToDeviceChannel {
+export class ToDeviceChannel {
     // userId and devices of user we're about to verify
     constructor(client, userId, devices, transactionId = null, deviceId = null) {
         this._client = client;

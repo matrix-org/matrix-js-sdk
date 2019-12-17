@@ -1,5 +1,6 @@
 /*
 Copyright 2016, 2017 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@ limitations under the License.
  * @module models/event-timeline
  */
 
-const RoomState = require("./room-state");
+import {RoomState} from "./room-state";
 
 /**
  * Construct a new EventTimeline
@@ -41,7 +42,7 @@ const RoomState = require("./room-state");
  * @param {EventTimelineSet} eventTimelineSet the set of timelines this is part of
  * @constructor
  */
-function EventTimeline(eventTimelineSet) {
+export function EventTimeline(eventTimelineSet) {
     this._eventTimelineSet = eventTimelineSet;
     this._roomId = eventTimelineSet.room ? eventTimelineSet.room.roomId : null;
     this._events = [];
@@ -396,8 +397,3 @@ EventTimeline.prototype.toString = function() {
     return this._name;
 };
 
-
-/**
- * The EventTimeline class
- */
-module.exports = EventTimeline;

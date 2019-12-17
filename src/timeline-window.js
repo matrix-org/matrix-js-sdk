@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +18,8 @@ limitations under the License.
 
 /** @module timeline-window */
 
-const EventTimeline = require("./models/event-timeline");
-import logger from './logger';
+import {EventTimeline} from './models/event-timeline';
+import {logger} from './logger';
 
 /**
  * @private
@@ -66,7 +67,7 @@ const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
  *
  * @constructor
  */
-function TimelineWindow(client, timelineSet, opts) {
+export function TimelineWindow(client, timelineSet, opts) {
     opts = opts || {};
     this._client = client;
     this._timelineSet = timelineSet;
@@ -397,7 +398,7 @@ TimelineWindow.prototype.getEvents = function() {
  * @param {number} index
  * @private
  */
-function TimelineIndex(timeline, index) {
+export function TimelineIndex(timeline, index) {
     this.timeline = timeline;
 
     // the indexes are relative to BaseIndex, so could well be negative.
@@ -491,12 +492,3 @@ TimelineIndex.prototype.retreat = function(delta) {
     return this.advance(delta * -1) * -1;
 };
 
-/**
- * The TimelineWindow class.
- */
-module.exports.TimelineWindow = TimelineWindow;
-
-/**
- * The TimelineIndex class. exported here for unit testing.
- */
-module.exports.TimelineIndex = TimelineIndex;

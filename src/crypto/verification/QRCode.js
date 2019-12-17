@@ -19,13 +19,8 @@ limitations under the License.
  * @module crypto/verification/QRCode
  */
 
-import Base from "./Base";
-import {
-    errorFactory,
-    newUserCancelledError,
-    newKeyMismatchError,
-    newUserMismatchError,
-} from './Error';
+import {VerificationBase as Base} from "./Base";
+import {errorFactory, newKeyMismatchError, newUserCancelledError, newUserMismatchError} from './Error';
 
 const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
 const KEY_REGEXP = /^key_([^:]+:.+)$/;

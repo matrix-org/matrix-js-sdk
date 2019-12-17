@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import EventEmitter from 'events';
-import { EventStatus } from '../models/event';
+import {EventEmitter} from 'events';
+import {EventStatus} from '../models/event';
 
 /**
  * A container for relation events that supports easy access to common ways of
@@ -25,7 +25,7 @@ import { EventStatus } from '../models/event';
  * The typical way to get one of these containers is via
  * EventTimelineSet#getRelationsForEvent.
  */
-export default class Relations extends EventEmitter {
+export class Relations extends EventEmitter {
     /**
      * @param {String} relationType
      * The type of relation involved, such as "m.annotation", "m.reference",

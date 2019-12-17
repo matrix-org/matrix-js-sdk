@@ -15,7 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import VerificationRequest, {REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
+import {REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
+
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
 const M_RELATES_TO = "m.relates_to";
@@ -24,7 +25,7 @@ const M_RELATES_TO = "m.relates_to";
  * A key verification channel that sends verification events in the timeline of a room.
  * Uses the event id of the initial m.key.verification.request event as a transaction id.
  */
-export default class InRoomChannel {
+export class InRoomChannel {
     /**
      * @param {MatrixClient} client the matrix client, to send messages with and get current user & device from.
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.

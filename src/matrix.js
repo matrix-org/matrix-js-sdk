@@ -17,127 +17,65 @@ limitations under the License.
 */
 "use strict";
 
-/** The {@link module:ContentHelpers} object */
-module.exports.ContentHelpers = require("./content-helpers");
-/** The {@link module:models/event.MatrixEvent|MatrixEvent} class. */
-module.exports.MatrixEvent = require("./models/event").MatrixEvent;
-/** The {@link module:models/event.EventStatus|EventStatus} enum. */
-module.exports.EventStatus = require("./models/event").EventStatus;
-/** The {@link module:store/memory.MemoryStore|MemoryStore} class. */
-module.exports.MemoryStore = require("./store/memory").MemoryStore;
-/**
- * The {@link module:store/memory.MemoryStore|MemoryStore} class was previously
- * exported as `MatrixInMemoryStore`, so this is preserved for SDK consumers.
- * @deprecated Prefer `MemoryStore` going forward.
- */
-module.exports.MatrixInMemoryStore = module.exports.MemoryStore;
-/** The {@link module:store/indexeddb.IndexedDBStore|IndexedDBStore} class. */
-module.exports.IndexedDBStore = require("./store/indexeddb").IndexedDBStore;
-/** The {@link module:store/indexeddb.IndexedDBStoreBackend|IndexedDBStoreBackend} class. */
-module.exports.IndexedDBStoreBackend = require("./store/indexeddb").IndexedDBStoreBackend;
-/** The {@link module:sync-accumulator.SyncAccumulator|SyncAccumulator} class. */
-module.exports.SyncAccumulator = require("./sync-accumulator");
-/** The {@link module:http-api.MatrixHttpApi|MatrixHttpApi} class. */
-module.exports.MatrixHttpApi = require("./http-api").MatrixHttpApi;
-/** The {@link module:http-api.MatrixError|MatrixError} class. */
-module.exports.MatrixError = require("./http-api").MatrixError;
-/** The {@link module:errors.InvalidStoreError|InvalidStoreError} class. */
-module.exports.InvalidStoreError = require("./errors").InvalidStoreError;
-/** The {@link module:client.MatrixClient|MatrixClient} class. */
-module.exports.MatrixClient = require("./client").MatrixClient;
-/** The {@link module:models/room|Room} class. */
-module.exports.Room = require("./models/room");
-/** The {@link module:models/group|Group} class. */
-module.exports.Group = require("./models/group");
-/** The {@link module:models/event-timeline~EventTimeline} class. */
-module.exports.EventTimeline = require("./models/event-timeline");
-/** The {@link module:models/event-timeline-set~EventTimelineSet} class. */
-module.exports.EventTimelineSet = require("./models/event-timeline-set");
-/** The {@link module:models/room-member|RoomMember} class. */
-module.exports.RoomMember = require("./models/room-member");
-/** The {@link module:models/room-state~RoomState|RoomState} class. */
-module.exports.RoomState = require("./models/room-state");
-/** The {@link module:models/user~User|User} class. */
-module.exports.User = require("./models/user");
-/** The {@link module:scheduler~MatrixScheduler|MatrixScheduler} class. */
-module.exports.MatrixScheduler = require("./scheduler");
-/** The {@link module:store/session/webstorage~WebStorageSessionStore|
- * WebStorageSessionStore} class. <strong>Work in progress; unstable.</strong> */
-module.exports.WebStorageSessionStore = require("./store/session/webstorage");
-/** True if crypto libraries are being used on this client. */
-module.exports.CRYPTO_ENABLED = require("./client").CRYPTO_ENABLED;
-/** {@link module:content-repo|ContentRepo} utility functions. */
-module.exports.ContentRepo = require("./content-repo");
-/** The {@link module:filter~Filter|Filter} class. */
-module.exports.Filter = require("./filter");
-/** The {@link module:timeline-window~TimelineWindow} class. */
-module.exports.TimelineWindow = require("./timeline-window").TimelineWindow;
-/** The {@link module:interactive-auth} class. */
-module.exports.InteractiveAuth = require("./interactive-auth");
-/** The {@link module:auto-discovery|AutoDiscovery} class. */
-module.exports.AutoDiscovery = require("./autodiscovery").AutoDiscovery;
+import {MemoryCryptoStore} from "./crypto/store/memory-crypto-store";
+import {MemoryStore} from "./store/memory";
+import {MatrixScheduler} from "./scheduler";
+import {MatrixClient} from "./client";
 
-module.exports.SERVICE_TYPES = require('./service-types').SERVICE_TYPES;
-
-module.exports.MemoryCryptoStore =
-    require("./crypto/store/memory-crypto-store").default;
-module.exports.IndexedDBCryptoStore =
-    require("./crypto/store/indexeddb-crypto-store").default;
-
-/**
- * Create a new Matrix Call.
- * @function
- * @param {module:client.MatrixClient} client The MatrixClient instance to use.
- * @param {string} roomId The room the call is in.
- * @return {module:webrtc/call~MatrixCall} The Matrix call or null if the browser
- * does not support WebRTC.
- */
-module.exports.createNewMatrixCall = require("./webrtc/call").createNewMatrixCall;
-
-
-/**
- * Set a preferred audio output device to use for MatrixCalls
- * @function
- * @param {string=} deviceId the identifier for the device
- * undefined treated as unset
- */
-module.exports.setMatrixCallAudioOutput = require('./webrtc/call').setAudioOutput;
-/**
- * Set a preferred audio input device to use for MatrixCalls
- * @function
- * @param {string=} deviceId the identifier for the device
- * undefined treated as unset
- */
-module.exports.setMatrixCallAudioInput = require('./webrtc/call').setAudioInput;
-/**
- * Set a preferred video input device to use for MatrixCalls
- * @function
- * @param {string=} deviceId the identifier for the device
- * undefined treated as unset
- */
-module.exports.setMatrixCallVideoInput = require('./webrtc/call').setVideoInput;
+export * from "./client";
+export * from "./http-api";
+export * from "./autodiscovery";
+export * from "./sync-accumulator";
+export * from "./errors";
+export * from "./models/event";
+export * from "./models/room";
+export * from "./models/group";
+export * from "./models/event-timeline";
+export * from "./models/event-timeline-set";
+export * from "./models/room-member";
+export * from "./models/room-state";
+export * from "./models/user";
+export * from "./scheduler";
+export * from "./filter";
+export * from "./timeline-window";
+export * from "./interactive-auth";
+export * from "./service-types";
+export * from "./store/memory";
+export * from "./store/indexeddb";
+export * from "./store/session/webstorage";
+export * from "./crypto/store/memory-crypto-store";
+export * from "./crypto/store/indexeddb-crypto-store";
+export const ContentHelpers = import("./content-helpers");
+export const ContentRepo = import("./content-repo");
+export {
+    createNewMatrixCall,
+    setAudioOutput as setMatrixCallAudioOutput,
+    setAudioInput as setMatrixCallAudioInput,
+    setVideoInput as setMatrixCallVideoInput,
+} from "./webrtc/call";
 
 
 // expose the underlying request object so different environments can use
 // different request libs (e.g. request or browser-request)
-let request;
+let requestInstance;
+
 /**
  * The function used to perform HTTP requests. Only use this if you want to
  * use a different HTTP library, e.g. Angular's <code>$http</code>. This should
  * be set prior to calling {@link createClient}.
  * @param {requestFunction} r The request function to use.
  */
-module.exports.request = function(r) {
-    request = r;
-};
+export function request(r) {
+    requestInstance = r;
+}
 
 /**
  * Return the currently-set request function.
  * @return {requestFunction} The current request function.
  */
-module.exports.getRequest = function() {
-    return request;
-};
+export function getRequest() {
+    return requestInstance;
+}
 
 /**
  * Apply wrapping code around the request function. The wrapper function is
@@ -145,15 +83,15 @@ module.exports.getRequest = function() {
  * previous value, along with the options and callback arguments.
  * @param {requestWrapperFunction} wrapper The wrapping function.
  */
-module.exports.wrapRequest = function(wrapper) {
-    const origRequest = request;
-    request = function(options, callback) {
+export function wrapRequest(wrapper) {
+    const origRequest = requestInstance;
+    requestInstance = function(options, callback) {
         return wrapper(origRequest, options, callback);
     };
-};
+}
 
 
-let cryptoStoreFactory = () => new module.exports.MemoryCryptoStore;
+let cryptoStoreFactory = () => new MemoryCryptoStore;
 
 /**
  * Configure a different factory to be used for creating crypto stores
@@ -161,9 +99,9 @@ let cryptoStoreFactory = () => new module.exports.MemoryCryptoStore;
  * @param {Function} fac  a function which will return a new
  *    {@link module:crypto.store.base~CryptoStore}.
  */
-module.exports.setCryptoStoreFactory = function(fac) {
+export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
-};
+}
 
 /**
  * Construct a Matrix Client. Similar to {@link module:client~MatrixClient}
@@ -188,20 +126,20 @@ module.exports.setCryptoStoreFactory = function(fac) {
  * @see {@link module:client~MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
-module.exports.createClient = function(opts) {
+export function createClient(opts) {
     if (typeof opts === "string") {
         opts = {
             "baseUrl": opts,
         };
     }
     opts.request = opts.request || request;
-    opts.store = opts.store || new module.exports.MemoryStore({
+    opts.store = opts.store || new MemoryStore({
       localStorage: global.localStorage,
     });
-    opts.scheduler = opts.scheduler || new module.exports.MatrixScheduler();
+    opts.scheduler = opts.scheduler || new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
-    return new module.exports.MatrixClient(opts);
-};
+    return new MatrixClient(opts);
+}
 
 /**
  * The request function interface for performing HTTP requests. This matches the

@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +18,13 @@ limitations under the License.
 /**
  * @module models/event-timeline-set
  */
-const EventEmitter = require("events").EventEmitter;
-const utils = require("../utils");
-const EventTimeline = require("./event-timeline");
+
+import {EventEmitter} from "events";
+import {EventTimeline} from "./event-timeline";
 import {EventStatus} from "./event";
-import logger from '../logger';
-import Relations from './relations';
+import * as utils from "../utils";
+import {logger} from '../logger';
+import {Relations} from './relations';
 
 // var DEBUG = false;
 const DEBUG = true;
@@ -71,7 +73,7 @@ if (DEBUG) {
  * via `getRelationsForEvent`.
  * This feature is currently unstable and the API may change without notice.
  */
-function EventTimelineSet(room, opts) {
+export function EventTimelineSet(room, opts) {
     this.room = room;
 
     this._timelineSupport = Boolean(opts.timelineSupport);
@@ -814,11 +816,6 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
         relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
     }
 };
-
-/**
- * The EventTimelineSet class.
- */
-module.exports = EventTimelineSet;
 
 /**
  * Fires whenever the timeline in a room is updated.

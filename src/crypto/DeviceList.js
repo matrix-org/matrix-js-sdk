@@ -24,12 +24,11 @@ limitations under the License.
  */
 
 import {EventEmitter} from 'events';
-
-import logger from '../logger';
-import DeviceInfo from './deviceinfo';
+import {logger} from '../logger';
+import {DeviceInfo} from './deviceinfo';
 import {CrossSigningInfo} from './CrossSigning';
-import olmlib from './olmlib';
-import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+import * as olmlib from './olmlib';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import {defer, sleep} from '../utils';
 
 
@@ -63,7 +62,7 @@ const TRACKING_STATUS_UP_TO_DATE = 3;
 /**
  * @alias module:crypto/DeviceList
  */
-export default class DeviceList extends EventEmitter {
+export class DeviceList extends EventEmitter {
     constructor(baseApis, cryptoStore, olmDevice) {
         super();
 

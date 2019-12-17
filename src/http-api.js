@@ -19,15 +19,15 @@ limitations under the License.
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
  * @module http-api
  */
-const parseContentType = require('content-type').parse;
 
-const utils = require("./utils");
-import logger from './logger';
+import {parse as parseContentType} from "content-type";
+import * as utils from "./utils";
+import {logger} from './logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
 // waiting for the delay to elapse.
-const callbacks = require("./realtime-callbacks");
+import * as callbacks from "./realtime-callbacks";
 
 /*
 TODO:
@@ -38,27 +38,27 @@ TODO:
 /**
  * A constant representing the URI path for release 0 of the Client-Server HTTP API.
  */
-module.exports.PREFIX_R0 = "/_matrix/client/r0";
+export const PREFIX_R0 = "/_matrix/client/r0";
 
 /**
  * A constant representing the URI path for as-yet unspecified Client-Server HTTP APIs.
  */
-module.exports.PREFIX_UNSTABLE = "/_matrix/client/unstable";
+export const PREFIX_UNSTABLE = "/_matrix/client/unstable";
 
 /**
  * URI path for v1 of the the identity API
  */
-module.exports.PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
+export const PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
 
 /**
  * URI path for the v2 identity API
  */
-module.exports.PREFIX_IDENTITY_V2 = "/_matrix/identity/v2";
+export const PREFIX_IDENTITY_V2 = "/_matrix/identity/v2";
 
 /**
  * URI path for the media repo API
  */
-module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
+export const PREFIX_MEDIA_R0 = "/_matrix/media/r0";
 
 /**
  * Construct a MatrixHttpApi.
@@ -85,16 +85,16 @@ module.exports.PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
  * Authorization header instead of query param to send the access token to the server.
  */
-module.exports.MatrixHttpApi = function MatrixHttpApi(event_emitter, opts) {
+export function MatrixHttpApi(event_emitter, opts) {
     utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
     opts.onlyData = opts.onlyData || false;
     this.event_emitter = event_emitter;
     this.opts = opts;
     this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
     this.uploads = [];
-};
+}
 
-module.exports.MatrixHttpApi.prototype = {
+MatrixHttpApi.prototype = {
     /**
      * Sets the baase URL for the identity server
      * @param {string} url The new base url
@@ -698,7 +698,7 @@ module.exports.MatrixHttpApi.prototype = {
                     if (req && req.abort) {
                         req.abort();
                     }
-                    defer.reject(new module.exports.MatrixError({
+                    defer.reject(new MatrixError({
                         error: "Locally timed out waiting for a response",
                         errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
                         timeout: localTimeoutMs,
@@ -836,7 +836,7 @@ function parseErrorResponse(response, body) {
     if (contentType) {
         if (contentType.type === 'application/json') {
             const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
-            err = new module.exports.MatrixError(jsonBody);
+            err = new MatrixError(jsonBody);
         } else if (contentType.type === 'text/plain') {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
         }
@@ -891,13 +891,12 @@ function getResponseContentType(response) {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {integer} httpStatus The numeric HTTP status code given
  */
-module.exports.MatrixError = function MatrixError(errorJson) {
+export function MatrixError(errorJson) {
     errorJson = errorJson || {};
     this.errcode = errorJson.errcode;
     this.name = errorJson.errcode || "Unknown error code";
     this.message = errorJson.error || "Unknown message";
     this.data = errorJson;
-};
-module.exports.MatrixError.prototype = Object.create(Error.prototype);
-/** */
-module.exports.MatrixError.prototype.constructor = module.exports.MatrixError;
+}
+MatrixError.prototype = Object.create(Error.prototype);
+MatrixError.prototype.constructor = MatrixError;

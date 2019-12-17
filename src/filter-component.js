@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +46,7 @@ function _matches_wildcard(actual_value, filter_value) {
  * @constructor
  * @param {Object} filter_json the definition of this filter JSON, e.g. { 'contains_url': true }
  */
-function FilterComponent(filter_json) {
+export function FilterComponent(filter_json) {
     this.filter_json = filter_json;
 
     this.types = filter_json.types || null;
@@ -141,6 +142,3 @@ FilterComponent.prototype.filter = function(events) {
 FilterComponent.prototype.limit = function() {
     return this.filter_json.limit !== undefined ? this.filter_json.limit : 10;
 };
-
-/** The FilterComponent class */
-module.exports = FilterComponent;
