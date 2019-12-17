@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import {VerificationBase as Base} from "./Base";
-import {errorFactory, newKeyMismatchError, newUserCancelledError, newUserMismatchError,} from './Error';
+import {errorFactory, newKeyMismatchError, newUserCancelledError, newUserMismatchError} from './Error';
 
 const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
 const KEY_REGEXP = /^key_([^:]+:.+)$/;

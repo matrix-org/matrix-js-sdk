@@ -25,7 +25,7 @@ import * as utils from "../../utils";
 import {polyfillSuper} from "../../utils";
 import * as olmlib from "../olmlib";
 import {DeviceInfo} from "../deviceinfo";
-import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm,} from "./base";
+import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm} from "./base";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

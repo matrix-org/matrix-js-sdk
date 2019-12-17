@@ -17,8 +17,8 @@ limitations under the License.
 
 import {randomString} from '../../../randomstring';
 import {logger} from '../../../logger';
-import {CANCEL_TYPE, PHASE_STARTED, REQUEST_TYPE, START_TYPE, VerificationRequest,} from "./VerificationRequest";
-import {errorFromEvent, newUnexpectedMessageError,} from "../Error";
+import {CANCEL_TYPE, PHASE_STARTED, REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
+import {errorFromEvent, newUnexpectedMessageError} from "../Error";
 
 /**
  * A key verification channel that sends verification events over to_device messages.
