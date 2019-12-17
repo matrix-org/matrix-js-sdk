@@ -1,5 +1,6 @@
 /*
 Copyright 2018,2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,14 +16,12 @@ limitations under the License.
 */
 
 import '../../../olm-loader';
-
-import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../../../MockStorageApi';
-import logger from '../../../../lib/logger';
-
-import OlmDevice from '../../../../lib/crypto/OlmDevice';
-import olmlib from '../../../../lib/crypto/olmlib';
-import DeviceInfo from '../../../../lib/crypto/deviceinfo';
+import {MemoryCryptoStore} from "../../../../src/crypto/store/memory-crypto-store";
+import {MockStorageApi} from "../../../MockStorageApi";
+import {logger} from "../../../../src/logger";
+import {OlmDevice} from "../../../../src/crypto/OlmDevice";
+import * as olmlib from "../../../../src/crypto/olmlib";
+import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
 
 function makeOlmDevice() {
     const mockStorage = new MockStorageApi();
