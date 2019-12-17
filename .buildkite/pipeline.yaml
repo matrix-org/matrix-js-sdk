@@ -34,7 +34,6 @@ steps:
   - label: ":jest: Tests"
     command:
       - "yarn install"
-      - "yarn build" # Needed for the tests to run - we don't build on install
       - "yarn test"
     plugins:
       - docker#v3.0.1:
