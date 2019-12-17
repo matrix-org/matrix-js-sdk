@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./src/matrix";
-import * as utils from "./src/utils";
+import * as matrixcs from "./matrix";
+import * as utils from "./utils";
 
 matrixcs.request(import("request"));
 utils.runPolyfills();
 
-export * from "./src/matrix";
+export * from "./matrix";
+export default matrixcs;

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./src/matrix";
+import * as matrixcs from "./matrix";
 import request from "browser-request";
 import queryString from "qs";
 
@@ -49,6 +49,6 @@ if (indexedDB) {
 
 // We export 3 things to make browserify happy as well as downstream projects.
 // It's awkward, but required.
-export * from "./src/matrix";
+export * from "./matrix";
 export default matrixcs; // keep export for browserify package deps
 global.matrixcs = matrixcs;

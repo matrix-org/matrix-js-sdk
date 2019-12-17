@@ -4,11 +4,11 @@
   "description": "Matrix Client-Server SDK for JavaScript",
   "scripts": {
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
-    "clean": "rimraf lib dist",
+    "clean": "rimraf lib",
     "build": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:compile-browser && yarn build:types",
     "build:types": "tsc --emitDeclarationOnly",
     "build:compile": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
-    "build:compile-browser": "mkdirp dist && browserify -d browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline ] > dist/browser-matrix.js",
+    "build:compile-browser": "mkdirp lib/browser && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline ] -t uglifyify > lib/browser/matrix.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:ts && yarn lint:js",
     "lint:js": "eslint --max-warnings 93 src spec",
@@ -24,22 +24,19 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./index.js",
+  "main": "./lib/index.js",
   "typings": "./lib/index.d.ts",
-  "browser": "browser-index.js",
+  "browser": "./lib/browser-index.js",
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
+    "lib",
+    "git-revision.txt",
     "CHANGELOG.md",
     "CONTRIBUTING.rst",
     "LICENSE",
     "README.md",
-    "git-revision.txt",
-    "index.js",
-    "browser-index.js",
-    "lib",
-    "package.json",
-    "src"
+    "package.json"
   ],
   "dependencies": {
     "another-json": "^0.2.0",
@@ -81,6 +78,7 @@
     "source-map-support": "^0.5.13",
     "tsify": "^4.0.1",
     "tslint": "^5.20.1",
-    "typescript": "^3.7.3"
+    "typescript": "^3.7.3",
+    "uglifyify": "^5.0.2"
   }
 }
