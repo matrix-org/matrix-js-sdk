@@ -1,5 +1,3 @@
-"use strict";
-
 import 'source-map-support/register';
 import * as callbacks from "../../src/realtime-callbacks";
 

@@ -1,4 +1,3 @@
-"use strict";
 import 'source-map-support/register';
 import * as utils from "../test-utils";
 import {CRYPTO_ENABLED} from "../../src/client";
