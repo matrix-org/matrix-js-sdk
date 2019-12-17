@@ -6,7 +6,7 @@
     "moduleResolution": "node",
     "target": "es2016",
     "noImplicitAny": false,
-    "sourceMap": false,
+    "sourceMap": true,
     "outDir": "./lib",
     "declaration": true,
     "types": [
