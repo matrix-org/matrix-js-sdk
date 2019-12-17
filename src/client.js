@@ -1668,7 +1668,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
 
                 totalKeyCount += Object.keys(roomData.sessions).length;
                 const roomKeys = keysFromRecoverySession(
-                    roomData.sessions, decryption, roomId, roomKeys,
+                    roomData.sessions, decryption, roomId,
                 );
                 for (const k of roomKeys) {
                     k.room_id = roomId;

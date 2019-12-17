@@ -25,6 +25,7 @@ import {logger} from '../../logger';
 import * as utils from "../../utils";
 import * as olmlib from "../olmlib";
 import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm, UnknownDeviceError} from "./base";
+import {polyfillSuper} from "../../utils";
 
 /**
  * @private
@@ -132,7 +133,7 @@ OutboundSessionInfo.prototype.sharedWithTooManyDevices = function(
  *     {@link module:crypto/algorithms/EncryptionAlgorithm}
  */
 function MegolmEncryption(params) {
-    EncryptionAlgorithm.call(this, params);
+    polyfillSuper(this, EncryptionAlgorithm, params);
 
     // the most recent attempt to set up a session. This is used to serialise
     // the session setups, so that we have a race-free view of which session we
@@ -707,7 +708,7 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
  *     {@link module:crypto/algorithms/DecryptionAlgorithm}
  */
 function MegolmDecryption(params) {
-    DecryptionAlgorithm.call(this, params);
+    polyfillSuper(this, DecryptionAlgorithm, params);
 
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
     // senderKey|sessionId to Set of MatrixEvents

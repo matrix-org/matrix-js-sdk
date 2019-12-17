@@ -1,10 +1,9 @@
-const sdk = require("../..");
-const EventStatus = sdk.EventStatus;
-const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import {EventStatus} from "../../src/models/event";
+import {TestClient} from "../TestClient";
+
 
 describe("MatrixClient room timelines", function() {
-    const baseUrl = "http://localhost.or.something";
     let client = null;
     let httpBackend = null;
     const userId = "@alice:localhost";
@@ -99,15 +98,11 @@ describe("MatrixClient room timelines", function() {
     }
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            accessToken: accessToken,
-            // these tests should work with or without timelineSupport
-            timelineSupport: true,
-        });
+        // these tests should work with or without timelineSupport
+        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, {timelineSupport: true});
+        httpBackend = testClient.httpBackend;
+        client = testClient.client;
+
         setNextSyncData();
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });

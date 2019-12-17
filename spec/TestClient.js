@@ -23,8 +23,9 @@ import MockHttpBackend from 'matrix-mock-request';
 import {LocalStorageCryptoStore} from '../src/crypto/store/localStorage-crypto-store';
 import {logger} from '../src/logger';
 import {WebStorageSessionStore} from "../src/store/session/webstorage";
-import {MockStorageApi, syncPromise} from "./test-utils";
+import {syncPromise} from "./test-utils";
 import {createClient} from "../src/matrix";
+import {MockStorageApi} from "./MockStorageApi";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient

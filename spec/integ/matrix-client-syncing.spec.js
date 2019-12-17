@@ -1,8 +1,7 @@
-const sdk = require("../..");
-const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
-const MatrixEvent = sdk.MatrixEvent;
-const EventTimeline = sdk.EventTimeline;
+import {MatrixEvent} from "../../src/models/event";
+import {EventTimeline} from "../../src/models/event-timeline";
+import * as utils from "../test-utils";
+import {TestClient} from "../TestClient";
 
 describe("MatrixClient syncing", function() {
     const baseUrl = "http://localhost.or.something";
@@ -18,13 +17,9 @@ describe("MatrixClient syncing", function() {
     const roomTwo = "!bar:localhost";
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: selfUserId,
-            accessToken: selfAccessToken,
-        });
+        const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
+        httpBackend = testClient.httpBackend;
+        client = testClient.client;
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });

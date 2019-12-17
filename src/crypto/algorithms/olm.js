@@ -25,6 +25,7 @@ import * as utils from "../../utils";
 import * as olmlib from "../olmlib";
 import {DeviceInfo} from "../deviceinfo";
 import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm} from "./base";
+import {polyfillSuper} from "../../utils";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -38,7 +39,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
  *     {@link module:crypto/algorithms/EncryptionAlgorithm}
  */
 function OlmEncryption(params) {
-    EncryptionAlgorithm.call(this, params);
+    polyfillSuper(this, EncryptionAlgorithm, params);
     this._sessionPrepared = false;
     this._prepPromise = null;
 }
@@ -148,7 +149,7 @@ OlmEncryption.prototype.encryptMessage = async function(room, eventType, content
  *     {@link module:crypto/algorithms/DecryptionAlgorithm}
  */
 function OlmDecryption(params) {
-    DecryptionAlgorithm.call(this, params);
+    polyfillSuper(this, DecryptionAlgorithm, params);
 }
 utils.inherits(OlmDecryption, DecryptionAlgorithm);
 
