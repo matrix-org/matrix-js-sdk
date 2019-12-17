@@ -15,19 +15,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
+import {randomString} from '../../../randomstring';
 import {logger} from '../../../logger';
-import {
-    VerificationRequest,
-    PHASE_STARTED,
-    REQUEST_TYPE,
-    START_TYPE,
-    CANCEL_TYPE,
-} from "./VerificationRequest";
-import {
-    newUnexpectedMessageError,
-    errorFromEvent,
-} from "../Error";
+import {CANCEL_TYPE, PHASE_STARTED, REQUEST_TYPE, START_TYPE, VerificationRequest,} from "./VerificationRequest";
+import {errorFromEvent, newUnexpectedMessageError,} from "../Error";
 
 /**
  * A key verification channel that sends verification events over to_device messages.

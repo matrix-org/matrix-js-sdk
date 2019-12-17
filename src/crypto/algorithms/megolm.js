@@ -23,6 +23,7 @@ limitations under the License.
 
 import {logger} from '../../logger';
 import * as utils from "../../utils";
+import {polyfillSuper} from "../../utils";
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
@@ -31,7 +32,6 @@ import {
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base";
-import {polyfillSuper} from "../../utils";
 
 /**
  * @private

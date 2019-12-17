@@ -23,10 +23,10 @@ import {VerificationBase as Base} from "./Base";
 import anotherjson from 'another-json';
 import {
     errorFactory,
-    newUserCancelledError,
-    newUnknownMethodError,
-    newKeyMismatchError,
     newInvalidMessageError,
+    newKeyMismatchError,
+    newUnknownMethodError,
+    newUserCancelledError,
 } from './Error';
 
 const EVENTS = [

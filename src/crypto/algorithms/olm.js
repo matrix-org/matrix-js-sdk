@@ -22,15 +22,10 @@ limitations under the License.
 
 import {logger} from '../../logger';
 import * as utils from "../../utils";
+import {polyfillSuper} from "../../utils";
 import * as olmlib from "../olmlib";
 import {DeviceInfo} from "../deviceinfo";
-import {
-    DecryptionAlgorithm,
-    DecryptionError,
-    EncryptionAlgorithm,
-    registerAlgorithm,
-} from "./base";
-import {polyfillSuper} from "../../utils";
+import {DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm,} from "./base";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 

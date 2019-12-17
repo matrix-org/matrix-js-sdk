@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/CrossSigning
  */
 
-import {pkSign, pkVerify, encodeBase64, decodeBase64} from './olmlib';
+import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 

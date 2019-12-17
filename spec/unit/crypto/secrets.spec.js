@@ -19,7 +19,7 @@ import * as olmlib from "../../../src/crypto/olmlib";
 import {SECRET_STORAGE_ALGORITHM_V1} from "../../../src/crypto/SecretStorage";
 import {MatrixEvent} from "../../../src/models/event";
 import {TestClient} from '../../TestClient';
-import { makeTestClients } from './verification/util';
+import {makeTestClients} from './verification/util';
 
 async function makeTestClient(userInfo, options) {
     const client = (new TestClient(

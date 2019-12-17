@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {VerificationRequest, REQUEST_TYPE, START_TYPE} from "./VerificationRequest";
+import {REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
 
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";

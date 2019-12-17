@@ -1,5 +1,5 @@
 import {EventTimeline} from "../../src/models/event-timeline";
-import {TimelineWindow, TimelineIndex} from "../../src/timeline-window";
+import {TimelineIndex, TimelineWindow} from "../../src/timeline-window";
 import * as utils from "../test-utils";
 
 const ROOM_ID = "roomId";

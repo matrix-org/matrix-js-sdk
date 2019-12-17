@@ -24,17 +24,11 @@ limitations under the License.
  * @module base-apis
  */
 
-import { SERVICE_TYPES } from './service-types';
+import {SERVICE_TYPES} from './service-types';
 import {logger} from './logger';
 import {PushProcessor} from "./pushprocessor";
 import * as utils from "./utils";
-import {
-    MatrixHttpApi,
-    PREFIX_IDENTITY_V1,
-    PREFIX_IDENTITY_V2,
-    PREFIX_R0,
-    PREFIX_UNSTABLE,
-} from "./http-api";
+import {MatrixHttpApi, PREFIX_IDENTITY_V1, PREFIX_IDENTITY_V2, PREFIX_R0, PREFIX_UNSTABLE,} from "./http-api";
 
 function termsUrlForService(serviceType, baseUrl) {
     switch (serviceType) {

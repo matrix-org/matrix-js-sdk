@@ -17,8 +17,8 @@ limitations under the License.
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
 import * as olmlib from './olmlib';
-import { randomString } from '../randomstring';
-import { pkVerify } from './olmlib';
+import {pkVerify} from './olmlib';
+import {randomString} from '../randomstring';
 
 export const SECRET_STORAGE_ALGORITHM_V1 = "m.secret_storage.v1.curve25519-aes-sha2";
 

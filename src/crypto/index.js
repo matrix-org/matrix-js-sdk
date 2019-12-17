@@ -26,25 +26,20 @@ import {EventEmitter} from 'events';
 import {ReEmitter} from '../ReEmitter';
 import {logger} from '../logger';
 import * as utils from "../utils";
+import {sleep} from "../utils";
 import {OlmDevice} from "./OlmDevice";
 import * as olmlib from "./olmlib";
 import {DeviceList} from "./DeviceList";
 import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
-import {
-    CrossSigningInfo,
-    UserTrustLevel,
-    DeviceTrustLevel,
-    CrossSigningLevel,
-} from './CrossSigning';
-import { SecretStorage, SECRET_STORAGE_ALGORITHM_V1 } from './SecretStorage';
+import {CrossSigningInfo, CrossSigningLevel, DeviceTrustLevel, UserTrustLevel,} from './CrossSigning';
+import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {ShowQRCode, ScanQRCode} from './verification/QRCode';
+import {ScanQRCode, ShowQRCode} from './verification/QRCode';
 import {SAS} from './verification/SAS';
-import {sleep} from '../utils';
-import { keyFromPassphrase } from './key_passphrase';
-import { encodeRecoveryKey } from './recoverykey';
+import {keyFromPassphrase} from './key_passphrase';
+import {encodeRecoveryKey} from './recoverykey';
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel} from "./verification/request/ToDeviceChannel";

@@ -17,7 +17,7 @@ limitations under the License.
 import "../../../olm-loader";
 import {logger} from "../../../../src/logger";
 import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
-import {ShowQRCode, ScanQRCode} from "../../../../src/crypto/verification/QRCode";
+import {ScanQRCode, ShowQRCode} from "../../../../src/crypto/verification/QRCode";
 
 const Olm = global.Olm;
 

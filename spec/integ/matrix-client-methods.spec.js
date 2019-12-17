@@ -1,8 +1,6 @@
 import * as utils from "../test-utils";
 import {CRYPTO_ENABLED} from "../../src/client";
-import {Filter} from "../../src/matrix";
-import {MemoryStore} from "../../src/matrix";
-import {Room} from "../../src/matrix";
+import {Filter, MemoryStore, Room} from "../../src/matrix";
 import {TestClient} from "../TestClient";
 
 describe("MatrixClient", function() {
