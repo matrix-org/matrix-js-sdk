@@ -613,16 +613,16 @@ export function inherits(ctor, superCtor) {
  * though this doesn't always work in some environments - this function
  * falls back to using `Object.assign()` to clone a constructed copy
  * of the super type onto `thisArg`.
- * @param thisArg The child instance. Modified in place.
- * @param superType The type to act as a super instance
- * @param params Arguments to supply to the super type's constructor
+ * @param {any} thisArg The child instance. Modified in place.
+ * @param {any} SuperType The type to act as a super instance
+ * @param {any} params Arguments to supply to the super type's constructor
  */
-export function polyfillSuper(thisArg, superType, ...params) {
+export function polyfillSuper(thisArg, SuperType, ...params) {
     try {
-        superType.call(thisArg, ...params);
+        SuperType.call(thisArg, ...params);
     } catch (e) {
         // fall back to Object.assign to just clone the thing
-        const fakeSuper = new superType(...params);
+        const fakeSuper = new SuperType(...params);
         Object.assign(thisArg, fakeSuper);
     }
 }

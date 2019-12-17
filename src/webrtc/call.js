@@ -1417,4 +1417,4 @@ export function createNewMatrixCall(client, roomId, options) {
         forceTURN: client._forceTURN || optionsForceTURN,
     };
     return new MatrixCall(opts);
-};
+}

@@ -4,7 +4,6 @@ import * as utils from "../test-utils";
 import {TestClient} from "../TestClient";
 
 describe("MatrixClient syncing", function() {
-    const baseUrl = "http://localhost.or.something";
     let client = null;
     let httpBackend = null;
     const selfUserId = "@alice:localhost";

@@ -46,7 +46,7 @@ export function RemoteIndexedDBStoreBackend(
     // Once we start connecting, we keep the promise and re-use it
     // if we try to connect again
     this._startPromise = null;
-};
+}
 
 
 RemoteIndexedDBStoreBackend.prototype = {

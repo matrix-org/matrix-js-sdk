@@ -31,7 +31,7 @@ matrixcs.request(function(opts, fn) {
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.
-var indexedDB;
+let indexedDB;
 try {
     indexedDB = global.indexedDB;
 } catch(e) {}
@@ -41,9 +41,9 @@ if (indexedDB) {
     matrixcs.setCryptoStoreFactory(
         function() {
             return new matrixcs.IndexedDBCryptoStore(
-                indexedDB, "matrix-js-sdk:crypto"
+                indexedDB, "matrix-js-sdk:crypto",
             );
-        }
+        },
     );
 }
 

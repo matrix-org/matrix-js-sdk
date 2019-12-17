@@ -99,7 +99,13 @@ describe("MatrixClient room timelines", function() {
 
     beforeEach(function() {
         // these tests should work with or without timelineSupport
-        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, {timelineSupport: true});
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {timelineSupport: true},
+        );
         httpBackend = testClient.httpBackend;
         client = testClient.client;
 

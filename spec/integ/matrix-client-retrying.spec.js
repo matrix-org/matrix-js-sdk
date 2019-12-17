@@ -14,7 +14,13 @@ describe("MatrixClient retrying", function() {
 
     beforeEach(function() {
         scheduler = new MatrixScheduler();
-        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, {scheduler});
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {scheduler},
+        );
         httpBackend = testClient.httpBackend;
         client = testClient.client;
         room = new Room(roomId);

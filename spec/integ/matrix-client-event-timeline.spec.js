@@ -122,7 +122,13 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support works when enabled", function() {
-        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, {timelineSupport: true});
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {timelineSupport: true},
+        );
         client = testClient.client;
         httpBackend = testClient.httpBackend;
 
@@ -207,7 +213,13 @@ describe("MatrixClient event timelines", function() {
     let httpBackend = null;
 
     beforeEach(function() {
-        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, {timelineSupport: true});
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {timelineSupport: true},
+        );
         client = testClient.client;
         httpBackend = testClient.httpBackend;
 
