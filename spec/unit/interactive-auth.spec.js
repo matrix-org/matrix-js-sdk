@@ -15,7 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import 'source-map-support/register';
 import {logger} from "../../src/logger";
 import {InteractiveAuth} from "../../src/interactive-auth";
 import {MatrixError} from "../../src/http-api";

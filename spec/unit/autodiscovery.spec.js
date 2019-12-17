@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import 'source-map-support/register';
-
 import MockHttpBackend from "matrix-mock-request";
 import * as sdk from "../../src";
 import {AutoDiscovery} from "../../src/autodiscovery";

@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import * as utils from "../test-utils";
 import {RoomState} from "../../src/models/room-state";
 import {RoomMember} from "../../src/models/room-member";

@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import * as ContentRepo from "../../src/content-repo";
 
 describe("ContentRepo", function() {

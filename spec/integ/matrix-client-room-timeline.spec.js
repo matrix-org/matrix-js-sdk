@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import * as utils from "../test-utils";
 import {EventStatus} from "../../src/models/event";
 import {TestClient} from "../TestClient";
