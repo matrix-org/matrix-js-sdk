@@ -32,7 +32,7 @@ import {MatrixEvent, EventStatus} from "./models/event";
 import {EventTimeline} from "./models/event-timeline";
 import {SearchResult} from "./models/search-result";
 import {StubStore} from "./store/stub";
-import {MatrixCall} from "./webrtc/call";
+import {createNewMatrixCall} from "./webrtc/call";
 import {sleep} from './utils';
 import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
 import * as contentRepo from "./content-repo";
@@ -47,6 +47,7 @@ import { isCryptoAvailable } from './crypto';
 import { decodeRecoveryKey } from './crypto/recoverykey';
 import { keyFromAuthData } from './crypto/key_passphrase';
 import { randomString } from './randomstring';
+import {PushProcessor} from "./pushprocessor";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();
@@ -267,7 +268,7 @@ export function MatrixClient(opts) {
 
     // try constructing a MatrixCall to see if we are running in an environment
     // which has WebRTC. If we are, listen for and handle m.call.* events.
-    const call = MatrixCall.createNewMatrixCall(this);
+    const call = createNewMatrixCall(this);
     this._supportsVoip = false;
     if (call) {
         setupCallEventHandler(this);
@@ -4791,7 +4792,7 @@ function setupCallEventHandler(client) {
                 );
             }
 
-            call = MatrixCall.createNewMatrixCall(client, event.getRoomId(), {
+            call = createNewMatrixCall(client, event.getRoomId(), {
                 forceTURN: client._forceTURN,
             });
             if (!call) {
@@ -4891,7 +4892,7 @@ function setupCallEventHandler(client) {
                 // if not live, store the fact that the call has ended because
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
-                call = MatrixCall.createNewMatrixCall(client, event.getRoomId());
+                call = createNewMatrixCall(client, event.getRoomId());
                 if (call) {
                     call.callId = content.call_id;
                     call._initWithHangup(event);
