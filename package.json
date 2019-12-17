@@ -81,5 +81,8 @@
     "source-map-support": "^0.5.13",
     "tslint": "^5.20.1",
     "typescript": "^3.7.3"
+  },
+  "jest": {
+    "testEnvironment": "node"
   }
 }

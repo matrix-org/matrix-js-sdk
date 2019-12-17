@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +17,11 @@ limitations under the License.
 
 "use strict";
 
-const anotherjson = require('another-json');
-
-const utils = require('../../lib/utils');
-const testUtils = require('../test-utils');
-const TestClient = require('../TestClient').default;
-import logger from '../../lib/logger';
+import anotherjson from "another-json";
+import * as utils from "../../src/utils";
+import * as testUtils from "../test-utils";
+import {TestClient} from "../TestClient";
+import {logger} from "../../src/logger";
 
 const ROOM_ID = "!room:id";
 

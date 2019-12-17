@@ -1,5 +1,6 @@
 /*
 Copyright 2017 New Vector Ltd
+Copyright 2019 The Matrix.org Foundaction C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import sdk from '../..';
-const MatrixEvent = sdk.MatrixEvent;
-
-import logger from '../../lib/logger';
+import {logger} from "../../src/logger";
+import {MatrixEvent} from "../../src/models/event";
 
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {

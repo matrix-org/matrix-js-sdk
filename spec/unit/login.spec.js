@@ -1,4 +1,4 @@
-import TestClient from '../TestClient';
+import {TestClient} from '../TestClient';
 
 describe('Login request', function() {
     let client;
