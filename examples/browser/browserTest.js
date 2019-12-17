@@ -1,4 +1,3 @@
-"use strict";
 console.log("Loading browser sdk");
 
 var client = matrixcs.createClient("http://matrix.org");
