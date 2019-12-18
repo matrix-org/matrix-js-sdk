@@ -34,11 +34,11 @@ import {
  * A key verification channel that sends verification events over to_device messages.
  * Generates its own transaction ids.
  */
-export default class ToDeviceChannel {
+export class ToDeviceChannel {
     // userId and devices of user we're about to verify
     constructor(client, userId, devices, transactionId = null, deviceId = null) {
         this._client = client;
-        this._userId = userId;
+        this.userId = userId;
         this._devices = devices;
         this.transactionId = transactionId;
         this._deviceId = deviceId;
@@ -239,7 +239,7 @@ export default class ToDeviceChannel {
                 msgMap[deviceId] = content;
             }
 
-            return this._client.sendToDevice(type, {[this._userId]: msgMap});
+            return this._client.sendToDevice(type, {[this.userId]: msgMap});
         } else {
             return Promise.resolve();
         }
@@ -251,5 +251,58 @@ export default class ToDeviceChannel {
      */
     static makeTransactionId() {
         return randomString(32);
+    }
+}
+
+
+export class ToDeviceRequests {
+    constructor() {
+        this._requestsByUserId = new Map();
+    }
+
+    getRequest(event) {
+        return this.getRequestBySenderAndTxnId(
+            event.getSender(),
+            ToDeviceChannel.getTransactionId(event),
+        );
+    }
+
+    getRequestBySenderAndTxnId(sender, txnId) {
+        const requestsByTxnId = this._requestsByUserId.get(sender);
+        if (requestsByTxnId) {
+            return requestsByTxnId.get(txnId);
+        }
+    }
+
+    setRequest(event, request) {
+        this.setBySenderAndTxnId(
+            event.getSender(),
+            ToDeviceChannel.getTransactionId(event),
+            request,
+        );
+    }
+
+    setRequestByChannel(channel, request) {
+        this.setBySenderAndTxnId(channel.userId, channel.transactionId, request);
+    }
+
+    setRequestBySenderAndTxnId(sender, txnId, request) {
+        let requestsByTxnId = this._requestsByUserId.get(sender);
+        if (!requestsByTxnId) {
+            requestsByTxnId = new Map();
+            this._requestsByUserId.set(sender, requestsByTxnId);
+        }
+        requestsByTxnId.set(txnId, request);
+    }
+
+    removeRequest(event) {
+        const userId = event.getSender();
+        const requestsByTxnId = this._requestsByUserId.get(userId);
+        if (requestsByTxnId) {
+            requestsByTxnId.delete(ToDeviceChannel.getTransactionId(event));
+            if (requestsByTxnId.size === 0) {
+                this._requestsByUserId.delete(userId);
+            }
+        }
     }
 }

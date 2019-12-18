@@ -52,8 +52,8 @@ import { keyFromPassphrase } from './key_passphrase';
 import { encodeRecoveryKey } from './recoverykey';
 
 import VerificationRequest from "./verification/request/VerificationRequest";
-import InRoomChannel from "./verification/request/InRoomChannel";
-import ToDeviceChannel from "./verification/request/ToDeviceChannel";
+import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
+import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -206,8 +206,8 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     // }
     this._lastNewSessionForced = {};
 
-    this._toDeviceVerificationRequests = new Map();
-    this._inRoomVerificationRequests = new Map();
+    this._toDeviceVerificationRequests = new ToDeviceRequests();
+    this._inRoomVerificationRequests = new InRoomRequests();
 
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
 
@@ -1557,16 +1557,11 @@ Crypto.prototype._requestVerificationWithChannel = async function(
         channel, verificationMethods, userId, this._baseApis);
     await request.sendRequest();
 
-    let requestsByTxnId = requestsMap.get(userId);
-    if (!requestsByTxnId) {
-        requestsByTxnId = new Map();
-        requestsMap.set(userId, requestsByTxnId);
-    }
     // TODO: we're only adding the request to the map once it has been sent
     // but if the other party is really fast they could potentially respond to the
     // request before the server tells us the event got sent, and we would probably
     // create a new request object
-    requestsByTxnId.set(channel.transactionId, request);
+    requestsMap.setRequestByChannel(channel, request);
 
     return request;
 };
@@ -1574,25 +1569,23 @@ Crypto.prototype._requestVerificationWithChannel = async function(
 Crypto.prototype.beginKeyVerification = function(
     method, userId, deviceId, transactionId = null,
 ) {
-    let requestsByTxnId = this._toDeviceVerificationRequests.get(userId);
-    if (!requestsByTxnId) {
-        requestsByTxnId = new Map();
-        this._toDeviceVerificationRequests.set(userId, requestsByTxnId);
-    }
     let request;
     if (transactionId) {
-        request = requestsByTxnId.get(transactionId);
+        request = this._toDeviceVerificationRequests.getRequestBySenderAndTxnId(
+            userId, transactionId);
+        if (!request) {
+            throw new Error(
+                `No request found for user ${userId} with ` +
+                `transactionId ${transactionId}`);
+        }
     } else {
         transactionId = ToDeviceChannel.makeTransactionId();
         const channel = new ToDeviceChannel(
             this._baseApis, userId, [deviceId], transactionId, deviceId);
         request = new VerificationRequest(
             channel, this._verificationMethods, userId, this._baseApis);
-        requestsByTxnId.set(transactionId, request);
-    }
-    if (!request) {
-        throw new Error(
-            `No request found for user ${userId} with transactionId ${transactionId}`);
+        this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
+            userId, transactionId, request);
     }
     return request.beginKeyVerification(method, {userId, deviceId});
 };
@@ -2440,7 +2433,6 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     if (!ToDeviceChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = ToDeviceChannel.getTransactionId(event);
     const createRequest = event => {
         if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
             return;
@@ -2459,8 +2451,11 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
         return new VerificationRequest(
             channel, this._verificationMethods, userId, this._baseApis);
     };
-    this._handleVerificationEvent(event, transactionId,
-        this._toDeviceVerificationRequests, createRequest);
+    this._handleVerificationEvent(
+        event,
+        this._toDeviceVerificationRequests,
+        createRequest,
+    );
 };
 
 /**
@@ -2475,7 +2470,6 @@ Crypto.prototype._onTimelineEvent = function(event) {
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = InRoomChannel.getTransactionId(event);
     const createRequest = event => {
         if (!InRoomChannel.canCreateRequest(InRoomChannel.getEventType(event))) {
             return;
@@ -2489,17 +2483,18 @@ Crypto.prototype._onTimelineEvent = function(event) {
         return new VerificationRequest(
             channel, this._verificationMethods, userId, this._baseApis);
     };
-    this._handleVerificationEvent(event, transactionId,
-        this._inRoomVerificationRequests, createRequest);
+    this._handleVerificationEvent(
+        event,
+        this._inRoomVerificationRequests,
+        createRequest,
+    );
 };
 
 Crypto.prototype._handleVerificationEvent = async function(
-    event, transactionId, requestsMap, createRequest,
+    event, requestsMap, createRequest,
 ) {
-    const sender = event.getSender();
-    let requestsByTxnId = requestsMap.get(sender);
+    let request = requestsMap.getRequest(event);
     let isNewRequest = false;
-    let request = requestsByTxnId && requestsByTxnId.get(transactionId);
     if (!request) {
         request = createRequest(event);
         // a request could not be made from this event, so ignore event
@@ -2507,11 +2502,7 @@ Crypto.prototype._handleVerificationEvent = async function(
             return;
         }
         isNewRequest = true;
-        if (!requestsByTxnId) {
-            requestsByTxnId = new Map();
-            requestsMap.set(sender, requestsByTxnId);
-        }
-        requestsByTxnId.set(transactionId, request);
+        requestsMap.setRequest(event, request);
     }
     event.setVerificationRequest(request);
     try {
@@ -2525,10 +2516,7 @@ Crypto.prototype._handleVerificationEvent = async function(
         console.error("error while handling verification event", event, err);
     }
     if (!request.pending) {
-        requestsByTxnId.delete(transactionId);
-        if (requestsByTxnId.size === 0) {
-            requestsMap.delete(sender);
-        }
+        requestsMap.removeRequest(event);
     } else if (isNewRequest && !request.initiatedByMe) {
         this._baseApis.emit("crypto.verification.request", request);
     }

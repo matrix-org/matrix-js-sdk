@@ -28,7 +28,7 @@ const M_RELATES_TO = "m.relates_to";
  * A key verification channel that sends verification events in the timeline of a room.
  * Uses the event id of the initial m.key.verification.request event as a transaction id.
  */
-export default class InRoomChannel {
+export class InRoomChannel {
     /**
      * @param {MatrixClient} client the matrix client, to send messages with and get current user & device from.
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.
@@ -239,6 +239,52 @@ export default class InRoomChannel {
         const response = await this._client.sendEvent(this._roomId, sendType, content);
         if (type === REQUEST_TYPE) {
             this._requestEventId = response.event_id;
+        }
+    }
+}
+
+export class InRoomRequests {
+    constructor() {
+        this._requestsByRoomId = new Map();
+    }
+
+    getRequest(event) {
+        const roomId = event.getRoomId();
+        const requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (requestsByTxnId) {
+            return requestsByTxnId.get(InRoomChannel.getTransactionId(event));
+        }
+    }
+
+    setRequest(event, request) {
+        this._setRequest(
+            event.getRoomId(),
+            InRoomChannel.getTransactionId(event),
+            request,
+        );
+    }
+
+    setRequestByChannel(channel, request) {
+        this._setRequest(channel.roomId, channel.transactionId, request);
+    }
+
+    _setRequest(roomId, txnId, request) {
+        let requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (!requestsByTxnId) {
+            requestsByTxnId = new Map();
+            this._requestsByRoomId.set(roomId, requestsByTxnId);
+        }
+        requestsByTxnId.set(txnId, request);
+    }
+
+    removeRequest(event) {
+        const roomId = event.getRoomId();
+        const requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (requestsByTxnId) {
+            requestsByTxnId.delete(InRoomChannel.getTransactionId(event));
+            if (requestsByTxnId.size === 0) {
+                this._requestsByRoomId.delete(roomId);
+            }
         }
     }
 }
