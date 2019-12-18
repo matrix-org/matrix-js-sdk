@@ -7,7 +7,7 @@
     "clean": "rimraf lib dist",
     "build": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:compile-browser && yarn build:types",
     "build:types": "tsc --emitDeclarationOnly",
-    "build:compile": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
+    "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
     "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline ] -t uglifyify > dist/browser-matrix.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:ts && yarn lint:js",
