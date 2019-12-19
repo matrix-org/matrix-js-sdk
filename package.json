@@ -9,7 +9,7 @@
     "build:types": "tsc --emitDeclarationOnly",
     "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
     "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
-    "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map \"content=inline\" --output dist/browser-matrix.min.js",
+    "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "jsdoc -c jsdoc.json -P package.json",
     "lint": "yarn lint:types && yarn lint:ts && yarn lint:js",
     "lint:js": "eslint --max-warnings 93 src spec",
