@@ -401,19 +401,20 @@ export default class VerificationRequest extends EventEmitter {
 
     async _handleStart(content, event) {
         if (this._hasValidPreStartPhase()) {
+            const sentByMe = this._wasSentByMe(event);
             const {method} = content;
-            if (!this._verificationMethods.has(method)) {
+            if (!sentByMe && !this._verificationMethods.has(method)) {
                 await this.cancel(errorFromEvent(newUnknownMethodError()));
-            } else {
-                // if not in requested phase
-                if (this.phase === PHASE_UNSENT) {
-                    this._initiatedByMe = this._wasSentByMe(event);
-                }
-                if (!this._verifier) {
-                    this._verifier = this._createVerifier(method, event);
-                }
-                this._setPhase(PHASE_STARTED);
+                return;
             }
+            // if not in requested phase
+            if (this.phase === PHASE_UNSENT) {
+                this._initiatedByMe = sentByMe;
+            }
+            if (!this._verifier) {
+                this._verifier = this._createVerifier(method, event);
+            }
+            this._setPhase(PHASE_STARTED);
         }
     }
 
@@ -425,13 +426,11 @@ export default class VerificationRequest extends EventEmitter {
     handleVerifierSend(type, content) {
         if (type === CANCEL_TYPE) {
             this._handleCancel();
-        } else if (type === START_TYPE) {
-            if (this._phase === PHASE_UNSENT || this._phase === PHASE_REQUESTED) {
-                // if unsent, we're sending a (first) .start event and hence requesting the verification.
-                // in any other situation, the request was initiated by the other party.
-                this._initiatedByMe = this.phase === PHASE_UNSENT;
-                this._setPhase(PHASE_STARTED);
-            }
+        } else if (type === START_TYPE && this._hasValidPreStartPhase()) {
+            // if unsent, we're sending a (first) .start event and hence requesting the verification.
+            // in any other situation, the request was initiated by the other party.
+            this._initiatedByMe = this.phase === PHASE_UNSENT;
+            this._setPhase(PHASE_STARTED);
         }
     }
 
@@ -449,7 +448,7 @@ export default class VerificationRequest extends EventEmitter {
     }
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
-        const startSentByMe = startEvent && this._wasSentByMe(startEvent);
+        const initiatedByMe = !startEvent || this._wasSentByMe(startEvent);
         const {userId, deviceId} = this._getVerifierTarget(startEvent, targetDevice);
 
         const VerifierCtor = this._verificationMethods.get(method);
@@ -464,7 +463,7 @@ export default class VerificationRequest extends EventEmitter {
             this._client,
             userId,
             deviceId,
-            startSentByMe ? null : startEvent,
+            initiatedByMe ? null : startEvent,
         );
     }
 
