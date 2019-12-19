@@ -242,12 +242,13 @@ export default class SecretStorage extends EventEmitter {
      * @param {string} name The name of the secret
      * @param {string} keyId The ID of the key whose value will be the
      *     value of the secret
+     * @returns {Promise} resolved when account data is saved
      */
     storePassthrough(name, keyId) {
         return this._baseApis.setAccountData(name, {
             [keyId]: {
                 passthrough: true,
-            }
+            },
         });
     }
 
@@ -296,7 +297,9 @@ export default class SecretStorage extends EventEmitter {
             const encInfo = secretContent.encrypted[keyId];
 
             // fetch private key from app
-            [keyId, decryption] = await this._getSecretStorageKey(keys, encInfo.passthrough);
+            [keyId, decryption] = await this._getSecretStorageKey(
+                keys, encInfo.passthrough,
+            );
 
             if (encInfo.passthrough) return decryption;
 

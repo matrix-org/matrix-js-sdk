@@ -409,7 +409,9 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     };
                 }
 
-                newKeyId = await cli.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1, opts);
+                newKeyId = await this.addSecretStorageKey(
+                    SECRET_STORAGE_ALGORITHM_V1, opts,
+                );
 
                 // Add an entry for the backup key in SSSS as a 'passthrough' key
                 // (ie. the secret is the key itself).
