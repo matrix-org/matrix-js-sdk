@@ -232,6 +232,27 @@ export default class SecretStorage extends EventEmitter {
     }
 
     /**
+     * Store a secret defined to be the same as the given key.
+     * No secret information will be stored, instead the secret will
+     * be stored with a marker to say that the contents of the secret is
+     * the value of the given key.
+     * This is useful for migration from systems that predate SSSS such as
+     * key backup.
+     *
+     * @param {string} name The name of the secret
+     * @param {string} keyId The ID of the key whose value will be the
+     *     value of the secret
+     * @returns {Promise} resolved when account data is saved
+     */
+    storePassthrough(name, keyId) {
+        return this._baseApis.setAccountData(name, {
+            [keyId]: {
+                passthrough: true,
+            },
+        });
+    }
+
+    /**
      * Get a secret from storage.
      *
      * @param {string} name the name of the secret
@@ -276,8 +297,13 @@ export default class SecretStorage extends EventEmitter {
             // fetch private key from app
             [keyId, decryption] = await this._getSecretStorageKey(keys);
 
-            // decrypt secret
             const encInfo = secretContent.encrypted[keyId];
+
+            // We don't actually need the decryption object if it's a passthrough
+            // since we just want to return the key itself.
+            if (encInfo.passthrough) return decryption.get_private_key();
+
+            // decrypt secret
             switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 return decryption.decrypt(
