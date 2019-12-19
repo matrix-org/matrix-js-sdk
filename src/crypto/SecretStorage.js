@@ -299,7 +299,9 @@ export default class SecretStorage extends EventEmitter {
 
             const encInfo = secretContent.encrypted[keyId];
 
-            if (encInfo.passthrough) return decryption.get_private_key();;
+            // We don't actually need the decryption object if it's a passthrough
+            // since we just want to return the key itself.
+            if (encInfo.passthrough) return decryption.get_private_key();
 
             // decrypt secret
             switch (keys[keyId].algorithm) {
