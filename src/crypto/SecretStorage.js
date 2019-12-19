@@ -232,6 +232,26 @@ export default class SecretStorage extends EventEmitter {
     }
 
     /**
+     * Store a secret defined to be the same as the given key.
+     * No secret information will be stored, instead the secret will
+     * be stored with a marker to say that the contents of the secret is
+     * the value of the given key.
+     * This is useful for migration from systems that predate SSSS such as
+     * key backup.
+     *
+     * @param {string} name The name of the secret
+     * @param {string} keyId The ID of the key whose value will be the
+     *     value of the secret
+     */
+    storePassthrough(name, keyId) {
+        return this._baseApis.setAccountData(name, {
+            [keyId]: {
+                passthrough: true,
+            }
+        });
+    }
+
+    /**
      * Get a secret from storage.
      *
      * @param {string} name the name of the secret
@@ -273,11 +293,14 @@ export default class SecretStorage extends EventEmitter {
         let keyId;
         let decryption;
         try {
+            const encInfo = secretContent.encrypted[keyId];
+
             // fetch private key from app
-            [keyId, decryption] = await this._getSecretStorageKey(keys);
+            [keyId, decryption] = await this._getSecretStorageKey(keys, encInfo.passthrough);
+
+            if (encInfo.passthrough) return decryption;
 
             // decrypt secret
-            const encInfo = secretContent.encrypted[keyId];
             switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 return decryption.decrypt(
@@ -518,7 +541,7 @@ export default class SecretStorage extends EventEmitter {
         }
     }
 
-    async _getSecretStorageKey(keys) {
+    async _getSecretStorageKey(keys, raw) {
         if (!this._cryptoCallbacks.getSecretStorageKey) {
             throw new Error("No getSecretStorageKey callback supplied");
         }
@@ -536,6 +559,8 @@ export default class SecretStorage extends EventEmitter {
         if (!keys[keyId]) {
             throw new Error("App returned unknown key from getSecretStorageKey!");
         }
+
+        if (raw) return [keyId, privateKey];
 
         switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:

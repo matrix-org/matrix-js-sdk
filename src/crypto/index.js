@@ -336,6 +336,8 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *     auth data as an object.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
+ * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
+ * the passphrase and recovery key from this backup will be used.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -343,6 +345,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
     createSecretStorageKey = async () => { },
+    keyBackupInfo,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -388,12 +391,37 @@ Crypto.prototype.bootstrapSecretStorage = async function({
         // Check if Secure Secret Storage has a default key. If we don't have one, create
         // the default key (which will also be signed by the cross-signing master key).
         if (!this.hasSecretStorageKey()) {
-            logger.log("Secret storage default key not found, creating new key");
-            const keyOptions = await createSecretStorageKey();
-            const newKeyId = await this.addSecretStorageKey(
-                SECRET_STORAGE_ALGORITHM_V1,
-                keyOptions,
-            );
+            let newKeyId;
+            if (keyBackupInfo) {
+                logger.log("Secret storage default key not found, using key backup key");
+                const opts = {
+                    pubkey: keyBackupInfo.auth_data.public_key,
+                };
+
+                if (
+                    keyBackupInfo.auth_data.private_key_salt &&
+                    keyBackupInfo.auth_data.private_key_iterations
+                ) {
+                    opts.passphrase = {
+                        algorithm: "m.pbkdf2",
+                        iterations: keyBackupInfo.auth_data.private_key_iterations,
+                        salt: keyBackupInfo.auth_data.private_key_salt,
+                    };
+                }
+
+                newKeyId = await cli.addSecretStorageKey(SECRET_STORAGE_ALGORITHM_V1, opts);
+
+                // Add an entry for the backup key in SSSS as a 'passthrough' key
+                // (ie. the secret is the key itself).
+                this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
+            } else {
+                logger.log("Secret storage default key not found, creating new key");
+                const keyOptions = await createSecretStorageKey();
+                newKeyId = await this.addSecretStorageKey(
+                    SECRET_STORAGE_ALGORITHM_V1,
+                    keyOptions,
+                );
+            }
             await this.setDefaultSecretStorageKeyId(newKeyId);
         }
 
