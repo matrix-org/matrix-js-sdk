@@ -585,6 +585,5 @@ export default class SecretStorage extends EventEmitter {
             default:
                 throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
-p
     }
 }
