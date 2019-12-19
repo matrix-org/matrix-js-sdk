@@ -386,6 +386,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     { authUploadDeviceSigningKeys },
                 );
             }
+        } else {
+            logger.log("Cross signing keys are present in secret storage");
         }
 
         // Check if Secure Secret Storage has a default key. If we don't have one, create
@@ -425,6 +427,8 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 );
             }
             await this.setDefaultSecretStorageKeyId(newKeyId);
+        } else {
+            logger.log("Have secret storage key");
         }
 
         // If cross-signing keys were reset, store them in Secure Secret Storage.

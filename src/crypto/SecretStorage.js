@@ -294,14 +294,12 @@ export default class SecretStorage extends EventEmitter {
         let keyId;
         let decryption;
         try {
+            // fetch private key from app
+            [keyId, decryption] = await this._getSecretStorageKey(keys);
+
             const encInfo = secretContent.encrypted[keyId];
 
-            // fetch private key from app
-            [keyId, decryption] = await this._getSecretStorageKey(
-                keys, encInfo.passthrough,
-            );
-
-            if (encInfo.passthrough) return decryption;
+            if (encInfo.passthrough) return decryption.get_private_key();;
 
             // decrypt secret
             switch (keys[keyId].algorithm) {
@@ -544,7 +542,7 @@ export default class SecretStorage extends EventEmitter {
         }
     }
 
-    async _getSecretStorageKey(keys, raw) {
+    async _getSecretStorageKey(keys) {
         if (!this._cryptoCallbacks.getSecretStorageKey) {
             throw new Error("No getSecretStorageKey callback supplied");
         }
@@ -562,8 +560,6 @@ export default class SecretStorage extends EventEmitter {
         if (!keys[keyId]) {
             throw new Error("App returned unknown key from getSecretStorageKey!");
         }
-
-        if (raw) return [keyId, privateKey];
 
         switch (keys[keyId].algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
@@ -587,5 +583,6 @@ export default class SecretStorage extends EventEmitter {
             default:
                 throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
+p
     }
 }
