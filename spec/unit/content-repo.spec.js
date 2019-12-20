@@ -1,4 +1,3 @@
-"use strict";
 import 'source-map-support/register';
 import * as ContentRepo from "../../src/content-repo";
 

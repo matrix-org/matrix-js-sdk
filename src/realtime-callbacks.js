@@ -24,8 +24,6 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-"use strict";
-
 import {logger} from './logger';
 
 // we schedule a callback at least this often, to check if we've missed out on

@@ -1,4 +1,3 @@
-"use strict";
 // load olm before the sdk if possible
 import './olm-loader';
 

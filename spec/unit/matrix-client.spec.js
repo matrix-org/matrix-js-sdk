@@ -1,4 +1,3 @@
-"use strict";
 import 'source-map-support/register';
 
 import {logger} from "../../src/logger";

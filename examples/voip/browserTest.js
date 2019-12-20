@@ -1,4 +1,3 @@
-"use strict";
 console.log("Loading browser sdk");
 var BASE_URL = "https://matrix.org";
 var TOKEN = "accesstokengoeshere";

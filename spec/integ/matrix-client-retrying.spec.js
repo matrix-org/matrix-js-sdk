@@ -1,4 +1,3 @@
-"use strict";
 import 'source-map-support/register';
 import {EventStatus} from "../../src/matrix";
 import {MatrixScheduler} from "../../src/scheduler";

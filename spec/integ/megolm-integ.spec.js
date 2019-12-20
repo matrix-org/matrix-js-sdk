@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-"use strict";
-
 import anotherjson from "another-json";
 import * as utils from "../../src/utils";
 import * as testUtils from "../test-utils";
