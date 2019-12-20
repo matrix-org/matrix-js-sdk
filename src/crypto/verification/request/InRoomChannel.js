@@ -55,6 +55,27 @@ export class InRoomChannel {
         return this._requestEventId;
     }
 
+    static getOtherPartyUserId(event, client) {
+        const type = InRoomChannel.getEventType(event);
+        if (type !== REQUEST_TYPE) {
+            return;
+        }
+        const ownUserId = client.getUserId();
+        const sender = event.getSender();
+        const content = event.getContent();
+        const receiver = content.to;
+
+        // request is not sent by or directed at us
+        if (sender !== ownUserId && receiver !== ownUserId) {
+            return;
+        }
+        if (sender === ownUserId) {
+            return receiver;
+        } else {
+            return sender;
+        }
+    }
+
     /**
      * @param {MatrixEvent} event the event to get the timestamp of
      * @return {number} the timestamp when the event was sent
@@ -110,9 +131,9 @@ export class InRoomChannel {
                 console.log("InRoomChannel: validateEvent: no valid to", type, content.to);
                 return false;
             }
-            const ownUserId = client.getUserId();
+
             // ignore requests that are not direct to or sent by the syncing user
-            if (event.getSender() !== ownUserId && content.to !== ownUserId) {
+            if (!InRoomChannel.getOtherPartyUserId(event, client)) {
                 console.log("InRoomChannel: validateEvent: not directed or sent my me", type, event.getSender(), content.to);
                 return false;
             }
