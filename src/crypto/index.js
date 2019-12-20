@@ -2463,8 +2463,12 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  *
  * @private
  * @param {module:models/event.MatrixEvent} event the timeline event
+ * @param {module:models/Room} room not used
+ * @param {bool} atStart not used
+ * @param {bool} removed not used
+ * @param {bool} data.liveEvent whether this is a live event
  */
-Crypto.prototype._onTimelineEvent = function(event) {
+Crypto.prototype._onTimelineEvent = function(event, room, atStart, removed, {liveEvent}) {
     // TODO: we still need a request object for past requests, so we can show it in the timeline
     // validation now excludes old requests
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
@@ -2491,11 +2495,12 @@ Crypto.prototype._onTimelineEvent = function(event) {
         event,
         this._inRoomVerificationRequests,
         createRequest,
+        liveEvent,
     );
 };
 
 Crypto.prototype._handleVerificationEvent = async function(
-    event, requestsMap, createRequest,
+    event, requestsMap, createRequest, isLiveEvent = true,
 ) {
     let request = requestsMap.getRequest(event);
     let isNewRequest = false;
@@ -2511,7 +2516,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     event.setVerificationRequest(request);
     try {
         const hadVerifier = !!request.verifier;
-        await request.channel.handleEvent(event, request);
+        await request.channel.handleEvent(event, request, isLiveEvent);
         // emit start event when verifier got set
         if (!hadVerifier && request.verifier) {
             this._baseApis.emit("crypto.verification.start", request.verifier);

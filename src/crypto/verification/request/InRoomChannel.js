@@ -168,9 +168,10 @@ export class InRoomChannel {
      * Changes the state of the channel, request, and verifier in response to a key verification event.
      * @param {MatrixEvent} event to handle
      * @param {VerificationRequest} request the request to forward handling to
+     * @param {bool} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(event, request) {
+    async handleEvent(event, request, isLiveEvent) {
         const type = InRoomChannel.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
@@ -190,7 +191,7 @@ export class InRoomChannel {
             this._requestEventId = event.getId();
         }
 
-        return await request.handleEvent(type, event, InRoomChannel.getTimestamp(event));
+        return await request.handleEvent(type, event, InRoomChannel.getTimestamp(event), isLiveEvent);
     }
 
     /**

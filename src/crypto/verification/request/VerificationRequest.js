@@ -338,7 +338,7 @@ export default class VerificationRequest extends EventEmitter {
      * @param {number} timestamp the timestamp in milliseconds when this event was sent.
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(type, event, timestamp) {
+    async handleEvent(type, event, timestamp, isLiveEvent) {
         const sender = event.getSender();
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
@@ -351,7 +351,7 @@ export default class VerificationRequest extends EventEmitter {
         } else if (type === READY_TYPE) {
             await this._handleReady(event);
         } else if (type === START_TYPE) {
-            await this._handleStart(content, event);
+            await this._handleStart(content, event, isLiveEvent);
         }
 
         // only pass events from the other side to the verifier,
@@ -407,7 +407,7 @@ export default class VerificationRequest extends EventEmitter {
             );
     }
 
-    async _handleStart(content, event) {
+    async _handleStart(content, event, isLiveEvent) {
         if (this._hasValidPreStartPhase()) {
             const sentByMe = this._wasSentByMe(event);
             const {method} = content;
@@ -419,7 +419,7 @@ export default class VerificationRequest extends EventEmitter {
             if (this.phase === PHASE_UNSENT) {
                 this._initiatedByMe = sentByMe;
             }
-            if (!this._verifier) {
+            if (!this._verifier && isLiveEvent) {
                 this._verifier = this._createVerifier(method, event);
             }
             this._setPhase(PHASE_STARTED);

@@ -123,9 +123,10 @@ export class ToDeviceChannel {
      * Changes the state of the channel, request, and verifier in response to a key verification event.
      * @param {MatrixEvent} event to handle
      * @param {VerificationRequest} request the request to forward handling to
+     * @param {bool} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(event, request) {
+    async handleEvent(event, request, isLiveEvent) {
         const type = event.getType();
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
@@ -151,7 +152,7 @@ export class ToDeviceChannel {
                            request.phase === PHASE_READY;
 
         await request.handleEvent(
-            event.getType(), event, ToDeviceChannel.getTimestamp(event));
+            event.getType(), event, ToDeviceChannel.getTimestamp(event), isLiveEvent);
 
         const isStarted = request.phase === PHASE_STARTED ||
                           request.phase === PHASE_READY;
