@@ -153,7 +153,8 @@ export class InRoomChannel {
         const type = InRoomChannel.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
-        if (event.getRoomId() !== this._roomId || event.getSender() !== this._userId) {
+
+        if (event.getRoomId() !== this._roomId) {
             return;
         }
         // set transactionId when receiving a .request

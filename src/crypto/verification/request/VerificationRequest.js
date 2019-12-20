@@ -339,6 +339,13 @@ export default class VerificationRequest extends EventEmitter {
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
     async handleEvent(type, event, timestamp) {
+        const sender = event.getSender();
+
+        if (sender !== this._client.getUserId() && sender !== this._otherUserId) {
+            console.log(`VerificationRequest: ignoring verification event from non-participating sender ${sender}`);
+            return;
+        }
+
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
             if (this._startTimestamp === null) {
@@ -353,7 +360,9 @@ export default class VerificationRequest extends EventEmitter {
             await this._handleStart(content, event);
         }
 
-        if (this._verifier) {
+        // only pass events from the other side to the verifier,
+        // no remote echos of our own events
+        if (this._verifier && sender === this._otherUserId) {
             if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
