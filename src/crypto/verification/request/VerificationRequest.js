@@ -340,12 +340,6 @@ export default class VerificationRequest extends EventEmitter {
      */
     async handleEvent(type, event, timestamp) {
         const sender = event.getSender();
-
-        if (sender !== this._client.getUserId() && sender !== this._otherUserId) {
-            console.log(`VerificationRequest: ignoring verification event from non-participating sender ${sender}`);
-            return;
-        }
-
         const content = event.getContent();
         if (type === REQUEST_TYPE || type === START_TYPE) {
             if (this._startTimestamp === null) {

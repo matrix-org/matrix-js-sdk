@@ -178,6 +178,13 @@ export class InRoomChannel {
         if (event.getRoomId() !== this._roomId) {
             return;
         }
+        // ignore events not sent by us or the other party
+        const ownUserId = this._client.getUserId();
+        const sender = event.getSender();
+        if (sender !== ownUserId && sender !== this.userId) {
+            console.log(`InRoomChannel: ignoring verification event from non-participating sender ${sender}`);
+            return;
+        }
         // set transactionId when receiving a .request
         if (!this._requestEventId && type === REQUEST_TYPE) {
             this._requestEventId = event.getId();
