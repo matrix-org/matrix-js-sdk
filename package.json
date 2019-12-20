@@ -25,9 +25,9 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./lib/index.js",
+  "main": "./src/browser-index.js",
   "typings": "./lib/index.d.ts",
-  "browser": "./lib/browser-index.js",
+  "browser": "./src/browser-index.js",
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
