@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import {MatrixEvent} from "../../src/models/event";
 import {EventTimeline} from "../../src/models/event-timeline";
 import * as utils from "../test-utils";

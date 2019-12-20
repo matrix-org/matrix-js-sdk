@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import {EventStatus} from "../../src/matrix";
 import {MatrixScheduler} from "../../src/scheduler";
 import {Room} from "../../src/models/room";

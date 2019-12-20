@@ -1,4 +1,3 @@
-import 'source-map-support/register';
 import {User} from "../../src/models/user";
 import * as utils from "../test-utils";
 
