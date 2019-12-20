@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import {EventEmitter} from "events";
-import * as ContentRepo from "../content-repo";
+import {ContentRepo} from "../content-repo";
 import * as utils from "../utils";
 
 /**

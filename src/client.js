@@ -36,7 +36,7 @@ import {createNewMatrixCall} from "./webrtc/call";
 import * as utils from './utils';
 import {sleep} from './utils';
 import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
-import * as contentRepo from "./content-repo";
+import {ContentRepo} from "./content-repo";
 import * as ContentHelpers from "./content-helpers";
 import * as olmlib from "./crypto/olmlib";
 import {ReEmitter} from './ReEmitter';

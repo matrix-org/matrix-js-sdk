@@ -44,8 +44,8 @@ export * from "./store/indexeddb";
 export * from "./store/session/webstorage";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
+export * from "./content-repo";
 export const ContentHelpers = import("./content-helpers");
-export const ContentRepo = import("./content-repo");
 export {
     createNewMatrixCall,
     setAudioOutput as setMatrixCallAudioOutput,

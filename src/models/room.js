@@ -23,7 +23,7 @@ limitations under the License.
 import {EventEmitter} from "events";
 import {EventTimelineSet} from "./event-timeline-set";
 import {EventTimeline} from "./event-timeline";
-import * as ContentRepo from "../content-repo";
+import {ContentRepo} from "../content-repo";
 import * as utils from "../utils";
 import {EventStatus, MatrixEvent} from "./event";
 import {RoomMember} from "./room-member";
