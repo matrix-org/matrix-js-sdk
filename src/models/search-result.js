@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +20,8 @@ limitations under the License.
  * @module models/search-result
  */
 
-const EventContext = require("./event-context");
-const utils = require("../utils");
+import * as utils from "../utils";
+import {EventContext} from "./event-context";
 
 /**
  * Construct a new SearchResult
@@ -31,7 +32,7 @@ const utils = require("../utils");
  *
  * @constructor
  */
-function SearchResult(rank, eventContext) {
+export function SearchResult(rank, eventContext) {
     this.rank = rank;
     this.context = eventContext;
 }
@@ -59,8 +60,3 @@ SearchResult.fromJson = function(jsonObj, eventMapper) {
     return new SearchResult(jsonObj.rank, context);
 };
 
-
-/**
- * The SearchResult class
- */
-module.exports = SearchResult;

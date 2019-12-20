@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +18,10 @@ limitations under the License.
 /**
  * @module models/room-member
  */
-const EventEmitter = require("events").EventEmitter;
-const ContentRepo = require("../content-repo");
 
-const utils = require("../utils");
+import {EventEmitter} from "events";
+import * as ContentRepo from "../content-repo";
+import * as utils from "../utils";
 
 /**
  * Construct a new room member.
@@ -45,7 +46,7 @@ const utils = require("../utils");
  * @prop {Object} events The events describing this RoomMember.
  * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
  */
-function RoomMember(roomId, userId) {
+export function RoomMember(roomId, userId) {
     this.roomId = roomId;
     this.userId = userId;
     this.typing = false;
@@ -324,11 +325,6 @@ function calculateDisplayName(selfUserId, displayName, roomState) {
     }
     return displayName;
 }
-
-/**
- * The RoomMember class.
- */
-module.exports = RoomMember;
 
 /**
  * Fires whenever any room member's name changes.

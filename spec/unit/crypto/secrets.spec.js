@@ -15,14 +15,11 @@ limitations under the License.
 */
 
 import '../../olm-loader';
-
-import { MatrixEvent } from '../../../lib/models/event';
-import { SECRET_STORAGE_ALGORITHM_V1 } from '../../../lib/crypto/SecretStorage';
-
-import olmlib from '../../../lib/crypto/olmlib';
-
-import TestClient from '../../TestClient';
-import { makeTestClients } from './verification/util';
+import * as olmlib from "../../../src/crypto/olmlib";
+import {SECRET_STORAGE_ALGORITHM_V1} from "../../../src/crypto/SecretStorage";
+import {MatrixEvent} from "../../../src/models/event";
+import {TestClient} from '../../TestClient';
+import {makeTestClients} from './verification/util';
 
 async function makeTestClient(userInfo, options) {
     const client = (new TestClient(

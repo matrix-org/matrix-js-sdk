@@ -20,29 +20,36 @@ limitations under the License.
  *
  * @module crypto/algorithms/olm
  */
-import logger from '../../logger';
-const utils = require("../../utils");
-const olmlib = require("../olmlib");
-const DeviceInfo = require("../deviceinfo");
-const DeviceVerification = DeviceInfo.DeviceVerification;
 
-const base = require("./base");
+import {logger} from '../../logger';
+import * as utils from "../../utils";
+import {polyfillSuper} from "../../utils";
+import * as olmlib from "../olmlib";
+import {DeviceInfo} from "../deviceinfo";
+import {
+    DecryptionAlgorithm,
+    DecryptionError,
+    EncryptionAlgorithm,
+    registerAlgorithm,
+} from "./base";
+
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 /**
  * Olm encryption implementation
  *
  * @constructor
- * @extends {module:crypto/algorithms/base.EncryptionAlgorithm}
+ * @extends {module:crypto/algorithms/EncryptionAlgorithm}
  *
  * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/base.EncryptionAlgorithm}
+ *     {@link module:crypto/algorithms/EncryptionAlgorithm}
  */
 function OlmEncryption(params) {
-    base.EncryptionAlgorithm.call(this, params);
+    polyfillSuper(this, EncryptionAlgorithm, params);
     this._sessionPrepared = false;
     this._prepPromise = null;
 }
-utils.inherits(OlmEncryption, base.EncryptionAlgorithm);
+utils.inherits(OlmEncryption, EncryptionAlgorithm);
 
 /**
  * @private
@@ -143,14 +150,14 @@ OlmEncryption.prototype.encryptMessage = async function(room, eventType, content
  * Olm decryption implementation
  *
  * @constructor
- * @extends {module:crypto/algorithms/base.DecryptionAlgorithm}
+ * @extends {module:crypto/algorithms/DecryptionAlgorithm}
  * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/base.DecryptionAlgorithm}
+ *     {@link module:crypto/algorithms/DecryptionAlgorithm}
  */
 function OlmDecryption(params) {
-    base.DecryptionAlgorithm.call(this, params);
+    polyfillSuper(this, DecryptionAlgorithm, params);
 }
-utils.inherits(OlmDecryption, base.DecryptionAlgorithm);
+utils.inherits(OlmDecryption, DecryptionAlgorithm);
 
 /**
  * @inheritdoc
@@ -168,14 +175,14 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     const ciphertext = content.ciphertext;
 
     if (!ciphertext) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_MISSING_CIPHERTEXT",
             "Missing ciphertext",
         );
     }
 
     if (!(this._olmDevice.deviceCurve25519Key in ciphertext)) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_NOT_INCLUDED_IN_RECIPIENTS",
             "Not included in recipients",
         );
@@ -186,7 +193,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     try {
         payloadString = await this._decryptMessage(deviceKey, message);
     } catch (e) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_BAD_ENCRYPTED_MESSAGE",
             "Bad Encrypted Message", {
                 sender: deviceKey,
@@ -200,14 +207,14 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     // check that we were the intended recipient, to avoid unknown-key attack
     // https://github.com/vector-im/vector-web/issues/2483
     if (payload.recipient != this._userId) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_BAD_RECIPIENT",
             "Message was intented for " + payload.recipient,
         );
     }
 
     if (payload.recipient_keys.ed25519 != this._olmDevice.deviceEd25519Key) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_BAD_RECIPIENT_KEY",
             "Message not intended for this device", {
                 intended: payload.recipient_keys.ed25519,
@@ -221,7 +228,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
     // (this check is also provided via the sender's embedded ed25519 key,
     // which is checked elsewhere).
     if (payload.sender != event.getSender()) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_FORWARDED_MESSAGE",
             "Message forwarded from " + payload.sender, {
                 reported_sender: event.getSender(),
@@ -231,7 +238,7 @@ OlmDecryption.prototype.decryptEvent = async function(event) {
 
     // Olm events intended for a room have a room_id.
     if (payload.room_id !== event.getRoomId()) {
-        throw new base.DecryptionError(
+        throw new DecryptionError(
             "OLM_BAD_ROOM",
             "Message intended for room " + payload.room_id, {
                 reported_room: event.room_id,
@@ -334,4 +341,4 @@ OlmDecryption.prototype._decryptMessage = async function(
 };
 
 
-base.registerAlgorithm(olmlib.OLM_ALGORITHM, OlmEncryption, OlmDecryption);
+registerAlgorithm(olmlib.OLM_ALGORITHM, OlmEncryption, OlmDecryption);

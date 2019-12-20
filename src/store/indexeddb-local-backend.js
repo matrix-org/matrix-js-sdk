@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,10 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import SyncAccumulator from "../sync-accumulator";
-import utils from "../utils";
+import {SyncAccumulator} from "../sync-accumulator";
+import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import logger from '../logger';
+import {logger} from '../logger';
 
 const VERSION = 3;
 
@@ -122,7 +123,7 @@ function reqAsCursorPromise(req) {
  * @param {string=} dbName Optional database name. The same name must be used
  * to open the same database.
  */
-const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
+export function LocalIndexedDBStoreBackend(
     indexedDBInterface, dbName,
 ) {
     this.indexedDB = indexedDBInterface;
@@ -131,7 +132,7 @@ const LocalIndexedDBStoreBackend = function LocalIndexedDBStoreBackend(
     this._disconnected = true;
     this._syncAccumulator = new SyncAccumulator();
     this._isNewlyCreated = false;
-};
+}
 
 LocalIndexedDBStoreBackend.exists = function(indexedDB, dbName) {
     dbName = "matrix-js-sdk:" + (dbName || "default");
@@ -572,5 +573,3 @@ LocalIndexedDBStoreBackend.prototype = {
         await txnAsPromise(txn);
     },
 };
-
-export default LocalIndexedDBStoreBackend;

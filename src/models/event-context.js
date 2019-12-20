@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +34,7 @@ limitations under the License.
  *
  * @constructor
  */
-function EventContext(ourEvent) {
+export function EventContext(ourEvent) {
     this._timeline = [ourEvent];
     this._ourEventIndex = 0;
     this._paginateTokens = {b: null, f: null};
@@ -113,7 +114,3 @@ EventContext.prototype.addEvents = function(events, atStart) {
     }
 };
 
-/**
- * The EventContext class
- */
-module.exports = EventContext;

@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018, 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,10 +16,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import DeviceList from '../../../lib/crypto/DeviceList';
-import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
-import utils from '../../../lib/utils';
-import logger from '../../../lib/logger';
+import {logger} from "../../../src/logger";
+import * as utils from "../../../src/utils";
+import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
+import {DeviceList} from "../../../src/crypto/DeviceList";
 
 const signedDeviceList = {
     "failures": {},

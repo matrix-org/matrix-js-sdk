@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import utils from '../../utils';
+import {logger} from '../../logger';
+import * as utils from "../../utils";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -27,7 +27,7 @@ import utils from '../../utils';
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
-export default class MemoryCryptoStore {
+export class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;

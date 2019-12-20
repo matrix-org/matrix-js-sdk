@@ -1,8 +1,7 @@
 "use strict";
 import 'source-map-support/register';
-const sdk = require("../..");
-const RoomMember = sdk.RoomMember;
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import {RoomMember} from "../../src/models/room-member";
 
 describe("RoomMember", function() {
     const roomId = "!foo:bar";

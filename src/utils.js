@@ -20,7 +20,7 @@ limitations under the License.
  * @module utils
  */
 
-const unhomoglyph = require('unhomoglyph');
+import unhomoglyph from 'unhomoglyph';
 
 /**
  * Encode a dictionary of query parameters.
@@ -28,7 +28,7 @@ const unhomoglyph = require('unhomoglyph');
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-module.exports.encodeParams = function(params) {
+export function encodeParams(params) {
     let qs = "";
     for (const key in params) {
         if (!params.hasOwnProperty(key)) {
@@ -38,7 +38,7 @@ module.exports.encodeParams = function(params) {
                 encodeURIComponent(params[key]);
     }
     return qs.substring(1);
-};
+}
 
 /**
  * Encodes a URI according to a set of template variables. Variables will be
@@ -48,7 +48,7 @@ module.exports.encodeParams = function(params) {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-module.exports.encodeUri = function(pathTemplate, variables) {
+export function encodeUri(pathTemplate, variables) {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -58,7 +58,7 @@ module.exports.encodeUri = function(pathTemplate, variables) {
         );
     }
     return pathTemplate;
-};
+}
 
 /**
  * Applies a map function to the given array.
@@ -67,13 +67,13 @@ module.exports.encodeUri = function(pathTemplate, variables) {
  * the array with the signature <code>fn(element){...}</code>
  * @return {Array} A new array with the results of the function.
  */
-module.exports.map = function(array, fn) {
+export function map(array, fn) {
     const results = new Array(array.length);
     for (let i = 0; i < array.length; i++) {
         results[i] = fn(array[i]);
     }
     return results;
-};
+}
 
 /**
  * Applies a filter function to the given array.
@@ -83,7 +83,7 @@ module.exports.map = function(array, fn) {
  * looks like <code>fn(element, index, array){...}</code>.
  * @return {Array} A new array with the results of the function.
  */
-module.exports.filter = function(array, fn) {
+export function filter(array, fn) {
     const results = [];
     for (let i = 0; i < array.length; i++) {
         if (fn(array[i], i, array)) {
@@ -91,14 +91,14 @@ module.exports.filter = function(array, fn) {
         }
     }
     return results;
-};
+}
 
 /**
  * Get the keys for an object. Same as <code>Object.keys()</code>.
  * @param {Object} obj The object to get the keys for.
  * @return {string[]} The keys of the object.
  */
-module.exports.keys = function(obj) {
+export function keys(obj) {
     const keys = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
@@ -107,14 +107,14 @@ module.exports.keys = function(obj) {
         keys.push(key);
     }
     return keys;
-};
+}
 
 /**
  * Get the values for an object.
  * @param {Object} obj The object to get the values for.
  * @return {Array<*>} The values of the object.
  */
-module.exports.values = function(obj) {
+export function values(obj) {
     const values = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
@@ -123,7 +123,7 @@ module.exports.values = function(obj) {
         values.push(obj[key]);
     }
     return values;
-};
+}
 
 /**
  * Invoke a function for each item in the array.
@@ -131,11 +131,11 @@ module.exports.values = function(obj) {
  * @param {Function} fn The function to invoke for each element. Has the
  * function signature <code>fn(element, index)</code>.
  */
-module.exports.forEach = function(array, fn) {
+export function forEach(array, fn) {
     for (let i = 0; i < array.length; i++) {
         fn(array[i], i);
     }
-};
+}
 
 /**
  * The findElement() method returns a value in the array, if an element in the array
@@ -148,7 +148,7 @@ module.exports.forEach = function(array, fn) {
  * @return {*} The first value in the array which returns <code>true</code> for
  * the given function.
  */
-module.exports.findElement = function(array, fn, reverse) {
+export function findElement(array, fn, reverse) {
     let i;
     if (reverse) {
         for (i = array.length - 1; i >= 0; i--) {
@@ -163,7 +163,7 @@ module.exports.findElement = function(array, fn, reverse) {
             }
         }
     }
-};
+}
 
 /**
  * The removeElement() method removes the first element in the array that
@@ -175,7 +175,7 @@ module.exports.findElement = function(array, fn, reverse) {
  * @param {boolean} reverse True to search in reverse order.
  * @return {boolean} True if an element was removed.
  */
-module.exports.removeElement = function(array, fn, reverse) {
+export function removeElement(array, fn, reverse) {
     let i;
     let removed;
     if (reverse) {
@@ -196,26 +196,26 @@ module.exports.removeElement = function(array, fn, reverse) {
         }
     }
     return false;
-};
+}
 
 /**
  * Checks if the given thing is a function.
  * @param {*} value The thing to check.
  * @return {boolean} True if it is a function.
  */
-module.exports.isFunction = function(value) {
+export function isFunction(value) {
     return Object.prototype.toString.call(value) == "[object Function]";
-};
+}
 
 /**
  * Checks if the given thing is an array.
  * @param {*} value The thing to check.
  * @return {boolean} True if it is an array.
  */
-module.exports.isArray = function(value) {
+export function isArray(value) {
     return Array.isArray ? Array.isArray(value) :
         Boolean(value && value.constructor === Array);
-};
+}
 
 /**
  * Checks that the given object has the specified keys.
@@ -223,13 +223,13 @@ module.exports.isArray = function(value) {
  * @param {string[]} keys The list of keys that 'obj' must have.
  * @throws If the object is missing keys.
  */
-module.exports.checkObjectHasKeys = function(obj, keys) {
+export function checkObjectHasKeys(obj, keys) {
     for (let i = 0; i < keys.length; i++) {
         if (!obj.hasOwnProperty(keys[i])) {
             throw new Error("Missing required key: " + keys[i]);
         }
     }
-};
+}
 
 /**
  * Checks that the given object has no extra keys other than the specified ones.
@@ -237,7 +237,7 @@ module.exports.checkObjectHasKeys = function(obj, keys) {
  * @param {string[]} allowedKeys The list of allowed key names.
  * @throws If there are extra keys.
  */
-module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
+export function checkObjectHasNoAdditionalKeys(obj, allowedKeys) {
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
@@ -246,7 +246,7 @@ module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
             throw new Error("Unknown key: " + key);
         }
     }
-};
+}
 
 /**
  * Deep copy the given object. The object MUST NOT have circular references and
@@ -254,9 +254,9 @@ module.exports.checkObjectHasNoAdditionalKeys = function(obj, allowedKeys) {
  * @param {Object} obj The object to deep copy.
  * @return {Object} A copy of the object without any references to the original.
  */
-module.exports.deepCopy = function(obj) {
+export function deepCopy(obj) {
     return JSON.parse(JSON.stringify(obj));
-};
+}
 
 /**
  * Compare two objects for equality. The objects MUST NOT have circular references.
@@ -266,7 +266,7 @@ module.exports.deepCopy = function(obj) {
  *
  * @return {boolean} true if the two objects are equal
  */
-const deepCompare = module.exports.deepCompare = function(x, y) {
+export function deepCompare(x, y) {
     // Inspired by
     // http://stackoverflow.com/questions/1068834/object-comparison-in-javascript#1144249
 
@@ -342,7 +342,7 @@ const deepCompare = module.exports.deepCompare = function(x, y) {
     }
     /* jshint +W089 */
     return true;
-};
+}
 
 /**
  * Copy properties from one object to another.
@@ -357,7 +357,7 @@ const deepCompare = module.exports.deepCompare = function(x, y) {
  *
  * @return {Object} target
  */
-module.exports.extend = function() {
+export function extend() {
     const target = arguments[0] || {};
     for (let i = 1; i < arguments.length; i++) {
         const source = arguments[i];
@@ -366,12 +366,12 @@ module.exports.extend = function() {
         }
     }
     return target;
-};
+}
 
 /**
  * Run polyfills to add Array.map and Array.filter if they are missing.
  */
-module.exports.runPolyfills = function() {
+export function runPolyfills() {
     //                Array.prototype.filter
     // ========================================================
     // SOURCE:
@@ -562,7 +562,7 @@ module.exports.runPolyfills = function() {
         // 8. return undefined
       };
     }
-};
+}
 
 /**
  * Inherit the prototype methods from one constructor into another. This is a
@@ -572,7 +572,7 @@ module.exports.runPolyfills = function() {
  *     prototype.
  * @param {function} superCtor Constructor function to inherit prototype from.
  */
-module.exports.inherits = function(ctor, superCtor) {
+export function inherits(ctor, superCtor) {
     // Add Object.create polyfill for IE8
     // Source:
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript
@@ -654,7 +654,27 @@ module.exports.inherits = function(ctor, superCtor) {
             configurable: true,
         },
     });
-};
+}
+
+/**
+ * Polyfills inheritance for prototypes by allowing different kinds of
+ * super types. Typically prototypes would use `SuperType.call(this, params)`
+ * though this doesn't always work in some environments - this function
+ * falls back to using `Object.assign()` to clone a constructed copy
+ * of the super type onto `thisArg`.
+ * @param {any} thisArg The child instance. Modified in place.
+ * @param {any} SuperType The type to act as a super instance
+ * @param {any} params Arguments to supply to the super type's constructor
+ */
+export function polyfillSuper(thisArg, SuperType, ...params) {
+    try {
+        SuperType.call(thisArg, ...params);
+    } catch (e) {
+        // fall back to Object.assign to just clone the thing
+        const fakeSuper = new SuperType(...params);
+        Object.assign(thisArg, fakeSuper);
+    }
+}
 
 /**
  * Returns whether the given value is a finite number without type-coercion
@@ -662,9 +682,9 @@ module.exports.inherits = function(ctor, superCtor) {
  * @param {*} value the value to test
  * @return {boolean} whether or not value is a finite number without type-coercion
  */
-module.exports.isNumber = function(value) {
+export function isNumber(value) {
     return typeof value === 'number' && isFinite(value);
-};
+}
 
 /**
  * Removes zero width chars, diacritics and whitespace from the string
@@ -672,17 +692,16 @@ module.exports.isNumber = function(value) {
  * @param {string} str the string to remove hidden characters from
  * @return {string} a string with the hidden characters removed
  */
-module.exports.removeHiddenChars = function(str) {
+export function removeHiddenChars(str) {
     return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
-};
+}
 const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
 
-function escapeRegExp(string) {
+export function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-module.exports.escapeRegExp = escapeRegExp;
 
-module.exports.globToRegexp = function(glob, extended) {
+export function globToRegexp(glob, extended) {
     extended = typeof(extended) === 'boolean' ? extended : true;
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
@@ -699,27 +718,29 @@ module.exports.globToRegexp = function(glob, extended) {
         });
     }
     return pat;
-};
+}
 
-module.exports.ensureNoTrailingSlash = function(url) {
+export function ensureNoTrailingSlash(url) {
     if (url && url.endsWith("/")) {
         return url.substr(0, url.length - 1);
     } else {
         return url;
     }
-};
+}
 
 // Returns a promise which resolves with a given value after the given number of ms
-module.exports.sleep = (ms, value) => new Promise((resolve => {
-    setTimeout(resolve, ms, value);
-}));
+export function sleep(ms, value) {
+    return new Promise((resolve => {
+        setTimeout(resolve, ms, value);
+    }));
+}
 
-module.exports.isNullOrUndefined = function(val) {
+export function isNullOrUndefined(val) {
     return val === null || val === undefined;
-};
+}
 
 // Returns a Deferred
-module.exports.defer = () => {
+export function defer() {
     let resolve;
     let reject;
 
@@ -729,14 +750,14 @@ module.exports.defer = () => {
     });
 
     return {resolve, reject, promise};
-};
+}
 
-module.exports.promiseMapSeries = async (promises, fn) => {
+export async function promiseMapSeries(promises, fn) {
     for (const o of await promises) {
         await fn(await o);
     }
-};
+}
 
-module.exports.promiseTry = (fn) => {
+export function promiseTry(fn) {
     return new Promise((resolve) => resolve(fn()));
-};
+}

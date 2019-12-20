@@ -1,5 +1,4 @@
 /*
-Copyright 2016 OpenMarket Ltd
 Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +13,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
-/**
- * @module crypto/algorithms
- */
+import * as matrixcs from "./matrix";
+import * as utils from "./utils";
 
-import "./olm";
-import "./megolm";
+matrixcs.request(import("request"));
+utils.runPolyfills();
 
-export * from "./base";
+export * from "./matrix";
+export default matrixcs;

@@ -18,10 +18,10 @@ limitations under the License.
 "use strict";
 
 /** @module interactive-auth */
-const url = require("url");
 
-const utils = require("./utils");
-import logger from './logger';
+import url from "url";
+import * as utils from "./utils";
+import {logger} from './logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -103,7 +103,7 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  *     attemptAuth promise.
  *
  */
-function InteractiveAuth(opts) {
+export function InteractiveAuth(opts) {
     this._matrixClient = opts.matrixClient;
     this._data = opts.authData || {};
     this._requestCallback = opts.doRequest;
@@ -510,6 +510,3 @@ InteractiveAuth.prototype = {
     },
 };
 
-
-/** */
-module.exports = InteractiveAuth;

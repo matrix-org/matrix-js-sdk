@@ -1,6 +1,6 @@
 "use strict";
 import 'source-map-support/register';
-const ContentRepo = require("../../lib/content-repo");
+import * as ContentRepo from "../../src/content-repo";
 
 describe("ContentRepo", function() {
     const baseUrl = "https://my.home.server";

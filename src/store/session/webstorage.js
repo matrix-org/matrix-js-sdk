@@ -2,6 +2,7 @@
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +22,8 @@ limitations under the License.
  * @module store/session/webstorage
  */
 
-const utils = require("../../utils");
-import logger from '../../logger';
+import * as utils from "../../utils";
+import {logger} from '../../logger';
 
 const DEBUG = false;  // set true to enable console logging.
 const E2E_PREFIX = "session.e2e.";
@@ -36,7 +37,7 @@ const E2E_PREFIX = "session.e2e.";
  * @throws if the supplied 'store' does not meet the Storage interface of the
  * WebStorage API.
  */
-function WebStorageSessionStore(webStore) {
+export function WebStorageSessionStore(webStore) {
     this.store = webStore;
     if (!utils.isFunction(webStore.getItem) ||
         !utils.isFunction(webStore.setItem) ||
@@ -261,6 +262,3 @@ function debuglog() {
         logger.log(...arguments);
     }
 }
-
-/** */
-module.exports = WebStorageSessionStore;

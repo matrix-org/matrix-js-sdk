@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +20,8 @@ limitations under the License.
  * of requests.
  * @module scheduler
  */
-const utils = require("./utils");
-import logger from './logger';
+import * as utils from "./utils";
+import {logger} from './logger';
 
 const DEBUG = false;  // set true to enable console logging.
 
@@ -36,7 +37,7 @@ const DEBUG = false;  // set true to enable console logging.
  * algorithm to apply when determining which events should be sent before the
  * given event. Defaults to {@link module:scheduler~MatrixScheduler.QUEUE_MESSAGES}.
  */
-function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
+export function MatrixScheduler(retryAlgorithm, queueAlgorithm) {
     this.retryAlgorithm = retryAlgorithm || MatrixScheduler.RETRY_BACKOFF_RATELIMIT;
     this.queueAlgorithm = queueAlgorithm || MatrixScheduler.QUEUE_MESSAGES;
     this._queues = {
@@ -318,7 +319,3 @@ function debuglog() {
  * @return {Promise} Resolved/rejected depending on the outcome of the request.
  */
 
-/**
- * The MatrixScheduler class.
- */
-module.exports = MatrixScheduler;
