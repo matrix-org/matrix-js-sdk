@@ -1,6 +1,3 @@
-"use strict";
-import 'source-map-support/register';
-
 import {logger} from "../../src/logger";
 import {MatrixClient} from "../../src/client";
 import {Filter} from "../../src/filter";

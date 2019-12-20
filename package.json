@@ -32,7 +32,6 @@
   "license": "Apache-2.0",
   "files": [
     "lib",
-    "dist",
     "src",
     "git-revision.txt",
     "CHANGELOG.md",
@@ -79,7 +78,6 @@
     "matrix-mock-request": "^1.2.3",
     "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
     "rimraf": "^3.0.0",
-    "source-map-support": "^0.5.13",
     "terser": "^4.4.3",
     "tsify": "^4.0.1",
     "tslint": "^5.20.1",

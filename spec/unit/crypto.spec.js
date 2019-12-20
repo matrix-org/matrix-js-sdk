@@ -1,5 +1,3 @@
-import 'source-map-support/register';
-
 import '../olm-loader';
 import {Crypto} from "../../src/crypto";
 import {WebStorageSessionStore} from "../../src/store/session/webstorage";

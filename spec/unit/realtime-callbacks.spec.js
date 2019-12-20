@@ -1,6 +1,3 @@
-"use strict";
-
-import 'source-map-support/register';
 import * as callbacks from "../../src/realtime-callbacks";
 
 let wallTime = 1234567890;

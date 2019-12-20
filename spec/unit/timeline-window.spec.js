@@ -1,5 +1,3 @@
-"use strict";
-import 'source-map-support/register';
 import {EventTimeline} from "../../src/models/event-timeline";
 import {TimelineIndex, TimelineWindow} from "../../src/timeline-window";
 import * as utils from "../test-utils";

@@ -1,5 +1,3 @@
-"use strict";
-import 'source-map-support/register';
 import * as utils from "../test-utils";
 import {EventTimeline} from "../../src/models/event-timeline";
 import {RoomState} from "../../src/models/room-state";

@@ -25,9 +25,6 @@ limitations under the License.
  * See also `megolm.spec.js`.
  */
 
-"use strict";
-import 'source-map-support/register';
-
 // load olm before the sdk if possible
 import '../olm-loader';
 
