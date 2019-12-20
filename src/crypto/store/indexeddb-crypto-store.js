@@ -18,7 +18,7 @@ limitations under the License.
 import {logger} from '../../logger';
 import {LocalStorageCryptoStore} from './localStorage-crypto-store';
 import {MemoryCryptoStore} from './memory-crypto-store';
-import {Backend as IndexedDBCryptoStoreBackend} from './indexeddb-crypto-store-backend';
+import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 import {InvalidCryptoStoreError} from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 
