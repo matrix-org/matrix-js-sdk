@@ -37,7 +37,7 @@ export class InRoomChannel {
     constructor(client, roomId, userId) {
         this._client = client;
         this._roomId = roomId;
-        this._userId = userId;
+        this.userId = userId;
         this._requestEventId = null;
     }
 
@@ -202,7 +202,7 @@ export class InRoomChannel {
                     "verification.  You will need to use legacy key " +
                     "verification to verify keys.",
                 msgtype: REQUEST_TYPE,
-                to: this._userId,
+                to: this.userId,
                 from_device: content.from_device,
                 methods: content.methods,
             };

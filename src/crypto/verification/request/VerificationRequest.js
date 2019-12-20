@@ -58,7 +58,7 @@ export const PHASE_DONE = 6;
  * @event "change" whenever the state of the request object has changed.
  */
 export default class VerificationRequest extends EventEmitter {
-    constructor(channel, verificationMethods, userId, client) {
+    constructor(channel, verificationMethods, client) {
         super();
         this.channel = channel;
         this._verificationMethods = verificationMethods;
@@ -66,8 +66,6 @@ export default class VerificationRequest extends EventEmitter {
         this._commonMethods = [];
         this._setPhase(PHASE_UNSENT, false);
         this._requestEvent = null;
-        // TODO: this can also be ourselves, we need to fish .to out of content on a .request
-        this._otherUserId = userId;
         this._initiatedByMe = null;
         this._startTimestamp = null;
         this._cancellingUserId = null;
@@ -200,14 +198,14 @@ export default class VerificationRequest extends EventEmitter {
         if (this.initiatedByMe) {
             return this._client.getUserId();
         } else {
-            return this._otherUserId;
+            return this.otherUserId;
         }
     }
 
     /** the id of the user that (will) receive(d) the request */
     get receivingUserId() {
         if (this.initiatedByMe) {
-            return this._otherUserId;
+            return this.otherUserId;
         } else {
             return this._client.getUserId();
         }
@@ -215,7 +213,7 @@ export default class VerificationRequest extends EventEmitter {
 
     /** the user id of the other party in this request */
     get otherUserId() {
-        return this._otherUserId;
+        return this.channel.userId;
     }
 
     /**
@@ -364,7 +362,7 @@ export default class VerificationRequest extends EventEmitter {
 
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && sender === this._otherUserId) {
+        if (this._verifier && sender === this.otherUserId) {
             if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
@@ -463,7 +461,7 @@ export default class VerificationRequest extends EventEmitter {
             if (sender === this._client.getUserId()) {
                 this._doneByUs = true;
                 console.log("VerificationRequest: received own .done event");
-            } else if (sender === this._otherUserId) {
+            } else if (sender === this.otherUserId) {
                 this._doneByThem = true;
                 console.log("VerificationRequest: received their .done event");
             }
