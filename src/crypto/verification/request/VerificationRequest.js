@@ -72,6 +72,8 @@ export default class VerificationRequest extends EventEmitter {
         this._startTimestamp = null;
         this._cancellingUserId = null;
         this._readyEvent = null;
+        this._doneByThem = false;
+        this._doneByUs = false;
     }
 
     /**
@@ -372,7 +374,7 @@ export default class VerificationRequest extends EventEmitter {
         if (type === CANCEL_TYPE) {
             this._handleCancel(event);
         } else if (type === DONE_TYPE) {
-            this._handleDone();
+            this._handleDone(event);
         }
     }
 
@@ -455,9 +457,23 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _handleDone() {
+    _handleDone(event) {
         if (this._phase === PHASE_STARTED) {
-            this._setPhase(PHASE_DONE);
+            const sender = event.getSender();
+            if (sender === this._client.getUserId()) {
+                this._doneByUs = true;
+                console.log("VerificationRequest: received own .done event");
+            } else if (sender === this._otherUserId) {
+                this._doneByThem = true;
+                console.log("VerificationRequest: received their .done event");
+            }
+            // we need both .done events to consider the request done,
+            // as it will be deleted from the requests map once it's done,
+            // and we need to find the request on our own incoming .done
+            // to attach the request to the event to render it in the timeline.
+            if (this._doneByUs && this._doneByThem) {
+                this._setPhase(PHASE_DONE);
+            }
         }
     }
 
