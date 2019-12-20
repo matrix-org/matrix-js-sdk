@@ -211,6 +211,11 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
+    /** the user id of the other party in this request */
+    get otherUserId() {
+        return this._otherUserId;
+    }
+
     /**
      * the id of the user that cancelled the request,
      * only defined when phase is PHASE_CANCELLED
