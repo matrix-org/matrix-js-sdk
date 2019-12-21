@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,6 +48,7 @@ function OutboundSessionInfo(sessionId) {
     this.useCount = 0;
     this.creationTime = new Date().getTime();
     this.sharedWithDevices = {};
+    this.blockedDevicesNotified = {};
 }
 
 
@@ -82,6 +84,15 @@ OutboundSessionInfo.prototype.markSharedWithDevice = function(
         this.sharedWithDevices[userId] = {};
     }
     this.sharedWithDevices[userId][deviceId] = chainIndex;
+};
+
+OutboundSessionInfo.prototype.markNotifiedBlockedDevice = function(
+    userId, deviceId,
+) {
+    if (!this.blockedDevicesNotified[userId]) {
+        this.blockedDevicesNotified[userId] = {};
+    }
+    this.blockedDevicesNotified[userId][deviceId] = true;
 };
 
 /**
@@ -170,7 +181,7 @@ utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
  * @return {module:client.Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
  */
-MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
+MegolmEncryption.prototype._ensureOutboundSession = async function(devicesInRoom, blocked) {
     const self = this;
 
     let session;
@@ -237,9 +248,36 @@ MegolmEncryption.prototype._ensureOutboundSession = function(devicesInRoom) {
             }
         }
 
-        return self._shareKeyWithDevices(
+        await self._shareKeyWithDevices(
             session, shareMap,
         );
+
+        // are there any new blocked devices that we need to notify?
+        const blockedMap = {};
+        for (const userId in blocked) {
+            if (!blocked.hasOwnProperty(userId)) {
+                continue;
+            }
+
+            const userBlockedDevices = blocked[userId];
+
+            for (const deviceId in userBlockedDevices) {
+                if (!userBlockedDevices.hasOwnProperty(deviceId)) {
+                    continue;
+                }
+
+                if (
+                    !session.blockedDevicesNotified[userId] ||
+                        session.blockedDevicesNotified[userId][deviceId] === undefined
+                ) {
+                    blockedMap[userId] = blockedMap[userId] || [];
+                    blockedMap[userId].push(userBlockedDevices[deviceId]);
+                }
+            }
+        }
+
+        // notify blocked devices that they're blocked
+        await self._notifyBlockedDevices(session, blockedMap);
     }
 
     // helper which returns the session prepared by prepareSession
@@ -363,6 +401,40 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
     return mapSlices;
 };
 
+MegolmEncryption.prototype._splitBlockedDevices = function(
+    session, devicesByUser,
+) {
+    const maxToDeviceMessagesPerRequest = 20;
+
+    // use an array where the slices of a content map gets stored
+    let currentSlice = [];
+    const mapSlices = [currentSlice];
+
+    for (const userId of Object.keys(devicesByUser)) {
+        const userBlockedDevicesToShareWith = devicesByUser[userId];
+
+        for (const blockedInfo of userBlockedDevicesToShareWith) {
+            const deviceInfo = blockedInfo.deviceInfo;
+            const deviceId = deviceInfo.deviceId;
+
+            if (currentSlice.length > maxToDeviceMessagesPerRequest) {
+                // the current slice is filled up. Start inserting into the next slice
+                currentSlice = [];
+                mapSlices.push(currentSlice);
+            }
+
+            currentSlice.push({
+                userId: userId,
+                blockedInfo: blockedInfo,
+            });
+        }
+    }
+    if (currentSlice.length === 0) {
+        mapSlices.pop();
+    }
+    return mapSlices;
+};
+
 /**
  * @private
  *
@@ -425,6 +497,37 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
             }
         });
     });
+};
+
+MegolmEncryption.prototype._sendBlockedNotificationsToDevices = async function(
+    session, userDeviceMap, payload,
+) {
+    const contentMap = {};
+
+    for (const val of userDeviceMap) {
+        const userId = val.userId;
+        const blockedInfo = val.blockedInfo;
+        const deviceInfo = blockedInfo.deviceInfo;
+        const deviceId = deviceInfo.deviceId;
+
+        const message = Object.assign({}, payload);
+        message.code = blockedInfo.code;
+        message.reason = blockedInfo.reason;
+
+        if (!contentMap[userId]) {
+            contentMap[userId] = {};
+        }
+        contentMap[userId][deviceId] = message;
+    }
+
+    await this._baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap)
+
+    // store that we successfully uploaded the keys of the current slice
+    for (const userId of Object.keys(contentMap)) {
+        for (const deviceId of Object.keys(contentMap[userId])) {
+            session.markNotifiedBlockedDevice(userId, deviceId);
+        }
+    }
 };
 
 /**
@@ -561,6 +664,35 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
     }
 };
 
+MegolmEncryption.prototype._notifyBlockedDevices = async function(
+    session, devicesByUser,
+) {
+    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
+    const payload = {
+        room_id: this._roomId,
+        session_id: session.sessionId,
+    };
+
+    const userDeviceMaps = this._splitBlockedDevices(
+        session, devicesByUser,
+    );
+
+    for (let i = 0; i < userDeviceMaps.length; i++) {
+        try {
+            await this._sendBlockedNotificationsToDevices(
+                session, userDeviceMaps[i], payload,
+            );
+            logger.log(`Completed blacklist notification for ${session.sessionId} `
+                + `in ${this._roomId} (slice ${i + 1}/${userDeviceMaps.length})`);
+        } catch (e) {
+            logger.log(`blacklist notification for ${session.sessionId} in `
+                + `${this._roomId} (slice ${i + 1}/${userDeviceMaps.length}) failed`);
+
+            throw e;
+        }
+    }
+};
+
 /**
  * @inheritdoc
  *
@@ -570,42 +702,41 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
  *
  * @return {module:client.Promise} Promise which resolves to the new event body
  */
-MegolmEncryption.prototype.encryptMessage = function(room, eventType, content) {
+MegolmEncryption.prototype.encryptMessage = async function(room, eventType, content) {
     const self = this;
     logger.log(`Starting to encrypt event for ${this._roomId}`);
 
-    return this._getDevicesInRoom(room).then(function(devicesInRoom) {
-        // check if any of these devices are not yet known to the user.
-        // if so, warn the user so they can verify or ignore.
-        self._checkForUnknownDevices(devicesInRoom);
+    const [devicesInRoom, blocked] = await this._getDevicesInRoom(room);
 
-        return self._ensureOutboundSession(devicesInRoom);
-    }).then(function(session) {
-        const payloadJson = {
-            room_id: self._roomId,
-            type: eventType,
-            content: content,
-        };
+    // check if any of these devices are not yet known to the user.
+    // if so, warn the user so they can verify or ignore.
+    self._checkForUnknownDevices(devicesInRoom);
 
-        const ciphertext = self._olmDevice.encryptGroupMessage(
-            session.sessionId, JSON.stringify(payloadJson),
-        );
+    const session = await self._ensureOutboundSession(devicesInRoom, blocked);
+    const payloadJson = {
+        room_id: self._roomId,
+        type: eventType,
+        content: content,
+    };
 
-        const encryptedContent = {
-            algorithm: olmlib.MEGOLM_ALGORITHM,
-            sender_key: self._olmDevice.deviceCurve25519Key,
-            ciphertext: ciphertext,
-            session_id: session.sessionId,
-             // Include our device ID so that recipients can send us a
-             // m.new_device message if they don't have our session key.
-             // XXX: Do we still need this now that m.new_device messages
-             // no longer exist since #483?
-            device_id: self._deviceId,
-        };
+    const ciphertext = self._olmDevice.encryptGroupMessage(
+        session.sessionId, JSON.stringify(payloadJson),
+    );
 
-        session.useCount++;
-        return encryptedContent;
-    });
+    const encryptedContent = {
+        algorithm: olmlib.MEGOLM_ALGORITHM,
+        sender_key: self._olmDevice.deviceCurve25519Key,
+        ciphertext: ciphertext,
+        session_id: session.sessionId,
+        // Include our device ID so that recipients can send us a
+        // m.new_device message if they don't have our session key.
+        // XXX: Do we still need this now that m.new_device messages
+        // no longer exist since #483?
+        device_id: self._deviceId,
+    };
+
+    session.useCount++;
+    return encryptedContent;
 };
 
 /**
@@ -676,6 +807,7 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     // using all the device_lists changes and left fields.
     // See https://github.com/vector-im/riot-web/issues/2305 for details.
     const devices = await this._crypto.downloadKeys(roomMembers, false);
+    const blocked = {};
     // remove any blocked devices
     for (const userId in devices) {
         if (!devices.hasOwnProperty(userId)) {
@@ -691,12 +823,26 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
             if (userDevices[deviceId].isBlocked() ||
                 (userDevices[deviceId].isUnverified() && isBlacklisting)
                ) {
+                if (!blocked[userId]) {
+                    blocked[userId] = {};
+                }
+                const blockedInfo = userDevices[deviceId].isBlocked()
+                      ? {
+                          code: "m.blacklisted",
+                          reason: "You have been blocked",
+                      }
+                      : {
+                          code: "m.unverified",
+                          reason: "You have not been verified",
+                      }
+                blockedInfo.deviceInfo = userDevices[deviceId];
+                blocked[userId][deviceId] = blockedInfo;
                 delete userDevices[deviceId];
             }
         }
     }
 
-    return devices;
+    return [devices, blocked];
 };
 
 /**
