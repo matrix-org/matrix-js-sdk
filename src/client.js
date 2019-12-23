@@ -3132,7 +3132,7 @@ MatrixClient.prototype.setAvatarUrl = function(url, callback) {
  */
 MatrixClient.prototype.mxcUrlToHttp =
         function(mxcUrl, width, height, resizeMethod, allowDirectLinks) {
-    return contentRepo.getHttpUriForMxc(
+    return ContentRepo.getHttpUriForMxc(
         this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks,
     );
 };
