@@ -131,7 +131,7 @@ export function createClient(opts) {
             "baseUrl": opts,
         };
     }
-    opts.request = opts.request || request;
+    opts.request = opts.request || requestInstance;
     opts.store = opts.store || new MemoryStore({
       localStorage: global.localStorage,
     });
