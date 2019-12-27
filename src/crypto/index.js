@@ -1128,17 +1128,13 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
         }
     });
 
-    eventEmitter.on("toDeviceEvent", function(event) {
-        crypto._onToDeviceEvent(event);
-    });
+    eventEmitter.on("toDeviceEvent", crypto._onToDeviceEvent.bind(crypto));
 
-    eventEmitter.on("Room.timeline", function(event) {
-        crypto._onTimelineEvent(event);
-    });
+    const timelineHandler = crypto._onTimelineEvent.bind(crypto);
 
-    eventEmitter.on("Event.decrypted", function(event) {
-        crypto._onTimelineEvent(event);
-    });
+    eventEmitter.on("Room.timeline", timelineHandler);
+
+    eventEmitter.on("Event.decrypted", timelineHandler);
 };
 
 
@@ -1561,6 +1557,7 @@ Crypto.prototype._requestVerificationWithChannel = async function(
     // but if the other party is really fast they could potentially respond to the
     // request before the server tells us the event got sent, and we would probably
     // create a new request object
+    console.log(`Crypto: adding new request to requestsByTxnId with id ${channel.transactionId}`);
     requestsMap.setRequestByChannel(channel, request);
 
     return request;
@@ -2468,11 +2465,16 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  * @param {bool} removed not used
  * @param {bool} data.liveEvent whether this is a live event
  */
-Crypto.prototype._onTimelineEvent = function(event, room, atStart, removed, {liveEvent}) {
+Crypto.prototype._onTimelineEvent = function(event, room, atStart, removed, {liveEvent} = {}) {
     // TODO: we still need a request object for past requests, so we can show it in the timeline
     // validation now excludes old requests
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
+        if (InRoomChannel.getTransactionId(event)) {
+            console.log(`Crypto: _onTimelineEvent NONVALID ${InRoomChannel.getTransactionId(event)}, ${event.getType()}, ${event.getSender()} liveEvent=${liveEvent}`);
+        }
         return;
+    } else {
+        console.log(`Crypto: _onTimelineEvent YESVALID ${InRoomChannel.getTransactionId(event)}, ${event.getType()}, ${event.getSender()} liveEvent=${liveEvent}`);
     }
     const createRequest = event => {
         if (!InRoomChannel.canCreateRequest(InRoomChannel.getEventType(event))) {
@@ -2508,6 +2510,7 @@ Crypto.prototype._handleVerificationEvent = async function(
         request = createRequest(event);
         // a request could not be made from this event, so ignore event
         if (!request) {
+            console.log(`Crypto: could not find VerificationRequest for ${event.getType()}, and could not create one, so ignoring.`);
             return;
         }
         isNewRequest = true;
@@ -2524,6 +2527,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     } catch (err) {
         console.error("error while handling verification event", event, err);
     }
+    console.log("Crypto: _handleVerificationEvent: done handling a request", isNewRequest, request.pending, request.phase, request.initiatedByMe);
     if (!request.pending) {
         requestsMap.removeRequest(event);
     } else if (isNewRequest && !request.initiatedByMe) {

@@ -134,7 +134,7 @@ export class InRoomChannel {
 
             // ignore requests that are not direct to or sent by the syncing user
             if (!InRoomChannel.getOtherPartyUserId(event, client)) {
-                console.log("InRoomChannel: validateEvent: not directed or sent my me", type, event.getSender(), content.to);
+                console.log("InRoomChannel: validateEvent: not directed or sent by me", type, event.getSender(), content.to);
                 return false;
             }
         }
@@ -280,9 +280,11 @@ export class InRoomRequests {
 
     getRequest(event) {
         const roomId = event.getRoomId();
+        const txnId = InRoomChannel.getTransactionId(event);
+        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
-            return requestsByTxnId.get(InRoomChannel.getTransactionId(event));
+            return requestsByTxnId.get(txnId);
         }
     }
 
