@@ -446,4 +446,51 @@ describe("MegolmDecryption", function() {
         bobClient1.stopClient();
         bobClient2.stopClient();
     });
+
+    it("throws an error describing why it doesn't have a key", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const bobDevice = bobClient._crypto._olmDevice;
+
+        const encryptionCfg = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+        };
+        const roomId = "!someroom";
+        const room = new Room(roomId, aliceClient, "@alice:example.com", {});
+
+        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+            type: "m.room_key.withheld",
+            sender: "@bob:example.com",
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                room_id: roomId,
+                session_id: "session_id",
+                sender_key: bobDevice.deviceCurve25519Key,
+                code: "m.blacklisted",
+                reason: "You have been blocked",
+            }
+        }));
+
+        expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id"
+            }
+        }))).rejects.toThrow("You have been blocked");
+    });
 });

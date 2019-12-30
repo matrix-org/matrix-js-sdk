@@ -18,7 +18,7 @@ limitations under the License.
 import logger from '../../logger';
 import utils from '../../utils';
 
-export const VERSION = 7;
+export const VERSION = 8;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -427,20 +427,36 @@ export class Backend {
 
     // Inbound group sessions
 
-    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        const objectStore = txn.objectStore("inbound_group_sessions");
-        const getReq = objectStore.get([senderCurve25519Key, sessionId]);
-        getReq.onsuccess = function() {
-            try {
-                if (getReq.result) {
-                    func(getReq.result.session);
-                } else {
-                    func(null);
+    async getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        const [session, withheld] = await Promise.all([
+            new Promise((resolve, reject) => {
+                const objectStore = txn.objectStore("inbound_group_sessions");
+                const getReq = objectStore.get([senderCurve25519Key, sessionId]);
+                getReq.onsuccess = function() {
+                    if (getReq.result) {
+                        resolve(getReq.result.session);
+                    } else {
+                        resolve(null);
+                    }
                 }
-            } catch (e) {
-                abortWithException(txn, e);
-            }
-        };
+            }),
+            new Promise((resolve, reject) => {
+                const objectStore = txn.objectStore("inbound_group_sessions_withheld");
+                const getReq = objectStore.get([senderCurve25519Key, sessionId]);
+                getReq.onsuccess = function() {
+                    if (getReq.result) {
+                        resolve(getReq.result.session);
+                    } else {
+                        resolve(null);
+                    }
+                }
+            }),
+        ]);
+        try {
+            func(session, withheld);
+        } catch (e) {
+            abortWithException(txn, e);
+        }
     }
 
     getAllEndToEndInboundGroupSessions(txn, func) {
@@ -494,6 +510,13 @@ export class Backend {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         const objectStore = txn.objectStore("inbound_group_sessions");
+        objectStore.put({
+            senderCurve25519Key, sessionId, session: sessionData,
+        });
+    }
+
+    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
+        const objectStore = txn.objectStore("inbound_group_sessions_withheld");
         objectStore.put({
             senderCurve25519Key, sessionId, session: sessionData,
         });
@@ -659,6 +682,11 @@ export function upgradeDatabase(db, oldVersion) {
     }
     if (oldVersion < 7) {
         db.createObjectStore("sessions_needing_backup", {
+            keyPath: ["senderCurve25519Key", "sessionId"],
+        });
+    }
+    if (oldVersion < 8) {
+        db.createObjectStore("inbound_group_sessions_withheld", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
     }

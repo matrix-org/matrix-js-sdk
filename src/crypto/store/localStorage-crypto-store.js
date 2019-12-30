@@ -32,6 +32,7 @@ const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_CROSS_SIGNING_KEYS = E2E_PREFIX + "cross_signing_keys";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
+const KEY_INBOUND_SESSION_WITHHELD_PREFIX = E2E_PREFIX + "inboundgroupsessions.withheld/";
 const KEY_ROOMS_PREFIX = E2E_PREFIX + "rooms/";
 const KEY_SESSIONS_NEEDING_BACKUP = E2E_PREFIX + "sessionsneedingbackup";
 
@@ -41,6 +42,10 @@ function keyEndToEndSessions(deviceKey) {
 
 function keyEndToEndInboundGroupSession(senderKey, sessionId) {
     return KEY_INBOUND_SESSION_PREFIX + senderKey + "/" + sessionId;
+}
+
+function keyEndToEndInboundGroupSessionWithheld(senderKey, sessionId) {
+    return KEY_INBOUND_SESSION_WITHHELD_PREFIX + senderKey + "/" + sessionId;
 }
 
 function keyEndToEndRoomsPrefix(roomId) {
@@ -125,10 +130,16 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
     // Inbound Group Sessions
 
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        func(getJsonItem(
-            this.store,
-            keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
-        ));
+        func(
+            getJsonItem(
+                this.store,
+                keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+            ),
+            getJsonItem(
+                this.store,
+                keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId),
+            ),
+        );
     }
 
     getAllEndToEndInboundGroupSessions(txn, func) {
@@ -166,6 +177,14 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(
             this.store,
             keyEndToEndInboundGroupSession(senderCurve25519Key, sessionId),
+            sessionData,
+        );
+    }
+
+    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
+        setJsonItem(
+            this.store,
+            keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId),
             sessionData,
         );
     }

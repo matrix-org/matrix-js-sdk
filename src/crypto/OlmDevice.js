@@ -818,9 +818,9 @@ OlmDevice.prototype._getInboundGroupSession = function(
     roomId, senderKey, sessionId, txn, func,
 ) {
     this._cryptoStore.getEndToEndInboundGroupSession(
-        senderKey, sessionId, txn, (sessionData) => {
+        senderKey, sessionId, txn, (sessionData, withheld) => {
             if (sessionData === null) {
-                func(null);
+                func(null, null, withheld);
                 return;
             }
 
@@ -834,7 +834,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
             }
 
             this._unpickleInboundGroupSession(sessionData, (session) => {
-                func(session, sessionData);
+                func(session, sessionData, withheld);
             });
         },
     );
@@ -914,6 +914,33 @@ OlmDevice.prototype.addInboundGroupSession = async function(
     );
 };
 
+OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
+    roomId, senderKey, sessionId, code, reason,
+) {
+    this._cryptoStore.storeEndToEndInboundGroupSessionWithheld(senderKey, sessionId, {
+        room_id: roomId,
+        code: code,
+        reason: reason,
+    });
+};
+
+const WITHHELD_MESSAGES = {
+    "m.unverified": "You have not been verified",
+    "m.blacklisted": "You have been blocked",
+    "m.unauthorised": "You are not authorised to read the message",
+    "m.no_olm": "Unable to establish a secure channel",
+};
+
+function _calculateWithheldMessage(withheld) {
+    if (withheld.code && withheld.code in WITHHELD_MESSAGES) {
+        return WITHHELD_MESSAGES[withheld.code];
+    } else if (withheld.reason) {
+        return withheld.reason;
+    } else {
+        return "decryption key withheld";
+    }
+}
+
 /**
  * Decrypt a received message with an inbound group session
  *
@@ -938,12 +965,24 @@ OlmDevice.prototype.decryptGroupMessage = async function(
     await this._cryptoStore.doTxn(
         'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
             this._getInboundGroupSession(
-                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null) {
+                        if (withheld) {
+                            throw new Error(_calculateWithheldMessage(withheld));
+                        }
                         result = null;
                         return;
                     }
-                    const res = session.decrypt(body);
+                    let res;
+                    try {
+                        res = session.decrypt(body);
+                    } catch (e) {
+                        if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
+                            throw new Error(_calculateWithheldMessage(withheld));
+                        } else {
+                            throw e;
+                        }
+                    }
 
                     let plaintext = res.plaintext;
                     if (plaintext === undefined) {

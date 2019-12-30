@@ -2371,6 +2371,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
+        } else if (event.getType() === "m.room_key.withheld") {
+            this._onRoomKeyWithheldEvent(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
@@ -2408,6 +2410,20 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
+    const content = event.getContent();
+
+    if (!content.room_id || !content.session_id) {
+        logger.error("key withheld event is missing fields");
+        return;
+    }
+
+    const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
+    if (alg.onRoomKeyWithheldEvent) {
+        alg.onRoomKeyWithheldEvent(event);
+    }
 };
 
 /**

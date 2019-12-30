@@ -1111,6 +1111,26 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 
 /**
  * @inheritdoc
+ *
+ * @param {module:models/event.MatrixEvent} event key event
+ */
+MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
+    const content = event.getContent();
+    const sessionId = content.session_id;
+    let senderKey = event.getSenderKey();
+
+    if (!senderKey) {
+        // FIXME:
+        senderKey = content.sender_key;
+    }
+
+    await this._olmDevice.addInboundGroupSessionWithheld(
+        content.room_id, senderKey, sessionId, content.code, content.reason
+    );
+};
+
+/**
+ * @inheritdoc
  */
 MegolmDecryption.prototype.hasKeysForKeyRequest = function(keyRequest) {
     const body = keyRequest.requestBody;
