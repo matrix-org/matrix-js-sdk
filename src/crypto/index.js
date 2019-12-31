@@ -2415,7 +2415,7 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
     const content = event.getContent();
 
-    if (!content.room_id || !content.session_id) {
+    if (!content.room_id || !content.session_id || !content.algorithm) {
         logger.error("key withheld event is missing fields");
         return;
     }

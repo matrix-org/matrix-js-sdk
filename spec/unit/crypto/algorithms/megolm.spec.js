@@ -460,11 +460,7 @@ describe("MegolmDecryption", function() {
         ]);
         const bobDevice = bobClient._crypto._olmDevice;
 
-        const encryptionCfg = {
-            "algorithm": "m.megolm.v1.aes-sha2",
-        };
         const roomId = "!someroom";
-        const room = new Room(roomId, aliceClient, "@alice:example.com", {});
 
         aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
             type: "m.room_key.withheld",
@@ -476,7 +472,7 @@ describe("MegolmDecryption", function() {
                 sender_key: bobDevice.deviceCurve25519Key,
                 code: "m.blacklisted",
                 reason: "You have been blocked",
-            }
+            },
         }));
 
         expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
@@ -489,8 +485,8 @@ describe("MegolmDecryption", function() {
                 ciphertext: "blablabla",
                 device_id: "bobdevice",
                 sender_key: bobDevice.deviceCurve25519Key,
-                session_id: "session_id"
-            }
+                session_id: "session_id",
+            },
         }))).rejects.toThrow("You have been blocked");
     });
 });

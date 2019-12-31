@@ -181,7 +181,9 @@ utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
  * @return {module:client.Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
  */
-MegolmEncryption.prototype._ensureOutboundSession = async function(devicesInRoom, blocked) {
+MegolmEncryption.prototype._ensureOutboundSession = async function(
+    devicesInRoom, blocked,
+) {
     const self = this;
 
     let session;
@@ -415,7 +417,6 @@ MegolmEncryption.prototype._splitBlockedDevices = function(
 
         for (const blockedInfo of userBlockedDevicesToShareWith) {
             const deviceInfo = blockedInfo.deviceInfo;
-            const deviceId = deviceInfo.deviceId;
 
             if (currentSlice.length > maxToDeviceMessagesPerRequest) {
                 // the current slice is filled up. Start inserting into the next slice
@@ -667,10 +668,11 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
 MegolmEncryption.prototype._notifyBlockedDevices = async function(
     session, devicesByUser,
 ) {
-    const key = this._olmDevice.getOutboundGroupSessionKey(session.sessionId);
     const payload = {
         room_id: this._roomId,
         session_id: session.sessionId,
+        algorithm: olmlib.MEGOLM_ALGORITHM,
+        session_key: this._olmDevice.deviceCurve25519Key,
     };
 
     const userDeviceMaps = this._splitBlockedDevices(
@@ -822,19 +824,19 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
 
             if (userDevices[deviceId].isBlocked() ||
                 (userDevices[deviceId].isUnverified() && isBlacklisting)
-               ) {
+            ) {
                 if (!blocked[userId]) {
                     blocked[userId] = {};
                 }
                 const blockedInfo = userDevices[deviceId].isBlocked()
-                      ? {
-                          code: "m.blacklisted",
-                          reason: "You have been blocked",
-                      }
-                      : {
-                          code: "m.unverified",
-                          reason: "You have not been verified",
-                      }
+                    ? {
+                        code: "m.blacklisted",
+                        reason: "You have been blocked",
+                    }
+                    : {
+                        code: "m.unverified",
+                        reason: "You have not been verified",
+                    };
                 blockedInfo.deviceInfo = userDevices[deviceId];
                 blocked[userId][deviceId] = blockedInfo;
                 delete userDevices[deviceId];
@@ -1117,15 +1119,14 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
 MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
     const content = event.getContent();
     const sessionId = content.session_id;
-    let senderKey = event.getSenderKey();
+    const senderKey = content.sender_key || event.getSenderKey();
 
     if (!senderKey) {
-        // FIXME:
-        senderKey = content.sender_key;
+        logger.error("key withheld event is missing fields");
     }
 
     await this._olmDevice.addInboundGroupSessionWithheld(
-        content.room_id, senderKey, sessionId, content.code, content.reason
+        content.room_id, senderKey, sessionId, content.code, content.reason,
     );
 };
 
