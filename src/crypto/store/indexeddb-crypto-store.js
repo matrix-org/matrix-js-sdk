@@ -471,7 +471,9 @@ export default class IndexedDBCryptoStore {
         });
     }
 
-    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
         this._backendPromise.then(backend => {
             backend.storeEndToEndInboundGroupSessionWithheld(
                 senderCurve25519Key, sessionId, sessionData, txn,

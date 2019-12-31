@@ -79,7 +79,7 @@ export class Backend {
                     `enqueueing key request for ${requestBody.room_id} / ` +
                         requestBody.session_id,
                 );
-                txn.oncomplete = () => { resolve(request); };
+                txn.oncomplete = () => {resolve(request);};
                 const store = txn.objectStore("outgoingRoomKeyRequests");
                 store.add(request);
             });
@@ -438,7 +438,7 @@ export class Backend {
                     } else {
                         resolve(null);
                     }
-                }
+                };
             }),
             new Promise((resolve, reject) => {
                 const objectStore = txn.objectStore("inbound_group_sessions_withheld");
@@ -449,7 +449,7 @@ export class Backend {
                     } else {
                         resolve(null);
                     }
-                }
+                };
             }),
         ]);
         try {
@@ -515,7 +515,9 @@ export class Backend {
         });
     }
 
-    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
         const objectStore = txn.objectStore("inbound_group_sessions_withheld");
         objectStore.put({
             senderCurve25519Key, sessionId, session: sessionData,

@@ -361,6 +361,7 @@ describe("MegolmDecryption", function() {
             bobClient1.initCrypto(),
             bobClient2.initCrypto(),
         ]);
+        const aliceDevice = aliceClient._crypto._olmDevice;
         const bobDevice1 = bobClient1._crypto._olmDevice;
         const bobDevice2 = bobClient2._crypto._olmDevice;
 
@@ -415,14 +416,18 @@ describe("MegolmDecryption", function() {
             expect(contentMap).toStrictEqual({
                 '@bob:example.com': {
                     bobdevice1: {
+                        algorithm: "m.megolm.v1.aes-sha2",
                         room_id: roomId,
                         code: 'm.unverified',
                         reason: 'You have not been verified',
+                        sender_key: aliceDevice.deviceCurve25519Key,
                     },
                     bobdevice2: {
+                        algorithm: "m.megolm.v1.aes-sha2",
                         room_id: roomId,
                         code: 'm.blacklisted',
                         reason: 'You have been blocked',
+                        sender_key: aliceDevice.deviceCurve25519Key,
                     },
                 },
             });

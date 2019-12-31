@@ -177,6 +177,7 @@ utils.inherits(MegolmEncryption, base.EncryptionAlgorithm);
  * @private
  *
  * @param {Object} devicesInRoom The devices in this room, indexed by user ID
+ * @param {Object} blocked The devices that are blocked, indexed by user ID
  *
  * @return {module:client.Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
@@ -416,8 +417,6 @@ MegolmEncryption.prototype._splitBlockedDevices = function(
         const userBlockedDevicesToShareWith = devicesByUser[userId];
 
         for (const blockedInfo of userBlockedDevicesToShareWith) {
-            const deviceInfo = blockedInfo.deviceInfo;
-
             if (currentSlice.length > maxToDeviceMessagesPerRequest) {
                 // the current slice is filled up. Start inserting into the next slice
                 currentSlice = [];
@@ -521,7 +520,7 @@ MegolmEncryption.prototype._sendBlockedNotificationsToDevices = async function(
         contentMap[userId][deviceId] = message;
     }
 
-    await this._baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap)
+    await this._baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap);
 
     // store that we successfully uploaded the keys of the current slice
     for (const userId of Object.keys(contentMap)) {
@@ -672,7 +671,7 @@ MegolmEncryption.prototype._notifyBlockedDevices = async function(
         room_id: this._roomId,
         session_id: session.sessionId,
         algorithm: olmlib.MEGOLM_ALGORITHM,
-        session_key: this._olmDevice.deviceCurve25519Key,
+        sender_key: this._olmDevice.deviceCurve25519Key,
     };
 
     const userDeviceMaps = this._splitBlockedDevices(

@@ -311,8 +311,11 @@ export default class MemoryCryptoStore {
         this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
     }
 
-    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
-        this._inboundGroupSessionsWithheld[senderCurve25519Key+'/'+sessionId] = sessionData;
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
+        const k = senderCurve25519Key+'/'+sessionId;
+        this._inboundGroupSessionsWithheld[k] = sessionData;
     }
 
     // Device Data
