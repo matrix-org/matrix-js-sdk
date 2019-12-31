@@ -181,7 +181,9 @@ export default class LocalStorageCryptoStore extends MemoryCryptoStore {
         );
     }
 
-    storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn) {
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
         setJsonItem(
             this.store,
             keyEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId),
