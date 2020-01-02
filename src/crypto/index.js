@@ -2416,12 +2416,13 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
  * Handle a key withheld event
  *
  * @private
- * @param {module:models/event.MatrixEvent} event key event
+ * @param {module:models/event.MatrixEvent} event key withheld event
  */
 Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
     const content = event.getContent();
 
-    if (!content.room_id || !content.session_id || !content.algorithm) {
+    if (!content.room_id || !content.session_id || !content.algorithm
+        || !content.sender_key) {
         logger.error("key withheld event is missing fields");
         return;
     }

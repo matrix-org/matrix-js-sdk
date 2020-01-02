@@ -1148,15 +1148,10 @@ MegolmDecryption.prototype.onRoomKeyEvent = function(event) {
  */
 MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
     const content = event.getContent();
-    const sessionId = content.session_id;
-    const senderKey = content.sender_key || event.getSenderKey();
-
-    if (!senderKey) {
-        logger.error("key withheld event is missing fields");
-    }
 
     await this._olmDevice.addInboundGroupSessionWithheld(
-        content.room_id, senderKey, sessionId, content.code, content.reason,
+        content.room_id, content.sender_key, content.session_id, content.code,
+        content.reason,
     );
 };
 
