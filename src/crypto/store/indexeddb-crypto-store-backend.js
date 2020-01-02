@@ -427,36 +427,42 @@ export class Backend {
 
     // Inbound group sessions
 
-    async getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        const [session, withheld] = await Promise.all([
-            new Promise((resolve, reject) => {
-                const objectStore = txn.objectStore("inbound_group_sessions");
-                const getReq = objectStore.get([senderCurve25519Key, sessionId]);
-                getReq.onsuccess = function() {
-                    if (getReq.result) {
-                        resolve(getReq.result.session);
-                    } else {
-                        resolve(null);
-                    }
-                };
-            }),
-            new Promise((resolve, reject) => {
-                const objectStore = txn.objectStore("inbound_group_sessions_withheld");
-                const getReq = objectStore.get([senderCurve25519Key, sessionId]);
-                getReq.onsuccess = function() {
-                    if (getReq.result) {
-                        resolve(getReq.result.session);
-                    } else {
-                        resolve(null);
-                    }
-                };
-            }),
-        ]);
-        try {
-            func(session, withheld);
-        } catch (e) {
-            abortWithException(txn, e);
-        }
+    getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        let session = false;
+        let withheld = false;
+        const objectStore = txn.objectStore("inbound_group_sessions");
+        const getReq = objectStore.get([senderCurve25519Key, sessionId]);
+        getReq.onsuccess = function() {
+            try {
+                if (getReq.result) {
+                    session = getReq.result.session;
+                } else {
+                    session = null;
+                }
+                if (withheld !== false) {
+                    func(session, withheld);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+
+        const withheldObjectStore = txn.objectStore("inbound_group_sessions_withheld");
+        const withheldGetReq = withheldObjectStore.get([senderCurve25519Key, sessionId]);
+        withheldGetReq.onsuccess = function() {
+            try {
+                if (withheldGetReq.result) {
+                    withheld = withheldGetReq.result.session;
+                } else {
+                    withheld = null;
+                }
+                if (session !== false) {
+                    func(session, withheld);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
     }
 
     getAllEndToEndInboundGroupSessions(txn, func) {

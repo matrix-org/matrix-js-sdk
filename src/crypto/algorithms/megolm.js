@@ -903,6 +903,11 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             event.getId(), event.getTs(),
         );
     } catch (e) {
+        if (e.name === "DecryptionError") {
+            // re-throw decryption errors as-is
+            throw e;
+        }
+
         let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
 
         if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {

@@ -18,6 +18,8 @@ limitations under the License.
 import logger from '../logger';
 import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
 
+import algorithms from './algorithms';
+
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
 const MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
@@ -859,7 +861,10 @@ OlmDevice.prototype.addInboundGroupSession = async function(
     exportFormat,
 ) {
     await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             /* if we already have this session, consider updating it */
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn,
@@ -917,11 +922,20 @@ OlmDevice.prototype.addInboundGroupSession = async function(
 OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
     roomId, senderKey, sessionId, code, reason,
 ) {
-    this._cryptoStore.storeEndToEndInboundGroupSessionWithheld(senderKey, sessionId, {
-        room_id: roomId,
-        code: code,
-        reason: reason,
-    });
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD],
+        (txn) => {
+            this._cryptoStore.storeEndToEndInboundGroupSessionWithheld(
+                senderKey, sessionId,
+                {
+                    room_id: roomId,
+                    code: code,
+                    reason: reason,
+                },
+                txn,
+            );
+        },
+    );
 };
 
 const WITHHELD_MESSAGES = {
@@ -961,14 +975,28 @@ OlmDevice.prototype.decryptGroupMessage = async function(
     roomId, senderKey, sessionId, body, eventId, timestamp,
 ) {
     let result;
+    // when the localstorage crypto store is used as an indexeddb backend,
+    // exceptions thrown from within the inner function are not passed through
+    // to the top level, so we store exceptions in a variable and raise them at
+    // the end
+    let error;
 
     await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null) {
                         if (withheld) {
-                            throw new Error(_calculateWithheldMessage(withheld));
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
                         }
                         result = null;
                         return;
@@ -978,9 +1006,15 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                         res = session.decrypt(body);
                     } catch (e) {
                         if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
-                            throw new Error(_calculateWithheldMessage(withheld));
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
                         } else {
-                            throw e;
+                            error = e;
                         }
                     }
 
@@ -1004,7 +1038,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                                 msgInfo.id !== eventId ||
                                 msgInfo.timestamp !== timestamp
                             ) {
-                                throw new Error(
+                                error = new Error(
                                     "Duplicate message index, possible replay attack: " +
                                     messageIndexKey,
                                 );
@@ -1033,6 +1067,9 @@ OlmDevice.prototype.decryptGroupMessage = async function(
         },
     );
 
+    if (error) {
+        throw error;
+    }
     return result;
 };
 
@@ -1048,7 +1085,10 @@ OlmDevice.prototype.decryptGroupMessage = async function(
 OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
     let result;
     await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._cryptoStore.getEndToEndInboundGroupSession(
                 senderKey, sessionId, txn, (sessionData) => {
                     if (sessionData === null) {
@@ -1099,7 +1139,10 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
 ) {
     let result;
     await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn, (session, sessionData) => {
                     if (session === null) {

@@ -2371,7 +2371,7 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
-        } else if (event.getType() === "m.room_key.withheld") {
+        } else if (event.getType() === "org.matrix.room_key.withheld") {
             this._onRoomKeyWithheldEvent(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);

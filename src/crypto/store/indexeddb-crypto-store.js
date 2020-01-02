@@ -104,7 +104,10 @@ export default class IndexedDBCryptoStore {
             // we can fall back to a different backend.
             return backend.doTxn(
                 'readonly',
-                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                [
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                ],
                 (txn) => {
                     backend.getEndToEndInboundGroupSession('', '', txn, () => {});
                 }).then(() => {
