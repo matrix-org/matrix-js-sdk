@@ -919,6 +919,15 @@ OlmDevice.prototype.addInboundGroupSession = async function(
     );
 };
 
+/**
+ * Record in the data store why an inbound group session was withheld.
+ *
+ * @param {string} roomId     room that the session belongs to
+ * @param {string} senderKey  base64-encoded curve25519 key of the sender
+ * @param {string} sessionId  session identifier
+ * @param {string} code       reason code
+ * @param {string} reason     human-readable version of `code`
+ */
 OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
     roomId, senderKey, sessionId, code, reason,
 ) {
@@ -945,6 +954,15 @@ const WITHHELD_MESSAGES = {
     "m.no_olm": "Unable to establish a secure channel",
 };
 
+/**
+ * Calculate the message to use for the exception when a session key is withheld.
+ *
+ * @param {object} withheld  An object that describes why the key was withheld.
+ *
+ * @return {string} the message
+ *
+ * @private
+ */
 function _calculateWithheldMessage(withheld) {
     if (withheld.code && withheld.code in WITHHELD_MESSAGES) {
         return WITHHELD_MESSAGES[withheld.code];

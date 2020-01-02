@@ -404,9 +404,14 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
     return mapSlices;
 };
 
-MegolmEncryption.prototype._splitBlockedDevices = function(
-    session, devicesByUser,
-) {
+/**
+ * @private
+ *
+ * @param {object} devicesByUser map from userid to list of devices
+ *
+ * @return {array<array<object>>} the blocked devices, split into chunks
+ */
+MegolmEncryption.prototype._splitBlockedDevices = function(devicesByUser) {
     const maxToDeviceMessagesPerRequest = 20;
 
     // use an array where the slices of a content map gets stored
@@ -499,6 +504,18 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     });
 };
 
+/**
+ * @private
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {array<object>} userDeviceMap list of blocked devices to notify
+ *
+ * @param {object} payload fields to include in the notification payload
+ *
+ * @return {module:client.Promise} Promise which resolves once the notifications
+ *     for the given userDeviceMap is generated and has been sent.
+ */
 MegolmEncryption.prototype._sendBlockedNotificationsToDevices = async function(
     session, userDeviceMap, payload,
 ) {
@@ -664,6 +681,14 @@ MegolmEncryption.prototype._shareKeyWithDevices = async function(session, device
     }
 };
 
+/**
+ * Notify blocked devices that they have been blocked.
+ *
+ * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
+ *
+ * @param {object<string, object>} devicesByUser
+ *    map from userid to device ID to blocked data
+ */
 MegolmEncryption.prototype._notifyBlockedDevices = async function(
     session, devicesByUser,
 ) {
@@ -674,9 +699,7 @@ MegolmEncryption.prototype._notifyBlockedDevices = async function(
         sender_key: this._olmDevice.deviceCurve25519Key,
     };
 
-    const userDeviceMaps = this._splitBlockedDevices(
-        session, devicesByUser,
-    );
+    const userDeviceMaps = this._splitBlockedDevices(devicesByUser);
 
     for (let i = 0; i < userDeviceMaps.length; i++) {
         try {
@@ -786,8 +809,11 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  *
  * @param {module:models/room} room
  *
- * @return {module:client.Promise} Promise which resolves to a map
- *     from userId to deviceId to deviceInfo
+ * @return {module:client.Promise} Promise which resolves to an array whose
+ *     first element is a map from userId to deviceId to deviceInfo indicating
+ *     the devices that messages should be encrypted to, and whose second
+ *     element is a map from userId to deviceId to data indicating the devices
+ *     that are in the room but that have been blocked
  */
 MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
     const members = await room.getEncryptionTargetMembers();

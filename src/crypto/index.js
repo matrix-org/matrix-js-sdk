@@ -2412,6 +2412,12 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
     alg.onRoomKeyEvent(event);
 };
 
+/**
+ * Handle a key withheld event
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event key event
+ */
 Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
     const content = event.getContent();
 
