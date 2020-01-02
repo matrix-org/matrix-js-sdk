@@ -106,15 +106,14 @@ export class ToDeviceChannel {
             }
         }
 
-        return VerificationRequest.validateEvent(
-            type, event, ToDeviceChannel.getTimestamp(event), client);
+        return VerificationRequest.validateEvent(type, event, client);
     }
 
     /**
      * @param {MatrixEvent} event the event to get the timestamp of
      * @return {number} the timestamp when the event was sent
      */
-    static getTimestamp(event) {
+    getTimestamp(event) {
         const content = event.getContent();
         return content && content.timestamp;
     }
@@ -151,8 +150,7 @@ export class ToDeviceChannel {
         const wasStarted = request.phase === PHASE_STARTED ||
                            request.phase === PHASE_READY;
 
-        await request.handleEvent(
-            event.getType(), event, ToDeviceChannel.getTimestamp(event), isLiveEvent);
+        await request.handleEvent(event.getType(), event, isLiveEvent);
 
         const isStarted = request.phase === PHASE_STARTED ||
                           request.phase === PHASE_READY;

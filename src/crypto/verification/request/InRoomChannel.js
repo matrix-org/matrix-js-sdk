@@ -34,7 +34,7 @@ export class InRoomChannel {
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.
      * @param {string} userId id of user that the verification request is directed at, should be present in the room.
      */
-    constructor(client, roomId, userId) {
+    constructor(client, roomId, userId = null) {
         this._client = client;
         this._roomId = roomId;
         this.userId = userId;
@@ -58,7 +58,7 @@ export class InRoomChannel {
     static getOtherPartyUserId(event, client) {
         const type = InRoomChannel.getEventType(event);
         if (type !== REQUEST_TYPE) {
-            return;
+           return;
         }
         const ownUserId = client.getUserId();
         const sender = event.getSender();
@@ -67,7 +67,7 @@ export class InRoomChannel {
 
         // request is not sent by or directed at us
         if (sender !== ownUserId && receiver !== ownUserId) {
-            return;
+            return sender;
         }
         if (sender === ownUserId) {
             return receiver;
@@ -80,7 +80,7 @@ export class InRoomChannel {
      * @param {MatrixEvent} event the event to get the timestamp of
      * @return {number} the timestamp when the event was sent
      */
-    static getTimestamp(event) {
+    getTimestamp(event) {
         return event.getTs();
     }
 
@@ -134,13 +134,12 @@ export class InRoomChannel {
 
             // ignore requests that are not direct to or sent by the syncing user
             if (!InRoomChannel.getOtherPartyUserId(event, client)) {
-                console.log("InRoomChannel: validateEvent: not directed or sent by me", type, event.getSender(), content.to);
+                console.log("InRoomChannel: validateEvent: not directed to or sent by me", type, event.getSender(), content.to);
                 return false;
             }
         }
 
-        return VerificationRequest.validateEvent(
-            type, event, InRoomChannel.getTimestamp(event), client);
+        return VerificationRequest.validateEvent(type, event, client);
     }
 
     /**
@@ -179,6 +178,13 @@ export class InRoomChannel {
         if (event.getRoomId() !== this._roomId) {
             return;
         }
+        // set userId if not set already
+        if (this.userId === null) {
+            const userId = InRoomChannel.getOtherPartyUserId(event, this._client);
+            if (userId) {
+                this.userId = userId;
+            }
+        }
         // ignore events not sent by us or the other party
         const ownUserId = this._client.getUserId();
         const sender = event.getSender();
@@ -187,11 +193,11 @@ export class InRoomChannel {
             return;
         }
         // set transactionId when receiving a .request
-        if (!this._requestEventId && type === REQUEST_TYPE) {
+        if (this._requestEventId === null && type === REQUEST_TYPE) {
             this._requestEventId = event.getId();
         }
 
-        return await request.handleEvent(type, event, InRoomChannel.getTimestamp(event), isLiveEvent);
+        return await request.handleEvent(type, event, isLiveEvent);
     }
 
     /**
@@ -281,7 +287,7 @@ export class InRoomRequests {
     getRequest(event) {
         const roomId = event.getRoomId();
         const txnId = InRoomChannel.getTransactionId(event);
-        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
+//        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             return requestsByTxnId.get(txnId);

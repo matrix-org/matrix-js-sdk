@@ -2465,7 +2465,9 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  * @param {bool} removed not used
  * @param {bool} data.liveEvent whether this is a live event
  */
-Crypto.prototype._onTimelineEvent = function(event, room, atStart, removed, {liveEvent} = {}) {
+Crypto.prototype._onTimelineEvent = function(
+    event, room, atStart, removed, {liveEvent} = {},
+) {
     // TODO: we still need a request object for past requests, so we can show it in the timeline
     // validation now excludes old requests
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
@@ -2477,18 +2479,9 @@ Crypto.prototype._onTimelineEvent = function(event, room, atStart, removed, {liv
         console.log(`Crypto: _onTimelineEvent YESVALID ${InRoomChannel.getTransactionId(event)}, ${event.getType()}, ${event.getSender()} liveEvent=${liveEvent}`);
     }
     const createRequest = event => {
-        if (!InRoomChannel.canCreateRequest(InRoomChannel.getEventType(event))) {
-            return;
-        }
-        const otherPartyUserId =
-            InRoomChannel.getOtherPartyUserId(event, this._baseApis);
-        if (!otherPartyUserId) {
-            return;
-        }
         const channel = new InRoomChannel(
             this._baseApis,
             event.getRoomId(),
-            otherPartyUserId,
         );
         return new VerificationRequest(
             channel, this._verificationMethods, this._baseApis);
@@ -2530,8 +2523,14 @@ Crypto.prototype._handleVerificationEvent = async function(
     console.log("Crypto: _handleVerificationEvent: done handling a request", isNewRequest, request.pending, request.phase, request.initiatedByMe);
     if (!request.pending) {
         requestsMap.removeRequest(event);
-    } else if (isNewRequest && !request.initiatedByMe) {
-        this._baseApis.emit("crypto.verification.request", request);
+    } else {
+        const shouldEmit = isNewRequest &&
+                           !request.initiatedByMe &&
+                           request.requested &&
+                           !request.observeOnly;
+        if (shouldEmit) {
+            this._baseApis.emit("crypto.verification.request", request);
+        }
     }
 };
 
