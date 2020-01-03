@@ -588,8 +588,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
 
 /**
  * Run various follow-up actions after cross-signing keys have changed locally
- * (either by resetting the keys for the account or bye getting them from secret
- * storaoge), such as signing the current device, upgrading device
+ * (either by resetting the keys for the account or by getting them from secret
+ * storage), such as signing the current device, upgrading device
  * verifications, etc.
  */
 Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
