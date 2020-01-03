@@ -419,14 +419,15 @@ describe("MegolmDecryption", function() {
                         algorithm: "m.megolm.v1.aes-sha2",
                         room_id: roomId,
                         code: 'm.unverified',
-                        reason: 'You have not been verified',
+                        reason:
+                        'The sender has disabled encrypting to unverified devices.',
                         sender_key: aliceDevice.deviceCurve25519Key,
                     },
                     bobdevice2: {
                         algorithm: "m.megolm.v1.aes-sha2",
                         room_id: roomId,
                         code: 'm.blacklisted',
-                        reason: 'You have been blocked',
+                        reason: 'The sender has blocked you.',
                         sender_key: aliceDevice.deviceCurve25519Key,
                     },
                 },
@@ -480,7 +481,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -492,6 +493,6 @@ describe("MegolmDecryption", function() {
                 sender_key: bobDevice.deviceCurve25519Key,
                 session_id: "session_id",
             },
-        }))).rejects.toThrow("You have been blocked");
+        }))).rejects.toThrow("The sender has blocked you.");
     });
 });

@@ -1,7 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2018 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ import logger from '../../logger';
 const utils = require("../../utils");
 const olmlib = require("../olmlib");
 const base = require("./base");
+
+import {WITHHELD_MESSAGES} from '../OlmDevice';
 
 /**
  * @private
@@ -856,11 +858,11 @@ MegolmEncryption.prototype._getDevicesInRoom = async function(room) {
                 const blockedInfo = userDevices[deviceId].isBlocked()
                     ? {
                         code: "m.blacklisted",
-                        reason: "You have been blocked",
+                        reason: WITHHELD_MESSAGES["m.blacklisted"],
                     }
                     : {
                         code: "m.unverified",
-                        reason: "You have not been verified",
+                        reason: WITHHELD_MESSAGES["m.unverified"],
                     };
                 blockedInfo.deviceInfo = userDevices[deviceId];
                 blocked[userId][deviceId] = blockedInfo;

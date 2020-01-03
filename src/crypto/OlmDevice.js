@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017, 2019 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -947,11 +948,11 @@ OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
     );
 };
 
-const WITHHELD_MESSAGES = {
-    "m.unverified": "You have not been verified",
-    "m.blacklisted": "You have been blocked",
-    "m.unauthorised": "You are not authorised to read the message",
-    "m.no_olm": "Unable to establish a secure channel",
+export const WITHHELD_MESSAGES = {
+    "m.unverified": "The sender has disabled encrypting to unverified devices.",
+    "m.blacklisted": "The sender has blocked you.",
+    "m.unauthorised": "You are not authorised to read the message.",
+    "m.no_olm": "Unable to establish a secure channel.",
 };
 
 /**
