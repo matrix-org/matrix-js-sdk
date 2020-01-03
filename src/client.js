@@ -1505,7 +1505,10 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
     // favour of just signing with the cross-singing master key.
     await this._crypto._signObject(data.auth_data);
 
-    if (this._cryptoCallbacks.getSecretStorageKey && this._crypto._crossSigningInfo.getId()) {
+    if (
+        this._cryptoCallbacks.getSecretStorageKey &&
+        this._crypto._crossSigningInfo.getId()
+    ) {
         // now also sign the auth data with the cross-signing master key
         // we check for the callback explicitly here because we still want to be able
         // to create an un-cross-signed key backup if there is a cross-signing key but
