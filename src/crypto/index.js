@@ -2517,7 +2517,7 @@ Crypto.prototype._handleVerificationEvent = async function(
     }
     const shouldEmit = isNewRequest &&
                        !request.initiatedByMe &&
-                       request.requested && // check it is in requested phase
+                       !request.invalid && // check it has enough events to pass the UNSENT stage
                        !request.observeOnly;
     if (shouldEmit) {
         this._baseApis.emit("crypto.verification.request", request);
