@@ -46,6 +46,10 @@ export class InRoomChannel {
         return true;
     }
 
+    get receiveStartFromOtherDevices() {
+        return true;
+    }
+
     get roomId() {
         return this._roomId;
     }

@@ -378,18 +378,16 @@ export default class VerificationRequest extends EventEmitter {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
         if (requestEvent) {
             transitions.push({phase: PHASE_REQUESTED, event: requestEvent});
-        } else {
-            return transitions;
         }
 
         const readyEvent =
-            this._getEventByOther(READY_TYPE, requestEvent.getSender());
-        if (readyEvent) {
+            requestEvent && this._getEventByOther(READY_TYPE, requestEvent.getSender());
+        if (readyEvent && phase() === PHASE_REQUESTED) {
             transitions.push({phase: PHASE_READY, event: readyEvent});
         }
 
-        const startEvent = readyEvent ?
-            this._getEventByEither(START_TYPE) : // any party can send .start after a .ready
+        const startEvent = readyEvent || !requestEvent ?
+            this._getEventByEither(START_TYPE) : // any party can send .start after a .ready or unsent
             this._getEventByOther(START_TYPE, requestEvent.getSender());
         if (startEvent) {
             const fromRequestPhase = phase() === PHASE_REQUESTED &&
@@ -433,8 +431,11 @@ export default class VerificationRequest extends EventEmitter {
                 phase === PHASE_STARTED ||
                 phase === PHASE_READY
             ) {
-                // if requested by one of my other devices
-                if (this._wasSentByOwnUser(event) && !this._wasSentByOwnDevice(event)) {
+                if (
+                    this.channel.receiveStartFromOtherDevices &&
+                    this._wasSentByOwnUser(event) &&
+                    !this._wasSentByOwnDevice(event)
+                ) {
                     this._observeOnly = true;
                 }
             }
