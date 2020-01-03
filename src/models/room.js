@@ -1069,10 +1069,11 @@ Room.prototype.removeFilteredTimelineSet = function(filter) {
  *
  * @param {MatrixEvent} event Event to be added
  * @param {string?} duplicateStrategy 'ignore' or 'replace'
+ * @param {boolean} fromCache whether the sync response came from cache
  * @fires module:client~MatrixClient#event:"Room.timeline"
  * @private
  */
-Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
+Room.prototype._addLiveEvent = function(event, duplicateStrategy, fromCache) {
     if (event.isRedaction()) {
         const redactId = event.event.redacts;
 
@@ -1119,7 +1120,7 @@ Room.prototype._addLiveEvent = function(event, duplicateStrategy) {
 
     // add to our timeline sets
     for (let i = 0; i < this._timelineSets.length; i++) {
-        this._timelineSets[i].addLiveEvent(event, duplicateStrategy);
+        this._timelineSets[i].addLiveEvent(event, duplicateStrategy, fromCache);
     }
 
     // synthesize and inject implicit read receipts
@@ -1429,9 +1430,10 @@ Room.prototype._revertRedactionLocalEcho = function(redactionEvent) {
  * this function will be ignored entirely, preserving the existing event in the
  * timeline. Events are identical based on their event ID <b>only</b>.
  *
+ * @param {boolean} fromCache whether the sync response came from cache
  * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
  */
-Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
+Room.prototype.addLiveEvents = function(events, duplicateStrategy, fromCache) {
     let i;
     if (duplicateStrategy && ["replace", "ignore"].indexOf(duplicateStrategy) === -1) {
         throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
@@ -1457,7 +1459,7 @@ Room.prototype.addLiveEvents = function(events, duplicateStrategy) {
     for (i = 0; i < events.length; i++) {
         // TODO: We should have a filter to say "only add state event
         // types X Y Z to the timeline".
-        this._addLiveEvent(events[i], duplicateStrategy);
+        this._addLiveEvent(events[i], duplicateStrategy, fromCache);
     }
 };
 
