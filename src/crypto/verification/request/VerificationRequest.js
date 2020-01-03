@@ -67,6 +67,7 @@ export default class VerificationRequest extends EventEmitter {
         this._eventsByUs = new Map();
         this._eventsByThem = new Map();
         this._observeOnly = false;
+        this._timeoutTimer = null;
     }
 
     /**
@@ -105,19 +106,6 @@ export default class VerificationRequest extends EventEmitter {
             }
         }
 
-        // // a timestamp is not provided on all to_device events
-        // if (Number.isFinite(timestamp)) {
-        //     const elapsed = Date.now() - timestamp;
-        //     // ignore if event is too far in the past or too far in the future
-        //     if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
-        //         elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)
-        //     ) {
-        //         console.log("VerificationRequest: validateEvent: verification event to far in future or past", type, elapsed);
-        //         logger.log("received verification that is too old or from the future");
-        //         return false;
-        //     }
-        // }
-
         return true;
     }
 
@@ -155,10 +143,14 @@ export default class VerificationRequest extends EventEmitter {
         return this._commonMethods;
     }
 
-    /** the timeout of the request, provided for compatibility with previous verification code */
+    /** the current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
-        const elapsed = Date.now() - this._startTimestamp;
-        return Math.max(0, VERIFICATION_REQUEST_TIMEOUT - elapsed);
+        const requestEvent = this._getEventByEither(REQUEST_TYPE);
+        if (requestEvent) {
+            const elapsed = Date.now() - this.channel.getTimestamp(requestEvent);
+            return Math.max(0, VERIFICATION_REQUEST_TIMEOUT - elapsed);
+        }
+        return 0;
     }
 
     /** the m.key.verification.request event that started this request, provided for compatibility with previous verification code */
@@ -260,7 +252,6 @@ export default class VerificationRequest extends EventEmitter {
      * @returns {VerifierBase} the verifier of the given method
      */
     beginKeyVerification(method, targetDevice = null) {
-        console.log("beginKeyVerification " + this._observeOnly);
         // need to allow also when unsent in case of to_device
         if (!this.observeOnly && !this._verifier) {
             const validStartPhase =
@@ -390,12 +381,6 @@ export default class VerificationRequest extends EventEmitter {
             return transitions;
         }
 
-        const cancelEvent = this._getEventByEither(CANCEL_TYPE);
-        if (cancelEvent) {
-            transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
-            return transitions;
-        }
-
         const readyEvent =
             this._getEventByOther(READY_TYPE, requestEvent.getSender());
         if (readyEvent) {
@@ -419,6 +404,12 @@ export default class VerificationRequest extends EventEmitter {
         const theirDoneEvent = this._eventsByThem.get(DONE_TYPE);
         if (ourDoneEvent && theirDoneEvent && phase() === PHASE_STARTED) {
             transitions.push({phase: PHASE_DONE});
+        }
+
+        const cancelEvent = this._getEventByEither(CANCEL_TYPE);
+        if (cancelEvent && phase() !== PHASE_DONE) {
+            transitions.push({phase: PHASE_CANCELLED, event: cancelEvent});
+            return transitions;
         }
 
         return transitions;
@@ -464,21 +455,23 @@ export default class VerificationRequest extends EventEmitter {
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
     async handleEvent(type, event, isLiveEvent) {
-        // don't send out events for historical requests
-        if (!isLiveEvent) {
-            this._observeOnly = true;
+        // if reached phase cancelled or done, ignore anything else that comes
+        if (!this.pending) {
+            return;
         }
-        // TODO: check if event is too old/far into the future?, set this._observeOnly
 
-        const sender = event.getSender();
-        const isOurs = sender === this._client.getUserId();
-        const isTheirs = sender === this.otherUserId;
+        this._adjustObserveOnly(event, isLiveEvent);
 
-        if (isOurs) {
-            this._eventsByUs.set(type, event);
-        } else if (isTheirs) {
-            this._eventsByThem.set(type, event);
+        if (!this.observeOnly) {
+            const sentByMe = this._wasSentByOwnUser(event);
+            if (!sentByMe) {
+                if (await this._cancelOnError(type, event)) {
+                    return;
+                }
+            }
         }
+
+        this._addEvent(type, event);
 
         const transitions = this._calculatePhaseTransitions();
         const existingIdx = transitions.findIndex(t => t.phase === this.phase);
@@ -490,7 +483,7 @@ export default class VerificationRequest extends EventEmitter {
         }
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && sender === this.otherUserId) {
+        if (this._verifier && event.getSender() === this.otherUserId) {
             if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
@@ -499,28 +492,98 @@ export default class VerificationRequest extends EventEmitter {
 
         if (newTransitions.length) {
             const lastTransition = newTransitions[newTransitions.length - 1];
-            this._setPhase(lastTransition.phase);
+            const {phase} = lastTransition;
+
+            this._setupTimeout(phase);
+            // set phase as last thing as this emits the "change" event
+            this._setPhase(phase);
         }
+    }
 
-        /*
-        // .request && .ready
-if (!this.observeOnly && this._phase !== PHASE_REQUESTED) {
-            logger.warn("Cancelling, unexpected .request verification event from " +
-                event.getSender());
-            await this.cancel(errorFromEvent(newUnexpectedMessageError()));
+    _setupTimeout(phase) {
+        const shouldTimeout = !this._timeoutTimer && !this.observeOnly &&
+            phase === PHASE_REQUESTED && this.initiatedByMe;
+
+        if (shouldTimeout) {
+            this._timeoutTimer = setInterval(this._cancelOnTimeout, this.timeout);
         }
-
-
-        cancel on handle unexpected events (only if !this.observeOnly):
-        const sentByMe = this._wasSentByOwnDevice(event);
-            if (!sentByMe && !this._verificationMethods.has(method)) {
-                await this.cancel(errorFromEvent(newUnknownMethodError()));
-                return;
+        if (this._timeoutTimer) {
+            const shouldClear = phase === PHASE_STARTED ||
+                phase === PHASE_READY ||
+                phase === PHASE_DONE ||
+                phase === PHASE_CANCELLED;
+            if (shouldClear) {
+                clearInterval(this._timeoutTimer);
+                this._timeoutTimer = null;
             }
-        */
+        }
+    }
 
-        const url = `http://localhost:8080/#/room/${encodeURIComponent(event.getRoomId())}/${encodeURIComponent(event.getId())}`;
-        console.log("VerificationRequest: handleEvent", isLiveEvent, url, event);
+    _cancelOnTimeout = () => {
+        try {
+            this.cancel({reason: "Other party didn't accept in time", code: "m.timeout"});
+        } catch (err) {
+            console.error("Error while cancelling verification request", err);
+        }
+    };
+
+    async _cancelOnError(type, event) {
+        if (type === START_TYPE) {
+            const method = event.getContent().method;
+            if (!this._verificationMethods.has(method)) {
+                await this.cancel(errorFromEvent(newUnknownMethodError()));
+                return true;
+            }
+        }
+
+        const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
+        const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
+        if (isUnexpectedRequest || isUnexpectedReady) {
+            logger.warn(`Cancelling, unexpected ${type} verification ` +
+                `event from ${event.getSender()}`);
+            const reason = `Unexpected ${type} event in phase ${this.phase}`;
+            await this.cancel(errorFromEvent(newUnexpectedMessageError({reason})));
+            return true;
+        }
+        return false;
+    }
+
+    _adjustObserveOnly(event, isLiveEvent) {
+        // don't send out events for historical requests
+        if (!isLiveEvent) {
+            this._observeOnly = true;
+        }
+        // a timestamp is not provided on all to_device events
+        const timestamp = this.channel.getTimestamp(event);
+        if (Number.isFinite(timestamp)) {
+            const elapsed = Date.now() - timestamp;
+            // don't allow interaction on old requests
+            if (elapsed > (VERIFICATION_REQUEST_TIMEOUT - VERIFICATION_REQUEST_MARGIN) ||
+                elapsed < -(VERIFICATION_REQUEST_TIMEOUT / 2)
+            ) {
+                this._observeOnly = true;
+            }
+        }
+    }
+
+    _addEvent(type, event) {
+        // TODO: this won't work when verifying our own devices
+        // and we can't use _wasSentByOwnDevice as not every event has from_device.
+        if (this._wasSentByOwnUser(event)) {
+            this._eventsByUs.set(type, event);
+        } else {
+            this._eventsByThem.set(type, event);
+        }
+
+        // once we know the userId of the other party (from the .request event)
+        // see if any event by anyone else crept into this._eventsByThem
+        if (type === REQUEST_TYPE) {
+            for (const [type, event] of this._eventsByThem.entries()) {
+                if (event.getSender() !== this.otherUserId) {
+                    this._eventsByThem.delete(type);
+                }
+            }
+        }
     }
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
@@ -551,32 +614,6 @@ if (!this.observeOnly && this._phase !== PHASE_REQUESTED) {
             deviceId,
             startedByMe ? null : startEvent,
         );
-    }
-
-    _getVerifierTarget(startEvent, targetDevice) {
-        // targetDevice should be set when creating a verifier for to_device before the .start event has been sent,
-        // so the userId and deviceId are provided
-        if (targetDevice) {
-            return targetDevice;
-        } else {
-            let targetEvent;
-            if (startEvent && !this._wasSentByOwnDevice(startEvent)) {
-                targetEvent = startEvent;
-            } else if (this._readyEvent && !this._wasSentByOwnDevice(this._readyEvent)) {
-                targetEvent = this._readyEvent;
-            } else if (this._requestEvent && !this._wasSentByOwnDevice(this._requestEvent)) {
-                targetEvent = this._requestEvent;
-            } else {
-                throw new Error(
-                    "can't determine who the verifier should be targeted at. " +
-                    "No .request or .start event and no targetDevice");
-            }
-            // TODO: could be replaced by otherUserId
-            const userId = targetEvent.getSender();
-            const content = targetEvent.getContent();
-            const deviceId = content && content.from_device;
-            return {userId, deviceId};
-        }
     }
 
     _wasSentByOwnUser(event) {

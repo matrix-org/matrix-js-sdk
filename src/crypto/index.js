@@ -2471,12 +2471,7 @@ Crypto.prototype._onTimelineEvent = function(
     // TODO: we still need a request object for past requests, so we can show it in the timeline
     // validation now excludes old requests
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
-        if (InRoomChannel.getTransactionId(event)) {
-            console.log(`Crypto: _onTimelineEvent NONVALID ${InRoomChannel.getTransactionId(event)}, ${event.getType()}, ${event.getSender()} liveEvent=${liveEvent}`);
-        }
         return;
-    } else {
-        console.log(`Crypto: _onTimelineEvent YESVALID ${InRoomChannel.getTransactionId(event)}, ${event.getType()}, ${event.getSender()} liveEvent=${liveEvent}`);
     }
     const createRequest = event => {
         const channel = new InRoomChannel(
@@ -2520,17 +2515,12 @@ Crypto.prototype._handleVerificationEvent = async function(
     } catch (err) {
         console.error("error while handling verification event", event, err);
     }
-    console.log("Crypto: _handleVerificationEvent: done handling a request", isNewRequest, request.pending, request.phase, request.initiatedByMe);
-    if (!request.pending) {
-        requestsMap.removeRequest(event);
-    } else {
-        const shouldEmit = isNewRequest &&
-                           !request.initiatedByMe &&
-                           request.requested &&
-                           !request.observeOnly;
-        if (shouldEmit) {
-            this._baseApis.emit("crypto.verification.request", request);
-        }
+    const shouldEmit = isNewRequest &&
+                       !request.initiatedByMe &&
+                       request.requested && // check it is in requested phase
+                       !request.observeOnly;
+    if (shouldEmit) {
+        this._baseApis.emit("crypto.verification.request", request);
     }
 };
 
