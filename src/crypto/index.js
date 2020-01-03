@@ -1068,6 +1068,9 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         );
         if (device) {
             sigInfo.device = device;
+            sigInfo.deviceTrust = await this.checkDeviceTrust(
+                this._userId, sigInfo.deviceId,
+            );
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
@@ -1095,7 +1098,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     ret.usable = ret.sigs.some((s) => {
         return (
             s.valid && (
-                (s.device && s.device.isVerified()) ||
+                (s.device && s.deviceTrust.isVerified()) ||
                 (s.crossSigningId)
             )
         );
