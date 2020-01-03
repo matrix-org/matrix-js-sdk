@@ -88,10 +88,12 @@ export class ToDeviceChannel {
         }
         const content = event.getContent();
         if (!content) {
+            logger.warn("ToDeviceChannel.validateEvent: invalid: no content");
             return false;
         }
 
         if (!content.transaction_id) {
+            logger.warn("ToDeviceChannel.validateEvent: invalid: no transaction_id");
             return false;
         }
 
@@ -99,6 +101,7 @@ export class ToDeviceChannel {
 
         if (type === REQUEST_TYPE) {
             if (!Number.isFinite(content.timestamp)) {
+                logger.warn("ToDeviceChannel.validateEvent: invalid: no timestamp");
                 return false;
             }
             if (event.getSender() === client.getUserId() &&
@@ -106,6 +109,7 @@ export class ToDeviceChannel {
             ) {
                 // ignore requests from ourselves, because it doesn't make sense for a
                 // device to verify itself
+                logger.warn("ToDeviceChannel.validateEvent: invalid: from own device");
                 return false;
             }
         }
