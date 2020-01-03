@@ -198,7 +198,9 @@ export class InRoomChannel {
             this._requestEventId = InRoomChannel.getTransactionId(event);
         }
 
-        return await request.handleEvent(type, event, isLiveEvent);
+        const isRemoteEcho = !!event.getUnsigned().transaction_id;
+
+        return await request.handleEvent(type, event, isLiveEvent, isRemoteEcho);
     }
 
     /**

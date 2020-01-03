@@ -150,7 +150,7 @@ export class ToDeviceChannel {
         const wasStarted = request.phase === PHASE_STARTED ||
                            request.phase === PHASE_READY;
 
-        await request.handleEvent(event.getType(), event, isLiveEvent);
+        await request.handleEvent(event.getType(), event, isLiveEvent, false);
 
         const isStarted = request.phase === PHASE_STARTED ||
                           request.phase === PHASE_READY;

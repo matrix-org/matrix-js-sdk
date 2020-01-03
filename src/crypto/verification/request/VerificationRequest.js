@@ -452,9 +452,10 @@ export default class VerificationRequest extends EventEmitter {
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
      * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
      * @param {bool} isLiveEvent whether this is an even received through sync or not
+     * @param {bool} isRemoteEcho whether this is the remote echo of an event sent by the same device
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(type, event, isLiveEvent) {
+    async handleEvent(type, event, isLiveEvent, isRemoteEcho) {
         // if reached phase cancelled or done, ignore anything else that comes
         if (!this.pending) {
             return;
@@ -462,16 +463,13 @@ export default class VerificationRequest extends EventEmitter {
 
         this._adjustObserveOnly(event, isLiveEvent);
 
-        if (!this.observeOnly) {
-            const sentByMe = this._wasSentByOwnUser(event);
-            if (!sentByMe) {
-                if (await this._cancelOnError(type, event)) {
-                    return;
-                }
+        if (!this.observeOnly && !isRemoteEcho) {
+            if (await this._cancelOnError(type, event)) {
+                return;
             }
         }
 
-        this._addEvent(type, event);
+        this._addEvent(type, event, isRemoteEcho);
 
         const transitions = this._calculatePhaseTransitions();
         const existingIdx = transitions.findIndex(t => t.phase === this.phase);
@@ -483,7 +481,7 @@ export default class VerificationRequest extends EventEmitter {
         }
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && event.getSender() === this.otherUserId) {
+        if (this._verifier && !isRemoteEcho) {
             if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
@@ -566,10 +564,8 @@ export default class VerificationRequest extends EventEmitter {
         }
     }
 
-    _addEvent(type, event) {
-        // TODO: this won't work when verifying our own devices
-        // and we can't use _wasSentByOwnDevice as not every event has from_device.
-        if (this._wasSentByOwnUser(event)) {
+    _addEvent(type, event, isRemoteEcho) {
+        if (isRemoteEcho || this._wasSentByOwnDevice(event)) {
             this._eventsByUs.set(type, event);
         } else {
             this._eventsByThem.set(type, event);
