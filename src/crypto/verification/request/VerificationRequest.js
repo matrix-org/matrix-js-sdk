@@ -258,7 +258,7 @@ export default class VerificationRequest extends EventEmitter {
             const validStartPhase =
                 this.phase === PHASE_REQUESTED ||
                 this.phase === PHASE_READY ||
-                this.phase === (PHASE_UNSENT &&
+                (this.phase === PHASE_UNSENT &&
                     this.channel.constructor.canCreateRequest(START_TYPE));
             if (validStartPhase) {
                 // when called on a request that was initiated with .request event
