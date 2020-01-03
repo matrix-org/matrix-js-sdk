@@ -293,7 +293,7 @@ export class ToDeviceRequests {
     }
 
     setRequest(event, request) {
-        this.setBySenderAndTxnId(
+        this.setRequestBySenderAndTxnId(
             event.getSender(),
             ToDeviceChannel.getTransactionId(event),
             request,
@@ -301,7 +301,7 @@ export class ToDeviceRequests {
     }
 
     setRequestByChannel(channel, request) {
-        this.setBySenderAndTxnId(channel.userId, channel.transactionId, request);
+        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId, request);
     }
 
     setRequestBySenderAndTxnId(sender, txnId, request) {
