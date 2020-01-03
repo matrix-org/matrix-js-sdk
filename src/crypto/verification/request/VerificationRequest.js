@@ -60,6 +60,7 @@ export default class VerificationRequest extends EventEmitter {
     constructor(channel, verificationMethods, client) {
         super();
         this.channel = channel;
+        this.channel._request = this;
         this._verificationMethods = verificationMethods;
         this._client = client;
         this._commonMethods = [];

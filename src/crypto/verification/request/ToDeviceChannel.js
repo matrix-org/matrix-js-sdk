@@ -30,6 +30,10 @@ import {
     newUnexpectedMessageError,
     errorFromEvent,
 } from "../Error";
+
+const MatrixEvent = require("../../../models/event").MatrixEvent;
+
+
 /**
  * A key verification channel that sends verification events over to_device messages.
  * Generates its own transaction ids.
@@ -223,12 +227,27 @@ export class ToDeviceChannel {
      * @param {object} content
      * @returns {Promise} the promise of the request
      */
-    sendCompleted(type, content) {
+    async sendCompleted(type, content) {
+        let result;
         if (type === REQUEST_TYPE) {
-            return this._sendToDevices(type, content, this._devices);
+            result = await this._sendToDevices(type, content, this._devices);
         } else {
-            return this._sendToDevices(type, content, [this._deviceId]);
+            result = await this._sendToDevices(type, content, [this._deviceId]);
         }
+        // the VerificationRequest state machine requires remote echos of the event
+        // the client sends itself, so we fake this for to_device messages
+        const remoteEchoEvent = new MatrixEvent({
+            sender: this._client.getUserId(),
+            content,
+            type,
+        });
+        await this._request.handleEvent(
+            type,
+            remoteEchoEvent,
+            /*isLiveEvent=*/true,
+            /*isRemoteEcho=*/true,
+        );
+        return result;
     }
 
     _sendToDevices(type, content, devices) {
