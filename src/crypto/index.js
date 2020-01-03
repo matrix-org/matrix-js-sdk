@@ -218,7 +218,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
-    if (!cryptoCallbacks.getCrossSigningKey) {
+    if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {
         cryptoCallbacks.getCrossSigningKey = async (type) => {
             return CrossSigningInfo.getFromSecretStorage(type, this._secretStorage);
         };
