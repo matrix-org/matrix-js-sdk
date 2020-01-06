@@ -617,6 +617,9 @@ describe("megolm", function() {
             ).respond(200, {
                 event_id: '$event_id',
             });
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
+            ).respond(200, {});
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test'),
@@ -714,6 +717,9 @@ describe("megolm", function() {
                     event_id: '$event_id',
                 };
             });
+            aliceTestClient.httpBackend.when(
+                'PUT', '/sendToDevice/org.matrix.room_key.withheld/',
+            ).respond(200, {});
 
             return Promise.all([
                 aliceTestClient.client.sendTextMessage(ROOM_ID, 'test2'),

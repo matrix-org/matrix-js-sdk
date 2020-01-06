@@ -2,7 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -2408,6 +2408,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
+        } else if (event.getType() === "org.matrix.room_key.withheld") {
+            this._onRoomKeyWithheldEvent(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
@@ -2445,6 +2447,27 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+/**
+ * Handle a key withheld event
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event key withheld event
+ */
+Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
+    const content = event.getContent();
+
+    if (!content.room_id || !content.session_id || !content.algorithm
+        || !content.sender_key) {
+        logger.error("key withheld event is missing fields");
+        return;
+    }
+
+    const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
+    if (alg.onRoomKeyWithheldEvent) {
+        alg.onRoomKeyWithheldEvent(event);
+    }
 };
 
 /**
