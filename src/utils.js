@@ -675,7 +675,14 @@ module.exports.isNumber = function(value) {
 module.exports.removeHiddenChars = function(str) {
     return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
 };
-const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
+// Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
+// Includes:
+// various width spaces U+2000 - U+200D
+// LTR and RTL marks U+200E and U+200F
+// LTR/RTL and other directional formatting marks U+202A - U+202F
+// Combining characters U+0300 - U+036F
+// Zero width no-break space (BOM) U+FEFF
+const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
 
 function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
