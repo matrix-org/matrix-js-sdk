@@ -1035,6 +1035,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                         } else {
                             error = e;
                         }
+                        return;
                     }
 
                     let plaintext = res.plaintext;
@@ -1061,6 +1062,7 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                                     "Duplicate message index, possible replay attack: " +
                                     messageIndexKey,
                                 );
+                                return;
                             }
                         }
                         this._inboundGroupSessionMessageIndexes[messageIndexKey] = {
