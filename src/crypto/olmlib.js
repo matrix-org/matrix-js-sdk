@@ -302,8 +302,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
  *
  * @param {module:crypto/OlmDevice} olmDevice olm wrapper to use for verify op
  *
- * @param {Object} obj object to check signature on. Note that this will be
- * stripped of its 'signatures' and 'unsigned' properties.
+ * @param {Object} obj object to check signature on.
  *
  * @param {string} signingUserId  ID of the user whose signature should be checked
  *

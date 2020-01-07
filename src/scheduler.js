@@ -157,6 +157,11 @@ MatrixScheduler.RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
         return -1;
     }
 
+    // if event that we are trying to send is too large in any way then retrying won't help
+    if (err.name === "M_TOO_LARGE") {
+        return -1;
+    }
+
     if (err.name === "M_LIMIT_EXCEEDED") {
         const waitTime = err.data.retry_after_ms;
         if (waitTime) {

@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -104,7 +105,10 @@ export class IndexedDBCryptoStore {
             // we can fall back to a different backend.
             return backend.doTxn(
                 'readonly',
-                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                [
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                ],
                 (txn) => {
                     backend.getEndToEndInboundGroupSession('', '', txn, () => {});
                 }).then(() => {
@@ -471,6 +475,16 @@ export class IndexedDBCryptoStore {
         });
     }
 
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
+        this._backendPromise.then(backend => {
+            backend.storeEndToEndInboundGroupSessionWithheld(
+                senderCurve25519Key, sessionId, sessionData, txn,
+            );
+        });
+    }
+
     // End-to-end device tracking
 
     /**
@@ -607,6 +621,8 @@ export class IndexedDBCryptoStore {
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
+IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
+    = 'inbound_group_sessions_withheld';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';
