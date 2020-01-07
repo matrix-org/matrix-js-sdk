@@ -334,7 +334,7 @@ describe("MegolmBackup", function() {
             });
             await client.resetCrossSigningKeys();
             let numCalls = 0;
-            await new Promise(async (resolve, reject) => {
+            await new Promise((resolve, reject) => {
                 client._http.authedRequest = function(
                     callback, method, path, queryParams, data, opts,
                 ) {
@@ -359,7 +359,7 @@ describe("MegolmBackup", function() {
                     resolve();
                     return Promise.resolve({});
                 };
-                await client.createKeyBackupVersion({
+                client.createKeyBackupVersion({
                     algorithm: "m.megolm_backup.v1",
                     auth_data: {
                         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",

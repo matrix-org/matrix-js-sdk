@@ -2,7 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -214,7 +214,7 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
-    if (!cryptoCallbacks.getCrossSigningKey) {
+    if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {
         cryptoCallbacks.getCrossSigningKey = async (type) => {
             return CrossSigningInfo.getFromSecretStorage(type, this._secretStorage);
         };
@@ -292,8 +292,9 @@ Crypto.prototype.init = async function() {
  * @param {string} password Passphrase string that can be entered by the user
  *     when restoring the backup as an alternative to entering the recovery key.
  *     Optional.
- * @returns {Promise<Array>} Array with public key metadata and encoded private
- *     recovery key which should be disposed of after displaying to the user.
+ * @returns {Promise<Array>} Array with public key metadata, encoded private
+ *     recovery key which should be disposed of after displaying to the user,
+ *     and raw private key to avoid round tripping if needed.
  */
 Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
     const decryption = new global.Olm.PkDecryption();
@@ -310,10 +311,11 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
         } else {
             keyInfo.pubkey = decryption.generate_key();
         }
-        const encodedPrivateKey = encodeRecoveryKey(decryption.get_private_key());
-        return [keyInfo, encodedPrivateKey];
+        const privateKey = decryption.get_private_key();
+        const encodedPrivateKey = encodeRecoveryKey(privateKey);
+        return [keyInfo, encodedPrivateKey, privateKey];
     } finally {
-        decryption.free();
+        if (decryption) decryption.free();
     }
 };
 
@@ -330,6 +332,8 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  *     auth data as an object.
  * @param {function} [opts.createSecretStorageKey] Optional. Function
  * called to await a secret storage key creation flow.
+ * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
+ * the passphrase and recovery key from this backup will be used.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -337,6 +341,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
 Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
     createSecretStorageKey = async () => { },
+    keyBackupInfo,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -377,18 +382,49 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     { authUploadDeviceSigningKeys },
                 );
             }
+        } else {
+            logger.log("Cross signing keys are present in secret storage");
         }
 
         // Check if Secure Secret Storage has a default key. If we don't have one, create
         // the default key (which will also be signed by the cross-signing master key).
         if (!this.hasSecretStorageKey()) {
-            logger.log("Secret storage default key not found, creating new key");
-            const keyOptions = await createSecretStorageKey();
-            const newKeyId = await this.addSecretStorageKey(
-                SECRET_STORAGE_ALGORITHM_V1,
-                keyOptions,
-            );
+            let newKeyId;
+            if (keyBackupInfo) {
+                logger.log("Secret storage default key not found, using key backup key");
+                const opts = {
+                    pubkey: keyBackupInfo.auth_data.public_key,
+                };
+
+                if (
+                    keyBackupInfo.auth_data.private_key_salt &&
+                    keyBackupInfo.auth_data.private_key_iterations
+                ) {
+                    opts.passphrase = {
+                        algorithm: "m.pbkdf2",
+                        iterations: keyBackupInfo.auth_data.private_key_iterations,
+                        salt: keyBackupInfo.auth_data.private_key_salt,
+                    };
+                }
+
+                newKeyId = await this.addSecretStorageKey(
+                    SECRET_STORAGE_ALGORITHM_V1, opts,
+                );
+
+                // Add an entry for the backup key in SSSS as a 'passthrough' key
+                // (ie. the secret is the key itself).
+                this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
+            } else {
+                logger.log("Secret storage default key not found, creating new key");
+                const keyOptions = await createSecretStorageKey();
+                newKeyId = await this.addSecretStorageKey(
+                    SECRET_STORAGE_ALGORITHM_V1,
+                    keyOptions,
+                );
+            }
             await this.setDefaultSecretStorageKeyId(newKeyId);
+        } else {
+            logger.log("Have secret storage key");
         }
 
         // If cross-signing keys were reset, store them in Secure Secret Storage.
@@ -548,8 +584,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
 
 /**
  * Run various follow-up actions after cross-signing keys have changed locally
- * (either by resetting the keys for the account or bye getting them from secret
- * storaoge), such as signing the current device, upgrading device
+ * (either by resetting the keys for the account or by getting them from secret
+ * storage), such as signing the current device, upgrading device
  * verifications, etc.
  */
 Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
@@ -784,7 +820,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
                 throw new Error("Cross-signing master private key not available");
             }
         } finally {
-            signing.free();
+            if (signing) signing.free();
         }
 
         logger.info("Got matching private key from callback for new public master key");
@@ -946,8 +982,7 @@ Crypto.prototype.setTrustedBackupPubKey = async function(trustedPubKey) {
  */
 Crypto.prototype.checkKeyBackup = async function() {
     this._checkedForBackup = false;
-    const returnInfo = await this._checkAndStartKeyBackup();
-    return returnInfo;
+    return this._checkAndStartKeyBackup();
 };
 
 /**
@@ -994,13 +1029,14 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
             logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
             continue;
         }
-        // Could be an SSK but just say this is the device ID for backwards compat
-        const sigInfo = { deviceId: keyIdParts[1] }; // XXX: is this how we're supposed to get the device ID?
+        // Could be a cross-signing master key, but just say this is the device
+        // ID for backwards compat
+        const sigInfo = { deviceId: keyIdParts[1] };
 
         // first check to see if it's from our cross-signing key
         const crossSigningId = this._crossSigningInfo.getId();
-        if (crossSigningId === keyId) {
-            sigInfo.cross_signing_key = crossSigningId;
+        if (crossSigningId === sigInfo.deviceId) {
+            sigInfo.crossSigningId = true;
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
@@ -1022,18 +1058,19 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
 
         // Now look for a sig from a device
         // At some point this can probably go away and we'll just support
-        // it being signed by the SSK
+        // it being signed by the cross-signing master key
         const device = this._deviceList.getStoredDevice(
             this._userId, sigInfo.deviceId,
         );
         if (device) {
             sigInfo.device = device;
+            sigInfo.deviceTrust = await this.checkDeviceTrust(
+                this._userId, sigInfo.deviceId,
+            );
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
-                    // verifySignature modifies the object so we need to copy
-                    // if we verify more than one sig
-                    Object.assign({}, backupInfo.auth_data),
+                    backupInfo.auth_data,
                     this._userId,
                     device.deviceId,
                     device.getFingerprint(),
@@ -1057,8 +1094,8 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     ret.usable = ret.sigs.some((s) => {
         return (
             s.valid && (
-                (s.device && s.device.isVerified()) ||
-                (s.cross_signing_key)
+                (s.device && s.deviceTrust.isVerified()) ||
+                (s.crossSigningId)
             )
         );
     });
@@ -2367,6 +2404,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
+        } else if (event.getType() === "org.matrix.room_key.withheld") {
+            this._onRoomKeyWithheldEvent(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
@@ -2404,6 +2443,27 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+/**
+ * Handle a key withheld event
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event key withheld event
+ */
+Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
+    const content = event.getContent();
+
+    if (!content.room_id || !content.session_id || !content.algorithm
+        || !content.sender_key) {
+        logger.error("key withheld event is missing fields");
+        return;
+    }
+
+    const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
+    if (alg.onRoomKeyWithheldEvent) {
+        alg.onRoomKeyWithheldEvent(event);
+    }
 };
 
 /**

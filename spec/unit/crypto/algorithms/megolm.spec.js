@@ -8,6 +8,22 @@ import {Crypto} from "../../../../src/crypto";
 import {logger} from "../../../../src/logger";
 import {MatrixEvent} from "../../../../src/models/event";
 
+<<<<<<< HEAD
+=======
+import sdk from '../../../..';
+import algorithms from '../../../../lib/crypto/algorithms';
+import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
+import MockStorageApi from '../../../MockStorageApi';
+import testUtils from '../../../test-utils';
+import OlmDevice from '../../../../lib/crypto/OlmDevice';
+import Crypto from '../../../../lib/crypto';
+import logger from '../../../../lib/logger';
+import TestClient from '../../../TestClient';
+import olmlib from '../../../../lib/crypto/olmlib';
+import Room from '../../../../lib/models/room';
+
+const MatrixEvent = sdk.MatrixEvent;
+>>>>>>> develop
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
@@ -339,5 +355,155 @@ describe("MegolmDecryption", function() {
             // likewise they should show the same session ID
             expect(ct2.session_id).toEqual(ct1.session_id);
         });
+    });
+
+    it("notifies devices that have been blocked", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient1 = (new TestClient(
+            "@bob:example.com", "bobdevice1",
+        )).client;
+        const bobClient2 = (new TestClient(
+            "@bob:example.com", "bobdevice2",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient1.initCrypto(),
+            bobClient2.initCrypto(),
+        ]);
+        const aliceDevice = aliceClient._crypto._olmDevice;
+        const bobDevice1 = bobClient1._crypto._olmDevice;
+        const bobDevice2 = bobClient2._crypto._olmDevice;
+
+        const encryptionCfg = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+        };
+        const roomId = "!someroom";
+        const room = new Room(roomId, aliceClient, "@alice:example.com", {});
+        room.getEncryptionTargetMembers = async function() {
+            return [{userId: "@bob:example.com"}];
+        };
+        room.setBlacklistUnverifiedDevices(true);
+        aliceClient.store.storeRoom(room);
+        await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+
+        const BOB_DEVICES = {
+            bobdevice1: {
+                user_id: "@bob:example.com",
+                device_id: "bobdevice1",
+                algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                keys: {
+                    "ed25519:Dynabook": bobDevice1.deviceEd25519Key,
+                    "curve25519:Dynabook": bobDevice1.deviceCurve25519Key,
+                },
+                verified: 0,
+            },
+            bobdevice2: {
+                user_id: "@bob:example.com",
+                device_id: "bobdevice2",
+                algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                keys: {
+                    "ed25519:Dynabook": bobDevice2.deviceEd25519Key,
+                    "curve25519:Dynabook": bobDevice2.deviceCurve25519Key,
+                },
+                verified: -1,
+            },
+        };
+
+        aliceClient._crypto._deviceList.storeDevicesForUser(
+            "@bob:example.com", BOB_DEVICES,
+        );
+        aliceClient._crypto._deviceList.downloadKeys = async function(userIds) {
+            return this._getDevicesFromStore(userIds);
+        };
+
+        let run = false;
+        aliceClient.sendToDevice = async (msgtype, contentMap) => {
+            run = true;
+            expect(msgtype).toBe("org.matrix.room_key.withheld");
+            delete contentMap["@bob:example.com"].bobdevice1.session_id;
+            delete contentMap["@bob:example.com"].bobdevice2.session_id;
+            expect(contentMap).toStrictEqual({
+                '@bob:example.com': {
+                    bobdevice1: {
+                        algorithm: "m.megolm.v1.aes-sha2",
+                        room_id: roomId,
+                        code: 'm.unverified',
+                        reason:
+                        'The sender has disabled encrypting to unverified devices.',
+                        sender_key: aliceDevice.deviceCurve25519Key,
+                    },
+                    bobdevice2: {
+                        algorithm: "m.megolm.v1.aes-sha2",
+                        room_id: roomId,
+                        code: 'm.blacklisted',
+                        reason: 'The sender has blocked you.',
+                        sender_key: aliceDevice.deviceCurve25519Key,
+                    },
+                },
+            });
+        };
+
+        const event = new MatrixEvent({
+            type: "m.room.message",
+            sender: "@alice:example.com",
+            room_id: roomId,
+            event_id: "$event",
+            content: {
+                msgtype: "m.text",
+                body: "secret",
+            },
+        });
+        await aliceClient._crypto.encryptEvent(event, room);
+
+        expect(run).toBe(true);
+
+        aliceClient.stopClient();
+        bobClient1.stopClient();
+        bobClient2.stopClient();
+    });
+
+    it("throws an error describing why it doesn't have a key", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const bobDevice = bobClient._crypto._olmDevice;
+
+        const roomId = "!someroom";
+
+        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+            type: "org.matrix.room_key.withheld",
+            sender: "@bob:example.com",
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                room_id: roomId,
+                session_id: "session_id",
+                sender_key: bobDevice.deviceCurve25519Key,
+                code: "m.blacklisted",
+                reason: "You have been blocked",
+            },
+        }));
+
+        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id",
+            },
+        }))).rejects.toThrow("The sender has blocked you.");
     });
 });

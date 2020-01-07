@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +19,7 @@ limitations under the License.
 import {logger} from '../../logger';
 import * as utils from "../../utils";
 
-export const VERSION = 7;
+export const VERSION = 8;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -79,7 +80,7 @@ export class Backend {
                     `enqueueing key request for ${requestBody.room_id} / ` +
                         requestBody.session_id,
                 );
-                txn.oncomplete = () => { resolve(request); };
+                txn.oncomplete = () => {resolve(request);};
                 const store = txn.objectStore("outgoingRoomKeyRequests");
                 store.add(request);
             });
@@ -428,14 +429,36 @@ export class Backend {
     // Inbound group sessions
 
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
+        let session = false;
+        let withheld = false;
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
         getReq.onsuccess = function() {
             try {
                 if (getReq.result) {
-                    func(getReq.result.session);
+                    session = getReq.result.session;
                 } else {
-                    func(null);
+                    session = null;
+                }
+                if (withheld !== false) {
+                    func(session, withheld);
+                }
+            } catch (e) {
+                abortWithException(txn, e);
+            }
+        };
+
+        const withheldObjectStore = txn.objectStore("inbound_group_sessions_withheld");
+        const withheldGetReq = withheldObjectStore.get([senderCurve25519Key, sessionId]);
+        withheldGetReq.onsuccess = function() {
+            try {
+                if (withheldGetReq.result) {
+                    withheld = withheldGetReq.result.session;
+                } else {
+                    withheld = null;
+                }
+                if (session !== false) {
+                    func(session, withheld);
                 }
             } catch (e) {
                 abortWithException(txn, e);
@@ -494,6 +517,15 @@ export class Backend {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         const objectStore = txn.objectStore("inbound_group_sessions");
+        objectStore.put({
+            senderCurve25519Key, sessionId, session: sessionData,
+        });
+    }
+
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
+        const objectStore = txn.objectStore("inbound_group_sessions_withheld");
         objectStore.put({
             senderCurve25519Key, sessionId, session: sessionData,
         });
@@ -659,6 +691,11 @@ export function upgradeDatabase(db, oldVersion) {
     }
     if (oldVersion < 7) {
         db.createObjectStore("sessions_needing_backup", {
+            keyPath: ["senderCurve25519Key", "sessionId"],
+        });
+    }
+    if (oldVersion < 8) {
+        db.createObjectStore("inbound_group_sessions_withheld", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
     }
