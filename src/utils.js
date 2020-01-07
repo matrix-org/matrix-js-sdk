@@ -645,11 +645,8 @@ export function isNumber(value) {
  */
 export function removeHiddenChars(str) {
     return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
-<<<<<<< HEAD
 }
-const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
-=======
-};
+
 // Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
 // Includes:
 // various width spaces U+2000 - U+200D
@@ -658,7 +655,6 @@ const removeHiddenCharsRegex = /[\u200B-\u200D\u0300-\u036f\uFEFF\s]/g;
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
 const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
->>>>>>> develop
 
 export function escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

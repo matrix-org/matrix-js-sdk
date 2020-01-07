@@ -22,7 +22,6 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  * @module client
  */
-<<<<<<< HEAD
 
 import url from "url";
 import {EventEmitter} from "events";
@@ -48,37 +47,7 @@ import {decodeRecoveryKey} from './crypto/recoverykey';
 import {keyFromAuthData} from './crypto/key_passphrase';
 import {randomString} from './randomstring';
 import {PushProcessor} from "./pushprocessor";
-=======
-const EventEmitter = require("events").EventEmitter;
-const url = require('url');
-
-const httpApi = require("./http-api");
-const MatrixEvent = require("./models/event").MatrixEvent;
-const EventStatus = require("./models/event").EventStatus;
-const EventTimeline = require("./models/event-timeline");
-const SearchResult = require("./models/search-result");
-const StubStore = require("./store/stub");
-const webRtcCall = require("./webrtc/call");
-const utils = require("./utils");
-const contentRepo = require("./content-repo");
-const Filter = require("./filter");
-const SyncApi = require("./sync");
-const MatrixBaseApis = require("./base-apis");
-const MatrixError = httpApi.MatrixError;
-const ContentHelpers = require("./content-helpers");
-const olmlib = require("./crypto/olmlib");
-
-import ReEmitter from './ReEmitter';
-import RoomList from './crypto/RoomList';
-import logger from './logger';
-
-import Crypto from './crypto';
-import { isCryptoAvailable } from './crypto';
-import { decodeRecoveryKey } from './crypto/recoverykey';
-import { keyFromAuthData } from './crypto/key_passphrase';
-import { randomString } from './randomstring';
-import { encodeBase64, decodeBase64 } from '../lib/crypto/olmlib';
->>>>>>> develop
+import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 
 const SCROLLBACK_DELAY_MS = 3000;
 export const CRYPTO_ENABLED = isCryptoAvailable();

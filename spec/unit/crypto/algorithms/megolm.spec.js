@@ -7,23 +7,10 @@ import {OlmDevice} from "../../../../src/crypto/OlmDevice";
 import {Crypto} from "../../../../src/crypto";
 import {logger} from "../../../../src/logger";
 import {MatrixEvent} from "../../../../src/models/event";
+import {TestClient} from "../../../TestClient";
+import {Room} from "../../../../src/models/room";
+import * as olmlib from "../../../../src/crypto/olmlib";
 
-<<<<<<< HEAD
-=======
-import sdk from '../../../..';
-import algorithms from '../../../../lib/crypto/algorithms';
-import MemoryCryptoStore from '../../../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../../../MockStorageApi';
-import testUtils from '../../../test-utils';
-import OlmDevice from '../../../../lib/crypto/OlmDevice';
-import Crypto from '../../../../lib/crypto';
-import logger from '../../../../lib/logger';
-import TestClient from '../../../TestClient';
-import olmlib from '../../../../lib/crypto/olmlib';
-import Room from '../../../../lib/models/room';
-
-const MatrixEvent = sdk.MatrixEvent;
->>>>>>> develop
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
