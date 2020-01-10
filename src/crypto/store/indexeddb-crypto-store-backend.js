@@ -467,6 +467,7 @@ export class Backend {
         return result;
     }
 
+    // FIXME: we should probably prune this when devices get deleted
     async filterOutNotifiedErrorDevices(devices) {
         const txn = this._db.transaction("notified_error_devices", "readwrite");
         const objectStore = txn.objectStore("notified_error_devices");

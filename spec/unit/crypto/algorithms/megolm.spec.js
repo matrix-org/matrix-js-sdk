@@ -11,7 +11,6 @@ import logger from '../../../../lib/logger';
 import TestClient from '../../../TestClient';
 import olmlib from '../../../../lib/crypto/olmlib';
 import Room from '../../../../lib/models/room';
-import DeviceInfo from '../../../../lib/crypto/deviceinfo';
 
 const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];

@@ -356,6 +356,10 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices
  *
+ * @param {array<object>} errorDevices
+ *    array that will be populated with the devices that can't get an
+ *    olm session for
+ *
  * @return {array<object<userid, deviceInfo>>}
  */
 MegolmEncryption.prototype._splitUserDeviceMap = function(
@@ -665,6 +669,10 @@ MegolmEncryption.prototype.reshareKeyWithDevice = async function(
  *
  * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
  *    map from userid to list of devices
+ *
+ * @param {array<object>} errorDevices
+ *    array that will be populated with the devices that we can't get an
+ *    olm session for
  */
 MegolmEncryption.prototype._shareKeyWithDevices = async function(
     session, devicesByUser, errorDevices,
