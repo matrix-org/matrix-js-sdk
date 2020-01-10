@@ -2458,8 +2458,8 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
     const content = event.getContent();
 
-    if (!content.room_id || !content.session_id || !content.algorithm
-        || !content.sender_key) {
+    if ((content.code !== "m.no_olm" && (!content.room_id || !content.session_id))
+        || !content.algorithm || !content.sender_key) {
         logger.error("key withheld event is missing fields");
         return;
     }
@@ -2609,6 +2609,9 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "Couldn't find device for identity key " + deviceKey +
             ": not re-establishing session",
         );
+        await this._olmDevice.recordSessionProblem(
+            deviceKey, "wedged", false,
+        );
         return;
     }
     const devicesByUser = {};
@@ -2639,6 +2642,8 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
         device,
         {type: "m.dummy"},
     );
+
+    await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
 
     await this._baseApis.sendToDevice("m.room.encrypted", {
         [sender]: {
