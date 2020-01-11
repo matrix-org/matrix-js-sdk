@@ -460,15 +460,15 @@ MegolmEncryption.prototype._splitBlockedDevices = function(devicesByUser) {
 MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
     session, chainIndex, userDeviceMap, payload,
 ) {
-    const encryptedContent = {
-        algorithm: olmlib.OLM_ALGORITHM,
-        sender_key: this._olmDevice.deviceCurve25519Key,
-        ciphertext: {},
-    };
     const contentMap = {};
 
     const promises = [];
     for (let i = 0; i < userDeviceMap.length; i++) {
+        const encryptedContent = {
+            algorithm: olmlib.OLM_ALGORITHM,
+            sender_key: this._olmDevice.deviceCurve25519Key,
+            ciphertext: {},
+        };
         const val = userDeviceMap[i];
         const userId = val.userId;
         const deviceInfo = val.deviceInfo;
