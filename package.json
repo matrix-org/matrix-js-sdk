@@ -1,7 +1,7 @@
 {
   "name": "matrix-js-sdk",
-  "version": "2.4.6",
-  "description": "Matrix Client-Server SDK for JavaScript",
+  "version": "3.0.0",
+  "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
     "clean": "rimraf lib dist",
