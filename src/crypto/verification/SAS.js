@@ -108,7 +108,7 @@ const emojiMapping = [
     ["✏️", "pencil"],     // 43
     ["📎", "paperclip"],  // 44
     ["✂️", "scissors"],    // 45
-    ["🔒", "padlock"],    // 46
+    ["🔒", "lock"],       // 46
     ["🔑", "key"],        // 47
     ["🔨", "hammer"],     // 48
     ["☎️", "telephone"],  // 49
