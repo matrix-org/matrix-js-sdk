@@ -330,6 +330,9 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
 };
 
 /**
+ * Splits the user device map into multiple chunks to reduce the number of
+ * devices we encrypt to per API call.
+ *
  * @private
  *
  * @param {module:crypto/algorithms/megolm.OutboundSessionInfo} session
@@ -386,11 +389,6 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
                 "share keys with device " + userId + ":" + deviceId,
             );
 
-            if (entriesInCurrentSlice > maxToDeviceMessagesPerRequest) {
-                // the current slice is filled up. Start inserting into the next slice
-                entriesInCurrentSlice = 0;
-                currentSliceId++;
-            }
             if (!mapSlices[currentSliceId]) {
                 mapSlices[currentSliceId] = [];
             }
@@ -401,6 +399,17 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
             });
 
             entriesInCurrentSlice++;
+        }
+
+        // We do this in the per-user loop as we prefer that all messages to the
+        // same user end up in the same API call to make it easier for the
+        // server (e.g. only have to send one EDU if a remote user, etc). This
+        // does mean that if a user has many devices we may go over the desired
+        // limit, but its not a hard limit so that is fine.
+        if (entriesInCurrentSlice > maxToDeviceMessagesPerRequest) {
+            // the current slice is filled up. Start inserting into the next slice
+            entriesInCurrentSlice = 0;
+            currentSliceId++;
         }
     }
     return mapSlices;
