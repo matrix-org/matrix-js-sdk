@@ -1,3 +1,61 @@
+Changes in [3.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.0.0) (2020-01-13)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v3.0.0-rc.1...v3.0.0)
+
+ * No changes from rc.1
+
+Changes in [3.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.0.0-rc.1) (2020-01-06)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.6...v3.0.0-rc.1)
+
+BREAKING CHANGES
+================
+ * matrix-js-sdk no longer uses bluebird promises, so promises returned
+   by the js-sdk no longer support the done() method. Code that calls
+   done() on promises returned by the js-sdk will break and will need
+   to be updated to remove the done() call.
+
+All Changes
+===========
+ * Make displayName disambiguation more fuzzy especially against RTL/LTR
+   content
+   [\#1141](https://github.com/matrix-org/matrix-js-sdk/pull/1141)
+ * stop trying to resend event if we get M_TOO_LARGE
+   [\#1129](https://github.com/matrix-org/matrix-js-sdk/pull/1129)
+ * Fix creating a key backup with cross signing diabled
+   [\#1139](https://github.com/matrix-org/matrix-js-sdk/pull/1139)
+ * Use checkDeviceTrust with key backup
+   [\#1138](https://github.com/matrix-org/matrix-js-sdk/pull/1138)
+ * Add support for passthrough SSSS secrets
+   [\#1128](https://github.com/matrix-org/matrix-js-sdk/pull/1128)
+ * Add support for key backups using secret storage
+   [\#1118](https://github.com/matrix-org/matrix-js-sdk/pull/1118)
+ * Remove unused user verification event
+   [\#1117](https://github.com/matrix-org/matrix-js-sdk/pull/1117)
+ * Fix check for private keys
+   [\#1116](https://github.com/matrix-org/matrix-js-sdk/pull/1116)
+ * Restore watching mode for `start:watch`
+   [\#1115](https://github.com/matrix-org/matrix-js-sdk/pull/1115)
+ * Add secret storage bootstrap flow
+   [\#1079](https://github.com/matrix-org/matrix-js-sdk/pull/1079)
+ * Part 1 of many: Upgrade to babel@7 and TypeScript
+   [\#1112](https://github.com/matrix-org/matrix-js-sdk/pull/1112)
+ * Remove Bluebird: phase 2.5
+   [\#1100](https://github.com/matrix-org/matrix-js-sdk/pull/1100)
+ * Remove Bluebird: phase 3
+   [\#1088](https://github.com/matrix-org/matrix-js-sdk/pull/1088)
+ * ignore m.key.verification.done messages when we don't expect any more
+   messages
+   [\#1104](https://github.com/matrix-org/matrix-js-sdk/pull/1104)
+ * dont cancel on remote echo of own .request event
+   [\#1111](https://github.com/matrix-org/matrix-js-sdk/pull/1111)
+ * Refactor verification request code
+   [\#1109](https://github.com/matrix-org/matrix-js-sdk/pull/1109)
+ * Fix device list's cross-signing storage path
+   [\#1105](https://github.com/matrix-org/matrix-js-sdk/pull/1105)
+ * yarn upgrade
+   [\#1103](https://github.com/matrix-org/matrix-js-sdk/pull/1103)
+
 Changes in [2.4.6](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v2.4.6) (2019-12-09)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v2.4.6-rc.1...v2.4.6)
