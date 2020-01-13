@@ -736,7 +736,9 @@ MegolmEncryption.prototype.encryptMessage = async function(room, eventType, cont
 
     // check if any of these devices are not yet known to the user.
     // if so, warn the user so they can verify or ignore.
-    self._checkForUnknownDevices(devicesInRoom);
+    if (this._crypto.getGlobalErrorOnUnknownDevices()) {
+        self._checkForUnknownDevices(devicesInRoom);
+    }
 
     const session = await self._ensureOutboundSession(devicesInRoom, blocked);
     const payloadJson = {

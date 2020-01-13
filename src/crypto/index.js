@@ -176,6 +176,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceKeys = {};
 
     this._globalBlacklistUnverifiedDevices = false;
+    this._globalErrorOnUnknownDevices = true;
 
     this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
          baseApis, this._deviceId, this._cryptoStore,
@@ -1188,6 +1189,29 @@ Crypto.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
  */
 Crypto.prototype.getGlobalBlacklistUnverifiedDevices = function() {
     return this._globalBlacklistUnverifiedDevices;
+};
+
+/**
+ * Set whether sendMessage in a room with unknown and unverified devices
+ * should throw an error and not send them message. This has 'Global' for
+ * symmertry with setGlobalBlacklistUnverifiedDevices but there is currently
+ * no room-level equivalent for this setting.
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ *
+ * @param {boolean} value whether error on unknown devices
+ */
+Crypto.prototype.setGlobalErrorOnUnknownDevices = function(value) {
+    this._globalErrorOnUnknownDevices = value;
+};
+
+/**
+ * @return {boolean} whether to error on unknown devices
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ */
+Crypto.prototype.getGlobalErrorOnUnknownDevices = function() {
+    return this._globalErrorOnUnknownDevices;
 };
 
 /**
