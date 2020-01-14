@@ -23,6 +23,7 @@ limitations under the License.
 
 import anotherjson from "another-json";
 import {EventEmitter} from 'events';
+<<<<<<<
 import {ReEmitter} from '../ReEmitter';
 import {logger} from '../logger';
 import * as utils from "../utils";
@@ -32,6 +33,19 @@ import * as olmlib from "./olmlib";
 import {DeviceList} from "./DeviceList";
 import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
+=======
+import ReEmitter from '../ReEmitter';
+
+import logger from '../logger';
+const utils = require("../utils");
+const httpApi = require("../http-api");
+const OlmDevice = require("./OlmDevice");
+const olmlib = require("./olmlib");
+const algorithms = require("./algorithms");
+const DeviceInfo = require("./deviceinfo");
+const DeviceVerification = DeviceInfo.DeviceVerification;
+const DeviceList = require('./DeviceList').default;
+>>>>>>>
 import {
     CrossSigningInfo,
     CrossSigningLevel,
@@ -414,6 +428,25 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 // Add an entry for the backup key in SSSS as a 'passthrough' key
                 // (ie. the secret is the key itself).
                 this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
+
+                // if this key backup is trusted, sign it with the cross signing key
+                // so the key backup can be trusted via cross-signing.
+                const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
+                if (backupSigStatus.trustInfo.usable) {
+                    console.log("Adding cross signing signature to key backup");
+                    await this._crossSigningInfo.signObject(
+                        keyBackupInfo.auth_data, "master",
+                    );
+                    await this._baseApis._http.authedRequest(
+                        undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
+                        undefined, keyBackupInfo,
+                        {prefix: httpApi.PREFIX_UNSTABLE},
+                    );
+                } else {
+                    console.log(
+                        "Key backup is NOT TRUSTED: NOT adding cross signing signature",
+                    );
+                }
             } else {
                 logger.log("Secret storage default key not found, creating new key");
                 const keyOptions = await createSecretStorageKey();
