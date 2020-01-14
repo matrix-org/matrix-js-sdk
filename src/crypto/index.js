@@ -23,7 +23,6 @@ limitations under the License.
 
 import anotherjson from "another-json";
 import {EventEmitter} from 'events';
-<<<<<<<
 import {ReEmitter} from '../ReEmitter';
 import {logger} from '../logger';
 import * as utils from "../utils";
@@ -33,19 +32,6 @@ import * as olmlib from "./olmlib";
 import {DeviceList} from "./DeviceList";
 import {DeviceInfo} from "./deviceinfo";
 import * as algorithms from "./algorithms";
-=======
-import ReEmitter from '../ReEmitter';
-
-import logger from '../logger';
-const utils = require("../utils");
-const httpApi = require("../http-api");
-const OlmDevice = require("./OlmDevice");
-const olmlib = require("./olmlib");
-const algorithms = require("./algorithms");
-const DeviceInfo = require("./deviceinfo");
-const DeviceVerification = DeviceInfo.DeviceVerification;
-const DeviceList = require('./DeviceList').default;
->>>>>>>
 import {
     CrossSigningInfo,
     CrossSigningLevel,
@@ -62,6 +48,7 @@ import {encodeRecoveryKey} from './recoverykey';
 import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel} from "./verification/request/ToDeviceChannel";
+import * as httpApi from "../http-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
