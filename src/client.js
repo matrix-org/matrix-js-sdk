@@ -947,6 +947,35 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
+ * Set whether sendMessage in a room with unknown and unverified devices
+ * should throw an error and not send them message. This has 'Global' for
+ * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
+ * no room-level equivalent for this setting.
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ *
+ * @param {boolean} value whether error on unknown devices
+ */
+MatrixClient.prototype.setGlobalErrorOnUnknownDevices = function(value) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.setGlobalErrorOnUnknownDevices(value);
+};
+
+/**
+ * @return {boolean} whether to error on unknown devices
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ */
+MatrixClient.prototype.getGlobalErrorOnUnknownDevices = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getGlobalErrorOnUnknownDevices();
+};
+
+/**
  * Add methods that call the corresponding method in this._crypto
  *
  * @param {class} MatrixClient the class to add the method to
