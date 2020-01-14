@@ -4,6 +4,7 @@
   "description": "Matrix Client-Server SDK for Javascript",
   "scripts": {
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
+    "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
     "clean": "rimraf lib dist",
     "build": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:compile-browser && yarn build:minify-browser && yarn build:types",
     "build:types": "tsc --emitDeclarationOnly",
@@ -40,7 +41,8 @@
     "CONTRIBUTING.rst",
     "LICENSE",
     "README.md",
-    "package.json"
+    "package.json",
+    "release.sh"
   ],
   "dependencies": {
     "another-json": "^0.2.0",
