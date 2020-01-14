@@ -949,7 +949,7 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 /**
  * Set whether sendMessage in a room with unknown and unverified devices
  * should throw an error and not send them message. This has 'Global' for
- * symmertry with setGlobalBlacklistUnverifiedDevices but there is currently
+ * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
  * no room-level equivalent for this setting.
  *
  * This API is currently UNSTABLE and may change or be removed without notice.
