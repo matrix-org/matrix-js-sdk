@@ -331,7 +331,8 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
 
 /**
  * Splits the user device map into multiple chunks to reduce the number of
- * devices we encrypt to per API call.
+ * devices we encrypt to per API call. Also filters out devices we don't have
+ * a session with.
  *
  * @private
  *
@@ -350,7 +351,7 @@ MegolmEncryption.prototype._prepareNewSession = async function() {
 MegolmEncryption.prototype._splitUserDeviceMap = function(
     session, chainIndex, devicemap, devicesByUser,
 ) {
-    const maxToDeviceMessagesPerRequest = 20;
+    const maxUsersPerRequest = 20;
 
     // use an array where the slices of a content map gets stored
     const mapSlices = [];
@@ -406,7 +407,7 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
         // server (e.g. only have to send one EDU if a remote user, etc). This
         // does mean that if a user has many devices we may go over the desired
         // limit, but its not a hard limit so that is fine.
-        if (entriesInCurrentSlice > maxToDeviceMessagesPerRequest) {
+        if (entriesInCurrentSlice > maxUsersPerRequest) {
             // the current slice is filled up. Start inserting into the next slice
             entriesInCurrentSlice = 0;
             currentSliceId++;
