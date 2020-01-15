@@ -19,7 +19,7 @@ limitations under the License.
 import logger from '../../logger';
 import utils from '../../utils';
 
-export const VERSION = 8;
+export const VERSION = 9;
 
 /**
  * Implementation of a CryptoStore which is backed by an existing
@@ -426,6 +426,74 @@ export class Backend {
         });
     }
 
+    async storeEndToEndSessionProblem(deviceKey, type, fixed) {
+        const txn = this._db.transaction("session_problems", "readwrite");
+        const objectStore = txn.objectStore("session_problems");
+        objectStore.put({
+            deviceKey,
+            type,
+            fixed,
+            time: Date.now(),
+        });
+        return promiseifyTxn(txn);
+    }
+
+    async getEndToEndSessionProblem(deviceKey, timestamp) {
+        let result;
+        const txn = this._db.transaction("session_problems", "readwrite");
+        const objectStore = txn.objectStore("session_problems");
+        const index = objectStore.index("deviceKey");
+        const req = index.getAll(deviceKey);
+        req.onsuccess = (event) => {
+            const problems = req.result;
+            if (!problems.length) {
+                result = null;
+                return;
+            }
+            problems.sort((a, b) => {
+                return a.time - b.time;
+            });
+            const lastProblem = problems[problems.length - 1];
+            for (const problem of problems) {
+                if (problem.time > timestamp) {
+                    result = Object.assign({}, problem, {fixed: lastProblem.fixed});
+                    return;
+                }
+            }
+            if (lastProblem.fixed) {
+                result = null;
+            } else {
+                result = lastProblem;
+            }
+        };
+        await promiseifyTxn(txn);
+        return result;
+    }
+
+    // FIXME: we should probably prune this when devices get deleted
+    async filterOutNotifiedErrorDevices(devices) {
+        const txn = this._db.transaction("notified_error_devices", "readwrite");
+        const objectStore = txn.objectStore("notified_error_devices");
+
+        const ret = [];
+
+        await Promise.all(devices.map((device) => {
+            return new Promise((resolve) => {
+                const {userId, deviceInfo} = device;
+                const getReq = objectStore.get([userId, deviceInfo.deviceId]);
+                getReq.onsuccess = function() {
+                    if (!getReq.result) {
+                        objectStore.put({userId, deviceId: deviceInfo.deviceId});
+                        ret.push(device);
+                    }
+                    resolve();
+                };
+            });
+        }));
+
+        return ret;
+    }
+
     // Inbound group sessions
 
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
@@ -697,6 +765,16 @@ export function upgradeDatabase(db, oldVersion) {
     if (oldVersion < 8) {
         db.createObjectStore("inbound_group_sessions_withheld", {
             keyPath: ["senderCurve25519Key", "sessionId"],
+        });
+    }
+    if (oldVersion < 9) {
+        const problemsStore = db.createObjectStore("session_problems", {
+            keyPath: ["deviceKey", "time"],
+        });
+        problemsStore.createIndex("deviceKey", "deviceKey");
+
+        db.createObjectStore("notified_error_devices", {
+            keyPath: ["userId", "deviceId"],
         });
     }
     // Expand as needed.

@@ -2502,15 +2502,30 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
     const content = event.getContent();
 
-    if (!content.room_id || !content.session_id || !content.algorithm
-        || !content.sender_key) {
+    if ((content.code !== "m.no_olm" && (!content.room_id || !content.session_id))
+        || !content.algorithm || !content.sender_key) {
         logger.error("key withheld event is missing fields");
         return;
     }
 
+    logger.info(
+        `Got room key withheld event from ${event.getSender()} (${content.sender_key}) `
+            + `for ${content.algorithm}/${content.room_id}/${content.session_id} `
+            + `with reason ${content.code} (${content.reason})`,
+    );
+
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     if (alg.onRoomKeyWithheldEvent) {
         alg.onRoomKeyWithheldEvent(event);
+    }
+    if (!content.room_id) {
+        // retry decryption for all events sent by the sender_key.  This will
+        // update the events to show a message indicating that the olm session was
+        // wedged.
+        const roomDecryptors = this._getRoomDecryptors(content.algorithm);
+        for (const decryptor of roomDecryptors) {
+            decryptor.retryDecryptionFromSender(content.sender_key);
+        }
     }
 };
 
@@ -2627,6 +2642,16 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     const algorithm = content.algorithm;
     const deviceKey = content.sender_key;
 
+    // retry decryption for all events sent by the sender_key.  This will
+    // update the events to show a message indicating that the olm session was
+    // wedged.
+    const retryDecryption = () => {
+        const roomDecryptors = this._getRoomDecryptors(olmlib.MEGOLM_ALGORITHM);
+        for (const decryptor of roomDecryptors) {
+            decryptor.retryDecryptionFromSender(deviceKey);
+        }
+    };
+
     if (sender === undefined || deviceKey === undefined || deviceKey === undefined) {
         return;
     }
@@ -2640,6 +2665,8 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "New session already forced with device " + sender + ":" + deviceKey +
             " at " + lastNewSessionForced + ": not forcing another",
         );
+        await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
+        retryDecryption();
         return;
     }
 
@@ -2653,6 +2680,8 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "Couldn't find device for identity key " + deviceKey +
             ": not re-establishing session",
         );
+        await this._olmDevice.recordSessionProblem(deviceKey, "wedged", false);
+        retryDecryption();
         return;
     }
     const devicesByUser = {};
@@ -2683,6 +2712,9 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
         device,
         {type: "m.dummy"},
     );
+
+    await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
+    retryDecryption();
 
     await this._baseApis.sendToDevice("m.room.encrypted", {
         [sender]: {
@@ -2962,6 +2994,24 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
         decryptors[algorithm] = alg;
     }
     return alg;
+};
+
+
+/**
+ * Get all the room decryptors for a given encryption algorithm.
+ *
+ * @param {string} algorithm The encryption algorithm
+ *
+ * @return {array} An array of room decryptors
+ */
+Crypto.prototype._getRoomDecryptors = function(algorithm) {
+    const decryptors = [];
+    for (const d of Object.values(this._roomDecryptors)) {
+        if (algorithm in d) {
+            decryptors.push(d[algorithm]);
+        }
+    }
+    return decryptors;
 };
 
 
