@@ -1021,9 +1021,6 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         // event is still in the pending list; if not, a retry will have been
         // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
-<<<<<<< HEAD
-        throw new DecryptionError(
-=======
 
         // See if there was a problem with the olm session at the time the
         // event was sent.  Use a fuzz factor of 2 minutes.
@@ -1037,7 +1034,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
                 problemDescription +=
                     " Trying to create a new secure channel and re-requesting the keys.";
             }
-            throw new base.DecryptionError(
+            throw new DecryptionError(
                 "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                 problemDescription,
                 {
@@ -1046,8 +1043,7 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
             );
         }
 
-        throw new base.DecryptionError(
->>>>>>> develop
+        throw new DecryptionError(
             "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
             "The sender's device has not sent us the keys for this message.",
             {
