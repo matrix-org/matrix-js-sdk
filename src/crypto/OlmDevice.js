@@ -673,6 +673,18 @@ OlmDevice.prototype.matchesSession = async function(
     return matches;
 };
 
+OlmDevice.prototype.recordSessionProblem = async function(deviceKey, type, fixed) {
+    await this._cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
+};
+
+OlmDevice.prototype.sessionMayHaveProblems = async function(deviceKey, timestamp) {
+    return await this._cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
+};
+
+OlmDevice.prototype.filterOutNotifiedErrorDevices = async function(devices) {
+    return await this._cryptoStore.filterOutNotifiedErrorDevices(devices);
+};
+
 
 // Outbound group session
 // ======================

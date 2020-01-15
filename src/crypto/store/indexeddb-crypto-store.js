@@ -409,6 +409,24 @@ export class IndexedDBCryptoStore {
         });
     }
 
+    storeEndToEndSessionProblem(deviceKey, type, fixed) {
+        return this._backendPromise.then(async (backend) => {
+            await backend.storeEndToEndSessionProblem(deviceKey, type, fixed);
+        });
+    }
+
+    getEndToEndSessionProblem(deviceKey, timestamp) {
+        return this._backendPromise.then(async (backend) => {
+            return await backend.getEndToEndSessionProblem(deviceKey, timestamp);
+        });
+    }
+
+    filterOutNotifiedErrorDevices(devices) {
+        return this._backendPromise.then(async (backend) => {
+            return await backend.filterOutNotifiedErrorDevices(devices);
+        });
+    }
+
     // Inbound group sessions
 
     /**

@@ -31,6 +31,7 @@ import {MemoryCryptoStore} from './memory-crypto-store';
 const E2E_PREFIX = "crypto.";
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_CROSS_SIGNING_KEYS = E2E_PREFIX + "cross_signing_keys";
+const KEY_NOTIFIED_ERROR_DEVICES = E2E_PREFIX + "notified_error_devices";
 const KEY_DEVICE_DATA = E2E_PREFIX + "device_data";
 const KEY_INBOUND_SESSION_PREFIX = E2E_PREFIX + "inboundgroupsessions/";
 const KEY_INBOUND_SESSION_WITHHELD_PREFIX = E2E_PREFIX + "inboundgroupsessions.withheld/";
@@ -39,6 +40,10 @@ const KEY_SESSIONS_NEEDING_BACKUP = E2E_PREFIX + "sessionsneedingbackup";
 
 function keyEndToEndSessions(deviceKey) {
     return E2E_PREFIX + "sessions/" + deviceKey;
+}
+
+function keyEndToEndSessionProblems(deviceKey) {
+    return E2E_PREFIX + "session.problems/" + deviceKey;
 }
 
 function keyEndToEndInboundGroupSession(senderKey, sessionId) {
@@ -126,6 +131,58 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(
             this.store, keyEndToEndSessions(deviceKey), sessions,
         );
+    }
+
+    async storeEndToEndSessionProblem(deviceKey, type, fixed) {
+        const key = keyEndToEndSessionProblems(deviceKey);
+        const problems = getJsonItem(this.store, key) || [];
+        problems.push({type, fixed, time: Date.now()});
+        problems.sort((a, b) => {
+            return a.time - b.time;
+        });
+        setJsonItem(this.store, key, problems);
+    }
+
+    async getEndToEndSessionProblem(deviceKey, timestamp) {
+        const key = keyEndToEndSessionProblems(deviceKey);
+        const problems = getJsonItem(this.store, key) || [];
+        if (!problems.length) {
+            return null;
+        }
+        const lastProblem = problems[problems.length - 1];
+        for (const problem of problems) {
+            if (problem.time > timestamp) {
+                return Object.assign({}, problem, {fixed: lastProblem.fixed});
+            }
+        }
+        if (lastProblem.fixed) {
+            return null;
+        } else {
+            return lastProblem;
+        }
+    }
+
+    async filterOutNotifiedErrorDevices(devices) {
+        const notifiedErrorDevices =
+              getJsonItem(this.store, KEY_NOTIFIED_ERROR_DEVICES) || {};
+        const ret = [];
+
+        for (const device of devices) {
+            const {userId, deviceInfo} = device;
+            if (userId in notifiedErrorDevices) {
+                if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
+                    ret.push(device);
+                    notifiedErrorDevices[userId][deviceInfo.deviceId] = true;
+                }
+            } else {
+                ret.push(device);
+                notifiedErrorDevices[userId] = {[deviceInfo.deviceId]: true };
+            }
+        }
+
+        setJsonItem(this.store, KEY_NOTIFIED_ERROR_DEVICES, notifiedErrorDevices);
+
+        return ret;
     }
 
     // Inbound Group Sessions

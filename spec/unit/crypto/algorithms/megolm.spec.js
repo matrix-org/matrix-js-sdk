@@ -451,6 +451,99 @@ describe("MegolmDecryption", function() {
         bobClient2.stopClient();
     });
 
+    it("notifies devices when unable to create olm session", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const aliceDevice = aliceClient._crypto._olmDevice;
+        const bobDevice = bobClient._crypto._olmDevice;
+
+        const encryptionCfg = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+        };
+        const roomId = "!someroom";
+        const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
+        const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
+        aliceClient.store.storeRoom(aliceRoom);
+        bobClient.store.storeRoom(bobRoom);
+        await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+        await bobClient.setRoomEncryption(roomId, encryptionCfg);
+
+        aliceRoom.getEncryptionTargetMembers = async () => {
+            return [
+                {
+                    userId: "@alice:example.com",
+                    membership: "join",
+                },
+                {
+                    userId: "@bob:example.com",
+                    membership: "join",
+                },
+            ];
+        };
+        const BOB_DEVICES = {
+            bobdevice: {
+                user_id: "@bob:example.com",
+                device_id: "bobdevice",
+                algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                keys: {
+                    "ed25519:bobdevice": bobDevice.deviceEd25519Key,
+                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key,
+                },
+                known: true,
+                verified: 1,
+            },
+        };
+
+        aliceClient._crypto._deviceList.storeDevicesForUser(
+            "@bob:example.com", BOB_DEVICES,
+        );
+        aliceClient._crypto._deviceList.downloadKeys = async function(userIds) {
+            return this._getDevicesFromStore(userIds);
+        };
+
+        aliceClient.claimOneTimeKeys = async () => {
+            // Bob has no one-time keys
+            return {
+                one_time_keys: {},
+            };
+        };
+
+        let run = false;
+        aliceClient.sendToDevice = async (msgtype, contentMap) => {
+            run = true;
+            expect(msgtype).toBe("org.matrix.room_key.withheld");
+            expect(contentMap).toStrictEqual({
+                '@bob:example.com': {
+                    bobdevice: {
+                        algorithm: "m.megolm.v1.aes-sha2",
+                        code: 'm.no_olm',
+                        reason: 'Unable to establish a secure channel.',
+                        sender_key: aliceDevice.deviceCurve25519Key,
+                    },
+                },
+            });
+        };
+
+        const event = new MatrixEvent({
+            type: "m.room.message",
+            sender: "@alice:example.com",
+            room_id: roomId,
+            event_id: "$event",
+            content: {},
+        });
+        await aliceClient._crypto.encryptEvent(event, aliceRoom);
+
+        expect(run).toBe(true);
+    });
+
     it("throws an error describing why it doesn't have a key", async function() {
         const aliceClient = (new TestClient(
             "@alice:example.com", "alicedevice",
@@ -492,5 +585,104 @@ describe("MegolmDecryption", function() {
                 session_id: "session_id",
             },
         }))).rejects.toThrow("The sender has blocked you.");
+    });
+
+    it("throws an error describing the lack of an olm session", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const bobDevice = bobClient._crypto._olmDevice;
+
+        const roomId = "!someroom";
+
+        const now = Date.now();
+
+        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+            type: "org.matrix.room_key.withheld",
+            sender: "@bob:example.com",
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                room_id: roomId,
+                session_id: "session_id",
+                sender_key: bobDevice.deviceCurve25519Key,
+                code: "m.no_olm",
+                reason: "Unable to establish a secure channel.",
+            },
+        }));
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 100);
+        });
+
+        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id",
+            },
+            origin_server_ts: now,
+        }))).rejects.toThrow("The sender was unable to establish a secure channel.");
+    });
+
+    it("throws an error to indicate a wedged olm session", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const bobDevice = bobClient._crypto._olmDevice;
+
+        const roomId = "!someroom";
+
+        const now = Date.now();
+
+        // pretend we got an event that we can't decrypt
+        aliceClient._crypto._onToDeviceEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            content: {
+                msgtype: "m.bad.encrypted",
+                algorithm: "m.megolm.v1.aes-sha2",
+                session_id: "session_id",
+                sender_key: bobDevice.deviceCurve25519Key,
+            },
+        }));
+
+        await new Promise((resolve) => {
+            setTimeout(resolve, 100);
+        });
+
+        await expect(aliceClient._crypto.decryptEvent(new MatrixEvent({
+            type: "m.room.encrypted",
+            sender: "@bob:example.com",
+            event_id: "$event",
+            room_id: roomId,
+            content: {
+                algorithm: "m.megolm.v1.aes-sha2",
+                ciphertext: "blablabla",
+                device_id: "bobdevice",
+                sender_key: bobDevice.deviceCurve25519Key,
+                session_id: "session_id",
+            },
+            origin_server_ts: now,
+        }))).rejects.toThrow("The secure channel with the sender was corrupted.");
     });
 });
