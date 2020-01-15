@@ -450,6 +450,9 @@ export class Backend {
                 result = null;
                 return;
             }
+            problems.sort((a, b) => {
+                return a.time - b.time;
+            });
             const lastProblem = problems[problems.length - 1];
             for (const problem of problems) {
                 if (problem.time > timestamp) {
@@ -768,7 +771,7 @@ export function upgradeDatabase(db, oldVersion) {
         const problemsStore = db.createObjectStore("session_problems", {
             keyPath: ["deviceKey", "time"],
         });
-        problemsStore.createIndex("deviceKey");
+        problemsStore.createIndex("deviceKey", "deviceKey");
 
         db.createObjectStore("notified_error_devices", {
             keyPath: ["userId", "deviceId"],

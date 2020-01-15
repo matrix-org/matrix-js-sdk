@@ -997,15 +997,17 @@ MegolmDecryption.prototype.decryptEvent = async function(event) {
         // scheduled, so we needn't send out the request here.)
         this._requestKeysForEvent(event);
 
+        // See if there was a problem with the olm session at the time the
+        // event was sent.  Use a fuzz factor of 2 minutes.
         const problem = await this._olmDevice.sessionMayHaveProblems(
-            content.sender_key, event.getTs(),
+            content.sender_key, event.getTs() - 120000,
         );
         if (problem) {
             let problemDescription = PROBLEM_DESCRIPTIONS[problem.type]
                   || PROBLEM_DESCRIPTIONS.unknown;
             if (problem.fixed) {
                 problemDescription +=
-                    " Trying to create a new secure channel and re-requesting the keys";
+                    " Trying to create a new secure channel and re-requesting the keys.";
             }
             throw new base.DecryptionError(
                 "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
@@ -1071,11 +1073,16 @@ MegolmDecryption.prototype._requestKeysForEvent = function(event) {
  */
 MegolmDecryption.prototype._addEventToPendingList = function(event) {
     const content = event.getWireContent();
-    const k = content.sender_key + "|" + content.session_id;
-    if (!this._pendingEvents[k]) {
-        this._pendingEvents[k] = new Set();
+    const senderKey = content.sender_key;
+    const sessionId = content.session_id;
+    if (!this._pendingEvents[senderKey]) {
+        this._pendingEvents[senderKey] = new Map();
     }
-    this._pendingEvents[k].add(event);
+    const senderPendingEvents = this._pendingEvents[senderKey];
+    if (!senderPendingEvents.has(sessionId)) {
+        senderPendingEvents.set(sessionId, new Set());
+    }
+    senderPendingEvents.get(sessionId).add(event);
 };
 
 /**
@@ -1087,14 +1094,20 @@ MegolmDecryption.prototype._addEventToPendingList = function(event) {
  */
 MegolmDecryption.prototype._removeEventFromPendingList = function(event) {
     const content = event.getWireContent();
-    const k = content.sender_key + "|" + content.session_id;
-    if (!this._pendingEvents[k]) {
+    const senderKey = content.sender_key;
+    const sessionId = content.session_id;
+    const senderPendingEvents = this._pendingEvents[senderKey];
+    const pendingEvents = senderPendingEvents && senderPendingEvents.get(sessionId);
+    if (!pendingEvents) {
         return;
     }
 
-    this._pendingEvents[k].delete(event);
-    if (this._pendingEvents[k].size === 0) {
-        delete this._pendingEvents[k];
+    pendingEvents.delete(event);
+    if (pendingEvents.size === 0) {
+        senderPendingEvents.delete(senderKey);
+    }
+    if (senderPendingEvents.size === 0) {
+        delete this._pendingEvents[senderKey];
     }
 };
 
@@ -1211,10 +1224,17 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
         const sender = event.getSender();
         // if the sender says that they haven't been able to establish an olm
         // session, let's proactively establish one
+
+        // Note: after we record that the olm session has had a problem, we
+        // trigger retrying decryption for all the messages from the sender's
+        // key, so that we can update the error message to indicate the olm
+        // session problem.
+
         if (await this._olmDevice.getSessionIdForDevice(senderKey)) {
             // a session has already been established, so we don't need to
             // create a new one.
             await this._olmDevice.recordSessionProblem(senderKey, "no_olm", true);
+            this.retryDecryptionFromSender(senderKey);
             return;
         }
         const device = this._crypto._deviceList.getDeviceByIdentityKey(
@@ -1226,6 +1246,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
                     ": not establishing session",
             );
             await this._olmDevice.recordSessionProblem(senderKey, "no_olm", false);
+            this.retryDecryptionFromSender(senderKey);
             return;
         }
         await olmlib.ensureOlmSessionsForDevices(
@@ -1247,6 +1268,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
         );
 
         await this._olmDevice.recordSessionProblem(senderKey, "no_olm", true);
+        this.retryDecryptionFromSender(senderKey);
 
         await this._baseApis.sendToDevice("m.room.encrypted", {
             [sender]: {
@@ -1404,13 +1426,20 @@ MegolmDecryption.prototype.importRoomKey = function(session) {
  * @return {Boolean} whether all messages were successfully decrypted
  */
 MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionId) {
-    const k = senderKey + "|" + sessionId;
-    const pending = this._pendingEvents[k];
+    const senderPendingEvents = this._pendingEvents[senderKey];
+    if (!senderPendingEvents) {
+        return true;
+    }
+
+    const pending = senderPendingEvents.get(sessionId);
     if (!pending) {
         return true;
     }
 
-    delete this._pendingEvents[k];
+    pending.delete(sessionId);
+    if (pending.size === 0) {
+        this._pendingEvents[senderKey];
+    }
 
     await Promise.all([...pending].map(async (ev) => {
         try {
@@ -1420,7 +1449,32 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
         }
     }));
 
-    return !this._pendingEvents[k];
+    // ev.attemptDecryption will re-add to this._pendingEvents if an event
+    // couldn't be decrypted
+    return !((this._pendingEvents[senderKey] || {})[sessionId]);
+};
+
+MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey) {
+    const senderPendingEvents = this._pendingEvents[senderKey];
+    logger.warn(senderPendingEvents);
+    if (!senderPendingEvents) {
+        return true;
+    }
+
+    delete this._pendingEvents[senderKey];
+
+    await Promise.all([...senderPendingEvents].map(async ([_sessionId, pending]) => {
+        await Promise.all([...pending].map(async (ev) => {
+            try {
+                logger.warn(ev.getId());
+                await ev.attemptDecryption(this._crypto);
+            } catch (e) {
+                // don't die if something goes wrong
+            }
+        }));
+    }));
+
+    return !this._pendingEvents[senderKey];
 };
 
 base.registerAlgorithm(

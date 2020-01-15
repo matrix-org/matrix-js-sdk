@@ -417,7 +417,7 @@ export default class IndexedDBCryptoStore {
 
     getEndToEndSessionProblem(deviceKey, timestamp) {
         return this._backendPromise.then(async (backend) => {
-            await backend.getEndToEndSessionProblem(deviceKey, timestamp);
+            return await backend.getEndToEndSessionProblem(deviceKey, timestamp);
         });
     }
 

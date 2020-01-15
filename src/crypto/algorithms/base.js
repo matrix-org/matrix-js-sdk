@@ -159,6 +159,16 @@ class DecryptionAlgorithm {
     shareKeysWithDevice(keyRequest) {
         throw new Error("shareKeysWithDevice not supported for this DecryptionAlgorithm");
     }
+
+    /**
+     * Retry decrypting all the events from a sender that haven't been
+     * decrypted yet.
+     *
+     * @param {string} senderKey the sender's key
+     */
+    async retryDecryptionFromSender(senderKey) {
+        // ignore by default
+    }
 }
 export {DecryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
 
