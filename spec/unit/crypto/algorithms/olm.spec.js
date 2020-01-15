@@ -41,29 +41,7 @@ async function setupSession(initiator, opponent) {
     return sid;
 }
 
-describe("OlmDevice", () => {
-    if (!global.Olm) {
-        logger.warn('Not running megolm unit tests: libolm not present');
-        return;
-    }
-
-    beforeAll(function() {
-        return global.Olm.init();
-    });
-
-    let olmDevice;
-
-    beforeEach(async function() {
-        olmDevice = makeOlmDevice();
-        await olmDevice.init();
-    });
-
-    it('exports picked account and olm sessions', async function() {
-        console.log('EXPORT RESULT:', await olmDevice.export());
-    });
-});
-
-describe("OlmDecryption", function() {
+describe("OlmDevice", function() {
     if (!global.Olm) {
         logger.warn('Not running megolm unit tests: libolm not present');
         return;
@@ -100,6 +78,24 @@ describe("OlmDecryption", function() {
             );
             expect(result.payload).toEqual(
                 "The olm or proteus is an aquatic salamander in the family Proteidae",
+            );
+        });
+
+        it('exports picked account and olm sessions', async function() {
+            await setupSession(aliceOlmDevice, bobOlmDevice);
+
+            let exported = await aliceOlmDevice.export();
+            expect(exported).toHaveProperty('pickleKey');
+            expect(exported).toHaveProperty('pickledAccount');
+            expect(exported).toHaveProperty('sessions');
+            expect(Array.isArray(exported.sessions)).toBe(true);
+            expect(exported.sessions[0]).toEqual(
+                expect.objectContaining({
+                    session: expect.any(String),
+                    lastReceivedMessageTs: expect.any(Number),
+                    deviceKey: expect.any(String),
+                    sessionId: expect.any(String),
+                })
             );
         });
 
