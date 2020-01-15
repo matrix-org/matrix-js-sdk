@@ -191,6 +191,35 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
     this._cryptoStore.storeAccount(txn, account.pickle(this._pickleKey));
 };
 
+/*
+ * Export data for re-creating the Olm device later.
+*/
+OlmDevice.prototype.export = async function() {
+    const result = {
+        pickleKey: this._pickleKey,
+    };
+    await this._cryptoStore.doTxn(
+        'readonly',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                result.pickledAccount = pickledAccount;
+            });
+            result.sessions = [];
+            // Note that the pickledSession object we get in the callback
+            // is not exactly the same thing you get in method _getSession
+            // see documentation of IndexedDBCryptoStore.getAllEndToEndSessions
+            this._cryptoStore.getAllEndToEndSessions(txn, (pickledSession) => {
+                result.sessions.push(pickledSession);
+            });
+        },
+    );
+    return result;
+};
+
 /**
  * extract an OlmSession from the session store and call the given function
  * The session is useable only within the callback passed to this

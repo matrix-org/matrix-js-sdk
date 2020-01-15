@@ -41,6 +41,28 @@ async function setupSession(initiator, opponent) {
     return sid;
 }
 
+describe("OlmDevice", () => {
+    if (!global.Olm) {
+        logger.warn('Not running megolm unit tests: libolm not present');
+        return;
+    }
+
+    beforeAll(function() {
+        return global.Olm.init();
+    });
+
+    let olmDevice;
+
+    beforeEach(async function() {
+        olmDevice = makeOlmDevice();
+        await olmDevice.init();
+    });
+
+    it('exports picked account and olm sessions', async function() {
+        console.log('EXPORT RESULT:', await olmDevice.export());
+    });
+});
+
 describe("OlmDecryption", function() {
     if (!global.Olm) {
         logger.warn('Not running megolm unit tests: libolm not present');
