@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,12 +14,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * @module models/user
  */
- const EventEmitter = require("events").EventEmitter;
- const utils = require("../utils");
+
+import * as utils from "../utils";
+import {EventEmitter} from "events";
 
 /**
  * Construct a new User. A User must have an ID and can optionally have extra
@@ -45,7 +47,7 @@ limitations under the License.
  * @prop {Object} events The events describing this user.
  * @prop {MatrixEvent} events.presence The m.presence event for this user.
  */
-function User(userId) {
+export function User(userId) {
     this.userId = userId;
     this.presence = "offline";
     this.presenceStatusMsg = null;
@@ -194,11 +196,6 @@ User.prototype._unstable_updateStatusMessage = function(event) {
     this._updateModifiedTime();
     this.emit("User._unstable_statusMessage", this);
 };
-
-/**
- * The User class.
- */
-module.exports = User;
 
 /**
  * Fires whenever any user's lastPresenceTs changes,

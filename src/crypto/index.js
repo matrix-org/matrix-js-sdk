@@ -16,45 +16,41 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * @module crypto
  */
 
-const anotherjson = require('another-json');
+import anotherjson from "another-json";
 import {EventEmitter} from 'events';
-import ReEmitter from '../ReEmitter';
-
-import logger from '../logger';
-const utils = require("../utils");
-const httpApi = require("../http-api");
-const OlmDevice = require("./OlmDevice");
-const olmlib = require("./olmlib");
-const algorithms = require("./algorithms");
-const DeviceInfo = require("./deviceinfo");
-const DeviceVerification = DeviceInfo.DeviceVerification;
-const DeviceList = require('./DeviceList').default;
+import {ReEmitter} from '../ReEmitter';
+import {logger} from '../logger';
+import * as utils from "../utils";
+import {sleep} from "../utils";
+import {OlmDevice} from "./OlmDevice";
+import * as olmlib from "./olmlib";
+import {DeviceList} from "./DeviceList";
+import {DeviceInfo} from "./deviceinfo";
+import * as algorithms from "./algorithms";
 import {
     CrossSigningInfo,
-    UserTrustLevel,
-    DeviceTrustLevel,
     CrossSigningLevel,
+    DeviceTrustLevel,
+    UserTrustLevel,
 } from './CrossSigning';
-import SecretStorage, { SECRET_STORAGE_ALGORITHM_V1 } from './SecretStorage';
+import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
+import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import {ScanQRCode, ShowQRCode} from './verification/QRCode';
+import {SAS} from './verification/SAS';
+import {keyFromPassphrase} from './key_passphrase';
+import {encodeRecoveryKey} from './recoverykey';
+import {VerificationRequest} from "./verification/request/VerificationRequest";
+import {InRoomChannel} from "./verification/request/InRoomChannel";
+import {ToDeviceChannel} from "./verification/request/ToDeviceChannel";
+import * as httpApi from "../http-api";
 
-import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
-import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
-
-import {ShowQRCode, ScanQRCode} from './verification/QRCode';
-import SAS from './verification/SAS';
-import {sleep} from '../utils';
-import { keyFromPassphrase } from './key_passphrase';
-import { encodeRecoveryKey } from './recoverykey';
-
-import VerificationRequest from "./verification/request/VerificationRequest";
-import InRoomChannel from "./verification/request/InRoomChannel";
-import ToDeviceChannel from "./verification/request/ToDeviceChannel";
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -108,7 +104,7 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  *    Each element can either be a string from MatrixClient.verificationMethods
  *    or a class that implements a verification method.
  */
-export default function Crypto(baseApis, sessionStore, userId, deviceId,
+export function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
     this._onDeviceListUserCrossSigningUpdated =
         this._onDeviceListUserCrossSigningUpdated.bind(this);

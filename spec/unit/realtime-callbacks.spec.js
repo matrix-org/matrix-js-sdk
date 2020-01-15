@@ -1,7 +1,4 @@
-"use strict";
-
-import 'source-map-support/register';
-const callbacks = require("../../src/realtime-callbacks");
+import * as callbacks from "../../src/realtime-callbacks";
 
 let wallTime = 1234567890;
 jest.useFakeTimers();

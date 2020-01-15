@@ -1,5 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,15 +14,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
-
-import 'source-map-support/register';
-const sdk = require("../..");
-
-const AutoDiscovery = sdk.AutoDiscovery;
 
 import MockHttpBackend from "matrix-mock-request";
-
+import * as sdk from "../../src";
+import {AutoDiscovery} from "../../src/autodiscovery";
 
 describe("AutoDiscovery", function() {
     let httpBackend = null;

@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,15 +14,15 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * @module models/room-state
  */
-const EventEmitter = require("events").EventEmitter;
 
-const utils = require("../utils");
-const RoomMember = require("./room-member");
-import logger from '../logger';
+import {EventEmitter} from "events";
+import {RoomMember} from "./room-member";
+import {logger} from '../logger';
+import * as utils from "../utils";
 
 // possible statuses for out-of-band member loading
 const OOB_STATUS_NOTSTARTED = 1;
@@ -62,7 +63,7 @@ const OOB_STATUS_FINISHED = 3;
  * events dictionary, keyed on the event type and then the state_key value.
  * @prop {string} paginationToken The pagination token for this state.
  */
-function RoomState(roomId, oobMemberFlags = undefined) {
+export function RoomState(roomId, oobMemberFlags = undefined) {
     this.roomId = roomId;
     this.members = {
         // userId: RoomMember
@@ -713,11 +714,6 @@ RoomState.prototype.mayTriggerNotifOfType = function(notifLevelKey, userId) {
 
     return member.powerLevel >= notifLevel;
 };
-
-/**
- * The RoomState class.
- */
-module.exports = RoomState;
 
 
 function _updateThirdPartyTokenCache(roomState, memberEvent) {

@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +21,8 @@ limitations under the License.
  * @module sync-accumulator
  */
 
-import utils from "./utils";
-import logger from './logger';
-
+import {logger} from './logger';
+import {deepCopy} from "./utils";
 
 /**
  * The purpose of this class is to accumulate /sync responses such that a
@@ -34,7 +34,7 @@ import logger from './logger';
  * be loaded from disk and incremental syncs can be performed on the server,
  * rather than asking the server to do an initial sync on startup.
  */
-class SyncAccumulator {
+export class SyncAccumulator {
     /**
      * @param {Object} opts
      * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
@@ -502,7 +502,7 @@ class SyncAccumulator {
                 // since we're going back in time, we need to use the previous
                 // state value else we'll break causality. We don't have the
                 // complete previous state event, so we need to create one.
-                const prevStateEvent = utils.deepCopy(timelineEvent);
+                const prevStateEvent = deepCopy(timelineEvent);
                 if (prevStateEvent.unsigned) {
                     if (prevStateEvent.unsigned.prev_content) {
                         prevStateEvent.content = prevStateEvent.unsigned.prev_content;
@@ -554,5 +554,3 @@ function setState(eventMap, event) {
     }
     eventMap[event.type][event.state_key] = event;
 }
-
-module.exports = SyncAccumulator;

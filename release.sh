@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Script to perform a release of matrix-js-sdk.
+# Script to perform a release of matrix-js-sdk and downstream projects.
 #
 # Requires:
 #   github-changelog-generator; install via:
@@ -9,6 +9,8 @@
 #   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
 #   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
+#
+# Note: this script is also used to release matrix-react-sdk and riot-web.
 
 set -e
 

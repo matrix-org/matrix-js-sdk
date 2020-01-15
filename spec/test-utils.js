@@ -1,10 +1,8 @@
-"use strict";
 // load olm before the sdk if possible
 import './olm-loader';
 
-import logger from '../lib/logger';
-import sdk from '..';
-const MatrixEvent = sdk.MatrixEvent;
+import {logger} from '../src/logger';
+import {MatrixEvent} from "../src/models/event";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -13,7 +11,7 @@ const MatrixEvent = sdk.MatrixEvent;
  * @param {Number=} count Number of syncs to wait for (default 1)
  * @return {Promise} Resolves once the client has emitted a SYNCING event
  */
-module.exports.syncPromise = function(client, count) {
+export function syncPromise(client, count) {
     if (count === undefined) {
         count = 1;
     }
@@ -24,7 +22,7 @@ module.exports.syncPromise = function(client, count) {
     const p = new Promise((resolve, reject) => {
         const cb = (state) => {
             logger.log(`${Date.now()} syncPromise(${count}): ${state}`);
-            if (state == 'SYNCING') {
+            if (state === 'SYNCING') {
                 resolve();
             } else {
                 client.once('sync', cb);
@@ -34,9 +32,9 @@ module.exports.syncPromise = function(client, count) {
     });
 
     return p.then(() => {
-        return module.exports.syncPromise(client, count-1);
+        return syncPromise(client, count-1);
     });
-};
+}
 
 /**
  * Create a spy for an object and automatically spy its methods.
@@ -44,7 +42,7 @@ module.exports.syncPromise = function(client, count) {
  * @param {string} name The name of the class
  * @return {Object} An instantiated object with spied methods/properties.
  */
-module.exports.mock = function(constr, name) {
+export function mock(constr, name) {
     // Based on
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
@@ -65,7 +63,7 @@ module.exports.mock = function(constr, name) {
         }
     }
     return result;
-};
+}
 
 /**
  * Create an Event.
@@ -78,7 +76,7 @@ module.exports.mock = function(constr, name) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object} a JSON object representing this event.
  */
-module.exports.mkEvent = function(opts) {
+export function mkEvent(opts) {
     if (!opts.type || !opts.content) {
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
@@ -97,14 +95,14 @@ module.exports.mkEvent = function(opts) {
         event.state_key = "";
     }
     return opts.event ? new MatrixEvent(event) : event;
-};
+}
 
 /**
  * Create an m.presence event.
  * @param {Object} opts Values for the presence.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkPresence = function(opts) {
+export function mkPresence(opts) {
     if (!opts.user) {
         throw new Error("Missing user");
     }
@@ -120,7 +118,7 @@ module.exports.mkPresence = function(opts) {
         },
     };
     return opts.event ? new MatrixEvent(event) : event;
-};
+}
 
 /**
  * Create an m.room.member event.
@@ -135,7 +133,7 @@ module.exports.mkPresence = function(opts) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMembership = function(opts) {
+export function mkMembership(opts) {
     opts.type = "m.room.member";
     if (!opts.skey) {
         opts.skey = opts.sender || opts.user;
@@ -152,8 +150,8 @@ module.exports.mkMembership = function(opts) {
     if (opts.url) {
         opts.content.avatar_url = opts.url;
     }
-    return module.exports.mkEvent(opts);
-};
+    return mkEvent(opts);
+}
 
 /**
  * Create an m.room.message event.
@@ -164,7 +162,7 @@ module.exports.mkMembership = function(opts) {
  * @param {boolean} opts.event True to make a MatrixEvent.
  * @return {Object|MatrixEvent} The event
  */
-module.exports.mkMessage = function(opts) {
+export function mkMessage(opts) {
     opts.type = "m.room.message";
     if (!opts.msg) {
         opts.msg = "Random->" + Math.random();
@@ -176,8 +174,8 @@ module.exports.mkMessage = function(opts) {
         msgtype: "m.text",
         body: opts.msg,
     };
-    return module.exports.mkEvent(opts);
-};
+    return mkEvent(opts);
+}
 
 
 /**
@@ -185,10 +183,10 @@ module.exports.mkMessage = function(opts) {
  *
  * @constructor
  */
-module.exports.MockStorageApi = function() {
+export function MockStorageApi() {
     this.data = {};
-};
-module.exports.MockStorageApi.prototype = {
+}
+MockStorageApi.prototype = {
     get length() {
         return Object.keys(this.data).length;
     },
@@ -213,7 +211,7 @@ module.exports.MockStorageApi.prototype = {
  * @param {MatrixEvent} event
  * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
  */
-module.exports.awaitDecryption = function(event) {
+export function awaitDecryption(event) {
     if (!event.isBeingDecrypted()) {
         return Promise.resolve(event);
     }
@@ -226,19 +224,19 @@ module.exports.awaitDecryption = function(event) {
             resolve(ev);
         });
     });
-};
+}
 
 
-const HttpResponse = module.exports.HttpResponse = function(
+export function HttpResponse(
     httpLookups, acceptKeepalives, ignoreUnhandledSync,
 ) {
     this.httpLookups = httpLookups;
     this.acceptKeepalives = acceptKeepalives === undefined ? true : acceptKeepalives;
     this.ignoreUnhandledSync = ignoreUnhandledSync;
     this.pendingLookup = null;
-};
+}
 
-HttpResponse.prototype.request = function HttpResponse(
+HttpResponse.prototype.request = function(
     cb, method, path, qp, data, prefix,
 ) {
     if (path === HttpResponse.KEEP_ALIVE_PATH && this.acceptKeepalives) {
@@ -351,7 +349,7 @@ HttpResponse.defaultResponses = function(userId) {
     ];
 };
 
-module.exports.setHttpResponses = function setHttpResponses(
+export function setHttpResponses(
     client, responses, acceptKeepalives, ignoreUnhandledSyncs,
 ) {
     const httpResponseObj = new HttpResponse(
@@ -367,4 +365,4 @@ module.exports.setHttpResponses = function setHttpResponses(
     client._http.authedRequestWithPrefix.mockImplementation(httpReq);
     client._http.requestWithPrefix.mockImplementation(httpReq);
     client._http.request.mockImplementation(httpReq);
-};
+}

@@ -22,25 +22,24 @@ limitations under the License.
  * Utilities common to olm encryption algorithms
  */
 
-const anotherjson = require('another-json');
-
-import logger from '../logger';
-const utils = require("../utils");
+import {logger} from '../logger';
+import * as utils from "../utils";
+import anotherjson from "another-json";
 
 /**
  * matrix algorithm tag for olm
  */
-module.exports.OLM_ALGORITHM = "m.olm.v1.curve25519-aes-sha2";
+export const OLM_ALGORITHM = "m.olm.v1.curve25519-aes-sha2";
 
 /**
  * matrix algorithm tag for megolm
  */
-module.exports.MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
+export const MEGOLM_ALGORITHM = "m.megolm.v1.aes-sha2";
 
 /**
  * matrix algorithm tag for megolm backups
  */
-module.exports.MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
+export const MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2";
 
 
 /**
@@ -59,7 +58,7 @@ module.exports.MEGOLM_BACKUP_ALGORITHM = "m.megolm_backup.v1.curve25519-aes-sha2
  * Returns a promise which resolves (to undefined) when the payload
  *    has been encrypted into `resultsObject`
  */
-module.exports.encryptMessageForDevice = async function(
+export async function encryptMessageForDevice(
     resultsObject,
     ourUserId, ourDeviceId, olmDevice, recipientUserId, recipientDevice,
     payloadFields,
@@ -112,7 +111,7 @@ module.exports.encryptMessageForDevice = async function(
     resultsObject[deviceKey] = await olmDevice.encryptMessage(
         deviceKey, sessionId, JSON.stringify(payload),
     );
-};
+}
 
 /**
  * Try to make sure we have established olm sessions for the given devices.
@@ -131,7 +130,7 @@ module.exports.encryptMessageForDevice = async function(
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
-module.exports.ensureOlmSessionsForDevices = async function(
+export async function ensureOlmSessionsForDevices(
     olmDevice, baseApis, devicesByUser, force,
 ) {
     const devicesWithoutSession = [
@@ -263,12 +262,12 @@ module.exports.ensureOlmSessionsForDevices = async function(
 
     await Promise.all(promises);
     return result;
-};
+}
 
 async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceInfo) {
     const deviceId = deviceInfo.deviceId;
     try {
-        await _verifySignature(
+        await verifySignature(
             olmDevice, oneTimeKey, userId, deviceId,
             deviceInfo.getFingerprint(),
         );
@@ -314,7 +313,7 @@ async function _verifyKeyAndStartSession(olmDevice, oneTimeKey, userId, deviceIn
  * Returns a promise which resolves (to undefined) if the the signature is good,
  * or rejects with an Error if it is bad.
  */
-const _verifySignature = module.exports.verifySignature = async function(
+export async function verifySignature(
     olmDevice, obj, signingUserId, signingDeviceId, signingKey,
 ) {
     const signKeyId = "ed25519:" + signingDeviceId;
@@ -335,7 +334,7 @@ const _verifySignature = module.exports.verifySignature = async function(
     olmDevice.verifySignature(
         signingKey, json, signature,
     );
-};
+}
 
 /**
  * Sign a JSON object using public key cryptography
@@ -347,7 +346,7 @@ const _verifySignature = module.exports.verifySignature = async function(
  * @param {string} pubkey The public key (ignored if key is a seed)
  * @returns {string} the signature for the object
  */
-module.exports.pkSign = function(obj, key, userId, pubkey) {
+export function pkSign(obj, key, userId, pubkey) {
     let createdKey = false;
     if (key instanceof Uint8Array) {
         const keyObj = new global.Olm.PkSigning();
@@ -371,7 +370,7 @@ module.exports.pkSign = function(obj, key, userId, pubkey) {
             key.free();
         }
     }
-};
+}
 
 /**
  * Verify a signed JSON object
@@ -379,7 +378,7 @@ module.exports.pkSign = function(obj, key, userId, pubkey) {
  * @param {string} pubkey The public key to use to verify
  * @param {string} userId The user ID who signed the object
  */
-module.exports.pkVerify = function(obj, pubkey, userId) {
+export function pkVerify(obj, pubkey, userId) {
     const keyId = "ed25519:" + pubkey;
     if (!(obj.signatures && obj.signatures[userId] && obj.signatures[userId][keyId])) {
         throw new Error("No signature");
@@ -397,22 +396,22 @@ module.exports.pkVerify = function(obj, pubkey, userId) {
         if (unsigned) obj.unsigned = unsigned;
         util.free();
     }
-};
+}
 
 /**
  * Encode a typed array of uint8 as base64.
  * @param {Uint8Array} uint8Array The data to encode.
  * @return {string} The base64.
  */
-module.exports.encodeBase64 = function(uint8Array) {
+export function encodeBase64(uint8Array) {
     return Buffer.from(uint8Array).toString("base64");
-};
+}
 
 /**
  * Decode a base64 string to a typed array of uint8.
  * @param {string} base64 The base64 to decode.
  * @return {Uint8Array} The decoded data.
  */
-module.exports.decodeBase64 = function(base64) {
+export function decodeBase64(base64) {
     return Buffer.from(base64, "base64");
-};
+}

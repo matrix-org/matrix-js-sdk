@@ -1,5 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,23 +16,20 @@ limitations under the License.
 */
 
 import '../../olm-loader';
-
-import sdk from '../../..';
-import algorithms from '../../../lib/crypto/algorithms';
-import WebStorageSessionStore from '../../../lib/store/session/webstorage';
-import MemoryCryptoStore from '../../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../../MockStorageApi';
-import testUtils from '../../test-utils';
-
-import OlmDevice from '../../../lib/crypto/OlmDevice';
-import Crypto from '../../../lib/crypto';
-import logger from '../../../lib/logger';
-import olmlib from '../../../lib/crypto/olmlib';
+import {logger} from "../../../src/logger";
+import * as olmlib from "../../../src/crypto/olmlib";
+import {MatrixClient} from "../../../src/client";
+import {MatrixEvent} from "../../../src/models/event";
+import * as algorithms from "../../../src/crypto/algorithms";
+import {WebStorageSessionStore} from "../../../src/store/session/webstorage";
+import {MemoryCryptoStore} from "../../../src/crypto/store/memory-crypto-store";
+import {MockStorageApi} from "../../MockStorageApi";
+import * as testUtils from "../../test-utils";
+import {OlmDevice} from "../../../src/crypto/OlmDevice";
+import {Crypto} from "../../../src/crypto";
 
 const Olm = global.Olm;
 
-const MatrixClient = sdk.MatrixClient;
-const MatrixEvent = sdk.MatrixEvent;
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
 
 const ROOM_ID = '!ROOM:ID';

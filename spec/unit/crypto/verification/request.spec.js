@@ -1,5 +1,6 @@
 /*
 Copyright 2019 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,21 +14,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-import logger from '../../../../lib/logger';
-
-try {
-    global.Olm = require('olm');
-} catch (e) {
-    logger.warn("unable to run device verification tests: libolm not available");
-}
-
-import {verificationMethods} from '../../../../lib/crypto';
-
-import SAS from '../../../../lib/crypto/verification/SAS';
+import "../../../olm-loader";
+import {verificationMethods} from "../../../../src/crypto";
+import {logger} from "../../../../src/logger";
+import {SAS} from "../../../../src/crypto/verification/SAS";
+import {makeTestClients} from './util';
 
 const Olm = global.Olm;
-
-import {makeTestClients} from './util';
 
 describe("verification request", function() {
     if (!global.Olm) {

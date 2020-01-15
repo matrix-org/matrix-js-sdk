@@ -1,39 +1,23 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const HttpBackend = require("matrix-mock-request");
-const publicGlobals = require("../../lib/matrix");
-const Room = publicGlobals.Room;
-const MemoryStore = publicGlobals.MemoryStore;
-const Filter = publicGlobals.Filter;
-const utils = require("../test-utils");
-const MockStorageApi = require("../MockStorageApi");
+import * as utils from "../test-utils";
+import {CRYPTO_ENABLED} from "../../src/client";
+import {Filter, MemoryStore, Room} from "../../src/matrix";
+import {TestClient} from "../TestClient";
 
 describe("MatrixClient", function() {
-    const baseUrl = "http://localhost.or.something";
     let client = null;
     let httpBackend = null;
     let store = null;
-    let sessionStore = null;
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
         store = new MemoryStore();
 
-        const mockStorage = new MockStorageApi();
-        sessionStore = new sdk.WebStorageSessionStore(mockStorage);
-
-        sdk.request(httpBackend.requestFn);
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            deviceId: "aliceDevice",
-            accessToken: accessToken,
+        const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
             store: store,
-            sessionStore: sessionStore,
         });
+        httpBackend = testClient.httpBackend;
+        client = testClient.client;
     });
 
     afterEach(function() {
@@ -303,7 +287,7 @@ describe("MatrixClient", function() {
 
 
     describe("downloadKeys", function() {
-        if (!sdk.CRYPTO_ENABLED) {
+        if (!CRYPTO_ENABLED) {
             return;
         }
 

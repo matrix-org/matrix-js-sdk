@@ -1,12 +1,10 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const EventTimeline = sdk.EventTimeline;
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import {EventTimeline} from "../../src/models/event-timeline";
+import {RoomState} from "../../src/models/room-state";
 
 function mockRoomStates(timeline) {
-    timeline._startState = utils.mock(sdk.RoomState, "startState");
-    timeline._endState = utils.mock(sdk.RoomState, "endState");
+    timeline._startState = utils.mock(RoomState, "startState");
+    timeline._endState = utils.mock(RoomState, "endState");
 }
 
 describe("EventTimeline", function() {

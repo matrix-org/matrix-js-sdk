@@ -1,8 +1,5 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const User = sdk.User;
-const utils = require("../test-utils");
+import {User} from "../../src/models/user";
+import * as utils from "../test-utils";
 
 describe("User", function() {
     const userId = "@alice:bar";

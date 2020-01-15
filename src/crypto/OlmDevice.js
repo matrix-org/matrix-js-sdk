@@ -1,7 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017, 2019 New Vector Ltd
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,10 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../logger';
-import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
-
-import algorithms from './algorithms';
+import {logger} from '../logger';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import * as algorithms from './algorithms';
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -72,7 +71,7 @@ function checkPayloadLength(payloadString) {
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
  */
-function OlmDevice(cryptoStore) {
+export function OlmDevice(cryptoStore) {
     this._cryptoStore = cryptoStore;
     this._pickleKey = "DEFAULT_KEY";
 
@@ -1254,6 +1253,3 @@ OlmDevice.prototype.verifySignature = function(
         util.ed25519_verify(key, message, signature);
     });
 };
-
-/** */
-module.exports = OlmDevice;

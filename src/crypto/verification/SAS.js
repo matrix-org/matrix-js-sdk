@@ -19,14 +19,14 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
-import Base from "./Base";
+import {VerificationBase as Base} from "./Base";
 import anotherjson from 'another-json';
 import {
     errorFactory,
-    newUserCancelledError,
-    newUnknownMethodError,
-    newKeyMismatchError,
     newInvalidMessageError,
+    newKeyMismatchError,
+    newUnknownMethodError,
+    newUserCancelledError,
 } from './Error';
 
 const EVENTS = [
@@ -185,7 +185,11 @@ function intersection(anArray, aSet) {
  * @alias module:crypto/verification/SAS
  * @extends {module:crypto/verification/Base}
  */
-export default class SAS extends Base {
+export class SAS extends Base {
+    static get NAME() {
+        return "m.sas.v1";
+    }
+
     get events() {
         return EVENTS;
     }
@@ -426,5 +430,3 @@ export default class SAS extends Base {
         });
     }
 }
-
-SAS.NAME = "m.sas.v1";

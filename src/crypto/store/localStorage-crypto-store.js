@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import MemoryCryptoStore from './memory-crypto-store';
+import {logger} from '../../logger';
+import {MemoryCryptoStore} from './memory-crypto-store';
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -61,7 +61,7 @@ function keyEndToEndRoomsPrefix(roomId) {
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
-export default class LocalStorageCryptoStore extends MemoryCryptoStore {
+export class LocalStorageCryptoStore extends MemoryCryptoStore {
     constructor(webStore) {
         super();
         this.store = webStore;

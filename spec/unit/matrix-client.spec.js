@@ -1,9 +1,6 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const MatrixClient = sdk.MatrixClient;
-
-import logger from '../../lib/logger';
+import {logger} from "../../src/logger";
+import {MatrixClient} from "../../src/client";
+import {Filter} from "../../src/filter";
 
 jest.useFakeTimers();
 
@@ -180,7 +177,7 @@ describe("MatrixClient", function() {
         httpLookups.push(SYNC_RESPONSE);
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
-        const filter = new sdk.Filter(0, filterId);
+        const filter = new Filter(0, filterId);
         filter.setDefinition({"room": {"timeline": {"limit": 8}}});
         store.getFilter.mockReturnValue(filter);
         const syncPromise = new Promise((resolve, reject) => {
@@ -247,7 +244,7 @@ describe("MatrixClient", function() {
 
             const filterName = getFilterName(client.credentials.userId);
             client.store.setFilterIdByName(filterName, invalidFilterId);
-            const filter = new sdk.Filter(client.credentials.userId);
+            const filter = new Filter(client.credentials.userId);
 
             client.getOrCreateFilter(filterName, filter).then(function(filterId) {
                 expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
