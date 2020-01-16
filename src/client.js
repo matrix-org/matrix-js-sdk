@@ -1943,6 +1943,25 @@ MatrixClient.prototype.getAccountData = function(eventType) {
 };
 
 /**
+ * Get account data event of given type for the current user. This variant
+ * bypasses the local store and gets account data directly from the homeserver,
+ * which can be useful very early in startup before the initial sync.
+ * @param {string} eventType The event type
+ * @return {module:client.Promise} Resolves: The contents of the given account
+ * data event.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getAccountDataFromServer = function(eventType) {
+    const path = utils.encodeUri("/user/$userId/account_data/$type", {
+        $userId: this.credentials.userId,
+        $type: eventType,
+    });
+    return this._http.authedRequest(
+        undefined, "GET", path, undefined,
+    );
+};
+
+/**
  * Gets the users that are ignored by this client
  * @returns {string[]} The array of users that are ignored (empty if none)
  */
