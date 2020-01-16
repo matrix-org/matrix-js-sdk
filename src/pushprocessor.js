@@ -80,7 +80,7 @@ const DEFAULT_OVERRIDE_RULES = [
  * @constructor
  * @param {Object} client The Matrix client object to use
  */
-function PushProcessor(client) {
+export function PushProcessor(client) {
     const cachedGlobToRegex = {
         // $glob: RegExp,
     };
@@ -503,6 +503,4 @@ PushProcessor.rewriteDefaultRules = function(incomingRules) {
  * noise.
  */
 
-/** The PushProcessor class. */
-module.exports = PushProcessor;
 

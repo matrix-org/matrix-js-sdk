@@ -1,12 +1,8 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const Room = sdk.Room;
-const RoomState = sdk.RoomState;
-const MatrixEvent = sdk.MatrixEvent;
-const EventStatus = sdk.EventStatus;
-const EventTimeline = sdk.EventTimeline;
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import {EventStatus, MatrixEvent} from "../../src/models/event";
+import {EventTimeline} from "../../src/models/event-timeline";
+import {RoomState} from "../../src/models/room-state";
+import {Room} from "../../src/models/room";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -20,9 +16,9 @@ describe("Room", function() {
         room = new Room(roomId);
         // mock RoomStates
         room.oldState = room.getLiveTimeline()._startState =
-            utils.mock(sdk.RoomState, "oldState");
+            utils.mock(RoomState, "oldState");
         room.currentState = room.getLiveTimeline()._endState =
-            utils.mock(sdk.RoomState, "currentState");
+            utils.mock(RoomState, "currentState");
     });
 
     describe("getAvatarUrl", function() {

@@ -1,6 +1,7 @@
 /*
 Copyright 2016 OpenMarket Ltd
 Copyright 2017, 2019 New Vector Ltd
+Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../logger';
-import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
+import {logger} from '../logger';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import * as algorithms from './algorithms';
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -69,7 +71,7 @@ function checkPayloadLength(payloadString) {
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
  */
-function OlmDevice(cryptoStore) {
+export function OlmDevice(cryptoStore) {
     this._cryptoStore = cryptoStore;
     this._pickleKey = "DEFAULT_KEY";
 
@@ -671,6 +673,18 @@ OlmDevice.prototype.matchesSession = async function(
     return matches;
 };
 
+OlmDevice.prototype.recordSessionProblem = async function(deviceKey, type, fixed) {
+    await this._cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
+};
+
+OlmDevice.prototype.sessionMayHaveProblems = async function(deviceKey, timestamp) {
+    return await this._cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
+};
+
+OlmDevice.prototype.filterOutNotifiedErrorDevices = async function(devices) {
+    return await this._cryptoStore.filterOutNotifiedErrorDevices(devices);
+};
+
 
 // Outbound group session
 // ======================
@@ -818,9 +832,9 @@ OlmDevice.prototype._getInboundGroupSession = function(
     roomId, senderKey, sessionId, txn, func,
 ) {
     this._cryptoStore.getEndToEndInboundGroupSession(
-        senderKey, sessionId, txn, (sessionData) => {
+        senderKey, sessionId, txn, (sessionData, withheld) => {
             if (sessionData === null) {
-                func(null);
+                func(null, null, withheld);
                 return;
             }
 
@@ -834,7 +848,7 @@ OlmDevice.prototype._getInboundGroupSession = function(
             }
 
             this._unpickleInboundGroupSession(sessionData, (session) => {
-                func(session, sessionData);
+                func(session, sessionData, withheld);
             });
         },
     );
@@ -859,7 +873,10 @@ OlmDevice.prototype.addInboundGroupSession = async function(
     exportFormat,
 ) {
     await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             /* if we already have this session, consider updating it */
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn,
@@ -915,6 +932,60 @@ OlmDevice.prototype.addInboundGroupSession = async function(
 };
 
 /**
+ * Record in the data store why an inbound group session was withheld.
+ *
+ * @param {string} roomId     room that the session belongs to
+ * @param {string} senderKey  base64-encoded curve25519 key of the sender
+ * @param {string} sessionId  session identifier
+ * @param {string} code       reason code
+ * @param {string} reason     human-readable version of `code`
+ */
+OlmDevice.prototype.addInboundGroupSessionWithheld = async function(
+    roomId, senderKey, sessionId, code, reason,
+) {
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD],
+        (txn) => {
+            this._cryptoStore.storeEndToEndInboundGroupSessionWithheld(
+                senderKey, sessionId,
+                {
+                    room_id: roomId,
+                    code: code,
+                    reason: reason,
+                },
+                txn,
+            );
+        },
+    );
+};
+
+export const WITHHELD_MESSAGES = {
+    "m.unverified": "The sender has disabled encrypting to unverified devices.",
+    "m.blacklisted": "The sender has blocked you.",
+    "m.unauthorised": "You are not authorised to read the message.",
+    "m.no_olm": "Unable to establish a secure channel.",
+};
+
+/**
+ * Calculate the message to use for the exception when a session key is withheld.
+ *
+ * @param {object} withheld  An object that describes why the key was withheld.
+ *
+ * @return {string} the message
+ *
+ * @private
+ */
+function _calculateWithheldMessage(withheld) {
+    if (withheld.code && withheld.code in WITHHELD_MESSAGES) {
+        return WITHHELD_MESSAGES[withheld.code];
+    } else if (withheld.reason) {
+        return withheld.reason;
+    } else {
+        return "decryption key withheld";
+    }
+}
+
+/**
  * Decrypt a received message with an inbound group session
  *
  * @param {string} roomId    room in which the message was received
@@ -934,16 +1005,49 @@ OlmDevice.prototype.decryptGroupMessage = async function(
     roomId, senderKey, sessionId, body, eventId, timestamp,
 ) {
     let result;
+    // when the localstorage crypto store is used as an indexeddb backend,
+    // exceptions thrown from within the inner function are not passed through
+    // to the top level, so we store exceptions in a variable and raise them at
+    // the end
+    let error;
 
     await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readwrite', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._getInboundGroupSession(
-                roomId, senderKey, sessionId, txn, (session, sessionData) => {
+                roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
                     if (session === null) {
+                        if (withheld) {
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
+                        }
                         result = null;
                         return;
                     }
-                    const res = session.decrypt(body);
+                    let res;
+                    try {
+                        res = session.decrypt(body);
+                    } catch (e) {
+                        if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
+                            error = new algorithms.DecryptionError(
+                                "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
+                                _calculateWithheldMessage(withheld),
+                                {
+                                    session: senderKey + '|' + sessionId,
+                                },
+                            );
+                        } else {
+                            error = e;
+                        }
+                        return;
+                    }
 
                     let plaintext = res.plaintext;
                     if (plaintext === undefined) {
@@ -965,10 +1069,11 @@ OlmDevice.prototype.decryptGroupMessage = async function(
                                 msgInfo.id !== eventId ||
                                 msgInfo.timestamp !== timestamp
                             ) {
-                                throw new Error(
+                                error = new Error(
                                     "Duplicate message index, possible replay attack: " +
                                     messageIndexKey,
                                 );
+                                return;
                             }
                         }
                         this._inboundGroupSessionMessageIndexes[messageIndexKey] = {
@@ -994,6 +1099,9 @@ OlmDevice.prototype.decryptGroupMessage = async function(
         },
     );
 
+    if (error) {
+        throw error;
+    }
     return result;
 };
 
@@ -1009,7 +1117,10 @@ OlmDevice.prototype.decryptGroupMessage = async function(
 OlmDevice.prototype.hasInboundSessionKeys = async function(roomId, senderKey, sessionId) {
     let result;
     await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._cryptoStore.getEndToEndInboundGroupSession(
                 senderKey, sessionId, txn, (sessionData) => {
                     if (sessionData === null) {
@@ -1060,7 +1171,10 @@ OlmDevice.prototype.getInboundGroupSessionKey = async function(
 ) {
     let result;
     await this._cryptoStore.doTxn(
-        'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+        'readonly', [
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+        ], (txn) => {
             this._getInboundGroupSession(
                 roomId, senderKey, sessionId, txn, (session, sessionData) => {
                     if (session === null) {
@@ -1139,6 +1253,3 @@ OlmDevice.prototype.verifySignature = function(
         util.ed25519_verify(key, message, signature);
     });
 };
-
-/** */
-module.exports = OlmDevice;

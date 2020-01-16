@@ -1,6 +1,7 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
 Copyright 2017 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +15,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  * @module webrtc/call
  */
-const utils = require("../utils");
-const EventEmitter = require("events").EventEmitter;
-import logger from '../logger';
+
+import {logger} from '../logger';
+import {EventEmitter} from "events";
+import * as utils from "../utils";
+
 const DEBUG = true;  // set true to enable console logging.
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
@@ -53,7 +56,7 @@ const DEBUG = true;  // set true to enable console logging.
  * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
  */
-function MatrixCall(opts) {
+export function MatrixCall(opts) {
     this.roomId = opts.roomId;
     this.client = opts.client;
     this.webRtc = opts.webRtc;
@@ -1304,9 +1307,6 @@ const forAllTracksOnStream = function(s, f) {
     forAllAudioTracksOnStream(s, f);
 };
 
-/** The MatrixCall class. */
-module.exports.MatrixCall = MatrixCall;
-
 let audioOutput;
 let audioInput;
 let videoInput;
@@ -1316,21 +1316,21 @@ let videoInput;
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
-module.exports.setAudioOutput = function(deviceId) { audioOutput = deviceId; };
+export function setAudioOutput(deviceId) { audioOutput = deviceId; }
 /**
  * Set an audio input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
-module.exports.setAudioInput = function(deviceId) { audioInput = deviceId; };
+export function setAudioInput(deviceId) { audioInput = deviceId; }
 /**
  * Set a video input device to use for MatrixCalls
  * @function
  * @param {string=} deviceId the identifier for the device
  * undefined treated as unset
  */
-module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
+export function setVideoInput(deviceId) { videoInput = deviceId; }
 
 /**
  * Create a new Matrix call for the browser.
@@ -1342,7 +1342,7 @@ module.exports.setVideoInput = function(deviceId) { videoInput = deviceId; };
  * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-module.exports.createNewMatrixCall = function(client, roomId, options) {
+export function createNewMatrixCall(client, roomId, options) {
     const w = global.window;
     const doc = global.document;
     if (!w || !doc) {
@@ -1417,4 +1417,4 @@ module.exports.createNewMatrixCall = function(client, roomId, options) {
         forceTURN: client._forceTURN || optionsForceTURN,
     };
     return new MatrixCall(opts);
-};
+}

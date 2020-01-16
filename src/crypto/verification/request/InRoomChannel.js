@@ -15,11 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import VerificationRequest, {
+import {
+    VerificationRequest,
     REQUEST_TYPE,
     READY_TYPE,
     START_TYPE,
 } from "./VerificationRequest";
+
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
 const M_RELATES_TO = "m.relates_to";

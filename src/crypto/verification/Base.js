@@ -21,13 +21,13 @@ limitations under the License.
 
 import {MatrixEvent} from '../../models/event';
 import {EventEmitter} from 'events';
-import logger from '../../logger';
-import DeviceInfo from '../deviceinfo';
+import {logger} from '../../logger';
+import {DeviceInfo} from '../deviceinfo';
 import {newTimeoutError} from "./Error";
 
 const timeoutException = new Error("Verification timed out");
 
-export default class VerificationBase extends EventEmitter {
+export class VerificationBase extends EventEmitter {
     /**
      * Base class for verification methods.
      *

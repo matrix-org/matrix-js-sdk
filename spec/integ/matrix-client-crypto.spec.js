@@ -2,6 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,17 +25,14 @@ limitations under the License.
  * See also `megolm.spec.js`.
  */
 
-"use strict";
-import 'source-map-support/register';
-
 // load olm before the sdk if possible
 import '../olm-loader';
 
-const sdk = require("../..");
-const utils = require("../../lib/utils");
-const testUtils = require("../test-utils");
-const TestClient = require('../TestClient').default;
-import logger from '../../lib/logger';
+import {logger} from '../../src/logger';
+import * as testUtils from "../test-utils";
+import * as utils from "../../src/utils";
+import {TestClient} from "../TestClient";
+import {CRYPTO_ENABLED} from "../../src/client";
 
 let aliTestClient;
 const roomId = "!room:localhost";
@@ -400,7 +398,7 @@ function firstSync(testClient) {
 
 
 describe("MatrixClient crypto", function() {
-    if (!sdk.CRYPTO_ENABLED) {
+    if (!CRYPTO_ENABLED) {
         return;
     }
 

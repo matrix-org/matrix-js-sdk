@@ -16,16 +16,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-"use strict";
-
 // load olm before the sdk if possible
 import './olm-loader';
 
-import sdk from '..';
-import testUtils from './test-utils';
 import MockHttpBackend from 'matrix-mock-request';
-import LocalStorageCryptoStore from '../lib/crypto/store/localStorage-crypto-store';
-import logger from '../lib/logger';
+import {LocalStorageCryptoStore} from '../src/crypto/store/localStorage-crypto-store';
+import {logger} from '../src/logger';
+import {WebStorageSessionStore} from "../src/store/session/webstorage";
+import {syncPromise} from "./test-utils";
+import {createClient} from "../src/matrix";
+import {MockStorageApi} from "./MockStorageApi";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -39,16 +39,16 @@ import logger from '../lib/logger';
  *     session store. If undefined, we will create a MockStorageApi.
  * @param {object} options additional options to pass to the client
  */
-export default function TestClient(
+export function TestClient(
     userId, deviceId, accessToken, sessionStoreBackend, options,
 ) {
     this.userId = userId;
     this.deviceId = deviceId;
 
     if (sessionStoreBackend === undefined) {
-        sessionStoreBackend = new testUtils.MockStorageApi();
+        sessionStoreBackend = new MockStorageApi();
     }
-    const sessionStore = new sdk.WebStorageSessionStore(sessionStoreBackend);
+    const sessionStore = new WebStorageSessionStore(sessionStoreBackend);
 
     this.httpBackend = new MockHttpBackend();
 
@@ -65,7 +65,7 @@ export default function TestClient(
         this.cryptoStore = new LocalStorageCryptoStore(sessionStoreBackend);
         options.cryptoStore = this.cryptoStore;
     }
-    this.client = sdk.createClient(options);
+    this.client = createClient(options);
 
     this.deviceKeys = null;
     this.oneTimeKeys = {};
@@ -97,7 +97,7 @@ TestClient.prototype.start = function() {
 
     return Promise.all([
         this.httpBackend.flushAllExpected(),
-        testUtils.syncPromise(this.client),
+        syncPromise(this.client),
     ]).then(() => {
         logger.log(this + ': started');
     });
@@ -225,7 +225,7 @@ TestClient.prototype.flushSync = function() {
     logger.log(`${this}: flushSync`);
     return Promise.all([
         this.httpBackend.flush('/sync', 1),
-        testUtils.syncPromise(this.client),
+        syncPromise(this.client),
     ]).then(() => {
         logger.log(`${this}: flushSync completed`);
     });

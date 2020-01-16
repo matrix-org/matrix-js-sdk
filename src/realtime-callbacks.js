@@ -1,5 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +24,7 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-"use strict";
-import logger from './logger';
+import {logger} from './logger';
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
@@ -52,9 +52,9 @@ const debuglog = function() {};
  *
  * @internal
  */
-module.exports.setNow = function(f) {
+export function setNow(f) {
     _now = f || Date.now;
-};
+}
 let _now = Date.now;
 
 /**
@@ -67,7 +67,7 @@ let _now = Date.now;
  * @return {Number} an identifier for this callback, which may be passed into
  *                   clearTimeout later.
  */
-module.exports.setTimeout = function(func, delayMs) {
+export function setTimeout(func, delayMs) {
     delayMs = delayMs || 0;
     if (delayMs < 0) {
         delayMs = 0;
@@ -96,14 +96,14 @@ module.exports.setTimeout = function(func, delayMs) {
     _scheduleRealCallback();
 
     return key;
-};
+}
 
 /**
  * reimplementation of window.clearTimeout, which mirrors setTimeout
  *
  * @param {Number} key   result from an earlier setTimeout call
  */
-module.exports.clearTimeout = function(key) {
+export function clearTimeout(key) {
     if (_callbackList.length === 0) {
         return;
     }
@@ -122,7 +122,7 @@ module.exports.clearTimeout = function(key) {
     if (i === 0) {
         _scheduleRealCallback();
     }
-};
+}
 
 // use the real global.setTimeout to schedule a callback to _runCallbacks.
 function _scheduleRealCallback() {

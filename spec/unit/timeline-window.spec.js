@@ -1,11 +1,6 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const EventTimeline = sdk.EventTimeline;
-const TimelineWindow = sdk.TimelineWindow;
-const TimelineIndex = require("../../lib/timeline-window").TimelineIndex;
-
-const utils = require("../test-utils");
+import {EventTimeline} from "../../src/models/event-timeline";
+import {TimelineIndex, TimelineWindow} from "../../src/timeline-window";
+import * as utils from "../test-utils";
 
 const ROOM_ID = "roomId";
 const USER_ID = "userId";

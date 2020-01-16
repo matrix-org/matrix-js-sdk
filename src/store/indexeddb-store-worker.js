@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
-import logger from '../logger';
+import {LocalIndexedDBStoreBackend} from "./indexeddb-local-backend.js";
+import {logger} from '../logger';
 
 /**
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
@@ -33,7 +34,7 @@ import logger from '../logger';
  * avoid a dependency on the whole js-sdk.
  *
  */
-class IndexedDBStoreWorker {
+export class IndexedDBStoreWorker {
     /**
      * @param {function} postMessage The web worker postMessage function that
      * should be used to communicate back to the main script.
@@ -143,5 +144,3 @@ class IndexedDBStoreWorker {
         });
     }
 }
-
-module.exports = IndexedDBStoreWorker;

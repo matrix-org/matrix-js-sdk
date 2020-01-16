@@ -1,24 +1,16 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import {TestClient} from "../TestClient";
 
 describe("MatrixClient events", function() {
-    const baseUrl = "http://localhost.or.something";
     let client;
     let httpBackend;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: selfUserId,
-            accessToken: selfAccessToken,
-        });
+        const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     });

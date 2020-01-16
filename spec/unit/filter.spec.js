@@ -1,7 +1,4 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const Filter = sdk.Filter;
+import {Filter} from "../../src/filter";
 
 describe("Filter", function() {
     const filterId = "f1lt3ring15g00d4ursoul";

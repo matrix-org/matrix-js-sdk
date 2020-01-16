@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../logger';
-import utils from '../utils';
+import {logger} from '../logger';
+import * as utils from '../utils';
 
 /**
  * Internal module. Management of outgoing room key requests.
@@ -75,7 +75,7 @@ const ROOM_KEY_REQUEST_STATES = {
     CANCELLATION_PENDING_AND_WILL_RESEND: 3,
 };
 
-export default class OutgoingRoomKeyRequestManager {
+export class OutgoingRoomKeyRequestManager {
     constructor(baseApis, deviceId, cryptoStore) {
         this._baseApis = baseApis;
         this._deviceId = deviceId;

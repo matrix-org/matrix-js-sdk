@@ -50,7 +50,7 @@ export const DECRYPTION_CLASSES = {};
  * @param {string} params.roomId  The ID of the room we will be sending to
  * @param {object} params.config  The body of the m.room.encryption event
  */
-class EncryptionAlgorithm {
+export class EncryptionAlgorithm {
     constructor(params) {
         this._userId = params.userId;
         this._deviceId = params.deviceId;
@@ -84,7 +84,6 @@ class EncryptionAlgorithm {
      onRoomMembership(event, member, oldMembership) {
      }
 }
-export {EncryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
 
 /**
  * base type for decryption implementations
@@ -98,7 +97,7 @@ export {EncryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
  * @param {string=} params.roomId The ID of the room we will be receiving
  *     from. Null for to-device events.
  */
-class DecryptionAlgorithm {
+export class DecryptionAlgorithm {
     constructor(params) {
         this._userId = params.userId;
         this._crypto = params.crypto;
@@ -159,8 +158,17 @@ class DecryptionAlgorithm {
     shareKeysWithDevice(keyRequest) {
         throw new Error("shareKeysWithDevice not supported for this DecryptionAlgorithm");
     }
+
+    /**
+     * Retry decrypting all the events from a sender that haven't been
+     * decrypted yet.
+     *
+     * @param {string} senderKey the sender's key
+     */
+    async retryDecryptionFromSender(senderKey) {
+        // ignore by default
+    }
 }
-export {DecryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
 
 /**
  * Exception thrown when decryption fails
@@ -173,7 +181,7 @@ export {DecryptionAlgorithm}; // https://github.com/jsdoc3/jsdoc/issues/1272
  *
  * @extends Error
  */
-class DecryptionError extends Error {
+export class DecryptionError extends Error {
     constructor(code, msg, details) {
         super(msg);
         this.code = code;
@@ -181,7 +189,6 @@ class DecryptionError extends Error {
         this.detailedString = _detailedStringForDecryptionError(this, details);
     }
 }
-export {DecryptionError}; // https://github.com/jsdoc3/jsdoc/issues/1272
 
 function _detailedStringForDecryptionError(err, details) {
     let result = err.name + '[msg: ' + err.message;

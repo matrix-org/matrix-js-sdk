@@ -1,11 +1,9 @@
 {
+    "sourceMaps": true,
     "presets": [
         ["@babel/preset-env", {
             "targets": {
-                "browsers": [
-                    "last 2 versions"
-                ],
-                "node": 12
+                "node": 10
             },
             "modules": "commonjs"
         }],

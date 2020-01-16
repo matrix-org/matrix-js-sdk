@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,13 +19,13 @@ limitations under the License.
 /* eslint-disable babel/no-invalid-this */
 
 import {MemoryStore} from "./memory";
-import utils from "../utils";
+import * as utils from "../utils";
 import {EventEmitter} from 'events';
-import LocalIndexedDBStoreBackend from "./indexeddb-local-backend.js";
-import RemoteIndexedDBStoreBackend from "./indexeddb-remote-backend.js";
-import User from "../models/user";
+import {LocalIndexedDBStoreBackend} from "./indexeddb-local-backend.js";
+import {RemoteIndexedDBStoreBackend} from "./indexeddb-remote-backend.js";
+import {User} from "../models/user";
 import {MatrixEvent} from "../models/event";
-import logger from '../logger';
+import {logger} from '../logger';
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -81,7 +82,7 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * this API if you need to perform specific indexeddb actions like deleting the
  * database.
  */
-const IndexedDBStore = function IndexedDBStore(opts) {
+export function IndexedDBStore(opts) {
     MemoryStore.call(this, opts);
 
     if (!opts.indexedDB) {
@@ -111,7 +112,7 @@ const IndexedDBStore = function IndexedDBStore(opts) {
     this._userModifiedMap = {
         // user_id : timestamp
     };
-};
+}
 utils.inherits(IndexedDBStore, MemoryStore);
 utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
 
@@ -272,8 +273,6 @@ IndexedDBStore.prototype.storeClientOptions = degradable(function(options) {
     MemoryStore.prototype.storeClientOptions.call(this, options);
     return this.backend.storeClientOptions(options);
 }, "storeClientOptions");
-
-module.exports.IndexedDBStore = IndexedDBStore;
 
 /**
  * All member functions of `IndexedDBStore` that access the backend use this wrapper to

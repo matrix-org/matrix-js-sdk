@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,14 +14,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * @module models/room-member
  */
-const EventEmitter = require("events").EventEmitter;
-const ContentRepo = require("../content-repo");
 
-const utils = require("../utils");
+import {EventEmitter} from "events";
+import {getHttpUriForMxc, getIdenticonUri} from "../content-repo";
+import * as utils from "../utils";
 
 /**
  * Construct a new room member.
@@ -45,7 +46,7 @@ const utils = require("../utils");
  * @prop {Object} events The events describing this RoomMember.
  * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
  */
-function RoomMember(roomId, userId) {
+export function RoomMember(roomId, userId) {
     this.roomId = roomId;
     this.userId = userId;
     this.typing = false;
@@ -268,13 +269,13 @@ RoomMember.prototype.getAvatarUrl =
     if (!rawUrl && !allowDefault) {
         return null;
     }
-    const httpUrl = ContentRepo.getHttpUriForMxc(
+    const httpUrl = getHttpUriForMxc(
         baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
     );
     if (httpUrl) {
         return httpUrl;
     } else if (allowDefault) {
-        return ContentRepo.getIdenticonUri(
+        return getIdenticonUri(
             baseUrl, this.userId, width, height,
         );
     }
@@ -311,10 +312,18 @@ function calculateDisplayName(selfUserId, displayName, roomState) {
     // Next check if the name contains something that look like a mxid
     // If it does, it may be someone trying to impersonate someone else
     // Show full mxid in this case
-    // Also show mxid if there are other people with the same or similar
-    // displayname, after hidden character removal.
     let disambiguate = /@.+:.+/.test(displayName);
+
     if (!disambiguate) {
+        // Also show mxid if the display name contains any LTR/RTL characters as these
+        // make it very difficult for us to find similar *looking* display names
+        // E.g "Mark" could be cloned by writing "kraM" but in RTL.
+        disambiguate = /[\u200E\u200F\u202A-\u202F]/.test(displayName);
+    }
+
+    if (!disambiguate) {
+        // Also show mxid if there are other people with the same or similar
+        // displayname, after hidden character removal.
         const userIds = roomState.getUserIdsWithDisplayName(displayName);
         disambiguate = userIds.some((u) => u !== selfUserId);
     }
@@ -324,11 +333,6 @@ function calculateDisplayName(selfUserId, displayName, roomState) {
     }
     return displayName;
 }
-
-/**
- * The RoomMember class.
- */
-module.exports = RoomMember;
 
 /**
  * Fires whenever any room member's name changes.

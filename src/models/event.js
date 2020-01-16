@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * This is an internal module. See {@link MatrixEvent} and {@link RoomEvent} for
@@ -22,15 +22,15 @@ limitations under the License.
  */
 
 import {EventEmitter} from 'events';
-import utils from '../utils.js';
-import logger from '../logger';
+import * as utils from '../utils.js';
+import {logger} from '../logger';
 
 /**
  * Enum for event statuses.
  * @readonly
  * @enum {string}
  */
-const EventStatus = {
+export const EventStatus = {
     /** The event was not sent and will no longer be retried. */
     NOT_SENT: "not_sent",
 
@@ -48,7 +48,6 @@ const EventStatus = {
     /** The event was cancelled before it was successfully sent. */
     CANCELLED: "cancelled",
 };
-module.exports.EventStatus = EventStatus;
 
 const interns = {};
 function intern(str) {
@@ -81,7 +80,7 @@ function intern(str) {
  * that getDirectionalContent() will return event.content and not event.prev_content.
  * Default: true. <strong>This property is experimental and may change.</strong>
  */
-module.exports.MatrixEvent = function MatrixEvent(
+export const MatrixEvent = function(
     event,
 ) {
     // intern the values of matrix events to force share strings and reduce the
@@ -162,10 +161,10 @@ module.exports.MatrixEvent = function MatrixEvent(
      */
     this.verificationRequest = null;
 };
-utils.inherits(module.exports.MatrixEvent, EventEmitter);
+utils.inherits(MatrixEvent, EventEmitter);
 
 
-utils.extend(module.exports.MatrixEvent.prototype, {
+utils.extend(MatrixEvent.prototype, {
 
     /**
      * Get the event_id for this event.

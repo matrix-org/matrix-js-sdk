@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,9 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import LocalStorageCryptoStore from './localStorage-crypto-store';
-import MemoryCryptoStore from './memory-crypto-store';
+import {logger} from '../../logger';
+import {LocalStorageCryptoStore} from './localStorage-crypto-store';
+import {MemoryCryptoStore} from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
 import {InvalidCryptoStoreError} from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
@@ -34,7 +35,7 @@ import * as IndexedDBHelpers from "../../indexeddb-helpers";
  *
  * @implements {module:crypto/store/base~CryptoStore}
  */
-export default class IndexedDBCryptoStore {
+export class IndexedDBCryptoStore {
     /**
      * Create a new IndexedDBCryptoStore
      *
@@ -104,7 +105,10 @@ export default class IndexedDBCryptoStore {
             // we can fall back to a different backend.
             return backend.doTxn(
                 'readonly',
-                [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS],
+                [
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                ],
                 (txn) => {
                     backend.getEndToEndInboundGroupSession('', '', txn, () => {});
                 }).then(() => {
@@ -405,6 +409,24 @@ export default class IndexedDBCryptoStore {
         });
     }
 
+    storeEndToEndSessionProblem(deviceKey, type, fixed) {
+        return this._backendPromise.then(async (backend) => {
+            await backend.storeEndToEndSessionProblem(deviceKey, type, fixed);
+        });
+    }
+
+    getEndToEndSessionProblem(deviceKey, timestamp) {
+        return this._backendPromise.then(async (backend) => {
+            return await backend.getEndToEndSessionProblem(deviceKey, timestamp);
+        });
+    }
+
+    filterOutNotifiedErrorDevices(devices) {
+        return this._backendPromise.then(async (backend) => {
+            return await backend.filterOutNotifiedErrorDevices(devices);
+        });
+    }
+
     // Inbound group sessions
 
     /**
@@ -466,6 +488,16 @@ export default class IndexedDBCryptoStore {
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         this._backendPromise.then(backend => {
             backend.storeEndToEndInboundGroupSession(
+                senderCurve25519Key, sessionId, sessionData, txn,
+            );
+        });
+    }
+
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
+        this._backendPromise.then(backend => {
+            backend.storeEndToEndInboundGroupSessionWithheld(
                 senderCurve25519Key, sessionId, sessionData, txn,
             );
         });
@@ -607,6 +639,8 @@ export default class IndexedDBCryptoStore {
 IndexedDBCryptoStore.STORE_ACCOUNT = 'account';
 IndexedDBCryptoStore.STORE_SESSIONS = 'sessions';
 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
+IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD
+    = 'inbound_group_sessions_withheld';
 IndexedDBCryptoStore.STORE_DEVICE_DATA = 'device_data';
 IndexedDBCryptoStore.STORE_ROOMS = 'rooms';
 IndexedDBCryptoStore.STORE_BACKUP = 'sessions_needing_backup';

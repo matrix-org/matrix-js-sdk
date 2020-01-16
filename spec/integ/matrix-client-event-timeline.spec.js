@@ -1,12 +1,8 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
-const EventTimeline = sdk.EventTimeline;
-import logger from '../../lib/logger';
+import * as utils from "../test-utils";
+import {EventTimeline} from "../../src/matrix";
+import {logger} from "../../src/logger";
+import {TestClient} from "../TestClient";
 
-const baseUrl = "http://localhost.or.something";
 const userId = "@alice:localhost";
 const userName = "Alice";
 const accessToken = "aseukfgwef";
@@ -103,8 +99,9 @@ describe("getEventTimeline support", function() {
     let client;
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
+        const testClient = new TestClient(userId, "DEVICE", accessToken);
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
     });
 
     afterEach(function() {
@@ -115,12 +112,6 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support must be enabled to work", function() {
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            accessToken: accessToken,
-        });
-
         return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -131,12 +122,15 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support works when enabled", function() {
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            accessToken: accessToken,
-            timelineSupport: true,
-        });
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {timelineSupport: true},
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
 
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId);
@@ -151,11 +145,7 @@ describe("getEventTimeline support", function() {
     it("scrollback should be able to scroll back to before a gappy /sync",
       function() {
         // need a client with timelineSupport disabled to make this work
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            accessToken: accessToken,
-        });
+
         let room;
 
         return startClient(httpBackend, client).then(function() {
@@ -223,15 +213,15 @@ describe("MatrixClient event timelines", function() {
     let httpBackend = null;
 
     beforeEach(function() {
-        httpBackend = new HttpBackend();
-        sdk.request(httpBackend.requestFn);
-
-        client = sdk.createClient({
-            baseUrl: baseUrl,
-            userId: userId,
-            accessToken: accessToken,
-            timelineSupport: true,
-        });
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            {timelineSupport: true},
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
 
         return startClient(httpBackend, client);
     });

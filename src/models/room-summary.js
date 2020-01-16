@@ -1,5 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +14,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
+
 /**
  * @module models/room-summary
  */
@@ -31,12 +32,8 @@ limitations under the License.
  * @param {string[]} info.aliases The list of aliases for this room.
  * @param {Number} info.timestamp The timestamp for this room.
  */
-function RoomSummary(roomId, info) {
+export function RoomSummary(roomId, info) {
     this.roomId = roomId;
     this.info = info;
 }
 
-/**
- * The RoomSummary class.
- */
-module.exports = RoomSummary;

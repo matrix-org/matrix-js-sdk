@@ -1,9 +1,8 @@
-"use strict";
-import 'source-map-support/register';
-const sdk = require("../..");
-const MatrixClient = sdk.MatrixClient;
-const HttpBackend = require("matrix-mock-request");
-const utils = require("../test-utils");
+import * as utils from "../test-utils";
+import HttpBackend from "matrix-mock-request";
+import {MatrixClient} from "../../src/matrix";
+import {MatrixScheduler} from "../../src/scheduler";
+import {MemoryStore} from "../../src/store/memory";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
@@ -71,7 +70,7 @@ describe("MatrixClient opts", function() {
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
-                scheduler: new sdk.MatrixScheduler(),
+                scheduler: new MatrixScheduler(),
             });
         });
 
@@ -124,7 +123,7 @@ describe("MatrixClient opts", function() {
         beforeEach(function() {
             client = new MatrixClient({
                 request: httpBackend.requestFn,
-                store: new sdk.MemoryStore(),
+                store: new MemoryStore(),
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,

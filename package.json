@@ -1,21 +1,23 @@
 {
   "name": "matrix-js-sdk",
-  "version": "2.4.6",
+  "version": "3.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
-  "main": "index.js",
   "scripts": {
-    "test:watch": "jest spec/ --coverage --testEnvironment node --watch",
-    "test": "jest spec/ --coverage --testEnvironment node",
-    "gendoc": "jsdoc -c jsdoc.json -P package.json",
-    "start": "yarn start:init && yarn start:watch",
-    "start:watch": "babel src -s -w --skip-initial-build -d lib --verbose --extensions \".ts,.js\"",
-    "start:init": "babel src -s -d lib --verbose --extensions \".ts,.js\"",
+    "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
+    "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
     "clean": "rimraf lib dist",
-    "build": "babel src -s -d lib --verbose --extensions \".ts,.js\" && rimraf dist && mkdir dist && browserify -d browser-index.js | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js && terser -c -m -o dist/browser-matrix.min.js --source-map \"content='dist/browser-matrix.js.map'\" dist/browser-matrix.js",
-    "dist": "yarn build",
-    "watch": "watchify -d browser-index.js -o 'exorcist dist/browser-matrix.js.map > dist/browser-matrix.js' -v",
-    "lint": "eslint --max-warnings 93 src spec",
-    "prepare": "yarn clean && yarn build && git rev-parse HEAD > git-revision.txt"
+    "build": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:compile-browser && yarn build:minify-browser && yarn build:types",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
+    "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
+    "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
+    "gendoc": "jsdoc -c jsdoc.json -P package.json",
+    "lint": "yarn lint:types && yarn lint:ts && yarn lint:js",
+    "lint:js": "eslint --max-warnings 93 src spec",
+    "lint:types": "tsc --noEmit",
+    "lint:ts": "tslint --project ./tsconfig.json -t stylish",
+    "test": "jest spec/ --coverage --testEnvironment node",
+    "test:watch": "jest spec/ --coverage --testEnvironment node --watch"
   },
   "repository": {
     "type": "git",
@@ -24,28 +26,23 @@
   "keywords": [
     "matrix-org"
   ],
-  "browser": "browser-index.js",
+  "main": "./lib/index.js",
+  "typings": "./lib/index.d.ts",
+  "browser": "./lib/browser-index.js",
+  "matrix_src_main": "./src/index.ts",
+  "matrix_src_browser": "./src/browser-index.js",
   "author": "matrix.org",
   "license": "Apache-2.0",
   "files": [
-    ".babelrc",
-    ".eslintrc.js",
-    "spec/.eslintrc.js",
+    "lib",
+    "src",
+    "git-revision.txt",
     "CHANGELOG.md",
     "CONTRIBUTING.rst",
     "LICENSE",
     "README.md",
-    "RELEASING.md",
-    "examples",
-    "git-hooks",
-    "git-revision.txt",
-    "index.js",
-    "browser-index.js",
-    "lib",
     "package.json",
-    "release.sh",
-    "spec",
-    "src"
+    "release.sh"
   ],
   "dependencies": {
     "another-json": "^0.2.0",
@@ -69,11 +66,12 @@
     "@babel/preset-typescript": "^7.7.4",
     "@babel/register": "^7.7.4",
     "@babel/runtime": "^7.7.6",
+    "@types/node": "12",
     "babel-eslint": "^10.0.3",
     "babel-jest": "^24.9.0",
+    "babelify": "^10.0.0",
     "better-docs": "^1.4.7",
-    "browserify": "^16.2.3",
-    "browserify-shim": "^3.8.13",
+    "browserify": "^16.5.0",
     "eslint": "^5.12.0",
     "eslint-config-google": "^0.7.1",
     "eslint-plugin-babel": "^5.3.0",
@@ -84,15 +82,12 @@
     "matrix-mock-request": "^1.2.3",
     "olm": "https://packages.matrix.org/npm/olm/olm-3.1.4.tgz",
     "rimraf": "^3.0.0",
-    "source-map-support": "^0.5.13",
-    "sourceify": "^1.0.0",
-    "terser": "^4.3.8",
-    "typescript": "^3.7.3",
-    "watchify": "^3.11.1"
+    "terser": "^4.4.3",
+    "tsify": "^4.0.1",
+    "tslint": "^5.20.1",
+    "typescript": "^3.7.3"
   },
-  "browserify": {
-    "transform": [
-      "sourceify"
-    ]
+  "jest": {
+    "testEnvironment": "node"
   }
 }

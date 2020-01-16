@@ -1,6 +1,7 @@
 /*
 Copyright 2017 Vector Creations Ltd
 Copyright 2018 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import logger from '../../logger';
-import utils from '../../utils';
+import {logger} from '../../logger';
+import * as utils from "../../utils";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -27,7 +28,7 @@ import utils from '../../utils';
 /**
  * @implements {module:crypto/store/base~CryptoStore}
  */
-export default class MemoryCryptoStore {
+export class MemoryCryptoStore {
     constructor() {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
@@ -35,8 +36,13 @@ export default class MemoryCryptoStore {
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
+        // Map of {devicekey -> array of problems}
+        this._sessionProblems = {};
+        // Map of {userId -> deviceId -> true}
+        this._notifiedErrorDevices = {};
         // Map of {senderCurve25519Key+'/'+sessionId -> session data object}
         this._inboundGroupSessions = {};
+        this._inboundGroupSessionsWithheld = {};
         // Opaque device data object
         this._deviceData = null;
         // roomId -> Opaque roomInfo object
@@ -273,10 +279,61 @@ export default class MemoryCryptoStore {
         deviceSessions[sessionId] = sessionInfo;
     }
 
+    async storeEndToEndSessionProblem(deviceKey, type, fixed) {
+        const problems = this._sessionProblems[deviceKey]
+              = this._sessionProblems[deviceKey] || [];
+        problems.push({type, fixed, time: Date.now()});
+        problems.sort((a, b) => {
+            return a.time - b.time;
+        });
+    }
+
+    async getEndToEndSessionProblem(deviceKey, timestamp) {
+        const problems = this._sessionProblems[deviceKey] || [];
+        if (!problems.length) {
+            return null;
+        }
+        const lastProblem = problems[problems.length - 1];
+        for (const problem of problems) {
+            if (problem.time > timestamp) {
+                return Object.assign({}, problem, {fixed: lastProblem.fixed});
+            }
+        }
+        if (lastProblem.fixed) {
+            return null;
+        } else {
+            return lastProblem;
+        }
+    }
+
+    async filterOutNotifiedErrorDevices(devices) {
+        const notifiedErrorDevices = this._notifiedErrorDevices;
+        const ret = [];
+
+        for (const device of devices) {
+            const {userId, deviceInfo} = device;
+            if (userId in notifiedErrorDevices) {
+                if (!(deviceInfo.deviceId in notifiedErrorDevices[userId])) {
+                    ret.push(device);
+                    notifiedErrorDevices[userId][deviceInfo.deviceId] = true;
+                }
+            } else {
+                ret.push(device);
+                notifiedErrorDevices[userId] = {[deviceInfo.deviceId]: true };
+            }
+        }
+
+        return ret;
+    }
+
     // Inbound Group Sessions
 
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        func(this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] || null);
+        const k = senderCurve25519Key+'/'+sessionId;
+        func(
+            this._inboundGroupSessions[k] || null,
+            this._inboundGroupSessionsWithheld[k] || null,
+        );
     }
 
     getAllEndToEndInboundGroupSessions(txn, func) {
@@ -304,6 +361,13 @@ export default class MemoryCryptoStore {
 
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
         this._inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+    }
+
+    storeEndToEndInboundGroupSessionWithheld(
+        senderCurve25519Key, sessionId, sessionData, txn,
+    ) {
+        const k = senderCurve25519Key+'/'+sessionId;
+        this._inboundGroupSessionsWithheld[k] = sessionData;
     }
 
     // Device Data

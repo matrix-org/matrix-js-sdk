@@ -1,5 +1,6 @@
 /*
 Copyright 2018 André Jaenisch
+Copyright 2019 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +18,8 @@ limitations under the License.
 /**
  * @module logger
  */
-const log = require("loglevel");
+
+import log from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
 // Namespaces allow you to turn on/off the logging for specific parts of the
@@ -25,12 +27,12 @@ const log = require("loglevel");
 // An idea would be to control this via an environment variable (on Node.js).
 // See https://www.npmjs.com/package/debug to see how this could be implemented
 // Part of #332 is introducing a logging library in the first place.
-const DEFAULT_NAME_SPACE = "matrix";
-const logger = log.getLogger(DEFAULT_NAME_SPACE);
-logger.setLevel(log.levels.DEBUG);
+const DEFAULT_NAMESPACE = "matrix";
 
 /**
  * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
-*/
-module.exports = logger;
+ */
+export const logger = log.getLogger(DEFAULT_NAMESPACE);
+logger.setLevel(log.levels.DEBUG);
+

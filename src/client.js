@@ -16,47 +16,41 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
-const PushProcessor = require('./pushprocessor');
-import {sleep} from './utils';
 
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
  * @module client
  */
-const EventEmitter = require("events").EventEmitter;
-const url = require('url');
 
-const httpApi = require("./http-api");
-const MatrixEvent = require("./models/event").MatrixEvent;
-const EventStatus = require("./models/event").EventStatus;
-const EventTimeline = require("./models/event-timeline");
-const SearchResult = require("./models/search-result");
-const StubStore = require("./store/stub");
-const webRtcCall = require("./webrtc/call");
-const utils = require("./utils");
-const contentRepo = require("./content-repo");
-const Filter = require("./filter");
-const SyncApi = require("./sync");
-const MatrixBaseApis = require("./base-apis");
-const MatrixError = httpApi.MatrixError;
-const ContentHelpers = require("./content-helpers");
-const olmlib = require("./crypto/olmlib");
-
-import ReEmitter from './ReEmitter';
-import RoomList from './crypto/RoomList';
-import logger from './logger';
-
-import Crypto from './crypto';
-import { isCryptoAvailable } from './crypto';
-import { decodeRecoveryKey } from './crypto/recoverykey';
-import { keyFromAuthData } from './crypto/key_passphrase';
-import { randomString } from './randomstring';
-import { encodeBase64, decodeBase64 } from '../lib/crypto/olmlib';
+import url from "url";
+import {EventEmitter} from "events";
+import {MatrixBaseApis} from "./base-apis";
+import {Filter} from "./filter";
+import {SyncApi} from "./sync";
+import {EventStatus, MatrixEvent} from "./models/event";
+import {EventTimeline} from "./models/event-timeline";
+import {SearchResult} from "./models/search-result";
+import {StubStore} from "./store/stub";
+import {createNewMatrixCall} from "./webrtc/call";
+import * as utils from './utils';
+import {sleep} from './utils';
+import {MatrixError, PREFIX_MEDIA_R0, PREFIX_UNSTABLE} from "./http-api";
+import {getHttpUriForMxc} from "./content-repo";
+import * as ContentHelpers from "./content-helpers";
+import * as olmlib from "./crypto/olmlib";
+import {ReEmitter} from './ReEmitter';
+import {RoomList} from './crypto/RoomList';
+import {logger} from './logger';
+import {Crypto, isCryptoAvailable} from './crypto';
+import {decodeRecoveryKey} from './crypto/recoverykey';
+import {keyFromAuthData} from './crypto/key_passphrase';
+import {randomString} from './randomstring';
+import {PushProcessor} from "./pushprocessor";
+import {encodeBase64, decodeBase64} from "./crypto/olmlib";
 
 const SCROLLBACK_DELAY_MS = 3000;
-const CRYPTO_ENABLED = isCryptoAvailable();
+export const CRYPTO_ENABLED = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 
 function keysFromRecoverySession(sessions, decryptionKey, roomId) {
@@ -235,7 +229,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  *   {DeviceTrustLevel} device_trust: The trust status of the device requesting
  *     the secret as returned by {@link module:client~MatrixClient#checkDeviceTrust}.
  */
-function MatrixClient(opts) {
+export function MatrixClient(opts) {
     opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
     opts.idBaseUrl = utils.ensureNoTrailingSlash(opts.idBaseUrl);
 
@@ -274,7 +268,7 @@ function MatrixClient(opts) {
 
     // try constructing a MatrixCall to see if we are running in an environment
     // which has WebRTC. If we are, listen for and handle m.call.* events.
-    const call = webRtcCall.createNewMatrixCall(this);
+    const call = createNewMatrixCall(this);
     this._supportsVoip = false;
     if (call) {
         setupCallEventHandler(this);
@@ -947,6 +941,35 @@ MatrixClient.prototype.getGlobalBlacklistUnverifiedDevices = function() {
 };
 
 /**
+ * Set whether sendMessage in a room with unknown and unverified devices
+ * should throw an error and not send them message. This has 'Global' for
+ * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
+ * no room-level equivalent for this setting.
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ *
+ * @param {boolean} value whether error on unknown devices
+ */
+MatrixClient.prototype.setGlobalErrorOnUnknownDevices = function(value) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    this._crypto.setGlobalErrorOnUnknownDevices(value);
+};
+
+/**
+ * @return {boolean} whether to error on unknown devices
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ */
+MatrixClient.prototype.getGlobalErrorOnUnknownDevices = function() {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.getGlobalErrorOnUnknownDevices();
+};
+
+/**
  * Add methods that call the corresponding method in this._crypto
  *
  * @param {class} MatrixClient the class to add the method to
@@ -1346,7 +1369,7 @@ MatrixClient.prototype.checkKeyBackup = function() {
 MatrixClient.prototype.getKeyBackupVersion = function() {
     return this._http.authedRequest(
         undefined, "GET", "/room_keys/version", undefined, undefined,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     ).then((res) => {
         if (res.algorithm !== olmlib.MEGOLM_BACKUP_ALGORITHM) {
             const err = "Unknown backup algorithm: " + res.algorithm;
@@ -1505,14 +1528,20 @@ MatrixClient.prototype.createKeyBackupVersion = async function(info) {
     // favour of just signing with the cross-singing master key.
     await this._crypto._signObject(data.auth_data);
 
-    if (this._crypto._crossSigningInfo.getId()) {
+    if (
+        this._cryptoCallbacks.getCrossSigningKey &&
+        this._crypto._crossSigningInfo.getId()
+    ) {
         // now also sign the auth data with the cross-signing master key
+        // we check for the callback explicitly here because we still want to be able
+        // to create an un-cross-signed key backup if there is a cross-signing key but
+        // no callback supplied.
         await this._crypto._crossSigningInfo.signObject(data.auth_data, "master");
     }
 
     const res = await this._http.authedRequest(
         undefined, "POST", "/room_keys/version", undefined, data,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     );
 
     // We could assume everything's okay and enable directly, but this ensures
@@ -1544,7 +1573,7 @@ MatrixClient.prototype.deleteKeyBackupVersion = function(version) {
 
     return this._http.authedRequest(
         undefined, "DELETE", path, undefined, undefined,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     );
 };
 
@@ -1586,7 +1615,7 @@ MatrixClient.prototype.sendKeyBackup = function(roomId, sessionId, version, data
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "PUT", path.path, path.queryData, data,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     );
 };
 
@@ -1720,7 +1749,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
 
     return this._http.authedRequest(
         undefined, "GET", path.path, path.queryData, undefined,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     ).then((res) => {
         if (res.rooms) {
             for (const [roomId, roomData] of Object.entries(res.rooms)) {
@@ -1728,7 +1757,7 @@ MatrixClient.prototype._restoreKeyBackup = function(
 
                 totalKeyCount += Object.keys(roomData.sessions).length;
                 const roomKeys = keysFromRecoverySession(
-                    roomData.sessions, decryption, roomId, roomKeys,
+                    roomData.sessions, decryption, roomId,
                 );
                 for (const k of roomKeys) {
                     k.room_id = roomId;
@@ -1770,7 +1799,7 @@ MatrixClient.prototype.deleteKeysFromBackup = function(roomId, sessionId, versio
     const path = this._makeKeyBackupPath(roomId, sessionId, version);
     return this._http.authedRequest(
         undefined, "DELETE", path.path, path.queryData, undefined,
-        {prefix: httpApi.PREFIX_UNSTABLE},
+        {prefix: PREFIX_UNSTABLE},
     );
 };
 
@@ -1806,7 +1835,7 @@ MatrixClient.prototype.getGroups = function() {
 MatrixClient.prototype.getMediaConfig = function(callback) {
     return this._http.authedRequest(
         callback, "GET", "/config", undefined, undefined, {
-            prefix: httpApi.PREFIX_MEDIA_R0,
+            prefix: PREFIX_MEDIA_R0,
         },
     );
 };
@@ -1911,6 +1940,25 @@ MatrixClient.prototype.setAccountData = function(eventType, contents, callback) 
  */
 MatrixClient.prototype.getAccountData = function(eventType) {
     return this.store.getAccountData(eventType);
+};
+
+/**
+ * Get account data event of given type for the current user. This variant
+ * bypasses the local store and gets account data directly from the homeserver,
+ * which can be useful very early in startup before the initial sync.
+ * @param {string} eventType The event type
+ * @return {module:client.Promise} Resolves: The contents of the given account
+ * data event.
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixClient.prototype.getAccountDataFromServer = function(eventType) {
+    const path = utils.encodeUri("/user/$userId/account_data/$type", {
+        $userId: this.credentials.userId,
+        $type: eventType,
+    });
+    return this._http.authedRequest(
+        undefined, "GET", path, undefined,
+    );
 };
 
 /**
@@ -2743,7 +2791,7 @@ MatrixClient.prototype.getUrlPreview = function(url, ts, callback) {
             url: url,
             ts: ts,
         }, undefined, {
-            prefix: httpApi.PREFIX_MEDIA_R0,
+            prefix: PREFIX_MEDIA_R0,
         },
     ).then(function(response) {
         // TODO: expire cache occasionally
@@ -3193,7 +3241,7 @@ MatrixClient.prototype.setAvatarUrl = function(url, callback) {
  */
 MatrixClient.prototype.mxcUrlToHttp =
         function(mxcUrl, width, height, resizeMethod, allowDirectLinks) {
-    return contentRepo.getHttpUriForMxc(
+    return getHttpUriForMxc(
         this.baseUrl, mxcUrl, width, height, resizeMethod, allowDirectLinks,
     );
 };
@@ -4852,7 +4900,7 @@ function setupCallEventHandler(client) {
                 );
             }
 
-            call = webRtcCall.createNewMatrixCall(client, event.getRoomId(), {
+            call = createNewMatrixCall(client, event.getRoomId(), {
                 forceTURN: client._forceTURN,
             });
             if (!call) {
@@ -4952,7 +5000,7 @@ function setupCallEventHandler(client) {
                 // if not live, store the fact that the call has ended because
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
-                call = webRtcCall.createNewMatrixCall(client, event.getRoomId());
+                call = createNewMatrixCall(client, event.getRoomId());
                 if (call) {
                     call.callId = content.call_id;
                     call._initWithHangup(event);
@@ -5051,11 +5099,6 @@ MatrixClient.prototype.getEventMapper = function() {
 MatrixClient.prototype.generateClientSecret = function() {
     return randomString(32);
 };
-
-/** */
-module.exports.MatrixClient = MatrixClient;
-/** */
-module.exports.CRYPTO_ENABLED = CRYPTO_ENABLED;
 
 // MatrixClient Event JSDocs
 

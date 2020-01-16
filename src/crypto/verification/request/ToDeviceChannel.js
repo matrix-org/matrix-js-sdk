@@ -15,24 +15,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
-import logger from '../../../logger';
-import VerificationRequest, {
+import {randomString} from '../../../randomstring';
+import {logger} from '../../../logger';
+import {
+    CANCEL_TYPE,
     PHASE_STARTED,
     PHASE_READY,
     REQUEST_TYPE,
     READY_TYPE,
     START_TYPE,
-    CANCEL_TYPE,
+    VerificationRequest,
 } from "./VerificationRequest";
-
-import {
-    newUnexpectedMessageError,
-    errorFromEvent,
-} from "../Error";
-
-const MatrixEvent = require("../../../models/event").MatrixEvent;
-
+import {errorFromEvent, newUnexpectedMessageError} from "../Error";
+import {MatrixEvent} from "../../../models/event";
 
 /**
  * A key verification channel that sends verification events over to_device messages.

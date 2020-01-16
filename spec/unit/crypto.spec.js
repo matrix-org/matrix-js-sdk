@@ -1,26 +1,20 @@
-import 'source-map-support/register';
-
 import '../olm-loader';
-
-import Crypto from '../../lib/crypto';
-
-import WebStorageSessionStore from '../../lib/store/session/webstorage';
-import MemoryCryptoStore from '../../lib/crypto/store/memory-crypto-store.js';
-import MockStorageApi from '../MockStorageApi';
-import TestClient from '../TestClient';
-import {MatrixEvent} from '../../lib/models/event';
-import Room from '../../lib/models/room';
-import olmlib from '../../lib/crypto/olmlib';
+import {Crypto} from "../../src/crypto";
+import {WebStorageSessionStore} from "../../src/store/session/webstorage";
+import {MemoryCryptoStore} from "../../src/crypto/store/memory-crypto-store";
+import {MockStorageApi} from "../MockStorageApi";
+import {TestClient} from "../TestClient";
+import {MatrixEvent} from "../../src/models/event";
+import {Room} from "../../src/models/room";
+import * as olmlib from "../../src/crypto/olmlib";
 import {sleep} from "../../src/utils";
-
-const EventEmitter = require("events").EventEmitter;
-
-const sdk = require("../..");
+import {EventEmitter} from "events";
+import {CRYPTO_ENABLED} from "../../src/client";
 
 const Olm = global.Olm;
 
 describe("Crypto", function() {
-    if (!sdk.CRYPTO_ENABLED) {
+    if (!CRYPTO_ENABLED) {
         return;
     }
 

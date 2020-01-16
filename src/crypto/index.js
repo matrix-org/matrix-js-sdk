@@ -2,7 +2,7 @@
 Copyright 2016 OpenMarket Ltd
 Copyright 2017 Vector Creations Ltd
 Copyright 2018-2019 New Vector Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019-2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,44 +16,41 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-"use strict";
 
 /**
  * @module crypto
  */
 
-const anotherjson = require('another-json');
+import anotherjson from "another-json";
 import {EventEmitter} from 'events';
-import ReEmitter from '../ReEmitter';
-
-import logger from '../logger';
-const utils = require("../utils");
-const OlmDevice = require("./OlmDevice");
-const olmlib = require("./olmlib");
-const algorithms = require("./algorithms");
-const DeviceInfo = require("./deviceinfo");
-const DeviceVerification = DeviceInfo.DeviceVerification;
-const DeviceList = require('./DeviceList').default;
+import {ReEmitter} from '../ReEmitter';
+import {logger} from '../logger';
+import * as utils from "../utils";
+import {sleep} from "../utils";
+import {OlmDevice} from "./OlmDevice";
+import * as olmlib from "./olmlib";
+import {DeviceList} from "./DeviceList";
+import {DeviceInfo} from "./deviceinfo";
+import * as algorithms from "./algorithms";
 import {
     CrossSigningInfo,
-    UserTrustLevel,
-    DeviceTrustLevel,
     CrossSigningLevel,
+    DeviceTrustLevel,
+    UserTrustLevel,
 } from './CrossSigning';
-import SecretStorage, { SECRET_STORAGE_ALGORITHM_V1 } from './SecretStorage';
-
-import OutgoingRoomKeyRequestManager from './OutgoingRoomKeyRequestManager';
-import IndexedDBCryptoStore from './store/indexeddb-crypto-store';
-
-import {ShowQRCode, ScanQRCode} from './verification/QRCode';
-import SAS from './verification/SAS';
-import {sleep} from '../utils';
-import { keyFromPassphrase } from './key_passphrase';
-import { encodeRecoveryKey } from './recoverykey';
-
-import VerificationRequest from "./verification/request/VerificationRequest";
+import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
+import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
+import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
+import {ScanQRCode, ShowQRCode} from './verification/QRCode';
+import {SAS} from './verification/SAS';
+import {keyFromPassphrase} from './key_passphrase';
+import {encodeRecoveryKey} from './recoverykey';
+import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
+import * as httpApi from "../http-api";
+
+const DeviceVerification = DeviceInfo.DeviceVerification;
 
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
@@ -107,7 +104,7 @@ const KEY_BACKUP_KEYS_PER_REQUEST = 200;
  *    Each element can either be a string from MatrixClient.verificationMethods
  *    or a class that implements a verification method.
  */
-export default function Crypto(baseApis, sessionStore, userId, deviceId,
+export function Crypto(baseApis, sessionStore, userId, deviceId,
     clientStore, cryptoStore, roomList, verificationMethods) {
     this._onDeviceListUserCrossSigningUpdated =
         this._onDeviceListUserCrossSigningUpdated.bind(this);
@@ -176,6 +173,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     this._deviceKeys = {};
 
     this._globalBlacklistUnverifiedDevices = false;
+    this._globalErrorOnUnknownDevices = true;
 
     this._outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
          baseApis, this._deviceId, this._cryptoStore,
@@ -218,7 +216,7 @@ export default function Crypto(baseApis, sessionStore, userId, deviceId,
     );
 
     // Assuming no app-supplied callback, default to getting from SSSS.
-    if (!cryptoCallbacks.getCrossSigningKey) {
+    if (!cryptoCallbacks.getCrossSigningKey && cryptoCallbacks.getSecretStorageKey) {
         cryptoCallbacks.getCrossSigningKey = async (type) => {
             return CrossSigningInfo.getFromSecretStorage(type, this._secretStorage);
         };
@@ -418,6 +416,25 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 // Add an entry for the backup key in SSSS as a 'passthrough' key
                 // (ie. the secret is the key itself).
                 this._secretStorage.storePassthrough('m.megolm_backup.v1', newKeyId);
+
+                // if this key backup is trusted, sign it with the cross signing key
+                // so the key backup can be trusted via cross-signing.
+                const backupSigStatus = await this.checkKeyBackup(keyBackupInfo);
+                if (backupSigStatus.trustInfo.usable) {
+                    console.log("Adding cross signing signature to key backup");
+                    await this._crossSigningInfo.signObject(
+                        keyBackupInfo.auth_data, "master",
+                    );
+                    await this._baseApis._http.authedRequest(
+                        undefined, "PUT", "/room_keys/version/" + keyBackupInfo.version,
+                        undefined, keyBackupInfo,
+                        {prefix: httpApi.PREFIX_UNSTABLE},
+                    );
+                } else {
+                    console.log(
+                        "Key backup is NOT TRUSTED: NOT adding cross signing signature",
+                    );
+                }
             } else {
                 logger.log("Secret storage default key not found, creating new key");
                 const keyOptions = await createSecretStorageKey();
@@ -588,8 +605,8 @@ Crypto.prototype.resetCrossSigningKeys = async function(level, {
 
 /**
  * Run various follow-up actions after cross-signing keys have changed locally
- * (either by resetting the keys for the account or bye getting them from secret
- * storaoge), such as signing the current device, upgrading device
+ * (either by resetting the keys for the account or by getting them from secret
+ * storage), such as signing the current device, upgrading device
  * verifications, etc.
  */
 Crypto.prototype._afterCrossSigningLocalKeyChange = async function() {
@@ -1068,6 +1085,9 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
         );
         if (device) {
             sigInfo.device = device;
+            sigInfo.deviceTrust = await this.checkDeviceTrust(
+                this._userId, sigInfo.deviceId,
+            );
             try {
                 await olmlib.verifySignature(
                     this._olmDevice,
@@ -1095,7 +1115,7 @@ Crypto.prototype.isKeyBackupTrusted = async function(backupInfo) {
     ret.usable = ret.sigs.some((s) => {
         return (
             s.valid && (
-                (s.device && s.device.isVerified()) ||
+                (s.device && s.deviceTrust.isVerified()) ||
                 (s.crossSigningId)
             )
         );
@@ -1181,6 +1201,29 @@ Crypto.prototype.setGlobalBlacklistUnverifiedDevices = function(value) {
  */
 Crypto.prototype.getGlobalBlacklistUnverifiedDevices = function() {
     return this._globalBlacklistUnverifiedDevices;
+};
+
+/**
+ * Set whether sendMessage in a room with unknown and unverified devices
+ * should throw an error and not send them message. This has 'Global' for
+ * symmertry with setGlobalBlacklistUnverifiedDevices but there is currently
+ * no room-level equivalent for this setting.
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ *
+ * @param {boolean} value whether error on unknown devices
+ */
+Crypto.prototype.setGlobalErrorOnUnknownDevices = function(value) {
+    this._globalErrorOnUnknownDevices = value;
+};
+
+/**
+ * @return {boolean} whether to error on unknown devices
+ *
+ * This API is currently UNSTABLE and may change or be removed without notice.
+ */
+Crypto.prototype.getGlobalErrorOnUnknownDevices = function() {
+    return this._globalErrorOnUnknownDevices;
 };
 
 /**
@@ -2381,6 +2424,8 @@ Crypto.prototype._onToDeviceEvent = function(event) {
             this._secretStorage._onRequestReceived(event);
         } else if (event.getType() === "m.secret.send") {
             this._secretStorage._onSecretReceived(event);
+        } else if (event.getType() === "org.matrix.room_key.withheld") {
+            this._onRoomKeyWithheldEvent(event);
         } else if (event.getContent().transaction_id) {
             this._onKeyVerificationMessage(event);
         } else if (event.getContent().msgtype === "m.bad.encrypted") {
@@ -2418,6 +2463,42 @@ Crypto.prototype._onRoomKeyEvent = function(event) {
 
     const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
     alg.onRoomKeyEvent(event);
+};
+
+/**
+ * Handle a key withheld event
+ *
+ * @private
+ * @param {module:models/event.MatrixEvent} event key withheld event
+ */
+Crypto.prototype._onRoomKeyWithheldEvent = function(event) {
+    const content = event.getContent();
+
+    if ((content.code !== "m.no_olm" && (!content.room_id || !content.session_id))
+        || !content.algorithm || !content.sender_key) {
+        logger.error("key withheld event is missing fields");
+        return;
+    }
+
+    logger.info(
+        `Got room key withheld event from ${event.getSender()} (${content.sender_key}) `
+            + `for ${content.algorithm}/${content.room_id}/${content.session_id} `
+            + `with reason ${content.code} (${content.reason})`,
+    );
+
+    const alg = this._getRoomDecryptor(content.room_id, content.algorithm);
+    if (alg.onRoomKeyWithheldEvent) {
+        alg.onRoomKeyWithheldEvent(event);
+    }
+    if (!content.room_id) {
+        // retry decryption for all events sent by the sender_key.  This will
+        // update the events to show a message indicating that the olm session was
+        // wedged.
+        const roomDecryptors = this._getRoomDecryptors(content.algorithm);
+        for (const decryptor of roomDecryptors) {
+            decryptor.retryDecryptionFromSender(content.sender_key);
+        }
+    }
 };
 
 /**
@@ -2536,6 +2617,16 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     const algorithm = content.algorithm;
     const deviceKey = content.sender_key;
 
+    // retry decryption for all events sent by the sender_key.  This will
+    // update the events to show a message indicating that the olm session was
+    // wedged.
+    const retryDecryption = () => {
+        const roomDecryptors = this._getRoomDecryptors(olmlib.MEGOLM_ALGORITHM);
+        for (const decryptor of roomDecryptors) {
+            decryptor.retryDecryptionFromSender(deviceKey);
+        }
+    };
+
     if (sender === undefined || deviceKey === undefined || deviceKey === undefined) {
         return;
     }
@@ -2549,6 +2640,8 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "New session already forced with device " + sender + ":" + deviceKey +
             " at " + lastNewSessionForced + ": not forcing another",
         );
+        await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
+        retryDecryption();
         return;
     }
 
@@ -2562,6 +2655,8 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
             "Couldn't find device for identity key " + deviceKey +
             ": not re-establishing session",
         );
+        await this._olmDevice.recordSessionProblem(deviceKey, "wedged", false);
+        retryDecryption();
         return;
     }
     const devicesByUser = {};
@@ -2592,6 +2687,9 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
         device,
         {type: "m.dummy"},
     );
+
+    await this._olmDevice.recordSessionProblem(deviceKey, "wedged", true);
+    retryDecryption();
 
     await this._baseApis.sendToDevice("m.room.encrypted", {
         [sender]: {
@@ -2871,6 +2969,24 @@ Crypto.prototype._getRoomDecryptor = function(roomId, algorithm) {
         decryptors[algorithm] = alg;
     }
     return alg;
+};
+
+
+/**
+ * Get all the room decryptors for a given encryption algorithm.
+ *
+ * @param {string} algorithm The encryption algorithm
+ *
+ * @return {array} An array of room decryptors
+ */
+Crypto.prototype._getRoomDecryptors = function(algorithm) {
+    const decryptors = [];
+    for (const d of Object.values(this._roomDecryptors)) {
+        if (algorithm in d) {
+            decryptors.push(d[algorithm]);
+        }
+    }
+    return decryptors;
 };
 
 

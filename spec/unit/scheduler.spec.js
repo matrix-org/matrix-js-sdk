@@ -1,12 +1,10 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import 'source-map-support/register';
 import {defer} from '../../src/utils';
-const sdk = require("../..");
-const MatrixScheduler = sdk.MatrixScheduler;
-const MatrixError = sdk.MatrixError;
-const utils = require("../test-utils");
+import {MatrixError} from "../../src/http-api";
+import {MatrixScheduler} from "../../src/scheduler";
+import * as utils from "../test-utils";
 
 jest.useFakeTimers();
 
