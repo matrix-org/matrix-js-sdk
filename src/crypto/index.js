@@ -359,15 +359,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
 
     try {
-        if (
-            !this._crossSigningInfo.getId() ||
-            !this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)
-        ) {
+        const inStorage =
+            await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
+        if (!this._crossSigningInfo.getId() || !inStorage) {
             logger.log(
                 "Cross-signing public and/or private keys not found, " +
                 "checking secret storage for private keys",
             );
-            if (this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage)) {
+            if (inStorage) {
                 logger.log("Cross-signing private keys found in secret storage");
                 await this.checkOwnCrossSigningTrust();
             } else {
@@ -390,7 +389,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
 
         // Check if Secure Secret Storage has a default key. If we don't have one, create
         // the default key (which will also be signed by the cross-signing master key).
-        if (!this.hasSecretStorageKey()) {
+        if (!await this.hasSecretStorageKey()) {
             let newKeyId;
             if (keyBackupInfo) {
                 logger.log("Secret storage default key not found, using key backup key");
