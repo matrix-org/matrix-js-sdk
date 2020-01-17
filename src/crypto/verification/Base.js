@@ -119,7 +119,10 @@ export class VerificationBase extends EventEmitter {
         } else if (e.getType() === "m.key.verification.cancel") {
             const reject = this._reject;
             this._reject = undefined;
-            reject(new Error("Other side cancelled verification"));
+            const content = e.getContent();
+            const {reason, code} = content;
+            reject(new Error(`Other side cancelled verification ` +
+                `because ${reason} (${code})`));
         } else if (this._expectedEvent) {
             // only cancel if there is an event expected.
             // if there is no event expected, it means verify() wasn't called
