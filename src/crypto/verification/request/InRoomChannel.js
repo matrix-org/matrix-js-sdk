@@ -21,6 +21,7 @@ import {
     READY_TYPE,
     START_TYPE,
 } from "./VerificationRequest";
+import {logger} from '../../../logger';
 
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
@@ -127,20 +128,23 @@ export class InRoomChannel {
     static validateEvent(event, client) {
         const txnId = InRoomChannel.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
-            console.log("InRoomChannel: validateEvent: no valid txnId", type, txnId);
+            logger.log("InRoomChannel: validateEvent: no valid txnId " + txnId);
             return false;
         }
         const type = InRoomChannel.getEventType(event);
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
             if (!content || typeof content.to !== "string" || !content.to.length) {
-                console.log("InRoomChannel: validateEvent: no valid to", type, content.to);
+                logger.log("InRoomChannel: validateEvent: " +
+                    "no valid to " + (content && content.to));
                 return false;
             }
 
             // ignore requests that are not direct to or sent by the syncing user
             if (!InRoomChannel.getOtherPartyUserId(event, client)) {
-                console.log("InRoomChannel: validateEvent: not directed to or sent by me", type, event.getSender(), content.to);
+                logger.log("InRoomChannel: validateEvent: " +
+                    `not directed to or sent by me: ${event.getSender()}` +
+                    `, ${content && content.to}`);
                 return false;
             }
         }
@@ -196,7 +200,8 @@ export class InRoomChannel {
         const sender = event.getSender();
         if (this.userId !== null) {
             if (sender !== ownUserId && sender !== this.userId) {
-                console.log(`InRoomChannel: ignoring verification event from non-participating sender ${sender}`);
+                logger.log(`InRoomChannel: ignoring verification event from ` +
+                    `non-participating sender ${sender}`);
                 return;
             }
         }

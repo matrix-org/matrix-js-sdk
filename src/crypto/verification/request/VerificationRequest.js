@@ -83,17 +83,19 @@ export class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
         if (!content) {
-            console.log("VerificationRequest: validateEvent: no content", type);
+            logger.log("VerificationRequest: validateEvent: no content");
         }
 
         if (!type.startsWith(EVENT_PREFIX)) {
-            console.log("VerificationRequest: validateEvent: fail because type doesnt start with " + EVENT_PREFIX, type);
+            logger.log("VerificationRequest: validateEvent: " +
+                "fail because type doesnt start with " + EVENT_PREFIX);
             return false;
         }
 
         if (type === REQUEST_TYPE || type === READY_TYPE) {
             if (!Array.isArray(content.methods)) {
-                console.log("VerificationRequest: validateEvent: fail because methods", type);
+                logger.log("VerificationRequest: validateEvent: " +
+                    "fail because methods");
                 return false;
             }
         }
@@ -102,7 +104,8 @@ export class VerificationRequest extends EventEmitter {
             if (typeof content.from_device !== "string" ||
                 content.from_device.length === 0
             ) {
-                console.log("VerificationRequest: validateEvent: fail because from_device", type);
+                logger.log("VerificationRequest: validateEvent: "+
+                    "fail because from_device");
                 return false;
             }
         }

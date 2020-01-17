@@ -1238,7 +1238,8 @@ SyncApi.prototype._processSyncResponse = async function(
             }
         }
 
-        self._processRoomEvents(room, stateEvents, timelineEvents, syncEventData.fromCache);
+        self._processRoomEvents(room, stateEvents,
+            timelineEvents, syncEventData.fromCache);
 
         // set summary after processing events,
         // because it will trigger a name calculation

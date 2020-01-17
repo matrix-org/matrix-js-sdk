@@ -1600,7 +1600,8 @@ Crypto.prototype._requestVerificationWithChannel = async function(
     // but if the other party is really fast they could potentially respond to the
     // request before the server tells us the event got sent, and we would probably
     // create a new request object
-    console.log(`Crypto: adding new request to requestsByTxnId with id ${channel.transactionId}`);
+    logger.log(`Crypto: adding new request to ` +
+        `requestsByTxnId with id ${channel.transactionId}`);
     requestsMap.setRequestByChannel(channel, request);
 
     return request;
@@ -2579,7 +2580,8 @@ Crypto.prototype._handleVerificationEvent = async function(
         request = createRequest(event);
         // a request could not be made from this event, so ignore event
         if (!request) {
-            console.log(`Crypto: could not find VerificationRequest for ${event.getType()}, and could not create one, so ignoring.`);
+            logger.log(`Crypto: could not find VerificationRequest for ` +
+                `${event.getType()}, and could not create one, so ignoring.`);
             return;
         }
         isNewRequest = true;
@@ -2594,7 +2596,7 @@ Crypto.prototype._handleVerificationEvent = async function(
             this._baseApis.emit("crypto.verification.start", request.verifier);
         }
     } catch (err) {
-        console.error("error while handling verification event", event, err);
+        logger.error("error while handling verification event: " + err.message);
     }
     const shouldEmit = isNewRequest &&
                        !request.initiatedByMe &&
