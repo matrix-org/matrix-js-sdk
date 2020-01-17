@@ -508,7 +508,7 @@ export class VerificationRequest extends EventEmitter {
             phase === PHASE_REQUESTED && this.initiatedByMe;
 
         if (shouldTimeout) {
-            this._timeoutTimer = setInterval(this._cancelOnTimeout, this.timeout);
+            this._timeoutTimer = setTimeout(this._cancelOnTimeout, this.timeout);
         }
         if (this._timeoutTimer) {
             const shouldClear = phase === PHASE_STARTED ||
@@ -516,7 +516,7 @@ export class VerificationRequest extends EventEmitter {
                 phase === PHASE_DONE ||
                 phase === PHASE_CANCELLED;
             if (shouldClear) {
-                clearInterval(this._timeoutTimer);
+                clearTimeout(this._timeoutTimer);
                 this._timeoutTimer = null;
             }
         }
