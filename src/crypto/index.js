@@ -727,6 +727,17 @@ Crypto.prototype.getCrossSigningId = function(type) {
 };
 
 /**
+ * Gets the user's cross-signing key.
+ * @param {string} type The key type ("master", "self_signing", or "user_signing")
+ * @param {string} expectedPublicKey The matching public key or undefined to use
+ *     the stored public key for the given key type.
+ * @returns {Array} An array with [ public key, Olm.PkSigning ]
+ */
+Crypto.prototype.getCrossSigningKey = function(type, expectedPublicKey) {
+    return this._crossSigningInfo.getCrossSigningKey(type, expectedPublicKey);
+};
+
+/**
  * Get the cross signing information for a given user.
  *
  * @param {string} userId the user ID to get the cross-signing info for.

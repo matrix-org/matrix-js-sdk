@@ -1006,6 +1006,18 @@ function wrapCryptoFuncs(MatrixClient, names) {
  */
 
 /**
+ * Get the user's cross-signing key.
+ * The cross-signing API is currently UNSTABLE and may change without notice.
+ *
+ * @function module:client~MatrixClient#getCrossSigningKey
+ * @param {string} type The key type ("master", "self_signing", or "user_signing")
+ * @param {string} expectedPublicKey The matching public key or undefined to use
+ *     the stored public key for the given key type.
+ *
+ * @returns {Array} An array with [ public key, Olm.PkSigning ]
+ */
+
+/**
  * Get the cross signing information for a given user.
  * The cross-signing API is currently UNSTABLE and may change without notice.
  *
@@ -1059,6 +1071,7 @@ function wrapCryptoFuncs(MatrixClient, names) {
 wrapCryptoFuncs(MatrixClient, [
     "resetCrossSigningKeys",
     "getCrossSigningId",
+    "getCrossSigningKey",
     "getStoredCrossSigningForUser",
     "checkUserTrust",
     "checkDeviceTrust",
