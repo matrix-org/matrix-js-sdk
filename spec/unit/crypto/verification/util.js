@@ -33,15 +33,13 @@ export async function makeTestClients(userInfos, options) {
                             content: msg,
                         });
                         const client = clientMap[userId][deviceId];
-                        if (event.isEncrypted()) {
-                            event.attemptDecryption(client._crypto)
-                                .then(() => client.emit("toDeviceEvent", event));
-                        } else {
-                            setTimeout(
-                                () => client.emit("toDeviceEvent", event),
-                                0,
-                            );
-                        }
+                        const decryptionPromise = event.isEncrypted() ?
+                            event.attemptDecryption(client._crypto) :
+                            Promise.resolve();
+
+                        decryptionPromise.then(
+                            () => client.emit("toDeviceEvent", event),
+                        );
                     }
                 }
             }
