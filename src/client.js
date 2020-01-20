@@ -499,6 +499,18 @@ MatrixClient.prototype.getSyncStateData = function() {
 };
 
 /**
+ * Whether the initial sync has completed.
+ * @return {boolean} True if at least on sync has happened.
+ */
+MatrixClient.prototype.isInitialSyncComplete = function() {
+    const state = this.getSyncState();
+    if (!state) {
+        return false;
+    }
+    return state === "PREPAED" || state === "SYNCING";
+};
+
+/**
  * Return whether the client is configured for a guest account.
  * @return {boolean} True if this is a guest access_token (or no token is supplied).
  */
@@ -1944,14 +1956,23 @@ MatrixClient.prototype.getAccountData = function(eventType) {
 
 /**
  * Get account data event of given type for the current user. This variant
- * bypasses the local store and gets account data directly from the homeserver,
- * which can be useful very early in startup before the initial sync.
+ * gets account data directly from the homeserver if the local store is not
+ * ready, which can be useful very early in startup before the initial sync.
  * @param {string} eventType The event type
  * @return {module:client.Promise} Resolves: The contents of the given account
  * data event.
  * @return {module:http-api.MatrixError} Rejects: with an error response.
  */
-MatrixClient.prototype.getAccountDataFromServer = function(eventType) {
+MatrixClient.prototype.getAccountDataFromServer = async function(eventType) {
+    if (this.isInitialSyncComplete()) {
+        const event = this.store.getAccountData(eventType);
+        if (!event) {
+            return null;
+        }
+        // The network version below returns just the content, so this branch
+        // does the same to match.
+        return event.getContent();
+    }
     const path = utils.encodeUri("/user/$userId/account_data/$type", {
         $userId: this.credentials.userId,
         $type: eventType,

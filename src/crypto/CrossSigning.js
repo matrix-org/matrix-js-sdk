@@ -113,10 +113,10 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {SecretStorage} secretStorage The secret store using account data
      * @returns {boolean} Whether all private keys were found in storage
      */
-    isStoredInSecretStorage(secretStorage) {
+    async isStoredInSecretStorage(secretStorage) {
         let stored = true;
         for (const type of ["master", "self_signing", "user_signing"]) {
-            stored &= secretStorage.isStored(`m.cross_signing.${type}`, false);
+            stored &= await secretStorage.isStored(`m.cross_signing.${type}`, false);
         }
         return stored;
     }

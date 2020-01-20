@@ -36,12 +36,12 @@ export class SecretStorage extends EventEmitter {
         this._incomingRequests = {};
     }
 
-    getDefaultKeyId() {
-        const defaultKeyEvent = this._baseApis.getAccountData(
+    async getDefaultKeyId() {
+        const defaultKey = await this._baseApis.getAccountDataFromServer(
             'm.secret_storage.default_key',
         );
-        if (!defaultKeyEvent) return null;
-        return defaultKeyEvent.getContent().key;
+        if (!defaultKey) return null;
+        return defaultKey.key;
     }
 
     setDefaultKeyId(keyId) {
@@ -112,7 +112,11 @@ export class SecretStorage extends EventEmitter {
         if (!keyId) {
             do {
                 keyId = randomString(32);
-            } while (this._baseApis.getAccountData(`m.secret_storage.key.${keyId}`));
+            } while (
+                await this._baseApis.getAccountDataFromServer(
+                    `m.secret_storage.key.${keyId}`,
+                )
+            );
         }
 
         await this._crossSigningInfo.signObject(keyData, 'master');
@@ -130,18 +134,20 @@ export class SecretStorage extends EventEmitter {
      * @param {string} [keyId = default key's ID] The ID of the key to sign.
      *     Defaults to the default key ID if not provided.
      */
-    async signKey(keyId = this.getDefaultKeyId()) {
+    async signKey(keyId) {
+        if (!keyId) {
+            keyId = await this.getDefaultKeyId();
+        }
         if (!keyId) {
             throw new Error("signKey requires a key ID");
         }
 
-        const keyInfoEvent = this._baseApis.getAccountData(
+        const keyInfo = await this._baseApis.getAccountDataFromServer(
             `m.secret_storage.key.${keyId}`,
         );
-        if (!keyInfoEvent) {
+        if (!keyInfo) {
             throw new Error(`Key ${keyId} does not exist in account data`);
         }
-        const keyInfo = keyInfoEvent.getContent();
 
         await this._crossSigningInfo.signObject(keyInfo, 'master');
         await this._baseApis.setAccountData(
@@ -156,15 +162,17 @@ export class SecretStorage extends EventEmitter {
      *     for. Defaults to the default key ID if not provided.
      * @return {boolean} Whether we have the key.
      */
-    hasKey(keyId = this.getDefaultKeyId()) {
+    async hasKey(keyId) {
+        if (!keyId) {
+            keyId = await this.getDefaultKeyId();
+        }
         if (!keyId) {
             return false;
         }
 
-        const keyInfo = this._baseApis.getAccountData(
+        return !!this._baseApis.getAccountDataFromServer(
             "m.secret_storage.key." + keyId,
         );
-        return keyInfo && keyInfo.getContent();
     }
 
     /**
@@ -179,7 +187,7 @@ export class SecretStorage extends EventEmitter {
         const encrypted = {};
 
         if (!keys) {
-            const defaultKeyId = this.getDefaultKeyId();
+            const defaultKeyId = await this.getDefaultKeyId();
             if (!defaultKeyId) {
                 throw new Error("No keys specified and no default key present");
             }
@@ -192,28 +200,27 @@ export class SecretStorage extends EventEmitter {
 
         for (const keyId of keys) {
             // get key information from key storage
-            const keyInfo = this._baseApis.getAccountData(
+            const keyInfo = await this._baseApis.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
             );
             if (!keyInfo) {
                 throw new Error("Unknown key: " + keyId);
             }
-            const keyInfoContent = keyInfo.getContent();
 
             // check signature of key info
             pkVerify(
-                keyInfoContent,
+                keyInfo,
                 this._crossSigningInfo.getId('master'),
                 this._crossSigningInfo.userId,
             );
 
             // encrypt secret, based on the algorithm
-            switch (keyInfoContent.algorithm) {
+            switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
             {
                 const encryption = new global.Olm.PkEncryption();
                 try {
-                    encryption.set_recipient_key(keyInfoContent.pubkey);
+                    encryption.set_recipient_key(keyInfo.pubkey);
                     encrypted[keyId] = encryption.encrypt(secret);
                 } finally {
                     encryption.free();
@@ -222,7 +229,7 @@ export class SecretStorage extends EventEmitter {
             }
             default:
                 logger.warn("unknown algorithm for secret storage key " + keyId
-                            + ": " + keyInfoContent.algorithm);
+                            + ": " + keyInfo.algorithm);
                 // do nothing if we don't understand the encryption algorithm
             }
         }
@@ -260,25 +267,22 @@ export class SecretStorage extends EventEmitter {
      * @return {string} the contents of the secret
      */
     async get(name) {
-        const secretInfo = this._baseApis.getAccountData(name);
+        const secretInfo = await this._baseApis.getAccountDataFromServer(name);
         if (!secretInfo) {
             return;
         }
-
-        const secretContent = secretInfo.getContent();
-
-        if (!secretContent.encrypted) {
+        if (!secretInfo.encrypted) {
             throw new Error("Content is not encrypted!");
         }
 
         // get possible keys to decrypt
         const keys = {};
-        for (const keyId of Object.keys(secretContent.encrypted)) {
+        for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = this._baseApis.getAccountData(
+            const keyInfo = await this._baseApis.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
-            ).getContent();
-            const encInfo = secretContent.encrypted[keyId];
+            );
+            const encInfo = secretInfo.encrypted[keyId];
             switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
@@ -297,7 +301,7 @@ export class SecretStorage extends EventEmitter {
             // fetch private key from app
             [keyId, decryption] = await this._getSecretStorageKey(keys);
 
-            const encInfo = secretContent.encrypted[keyId];
+            const encInfo = secretInfo.encrypted[keyId];
 
             // We don't actually need the decryption object if it's a passthrough
             // since we just want to return the key itself.
@@ -323,32 +327,24 @@ export class SecretStorage extends EventEmitter {
      *
      * @return {boolean} whether or not the secret is stored
      */
-    isStored(name, checkKey) {
+    async isStored(name, checkKey) {
         // check if secret exists
-        const secretInfo = this._baseApis.getAccountData(name);
-        if (!secretInfo) {
+        const secretInfo = await this._baseApis.getAccountDataFromServer(name);
+        if (!secretInfo || !secretInfo.encrypted) {
             return false;
         }
 
         if (checkKey === undefined) checkKey = true;
 
-        const secretContent = secretInfo.getContent();
-
-        if (!secretContent.encrypted) {
-            return false;
-        }
-
         // check if secret is encrypted by a known/trusted secret and
         // encryption looks sane
-        for (const keyId of Object.keys(secretContent.encrypted)) {
+        for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyEvent = this._baseApis.getAccountData(
+            const keyInfo = await this._baseApis.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
             );
-            if (!keyEvent) return false;
-            const keyInfo = keyEvent.getContent();
             if (!keyInfo) return false;
-            const encInfo = secretContent.encrypted[keyId];
+            const encInfo = secretInfo.encrypted[keyId];
             if (checkKey) {
                 pkVerify(
                     keyInfo,
