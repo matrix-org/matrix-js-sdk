@@ -284,6 +284,10 @@ export class ToDeviceRequests {
         );
     }
 
+    getRequestByChannel(channel) {
+        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId);
+    }
+
     getRequestBySenderAndTxnId(sender, txnId) {
         const requestsByTxnId = this._requestsByUserId.get(sender);
         if (requestsByTxnId) {

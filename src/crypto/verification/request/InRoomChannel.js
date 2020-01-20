@@ -302,6 +302,14 @@ export class InRoomRequests {
         const roomId = event.getRoomId();
         const txnId = InRoomChannel.getTransactionId(event);
 //        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
+        return this._getRequestByTxnId(roomId, txnId);
+    }
+
+    getRequestByChannel(channel) {
+        return this._getRequestByTxnId(channel.roomId, channel.transactionId);
+    }
+
+    _getRequestByTxnId(roomId, txnId) {
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             return requestsByTxnId.get(txnId);

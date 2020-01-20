@@ -1592,18 +1592,18 @@ Crypto.prototype._requestVerificationWithChannel = async function(
             return map;
         }, new Map());
     }
-    const request = new VerificationRequest(
+    let request = new VerificationRequest(
         channel, verificationMethods, this._baseApis);
     await request.sendRequest();
-
-    // TODO: we're only adding the request to the map once it has been sent
-    // but if the other party is really fast they could potentially respond to the
-    // request before the server tells us the event got sent, and we would probably
-    // create a new request object
-    logger.log(`Crypto: adding new request to ` +
-        `requestsByTxnId with id ${channel.transactionId}`);
-    requestsMap.setRequestByChannel(channel, request);
-
+    // don't replace the request created by a racing remote echo
+    const racingRequest = requestsMap.getRequestByChannel(channel);
+    if (racingRequest) {
+        request = racingRequest;
+    } else {
+        logger.log(`Crypto: adding new request to ` +
+            `requestsByTxnId with id ${channel.transactionId} ${channel.roomId}`);
+        requestsMap.setRequestByChannel(channel, request);
+    }
     return request;
 };
 
