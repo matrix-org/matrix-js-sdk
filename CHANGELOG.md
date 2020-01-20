@@ -1,3 +1,63 @@
+Changes in [4.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v4.0.0-rc.1) (2020-01-20)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v3.0.0...v4.0.0-rc.1)
+
+BREAKING CHANGES
+================
+ * The js-sdk node module now exports ES6 rather than ES5. If you
+   wish to supports target that aren't compatible with ES6, you
+   will need to transpile the js-sdk to a suitable dialect.
+
+All Changes
+===========
+ * Convert secret storage to new account data API
+   [\#1154](https://github.com/matrix-org/matrix-js-sdk/pull/1154)
+ * Add v5 as a safe room version
+   [\#1157](https://github.com/matrix-org/matrix-js-sdk/pull/1157)
+ * Add API to get account data from server
+   [\#1153](https://github.com/matrix-org/matrix-js-sdk/pull/1153)
+ * Fix sourcemaps by refactoring the build system
+   [\#1151](https://github.com/matrix-org/matrix-js-sdk/pull/1151)
+ * record, report, and notify about olm errors
+   [\#1146](https://github.com/matrix-org/matrix-js-sdk/pull/1146)
+ * Send device messages for the same user in same API call.
+   [\#1148](https://github.com/matrix-org/matrix-js-sdk/pull/1148)
+ * Add an option to ignore unverified devices
+   [\#1150](https://github.com/matrix-org/matrix-js-sdk/pull/1150)
+ * Sign key backup with cross-signing key on upgrade
+   [\#1144](https://github.com/matrix-org/matrix-js-sdk/pull/1144)
+ * Emoji verification: Change name of 🔒 to lock
+   [\#1145](https://github.com/matrix-org/matrix-js-sdk/pull/1145)
+ * use a separate object for each encrypted content
+   [\#1147](https://github.com/matrix-org/matrix-js-sdk/pull/1147)
+ * Sourcemaps: develop -> feature branch
+   [\#1143](https://github.com/matrix-org/matrix-js-sdk/pull/1143)
+ * Use a safer import/export scheme for the ContentRepo utilities
+   [\#1134](https://github.com/matrix-org/matrix-js-sdk/pull/1134)
+ * Fix error handling in decryptGroupMessage
+   [\#1142](https://github.com/matrix-org/matrix-js-sdk/pull/1142)
+ * Add additional properties to package.json for riot-web's webpack
+   [\#1131](https://github.com/matrix-org/matrix-js-sdk/pull/1131)
+ * Fix import for indexeddb crypto store
+   [\#1133](https://github.com/matrix-org/matrix-js-sdk/pull/1133)
+ * Use the right request when creating clients
+   [\#1132](https://github.com/matrix-org/matrix-js-sdk/pull/1132)
+ * Target NodeJS 10, minified browser bundle, and other publishing/package
+   things
+   [\#1127](https://github.com/matrix-org/matrix-js-sdk/pull/1127)
+ * Re-focus sourcemap generation
+   [\#1126](https://github.com/matrix-org/matrix-js-sdk/pull/1126)
+ * Remove ancient polyfill for prototype inheritance
+   [\#1125](https://github.com/matrix-org/matrix-js-sdk/pull/1125)
+ * Remove "source-map-support" from tests because it makes sourcemaps worse
+   [\#1124](https://github.com/matrix-org/matrix-js-sdk/pull/1124)
+ * Remove ancient "use strict" annotations
+   [\#1123](https://github.com/matrix-org/matrix-js-sdk/pull/1123)
+ * Use ES6 imports/exports instead of older CommonJS ones
+   [\#1122](https://github.com/matrix-org/matrix-js-sdk/pull/1122)
+ * [BREAKING] Refactor the entire build process
+   [\#1113](https://github.com/matrix-org/matrix-js-sdk/pull/1113)
+
 Changes in [3.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v3.0.0) (2020-01-13)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v3.0.0-rc.1...v3.0.0)
