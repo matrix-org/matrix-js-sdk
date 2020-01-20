@@ -2550,8 +2550,6 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
 Crypto.prototype._onTimelineEvent = function(
     event, room, atStart, removed, {liveEvent} = {},
 ) {
-    // TODO: we still need a request object for past requests, so we can show it in the timeline
-    // validation now excludes old requests
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
     }
