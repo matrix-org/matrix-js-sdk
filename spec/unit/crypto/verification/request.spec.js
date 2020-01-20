@@ -64,7 +64,9 @@ describe("verification request", function() {
             // XXX: Private function access (but it's a test, so we're okay)
             bobVerifier._endTimer();
         });
-        const aliceVerifier = await alice.client.requestVerification("@bob:example.com");
+        const aliceRequest = await alice.client.requestVerification("@bob:example.com");
+        await aliceRequest.waitFor(r => r.started);
+        const aliceVerifier = aliceRequest.verifier;
         expect(aliceVerifier).toBeInstanceOf(SAS);
 
         // XXX: Private function access (but it's a test, so we're okay)
