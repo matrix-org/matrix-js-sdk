@@ -853,8 +853,8 @@ async function _setDeviceVerification(
  * @param {Array} methods array of verification methods to use.  Defaults to
  *    all known methods
  *
- * @returns {Promise<module:crypto/verification/Base>} resolves to a verifier
- *    when the request is accepted by the other user
+ * @returns {Promise<module:crypto/verification/request/VerificationRequest>} resolves to a VerificationRequest
+ *    when the request has been sent to the other party.
  */
 MatrixClient.prototype.requestVerificationDM = function(userId, roomId, methods) {
     if (this._crypto === null) {
