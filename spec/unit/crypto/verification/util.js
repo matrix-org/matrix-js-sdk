@@ -56,9 +56,8 @@ export async function makeTestClients(userInfos, options) {
             event_id: eventId,
         });
         for (const tc of clients) {
-            setTimeout(
+            Promise.resolve().then(
                 () => tc.client.emit("Room.timeline", event),
-                0,
             );
         }
 
