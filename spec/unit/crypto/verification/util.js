@@ -54,14 +54,17 @@ export async function makeTestClients(userInfos, options) {
             content: content,
             room_id: room,
             event_id: eventId,
+            origin_server_ts: Date.now(),
         });
-        for (const tc of clients) {
-            Promise.resolve().then(
-                () => tc.client.emit("Room.timeline", event),
-            );
-        }
 
-        return {event_id: eventId};
+
+        setImmediate(() => {
+            for (const tc of clients) {
+                tc.client.emit("Room.timeline", event);
+            }
+        });
+
+        return Promise.resolve({event_id: eventId});
     };
 
     for (const userInfo of userInfos) {
