@@ -864,22 +864,6 @@ MatrixClient.prototype.requestVerificationDM = function(userId, roomId, methods)
 };
 
 /**
- * Accept a key verification request from a DM.
- *
- * @param {module:models/event~MatrixEvent} event the verification request
- * that is accepted
- * @param {string} method the verification mmethod to use
- *
- * @returns {module:crypto/verification/Base} a verifier
- */
-MatrixClient.prototype.acceptVerificationDM = function(event, method) {
-    if (this._crypto === null) {
-        throw new Error("End-to-end encryption disabled");
-    }
-    return this._crypto.acceptVerificationDM(event, method);
-};
-
-/**
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
