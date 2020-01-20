@@ -442,9 +442,11 @@ describe("SAS verification", function() {
                 });
             });
 
-            aliceVerifier = await alice.client.requestVerificationDM(
+            const aliceRequest = await alice.client.requestVerificationDM(
                 bob.client.getUserId(), "!room_id", [verificationMethods.SAS],
             );
+            await aliceRequest.waitFor(r => r.started);
+            aliceVerifier = aliceRequest.verifier;
             aliceVerifier.on("show_sas", (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
