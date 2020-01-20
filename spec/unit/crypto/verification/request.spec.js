@@ -22,6 +22,8 @@ import {makeTestClients} from './util';
 
 const Olm = global.Olm;
 
+jest.useFakeTimers();
+
 describe("verification request", function() {
     if (!global.Olm) {
         logger.warn('Not running device verification unit tests: libolm not present');
