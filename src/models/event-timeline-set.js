@@ -490,8 +490,9 @@ EventTimelineSet.prototype.addEventsToTimeline = function(events, toStartOfTimel
  *
  * @param {MatrixEvent} event Event to be added
  * @param {string?} duplicateStrategy 'ignore' or 'replace'
+ * @param {boolean} fromCache whether the sync response came from cache
  */
-EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
+EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy, fromCache) {
     if (this._filter) {
         const events = this._filter.filterRoomTimeline([event]);
         if (!events.length) {
@@ -529,7 +530,7 @@ EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
         return;
     }
 
-    this.addEventToTimeline(event, this._liveTimeline, false);
+    this.addEventToTimeline(event, this._liveTimeline, false, fromCache);
 };
 
 /**
@@ -541,11 +542,12 @@ EventTimelineSet.prototype.addLiveEvent = function(event, duplicateStrategy) {
  * @param {MatrixEvent} event
  * @param {EventTimeline} timeline
  * @param {boolean} toStartOfTimeline
+ * @param {boolean} fromCache whether the sync response came from cache
  *
  * @fires module:client~MatrixClient#event:"Room.timeline"
  */
 EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
-                                                         toStartOfTimeline) {
+                                                         toStartOfTimeline, fromCache) {
     const eventId = event.getId();
     timeline.addEvent(event, toStartOfTimeline);
     this._eventIdToTimeline[eventId] = timeline;
@@ -555,7 +557,7 @@ EventTimelineSet.prototype.addEventToTimeline = function(event, timeline,
 
     const data = {
         timeline: timeline,
-        liveEvent: !toStartOfTimeline && timeline == this._liveTimeline,
+        liveEvent: !toStartOfTimeline && timeline == this._liveTimeline && !fromCache,
     };
     this.emit("Room.timeline", event, this.room,
               Boolean(toStartOfTimeline), false, data);

@@ -15,7 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {REQUEST_TYPE, START_TYPE, VerificationRequest} from "./VerificationRequest";
+import {
+    VerificationRequest,
+    REQUEST_TYPE,
+    READY_TYPE,
+    START_TYPE,
+} from "./VerificationRequest";
+import {logger} from '../../../logger';
 
 const MESSAGE_TYPE = "m.room.message";
 const M_REFERENCE = "m.reference";
@@ -31,10 +37,10 @@ export class InRoomChannel {
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.
      * @param {string} userId id of user that the verification request is directed at, should be present in the room.
      */
-    constructor(client, roomId, userId) {
+    constructor(client, roomId, userId = null) {
         this._client = client;
         this._roomId = roomId;
-        this._userId = userId;
+        this.userId = userId;
         this._requestEventId = null;
     }
 
@@ -43,16 +49,45 @@ export class InRoomChannel {
         return true;
     }
 
+    get receiveStartFromOtherDevices() {
+        return true;
+    }
+
+    get roomId() {
+        return this._roomId;
+    }
+
     /** The transaction id generated/used by this verification channel */
     get transactionId() {
         return this._requestEventId;
+    }
+
+    static getOtherPartyUserId(event, client) {
+        const type = InRoomChannel.getEventType(event);
+        if (type !== REQUEST_TYPE) {
+           return;
+        }
+        const ownUserId = client.getUserId();
+        const sender = event.getSender();
+        const content = event.getContent();
+        const receiver = content.to;
+
+        // request is not sent by or directed at us
+        if (sender !== ownUserId && receiver !== ownUserId) {
+            return sender;
+        }
+        if (sender === ownUserId) {
+            return receiver;
+        } else {
+            return sender;
+        }
     }
 
     /**
      * @param {MatrixEvent} event the event to get the timestamp of
      * @return {number} the timestamp when the event was sent
      */
-    static getTimestamp(event) {
+    getTimestamp(event) {
         return event.getTs();
     }
 
@@ -93,23 +128,28 @@ export class InRoomChannel {
     static validateEvent(event, client) {
         const txnId = InRoomChannel.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
+            logger.log("InRoomChannel: validateEvent: no valid txnId " + txnId);
             return false;
         }
         const type = InRoomChannel.getEventType(event);
         const content = event.getContent();
         if (type === REQUEST_TYPE) {
-            if (typeof content.to !== "string" || !content.to.length) {
+            if (!content || typeof content.to !== "string" || !content.to.length) {
+                logger.log("InRoomChannel: validateEvent: " +
+                    "no valid to " + (content && content.to));
                 return false;
             }
-            const ownUserId = client.getUserId();
+
             // ignore requests that are not direct to or sent by the syncing user
-            if (event.getSender() !== ownUserId && content.to !== ownUserId) {
+            if (!InRoomChannel.getOtherPartyUserId(event, client)) {
+                logger.log("InRoomChannel: validateEvent: " +
+                    `not directed to or sent by me: ${event.getSender()}` +
+                    `, ${content && content.to}`);
                 return false;
             }
         }
 
-        return VerificationRequest.validateEvent(
-            type, event, InRoomChannel.getTimestamp(event), client);
+        return VerificationRequest.validateEvent(type, event, client);
     }
 
     /**
@@ -137,21 +177,41 @@ export class InRoomChannel {
      * Changes the state of the channel, request, and verifier in response to a key verification event.
      * @param {MatrixEvent} event to handle
      * @param {VerificationRequest} request the request to forward handling to
+     * @param {bool} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(event, request) {
+    async handleEvent(event, request, isLiveEvent) {
         const type = InRoomChannel.getEventType(event);
         // do validations that need state (roomId, userId),
         // ignore if invalid
-        if (event.getRoomId() !== this._roomId || event.getSender() !== this._userId) {
+
+        if (event.getRoomId() !== this._roomId) {
             return;
         }
-        // set transactionId when receiving a .request
-        if (!this._requestEventId && type === REQUEST_TYPE) {
-            this._requestEventId = event.getId();
+        // set userId if not set already
+        if (this.userId === null) {
+            const userId = InRoomChannel.getOtherPartyUserId(event, this._client);
+            if (userId) {
+                this.userId = userId;
+            }
+        }
+        // ignore events not sent by us or the other party
+        const ownUserId = this._client.getUserId();
+        const sender = event.getSender();
+        if (this.userId !== null) {
+            if (sender !== ownUserId && sender !== this.userId) {
+                logger.log(`InRoomChannel: ignoring verification event from ` +
+                    `non-participating sender ${sender}`);
+                return;
+            }
+        }
+        if (this._requestEventId === null) {
+            this._requestEventId = InRoomChannel.getTransactionId(event);
         }
 
-        return await request.handleEvent(type, event, InRoomChannel.getTimestamp(event));
+        const isRemoteEcho = !!event.getUnsigned().transaction_id;
+
+        return await request.handleEvent(type, event, isLiveEvent, isRemoteEcho);
     }
 
     /**
@@ -180,7 +240,7 @@ export class InRoomChannel {
      */
     completeContent(type, content) {
         content = Object.assign({}, content);
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
             content.from_device = this._client.getDeviceId();
         }
         if (type === REQUEST_TYPE) {
@@ -191,7 +251,7 @@ export class InRoomChannel {
                     "verification.  You will need to use legacy key " +
                     "verification to verify keys.",
                 msgtype: REQUEST_TYPE,
-                to: this._userId,
+                to: this.userId,
                 from_device: content.from_device,
                 methods: content.methods,
             };
@@ -229,6 +289,62 @@ export class InRoomChannel {
         const response = await this._client.sendEvent(this._roomId, sendType, content);
         if (type === REQUEST_TYPE) {
             this._requestEventId = response.event_id;
+        }
+    }
+}
+
+export class InRoomRequests {
+    constructor() {
+        this._requestsByRoomId = new Map();
+    }
+
+    getRequest(event) {
+        const roomId = event.getRoomId();
+        const txnId = InRoomChannel.getTransactionId(event);
+//        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
+        return this._getRequestByTxnId(roomId, txnId);
+    }
+
+    getRequestByChannel(channel) {
+        return this._getRequestByTxnId(channel.roomId, channel.transactionId);
+    }
+
+    _getRequestByTxnId(roomId, txnId) {
+        const requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (requestsByTxnId) {
+            return requestsByTxnId.get(txnId);
+        }
+    }
+
+    setRequest(event, request) {
+        this._setRequest(
+            event.getRoomId(),
+            InRoomChannel.getTransactionId(event),
+            request,
+        );
+    }
+
+    setRequestByChannel(channel, request) {
+        this._setRequest(channel.roomId, channel.transactionId, request);
+    }
+
+    _setRequest(roomId, txnId, request) {
+        let requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (!requestsByTxnId) {
+            requestsByTxnId = new Map();
+            this._requestsByRoomId.set(roomId, requestsByTxnId);
+        }
+        requestsByTxnId.set(txnId, request);
+    }
+
+    removeRequest(event) {
+        const roomId = event.getRoomId();
+        const requestsByTxnId = this._requestsByRoomId.get(roomId);
+        if (requestsByTxnId) {
+            requestsByTxnId.delete(InRoomChannel.getTransactionId(event));
+            if (requestsByTxnId.size === 0) {
+                this._requestsByRoomId.delete(roomId);
+            }
         }
     }
 }

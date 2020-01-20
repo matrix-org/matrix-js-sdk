@@ -67,9 +67,6 @@ export class VerificationBase extends EventEmitter {
         this._done = false;
         this._promise = null;
         this._transactionTimeoutTimer = null;
-
-        // At this point, the verification request was received so start the timeout timer.
-        this._resetTimer();
     }
 
     _resetTimer() {
@@ -122,8 +119,15 @@ export class VerificationBase extends EventEmitter {
         } else if (e.getType() === "m.key.verification.cancel") {
             const reject = this._reject;
             this._reject = undefined;
-            reject(new Error("Other side cancelled verification"));
-        } else {
+            const content = e.getContent();
+            const {reason, code} = content;
+            reject(new Error(`Other side cancelled verification ` +
+                `because ${reason} (${code})`));
+        } else if (this._expectedEvent) {
+            // only cancel if there is an event expected.
+            // if there is no event expected, it means verify() wasn't called
+            // and we're just replaying the timeline events when syncing
+            // after a refresh when the events haven't been stored in the cache yet.
             const exception = new Error(
                 "Unexpected message: expecting " + this._expectedEvent
                     + " but got " + e.getType(),

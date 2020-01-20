@@ -23,12 +23,10 @@ limitations under the License.
 import {MatrixEvent} from "../../models/event";
 
 export function newVerificationError(code, reason, extradata) {
-    extradata = extradata || {};
-    extradata.code = code;
-    extradata.reason = reason;
+    const content = Object.assign({}, {code, reason}, extradata);
     return new MatrixEvent({
         type: "m.key.verification.cancel",
-        content: extradata,
+        content,
     });
 }
 

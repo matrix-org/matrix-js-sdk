@@ -46,8 +46,8 @@ import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
 import {encodeRecoveryKey} from './recoverykey';
 import {VerificationRequest} from "./verification/request/VerificationRequest";
-import {InRoomChannel} from "./verification/request/InRoomChannel";
-import {ToDeviceChannel} from "./verification/request/ToDeviceChannel";
+import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
+import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 import * as httpApi from "../http-api";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
@@ -204,8 +204,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     // }
     this._lastNewSessionForced = {};
 
-    this._toDeviceVerificationRequests = new Map();
-    this._inRoomVerificationRequests = new Map();
+    this._toDeviceVerificationRequests = new ToDeviceRequests();
+    this._inRoomVerificationRequests = new InRoomRequests();
 
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
 
@@ -1147,17 +1147,13 @@ Crypto.prototype.registerEventHandlers = function(eventEmitter) {
         }
     });
 
-    eventEmitter.on("toDeviceEvent", function(event) {
-        crypto._onToDeviceEvent(event);
-    });
+    eventEmitter.on("toDeviceEvent", crypto._onToDeviceEvent.bind(crypto));
 
-    eventEmitter.on("Room.timeline", function(event) {
-        crypto._onTimelineEvent(event);
-    });
+    const timelineHandler = crypto._onTimelineEvent.bind(crypto);
 
-    eventEmitter.on("Event.decrypted", function(event) {
-        crypto._onTimelineEvent(event);
-    });
+    eventEmitter.on("Room.timeline", timelineHandler);
+
+    eventEmitter.on("Event.decrypted", timelineHandler);
 };
 
 
@@ -1557,98 +1553,79 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
-Crypto.prototype.requestVerificationDM = async function(userId, roomId, methods) {
+Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
-    const request = await this._requestVerificationWithChannel(
+    return this._requestVerificationWithChannel(
         userId,
         methods,
         channel,
         this._inRoomVerificationRequests,
     );
-    return await request.waitForVerifier();
 };
 
-Crypto.prototype.acceptVerificationDM = function(event, method) {
-    if(!InRoomChannel.validateEvent(event, this._baseApis)) {
-        return;
-    }
-
-    const sender = event.getSender();
-    const requestsByTxnId = this._inRoomVerificationRequests.get(sender);
-    if (!requestsByTxnId) {
-        return;
-    }
-    const transactionId = InRoomChannel.getTransactionId(event);
-    const request = requestsByTxnId.get(transactionId);
-    if (!request) {
-        return;
-    }
-
-    return request.beginKeyVerification(method);
-};
-
-Crypto.prototype.requestVerification = async function(userId, methods, devices) {
+Crypto.prototype.requestVerification = function(userId, methods, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
-    const request = await this._requestVerificationWithChannel(
+    return this._requestVerificationWithChannel(
         userId,
         methods,
         channel,
         this._toDeviceVerificationRequests,
     );
-    return await request.waitForVerifier();
 };
 
 Crypto.prototype._requestVerificationWithChannel = async function(
     userId, methods, channel, requestsMap,
 ) {
-    if (!methods) {
-        // .keys() returns an iterator, so we need to explicitly turn it into an array
-        methods = [...this._verificationMethods.keys()];
+    let verificationMethods = this._verificationMethods;
+    if (methods) {
+        verificationMethods = methods.reduce((map, name) => {
+            const method = this._verificationMethods.get(name);
+            if (!method) {
+                throw new Error(`Verification method ${name} is not supported.`);
+            } else {
+                map.set(name, method);
+            }
+            return map;
+        }, new Map());
     }
-    // TODO: filter by given methods
-    const request = new VerificationRequest(
-        channel, this._verificationMethods, userId, this._baseApis);
+    let request = new VerificationRequest(
+        channel, verificationMethods, this._baseApis);
     await request.sendRequest();
-
-    let requestsByTxnId = requestsMap.get(userId);
-    if (!requestsByTxnId) {
-        requestsByTxnId = new Map();
-        requestsMap.set(userId, requestsByTxnId);
+    // don't replace the request created by a racing remote echo
+    const racingRequest = requestsMap.getRequestByChannel(channel);
+    if (racingRequest) {
+        request = racingRequest;
+    } else {
+        logger.log(`Crypto: adding new request to ` +
+            `requestsByTxnId with id ${channel.transactionId} ${channel.roomId}`);
+        requestsMap.setRequestByChannel(channel, request);
     }
-    // TODO: we're only adding the request to the map once it has been sent
-    // but if the other party is really fast they could potentially respond to the
-    // request before the server tells us the event got sent, and we would probably
-    // create a new request object
-    requestsByTxnId.set(channel.transactionId, request);
-
     return request;
 };
 
 Crypto.prototype.beginKeyVerification = function(
     method, userId, deviceId, transactionId = null,
 ) {
-    let requestsByTxnId = this._toDeviceVerificationRequests.get(userId);
-    if (!requestsByTxnId) {
-        requestsByTxnId = new Map();
-        this._toDeviceVerificationRequests.set(userId, requestsByTxnId);
-    }
     let request;
     if (transactionId) {
-        request = requestsByTxnId.get(transactionId);
+        request = this._toDeviceVerificationRequests.getRequestBySenderAndTxnId(
+            userId, transactionId);
+        if (!request) {
+            throw new Error(
+                `No request found for user ${userId} with ` +
+                `transactionId ${transactionId}`);
+        }
     } else {
         transactionId = ToDeviceChannel.makeTransactionId();
         const channel = new ToDeviceChannel(
             this._baseApis, userId, [deviceId], transactionId, deviceId);
         request = new VerificationRequest(
-            channel, this._verificationMethods, userId, this._baseApis);
-        requestsByTxnId.set(transactionId, request);
-    }
-    if (!request) {
-        throw new Error(
-            `No request found for user ${userId} with transactionId ${transactionId}`);
+            channel, this._verificationMethods, this._baseApis);
+        this._toDeviceVerificationRequests.setRequestBySenderAndTxnId(
+            userId, transactionId, request);
     }
     return request.beginKeyVerification(method, {userId, deviceId});
 };
@@ -2534,7 +2511,6 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
     if (!ToDeviceChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = ToDeviceChannel.getTransactionId(event);
     const createRequest = event => {
         if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
             return;
@@ -2551,10 +2527,13 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
             [deviceId],
         );
         return new VerificationRequest(
-            channel, this._verificationMethods, userId, this._baseApis);
+            channel, this._verificationMethods, this._baseApis);
     };
-    this._handleVerificationEvent(event, transactionId,
-        this._toDeviceVerificationRequests, createRequest);
+    this._handleVerificationEvent(
+        event,
+        this._toDeviceVerificationRequests,
+        createRequest,
+    );
 };
 
 /**
@@ -2562,65 +2541,65 @@ Crypto.prototype._onKeyVerificationMessage = function(event) {
  *
  * @private
  * @param {module:models/event.MatrixEvent} event the timeline event
+ * @param {module:models/Room} room not used
+ * @param {bool} atStart not used
+ * @param {bool} removed not used
+ * @param {bool} data.liveEvent whether this is a live event
  */
-Crypto.prototype._onTimelineEvent = function(event) {
+Crypto.prototype._onTimelineEvent = function(
+    event, room, atStart, removed, {liveEvent} = {},
+) {
     if (!InRoomChannel.validateEvent(event, this._baseApis)) {
         return;
     }
-    const transactionId = InRoomChannel.getTransactionId(event);
     const createRequest = event => {
-        if (!InRoomChannel.canCreateRequest(InRoomChannel.getEventType(event))) {
-            return;
-        }
-        const userId = event.getSender();
         const channel = new InRoomChannel(
             this._baseApis,
             event.getRoomId(),
-            userId,
         );
         return new VerificationRequest(
-            channel, this._verificationMethods, userId, this._baseApis);
+            channel, this._verificationMethods, this._baseApis);
     };
-    this._handleVerificationEvent(event, transactionId,
-        this._inRoomVerificationRequests, createRequest);
+    this._handleVerificationEvent(
+        event,
+        this._inRoomVerificationRequests,
+        createRequest,
+        liveEvent,
+    );
 };
 
 Crypto.prototype._handleVerificationEvent = async function(
-    event, transactionId, requestsMap, createRequest,
+    event, requestsMap, createRequest, isLiveEvent = true,
 ) {
-    const sender = event.getSender();
-    let requestsByTxnId = requestsMap.get(sender);
+    let request = requestsMap.getRequest(event);
     let isNewRequest = false;
-    let request = requestsByTxnId && requestsByTxnId.get(transactionId);
     if (!request) {
         request = createRequest(event);
         // a request could not be made from this event, so ignore event
         if (!request) {
+            logger.log(`Crypto: could not find VerificationRequest for ` +
+                `${event.getType()}, and could not create one, so ignoring.`);
             return;
         }
         isNewRequest = true;
-        if (!requestsByTxnId) {
-            requestsByTxnId = new Map();
-            requestsMap.set(sender, requestsByTxnId);
-        }
-        requestsByTxnId.set(transactionId, request);
+        requestsMap.setRequest(event, request);
     }
+    event.setVerificationRequest(request);
     try {
         const hadVerifier = !!request.verifier;
-        await request.channel.handleEvent(event, request);
+        await request.channel.handleEvent(event, request, isLiveEvent);
         // emit start event when verifier got set
         if (!hadVerifier && request.verifier) {
             this._baseApis.emit("crypto.verification.start", request.verifier);
         }
     } catch (err) {
-        console.error("error while handling verification event", event, err);
+        logger.error("error while handling verification event: " + err.message);
     }
-    if (!request.pending) {
-        requestsByTxnId.delete(transactionId);
-        if (requestsByTxnId.size === 0) {
-            requestsMap.delete(sender);
-        }
-    } else if (isNewRequest && !request.initiatedByMe) {
+    const shouldEmit = isNewRequest &&
+                       !request.initiatedByMe &&
+                       !request.invalid && // check it has enough events to pass the UNSENT stage
+                       !request.observeOnly;
+    if (shouldEmit) {
         this._baseApis.emit("crypto.verification.request", request);
     }
 };

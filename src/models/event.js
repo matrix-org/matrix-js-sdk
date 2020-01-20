@@ -154,6 +154,12 @@ export const MatrixEvent = function(
      * attempt may succeed)
      */
     this._retryDecryption = false;
+
+    /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
+     * `Crypto` will set this the `VerificationRequest` for the event
+     * so it can be easily accessed from the timeline.
+     */
+    this.verificationRequest = null;
 };
 utils.inherits(MatrixEvent, EventEmitter);
 
@@ -1053,6 +1059,10 @@ utils.extend(MatrixEvent.prototype, {
             decrypted: event,
             encrypted: this.event,
         };
+    },
+
+    setVerificationRequest: function(request) {
+        this.verificationRequest = request;
     },
 });
 

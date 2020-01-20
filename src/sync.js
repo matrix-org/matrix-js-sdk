@@ -688,6 +688,7 @@ SyncApi.prototype._syncFromCache = async function(savedSync) {
         oldSyncToken: null,
         nextSyncToken,
         catchingUp: false,
+        fromCache: true,
     };
 
     const data = {
@@ -1237,7 +1238,8 @@ SyncApi.prototype._processSyncResponse = async function(
             }
         }
 
-        self._processRoomEvents(room, stateEvents, timelineEvents);
+        self._processRoomEvents(room, stateEvents,
+            timelineEvents, syncEventData.fromCache);
 
         // set summary after processing events,
         // because it will trigger a name calculation
@@ -1564,10 +1566,11 @@ SyncApi.prototype._resolveInvites = function(room) {
  * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
  * at the *START* of the timeline list if it is supplied.
  * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+ * @param {boolean} fromCache whether the sync response came from cache
  * is earlier in time. Higher index is later.
  */
 SyncApi.prototype._processRoomEvents = function(room, stateEventList,
-                                                timelineEventList) {
+                                                timelineEventList, fromCache) {
     // If there are no events in the timeline yet, initialise it with
     // the given state events
     const liveTimeline = room.getLiveTimeline();
@@ -1621,7 +1624,7 @@ SyncApi.prototype._processRoomEvents = function(room, stateEventList,
     // if the timeline has any state events in it.
     // This also needs to be done before running push rules on the events as they need
     // to be decorated with sender etc.
-    room.addLiveEvents(timelineEventList || []);
+    room.addLiveEvents(timelineEventList || [], null, fromCache);
 };
 
 /**

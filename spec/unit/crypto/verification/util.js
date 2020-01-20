@@ -33,15 +33,13 @@ export async function makeTestClients(userInfos, options) {
                             content: msg,
                         });
                         const client = clientMap[userId][deviceId];
-                        if (event.isEncrypted()) {
-                            event.attemptDecryption(client._crypto)
-                                .then(() => client.emit("toDeviceEvent", event));
-                        } else {
-                            setTimeout(
-                                () => client.emit("toDeviceEvent", event),
-                                0,
-                            );
-                        }
+                        const decryptionPromise = event.isEncrypted() ?
+                            event.attemptDecryption(client._crypto) :
+                            Promise.resolve();
+
+                        decryptionPromise.then(
+                            () => client.emit("toDeviceEvent", event),
+                        );
                     }
                 }
             }
@@ -50,21 +48,33 @@ export async function makeTestClients(userInfos, options) {
     const sendEvent = function(room, type, content) {
         // make up a unique ID as the event ID
         const eventId = "$" + this.makeTxnId(); // eslint-disable-line babel/no-invalid-this
-        const event = new MatrixEvent({
+        const rawEvent = {
             sender: this.getUserId(), // eslint-disable-line babel/no-invalid-this
             type: type,
             content: content,
             room_id: room,
             event_id: eventId,
-        });
-        for (const tc of clients) {
-            setTimeout(
-                () => tc.client.emit("Room.timeline", event),
-                0,
-            );
-        }
+            origin_server_ts: Date.now(),
+        };
+        const event = new MatrixEvent(rawEvent);
+        const remoteEcho = new MatrixEvent(Object.assign({}, rawEvent, {
+            unsigned: {
+                transaction_id: this.makeTxnId(), // eslint-disable-line babel/no-invalid-this
+            },
+        }));
 
-        return {event_id: eventId};
+        setImmediate(() => {
+            for (const tc of clients) {
+                if (tc.client === this) { // eslint-disable-line babel/no-invalid-this
+                    console.log("sending remote echo!!");
+                    tc.client.emit("Room.timeline", remoteEcho);
+                } else {
+                    tc.client.emit("Room.timeline", event);
+                }
+            }
+        });
+
+        return Promise.resolve({event_id: eventId});
     };
 
     for (const userInfo of userInfos) {
