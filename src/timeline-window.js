@@ -151,7 +151,7 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
  * Get the TimelineIndex of the window in the given direction.
  *
  * @param {string} direction   EventTimeline.BACKWARDS to get the TimelineIndex
- * at the end of the window; EventTimeline.FORWARDS to get the TimelineIndex at
+ * at the start of the window; EventTimeline.FORWARDS to get the TimelineIndex at
  * the end.
  *
  * @return {TimelineIndex} The requested timeline index if one exists, null
@@ -521,4 +521,3 @@ TimelineIndex.prototype.advance = function(delta) {
 TimelineIndex.prototype.retreat = function(delta) {
     return this.advance(delta * -1) * -1;
 };
-
