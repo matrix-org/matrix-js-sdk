@@ -148,6 +148,62 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
 };
 
 /**
+ * Get the TimelineIndex of the window in the given direction.
+ *
+ * @param {string} direction   EventTimeline.BACKWARDS to get the TimelineIndex
+ * at the start of the window; EventTimeline.FORWARDS to get the TimelineIndex at
+ * the end.
+ *
+ * @return {TimelineIndex} The requested timeline index if one exists, null
+ * otherwise.
+ */
+TimelineWindow.prototype.getTimelineIndex = function(direction) {
+    if (direction == EventTimeline.BACKWARDS) {
+        return this._start;
+    } else if (direction == EventTimeline.FORWARDS) {
+        return this._end;
+    } else {
+        throw new Error("Invalid direction '" + direction + "'");
+    }
+};
+
+/**
+ * Try to extend the window using events that are already in the underlying
+ * TimelineIndex.
+ *
+ * @param {string} direction   EventTimeline.BACKWARDS to try extending it
+ *   backwards; EventTimeline.FORWARDS to try extending it forwards.
+ * @param {number} size   number of events to try to extend by.
+ *
+ * @return {boolean} true if the window was extended, false otherwise.
+ */
+TimelineWindow.prototype.extend = function(direction, size) {
+    const tl = this.getTimelineIndex(direction);
+
+    if (!tl) {
+        debuglog("TimelineWindow: no timeline yet");
+        return false;
+    }
+
+    const count = (direction == EventTimeline.BACKWARDS) ?
+        tl.retreat(size) : tl.advance(size);
+
+    if (count) {
+        this._eventCount += count;
+        debuglog("TimelineWindow: increased cap by " + count +
+                 " (now " + this._eventCount + ")");
+        // remove some events from the other end, if necessary
+        const excess = this._eventCount - this._windowLimit;
+        if (excess > 0) {
+            this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
+        }
+        return true;
+    }
+
+    return false;
+};
+
+/**
  * Check if this window can be extended
  *
  * <p>This returns true if we either have more events, or if we have a
@@ -161,14 +217,7 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
  * @return {boolean} true if we can paginate in the given direction
  */
 TimelineWindow.prototype.canPaginate = function(direction) {
-    let tl;
-    if (direction == EventTimeline.BACKWARDS) {
-        tl = this._start;
-    } else if (direction == EventTimeline.FORWARDS) {
-        tl = this._end;
-    } else {
-        throw new Error("Invalid direction '" + direction + "'");
-    }
+    const tl = this.getTimelineIndex(direction);
 
     if (!tl) {
         debuglog("TimelineWindow: no timeline yet");
@@ -224,14 +273,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
         requestLimit = DEFAULT_PAGINATE_LOOP_LIMIT;
     }
 
-    let tl;
-    if (direction == EventTimeline.BACKWARDS) {
-        tl = this._start;
-    } else if (direction == EventTimeline.FORWARDS) {
-        tl = this._end;
-    } else {
-        throw new Error("Invalid direction '" + direction + "'");
-    }
+    const tl = this.getTimelineIndex(direction);
 
     if (!tl) {
         debuglog("TimelineWindow: no timeline yet");
@@ -243,18 +285,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     }
 
     // try moving the cap
-    const count = (direction == EventTimeline.BACKWARDS) ?
-        tl.retreat(size) : tl.advance(size);
-
-    if (count) {
-        this._eventCount += count;
-        debuglog("TimelineWindow: increased cap by " + count +
-                 " (now " + this._eventCount + ")");
-        // remove some events from the other end, if necessary
-        const excess = this._eventCount - this._windowLimit;
-        if (excess > 0) {
-            this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
-        }
+    if (this.extend(direction, size)) {
         return Promise.resolve(true);
     }
 
@@ -490,4 +521,3 @@ TimelineIndex.prototype.advance = function(delta) {
 TimelineIndex.prototype.retreat = function(delta) {
     return this.advance(delta * -1) * -1;
 };
-
