@@ -1071,7 +1071,6 @@ function wrapCryptoFuncs(MatrixClient, names) {
 wrapCryptoFuncs(MatrixClient, [
     "resetCrossSigningKeys",
     "getCrossSigningId",
-    "getCrossSigningKey",
     "getStoredCrossSigningForUser",
     "checkUserTrust",
     "checkDeviceTrust",
