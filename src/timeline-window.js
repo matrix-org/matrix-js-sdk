@@ -168,6 +168,42 @@ TimelineWindow.prototype.getTimelineIndex = function(direction) {
 };
 
 /**
+ * Try to extend the window using events that are already in the underlying
+ * TimelineIndex.
+ *
+ * @param {string} direction   EventTimeline.BACKWARDS to try extending it
+ *   backwards; EventTimeline.FORWARDS to try extending it forwards.
+ * @param {number} size   number of events to try to extend by.
+ *
+ * @return {boolean} true if the window was extended, false otherwise.
+ */
+TimelineWindow.prototype.extend = function(direction, size) {
+    const tl = this.getTimelineIndex(direction);
+
+    if (!tl) {
+        debuglog("TimelineWindow: no timeline yet");
+        return false;
+    }
+
+    const count = (direction == EventTimeline.BACKWARDS) ?
+        tl.retreat(size) : tl.advance(size);
+
+    if (count) {
+        this._eventCount += count;
+        debuglog("TimelineWindow: increased cap by " + count +
+                 " (now " + this._eventCount + ")");
+        // remove some events from the other end, if necessary
+        const excess = this._eventCount - this._windowLimit;
+        if (excess > 0) {
+            this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
+        }
+        return true;
+    }
+
+    return false;
+};
+
+/**
  * Check if this window can be extended
  *
  * <p>This returns true if we either have more events, or if we have a
@@ -249,18 +285,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
     }
 
     // try moving the cap
-    const count = (direction == EventTimeline.BACKWARDS) ?
-        tl.retreat(size) : tl.advance(size);
-
-    if (count) {
-        this._eventCount += count;
-        debuglog("TimelineWindow: increased cap by " + count +
-                 " (now " + this._eventCount + ")");
-        // remove some events from the other end, if necessary
-        const excess = this._eventCount - this._windowLimit;
-        if (excess > 0) {
-            this.unpaginate(excess, direction != EventTimeline.BACKWARDS);
-        }
+    if (this.extend(direction, size)) {
         return Promise.resolve(true);
     }
 
