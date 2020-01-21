@@ -148,6 +148,26 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
 };
 
 /**
+ * Get the TimelineIndex of the window in the given direction.
+ *
+ * @param {string} direction   EventTimeline.BACKWARDS to get the TimelineIndex
+ * at the end of the window; EventTimeline.FORWARDS to get the TimelineIndex at
+ * the end.
+ *
+ * @return {TimelineIndex} The requested timeline index if one exists, null
+ * otherwise.
+ */
+TimelineWindow.prototype.getTimelineIndex = function(direction) {
+    if (direction == EventTimeline.BACKWARDS) {
+        return this._start;
+    } else if (direction == EventTimeline.FORWARDS) {
+        return this._end;
+    } else {
+        throw new Error("Invalid direction '" + direction + "'");
+    }
+};
+
+/**
  * Check if this window can be extended
  *
  * <p>This returns true if we either have more events, or if we have a
@@ -161,14 +181,7 @@ TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
  * @return {boolean} true if we can paginate in the given direction
  */
 TimelineWindow.prototype.canPaginate = function(direction) {
-    let tl;
-    if (direction == EventTimeline.BACKWARDS) {
-        tl = this._start;
-    } else if (direction == EventTimeline.FORWARDS) {
-        tl = this._end;
-    } else {
-        throw new Error("Invalid direction '" + direction + "'");
-    }
+    const tl = this.getTimelineIndex(direction);
 
     if (!tl) {
         debuglog("TimelineWindow: no timeline yet");
@@ -224,14 +237,7 @@ TimelineWindow.prototype.paginate = function(direction, size, makeRequest,
         requestLimit = DEFAULT_PAGINATE_LOOP_LIMIT;
     }
 
-    let tl;
-    if (direction == EventTimeline.BACKWARDS) {
-        tl = this._start;
-    } else if (direction == EventTimeline.FORWARDS) {
-        tl = this._end;
-    } else {
-        throw new Error("Invalid direction '" + direction + "'");
-    }
+    const tl = this.getTimelineIndex(direction);
 
     if (!tl) {
         debuglog("TimelineWindow: no timeline yet");
