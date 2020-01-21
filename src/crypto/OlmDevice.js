@@ -115,12 +115,18 @@ export function OlmDevice(cryptoStore) {
  * found.
  *
  * Reads the device keys from the OlmAccount object.
+ * 
+ * @param {object} fromExportedDevice (Optional) data from exported device
+ *     that must be re-created.
  */
-OlmDevice.prototype.init = async function() {
+OlmDevice.prototype.init = async function(fromExportedDevice) {
     let e2eKeys;
     const account = new global.Olm.Account();
     try {
-        await _initialiseAccount(this._cryptoStore, this._pickleKey, account);
+        if (fromExportedDevice){
+            this._pickleKey = fromExportedDevice.pickleKey;
+        }
+        await _initialiseAccount(fromExportedDevice, this._cryptoStore, this._pickleKey, account);
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -132,18 +138,42 @@ OlmDevice.prototype.init = async function() {
     this.deviceEd25519Key = e2eKeys.ed25519;
 };
 
-async function _initialiseAccount(cryptoStore, pickleKey, account) {
-    await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        cryptoStore.getAccount(txn, (pickledAccount) => {
-            if (pickledAccount !== null) {
-                account.unpickle(pickleKey, pickledAccount);
-            } else {
-                account.create();
-                pickledAccount = account.pickle(pickleKey);
-                cryptoStore.storeAccount(txn, pickledAccount);
-            }
+async function _initialiseAccount(fromExportedDevice, cryptoStore, pickleKey, account) {
+    if (fromExportedDevice) {
+        await cryptoStore.doTxn(
+            'readwrite',
+            [
+                IndexedDBCryptoStore.STORE_ACCOUNT,
+                IndexedDBCryptoStore.STORE_SESSIONS,
+            ],
+            (txn) => {
+                cryptoStore.storeAccount(txn, fromExportedDevice.pickledAccount);
+                fromExportedDevice.sessions.forEach((session) => {
+                    const {
+                        deviceKey,
+                        sessionId,
+                    } = session;
+                    const sessionInfo = {
+                        session: session.session,
+                        lastReceivedMessageTs: session.lastReceivedMessageTs,
+                    };
+                    cryptoStore.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
+                });
         });
-    });
+        account.unpickle(pickleKey, fromExportedDevice.pickledAccount);
+    } else {
+        await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
+            cryptoStore.getAccount(txn, (pickledAccount) => {
+                if (pickledAccount !== null) {
+                    account.unpickle(pickleKey, pickledAccount);
+                } else {
+                    account.create();
+                    pickledAccount = account.pickle(pickleKey);
+                    cryptoStore.storeAccount(txn, pickledAccount);
+                }
+            });
+        });
+    }
 }
 
 /**

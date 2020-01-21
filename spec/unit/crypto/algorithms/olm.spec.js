@@ -82,14 +82,43 @@ describe("OlmDevice", function() {
         });
 
         it('exports picked account and olm sessions', async function() {
-            await setupSession(aliceOlmDevice, bobOlmDevice);
+            const sessionId = await setupSession(aliceOlmDevice, bobOlmDevice);
 
-            let exported = await aliceOlmDevice.export();
+            // At the time of writing, Jest only tests with in-memory DB,
+            // but I manually checked that the exported data has the same structure
+            // when coming from indexed DB
+            const exported = await bobOlmDevice.export();
             expect(exported).toHaveProperty('pickleKey');
             expect(exported).toHaveProperty('pickledAccount');
             expect(exported).toHaveProperty('sessions');
-            expect(Array.isArray(exported.sessions)).toBe(true);
-            expect(exported.sessions[0]).toEqual(
+            // At this moment only Alice (the “initiator” in setupSession)
+            // has a session
+            expect(exported.sessions).toEqual([]);
+
+            const MESSAGE = "The olm or proteus is an aquatic salamander in the family Proteidae";
+            const ciphertext = await aliceOlmDevice.encryptMessage(
+                bobOlmDevice.deviceCurve25519Key,
+                sessionId,
+                MESSAGE,
+            );
+
+            const bobRecreatedOlmDevice = makeOlmDevice();
+            bobRecreatedOlmDevice.init(exported);
+
+            const decrypted = await bobRecreatedOlmDevice.createInboundSession(
+                aliceOlmDevice.deviceCurve25519Key,
+                ciphertext.type,
+                ciphertext.body,
+            );
+            expect(decrypted.payload).toEqual(MESSAGE);
+
+            const exportedAgain = await bobRecreatedOlmDevice.export();
+            expect(exportedAgain).toHaveProperty('pickleKey');
+            expect(exportedAgain).toHaveProperty('pickledAccount');
+            expect(exportedAgain).toHaveProperty('sessions');
+            expect(Array.isArray(exportedAgain.sessions)).toBe(true);
+            // this time we expect Bob to have a session to export
+            expect(exportedAgain.sessions[0]).toEqual(
                 expect.objectContaining({
                     session: expect.any(String),
                     lastReceivedMessageTs: expect.any(Number),
@@ -97,6 +126,26 @@ describe("OlmDevice", function() {
                     sessionId: expect.any(String),
                 })
             );
+
+            const MESSAGE_2 = "In contrast to most amphibians, the olm is entirely aquatic";
+            const ciphertext_2 = await aliceOlmDevice.encryptMessage(
+                bobOlmDevice.deviceCurve25519Key,
+                sessionId,
+                MESSAGE_2,
+            );
+
+            const bobRecreatedAgainOlmDevice = makeOlmDevice();
+            bobRecreatedAgainOlmDevice.init(exportedAgain);
+
+            // Note: decrypted_2 does not have the same structure than decrypted
+            const decrypted_2 = await bobRecreatedAgainOlmDevice.decryptMessage(
+                aliceOlmDevice.deviceCurve25519Key,
+                decrypted.session_id,
+                ciphertext_2.type,
+                ciphertext_2.body,
+            );
+            expect(decrypted_2).toEqual(MESSAGE_2);
+
         });
 
         it("creates only one session at a time", async function() {
