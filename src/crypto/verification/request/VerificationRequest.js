@@ -544,7 +544,6 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
-        /* FIXME: https://github.com/vector-im/riot-web/issues/11765 */
         const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
         const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
         if (isUnexpectedRequest || isUnexpectedReady) {
