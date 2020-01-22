@@ -465,6 +465,7 @@ export class VerificationRequest extends EventEmitter {
         if (!this.pending) {
             return;
         }
+        const wasObserveOnly = this._observeOnly;
 
         this._adjustObserveOnly(event, isLiveEvent);
 
@@ -500,6 +501,8 @@ export class VerificationRequest extends EventEmitter {
             this._setupTimeout(phase);
             // set phase as last thing as this emits the "change" event
             this._setPhase(phase);
+        } else if (this._observeOnly !== wasObserveOnly) {
+            this.emit("change");
         }
     }
 
