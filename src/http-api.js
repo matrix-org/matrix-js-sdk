@@ -436,7 +436,7 @@ MatrixHttpApi.prototype = {
      * @param {Object=} queryParams A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param {Object} data The HTTP JSON body.
+     * @param {Object} [data] The HTTP JSON body.
      *
      * @param {Object|Number=} opts additional options. If a number is specified,
      * this is treated as `opts.localTimeoutMs`.
@@ -518,7 +518,7 @@ MatrixHttpApi.prototype = {
      * @param {Object=} queryParams A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param {Object} data The HTTP JSON body.
+     * @param {Object} [data] The HTTP JSON body.
      *
      * @param {Object=} opts additional options
      *
@@ -557,7 +557,7 @@ MatrixHttpApi.prototype = {
      * @param {Object=} queryParams A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param {Object} data The HTTP JSON body.
+     * @param {Object} [data] The HTTP JSON body.
      *
      * @param {Object=} opts additional options
      *

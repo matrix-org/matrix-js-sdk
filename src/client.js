@@ -751,7 +751,7 @@ MatrixClient.prototype.downloadKeys = function(userIds, forceDownload) {
  *
  * @param {string} userId the user to list keys for.
  *
- * @return {Promise<module:crypto-deviceinfo[]>} list of devices
+ * @return {Promise<module:crypto/deviceinfo[]>} list of devices
  */
 MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
     if (this._crypto === null) {
@@ -766,7 +766,7 @@ MatrixClient.prototype.getStoredDevicesForUser = async function(userId) {
  * @param {string} userId the user to list keys for.
  * @param {string} deviceId unique identifier for the device
  *
- * @return {Promise<?module:crypto-deviceinfo>} device or null
+ * @return {Promise<?module:crypto/deviceinfo>} device or null
  */
 MatrixClient.prototype.getStoredDevice = async function(userId, deviceId) {
     if (this._crypto === null) {
