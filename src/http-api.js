@@ -20,9 +20,9 @@ limitations under the License.
  * @module http-api
  */
 
-import {parse as parseContentType} from "content-type";
+import { parse as parseContentType } from "content-type";
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from "./logger";
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -110,12 +110,12 @@ MatrixHttpApi.prototype = {
      */
     getContentUri: function() {
         const params = {
-            access_token: this.opts.accessToken,
+            access_token: this.opts.accessToken
         };
         return {
             base: this.opts.baseUrl,
             path: "/_matrix/media/r0/upload",
-            params: params,
+            params: params
         };
     },
 
@@ -163,7 +163,7 @@ MatrixHttpApi.prototype = {
         if (utils.isFunction(opts)) {
             // opts used to be callback
             opts = {
-                callback: opts,
+                callback: opts
             };
         } else if (opts === undefined) {
             opts = {};
@@ -174,7 +174,8 @@ MatrixHttpApi.prototype = {
 
         // if the file doesn't have a mime type, use a default since
         // the HS errors if we don't supply one.
-        const contentType = opts.type || file.type || 'application/octet-stream';
+        const contentType =
+            opts.type || file.type || "application/octet-stream";
         const fileName = opts.name || file.name;
 
         // We used to recommend setting file.stream to the thing to upload on
@@ -187,8 +188,8 @@ MatrixHttpApi.prototype = {
         if (body.stream && typeof body.stream !== "function") {
             logger.warn(
                 "Using `file.stream` as the content to upload. Future " +
-                "versions of the js-sdk will change this to expect `file` to " +
-                "be the content directly.",
+                    "versions of the js-sdk will change this to expect `file` to " +
+                    "be the content directly."
             );
             body = body.stream;
         }
@@ -202,9 +203,9 @@ MatrixHttpApi.prototype = {
             } else {
                 logger.warn(
                     "Returning the raw JSON from uploadContent(). Future " +
-                    "versions of the js-sdk will change this default, to " +
-                    "return the parsed object. Set opts.rawResponse=false " +
-                    "to change this behaviour now.",
+                        "versions of the js-sdk will change this default, to " +
+                        "return the parsed object. Set opts.rawResponse=false " +
+                        "to change this behaviour now."
                 );
                 rawResponse = true;
             }
@@ -215,9 +216,9 @@ MatrixHttpApi.prototype = {
             if (global.XMLHttpRequest) {
                 logger.warn(
                     "Returning only the content-uri from uploadContent(). " +
-                    "Future versions of the js-sdk will change this " +
-                    "default, to return the whole response object. Set " +
-                    "opts.onlyContentUri=false to change this behaviour now.",
+                        "Future versions of the js-sdk will change this " +
+                        "default, to return the whole response object. Set " +
+                        "opts.onlyContentUri=false to change this behaviour now."
                 );
                 onlyContentUri = true;
             } else {
@@ -247,7 +248,7 @@ MatrixHttpApi.prototype = {
                 if (onlyContentUri) {
                     body = body.content_uri;
                     if (body === undefined) {
-                        throw Error('Bad response');
+                        throw Error("Bad response");
                     }
                 }
                 return body;
@@ -258,11 +259,15 @@ MatrixHttpApi.prototype = {
             const defer = utils.defer();
             const xhr = new global.XMLHttpRequest();
             upload.xhr = xhr;
-            const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
+            const cb = requestCallback(
+                defer,
+                opts.callback,
+                this.opts.onlyData
+            );
 
             const timeout_fn = function() {
                 xhr.abort();
-                cb(new Error('Timeout'));
+                cb(new Error("Timeout"));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get
@@ -276,7 +281,7 @@ MatrixHttpApi.prototype = {
                         var resp;
                         try {
                             if (!xhr.responseText) {
-                                throw new Error('No response body.');
+                                throw new Error("No response body.");
                             }
                             resp = xhr.responseText;
                             if (bodyParser) {
@@ -299,7 +304,7 @@ MatrixHttpApi.prototype = {
                 if (opts.progressHandler) {
                     opts.progressHandler({
                         loaded: ev.loaded,
-                        total: ev.total,
+                        total: ev.total
                     });
                 }
             });
@@ -312,8 +317,9 @@ MatrixHttpApi.prototype = {
             }
 
             if (!this.useAuthorizationHeader) {
-                queryArgs.push("access_token="
-                    + encodeURIComponent(this.opts.accessToken));
+                queryArgs.push(
+                    "access_token=" + encodeURIComponent(this.opts.accessToken)
+                );
             }
 
             if (queryArgs.length > 0) {
@@ -322,7 +328,10 @@ MatrixHttpApi.prototype = {
 
             xhr.open("POST", url);
             if (this.useAuthorizationHeader) {
-                xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
+                xhr.setRequestHeader(
+                    "Authorization",
+                    "Bearer " + this.opts.accessToken
+                );
             }
             xhr.setRequestHeader("Content-Type", contentType);
             xhr.send(body);
@@ -338,12 +347,17 @@ MatrixHttpApi.prototype = {
             }
 
             promise = this.authedRequest(
-                opts.callback, "POST", "/upload", queryParams, body, {
+                opts.callback,
+                "POST",
+                "/upload",
+                queryParams,
+                body,
+                {
                     prefix: "/_matrix/media/r0",
-                    headers: {"Content-Type": contentType},
+                    headers: { "Content-Type": contentType },
                     json: false,
-                    bodyParser: bodyParser,
-                },
+                    bodyParser: bodyParser
+                }
             );
         }
 
@@ -386,7 +400,7 @@ MatrixHttpApi.prototype = {
         path,
         params,
         prefix,
-        accessToken,
+        accessToken
     ) {
         if (!this.opts.idBaseUrl) {
             throw new Error("No Identity Server base URL set");
@@ -396,7 +410,7 @@ MatrixHttpApi.prototype = {
 
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
-                "Expected callback to be a function but got " + typeof callback,
+                "Expected callback to be a function but got " + typeof callback
             );
         }
 
@@ -406,21 +420,21 @@ MatrixHttpApi.prototype = {
             withCredentials: false,
             json: true, // we want a JSON response if we can
             _matrix_opts: this.opts,
-            headers: {},
+            headers: {}
         };
-        if (method === 'GET') {
+        if (method === "GET") {
             opts.qs = params;
         } else if (typeof params === "object") {
             opts.json = params;
         }
         if (accessToken) {
-            opts.headers['Authorization'] = `Bearer ${accessToken}`;
+            opts.headers["Authorization"] = `Bearer ${accessToken}`;
         }
 
         const defer = utils.defer();
         this.opts.request(
             opts,
-            requestCallback(defer, callback, this.opts.onlyData),
+            requestCallback(defer, callback, this.opts.onlyData)
         );
         return defer.promise;
     },
@@ -464,7 +478,7 @@ MatrixHttpApi.prototype = {
             if (isFinite(opts)) {
                 // opts used to be localTimeoutMs
                 opts = {
-                    localTimeoutMs: opts,
+                    localTimeoutMs: opts
                 };
             }
             if (!opts) {
@@ -486,18 +500,23 @@ MatrixHttpApi.prototype = {
         }
 
         const requestPromise = this.request(
-            callback, method, path, queryParams, data, opts,
+            callback,
+            method,
+            path,
+            queryParams,
+            data,
+            opts
         );
 
         const self = this;
         requestPromise.catch(function(err) {
-            if (err.errcode == 'M_UNKNOWN_TOKEN') {
+            if (err.errcode == "M_UNKNOWN_TOKEN") {
                 self.event_emitter.emit("Session.logged_out", err);
-            } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
+            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 self.event_emitter.emit(
                     "no_consent",
                     err.message,
-                    err.data.consent_uri,
+                    err.data.consent_uri
                 );
             }
         });
@@ -539,11 +558,17 @@ MatrixHttpApi.prototype = {
      */
     request: function(callback, method, path, queryParams, data, opts) {
         opts = opts || {};
-        const prefix = opts.prefix !== undefined ? opts.prefix : this.opts.prefix;
+        const prefix =
+            opts.prefix !== undefined ? opts.prefix : this.opts.prefix;
         const fullUri = this.opts.baseUrl + prefix + path;
 
         return this.requestOtherUrl(
-            callback, method, fullUri, queryParams, data, opts,
+            callback,
+            method,
+            fullUri,
+            queryParams,
+            data,
+            opts
         );
     },
 
@@ -576,20 +601,17 @@ MatrixHttpApi.prototype = {
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    requestOtherUrl: function(callback, method, uri, queryParams, data,
-                              opts) {
+    requestOtherUrl: function(callback, method, uri, queryParams, data, opts) {
         if (opts === undefined || opts === null) {
             opts = {};
         } else if (isFinite(opts)) {
             // opts used to be localTimeoutMs
             opts = {
-                localTimeoutMs: opts,
+                localTimeoutMs: opts
             };
         }
 
-        return this._request(
-            callback, method, uri, queryParams, data, opts,
-        );
+        return this._request(callback, method, uri, queryParams, data, opts);
     },
 
     /**
@@ -640,7 +662,7 @@ MatrixHttpApi.prototype = {
     _request: function(callback, method, uri, queryParams, data, opts) {
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
-                "Expected callback to be a function but got " + typeof callback,
+                "Expected callback to be a function but got " + typeof callback
             );
         }
         opts = opts || {};
@@ -667,11 +689,11 @@ MatrixHttpApi.prototype = {
         if (json) {
             if (data) {
                 data = JSON.stringify(data);
-                headers['content-type'] = 'application/json';
+                headers["content-type"] = "application/json";
             }
 
-            if (!headers['accept']) {
-                headers['accept'] = 'application/json';
+            if (!headers["accept"]) {
+                headers["accept"] = "application/json";
             }
 
             if (bodyParser === undefined) {
@@ -698,11 +720,13 @@ MatrixHttpApi.prototype = {
                     if (req && req.abort) {
                         req.abort();
                     }
-                    defer.reject(new MatrixError({
-                        error: "Locally timed out waiting for a response",
-                        errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
-                        timeout: localTimeoutMs,
-                    }));
+                    defer.reject(
+                        new MatrixError({
+                            error: "Locally timed out waiting for a response",
+                            errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
+                            timeout: localTimeoutMs
+                        })
+                    );
                 }, localTimeoutMs);
             }
         };
@@ -723,7 +747,7 @@ MatrixHttpApi.prototype = {
                     json: false,
                     timeout: localTimeoutMs,
                     headers: headers || {},
-                    _matrix_opts: this.opts,
+                    _matrix_opts: this.opts
                 },
                 function(err, response, body) {
                     if (localTimeoutMs) {
@@ -734,19 +758,21 @@ MatrixHttpApi.prototype = {
                     }
 
                     const handlerFn = requestCallback(
-                        defer, callback, self.opts.onlyData,
-                        bodyParser,
+                        defer,
+                        callback,
+                        self.opts.onlyData,
+                        bodyParser
                     );
                     handlerFn(err, response, body);
-                },
+                }
             );
             if (req) {
                 // This will only work in a browser, where opts.request is the
                 // `browser-request` import. Currently `request` does not support progress
                 // updates - see https://github.com/request/request/pull/2346.
                 // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
-                if ('onprogress' in req) {
-                    req.onprogress = (e) => {
+                if ("onprogress" in req) {
+                    req.onprogress = e => {
                         // Prevent the timeout from rejecting the deferred promise if progress is
                         // seen with the request
                         resetTimeout();
@@ -764,7 +790,7 @@ MatrixHttpApi.prototype = {
             }
         }
         return reqPromise;
-    },
+    }
 };
 
 /*
@@ -782,8 +808,10 @@ MatrixHttpApi.prototype = {
  *
  */
 const requestCallback = function(
-    defer, userDefinedCallback, onlyData,
-    bodyParser,
+    defer,
+    userDefinedCallback,
+    onlyData,
+    bodyParser
 ) {
     userDefinedCallback = userDefinedCallback || function() {};
 
@@ -810,7 +838,7 @@ const requestCallback = function(
                 // XXX: why do we bother with this? it doesn't work for
                 // XMLHttpRequest, so clearly we don't use it.
                 headers: response.headers,
-                data: body,
+                data: body
             };
             defer.resolve(onlyData ? body : res);
             userDefinedCallback(null, onlyData ? body : res);
@@ -834,10 +862,10 @@ function parseErrorResponse(response, body) {
 
     let err;
     if (contentType) {
-        if (contentType.type === 'application/json') {
-            const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
+        if (contentType.type === "application/json") {
+            const jsonBody = typeof body === "object" ? body : JSON.parse(body);
             err = new MatrixError(jsonBody);
-        } else if (contentType.type === 'text/plain') {
+        } else if (contentType.type === "text/plain") {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
         }
     }
@@ -848,7 +876,6 @@ function parseErrorResponse(response, body) {
     err.httpStatus = httpStatus;
     return err;
 }
-
 
 /**
  * extract the Content-Type header from the response object, and
@@ -866,7 +893,7 @@ function getResponseContentType(response) {
         contentType = response.getResponseHeader("Content-Type");
     } else if (response.headers) {
         // request provides http.IncomingMessage which has a message.headers map
-        contentType = response.headers['content-type'] || null;
+        contentType = response.headers["content-type"] || null;
     }
 
     if (!contentType) {
@@ -875,7 +902,7 @@ function getResponseContentType(response) {
 
     try {
         return parseContentType(contentType);
-    } catch(e) {
+    } catch (e) {
         throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
     }
 }
@@ -891,12 +918,13 @@ function getResponseContentType(response) {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {integer} httpStatus The numeric HTTP status code given
  */
-export function MatrixError(errorJson) {
-    errorJson = errorJson || {};
-    this.errcode = errorJson.errcode;
-    this.name = errorJson.errcode || "Unknown error code";
-    this.message = errorJson.error || "Unknown message";
-    this.data = errorJson;
+export class MatrixError extends Error {
+    constructor(errorJson) {
+        super(errorJson.error || "Unknown message");
+        errorJson = errorJson || {};
+        this.errcode = errorJson.errcode;
+        this.name = errorJson.errcode || "Unknown error code";
+        this.message = errorJson.error || "Unknown message";
+        this.data = errorJson;
+    }
 }
-MatrixError.prototype = Object.create(Error.prototype);
-MatrixError.prototype.constructor = MatrixError;
