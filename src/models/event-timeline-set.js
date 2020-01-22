@@ -830,7 +830,7 @@ EventTimelineSet.prototype.aggregateRelations = function(event) {
  *
  * @param {object} data  more data about the event
  *
- * @param {module:event-timeline.EventTimeline} data.timeline the timeline the
+ * @param {module:models/event-timeline.EventTimeline} data.timeline the timeline the
  * event was added to/removed from
  *
  * @param {boolean} data.liveEvent true if the event was a real-time event
