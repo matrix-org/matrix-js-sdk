@@ -174,7 +174,7 @@ describe("Cross Signing", function() {
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",
-                path: "/keys/upload/Osborne2",
+                path: "/keys/upload",
                 data: {
                     one_time_key_counts: {
                         curve25519: 100,
@@ -237,7 +237,7 @@ describe("Cross Signing", function() {
             },
             {
                 method: "POST",
-                path: "/keys/upload/Osborne2",
+                path: "/keys/upload",
                 data: {
                     one_time_key_counts: {
                         curve25519: 100,
@@ -429,7 +429,7 @@ describe("Cross Signing", function() {
             HttpResponse.PUSH_RULES_RESPONSE,
             {
                 method: "POST",
-                path: "/keys/upload/Osborne2",
+                path: "/keys/upload",
                 data: {
                     one_time_key_counts: {
                         curve25519: 100,
@@ -487,7 +487,7 @@ describe("Cross Signing", function() {
             },
             {
                 method: "POST",
-                path: "/keys/upload/Osborne2",
+                path: "/keys/upload",
                 data: {
                     one_time_key_counts: {
                         curve25519: 100,
