@@ -18,14 +18,14 @@ limitations under the License.
 
 /* eslint-disable babel/no-invalid-this */
 
-import {MemoryStore} from "./memory";
+import { MemoryStore } from "./memory";
 import * as utils from "../utils";
-import {EventEmitter} from 'events';
-import {LocalIndexedDBStoreBackend} from "./indexeddb-local-backend.js";
-import {RemoteIndexedDBStoreBackend} from "./indexeddb-remote-backend.js";
-import {User} from "../models/user";
-import {MatrixEvent} from "../models/event";
-import {logger} from '../logger';
+import { EventEmitter } from "events";
+import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend.js";
+import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend.js";
+import { User } from "../models/user";
+import { MatrixEvent } from "../models/event";
+import { logger } from "../logger";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -38,7 +38,6 @@ import {logger} from '../logger';
 // often does not affect the length of the pause since the entire /sync
 // response is persisted each time.
 const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
-
 
 /**
  * Construct a new Indexed Database store, which extends MemoryStore.
@@ -82,69 +81,100 @@ const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
  * this API if you need to perform specific indexeddb actions like deleting the
  * database.
  */
-export function IndexedDBStore(opts) {
-    MemoryStore.call(this, opts);
-
-    if (!opts.indexedDB) {
-        throw new Error('Missing required option: indexedDB');
-    }
-
-    if (opts.workerScript) {
-        // try & find a webworker-compatible API
-        let workerApi = opts.workerApi;
-        if (!workerApi) {
-            // default to the global Worker object (which is where it in a browser)
-            workerApi = global.Worker;
+export class IndexedDBStore extends MemoryStore {
+    constructor(opts) {
+        super(opts);
+        MemoryStore.call(this, opts);
+        if (!opts.indexedDB) {
+            throw new Error("Missing required option: indexedDB");
         }
-        this.backend = new RemoteIndexedDBStoreBackend(
-            opts.workerScript, opts.dbName, workerApi,
-        );
-    } else {
-        this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
+        if (opts.workerScript) {
+            // try & find a webworker-compatible API
+            let workerApi = opts.workerApi;
+            if (!workerApi) {
+                // default to the global Worker object (which is where it in a browser)
+                workerApi = global.Worker;
+            }
+            this.backend = new RemoteIndexedDBStoreBackend(
+                opts.workerScript,
+                opts.dbName,
+                workerApi
+            );
+        } else {
+            this.backend = new LocalIndexedDBStoreBackend(
+                opts.indexedDB,
+                opts.dbName
+            );
+        }
+        this.startedUp = false;
+        this._syncTs = 0;
+        // Records the last-modified-time of each user at the last point we saved
+        // the database, such that we can derive the set if users that have been
+        // modified since we last saved.
+        this._userModifiedMap = {
+            // user_id : timestamp
+        };
     }
-
-    this.startedUp = false;
-    this._syncTs = 0;
-
-    // Records the last-modified-time of each user at the last point we saved
-    // the database, such that we can derive the set if users that have been
-    // modified since we last saved.
-    this._userModifiedMap = {
-        // user_id : timestamp
-    };
-}
-utils.inherits(IndexedDBStore, MemoryStore);
-utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
-
-IndexedDBStore.exists = function(indexedDB, dbName) {
-    return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
-};
-
-/**
- * @return {Promise} Resolved when loaded from indexed db.
-  */
-IndexedDBStore.prototype.startup = function() {
-    if (this.startedUp) {
-        logger.log(`IndexedDBStore.startup: already started`);
+    /**
+     * @return {Promise} Resolved when loaded from indexed db.
+     */
+    startup() {
+        if (this.startedUp) {
+            logger.log(`IndexedDBStore.startup: already started`);
+            return Promise.resolve();
+        }
+        logger.log(`IndexedDBStore.startup: connecting to backend`);
+        return this.backend
+            .connect()
+            .then(() => {
+                logger.log(`IndexedDBStore.startup: loading presence events`);
+                return this.backend.getUserPresenceEvents();
+            })
+            .then(userPresenceEvents => {
+                logger.log(
+                    `IndexedDBStore.startup: processing presence events`
+                );
+                userPresenceEvents.forEach(([userId, rawEvent]) => {
+                    const u = new User(userId);
+                    if (rawEvent) {
+                        u.setPresenceEvent(new MatrixEvent(rawEvent));
+                    }
+                    this._userModifiedMap[u.userId] = u.getLastModifiedTime();
+                    this.storeUser(u);
+                });
+            });
+    }
+    /**
+     * Whether this store would like to save its data
+     * Note that obviously whether the store wants to save or
+     * not could change between calling this function and calling
+     * save().
+     *
+     * @return {boolean} True if calling save() will actually save
+     *     (at the time this function is called).
+     */
+    wantsSave() {
+        const now = Date.now();
+        return now - this._syncTs > WRITE_DELAY_MS;
+    }
+    /**
+     * Possibly write data to the database.
+     *
+     * @param {bool} force True to force a save to happen
+     * @return {Promise} Promise resolves after the write completes
+     *     (or immediately if no write is performed)
+     */
+    save(force) {
+        if (force || this.wantsSave()) {
+            return this._reallySave();
+        }
         return Promise.resolve();
     }
-
-    logger.log(`IndexedDBStore.startup: connecting to backend`);
-    return this.backend.connect().then(() => {
-        logger.log(`IndexedDBStore.startup: loading presence events`);
-        return this.backend.getUserPresenceEvents();
-    }).then((userPresenceEvents) => {
-        logger.log(`IndexedDBStore.startup: processing presence events`);
-        userPresenceEvents.forEach(([userId, rawEvent]) => {
-            const u = new User(userId);
-            if (rawEvent) {
-                u.setPresenceEvent(new MatrixEvent(rawEvent));
-            }
-            this._userModifiedMap[u.userId] = u.getLastModifiedTime();
-            this.storeUser(u);
-        });
-    });
-};
+    static exists(indexedDB, dbName) {
+        return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
+    }
+}
+utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
 
 /**
  * @return {Promise} Resolves with a sync response to restore the
@@ -166,49 +196,23 @@ IndexedDBStore.prototype.isNewlyCreated = degradable(function() {
  */
 IndexedDBStore.prototype.getSavedSyncToken = degradable(function() {
     return this.backend.getNextBatchToken();
-}, "getSavedSyncToken"),
-
+}, "getSavedSyncToken");
 /**
  * Delete all data from this store.
  * @return {Promise} Resolves if the data was deleted from the database.
  */
 IndexedDBStore.prototype.deleteAllData = degradable(function() {
     MemoryStore.prototype.deleteAllData.call(this);
-    return this.backend.clearDatabase().then(() => {
-        logger.log("Deleted indexeddb data.");
-    }, (err) => {
-        logger.error(`Failed to delete indexeddb data: ${err}`);
-        throw err;
-    });
+    return this.backend.clearDatabase().then(
+        () => {
+            logger.log("Deleted indexeddb data.");
+        },
+        err => {
+            logger.error(`Failed to delete indexeddb data: ${err}`);
+            throw err;
+        }
+    );
 });
-
-/**
- * Whether this store would like to save its data
- * Note that obviously whether the store wants to save or
- * not could change between calling this function and calling
- * save().
- *
- * @return {boolean} True if calling save() will actually save
- *     (at the time this function is called).
- */
-IndexedDBStore.prototype.wantsSave = function() {
-    const now = Date.now();
-    return now - this._syncTs > WRITE_DELAY_MS;
-};
-
-/**
- * Possibly write data to the database.
- *
- * @param {bool} force True to force a save to happen
- * @return {Promise} Promise resolves after the write completes
- *     (or immediately if no write is performed)
- */
-IndexedDBStore.prototype.save = function(force) {
-    if (force || this.wantsSave()) {
-        return this._reallySave();
-    }
-    return Promise.resolve();
-};
 
 IndexedDBStore.prototype._reallySave = degradable(function() {
     this._syncTs = Date.now(); // set now to guard against multi-writes
@@ -217,7 +221,8 @@ IndexedDBStore.prototype._reallySave = degradable(function() {
     // can't 'delete' users as they are just presence events).
     const userTuples = [];
     for (const u of this.getUsers()) {
-        if (this._userModifiedMap[u.userId] === u.getLastModifiedTime()) continue;
+        if (this._userModifiedMap[u.userId] === u.getLastModifiedTime())
+            continue;
         if (!u.events.presence) continue;
 
         userTuples.push([u.userId, u.events.presence.event]);
@@ -254,11 +259,16 @@ IndexedDBStore.prototype.getOutOfBandMembers = degradable(function(roomId) {
  */
 IndexedDBStore.prototype.setOutOfBandMembers = degradable(function(
     roomId,
-    membershipEvents,
+    membershipEvents
 ) {
-    MemoryStore.prototype.setOutOfBandMembers.call(this, roomId, membershipEvents);
+    MemoryStore.prototype.setOutOfBandMembers.call(
+        this,
+        roomId,
+        membershipEvents
+    );
     return this.backend.setOutOfBandMembers(roomId, membershipEvents);
-}, "setOutOfBandMembers");
+},
+"setOutOfBandMembers");
 
 IndexedDBStore.prototype.clearOutOfBandMembers = degradable(function(roomId) {
     MemoryStore.prototype.clearOutOfBandMembers.call(this);
@@ -283,7 +293,7 @@ IndexedDBStore.prototype.storeClientOptions = degradable(function(options) {
  * in place so that the current operation and all future ones are in-memory only.
  *
  * @param {Function} func The degradable work to do.
- * @param {String} fallback The method name for fallback.
+ * @param {String} [fallback] The method name for fallback.
  * @returns {Function} A wrapped member function.
  */
 function degradable(func, fallback) {
@@ -313,7 +323,10 @@ function degradable(func, fallback) {
             // not overridden at all).
             Object.setPrototypeOf(this, MemoryStore.prototype);
             if (fallback) {
-                return await MemoryStore.prototype[fallback].call(this, ...args);
+                return await MemoryStore.prototype[fallback].call(
+                    this,
+                    ...args
+                );
             }
         }
     };
