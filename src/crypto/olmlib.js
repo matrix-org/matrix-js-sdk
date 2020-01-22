@@ -126,7 +126,7 @@ export async function encryptMessageForDevice(
  * @param {boolean} force If true, establish a new session even if one already exists.
  *     Optional.
  *
- * @return {module:client.Promise} resolves once the sessions are complete, to
+ * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */

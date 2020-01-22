@@ -54,7 +54,7 @@ utils.inherits(OlmEncryption, EncryptionAlgorithm);
  * @private
 
  * @param {string[]} roomMembers list of currently-joined users in the room
- * @return {module:client.Promise} Promise which resolves when setup is complete
+ * @return {Promise} Promise which resolves when setup is complete
  */
 OlmEncryption.prototype._ensureSession = function(roomMembers) {
     if (this._prepPromise) {
@@ -85,7 +85,7 @@ OlmEncryption.prototype._ensureSession = function(roomMembers) {
  * @param {string} eventType
  * @param {object} content plaintext event content
  *
- * @return {module:client.Promise} Promise which resolves to the new event body
+ * @return {Promise} Promise which resolves to the new event body
  */
 OlmEncryption.prototype.encryptMessage = async function(room, eventType, content) {
     // pick the list of recipients based on the membership list.

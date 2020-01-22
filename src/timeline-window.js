@@ -89,7 +89,7 @@ export function TimelineWindow(client, timelineSet, opts) {
  *    given event
  * @param {number} [initialWindowSize = 20]   Size of the initial window
  *
- * @return {module:client.Promise}
+ * @return {Promise}
  */
 TimelineWindow.prototype.load = function(initialEventId, initialWindowSize) {
     const self = this;
@@ -257,7 +257,7 @@ TimelineWindow.prototype.canPaginate = function(direction) {
  * @param {number} [requestLimit = 5] limit for the number of API requests we
  *    should make.
  *
- * @return {module:client.Promise} Resolves to a boolean which is true if more events
+ * @return {Promise} Resolves to a boolean which is true if more events
  *    were successfully retrieved.
  */
 TimelineWindow.prototype.paginate = function(direction, size, makeRequest,

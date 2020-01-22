@@ -594,7 +594,7 @@ export class DeviceList extends EventEmitter {
      *
      * @param {String[]} users  list of userIds
      *
-     * @return {module:client.Promise} resolves when all the users listed have
+     * @return {Promise} resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
      *     users.
      */
@@ -699,7 +699,7 @@ class DeviceListUpdateSerialiser {
      * @param {String} syncToken sync token to pass in the query request, to
      *     help the HS give the most recent results
      *
-     * @return {module:client.Promise} resolves when all the users listed have
+     * @return {Promise} resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
      *     users.
      */
