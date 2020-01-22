@@ -458,9 +458,11 @@ export class VerificationRequest extends EventEmitter {
      * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
      * @param {bool} isLiveEvent whether this is an even received through sync or not
      * @param {bool} isRemoteEcho whether this is the remote echo of an event sent by the same device
+     * @param {bool} isSentByUs whether this event is sent by a party that can accept and/or observe the request like one of our peers.
+     *   For InRoomChannel this means any device for the syncing user. For ToDeviceChannel, just the syncing device.
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(type, event, isLiveEvent, isRemoteEcho) {
+    async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
         // if reached phase cancelled or done, ignore anything else that comes
         if (!this.pending) {
             return;
@@ -475,7 +477,7 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
-        this._addEvent(type, event, isRemoteEcho);
+        this._addEvent(type, event, isSentByUs);
 
         const transitions = this._calculatePhaseTransitions();
         const existingIdx = transitions.findIndex(t => t.phase === this.phase);
@@ -573,8 +575,8 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
-    _addEvent(type, event, isRemoteEcho) {
-        if (isRemoteEcho || this._wasSentByOwnDevice(event)) {
+    _addEvent(type, event, isSentByUs) {
+        if (isSentByUs) {
             this._eventsByUs.set(type, event);
         } else {
             this._eventsByThem.set(type, event);

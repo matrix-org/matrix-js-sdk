@@ -153,7 +153,7 @@ export class ToDeviceChannel {
         const wasStarted = request.phase === PHASE_STARTED ||
                            request.phase === PHASE_READY;
 
-        await request.handleEvent(event.getType(), event, isLiveEvent, false);
+        await request.handleEvent(event.getType(), event, isLiveEvent, false, false);
 
         const isStarted = request.phase === PHASE_STARTED ||
                           request.phase === PHASE_READY;
@@ -245,6 +245,7 @@ export class ToDeviceChannel {
             remoteEchoEvent,
             /*isLiveEvent=*/true,
             /*isRemoteEcho=*/true,
+            /*isSentByUs=*/true,
         );
         return result;
     }
