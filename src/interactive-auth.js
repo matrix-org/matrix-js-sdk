@@ -47,14 +47,14 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  * @param {object?} opts.authData error response from the last request. If
  *    null, a request will be made with no auth before starting.
  *
- * @param {function(object?): module:client.Promise} opts.doRequest
+ * @param {function(object?): Promise} opts.doRequest
  *     called with the new auth dict to submit the request. Also passes a
  *     second deprecated arg which is a flag set to true if this request
  *     is a background request. The busyChanged callback should be used
  *     instead of the backfround flag. Should return a promise which resolves
  *     to the successful response or rejects with a MatrixError.
  *
- * @param {function(bool): module:client.Promise} opts.busyChanged
+ * @param {function(bool): Promise} opts.busyChanged
  *     called whenever the interactive auth logic becomes busy submitting
  *     information provided by the user or finsihes. After this has been
  *     called with true the UI should indicate that a request is in progress
@@ -132,7 +132,7 @@ InteractiveAuth.prototype = {
     /**
      * begin the authentication process.
      *
-     * @return {module:client.Promise} which resolves to the response on success,
+     * @return {Promise} which resolves to the response on success,
      * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */

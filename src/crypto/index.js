@@ -1866,7 +1866,7 @@ Crypto.prototype.trackRoomDevices = function(roomId) {
  *
  * @param {string[]} users list of user ids
  *
- * @return {module:client.Promise} resolves once the sessions are complete, to
+ * @return {Promise} resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
@@ -1929,7 +1929,7 @@ Crypto.prototype.exportRoomKeys = async function() {
  * Import a list of room keys previously exported by exportRoomKeys
  *
  * @param {Object[]} keys a list of session export objects
- * @return {module:client.Promise} a promise which resolves once the keys have been imported
+ * @return {Promise} a promise which resolves once the keys have been imported
  */
 Crypto.prototype.importRoomKeys = function(keys) {
     return Promise.all(keys.map((key) => {
@@ -2125,7 +2125,7 @@ Crypto.prototype.flagAllGroupSessionsForBackup = async function() {
  *
  * @param {module:models/room} room destination room.
  *
- * @return {module:client.Promise?} Promise which resolves when the event has been
+ * @return {Promise?} Promise which resolves when the event has been
  *     encrypted, or null if nothing was needed
  */
 /* eslint-enable valid-jsdoc */

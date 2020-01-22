@@ -155,7 +155,7 @@ MatrixHttpApi.prototype = {
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
      *
-     * @return {module:client.Promise} Resolves to response object, as
+     * @return {Promise} Resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
@@ -449,7 +449,7 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {module:client.Promise} Resolves to <code>{data: {Object},
+     * @return {Promise} Resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
@@ -530,7 +530,7 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {module:client.Promise} Resolves to <code>{data: {Object},
+     * @return {Promise} Resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
@@ -569,7 +569,7 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {module:client.Promise} Resolves to <code>{data: {Object},
+     * @return {Promise} Resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
@@ -633,7 +633,7 @@ MatrixHttpApi.prototype = {
      * @param {function=} opts.bodyParser function to parse the body of the
      *    response before passing it to the promise and callback.
      *
-     * @return {module:client.Promise} a promise which resolves to either the
+     * @return {Promise} a promise which resolves to either the
      * response object (if this.opts.onlyData is truthy), or the parsed
      * body. Rejects
      */

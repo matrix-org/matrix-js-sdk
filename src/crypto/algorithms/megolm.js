@@ -186,7 +186,7 @@ utils.inherits(MegolmEncryption, EncryptionAlgorithm);
  * @param {Object} devicesInRoom The devices in this room, indexed by user ID
  * @param {Object} blocked The devices that are blocked, indexed by user ID
  *
- * @return {module:client.Promise} Promise which resolves to the
+ * @return {Promise} Promise which resolves to the
  *    OutboundSessionInfo when setup is complete.
  */
 MegolmEncryption.prototype._ensureOutboundSession = async function(
@@ -497,7 +497,7 @@ MegolmEncryption.prototype._splitBlockedDevices = function(devicesByUser) {
  *
  * @param {object} payload fields to include in the encrypted payload
  *
- * @return {module:client.Promise} Promise which resolves once the key sharing
+ * @return {Promise} Promise which resolves once the key sharing
  *     for the given userDeviceMap is generated and has been sent.
  */
 MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
@@ -558,7 +558,7 @@ MegolmEncryption.prototype._encryptAndSendKeysToDevices = function(
  *
  * @param {object} payload fields to include in the notification payload
  *
- * @return {module:client.Promise} Promise which resolves once the notifications
+ * @return {Promise} Promise which resolves once the notifications
  *     for the given userDeviceMap is generated and has been sent.
  */
 MegolmEncryption.prototype._sendBlockedNotificationsToDevices = async function(
@@ -779,7 +779,7 @@ MegolmEncryption.prototype._notifyBlockedDevices = async function(
  * @param {string} eventType
  * @param {object} content plaintext event content
  *
- * @return {module:client.Promise} Promise which resolves to the new event body
+ * @return {Promise} Promise which resolves to the new event body
  */
 MegolmEncryption.prototype.encryptMessage = async function(room, eventType, content) {
     const self = this;
@@ -866,7 +866,7 @@ MegolmEncryption.prototype._checkForUnknownDevices = function(devicesInRoom) {
  *
  * @param {module:models/room} room
  *
- * @return {module:client.Promise} Promise which resolves to an array whose
+ * @return {Promise} Promise which resolves to an array whose
  *     first element is a map from userId to deviceId to deviceInfo indicating
  *     the devices that messages should be encrypted to, and whose second
  *     element is a map from userId to deviceId to data indicating the devices
