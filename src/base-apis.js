@@ -1698,10 +1698,8 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
  *
  * @param {Object} content  body of upload request
  *
- * @param {Object=} opts
- *
- * @param {string=} opts.device_id  explicit device_id to use for upload
- *    (default is to use the same as that used during auth).
+ * @param {Object=} opts this method no longer takes any opts,
+ *  used to take opts.device_id but this was not removed from the spec as a redundant parameter
  *
  * @param {module:client.callback=} callback
  *
@@ -1709,17 +1707,7 @@ MatrixBaseApis.prototype.search = function(opts, callback) {
  *     an error response ({@link module:http-api.MatrixError}).
  */
 MatrixBaseApis.prototype.uploadKeysRequest = function(content, opts, callback) {
-    opts = opts || {};
-    const deviceId = opts.device_id;
-    let path;
-    if (deviceId) {
-        path = utils.encodeUri("/keys/upload/$deviceId", {
-            $deviceId: deviceId,
-        });
-    } else {
-        path = "/keys/upload";
-    }
-    return this._http.authedRequest(callback, "POST", path, undefined, content);
+    return this._http.authedRequest(callback, "POST", "/keys/upload", undefined, content);
 };
 
 MatrixBaseApis.prototype.uploadKeySignatures = function(content) {

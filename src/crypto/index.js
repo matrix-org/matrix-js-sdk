@@ -1244,10 +1244,6 @@ Crypto.prototype.uploadDeviceKeys = function() {
     return crypto._signObject(deviceKeys).then(() => {
         return crypto._baseApis.uploadKeysRequest({
             device_keys: deviceKeys,
-        }, {
-            // for now, we set the device id explicitly, as we may not be using the
-            // same one as used in login.
-            device_id: deviceId,
         });
     });
 };
@@ -1344,9 +1340,7 @@ function _maybeUploadOneTimeKeys(crypto) {
             return Promise.resolve(crypto._oneTimeKeyCount);
         }
         // ask the server how many keys we have
-        return crypto._baseApis.uploadKeysRequest({}, {
-            device_id: crypto._deviceId,
-        }).then((res) => {
+        return crypto._baseApis.uploadKeysRequest({}).then((res) => {
             return res.one_time_key_counts.signed_curve25519 || 0;
         });
     }).then((keyCount) => {
@@ -1386,10 +1380,6 @@ async function _uploadOneTimeKeys(crypto) {
 
     const res = await crypto._baseApis.uploadKeysRequest({
         one_time_keys: oneTimeJson,
-    }, {
-        // for now, we set the device id explicitly, as we may not be using the
-        // same one as used in login.
-        device_id: crypto._deviceId,
     });
 
     await crypto._olmDevice.markKeysAsPublished();
