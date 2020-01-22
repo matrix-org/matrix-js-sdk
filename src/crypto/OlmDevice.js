@@ -225,7 +225,7 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
  * Export data for re-creating the Olm device later.
  * TODO export data other than just account and (P2P) sessions.
  * 
- * @return {Promise<object>} The export data (see specs for structure)
+ * @return {Promise<object>} The exported data
 */
 OlmDevice.prototype.export = async function() {
     const result = {

@@ -97,6 +97,11 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {string} opts.accessToken The access_token for this user.
  *
  * @param {string} opts.userId The user ID for this user.
+ * 
+ * @param {Object} opts.deviceToImport Device data exported with
+ *     (TODO link to export method) that must be imported to recreate this device.
+ *     Should only be useful for deviced with end-to-end crypto enabled.
+ *     If provided, opts.userId should **not** be provided.
  *
  * @param {IdentityServerProvider} [opts.identityServer]
  * Optional. A provider object with one function `getAccessToken`, which is a
@@ -242,6 +247,18 @@ export function MatrixClient(opts) {
     this.store = opts.store || new StubStore();
 
     this.deviceId = opts.deviceId || null;
+
+    if (opts.deviceToImport) {
+        if (this.deviceId) {
+            logger.warn('not importing device because device ID is provided to constructor independently of exported data');
+        } else if (!(opts.deviceToImport.deviceId)){
+            logger.warn('not importing device because no device ID in exported data');
+        } else {
+            this.deviceId = opts.deviceToImport.deviceId;
+            // will be used during async initialization of the crypto
+            this._exportedOlmDeviceToImport = opts.deviceToImport.olmDevice;
+        }
+    }
 
     const userId = (opts.userId || null);
     this.credentials = {
@@ -390,6 +407,17 @@ export function MatrixClient(opts) {
 }
 utils.inherits(MatrixClient, EventEmitter);
 utils.extend(MatrixClient.prototype, MatrixBaseApis.prototype);
+
+MatrixClient.prototype.exportDevice = async function() {
+    if (!(this._crypto)) {
+        logger.warn('not exporting device if crypto is not enabled');
+        return;
+    }
+    return {
+        deviceId: this.deviceId,
+        olmDevice: await this._crypto._olmDevice.export(),
+    };
+};
 
 /**
  * Clear any data out of the persistent stores used by the client.
@@ -684,7 +712,10 @@ MatrixClient.prototype.initCrypto = async function() {
     ]);
 
     logger.log("Crypto: initialising crypto object...");
-    await crypto.init();
+    await crypto.init({
+        exportedOlmDevice: this._exportedOlmDeviceToImport,
+    });
+    delete this._exportedOlmDeviceToImport;
 
     this.olmVersion = Crypto.getOlmVersion();
 
