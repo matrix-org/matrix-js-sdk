@@ -101,7 +101,8 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {Object} opts.deviceToImport Device data exported with
  *     (TODO link to export method) that must be imported to recreate this device.
  *     Should only be useful for deviced with end-to-end crypto enabled.
- *     If provided, opts.userId should **not** be provided.
+ *     If provided, opts.deviceId and opts.userId should **NOT** be provided
+ *     (they are present in the exported data).
  *
  * @param {IdentityServerProvider} [opts.identityServer]
  * Optional. A provider object with one function `getAccessToken`, which is a
@@ -248,22 +249,25 @@ export function MatrixClient(opts) {
 
     this.deviceId = opts.deviceId || null;
 
-    if (opts.deviceToImport) {
-        if (this.deviceId) {
-            logger.warn('not importing device because device ID is provided to constructor independently of exported data');
-        } else if (!(opts.deviceToImport.deviceId)){
-            logger.warn('not importing device because no device ID in exported data');
-        } else {
-            this.deviceId = opts.deviceToImport.deviceId;
-            // will be used during async initialization of the crypto
-            this._exportedOlmDeviceToImport = opts.deviceToImport.olmDevice;
-        }
-    }
-
     const userId = (opts.userId || null);
     this.credentials = {
         userId: userId,
     };
+
+    if (opts.deviceToImport) {
+        if (this.deviceId) {
+            logger.warn('not importing device because device ID is provided to constructor independently of exported data');
+        } else if (this.credentials.userId) {
+            logger.warn('not importing device because user ID is provided to constructor independently of exported data');
+        } else if (!(opts.deviceToImport.deviceId)){
+            logger.warn('not importing device because no device ID in exported data');
+        } else {
+            this.deviceId = opts.deviceToImport.deviceId;
+            this.credentials.userId = opts.deviceToImport.userId;
+            // will be used during async initialization of the crypto
+            this._exportedOlmDeviceToImport = opts.deviceToImport.olmDevice;
+        }
+    }
 
     this.scheduler = opts.scheduler;
     if (this.scheduler) {
@@ -414,6 +418,7 @@ MatrixClient.prototype.exportDevice = async function() {
         return;
     }
     return {
+        userId: this.credentials.userId,
         deviceId: this.deviceId,
         olmDevice: await this._crypto._olmDevice.export(),
     };
