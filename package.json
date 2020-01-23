@@ -46,6 +46,7 @@
     "release.sh"
   ],
   "dependencies": {
+    "@babel/runtime": "^7.8.3",
     "another-json": "^0.2.0",
     "browser-request": "^0.3.3",
     "bs58": "^4.0.1",
@@ -62,11 +63,10 @@
     "@babel/plugin-proposal-numeric-separator": "^7.7.4",
     "@babel/plugin-proposal-object-rest-spread": "^7.7.4",
     "@babel/plugin-syntax-dynamic-import": "^7.7.4",
-    "@babel/plugin-transform-runtime": "^7.7.6",
+    "@babel/plugin-transform-runtime": "^7.8.3",
     "@babel/preset-env": "^7.7.6",
     "@babel/preset-typescript": "^7.7.4",
     "@babel/register": "^7.7.4",
-    "@babel/runtime": "^7.7.6",
     "@types/node": "12",
     "babel-eslint": "^10.0.3",
     "babel-jest": "^24.9.0",
