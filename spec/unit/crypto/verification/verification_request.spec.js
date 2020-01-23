@@ -16,7 +16,8 @@ limitations under the License.
 import {VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE} from
     "../../../../src/crypto/verification/request/VerificationRequest";
 import {InRoomChannel} from "../../../../src/crypto/verification/request/InRoomChannel";
-import {ToDeviceChannel} from "../../../../src/crypto/verification/request/ToDeviceChannel";
+import {ToDeviceChannel} from
+    "../../../../src/crypto/verification/request/ToDeviceChannel";
 import {MatrixEvent} from "../../../../src/models/event";
 
 function makeMockClient(userId, deviceId) {
