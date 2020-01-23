@@ -16,14 +16,18 @@ limitations under the License.
 import {VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE} from
     "../../../../src/crypto/verification/request/VerificationRequest";
 import {InRoomChannel} from "../../../../src/crypto/verification/request/InRoomChannel";
+import {ToDeviceChannel} from
+    "../../../../src/crypto/verification/request/ToDeviceChannel";
 import {MatrixEvent} from "../../../../src/models/event";
 
 function makeMockClient(userId, deviceId) {
     let counter = 1;
     let events = [];
+    const deviceEvents = {};
     return {
         getUserId() { return userId; },
         getDeviceId() { return deviceId; },
+
         sendEvent(roomId, type, content) {
             counter = counter + 1;
             const eventId = `$${userId}-${deviceId}-${counter}`;
@@ -37,10 +41,35 @@ function makeMockClient(userId, deviceId) {
             }));
             return Promise.resolve({event_id: eventId});
         },
+
+        sendToDevice(type, msgMap) {
+            for (const userId of Object.keys(msgMap)) {
+                const deviceMap = msgMap[userId];
+                for (const deviceId of Object.keys(deviceMap)) {
+                    const content = deviceMap[deviceId];
+                    const event = new MatrixEvent({content, type});
+                    deviceEvents[userId] = deviceEvents[userId] || {};
+                    deviceEvents[userId][deviceId] = deviceEvents[userId][deviceId] || [];
+                    deviceEvents[userId][deviceId].push(event);
+                }
+            }
+            return Promise.resolve();
+        },
+
         popEvents() {
             const e = events;
             events = [];
             return e;
+        },
+
+        popDeviceEvents(userId, deviceId) {
+            const forDevice = deviceEvents[userId];
+            const events = forDevice && forDevice[deviceId];
+            const result = events || [];
+            if (events) {
+                delete forDevice[deviceId];
+            }
+            return result;
         },
     };
 }
@@ -173,5 +202,35 @@ describe("verification request unit tests", function() {
         expect(bob2Request.observeOnly).toBe(false);
         await bob2Request.channel.handleEvent(readyEvent, bob2Request, true);
         expect(bob2Request.observeOnly).toBe(true);
+    });
+
+    it("verify own device with to_device messages", async function() {
+        const bob1 = makeMockClient("@bob:matrix.tld", "device1");
+        const bob2 = makeMockClient("@bob:matrix.tld", "device2");
+        const bob1Request = new VerificationRequest(
+            new ToDeviceChannel(bob1, bob1.getUserId(), ["device1", "device2"],
+                ToDeviceChannel.makeTransactionId(), "device2"),
+            new Map([[MOCK_METHOD, MockVerifier]]), bob1);
+        const to = {userId: "@bob:matrix.tld", deviceId: "device2"};
+        const verifier = bob1Request.beginKeyVerification(MOCK_METHOD, to);
+        expect(verifier).toBeInstanceOf(MockVerifier);
+        await verifier.start();
+        const [startEvent] = bob1.popDeviceEvents(to.userId, to.deviceId);
+        expect(startEvent.getType()).toBe(START_TYPE);
+        const bob2Request = new VerificationRequest(
+            new ToDeviceChannel(bob2, bob2.getUserId(), ["device1"]),
+            new Map([[MOCK_METHOD, MockVerifier]]), bob2);
+
+        await bob2Request.channel.handleEvent(startEvent, bob2Request, true);
+        await bob2Request.verifier.start();
+        const [doneEvent1] = bob2.popDeviceEvents("@bob:matrix.tld", "device1");
+        expect(doneEvent1.getType()).toBe(DONE_TYPE);
+        await bob1Request.channel.handleEvent(doneEvent1, bob1Request, true);
+        const [doneEvent2] = bob1.popDeviceEvents("@bob:matrix.tld", "device2");
+        expect(doneEvent2.getType()).toBe(DONE_TYPE);
+        await bob2Request.channel.handleEvent(doneEvent2, bob2Request, true);
+
+        expect(bob1Request.done).toBe(true);
+        expect(bob2Request.done).toBe(true);
     });
 });

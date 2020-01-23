@@ -157,11 +157,6 @@ export class VerificationRequest extends EventEmitter {
         return 0;
     }
 
-    /** the m.key.verification.request event that started this request, provided for compatibility with previous verification code */
-    get event() {
-        return this._getEventByEither(REQUEST_TYPE) || this._getEventByEither(START_TYPE);
-    }
-
     /** current phase of the request. Some properties might only be defined in a current phase. */
     get phase() {
         return this._phase;
