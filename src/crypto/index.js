@@ -236,7 +236,7 @@ utils.inherits(Crypto, EventEmitter);
 Crypto.prototype.init = async function(kwargs) {
     const {
         exportedOlmDevice,
-    } = kwargs;
+    } = kwargs || {};
 
     logger.log("Crypto: initialising Olm...");
     await global.Olm.init();
