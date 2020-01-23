@@ -210,8 +210,10 @@ export class InRoomChannel {
         }
 
         const isRemoteEcho = !!event.getUnsigned().transaction_id;
+        const isSentByUs = event.getSender() === this._client.getUserId();
 
-        return await request.handleEvent(type, event, isLiveEvent, isRemoteEcho);
+        return await request.handleEvent(
+            type, event, isLiveEvent, isRemoteEcho, isSentByUs);
     }
 
     /**

@@ -458,13 +458,16 @@ export class VerificationRequest extends EventEmitter {
      * @param {MatrixEvent} event the event to handle. Don't call getType() on it but use the `type` parameter instead.
      * @param {bool} isLiveEvent whether this is an even received through sync or not
      * @param {bool} isRemoteEcho whether this is the remote echo of an event sent by the same device
+     * @param {bool} isSentByUs whether this event is sent by a party that can accept and/or observe the request like one of our peers.
+     *   For InRoomChannel this means any device for the syncing user. For ToDeviceChannel, just the syncing device.
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
-    async handleEvent(type, event, isLiveEvent, isRemoteEcho) {
+    async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
         // if reached phase cancelled or done, ignore anything else that comes
         if (!this.pending) {
             return;
         }
+        const wasObserveOnly = this._observeOnly;
 
         this._adjustObserveOnly(event, isLiveEvent);
 
@@ -474,7 +477,7 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
-        this._addEvent(type, event, isRemoteEcho);
+        this._addEvent(type, event, isSentByUs);
 
         const transitions = this._calculatePhaseTransitions();
         const existingIdx = transitions.findIndex(t => t.phase === this.phase);
@@ -486,7 +489,7 @@ export class VerificationRequest extends EventEmitter {
         }
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && !isRemoteEcho) {
+        if (this._verifier && !isRemoteEcho && !this.observeOnly) {
             if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
@@ -500,6 +503,8 @@ export class VerificationRequest extends EventEmitter {
             this._setupTimeout(phase);
             // set phase as last thing as this emits the "change" event
             this._setPhase(phase);
+        } else if (this._observeOnly !== wasObserveOnly) {
+            this.emit("change");
         }
     }
 
@@ -539,7 +544,6 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
-        /* FIXME: https://github.com/vector-im/riot-web/issues/11765 */
         const isUnexpectedRequest = type === REQUEST_TYPE && this.phase !== PHASE_UNSENT;
         const isUnexpectedReady = type === READY_TYPE && this.phase !== PHASE_REQUESTED;
         if (isUnexpectedRequest || isUnexpectedReady) {
@@ -570,8 +574,8 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
-    _addEvent(type, event, isRemoteEcho) {
-        if (isRemoteEcho || this._wasSentByOwnDevice(event)) {
+    _addEvent(type, event, isSentByUs) {
+        if (isSentByUs) {
             this._eventsByUs.set(type, event);
         } else {
             this._eventsByThem.set(type, event);
