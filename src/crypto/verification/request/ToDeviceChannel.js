@@ -43,6 +43,10 @@ export class ToDeviceChannel {
         this._deviceId = deviceId;
     }
 
+    get deviceId() {
+        return this._deviceId;
+    }
+
     static getEventType(event) {
         return event.getType();
     }
