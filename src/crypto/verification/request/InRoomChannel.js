@@ -128,11 +128,13 @@ export class InRoomChannel {
     static validateEvent(event, client) {
         const txnId = InRoomChannel.getTransactionId(event);
         if (typeof txnId !== "string" || txnId.length === 0) {
-            logger.log("InRoomChannel: validateEvent: no valid txnId " + txnId);
             return false;
         }
         const type = InRoomChannel.getEventType(event);
         const content = event.getContent();
+
+        // from here on we're fairly sure that this is supposed to be
+        // part of a verification request, so be noisy when rejecting something
         if (type === REQUEST_TYPE) {
             if (!content || typeof content.to !== "string" || !content.to.length) {
                 logger.log("InRoomChannel: validateEvent: " +
