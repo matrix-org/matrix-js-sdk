@@ -88,7 +88,10 @@ describe("OlmDevice", function() {
             // At this moment only Alice (the “initiator” in setupSession) has a session
             expect(exported.sessions).toEqual([]);
 
-            const MESSAGE = "The olm or proteus is an aquatic salamander in the family Proteidae";
+            const MESSAGE = (
+                "The olm or proteus is an aquatic salamander"
+                + " in the family Proteidae"
+            );
             const ciphertext = await aliceOlmDevice.encryptMessage(
                 bobOlmDevice.deviceCurve25519Key,
                 sessionId,
@@ -109,7 +112,10 @@ describe("OlmDevice", function() {
             // this time we expect Bob to have a session to export
             expect(exportedAgain.sessions).toHaveLength(1);
 
-            const MESSAGE_2 = "In contrast to most amphibians, the olm is entirely aquatic";
+            const MESSAGE_2 = (
+                "In contrast to most amphibians,"
+                + " the olm is entirely aquatic"
+            );
             const ciphertext_2 = await aliceOlmDevice.encryptMessage(
                 bobOlmDevice.deviceCurve25519Key,
                 sessionId,

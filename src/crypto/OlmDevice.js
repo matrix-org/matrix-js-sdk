@@ -115,7 +115,7 @@ export function OlmDevice(cryptoStore) {
  * found.
  *
  * Reads the device keys from the OlmAccount object.
- * 
+ *
  * @param {object} fromExportedDevice (Optional) data from exported device
  *     that must be re-created.
  */
@@ -123,10 +123,15 @@ OlmDevice.prototype.init = async function(fromExportedDevice) {
     let e2eKeys;
     const account = new global.Olm.Account();
     try {
-        if (fromExportedDevice){
+        if (fromExportedDevice) {
             this._pickleKey = fromExportedDevice.pickleKey;
         }
-        await _initialiseAccount(fromExportedDevice, this._cryptoStore, this._pickleKey, account);
+        await _initialiseAccount(
+            fromExportedDevice,
+            this._cryptoStore,
+            this._pickleKey,
+            account,
+        );
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -157,22 +162,31 @@ async function _initialiseAccount(fromExportedDevice, cryptoStore, pickleKey, ac
                         session: session.session,
                         lastReceivedMessageTs: session.lastReceivedMessageTs,
                     };
-                    cryptoStore.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
+                    cryptoStore.storeEndToEndSession(
+                        deviceKey,
+                        sessionId,
+                        sessionInfo,
+                        txn,
+                    );
                 });
         });
         account.unpickle(pickleKey, fromExportedDevice.pickledAccount);
     } else {
-        await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-            cryptoStore.getAccount(txn, (pickledAccount) => {
-                if (pickledAccount !== null) {
-                    account.unpickle(pickleKey, pickledAccount);
-                } else {
-                    account.create();
-                    pickledAccount = account.pickle(pickleKey);
-                    cryptoStore.storeAccount(txn, pickledAccount);
-                }
-            });
-        });
+        await cryptoStore.doTxn(
+            'readwrite',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                cryptoStore.getAccount(txn, (pickledAccount) => {
+                    if (pickledAccount !== null) {
+                        account.unpickle(pickleKey, pickledAccount);
+                    } else {
+                        account.create();
+                        pickledAccount = account.pickle(pickleKey);
+                        cryptoStore.storeAccount(txn, pickledAccount);
+                    }
+                });
+            },
+        );
     }
 }
 
@@ -224,7 +238,7 @@ OlmDevice.prototype._storeAccount = function(txn, account) {
 /**
  * Export data for re-creating the Olm device later.
  * TODO export data other than just account and (P2P) sessions.
- * 
+ *
  * @return {Promise<object>} The exported data
 */
 OlmDevice.prototype.export = async function() {

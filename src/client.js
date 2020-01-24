@@ -97,7 +97,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {string} opts.accessToken The access_token for this user.
  *
  * @param {string} opts.userId The user ID for this user.
- * 
+ *
  * @param {Object} opts.deviceToImport Device data exported with
  *     (TODO link to export method) that must be imported to recreate this device.
  *     Should only be useful for deviced with end-to-end crypto enabled.
@@ -256,10 +256,18 @@ export function MatrixClient(opts) {
 
     if (opts.deviceToImport) {
         if (this.deviceId) {
-            logger.warn('not importing device because device ID is provided to constructor independently of exported data');
+            logger.warn(
+                'not importing device because'
+                + ' device ID is provided to constructor'
+                + ' independently of exported data',
+            );
         } else if (this.credentials.userId) {
-            logger.warn('not importing device because user ID is provided to constructor independently of exported data');
-        } else if (!(opts.deviceToImport.deviceId)){
+            logger.warn(
+                'not importing device because'
+                + ' user ID is provided to constructor'
+                + ' independently of exported data',
+            );
+        } else if (!(opts.deviceToImport.deviceId)) {
             logger.warn('not importing device because no device ID in exported data');
         } else {
             this.deviceId = opts.deviceToImport.deviceId;
