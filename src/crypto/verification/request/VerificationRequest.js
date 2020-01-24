@@ -159,6 +159,14 @@ export class VerificationRequest extends EventEmitter {
         return 0;
     }
 
+    /**
+     * The key verification request event.
+     * @returns {MatrixEvent} The request event, or falsey if not found.
+     */
+    get requestEvent() {
+        return this._getEventByEither(REQUEST_TYPE);
+    }
+
     /** current phase of the request. Some properties might only be defined in a current phase. */
     get phase() {
         return this._phase;
