@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import {makeTestClients} from './util';
+import {makeTestClients, setupWebcrypto, teardownWebcrypto} from './util';
 import {MatrixEvent} from "../../../../src/models/event";
 import {SAS} from "../../../../src/crypto/verification/SAS";
 import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
@@ -35,7 +35,12 @@ describe("SAS verification", function() {
     }
 
     beforeAll(function() {
+        setupWebcrypto();
         return Olm.init();
+    });
+
+    afterAll(() => {
+        teardownWebcrypto();
     });
 
     it("should error on an unexpected event", async function() {

@@ -17,6 +17,7 @@ limitations under the License.
 
 import {TestClient} from '../../../TestClient';
 import {MatrixEvent} from "../../../../src/models/event";
+import nodeCrypto from "crypto";
 
 export async function makeTestClients(userInfos, options) {
     const clients = [];
@@ -101,4 +102,16 @@ export async function makeTestClients(userInfos, options) {
     await Promise.all(clients.map((testClient) => testClient.client.initCrypto()));
 
     return clients;
+}
+
+export function setupWebcrypto() {
+    global.crypto = {
+        getRandomValues: (buf) => {
+            return nodeCrypto.randomFillSync(buf);
+        },
+    };
+}
+
+export function teardownWebcrypto() {
+    global.crypto = undefined;
 }

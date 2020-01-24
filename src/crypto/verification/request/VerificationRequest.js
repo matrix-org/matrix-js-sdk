@@ -23,6 +23,7 @@ import {
     newUnexpectedMessageError,
     newUnknownMethodError,
 } from "../Error";
+import * as olmlib from "../../olmlib";
 
 // the recommended amount of time before a verification request
 // should be (automatically) cancelled without user interaction
@@ -69,6 +70,7 @@ export class VerificationRequest extends EventEmitter {
         this._eventsByThem = new Map();
         this._observeOnly = false;
         this._timeoutTimer = null;
+        this._sharedSecret = null; // used for QR codes
     }
 
     /**
@@ -157,6 +159,14 @@ export class VerificationRequest extends EventEmitter {
         return 0;
     }
 
+    /**
+     * The key verification request event.
+     * @returns {MatrixEvent} The request event, or falsey if not found.
+     */
+    get requestEvent() {
+        return this._getEventByEither(REQUEST_TYPE);
+    }
+
     /** current phase of the request. Some properties might only be defined in a current phase. */
     get phase() {
         return this._phase;
@@ -243,6 +253,15 @@ export class VerificationRequest extends EventEmitter {
         return this._observeOnly;
     }
 
+    /**
+     * The unpadded base64 encoded shared secret. Primarily used for QR code
+     * verification.
+     */
+    get encodedSharedSecret() {
+        if (!this._sharedSecret) this._generateSharedSecret();
+        return this._sharedSecret;
+    }
+
     /* Start the key verification, creating a verifier and sending a .start event.
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
      * @param {string} method the name of the verification method to use.
@@ -281,6 +300,7 @@ export class VerificationRequest extends EventEmitter {
         if (!this.observeOnly && this._phase === PHASE_UNSENT) {
             const methods = [...this._verificationMethods.keys()];
             await this.channel.send(REQUEST_TYPE, {methods});
+            this._generateSharedSecret();
         }
     }
 
@@ -309,7 +329,14 @@ export class VerificationRequest extends EventEmitter {
         if (!this.observeOnly && this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
             const methods = [...this._verificationMethods.keys()];
             await this.channel.send(READY_TYPE, {methods});
+            this._generateSharedSecret();
         }
+    }
+
+    _generateSharedSecret() {
+        const secretBytes = new Uint8Array(32); // 256bits
+        global.crypto.getRandomValues(secretBytes);
+        this._sharedSecret = olmlib.encodeBase64(secretBytes);
     }
 
     /**

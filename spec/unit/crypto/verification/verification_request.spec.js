@@ -19,6 +19,7 @@ import {InRoomChannel} from "../../../../src/crypto/verification/request/InRoomC
 import {ToDeviceChannel} from
     "../../../../src/crypto/verification/request/ToDeviceChannel";
 import {MatrixEvent} from "../../../../src/models/event";
+import {setupWebcrypto, teardownWebcrypto} from "./util";
 
 function makeMockClient(userId, deviceId) {
     let counter = 1;
@@ -115,6 +116,15 @@ async function distributeEvent(ownRequest, theirRequest, event) {
 }
 
 describe("verification request unit tests", function() {
+
+    beforeAll(function() {
+        setupWebcrypto();
+    });
+
+    afterAll(() => {
+        teardownWebcrypto();
+    });
+
     it("transition from UNSENT to DONE through happy path", async function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
