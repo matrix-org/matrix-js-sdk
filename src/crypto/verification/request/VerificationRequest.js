@@ -258,6 +258,7 @@ export class VerificationRequest extends EventEmitter {
      * verification.
      */
     get encodedSharedSecret() {
+        if (!this._sharedSecret) this._generateSharedSecret();
         return this._sharedSecret;
     }
 
