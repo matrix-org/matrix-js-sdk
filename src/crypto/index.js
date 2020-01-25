@@ -351,7 +351,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // key with the cross-signing master key. The cross-signing master key is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
-    let crossSigningPrivateKeys = {};
+    const crossSigningPrivateKeys = {};
 
     // If we happen to reset cross-signing keys here, then we want access to the
     // cross-signing private keys, but only for the scope of this method, so we
