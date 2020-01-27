@@ -125,13 +125,19 @@ OlmDevice.prototype.init = async function(fromExportedDevice) {
     try {
         if (fromExportedDevice) {
             this._pickleKey = fromExportedDevice.pickleKey;
+            await _initialiseFromExportedDevice(
+                fromExportedDevice,
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
+        } else {
+            await _initialiseAccount(
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
         }
-        await _initialiseAccount(
-            fromExportedDevice,
-            this._cryptoStore,
-            this._pickleKey,
-            account,
-        );
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -143,51 +149,67 @@ OlmDevice.prototype.init = async function(fromExportedDevice) {
     this.deviceEd25519Key = e2eKeys.ed25519;
 };
 
-async function _initialiseAccount(fromExportedDevice, cryptoStore, pickleKey, account) {
-    if (fromExportedDevice) {
-        await cryptoStore.doTxn(
-            'readwrite',
-            [
-                IndexedDBCryptoStore.STORE_ACCOUNT,
-                IndexedDBCryptoStore.STORE_SESSIONS,
-            ],
-            (txn) => {
-                cryptoStore.storeAccount(txn, fromExportedDevice.pickledAccount);
-                fromExportedDevice.sessions.forEach((session) => {
-                    const {
-                        deviceKey,
-                        sessionId,
-                    } = session;
-                    const sessionInfo = {
-                        session: session.session,
-                        lastReceivedMessageTs: session.lastReceivedMessageTs,
-                    };
-                    cryptoStore.storeEndToEndSession(
-                        deviceKey,
-                        sessionId,
-                        sessionInfo,
-                        txn,
-                    );
-                });
-        });
-        account.unpickle(pickleKey, fromExportedDevice.pickledAccount);
-    } else {
-        await cryptoStore.doTxn(
-            'readwrite',
-            [IndexedDBCryptoStore.STORE_ACCOUNT],
-            (txn) => {
-                cryptoStore.getAccount(txn, (pickledAccount) => {
-                    if (pickledAccount !== null) {
-                        account.unpickle(pickleKey, pickledAccount);
-                    } else {
-                        account.create();
-                        pickledAccount = account.pickle(pickleKey);
-                        cryptoStore.storeAccount(txn, pickledAccount);
-                    }
-                });
-            },
-        );
-    }
+/**
+ * Populates the crypto store using data that was exported from an existing device.
+ * Note that for now only the “account” and “sessions” stores are populated;
+ * Other stores will be as with a new device.
+ *
+ * @param {Object} exportedData Data exported from another device
+ *     through the “export” method.
+ * @param {*} cryptoStore
+ * @param {*} pickleKey
+ * @param {*} account
+ */
+async function _initialiseFromExportedDevice(
+    exportedData,
+    cryptoStore,
+    pickleKey,
+    account,
+) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            cryptoStore.storeAccount(txn, exportedData.pickledAccount);
+            exportedData.sessions.forEach((session) => {
+                const {
+                    deviceKey,
+                    sessionId,
+                } = session;
+                const sessionInfo = {
+                    session: session.session,
+                    lastReceivedMessageTs: session.lastReceivedMessageTs,
+                };
+                cryptoStore.storeEndToEndSession(
+                    deviceKey,
+                    sessionId,
+                    sessionInfo,
+                    txn,
+                );
+            });
+    });
+    account.unpickle(pickleKey, exportedData.pickledAccount);
+}
+
+async function _initialiseAccount(cryptoStore, pickleKey, account) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            cryptoStore.getAccount(txn, (pickledAccount) => {
+                if (pickledAccount !== null) {
+                    account.unpickle(pickleKey, pickledAccount);
+                } else {
+                    account.create();
+                    pickledAccount = account.pickle(pickleKey);
+                    cryptoStore.storeAccount(txn, pickledAccount);
+                }
+            });
+        },
+    );
 }
 
 /**
