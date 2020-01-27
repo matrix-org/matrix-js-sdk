@@ -363,7 +363,8 @@ export class SecretStorage extends EventEmitter {
     async isStored(name, checkKey) {
         // check if secret exists
         let secretInfo = await this._baseApis.getAccountDataFromServer(name);
-        if (!secretInfo || !secretInfo.encrypted) {
+        if (!secretInfo) return false;
+        if (!secretInfo.encrypted) {
             // try to fix it up
             secretInfo = await this._fixupStoredSecret(name, secretInfo);
             if (!secretInfo || !secretInfo.encrypted) {
