@@ -34,6 +34,9 @@ async function makeTestClient(userInfo, options) {
 
     await client.initCrypto();
 
+    // No need to download keys for these tests
+    client._crypto.downloadKeys = async function() {};
+
     return client;
 }
 

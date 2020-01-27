@@ -819,6 +819,10 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
 Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const userId = this._userId;
 
+    // Before proceeding, ensure our cross-signing public keys have been
+    // downloaded via the device list.
+    await this.downloadKeys([this._userId]);
+
     // If we see an update to our own master key, check it against the master
     // key we have and, if it matches, mark it as verified
 
@@ -858,13 +862,7 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const oldUserSigningId = this._crossSigningInfo.getId("user_signing");
 
     // Update the version of our keys in our cross-signing object and the local store
-    this._crossSigningInfo.setKeys(newCrossSigning.keys);
-    await this._cryptoStore.doTxn(
-        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
-        (txn) => {
-            this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
-        },
-    );
+    this._storeTrustedSelfKeys(newCrossSigning.keys);
 
     const keySignatures = {};
 
@@ -902,6 +900,21 @@ Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     await this.checkKeyBackup();
     // FIXME: if we previously trusted the backup, should we automatically sign
     // the backup with the new key (if not already signed)?
+};
+
+/**
+ * Store a set of keys as our own, trusted, cross-signing keys.
+ *
+ * @param {object} keys The new trusted set of keys
+ */
+Crypto.prototype._storeTrustedSelfKeys = async function(keys) {
+    this._crossSigningInfo.setKeys(keys);
+    await this._cryptoStore.doTxn(
+        'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            this._cryptoStore.storeCrossSigningKeys(txn, this._crossSigningInfo.keys);
+        },
+    );
 };
 
 /**
@@ -1486,6 +1499,11 @@ Crypto.prototype.setDeviceVerification = async function(
         if (!verified) {
             throw new Error("Cannot set a cross-signing key as unverified");
         }
+
+        if (!this._crossSigningInfo.getId() && userId === this._crossSigningInfo.userId) {
+            this._storeTrustedSelfKeys(xsk.keys);
+        }
+
         const device = await this._crossSigningInfo.signUser(xsk);
         if (device) {
             await this._baseApis.uploadKeySignatures({
