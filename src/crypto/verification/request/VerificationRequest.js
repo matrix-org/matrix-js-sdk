@@ -84,13 +84,15 @@ export class VerificationRequest extends EventEmitter {
     static validateEvent(type, event, client) {
         const content = event.getContent();
 
-        if (!content) {
-            logger.log("VerificationRequest: validateEvent: no content");
-        }
 
         if (!type.startsWith(EVENT_PREFIX)) {
-            logger.log("VerificationRequest: validateEvent: " +
-                "fail because type doesnt start with " + EVENT_PREFIX);
+            return false;
+        }
+
+        // from here on we're fairly sure that this is supposed to be
+        // part of a verification request, so be noisy when rejecting something
+        if (!content) {
+            logger.log("VerificationRequest: validateEvent: no content");
             return false;
         }
 
