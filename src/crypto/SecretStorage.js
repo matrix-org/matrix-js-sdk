@@ -253,10 +253,39 @@ export class SecretStorage extends EventEmitter {
      */
     storePassthrough(name, keyId) {
         return this._baseApis.setAccountData(name, {
-            [keyId]: {
-                passthrough: true,
+            encrypted: {
+                [keyId]: {
+                    passthrough: true,
+                },
             },
         });
+    }
+
+    /**
+     * Temporary method to fix up existing accounts where secrets
+     * are incorrectly stored without the 'encrypted' level
+     *
+     * @param {string} name The name of the secret
+     * @param {object} secretInfo The account data object
+     * @returns {object} The fixed object or null if no fix was performed
+     */
+    async _fixupStoredSecret(name, secretInfo) {
+        // We assume the secret was only stored passthrough for 1
+        // key - this was all the broken code supported.
+        const keys = Object.keys(secretInfo);
+        if (
+            keys.length === 1 && keys[0] !== 'encrypted' &&
+            secretInfo[keys[0]].passthrough
+        ) {
+            const hasKey = await this.hasKey(keys[0]);
+            if (hasKey) {
+                console.log("Fixing up passthrough secret: " + name);
+                await this.storePassthrough(name, keys[0]);
+                const newData = await this._baseApis.getAccountDataFromServer(name);
+                return newData;
+            }
+        }
+        return null;
     }
 
     /**
@@ -267,12 +296,16 @@ export class SecretStorage extends EventEmitter {
      * @return {string} the contents of the secret
      */
     async get(name) {
-        const secretInfo = await this._baseApis.getAccountDataFromServer(name);
+        let secretInfo = await this._baseApis.getAccountDataFromServer(name);
         if (!secretInfo) {
             return;
         }
         if (!secretInfo.encrypted) {
-            throw new Error("Content is not encrypted!");
+            // try to fix it up
+            secretInfo = await this._fixupStoredSecret(name, secretInfo);
+            if (!secretInfo || !secretInfo.encrypted) {
+                throw new Error("Content is not encrypted!");
+            }
         }
 
         // get possible keys to decrypt
@@ -329,9 +362,14 @@ export class SecretStorage extends EventEmitter {
      */
     async isStored(name, checkKey) {
         // check if secret exists
-        const secretInfo = await this._baseApis.getAccountDataFromServer(name);
-        if (!secretInfo || !secretInfo.encrypted) {
-            return false;
+        let secretInfo = await this._baseApis.getAccountDataFromServer(name);
+        if (!secretInfo) return false;
+        if (!secretInfo.encrypted) {
+            // try to fix it up
+            secretInfo = await this._fixupStoredSecret(name, secretInfo);
+            if (!secretInfo || !secretInfo.encrypted) {
+                return false;
+            }
         }
 
         if (checkKey === undefined) checkKey = true;
@@ -352,6 +390,11 @@ export class SecretStorage extends EventEmitter {
                     this._crossSigningInfo.userId,
                 );
             }
+
+            // We don't actually need the decryption object if it's a passthrough
+            // since we just want to return the key itself.
+            if (encInfo.passthrough) return true;
+
             switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
