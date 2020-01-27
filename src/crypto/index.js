@@ -351,7 +351,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     // key with the cross-signing master key. The cross-signing master key is also used
     // to verify the signature on the SSSS default key when adding secrets, so we
     // effectively need it for both reading and writing secrets.
-    let crossSigningPrivateKeys = {};
+    const crossSigningPrivateKeys = {};
 
     // If we happen to reset cross-signing keys here, then we want access to the
     // cross-signing private keys, but only for the scope of this method, so we
@@ -375,7 +375,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     "creating new keys",
                 );
                 this._baseApis._cryptoCallbacks.saveCrossSigningKeys =
-                    keys => crossSigningPrivateKeys = keys;
+                    keys => Object.assign(crossSigningPrivateKeys, keys);
                 this._baseApis._cryptoCallbacks.getCrossSigningKey =
                     name => crossSigningPrivateKeys[name];
                 await this.resetCrossSigningKeys(
@@ -468,7 +468,15 @@ Crypto.prototype.bootstrapSecretStorage = async function({
             }
         }
     } finally {
-        this._baseApis._cryptoCallbacks = appCallbacks;
+        // Restore the original callbacks. NB. we must do this by manipulating
+        // the same object since the CrossSigning class has a reference to the
+        // object, so if we assign the object here then our callbacks will change
+        // but the instances of the CrossSigning class will be left with our
+        // random, otherwise dead closures.
+        for (const cb of Object.keys(this._baseApis._cryptoCallbacks)) {
+            delete this._baseApis._cryptoCallbacks[cb];
+        }
+        Object.assign(this._baseApis._cryptoCallbacks, appCallbacks);
     }
 
     logger.log("Secure Secret Storage ready");
