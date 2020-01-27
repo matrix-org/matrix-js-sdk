@@ -819,6 +819,10 @@ Crypto.prototype._onDeviceListUserCrossSigningUpdated = async function(userId) {
 Crypto.prototype.checkOwnCrossSigningTrust = async function() {
     const userId = this._userId;
 
+    // Before proceeding, ensure our cross-signing public keys have been
+    // downloaded via the device list.
+    await this.downloadKeys([this._userId]);
+
     // If we see an update to our own master key, check it against the master
     // key we have and, if it matches, mark it as verified
 
