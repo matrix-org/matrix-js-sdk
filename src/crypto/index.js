@@ -41,7 +41,7 @@ import {
 import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {ScanQRCode, ShowQRCode} from './verification/QRCode';
+import {ReciprocateQRCode, ScanQRCode, ShowQRCode} from './verification/QRCode';
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
 import {encodeRecoveryKey} from './recoverykey';
@@ -55,6 +55,7 @@ const DeviceVerification = DeviceInfo.DeviceVerification;
 const defaultVerificationMethods = {
     [ScanQRCode.NAME]: ScanQRCode,
     [ShowQRCode.NAME]: ShowQRCode,
+    [ReciprocateQRCode.NAME]: ReciprocateQRCode,
     [SAS.NAME]: SAS,
 };
 
@@ -64,6 +65,7 @@ const defaultVerificationMethods = {
 export const verificationMethods = {
     QR_CODE_SCAN: ScanQRCode.NAME,
     QR_CODE_SHOW: ShowQRCode.NAME,
+    RECIPROCATE_QR_CODE: ReciprocateQRCode.NAME,
     SAS: SAS.NAME,
 };
 

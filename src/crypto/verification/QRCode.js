@@ -30,7 +30,6 @@ import {
 import * as qs from "qs";
 
 const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
-const KEY_REGEXP = /^key_([^:]+:.+)$/;
 
 const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 
@@ -83,38 +82,34 @@ export class ScanQRCode extends Base {
                 cancel: () => reject(newUserCancelledError()),
             });
         });
+        const {action, secret, otherUserKey, keys, targetUserId} = ReciprocateQRCode.splitUrl(code);
+    }
+}
 
-        const match = code.match(MATRIXTO_REGEXP);
-        let deviceId;
-        const keys = {};
-        if (!match) {
-            throw newQRCodeError();
-        }
-        const userId = match[1];
-        const params = match[2].split("&").map(
-            (x) => x.split("=", 2).map(decodeURIComponent),
-        );
-        let action;
-        for (const [name, value] of params) {
-            if (name === "device") {
-                deviceId = value;
-            } else if (name === "action") {
-                action = value;
-            } else {
-                const keyMatch = name.match(KEY_REGEXP);
-                if (keyMatch) {
-                    keys[keyMatch[1]] = value;
-                }
-            }
-        }
-        if (!deviceId || action !== "verify" || Object.keys(keys).length === 0) {
-            throw newQRCodeError();
-        }
+ScanQRCode.NAME = "m.qr_code.scan.v1";
+
+/**
+ * @class crypto/verification/QRCode/ReciprocateQRCode
+ * @extends {module:crypto/verification/Base}
+ */
+export class ReciprocateQRCode extends Base {
+    static factory(...args) {
+        return new ReciprocateQRCode(...args);
+    }
+
+    async _doVerification() {
+        const code = await new Promise((resolve, reject) => {
+            this.emit("scan", {
+                done: resolve,
+                cancel: () => reject(newUserCancelledError()),
+            });
+        });
+        const {secret, otherUserKey, keys, targetUserId} = ReciprocateQRCode.splitUrl(code);
 
         if (!this.userId) {
             await new Promise((resolve, reject) => {
                 this.emit("confirm_user_id", {
-                    userId: userId,
+                    userId: targetUserId,
                     confirm: resolve,
                     cancel: () => reject(newUserMismatchError()),
                 });
@@ -122,16 +117,64 @@ export class ScanQRCode extends Base {
         } else if (this.userId !== userId) {
             throw newUserMismatchError({
                 expected: this.userId,
-                actual: userId,
+                actual: targetUserId,
             });
         }
 
-        await this._verifyKeys(userId, keys, (keyId, device, key) => {
+        const crossSigningInfo = this._baseApis.getStoredCrossSigningInfo(targetUserId);
+        if (!crossSigningInfo) throw new Error("Missing cross signing info for user"); // this shouldn't happen by now
+        if (crossSigningInfo.getId("master") !== otherUserKey) {
+            throw newKeyMismatchError();
+        }
+
+        if (secret !== this.request.encodedSharedSecret) {
+            throw newQRCodeError();
+        }
+
+        // Verify our own keys that were sent in this code too
+        await this._verifyKeys(this._baseApis.getUserId(), keys, (keyId, device, key) => {
+            if (device.keys[keyId] !== key) {
+                throw newKeyMismatchError();
+            }
+        });
+
+        await this._verifyKeys(targetUserId, [otherUserKey, otherUserKey], (keyId, device, key) => {
             if (device.keys[keyId] !== key) {
                 throw newKeyMismatchError();
             }
         });
     }
+
+    static splitUrl(code) {
+        const match = code.match(MATRIXTO_REGEXP);
+        const keys = {};
+        if (!match) {
+            throw newQRCodeError();
+        }
+        const targetUserId = match[1];
+        const params = match[2].split("&").map(
+            (x) => x.split("=", 2).map(decodeURIComponent),
+        );
+        let action;
+        let otherUserKey;
+        let secret;
+        for (const [name, value] of params) {
+            if (name === "action") {
+                action = value;
+            } else if (name.startsWith("key_")) {
+                keys[name.substring("key_".length)] = value;
+            } else if (name === "other_user_key") {
+                otherUserKey = value;
+            } else if (name === "secret") {
+                secret = value;
+            }
+        }
+        if (!secret || !otherUserKey || action !== "verify" || Object.keys(keys).length === 0) {
+            throw newQRCodeError();
+        }
+
+        return {action, secret, otherUserKey, keys, targetUserId};
+    }
 }
 
-ScanQRCode.NAME = "m.qr_code.scan.v1";
+ReciprocateQRCode.NAME = "m.reciprocate.v1";
