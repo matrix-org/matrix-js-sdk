@@ -229,14 +229,14 @@ utils.inherits(Crypto, EventEmitter);
  *
  * Returns a promise which resolves once the crypto module is ready for use.
  *
- * @param {Object} kwargs keyword arguments.
- * @param {string} kwargs.exportedOlmDevice (Optional) data from exported device
+ * @param {Object} opts keyword arguments.
+ * @param {string} opts.exportedOlmDevice (Optional) data from exported device
  *     that must be re-created.
  */
-Crypto.prototype.init = async function(kwargs) {
+Crypto.prototype.init = async function(opts) {
     const {
         exportedOlmDevice,
-    } = kwargs || {};
+    } = opts || {};
 
     logger.log("Crypto: initialising Olm...");
     await global.Olm.init();
