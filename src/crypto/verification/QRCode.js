@@ -1,5 +1,6 @@
 /*
 Copyright 2018 New Vector Ltd
+Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@ import {
     newUserCancelledError,
     newUserMismatchError,
 } from './Error';
+import * as qs from "qs";
 
 const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
 const KEY_REGEXP = /^key_([^:]+:.+)$/;
@@ -39,13 +41,25 @@ const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 export class ShowQRCode extends Base {
     _doVerification() {
         if (!this._done) {
-            const url = "https://matrix.to/#/" + this._baseApis.getUserId()
-                  + "?device=" + encodeURIComponent(this._baseApis.deviceId)
-                  + "&action=verify&key_ed25519%3A"
-                  + encodeURIComponent(this._baseApis.deviceId) + "="
-                  + encodeURIComponent(this._baseApis.getDeviceEd25519Key());
+            const crossSigningInfo = this._baseApis.getStoredCrossSigningForUser(this.request.otherUserId);
+            const myKeyId = this._baseApis.getCrossSigningId();
+            const qrCodeKeys = [
+                [this._baseApis.getDeviceId(), this._baseApis.getDeviceEd25519Key()],
+                [myKeyId, myKeyId],
+            ];
+            const query = {
+                request: this.request.requestEvent.getId(),
+                action: "verify",
+                secret: this.request.encodedSharedSecret,
+                other_user_key: crossSigningInfo.getId("master"),
+            };
+            for (const key of qrCodeKeys) {
+                query[`key_${key[0]}`] = key[1];
+            }
+
+            const uri = `https://matrix.to/#/${this._baseApis.getUserId()}?${qs.stringify(query)}`;
             this.emit("show_qr_code", {
-                url: url,
+                url: uri,
             });
         }
     }
