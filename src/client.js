@@ -99,7 +99,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  * @param {string} opts.userId The user ID for this user.
  *
  * @param {Object} opts.deviceToImport Device data exported with
- *     (TODO link to export method) that must be imported to recreate this device.
+ *     "exportDevice" method that must be imported to recreate this device.
  *     Should only be useful for devices with end-to-end crypto enabled.
  *     If provided, opts.deviceId and opts.userId should **NOT** be provided
  *     (they are present in the exported data).
