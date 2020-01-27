@@ -1,3 +1,12 @@
+Changes in [4.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v4.0.0) (2020-01-27)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v4.0.0-rc.1...v4.0.0)
+
+ * Move & upgrade babel runtime into dependencies (like it wants)
+   [\#1170](https://github.com/matrix-org/matrix-js-sdk/pull/1170)
+ * Add a prepare script
+   [\#1164](https://github.com/matrix-org/matrix-js-sdk/pull/1164)
+
 Changes in [4.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v4.0.0-rc.1) (2020-01-20)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v3.0.0...v4.0.0-rc.1)
