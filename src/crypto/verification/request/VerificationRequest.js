@@ -251,6 +251,14 @@ export class VerificationRequest extends EventEmitter {
         return undefined;
     }
 
+    /**
+     * the cancellation code e.g m.user which is responsible for cancelling this verification
+     */
+    get cancellationCode() {
+        const ev = this._getEventByEither(CANCEL_TYPE);
+        return ev ? ev.getContent().code : null;
+    }
+
     get observeOnly() {
         return this._observeOnly;
     }
