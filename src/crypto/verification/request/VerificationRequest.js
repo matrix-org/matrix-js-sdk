@@ -185,6 +185,11 @@ export class VerificationRequest extends EventEmitter {
             && this._phase !== PHASE_CANCELLED;
     }
 
+    get canAcceptOrCancel() {
+        return !(this.ready || this.started || this.done ||
+            this.cancelled || this.observeOnly);
+    }
+
     /** Whether this request was initiated by the syncing user.
      * For InRoomChannel, this is who sent the .request event.
      * For ToDeviceChannel, this is who sent the .start event
