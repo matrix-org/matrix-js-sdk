@@ -458,9 +458,20 @@ export class VerificationRequest extends EventEmitter {
             transitions.push({phase: PHASE_READY, event: readyEvent});
         }
 
-        const startEvent = readyEvent || !requestEvent ?
-            this._getEventByEither(START_TYPE) : // any party can send .start after a .ready or unsent
-            this._getEventByOther(START_TYPE, requestEvent.getSender());
+        let startEvent;
+        if (readyEvent || !requestEvent) {
+            const theirStartEvent = this._eventsByThem.get(START_TYPE);
+            const ourStartEvent = this._eventsByUs.get(START_TYPE);
+            // any party can send .start after a .ready or unsent
+            if (theirStartEvent && ourStartEvent) {
+                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ?
+                    theirStartEvent : ourStartEvent;
+            } else {
+                startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
+            }
+        } else {
+            startEvent = this._getEventByOther(START_TYPE, requestEvent.getSender());
+        }
         if (startEvent) {
             const fromRequestPhase = phase() === PHASE_REQUESTED &&
                 requestEvent.getSender() !== startEvent.getSender();
