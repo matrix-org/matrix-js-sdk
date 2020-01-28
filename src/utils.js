@@ -565,69 +565,6 @@ export function runPolyfills() {
 }
 
 /**
- * Inherit the prototype methods from one constructor into another. This is a
- * port of the Node.js implementation with an Object.create polyfill.
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-export function inherits(ctor, superCtor) {
-    // Add util.inherits from Node.js
-    // Source:
-    // https://github.com/joyent/node/blob/master/lib/util.js
-    // Copyright Joyent, Inc. and other Node contributors.
-    //
-    // Permission is hereby granted, free of charge, to any person obtaining a
-    // copy of this software and associated documentation files (the
-    // "Software"), to deal in the Software without restriction, including
-    // without limitation the rights to use, copy, modify, merge, publish,
-    // distribute, sublicense, and/or sell copies of the Software, and to permit
-    // persons to whom the Software is furnished to do so, subject to the
-    // following conditions:
-    //
-    // The above copyright notice and this permission notice shall be included
-    // in all copies or substantial portions of the Software.
-    //
-    // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-    // OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-    // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-    // NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-    // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-    // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-    // USE OR OTHER DEALINGS IN THE SOFTWARE.
-    ctor.super_ = superCtor;
-    ctor.prototype = Object.create(superCtor.prototype, {
-        constructor: {
-            value: ctor,
-            enumerable: false,
-            writable: true,
-            configurable: true,
-        },
-    });
-}
-
-/**
- * Polyfills inheritance for prototypes by allowing different kinds of
- * super types. Typically prototypes would use `SuperType.call(this, params)`
- * though this doesn't always work in some environments - this function
- * falls back to using `Object.assign()` to clone a constructed copy
- * of the super type onto `thisArg`.
- * @param {any} thisArg The child instance. Modified in place.
- * @param {any} SuperType The type to act as a super instance
- * @param {any} params Arguments to supply to the super type's constructor
- */
-export function polyfillSuper(thisArg, SuperType, ...params) {
-    try {
-        SuperType.call(thisArg, ...params);
-    } catch (e) {
-        // fall back to Object.assign to just clone the thing
-        const fakeSuper = new SuperType(...params);
-        Object.assign(thisArg, fakeSuper);
-    }
-}
-
-/**
  * Returns whether the given value is a finite number without type-coercion
  *
  * @param {*} value the value to test
