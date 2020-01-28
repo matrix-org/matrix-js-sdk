@@ -48,8 +48,8 @@ export class VerificationBase extends EventEmitter {
      *
      * @param {string} deviceId the device ID that is being verified
      *
-     * @param {object} [startEvent] the m.key.verification.start event that
-     * initiated this verification, if any
+     * @param {object} startEvent the m.key.verification.start event that
+     * initiated this verification
      *
      * @param {object} [request] the key verification request object related to
      * this verification, if any
@@ -67,6 +67,13 @@ export class VerificationBase extends EventEmitter {
         this._done = false;
         this._promise = null;
         this._transactionTimeoutTimer = null;
+    }
+
+    get initiatedByMe() {
+        const sender = this.startEvent.getSender();
+        const content = this.startEvent.getContent();
+        return sender === this._baseApis.getUserId() &&
+            content.from_device === this._baseApis.getDeviceId();
     }
 
     _resetTimer() {

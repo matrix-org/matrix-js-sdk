@@ -201,16 +201,16 @@ export class SAS extends Base {
         // make sure user's keys are downloaded
         await this._baseApis.downloadKeys([this.userId]);
 
-        if (this.startEvent) {
-            return await this._doRespondVerification();
-        } else {
-            return await this._doSendVerification();
-        }
+                if (this.initiatedByMe) {
+                    return await this._doRespondVerification();
+                } else {
+                    return await this._doSendVerification();
+                }
     }
 
-    async _doSendVerification() {
+    async start() {
         const type = "m.key.verification.start";
-        const initialMessage = this._channel.completeContent(type, {
+        const startContent = this._channel.completeContent(type, {
             method: SAS.NAME,
             from_device: this._baseApis.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
@@ -219,11 +219,20 @@ export class SAS extends Base {
             // FIXME: allow app to specify what SAS methods can be used
             short_authentication_string: SAS_LIST,
         });
-        // add the transaction id to the message beforehand because
-        // it needs to be included in the commitment hash later on
-        this._channel.sendCompleted(type, initialMessage);
+        await this._channel.sendCompleted(type, startContent);
+        return startContent;
+    }
 
-        let e = await this._waitForEvent("m.key.verification.accept");
+    async _doSendVerification() {
+        let startContent;
+        if (this.startEvent) {
+            console.log("VERIFR: _doSendVerification not sending .start because already have a startEvent");
+            startContent = this._channel.completedContentFromEvent(this.startEvent);
+        } else {
+            startContent = await this.start();
+        }
+        let e;
+            e = await this._waitForEvent("m.key.verification.accept");
         let content = e.getContent();
         const sasMethods
               = intersection(content.short_authentication_string, SAS_SET);
@@ -248,7 +257,7 @@ export class SAS extends Base {
             e = await this._waitForEvent("m.key.verification.key");
             // FIXME: make sure event is properly formed
             content = e.getContent();
-            const commitmentStr = content.key + anotherjson.stringify(initialMessage);
+            const commitmentStr = content.key + anotherjson.stringify(startContent);
             // TODO: use selected hash function (when we support multiple)
             if (olmutil.sha256(commitmentStr) !== hashCommitment) {
                 throw newMismatchedCommitmentError();
