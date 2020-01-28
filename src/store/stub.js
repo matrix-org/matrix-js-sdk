@@ -26,120 +26,118 @@ limitations under the License.
  * Construct a stub store. This does no-ops on most store methods.
  * @constructor
  */
-export function StubStore() {
-    this.fromToken = null;
-}
-
-StubStore.prototype = {
-
+export class StubStore {
+    constructor() {
+        this.fromToken = null;
+    }
     /** @return {Promise<bool>} whether or not the database was newly created in this session. */
-    isNewlyCreated: function() {
+    isNewlyCreated() {
         return Promise.resolve(true);
-    },
+    }
 
     /**
      * Get the sync token.
      * @return {string}
      */
-    getSyncToken: function() {
+    getSyncToken() {
         return this.fromToken;
-    },
+    }
 
     /**
      * Set the sync token.
      * @param {string} token
      */
-    setSyncToken: function(token) {
+    setSyncToken(token) {
         this.fromToken = token;
-    },
+    }
 
     /**
      * No-op.
      * @param {Group} group
      */
-    storeGroup: function(group) {
-    },
+    storeGroup(group) {
+    }
 
     /**
      * No-op.
      * @param {string} groupId
      * @return {null}
      */
-    getGroup: function(groupId) {
+    getGroup(groupId) {
         return null;
-    },
+    }
 
     /**
      * No-op.
      * @return {Array} An empty array.
      */
-    getGroups: function() {
+    getGroups() {
         return [];
-    },
+    }
 
     /**
      * No-op.
      * @param {Room} room
      */
-    storeRoom: function(room) {
-    },
+    storeRoom(room) {
+    }
 
     /**
      * No-op.
      * @param {string} roomId
      * @return {null}
      */
-    getRoom: function(roomId) {
+    getRoom(roomId) {
         return null;
-    },
+    }
 
     /**
      * No-op.
      * @return {Array} An empty array.
      */
-    getRooms: function() {
+    getRooms() {
         return [];
-    },
+    }
 
     /**
      * Permanently delete a room.
      * @param {string} roomId
      */
-    removeRoom: function(roomId) {
+    removeRoom(roomId) {
         return;
-    },
+    }
 
     /**
      * No-op.
      * @return {Array} An empty array.
      */
-    getRoomSummaries: function() {
+    getRoomSummaries() {
         return [];
-    },
+    }
 
     /**
      * No-op.
      * @param {User} user
      */
-    storeUser: function(user) {
-    },
+    storeUser(user) {
+    }
 
     /**
      * No-op.
      * @param {string} userId
      * @return {null}
      */
-    getUser: function(userId) {
+    getUser(userId) {
         return null;
-    },
+    }
 
     /**
      * No-op.
      * @return {User[]}
      */
-    getUsers: function() {
+    getUsers() {
         return [];
-    },
+    }
 
     /**
      * No-op.
@@ -147,9 +145,9 @@ StubStore.prototype = {
      * @param {integer} limit
      * @return {Array}
      */
-    scrollback: function(room, limit) {
+    scrollback(room, limit) {
         return [];
-    },
+    }
 
     /**
      * Store events for a room.
@@ -158,15 +156,15 @@ StubStore.prototype = {
      * @param {string} token The token associated with these events.
      * @param {boolean} toStart True if these are paginated results.
      */
-    storeEvents: function(room, events, token, toStart) {
-    },
+    storeEvents(room, events, token, toStart) {
+    }
 
     /**
      * Store a filter.
      * @param {Filter} filter
      */
-    storeFilter: function(filter) {
-    },
+    storeFilter(filter) {
+    }
 
     /**
      * Retrieve a filter.
@@ -174,43 +172,43 @@ StubStore.prototype = {
      * @param {string} filterId
      * @return {?Filter} A filter or null.
      */
-    getFilter: function(userId, filterId) {
+    getFilter(userId, filterId) {
         return null;
-    },
+    }
 
     /**
      * Retrieve a filter ID with the given name.
      * @param {string} filterName The filter name.
      * @return {?string} The filter ID or null.
      */
-    getFilterIdByName: function(filterName) {
+    getFilterIdByName(filterName) {
         return null;
-    },
+    }
 
     /**
      * Set a filter name to ID mapping.
      * @param {string} filterName
      * @param {string} filterId
      */
-    setFilterIdByName: function(filterName, filterId) {
+    setFilterIdByName(filterName, filterId) {
 
-    },
+    }
 
     /**
      * Store user-scoped account data events
      * @param {Array<MatrixEvent>} events The events to store.
      */
-    storeAccountDataEvents: function(events) {
+    storeAccountDataEvents(events) {
 
-    },
+    }
 
     /**
      * Get account data event by event type
      * @param {string} eventType The event type being queried
      */
-    getAccountData: function(eventType) {
+    getAccountData(eventType) {
 
-    },
+    }
 
     /**
      * setSyncData does nothing as there is no backing data store.
@@ -218,75 +216,75 @@ StubStore.prototype = {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    setSyncData: function(syncData) {
+    setSyncData(syncData) {
         return Promise.resolve();
-    },
+    }
 
     /**
      * We never want to save becase we have nothing to save to.
      *
      * @return {boolean} If the store wants to save
      */
-    wantsSave: function() {
+    wantsSave() {
         return false;
-    },
+    }
 
     /**
      * Save does nothing as there is no backing data store.
      */
-    save: function() {},
+    save() { }
 
     /**
      * Startup does nothing.
      * @return {Promise} An immediately resolved promise.
      */
-    startup: function() {
+    startup() {
         return Promise.resolve();
-    },
+    }
 
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync: function() {
+    getSavedSync() {
         return Promise.resolve(null);
-    },
+    }
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
-    getSavedSyncToken: function() {
+    getSavedSyncToken() {
         return Promise.resolve(null);
-    },
+    }
 
     /**
      * Delete all data from this store. Does nothing since this store
      * doesn't store anything.
      * @return {Promise} An immediately resolved promise.
      */
-    deleteAllData: function() {
+    deleteAllData() {
         return Promise.resolve();
-    },
+    }
 
-    getOutOfBandMembers: function() {
+    getOutOfBandMembers() {
         return Promise.resolve(null);
-    },
+    }
 
-    setOutOfBandMembers: function() {
+    setOutOfBandMembers() {
         return Promise.resolve();
-    },
+    }
 
-    clearOutOfBandMembers: function() {
+    clearOutOfBandMembers() {
         return Promise.resolve();
-    },
+    }
 
-    getClientOptions: function() {
+    getClientOptions() {
         return Promise.resolve();
-    },
+    }
 
-    storeClientOptions: function() {
+    storeClientOptions() {
         return Promise.resolve();
-    },
+    }
 };

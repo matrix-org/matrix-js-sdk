@@ -19,8 +19,8 @@ limitations under the License.
  * @module models/room-member
  */
 
-import {EventEmitter} from "events";
-import {getHttpUriForMxc, getIdenticonUri} from "../content-repo";
+import { EventEmitter } from "events";
+import { getHttpUriForMxc, getIdenticonUri } from "../content-repo";
 import * as utils from "../utils";
 
 /**
@@ -46,253 +46,254 @@ import * as utils from "../utils";
  * @prop {Object} events The events describing this RoomMember.
  * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
  */
-export function RoomMember(roomId, userId) {
-    this.roomId = roomId;
-    this.userId = userId;
-    this.typing = false;
-    this.name = userId;
-    this.rawDisplayName = userId;
-    this.powerLevel = 0;
-    this.powerLevelNorm = 0;
-    this.user = null;
-    this.membership = null;
-    this.events = {
-        member: null,
-    };
-    this._isOutOfBand = false;
-    this._updateModifiedTime();
-}
-utils.inherits(RoomMember, EventEmitter);
-
-/**
- * Mark the member as coming from a channel that is not sync
- */
-RoomMember.prototype.markOutOfBand = function() {
-    this._isOutOfBand = true;
-};
-
-/**
- * @return {bool} does the member come from a channel that is not sync?
- * This is used to store the member seperately
- * from the sync state so it available across browser sessions.
- */
-RoomMember.prototype.isOutOfBand = function() {
-    return this._isOutOfBand;
-};
-
-/**
- * Update this room member's membership event. May fire "RoomMember.name" if
- * this event updates this member's name.
- * @param {MatrixEvent} event The <code>m.room.member</code> event
- * @param {RoomState} roomState Optional. The room state to take into account
- * when calculating (e.g. for disambiguating users with the same name).
- * @fires module:client~MatrixClient#event:"RoomMember.name"
- * @fires module:client~MatrixClient#event:"RoomMember.membership"
- */
-RoomMember.prototype.setMembershipEvent = function(event, roomState) {
-    if (event.getType() !== "m.room.member") {
-        return;
-    }
-
-    this._isOutOfBand = false;
-
-    this.events.member = event;
-
-    const oldMembership = this.membership;
-    this.membership = event.getDirectionalContent().membership;
-
-    const oldName = this.name;
-    this.name = calculateDisplayName(
-        this.userId,
-        event.getDirectionalContent().displayname,
-        roomState);
-
-    this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
-    if (oldMembership !== this.membership) {
-        this._updateModifiedTime();
-        this.emit("RoomMember.membership", event, this, oldMembership);
-    }
-    if (oldName !== this.name) {
-        this._updateModifiedTime();
-        this.emit("RoomMember.name", event, this, oldName);
-    }
-};
-
-/**
- * Update this room member's power level event. May fire
- * "RoomMember.powerLevel" if this event updates this member's power levels.
- * @param {MatrixEvent} powerLevelEvent The <code>m.room.power_levels</code>
- * event
- * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
- */
-RoomMember.prototype.setPowerLevelEvent = function(powerLevelEvent) {
-    if (powerLevelEvent.getType() !== "m.room.power_levels") {
-        return;
-    }
-
-    const evContent = powerLevelEvent.getDirectionalContent();
-
-    let maxLevel = evContent.users_default || 0;
-    utils.forEach(utils.values(evContent.users), function(lvl) {
-        maxLevel = Math.max(maxLevel, lvl);
-    });
-    const oldPowerLevel = this.powerLevel;
-    const oldPowerLevelNorm = this.powerLevelNorm;
-
-    if (evContent.users && evContent.users[this.userId] !== undefined) {
-        this.powerLevel = evContent.users[this.userId];
-    } else if (evContent.users_default !== undefined) {
-        this.powerLevel = evContent.users_default;
-    } else {
+export class RoomMember extends EventEmitter {
+    constructor(roomId, userId) {
+        super();
+        this.roomId = roomId;
+        this.userId = userId;
+        this.typing = false;
+        this.name = userId;
+        this.rawDisplayName = userId;
         this.powerLevel = 0;
-    }
-    this.powerLevelNorm = 0;
-    if (maxLevel > 0) {
-        this.powerLevelNorm = (this.powerLevel * 100) / maxLevel;
-    }
-
-    // emit for changes in powerLevelNorm as well (since the app will need to
-    // redraw everyone's level if the max has changed)
-    if (oldPowerLevel !== this.powerLevel || oldPowerLevelNorm !== this.powerLevelNorm) {
+        this.powerLevelNorm = 0;
+        this.user = null;
+        this.membership = null;
+        this.events = {
+            member: null,
+        };
+        this._isOutOfBand = false;
         this._updateModifiedTime();
-        this.emit("RoomMember.powerLevel", powerLevelEvent, this);
     }
-};
 
-/**
- * Update this room member's typing event. May fire "RoomMember.typing" if
- * this event changes this member's typing state.
- * @param {MatrixEvent} event The typing event
- * @fires module:client~MatrixClient#event:"RoomMember.typing"
- */
-RoomMember.prototype.setTypingEvent = function(event) {
-    if (event.getType() !== "m.typing") {
-        return;
-    }
-    const oldTyping = this.typing;
-    this.typing = false;
-    const typingList = event.getContent().user_ids;
-    if (!utils.isArray(typingList)) {
-        // malformed event :/ bail early. TODO: whine?
-        return;
-    }
-    if (typingList.indexOf(this.userId) !== -1) {
-        this.typing = true;
-    }
-    if (oldTyping !== this.typing) {
-        this._updateModifiedTime();
-        this.emit("RoomMember.typing", event, this);
-    }
-};
+    /**
+     * Mark the member as coming from a channel that is not sync
+     */
+    markOutOfBand() {
+        this._isOutOfBand = true;
+    };
 
-/**
- * Update the last modified time to the current time.
- */
-RoomMember.prototype._updateModifiedTime = function() {
-    this._modified = Date.now();
-};
+    /**
+     * @return {bool} does the member come from a channel that is not sync?
+     * This is used to store the member seperately
+     * from the sync state so it available across browser sessions.
+     */
+    isOutOfBand() {
+        return this._isOutOfBand;
+    };
 
-/**
- * Get the timestamp when this RoomMember was last updated. This timestamp is
- * updated when properties on this RoomMember are updated.
- * It is updated <i>before</i> firing events.
- * @return {number} The timestamp
- */
-RoomMember.prototype.getLastModifiedTime = function() {
-    return this._modified;
-};
-
-
-RoomMember.prototype.isKicked = function() {
-    return this.membership === "leave" &&
-        this.events.member.getSender() !== this.events.member.getStateKey();
-};
-
-/**
- * If this member was invited with the is_direct flag set, return
- * the user that invited this member
- * @return {string} user id of the inviter
- */
-RoomMember.prototype.getDMInviter = function() {
-    // when not available because that room state hasn't been loaded in,
-    // we don't really know, but more likely to not be a direct chat
-    if (this.events.member) {
-        // TODO: persist the is_direct flag on the member as more member events
-        //       come in caused by displayName changes.
-
-        // the is_direct flag is set on the invite member event.
-        // This is copied on the prev_content section of the join member event
-        // when the invite is accepted.
-
-        const memberEvent = this.events.member;
-        let memberContent = memberEvent.getContent();
-        let inviteSender = memberEvent.getSender();
-
-        if (memberContent.membership === "join") {
-            memberContent = memberEvent.getPrevContent();
-            inviteSender = memberEvent.getUnsigned().prev_sender;
+    /**
+     * Update this room member's membership event. May fire "RoomMember.name" if
+     * this event updates this member's name.
+     * @param {MatrixEvent} event The <code>m.room.member</code> event
+     * @param {RoomState} roomState Optional. The room state to take into account
+     * when calculating (e.g. for disambiguating users with the same name).
+     * @fires module:client~MatrixClient#event:"RoomMember.name"
+     * @fires module:client~MatrixClient#event:"RoomMember.membership"
+     */
+    setMembershipEvent(event, roomState) {
+        if (event.getType() !== "m.room.member") {
+            return;
         }
 
-        if (memberContent.membership === "invite" && memberContent.is_direct) {
-            return inviteSender;
+        this._isOutOfBand = false;
+
+        this.events.member = event;
+
+        const oldMembership = this.membership;
+        this.membership = event.getDirectionalContent().membership;
+
+        const oldName = this.name;
+        this.name = calculateDisplayName(
+            this.userId,
+            event.getDirectionalContent().displayname,
+            roomState);
+
+        this.rawDisplayName = event.getDirectionalContent().displayname || this.userId;
+        if (oldMembership !== this.membership) {
+            this._updateModifiedTime();
+            this.emit("RoomMember.membership", event, this, oldMembership);
         }
-    }
-};
+        if (oldName !== this.name) {
+            this._updateModifiedTime();
+            this.emit("RoomMember.name", event, this, oldName);
+        }
+    };
+
+    /**
+     * Update this room member's power level event. May fire
+     * "RoomMember.powerLevel" if this event updates this member's power levels.
+     * @param {MatrixEvent} powerLevelEvent The <code>m.room.power_levels</code>
+     * event
+     * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
+     */
+    setPowerLevelEvent(powerLevelEvent) {
+        if (powerLevelEvent.getType() !== "m.room.power_levels") {
+            return;
+        }
+
+        const evContent = powerLevelEvent.getDirectionalContent();
+
+        let maxLevel = evContent.users_default || 0;
+        utils.forEach(utils.values(evContent.users), function (lvl) {
+            maxLevel = Math.max(maxLevel, lvl);
+        });
+        const oldPowerLevel = this.powerLevel;
+        const oldPowerLevelNorm = this.powerLevelNorm;
+
+        if (evContent.users && evContent.users[this.userId] !== undefined) {
+            this.powerLevel = evContent.users[this.userId];
+        } else if (evContent.users_default !== undefined) {
+            this.powerLevel = evContent.users_default;
+        } else {
+            this.powerLevel = 0;
+        }
+        this.powerLevelNorm = 0;
+        if (maxLevel > 0) {
+            this.powerLevelNorm = (this.powerLevel * 100) / maxLevel;
+        }
+
+        // emit for changes in powerLevelNorm as well (since the app will need to
+        // redraw everyone's level if the max has changed)
+        if (oldPowerLevel !== this.powerLevel || oldPowerLevelNorm !== this.powerLevelNorm) {
+            this._updateModifiedTime();
+            this.emit("RoomMember.powerLevel", powerLevelEvent, this);
+        }
+    };
+
+    /**
+     * Update this room member's typing event. May fire "RoomMember.typing" if
+     * this event changes this member's typing state.
+     * @param {MatrixEvent} event The typing event
+     * @fires module:client~MatrixClient#event:"RoomMember.typing"
+     */
+    setTypingEvent(event) {
+        if (event.getType() !== "m.typing") {
+            return;
+        }
+        const oldTyping = this.typing;
+        this.typing = false;
+        const typingList = event.getContent().user_ids;
+        if (!utils.isArray(typingList)) {
+            // malformed event :/ bail early. TODO: whine?
+            return;
+        }
+        if (typingList.indexOf(this.userId) !== -1) {
+            this.typing = true;
+        }
+        if (oldTyping !== this.typing) {
+            this._updateModifiedTime();
+            this.emit("RoomMember.typing", event, this);
+        }
+    };
+
+    /**
+     * Update the last modified time to the current time.
+     */
+    _updateModifiedTime() {
+        this._modified = Date.now();
+    };
+
+    /**
+     * Get the timestamp when this RoomMember was last updated. This timestamp is
+     * updated when properties on this RoomMember are updated.
+     * It is updated <i>before</i> firing events.
+     * @return {number} The timestamp
+     */
+    getLastModifiedTime() {
+        return this._modified;
+    };
 
 
-/**
- * Get the avatar URL for a room member.
- * @param {string} baseUrl The base homeserver URL See
- * {@link module:client~MatrixClient#getHomeserverUrl}.
- * @param {Number} width The desired width of the thumbnail.
- * @param {Number} height The desired height of the thumbnail.
- * @param {string} resizeMethod The thumbnail resize method to use, either
- * "crop" or "scale".
- * @param {Boolean} allowDefault (optional) Passing false causes this method to
- * return null if the user has no avatar image. Otherwise, a default image URL
- * will be returned. Default: true. (Deprecated)
- * @param {Boolean} allowDirectLinks (optional) If true, the avatar URL will be
- * returned even if it is a direct hyperlink rather than a matrix content URL.
- * If false, any non-matrix content URLs will be ignored. Setting this option to
- * true will expose URLs that, if fetched, will leak information about the user
- * to anyone who they share a room with.
- * @return {?string} the avatar URL or null.
- */
-RoomMember.prototype.getAvatarUrl =
-        function(baseUrl, width, height, resizeMethod, allowDefault, allowDirectLinks) {
-    if (allowDefault === undefined) {
-        allowDefault = true;
-    }
+    isKicked() {
+        return this.membership === "leave" &&
+            this.events.member.getSender() !== this.events.member.getStateKey();
+    };
 
-    const rawUrl = this.getMxcAvatarUrl();
+    /**
+     * If this member was invited with the is_direct flag set, return
+     * the user that invited this member
+     * @return {string} user id of the inviter
+     */
+    getDMInviter() {
+        // when not available because that room state hasn't been loaded in,
+        // we don't really know, but more likely to not be a direct chat
+        if (this.events.member) {
+            // TODO: persist the is_direct flag on the member as more member events
+            //       come in caused by displayName changes.
 
-    if (!rawUrl && !allowDefault) {
-        return null;
-    }
-    const httpUrl = getHttpUriForMxc(
-        baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
-    );
-    if (httpUrl) {
-        return httpUrl;
-    } else if (allowDefault) {
-        return getIdenticonUri(
-            baseUrl, this.userId, width, height,
+            // the is_direct flag is set on the invite member event.
+            // This is copied on the prev_content section of the join member event
+            // when the invite is accepted.
+
+            const memberEvent = this.events.member;
+            let memberContent = memberEvent.getContent();
+            let inviteSender = memberEvent.getSender();
+
+            if (memberContent.membership === "join") {
+                memberContent = memberEvent.getPrevContent();
+                inviteSender = memberEvent.getUnsigned().prev_sender;
+            }
+
+            if (memberContent.membership === "invite" && memberContent.is_direct) {
+                return inviteSender;
+            }
+        }
+    };
+
+
+    /**
+     * Get the avatar URL for a room member.
+     * @param {string} baseUrl The base homeserver URL See
+     * {@link module:client~MatrixClient#getHomeserverUrl}.
+     * @param {Number} width The desired width of the thumbnail.
+     * @param {Number} height The desired height of the thumbnail.
+     * @param {string} resizeMethod The thumbnail resize method to use, either
+     * "crop" or "scale".
+     * @param {Boolean} allowDefault (optional) Passing false causes this method to
+     * return null if the user has no avatar image. Otherwise, a default image URL
+     * will be returned. Default: true. (Deprecated)
+     * @param {Boolean} allowDirectLinks (optional) If true, the avatar URL will be
+     * returned even if it is a direct hyperlink rather than a matrix content URL.
+     * If false, any non-matrix content URLs will be ignored. Setting this option to
+     * true will expose URLs that, if fetched, will leak information about the user
+     * to anyone who they share a room with.
+     * @return {?string} the avatar URL or null.
+     */
+    getAvatarUrl(baseUrl, width, height, resizeMethod, allowDefault, allowDirectLinks) {
+        if (allowDefault === undefined) {
+            allowDefault = true;
+        }
+
+        const rawUrl = this.getMxcAvatarUrl();
+
+        if (!rawUrl && !allowDefault) {
+            return null;
+        }
+        const httpUrl = getHttpUriForMxc(
+            baseUrl, rawUrl, width, height, resizeMethod, allowDirectLinks,
         );
-    }
-    return null;
-};
-/**
- * get the mxc avatar url, either from a state event, or from a lazily loaded member
- * @return {string} the mxc avatar url
- */
-RoomMember.prototype.getMxcAvatarUrl = function() {
-    if(this.events.member) {
-        return this.events.member.getDirectionalContent().avatar_url;
-    } else if(this.user) {
-        return this.user.avatarUrl;
-    }
-    return null;
-};
+        if (httpUrl) {
+            return httpUrl;
+        } else if (allowDefault) {
+            return getIdenticonUri(
+                baseUrl, this.userId, width, height,
+            );
+        }
+        return null;
+    };
+    /**
+     * get the mxc avatar url, either from a state event, or from a lazily loaded member
+     * @return {string} the mxc avatar url
+     */
+    getMxcAvatarUrl() {
+        if (this.events.member) {
+            return this.events.member.getDirectionalContent().avatar_url;
+        } else if (this.user) {
+            return this.user.avatarUrl;
+        }
+        return null;
+    };
+}
 
 function calculateDisplayName(selfUserId, displayName, roomState) {
     if (!displayName || displayName === selfUserId) {

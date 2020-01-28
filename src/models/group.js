@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import * as utils from "../utils";
-import {EventEmitter} from "events";
+import { EventEmitter } from "events";
 
 /**
  * Construct a new Group.
@@ -35,42 +35,43 @@ import {EventEmitter} from "events";
  *       to the group, if myMembership is 'invite'.
  * @prop {string} inviter.userId The user ID of the inviter
  */
-export function Group(groupId) {
-    this.groupId = groupId;
-    this.name = null;
-    this.avatarUrl = null;
-    this.myMembership = null;
-    this.inviter = null;
+export class Group extends EventEmitter {
+    constructor(groupId) {
+        super();
+        this.groupId = groupId;
+        this.name = null;
+        this.avatarUrl = null;
+        this.myMembership = null;
+        this.inviter = null;
+    }
+    setProfile(name, avatarUrl) {
+        if (this.name === name && this.avatarUrl === avatarUrl)
+            return;
+        this.name = name || this.groupId;
+        this.avatarUrl = avatarUrl;
+
+        this.emit("Group.profile", this);
+    };
+
+    setMyMembership(membership) {
+        if (this.myMembership === membership)
+            return;
+        this.myMembership = membership;
+
+        this.emit("Group.myMembership", this);
+    };
+
+    /**
+     * Sets the 'inviter' property. This does not emit an event (the inviter
+     * will only change when the user is revited / reinvited to a room),
+     * so set this before setting myMembership.
+     * @param {Object} inviter Infomation about who invited us to the room
+     */
+    setInviter(inviter) {
+        this.inviter = inviter;
+    };
+
 }
-utils.inherits(Group, EventEmitter);
-
-Group.prototype.setProfile = function(name, avatarUrl) {
-    if (this.name === name && this.avatarUrl === avatarUrl) return;
-
-    this.name = name || this.groupId;
-    this.avatarUrl = avatarUrl;
-
-    this.emit("Group.profile", this);
-};
-
-Group.prototype.setMyMembership = function(membership) {
-    if (this.myMembership === membership) return;
-
-    this.myMembership = membership;
-
-    this.emit("Group.myMembership", this);
-};
-
-/**
- * Sets the 'inviter' property. This does not emit an event (the inviter
- * will only change when the user is revited / reinvited to a room),
- * so set this before setting myMembership.
- * @param {Object} inviter Infomation about who invited us to the room
- */
-Group.prototype.setInviter = function(inviter) {
-    this.inviter = inviter;
-};
-
 /**
  * Fires whenever a group's profile information is updated.
  * This means the 'name' and 'avatarUrl' properties.
