@@ -27,6 +27,13 @@ import {newTimeoutError} from "./Error";
 
 const timeoutException = new Error("Verification timed out");
 
+export class SwitchStartEventError extends Error {
+    constructor(startEvent) {
+        super();
+        this.startEvent = startEvent;
+    }
+}
+
 export class VerificationBase extends EventEmitter {
     /**
      * Base class for verification methods.
@@ -109,6 +116,18 @@ export class VerificationBase extends EventEmitter {
             this._resolveEvent = resolve;
             this._rejectEvent = reject;
         });
+    }
+
+    canSwitchStartEvent() {
+        return false;
+    }
+
+    switchStartEvent(event) {
+        if (this.canSwitchStartEvent(event) && this._rejectEvent) {
+             const reject = this._rejectEvent;
+            this._rejectEvent = undefined;
+            reject(new SwitchStartEventError(event));
+        }
     }
 
     handleEvent(e) {

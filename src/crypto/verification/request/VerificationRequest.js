@@ -558,7 +558,9 @@ export class VerificationRequest extends EventEmitter {
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
         if (this._verifier && !isRemoteEcho && !this.observeOnly) {
-            if (type === CANCEL_TYPE || (this._verifier.events
+            if (this._verifier.canSwitchStartEvent(event) && event.getSender() < this._client.getUserId()) {
+                this._verifier.switchStartEvent(event);
+            } else if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
                 this._verifier.handleEvent(event);
             }

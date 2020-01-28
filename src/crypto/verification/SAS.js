@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
-import {VerificationBase as Base} from "./Base";
+import {VerificationBase as Base, SwitchStartEventError} from "./Base";
 import anotherjson from 'another-json';
 import {
     errorFactory,
@@ -28,6 +28,8 @@ import {
     newUnknownMethodError,
     newUserCancelledError,
 } from './Error';
+
+const START_TYPE = "m.key.verification.start";
 
 const EVENTS = [
     "m.key.verification.accept",
@@ -201,16 +203,34 @@ export class SAS extends Base {
         // make sure user's keys are downloaded
         await this._baseApis.downloadKeys([this.userId]);
 
+        let retry = false;
+        do {
+            try {
                 if (this.initiatedByMe) {
                     return await this._doRespondVerification();
                 } else {
                     return await this._doSendVerification();
                 }
+            } catch (err) {
+                if (err instanceof SwitchStartEventError) {
+                    console.log("VERIFR: switching start event to sender " + err.startEvent.getSender());
+                    // this changes what initiatedByMe returns
+                    this.startEvent = err.startEvent;
+                    retry = true;
+                }
+            }
+        } while (retry);
+    }
+
+    canSwitchStartEvent(event) {
+        const content = event.getContent();
+        return event.getType() === START_TYPE &&
+            content.method === SAS.NAME &&
+            this._waitingForAccept;
     }
 
     async start() {
-        const type = "m.key.verification.start";
-        const startContent = this._channel.completeContent(type, {
+        const startContent = this._channel.completeContent(START_TYPE, {
             method: SAS.NAME,
             from_device: this._baseApis.deviceId,
             key_agreement_protocols: KEY_AGREEMENT_LIST,
@@ -219,7 +239,7 @@ export class SAS extends Base {
             // FIXME: allow app to specify what SAS methods can be used
             short_authentication_string: SAS_LIST,
         });
-        await this._channel.sendCompleted(type, startContent);
+        await this._channel.sendCompleted(START_TYPE, startContent);
         return startContent;
     }
 
@@ -231,8 +251,13 @@ export class SAS extends Base {
         } else {
             startContent = await this.start();
         }
+        this._waitingForAccept = true;
         let e;
+        try {
             e = await this._waitForEvent("m.key.verification.accept");
+        } finally {
+            this._waitingForAccept = false;
+        }
         let content = e.getContent();
         const sasMethods
               = intersection(content.short_authentication_string, SAS_SET);
