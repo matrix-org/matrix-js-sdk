@@ -340,8 +340,8 @@ export class MatrixHttpApi {
             promise = this.authedRequest(
                 opts.callback, "POST", "/upload", queryParams, body, {
                 prefix: "/_matrix/media/r0",
-                headers: { "Content-Type": contentType }
-                    json: false,
+                headers: { "Content-Type": contentType },
+                json: false,
                 bodyParser: bodyParser,
             }
             );
@@ -655,7 +655,7 @@ export class MatrixHttpApi {
             }
         }
 
-        const headers = utils.extend({} opts.headers || {});
+        const headers = utils.extend({}, opts.headers || {});
         const json = opts.json === undefined ? true : opts.json;
         let bodyParser = opts.bodyParser;
 
@@ -703,7 +703,7 @@ export class MatrixHttpApi {
                         errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
                         timeout: localTimeoutMs,
                     }));
-                } localTimeoutMs);
+                }, localTimeoutMs);
             }
         };
         resetTimeout();
@@ -722,9 +722,9 @@ export class MatrixHttpApi {
                     body: data,
                     json: false,
                     timeout: localTimeoutMs,
-                    headers: headers || {}
+                    headers: headers || {},
                     _matrix_opts: this.opts,
-                }
+                },
                 function (err, response, body) {
                     if (localTimeoutMs) {
                         callbacks.clearTimeout(timeoutId);

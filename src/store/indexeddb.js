@@ -165,7 +165,7 @@ export class IndexedDBStore extends MemoryStore {
      */
     getSavedSyncToken = degradable(function () {
         return this.backend.getNextBatchToken();
-    }, "getSavedSyncToken"),
+    }, "getSavedSyncToken");
 
     /**
      * Delete all data from this store.

@@ -1689,6 +1689,7 @@ export class SyncApi {
         debuglog("Browser thinks we are back online");
         this._startKeepAlives(0);
     };
+};
 
 function createNewUser(client, userId) {
     const user = new User(userId);

@@ -4250,6 +4250,7 @@ export class MatrixClient extends EventEmitter {
     generateClientSecret() {
         return randomString(32);
     }
+    static RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 }
 /**
  * This cannot be transformed into ES6 class.
@@ -4506,8 +4507,6 @@ wrapCryptoFuncs(MatrixClient, [
     "setDefaultSecretStorageKeyId",
     "checkSecretStoragePrivateKey",
 ]);
-
-MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY = 'RESTORE_BACKUP_ERROR_BAD_KEY';
 
 // encrypts the event if necessary
 // adds the event to the queue, or sends it
