@@ -22,7 +22,7 @@ limitations under the License.
  * @module store/memory
  */
 
-import {User} from "../models/user";
+import { User } from "../models/user";
 import * as utils from "../utils";
 
 /**
@@ -32,96 +32,95 @@ import * as utils from "../utils";
  * @param {LocalStorage} opts.localStorage The local storage instance to persist
  * some forms of data such as tokens. Rooms will NOT be stored.
  */
-export function MemoryStore(opts) {
-    opts = opts || {};
-    this.rooms = {
-        // roomId: Room
-    };
-    this.groups = {
-        // groupId: Group
-    };
-    this.users = {
-        // userId: User
-    };
-    this.syncToken = null;
-    this.filters = {
-        // userId: {
-        //    filterId: Filter
-        // }
-    };
-    this.accountData = {
-        // type : content
-    };
-    this.localStorage = opts.localStorage;
-    this._oobMembers = {
-        // roomId: [member events]
-    };
-    this._clientOptions = {};
-}
-
-MemoryStore.prototype = {
+export class MemoryStore {
+    constructor(opts) {
+        opts = opts || {};
+        this.rooms = {
+            // roomId: Room
+        };
+        this.groups = {
+            // groupId: Group
+        };
+        this.users = {
+            // userId: User
+        };
+        this.syncToken = null;
+        this.filters = {
+            // userId: {
+            //    filterId: Filter
+            // }
+        };
+        this.accountData = {
+            // type : content
+        };
+        this.localStorage = opts.localStorage;
+        this._oobMembers = {
+            // roomId: [member events]
+        };
+        this._clientOptions = {};
+    }
 
     /**
      * Retrieve the token to stream from.
      * @return {string} The token or null.
      */
-    getSyncToken: function() {
+    getSyncToken() {
         return this.syncToken;
-    },
+    }
 
     /** @return {Promise<bool>} whether or not the database was newly created in this session. */
-    isNewlyCreated: function() {
+    isNewlyCreated() {
         return Promise.resolve(true);
-    },
+    }
 
     /**
      * Set the token to stream from.
      * @param {string} token The token to stream from.
      */
-    setSyncToken: function(token) {
+    setSyncToken(token) {
         this.syncToken = token;
-    },
+    }
 
     /**
      * Store the given room.
      * @param {Group} group The group to be stored
      */
-    storeGroup: function(group) {
+    storeGroup(group) {
         this.groups[group.groupId] = group;
-    },
+    }
 
     /**
      * Retrieve a group by its group ID.
      * @param {string} groupId The group ID.
      * @return {Group} The group or null.
      */
-    getGroup: function(groupId) {
+    getGroup(groupId) {
         return this.groups[groupId] || null;
-    },
+    }
 
     /**
      * Retrieve all known groups.
      * @return {Group[]} A list of groups, which may be empty.
      */
-    getGroups: function() {
+    getGroups() {
         return utils.values(this.groups);
-    },
+    }
 
     /**
      * Store the given room.
      * @param {Room} room The room to be stored. All properties must be stored.
      */
-    storeRoom: function(room) {
+    storeRoom(room) {
         this.rooms[room.roomId] = room;
         // add listeners for room member changes so we can keep the room member
         // map up-to-date.
         room.currentState.on("RoomState.members", this._onRoomMember.bind(this));
         // add existing members
         const self = this;
-        room.currentState.getMembers().forEach(function(m) {
+        room.currentState.getMembers().forEach(function (m) {
             self._onRoomMember(null, room.currentState, m);
         });
-    },
+    }
 
     /**
      * Called when a room member in a room being tracked by this store has been
@@ -130,7 +129,7 @@ MemoryStore.prototype = {
      * @param {RoomState} state
      * @param {RoomMember} member
      */
-    _onRoomMember: function(event, state, member) {
+    _onRoomMember(event, state, member) {
         if (member.membership === "invite") {
             // We do NOT add invited members because people love to typo user IDs
             // which would then show up in these lists (!)
@@ -150,70 +149,70 @@ MemoryStore.prototype = {
             user.setAvatarUrl(member.events.member.getContent().avatar_url);
         }
         this.users[user.userId] = user;
-    },
+    }
 
     /**
      * Retrieve a room by its' room ID.
      * @param {string} roomId The room ID.
      * @return {Room} The room or null.
      */
-    getRoom: function(roomId) {
+    getRoom(roomId) {
         return this.rooms[roomId] || null;
-    },
+    }
 
     /**
      * Retrieve all known rooms.
      * @return {Room[]} A list of rooms, which may be empty.
      */
-    getRooms: function() {
+    getRooms() {
         return utils.values(this.rooms);
-    },
+    }
 
     /**
      * Permanently delete a room.
      * @param {string} roomId
      */
-    removeRoom: function(roomId) {
+    removeRoom(roomId) {
         if (this.rooms[roomId]) {
             this.rooms[roomId].removeListener("RoomState.members", this._onRoomMember);
         }
         delete this.rooms[roomId];
-    },
+    }
 
     /**
      * Retrieve a summary of all the rooms.
      * @return {RoomSummary[]} A summary of each room.
      */
-    getRoomSummaries: function() {
-        return utils.map(utils.values(this.rooms), function(room) {
+    getRoomSummaries() {
+        return utils.map(utils.values(this.rooms), function (room) {
             return room.summary;
         });
-    },
+    }
 
     /**
      * Store a User.
      * @param {User} user The user to store.
      */
-    storeUser: function(user) {
+    storeUser(user) {
         this.users[user.userId] = user;
-    },
+    }
 
     /**
      * Retrieve a User by its' user ID.
      * @param {string} userId The user ID.
      * @return {User} The user or null.
      */
-    getUser: function(userId) {
+    getUser(userId) {
         return this.users[userId] || null;
-    },
+    }
 
     /**
      * Retrieve all known users.
      * @return {User[]} A list of users, which may be empty.
      */
-    getUsers: function() {
+    getUsers() {
         return utils.values(this.users);
-    },
+    }
 
     /**
      * Retrieve scrollback for this room.
@@ -222,9 +221,9 @@ MemoryStore.prototype = {
      * @return {Array<Object>} An array of objects which will be at most 'limit'
      * length and at least 0. The objects are the raw event JSON.
      */
-    scrollback: function(room, limit) {
+    scrollback(room, limit) {
         return [];
-    },
+    }
 
     /**
      * Store events for a room. The events have already been added to the timeline
@@ -233,15 +232,15 @@ MemoryStore.prototype = {
      * @param {string} token The token associated with these events.
      * @param {boolean} toStart True if these are paginated results.
      */
-    storeEvents: function(room, events, token, toStart) {
+    storeEvents(room, events, token, toStart) {
         // no-op because they've already been added to the room instance.
-    },
+    }
 
     /**
      * Store a filter.
      * @param {Filter} filter
      */
-    storeFilter: function(filter) {
+    storeFilter(filter) {
         if (!filter) {
             return;
         }
@@ -249,7 +248,7 @@ MemoryStore.prototype = {
             this.filters[filter.userId] = {};
         }
         this.filters[filter.userId][filter.filterId] = filter;
-    },
+    }
 
     /**
      * Retrieve a filter.
@@ -257,41 +256,41 @@ MemoryStore.prototype = {
      * @param {string} filterId
      * @return {?Filter} A filter or null.
      */
-    getFilter: function(userId, filterId) {
+    getFilter(userId, filterId) {
         if (!this.filters[userId] || !this.filters[userId][filterId]) {
             return null;
         }
         return this.filters[userId][filterId];
-    },
+    }
 
     /**
      * Retrieve a filter ID with the given name.
      * @param {string} filterName The filter name.
      * @return {?string} The filter ID or null.
      */
-    getFilterIdByName: function(filterName) {
+    getFilterIdByName(filterName) {
         if (!this.localStorage) {
             return null;
         }
         try {
             return this.localStorage.getItem("mxjssdk_memory_filter_" + filterName);
-        } catch (e) {}
+        } catch (e) { }
         return null;
-    },
+    }
 
     /**
      * Set a filter name to ID mapping.
      * @param {string} filterName
      * @param {string} filterId
      */
-    setFilterIdByName: function(filterName, filterId) {
+    setFilterIdByName(filterName, filterId) {
         if (!this.localStorage) {
             return;
         }
         try {
             this.localStorage.setItem("mxjssdk_memory_filter_" + filterName, filterId);
-        } catch (e) {}
-    },
+        } catch (e) { }
+    }
 
     /**
      * Store user-scoped account data events.
@@ -299,21 +298,21 @@ MemoryStore.prototype = {
      * events with the same type will replace each other.
      * @param {Array<MatrixEvent>} events The events to store.
      */
-    storeAccountDataEvents: function(events) {
+    storeAccountDataEvents(events) {
         const self = this;
-        events.forEach(function(event) {
+        events.forEach(function (event) {
             self.accountData[event.getType()] = event;
         });
-    },
+    }
 
     /**
      * Get account data event by event type
      * @param {string} eventType The event type being queried
      * @return {?MatrixEvent} the user account_data event of given type, if any
      */
-    getAccountData: function(eventType) {
+    getAccountData(eventType) {
         return this.accountData[eventType];
-    },
+    }
 
     /**
      * setSyncData does nothing as there is no backing data store.
@@ -321,56 +320,56 @@ MemoryStore.prototype = {
      * @param {Object} syncData The sync data
      * @return {Promise} An immediately resolved promise.
      */
-    setSyncData: function(syncData) {
+    setSyncData(syncData) {
         return Promise.resolve();
-    },
+    }
 
     /**
      * We never want to save becase we have nothing to save to.
      *
      * @return {boolean} If the store wants to save
      */
-    wantsSave: function() {
+    wantsSave() {
         return false;
-    },
+    }
 
     /**
      * Save does nothing as there is no backing data store.
      * @param {bool} force True to force a save (but the memory
      *     store still can't save anything)
      */
-    save: function(force) {},
+    save(force) { }
 
     /**
      * Startup does nothing as this store doesn't require starting up.
      * @return {Promise} An immediately resolved promise.
      */
-    startup: function() {
+    startup() {
         return Promise.resolve();
-    },
+    }
 
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync: function() {
+    getSavedSync() {
         return Promise.resolve(null);
-    },
+    }
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
-    getSavedSyncToken: function() {
+    getSavedSyncToken() {
         return Promise.resolve(null);
-    },
+    }
 
     /**
      * Delete all data from this store.
      * @return {Promise} An immediately resolved promise.
      */
-    deleteAllData: function() {
+    deleteAllData() {
         this.rooms = {
             // roomId: Room
         };
@@ -387,7 +386,7 @@ MemoryStore.prototype = {
             // type : content
         };
         return Promise.resolve();
-    },
+    }
 
     /**
      * Returns the out-of-band membership events for this room that
@@ -396,9 +395,9 @@ MemoryStore.prototype = {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    getOutOfBandMembers: function(roomId) {
+    getOutOfBandMembers(roomId) {
         return Promise.resolve(this._oobMembers[roomId] || null);
-    },
+    }
 
     /**
      * Stores the out-of-band membership events for this room. Note that
@@ -408,22 +407,22 @@ MemoryStore.prototype = {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    setOutOfBandMembers: function(roomId, membershipEvents) {
+    setOutOfBandMembers(roomId, membershipEvents) {
         this._oobMembers[roomId] = membershipEvents;
         return Promise.resolve();
-    },
+    }
 
-    clearOutOfBandMembers: function() {
+    clearOutOfBandMembers() {
         this._oobMembers = {};
         return Promise.resolve();
-    },
+    }
 
-    getClientOptions: function() {
+    getClientOptions() {
         return Promise.resolve(this._clientOptions);
-    },
+    }
 
-    storeClientOptions: function(options) {
+    storeClientOptions(options) {
         this._clientOptions = Object.assign({}, options);
         return Promise.resolve();
-    },
+    }
 };
