@@ -16,8 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {logger} from '../logger';
-import {defer} from '../utils';
+import { logger } from '../logger';
+import { defer } from '../utils';
 
 /**
  * An IndexedDB store backend where the actual backend sits in a web
@@ -31,66 +31,66 @@ import {defer} from '../utils';
  * to open the same database.
  * @param {Object} workerApi The web worker compatible interface object
  */
-export function RemoteIndexedDBStoreBackend(
-    workerScript, dbName, workerApi,
-) {
-    this._workerScript = workerScript;
-    this._dbName = dbName;
-    this._workerApi = workerApi;
-    this._worker = null;
-    this._nextSeq = 0;
-    // The currently in-flight requests to the actual backend
-    this._inFlight = {
-        // seq: promise,
-    };
-    // Once we start connecting, we keep the promise and re-use it
-    // if we try to connect again
-    this._startPromise = null;
-}
+export class RemoteIndexedDBStoreBackend {
+    constructor(
+        workerScript, dbName, workerApi,
+    ) {
+        this._workerScript = workerScript;
+        this._dbName = dbName;
+        this._workerApi = workerApi;
+        this._worker = null;
+        this._nextSeq = 0;
+        // The currently in-flight requests to the actual backend
+        this._inFlight = {
+            // seq: promise,
+        };
+        // Once we start connecting, we keep the promise and re-use it
+        // if we try to connect again
+        this._startPromise = null;
+    }
 
 
-RemoteIndexedDBStoreBackend.prototype = {
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
      * @return {Promise} Resolves if successfully connected.
      */
-    connect: function() {
+    connect() {
         return this._ensureStarted().then(() => this._doCmd('connect'));
-    },
+    }
 
     /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
      * @return {Promise} Resolved when the database is cleared.
      */
-    clearDatabase: function() {
+    clearDatabase() {
         return this._ensureStarted().then(() => this._doCmd('clearDatabase'));
-    },
+    }
     /** @return {Promise<bool>} whether or not the database was newly created in this session. */
-    isNewlyCreated: function() {
+    isNewlyCreated() {
         return this._doCmd('isNewlyCreated');
-    },
+    }
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync: function() {
+    getSavedSync() {
         return this._doCmd('getSavedSync');
-    },
+    }
 
-    getNextBatchToken: function() {
+    getNextBatchToken() {
         return this._doCmd('getNextBatchToken');
-    },
+    }
 
-    setSyncData: function(syncData) {
+    setSyncData(syncData) {
         return this._doCmd('setSyncData', [syncData]);
-    },
+    }
 
-    syncToDatabase: function(users) {
+    syncToDatabase(users) {
         return this._doCmd('syncToDatabase', [users]);
-    },
+    }
 
     /**
      * Returns the out-of-band membership events for this room that
@@ -99,9 +99,9 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    getOutOfBandMembers: function(roomId) {
+    getOutOfBandMembers(roomId) {
         return this._doCmd('getOutOfBandMembers', [roomId]);
-    },
+    }
 
     /**
      * Stores the out-of-band membership events for this room. Note that
@@ -111,31 +111,31 @@ RemoteIndexedDBStoreBackend.prototype = {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    setOutOfBandMembers: function(roomId, membershipEvents) {
+    setOutOfBandMembers(roomId, membershipEvents) {
         return this._doCmd('setOutOfBandMembers', [roomId, membershipEvents]);
-    },
+    }
 
-    clearOutOfBandMembers: function(roomId) {
+    clearOutOfBandMembers(roomId) {
         return this._doCmd('clearOutOfBandMembers', [roomId]);
-    },
+    }
 
-    getClientOptions: function() {
+    getClientOptions() {
         return this._doCmd('getClientOptions');
-    },
+    }
 
-    storeClientOptions: function(options) {
+    storeClientOptions(options) {
         return this._doCmd('storeClientOptions', [options]);
-    },
+    }
 
     /**
      * Load all user presence events from the database. This is not cached.
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
-    getUserPresenceEvents: function() {
+    getUserPresenceEvents() {
         return this._doCmd('getUserPresenceEvents');
-    },
+    }
 
-    _ensureStarted: function() {
+    _ensureStarted() {
         if (this._startPromise === null) {
             this._worker = new this._workerApi(this._workerScript);
             this._worker.onmessage = this._onWorkerMessage.bind(this);
@@ -146,9 +146,9 @@ RemoteIndexedDBStoreBackend.prototype = {
             });
         }
         return this._startPromise;
-    },
+    }
 
-    _doCmd: function(cmd, args) {
+    _doCmd(cmd, args) {
         // wrap in a q so if the postMessage throws,
         // the promise automatically gets rejected
         return Promise.resolve().then(() => {
@@ -165,9 +165,9 @@ RemoteIndexedDBStoreBackend.prototype = {
 
             return def.promise;
         });
-    },
+    }
 
-    _onWorkerMessage: function(ev) {
+    _onWorkerMessage(ev) {
         const msg = ev.data;
 
         if (msg.command == 'cmd_success' || msg.command == 'cmd_fail') {
@@ -193,5 +193,5 @@ RemoteIndexedDBStoreBackend.prototype = {
         } else {
             logger.warn("Unrecognised message from worker: " + msg);
         }
-    },
+    }
 };
