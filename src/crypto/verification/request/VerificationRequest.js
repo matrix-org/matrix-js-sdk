@@ -151,7 +151,7 @@ export class VerificationRequest extends EventEmitter {
         return this._commonMethods;
     }
 
-    /** the current remaining amount of ms before the request should be automatically cancelled */
+    /** The current remaining amount of ms before the request should be automatically cancelled */
     get timeout() {
         const requestEvent = this._getEventByEither(REQUEST_TYPE);
         if (requestEvent) {
@@ -211,7 +211,7 @@ export class VerificationRequest extends EventEmitter {
         return false;
     }
 
-    /** the id of the user that initiated the request */
+    /** The id of the user that initiated the request */
     get requestingUserId() {
         if (this.initiatedByMe) {
             return this._client.getUserId();
@@ -220,7 +220,7 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
-    /** the id of the user that (will) receive(d) the request */
+    /** The id of the user that (will) receive(d) the request */
     get receivingUserId() {
         if (this.initiatedByMe) {
             return this.otherUserId;
@@ -229,13 +229,13 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
-    /** the user id of the other party in this request */
+    /** The user id of the other party in this request */
     get otherUserId() {
         return this.channel.userId;
     }
 
     /**
-     * the id of the user that cancelled the request,
+     * The id of the user that cancelled the request,
      * only defined when phase is PHASE_CANCELLED
      */
     get cancellingUserId() {
@@ -249,6 +249,14 @@ export class VerificationRequest extends EventEmitter {
             return theirCancel.getSender();
         }
         return undefined;
+    }
+
+    /**
+     * The cancellation code e.g m.user which is responsible for cancelling this verification
+     */
+    get cancellationCode() {
+        const ev = this._getEventByEither(CANCEL_TYPE);
+        return ev ? ev.getContent().code : null;
     }
 
     get observeOnly() {
