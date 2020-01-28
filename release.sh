@@ -294,9 +294,14 @@ fi
 rm "${release_text}"
 rm "${latest_changes}"
 
+npm_publish_flags=''
+if [ $prerelease -eq 1 ]; then
+    # Tag prereleases as `next` so the last stable release remains the default
+    npm_publish_flags='--tag next'
+fi
 # Login and publish continues to use `npm`, as it seems to have more clearly
 # defined options and semantics than `yarn` for writing to the registry.
-npm publish
+npm publish $npm_publish_flags
 
 if [ -z "$skip_jsdoc" ]; then
     echo "generating jsdocs"
