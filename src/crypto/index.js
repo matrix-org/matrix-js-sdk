@@ -336,6 +336,9 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  * called to await a secret storage key creation flow.
  * @param {object} [opts.keyBackupInfo] The current key backup object. If passed,
  * the passphrase and recovery key from this backup will be used.
+ * @param {bool} [opts.setupNewKeyBackup] If true, a new key backup version will be
+ * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
+ * is supplied.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -344,6 +347,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     authUploadDeviceSigningKeys,
     createSecretStorageKey = async () => { },
     keyBackupInfo,
+    setupNewKeyBackup,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -466,6 +470,14 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                     this._secretStorage,
                 );
             }
+        }
+
+        if (setupNewKeyBackup && !keyBackupInfo) {
+            const info = await this._baseApis.prepareKeyBackupVersion(
+                null /* random key */,
+                { secureSecretStorage: true },
+            );
+            await this._baseApis.createKeyBackupVersion(info);
         }
     } finally {
         // Restore the original callbacks. NB. we must do this by manipulating
