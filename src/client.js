@@ -4675,6 +4675,7 @@ MatrixClient.prototype.isVersionSupported = async function(version) {
  */
 MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
     const response = await this.getVersions();
+    if (!response) return false;
 
     const versions = response["versions"];
     const unstableFeatures = response["unstable_features"];
@@ -4690,6 +4691,7 @@ MatrixClient.prototype.doesServerSupportLazyLoading = async function() {
  */
 MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
     const response = await this.getVersions();
+    if (!response) return true;
 
     const versions = response["versions"];
 
@@ -4699,6 +4701,7 @@ MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
     }
 
     const unstableFeatures = response["unstable_features"];
+    if (!unstableFeatures) return true;
     if (unstableFeatures["m.require_identity_server"] === undefined) {
         return true;
     } else {
@@ -4714,10 +4717,10 @@ MatrixClient.prototype.doesServerRequireIdServerParam = async function() {
  */
 MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
     const response = await this.getVersions();
+    if (!response) return false;
 
     const versions = response["versions"];
     const unstableFeatures = response["unstable_features"];
-
     return (versions && versions.includes("r0.6.0"))
         || (unstableFeatures && unstableFeatures["m.id_access_token"]);
 };
@@ -4730,6 +4733,7 @@ MatrixClient.prototype.doesServerAcceptIdentityAccessToken = async function() {
  */
 MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
     const response = await this.getVersions();
+    if (!response) return false;
 
     const versions = response["versions"];
     const unstableFeatures = response["unstable_features"];
