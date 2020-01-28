@@ -290,6 +290,7 @@ export class InRoomChannel {
         if (type === REQUEST_TYPE) {
             sendType = MESSAGE_TYPE;
         }
+        logger.info("VERIFR: sending " + sendType);
         const response = await this._client.sendEvent(this._roomId, sendType, content);
         if (type === REQUEST_TYPE) {
             this._requestEventId = response.event_id;

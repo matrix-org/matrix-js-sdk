@@ -415,6 +415,7 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _setPhase(phase, notify = true) {
+        logger.info(`VERIFR: changing phase of request ${this.channel.transactionId} from ${this._phase} to ${phase} ${!notify ? "(silenty)" : ""}`);
         this._phase = phase;
         if (notify) {
             this.emit("change");
@@ -531,6 +532,7 @@ export class VerificationRequest extends EventEmitter {
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
     async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
+        logger.info(`VERIFR: handleEvent start receive ${type}`);
         // if reached phase cancelled or done, ignore anything else that comes
         if (!this.pending) {
             return;
@@ -562,6 +564,7 @@ export class VerificationRequest extends EventEmitter {
                 this._verifier.switchStartEvent(event);
             } else if (type === CANCEL_TYPE || (this._verifier.events
                 && this._verifier.events.includes(type))) {
+                logger.info(`VERIFR: passing ${type} from ${event.getSender()} to verifier`);
                 this._verifier.handleEvent(event);
             }
         }
@@ -569,13 +572,14 @@ export class VerificationRequest extends EventEmitter {
         if (newTransitions.length) {
             const lastTransition = newTransitions[newTransitions.length - 1];
             const {phase} = lastTransition;
-
             this._setupTimeout(phase);
             // set phase as last thing as this emits the "change" event
             this._setPhase(phase);
         } else if (this._observeOnly !== wasObserveOnly) {
+            logger.info(`VERIFR: handleEvent emit change`);
             this.emit("change");
         }
+        logger.info(`VERIFR: handleEvent end receive ${type} ${this.phase} ${this.observeOnly}`);
     }
 
     _setupTimeout(phase) {

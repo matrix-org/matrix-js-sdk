@@ -244,11 +244,13 @@ export class SAS extends Base {
     }
 
     async _doSendVerification() {
+        console.log("VERIFR: starting verification on receiver side");
         let startContent;
         if (this.startEvent) {
             console.log("VERIFR: _doSendVerification not sending .start because already have a startEvent");
             startContent = this._channel.completedContentFromEvent(this.startEvent);
         } else {
+            console.log("VERIFR: _doSendVerification sending .start");
             startContent = await this.start();
         }
         this._waitingForAccept = true;
@@ -326,6 +328,7 @@ export class SAS extends Base {
     }
 
     async _doRespondVerification() {
+        console.log("VERIFR: starting verification on initiator side");
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
         let content = this._channel.completedContentFromEvent(this.startEvent);
