@@ -20,7 +20,7 @@ limitations under the License.
 
 import url from "url";
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from './logger';
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -102,33 +102,33 @@ const MSISDN_STAGE_TYPE = "m.login.msisdn";
  *     attemptAuth promise.
  *
  */
-export function InteractiveAuth(opts) {
-    this._matrixClient = opts.matrixClient;
-    this._data = opts.authData || {};
-    this._requestCallback = opts.doRequest;
-    this._busyChangedCallback = opts.busyChanged;
-    // startAuthStage included for backwards compat
-    this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
-    this._resolveFunc = null;
-    this._rejectFunc = null;
-    this._inputs = opts.inputs || {};
-    this._requestEmailTokenCallback = opts.requestEmailToken;
+export class InteractiveAuth {
+    constructor(opts) {
+        this._matrixClient = opts.matrixClient;
+        this._data = opts.authData || {};
+        this._requestCallback = opts.doRequest;
+        this._busyChangedCallback = opts.busyChanged;
+        // startAuthStage included for backwards compat
+        this._stateUpdatedCallback = opts.stateUpdated || opts.startAuthStage;
+        this._resolveFunc = null;
+        this._rejectFunc = null;
+        this._inputs = opts.inputs || {};
+        this._requestEmailTokenCallback = opts.requestEmailToken;
 
-    if (opts.sessionId) this._data.session = opts.sessionId;
-    this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
-    this._emailSid = opts.emailSid;
-    if (this._emailSid === undefined) this._emailSid = null;
-    this._requestingEmailToken = false;
+        if (opts.sessionId) this._data.session = opts.sessionId;
+        this._clientSecret = opts.clientSecret || this._matrixClient.generateClientSecret();
+        this._emailSid = opts.emailSid;
+        if (this._emailSid === undefined) this._emailSid = null;
+        this._requestingEmailToken = false;
 
-    this._chosenFlow = null;
-    this._currentStage = null;
+        this._chosenFlow = null;
+        this._currentStage = null;
 
-    // if we are currently trying to submit an auth dict (which includes polling)
-    // the promise the will resolve/reject when it completes
-    this._submitPromise = null;
-}
+        // if we are currently trying to submit an auth dict (which includes polling)
+        // the promise the will resolve/reject when it completes
+        this._submitPromise = null;
+    }
 
-InteractiveAuth.prototype = {
     /**
      * begin the authentication process.
      *
@@ -136,7 +136,7 @@ InteractiveAuth.prototype = {
      * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */
-    attemptAuth: function() {
+    attemptAuth() {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
         return new Promise((resolve, reject) => {
@@ -154,14 +154,14 @@ InteractiveAuth.prototype = {
                 this._startNextAuthStage();
             }
         });
-    },
+    }
 
     /**
      * Poll to check if the auth session or current stage has been
      * completed out-of-band. If so, the attemptAuth promise will
      * be resolved.
      */
-    poll: async function() {
+    async poll() {
         if (!this._data.session) return;
         // if we currently have a request in flight, there's no point making
         // another just to check what the status is
@@ -190,16 +190,16 @@ InteractiveAuth.prototype = {
         }
 
         this.submitAuthDict(authDict, true);
-    },
+    }
 
     /**
      * get the auth session ID
      *
      * @return {string} session id
      */
-    getSessionId: function() {
+    getSessionId() {
         return this._data ? this._data.session : undefined;
-    },
+    }
 
     /**
      * get the client secret used for validation sessions
@@ -207,9 +207,9 @@ InteractiveAuth.prototype = {
      *
      * @return {string} client secret
      */
-    getClientSecret: function() {
+    getClientSecret() {
         return this._clientSecret;
-    },
+    }
 
     /**
      * get the server params for a given stage
@@ -217,17 +217,17 @@ InteractiveAuth.prototype = {
      * @param {string} loginType login type for the stage
      * @return {object?} any parameters from the server for this stage
      */
-    getStageParams: function(loginType) {
+    getStageParams(loginType) {
         let params = {};
         if (this._data && this._data.params) {
             params = this._data.params;
         }
         return params[loginType];
-    },
+    }
 
     getChosenFlow() {
         return this._chosenFlow;
-    },
+    }
 
     /**
      * submit a new auth dict and fire off the request. This will either
@@ -241,7 +241,7 @@ InteractiveAuth.prototype = {
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
-    submitAuthDict: async function(authData, background) {
+    async submitAuthDict(authData, background) {
         if (!this._resolveFunc) {
             throw new Error("submitAuthDict() called before attemptAuth()");
         }
@@ -279,7 +279,7 @@ InteractiveAuth.prototype = {
                 this._busyChangedCallback(false);
             }
         }
-    },
+    }
 
     /**
      * Gets the sid for the email validation session
@@ -287,9 +287,9 @@ InteractiveAuth.prototype = {
      *
      * @returns {string} The sid of the email auth session
      */
-    getEmailSid: function() {
+    getEmailSid() {
         return this._emailSid;
-    },
+    }
 
     /**
      * Sets the sid for the email validation session
@@ -299,9 +299,9 @@ InteractiveAuth.prototype = {
      *
      * @param {string} sid The sid for the email validation session
      */
-    setEmailSid: function(sid) {
+    setEmailSid(sid) {
         this._emailSid = sid;
-    },
+    }
 
     /**
      * Fire off a request, and either resolve the promise, or call
@@ -314,7 +314,7 @@ InteractiveAuth.prototype = {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    _doRequest: async function(auth, background) {
+    async _doRequest(auth, background) {
         try {
             const result = await this._requestCallback(auth, background);
             this._resolveFunc(result);
@@ -386,7 +386,7 @@ InteractiveAuth.prototype = {
                 }
             }
         }
-    },
+    }
 
     /**
      * Pick the next stage and call the callback
@@ -394,7 +394,7 @@ InteractiveAuth.prototype = {
      * @private
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    _startNextAuthStage: function() {
+    _startNextAuthStage() {
         const nextStage = this._chooseStage();
         if (!nextStage) {
             throw new Error("No incomplete flows from the server");
@@ -421,7 +421,7 @@ InteractiveAuth.prototype = {
             stageStatus.emailSid = this._emailSid;
         }
         this._stateUpdatedCallback(nextStage, stageStatus);
-    },
+    }
 
     /**
      * Pick the next auth stage
@@ -430,7 +430,7 @@ InteractiveAuth.prototype = {
      * @return {string?} login type
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    _chooseStage: function() {
+    _chooseStage() {
         if (this._chosenFlow === null) {
             this._chosenFlow = this._chooseFlow();
         }
@@ -438,7 +438,7 @@ InteractiveAuth.prototype = {
         const nextStage = this._firstUncompletedStage(this._chosenFlow);
         logger.log("Next stage: %s", nextStage);
         return nextStage;
-    },
+    }
 
     /**
      * Pick one of the flows from the returned list
@@ -455,7 +455,7 @@ InteractiveAuth.prototype = {
      * @return {object} flow
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    _chooseFlow: function() {
+    _chooseFlow() {
         const flows = this._data.flows || [];
 
         // we've been given an email or we've already done an email part
@@ -489,7 +489,7 @@ InteractiveAuth.prototype = {
         if (haveMsisdn) err.required_stages.push(MSISDN_STAGE_TYPE);
         err.available_flows = flows;
         throw err;
-    },
+    }
 
     /**
      * Get the first uncompleted stage in the given flow
@@ -498,7 +498,7 @@ InteractiveAuth.prototype = {
      * @param {object} flow
      * @return {string} login type
      */
-    _firstUncompletedStage: function(flow) {
+    _firstUncompletedStage(flow) {
         const completed = (this._data || {}).completed || [];
         for (let i = 0; i < flow.stages.length; ++i) {
             const stageType = flow.stages[i];
@@ -506,6 +506,6 @@ InteractiveAuth.prototype = {
                 return stageType;
             }
         }
-    },
+    }
 };
 
