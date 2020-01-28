@@ -103,11 +103,11 @@ export function setCryptoStoreFactory(fac) {
 }
 
 /**
- * Construct a Matrix Client. Similar to {@link module:client~MatrixClient}
+ * Construct a Matrix Client. Similar to {@link module:client.MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
  * @param {(Object|string)} opts The configuration options for this client. If
  * this is a string, it is assumed to be the base URL. These configuration
- * options will be passed directly to {@link module:client~MatrixClient}.
+ * options will be passed directly to {@link module:client.MatrixClient}.
  * @param {Object} opts.store If not set, defaults to
  * {@link module:store/memory.MemoryStore}.
  * @param {Object} opts.scheduler If not set, defaults to
@@ -122,7 +122,7 @@ export function setCryptoStoreFactory(fac) {
  *    in-memory otherwise).
  *
  * @return {MatrixClient} A new matrix client.
- * @see {@link module:client~MatrixClient} for the full list of options for
+ * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
 export function createClient(opts) {
