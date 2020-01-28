@@ -20,9 +20,9 @@ limitations under the License.
  * @module http-api
  */
 
-import {parse as parseContentType} from "content-type";
+import { parse as parseContentType } from "content-type";
 import * as utils from "./utils";
-import {logger} from './logger';
+import { logger } from './logger';
 
 // we use our own implementation of setTimeout, so that if we get suspended in
 // the middle of a /sync, we cancel the sync as soon as we awake, rather than
@@ -85,30 +85,30 @@ export const PREFIX_MEDIA_R0 = "/_matrix/media/r0";
  * @param {boolean} [opts.useAuthorizationHeader = false] Set to true to use
  * Authorization header instead of query param to send the access token to the server.
  */
-export function MatrixHttpApi(event_emitter, opts) {
-    utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
-    opts.onlyData = opts.onlyData || false;
-    this.event_emitter = event_emitter;
-    this.opts = opts;
-    this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
-    this.uploads = [];
-}
+export class MatrixHttpApi {
+    constructor(event_emitter, opts) {
+        utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
+        opts.onlyData = opts.onlyData || false;
+        this.event_emitter = event_emitter;
+        this.opts = opts;
+        this.useAuthorizationHeader = Boolean(opts.useAuthorizationHeader);
+        this.uploads = [];
+    }
 
-MatrixHttpApi.prototype = {
     /**
      * Sets the baase URL for the identity server
      * @param {string} url The new base url
      */
-    setIdBaseUrl: function(url) {
+    setIdBaseUrl(url) {
         this.opts.idBaseUrl = url;
-    },
+    }
 
     /**
      * Get the content repository url with query parameters.
      * @return {Object} An object with a 'base', 'path' and 'params' for base URL,
      *          path and query parameters respectively.
      */
-    getContentUri: function() {
+    getContentUri() {
         const params = {
             access_token: this.opts.accessToken,
         };
@@ -117,7 +117,7 @@ MatrixHttpApi.prototype = {
             path: "/_matrix/media/r0/upload",
             params: params,
         };
-    },
+    }
 
     /**
      * Upload content to the Home Server
@@ -159,7 +159,7 @@ MatrixHttpApi.prototype = {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    uploadContent: function(file, opts) {
+    uploadContent(file, opts) {
         if (utils.isFunction(opts)) {
             // opts used to be callback
             opts = {
@@ -242,7 +242,7 @@ MatrixHttpApi.prototype = {
         // way, we have to JSON-parse the response ourselves.
         let bodyParser = null;
         if (!rawResponse) {
-            bodyParser = function(rawBody) {
+            bodyParser = function (rawBody) {
                 let body = JSON.parse(rawBody);
                 if (onlyContentUri) {
                     body = body.content_uri;
@@ -260,7 +260,7 @@ MatrixHttpApi.prototype = {
             upload.xhr = xhr;
             const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
 
-            const timeout_fn = function() {
+            const timeout_fn = function () {
                 xhr.abort();
                 cb(new Error('Timeout'));
             };
@@ -269,7 +269,7 @@ MatrixHttpApi.prototype = {
             // a progress notification
             xhr.timeout_timer = callbacks.setTimeout(timeout_fn, 30000);
 
-            xhr.onreadystatechange = function() {
+            xhr.onreadystatechange = function () {
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(xhr.timeout_timer);
@@ -291,7 +291,7 @@ MatrixHttpApi.prototype = {
                         break;
                 }
             };
-            xhr.upload.addEventListener("progress", function(ev) {
+            xhr.upload.addEventListener("progress", function (ev) {
                 callbacks.clearTimeout(xhr.timeout_timer);
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;
@@ -339,18 +339,18 @@ MatrixHttpApi.prototype = {
 
             promise = this.authedRequest(
                 opts.callback, "POST", "/upload", queryParams, body, {
-                    prefix: "/_matrix/media/r0",
-                    headers: {"Content-Type": contentType},
+                prefix: "/_matrix/media/r0",
+                headers: { "Content-Type": contentType }
                     json: false,
-                    bodyParser: bodyParser,
-                },
+                bodyParser: bodyParser,
+            }
             );
         }
 
         const self = this;
 
         // remove the upload from the list on completion
-        const promise0 = promise.finally(function() {
+        const promise0 = promise.finally(function () {
             for (let i = 0; i < self.uploads.length; ++i) {
                 if (self.uploads[i] === upload) {
                     self.uploads.splice(i, 1);
@@ -366,21 +366,21 @@ MatrixHttpApi.prototype = {
         this.uploads.push(upload);
 
         return promise0;
-    },
+    }
 
-    cancelUpload: function(promise) {
+    cancelUpload(promise) {
         if (promise.abort) {
             promise.abort();
             return true;
         }
         return false;
-    },
+    }
 
-    getCurrentUploads: function() {
+    getCurrentUploads() {
         return this.uploads;
-    },
+    }
 
-    idServerRequest: function(
+    idServerRequest(
         callback,
         method,
         path,
@@ -406,7 +406,7 @@ MatrixHttpApi.prototype = {
             withCredentials: false,
             json: true, // we want a JSON response if we can
             _matrix_opts: this.opts,
-            headers: {},
+            headers: {}
         };
         if (method === 'GET') {
             opts.qs = params;
@@ -423,7 +423,7 @@ MatrixHttpApi.prototype = {
             requestCallback(defer, callback, this.opts.onlyData),
         );
         return defer.promise;
-    },
+    }
 
     /**
      * Perform an authorised request to the homeserver.
@@ -449,14 +449,14 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {Promise} Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
+     * @return {Promise} Resolves to <code>{data: {Object}
+     * headers: {Object} code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    authedRequest: function(callback, method, path, queryParams, data, opts) {
+    authedRequest(callback, method, path, queryParams, data, opts) {
         if (!queryParams) {
             queryParams = {};
         }
@@ -490,7 +490,7 @@ MatrixHttpApi.prototype = {
         );
 
         const self = this;
-        requestPromise.catch(function(err) {
+        requestPromise.catch(function (err) {
             if (err.errcode == 'M_UNKNOWN_TOKEN') {
                 self.event_emitter.emit("Session.logged_out", err);
             } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
@@ -505,7 +505,7 @@ MatrixHttpApi.prototype = {
         // return the original promise, otherwise tests break due to it having to
         // go around the event loop one more time to process the result of the request
         return requestPromise;
-    },
+    }
 
     /**
      * Perform a request to the homeserver without any credentials.
@@ -530,14 +530,14 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {Promise} Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
+     * @return {Promise} Resolves to <code>{data: {Object}
+     * headers: {Object} code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    request: function(callback, method, path, queryParams, data, opts) {
+    request(callback, method, path, queryParams, data, opts) {
         opts = opts || {};
         const prefix = opts.prefix !== undefined ? opts.prefix : this.opts.prefix;
         const fullUri = this.opts.baseUrl + prefix + path;
@@ -545,7 +545,7 @@ MatrixHttpApi.prototype = {
         return this.requestOtherUrl(
             callback, method, fullUri, queryParams, data, opts,
         );
-    },
+    }
 
     /**
      * Perform a request to an arbitrary URL.
@@ -569,15 +569,15 @@ MatrixHttpApi.prototype = {
      *
      * @param {Object=} opts.headers map of additional request headers
      *
-     * @return {Promise} Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
+     * @return {Promise} Resolves to <code>{data: {Object}
+     * headers: {Object} code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
      * @return {module:http-api.MatrixError} Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
-    requestOtherUrl: function(callback, method, uri, queryParams, data,
-                              opts) {
+    requestOtherUrl(callback, method, uri, queryParams, data,
+        opts) {
         if (opts === undefined || opts === null) {
             opts = {};
         } else if (isFinite(opts)) {
@@ -590,7 +590,7 @@ MatrixHttpApi.prototype = {
         return this._request(
             callback, method, uri, queryParams, data, opts,
         );
-    },
+    }
 
     /**
      * Form and return a homeserver request URL based on the given path
@@ -603,13 +603,13 @@ MatrixHttpApi.prototype = {
      * "/_matrix/client/v2_alpha".
      * @return {string} URL
      */
-    getUrl: function(path, queryParams, prefix) {
+    getUrl(path, queryParams, prefix) {
         let queryString = "";
         if (queryParams) {
             queryString = "?" + utils.encodeParams(queryParams);
         }
         return this.opts.baseUrl + prefix + path + queryString;
-    },
+    }
 
     /**
      * @private
@@ -637,7 +637,7 @@ MatrixHttpApi.prototype = {
      * response object (if this.opts.onlyData is truthy), or the parsed
      * body. Rejects
      */
-    _request: function(callback, method, uri, queryParams, data, opts) {
+    _request(callback, method, uri, queryParams, data, opts) {
         if (callback !== undefined && !utils.isFunction(callback)) {
             throw Error(
                 "Expected callback to be a function but got " + typeof callback,
@@ -655,7 +655,7 @@ MatrixHttpApi.prototype = {
             }
         }
 
-        const headers = utils.extend({}, opts.headers || {});
+        const headers = utils.extend({} opts.headers || {});
         const json = opts.json === undefined ? true : opts.json;
         let bodyParser = opts.bodyParser;
 
@@ -675,7 +675,7 @@ MatrixHttpApi.prototype = {
             }
 
             if (bodyParser === undefined) {
-                bodyParser = function(rawBody) {
+                bodyParser = function (rawBody) {
                     return JSON.parse(rawBody);
                 };
             }
@@ -693,7 +693,7 @@ MatrixHttpApi.prototype = {
                 if (timeoutId) {
                     callbacks.clearTimeout(timeoutId);
                 }
-                timeoutId = callbacks.setTimeout(function() {
+                timeoutId = callbacks.setTimeout(function () {
                     timedOut = true;
                     if (req && req.abort) {
                         req.abort();
@@ -703,7 +703,7 @@ MatrixHttpApi.prototype = {
                         errcode: "ORG.MATRIX.JSSDK_TIMEOUT",
                         timeout: localTimeoutMs,
                     }));
-                }, localTimeoutMs);
+                } localTimeoutMs);
             }
         };
         resetTimeout();
@@ -722,10 +722,10 @@ MatrixHttpApi.prototype = {
                     body: data,
                     json: false,
                     timeout: localTimeoutMs,
-                    headers: headers || {},
+                    headers: headers || {}
                     _matrix_opts: this.opts,
-                },
-                function(err, response, body) {
+                }
+                function (err, response, body) {
                     if (localTimeoutMs) {
                         callbacks.clearTimeout(timeoutId);
                         if (timedOut) {
@@ -738,7 +738,7 @@ MatrixHttpApi.prototype = {
                         bodyParser,
                     );
                     handlerFn(err, response, body);
-                },
+                }
             );
             if (req) {
                 // This will only work in a browser, where opts.request is the
@@ -764,7 +764,7 @@ MatrixHttpApi.prototype = {
             }
         }
         return reqPromise;
-    },
+    }
 };
 
 /*
@@ -781,13 +781,13 @@ MatrixHttpApi.prototype = {
  * response, otherwise the result object (with `code` and `data` fields)
  *
  */
-const requestCallback = function(
+const requestCallback = function (
     defer, userDefinedCallback, onlyData,
     bodyParser,
 ) {
-    userDefinedCallback = userDefinedCallback || function() {};
+    userDefinedCallback = userDefinedCallback || function () { };
 
-    return function(err, response, body) {
+    return function (err, response, body) {
         if (!err) {
             try {
                 if (response.statusCode >= 400) {
@@ -835,7 +835,7 @@ function parseErrorResponse(response, body) {
     let err;
     if (contentType) {
         if (contentType.type === 'application/json') {
-            const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
+            const jsonBody = typeof (body) === 'object' ? body : JSON.parse(body);
             err = new MatrixError(jsonBody);
         } else if (contentType.type === 'text/plain') {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
@@ -875,7 +875,7 @@ function getResponseContentType(response) {
 
     try {
         return parseContentType(contentType);
-    } catch(e) {
+    } catch (e) {
         throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
     }
 }
@@ -891,12 +891,13 @@ function getResponseContentType(response) {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {integer} httpStatus The numeric HTTP status code given
  */
-export function MatrixError(errorJson) {
-    errorJson = errorJson || {};
-    this.errcode = errorJson.errcode;
-    this.name = errorJson.errcode || "Unknown error code";
-    this.message = errorJson.error || "Unknown message";
-    this.data = errorJson;
+export class MatrixError extends Error {
+    constructor(errorJson) {
+        super(errorJson.message);
+        errorJson = errorJson || {};
+        this.errcode = errorJson.errcode;
+        this.name = errorJson.errcode || "Unknown error code";
+        this.message = errorJson.error || "Unknown message";
+        this.data = errorJson;
+    }
 }
-MatrixError.prototype = Object.create(Error.prototype);
-MatrixError.prototype.constructor = MatrixError;
