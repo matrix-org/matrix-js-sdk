@@ -249,6 +249,7 @@ export class SAS extends Base {
 
     async _doSendVerification() {
         console.log("VERIFR: starting verification on receiver side");
+        this._waitingForAccept = true;
         let startContent;
         if (this.startEvent) {
             console.log("VERIFR: _doSendVerification not sending .start because already have a startEvent");
@@ -257,7 +258,15 @@ export class SAS extends Base {
             console.log("VERIFR: _doSendVerification sending .start");
             startContent = await this.start();
         }
-        this._waitingForAccept = true;
+
+        // we might have switched to a different start event,
+        // but was we didn't call _waitForEvent there was no
+        // call that could throw yet. So check manually that
+        // we're still on the initiator side
+        if (!this.initiatedByMe) {
+            throw new SwitchStartEventError(this.startEvent);
+        }
+
         let e;
         try {
             e = await this._waitForEvent("m.key.verification.accept");
