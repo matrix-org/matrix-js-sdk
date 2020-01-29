@@ -41,7 +41,11 @@ import {
 import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD} from './verification/QRCode';
+import {
+    ReciprocateQRCode,
+    SCAN_QR_CODE_METHOD,
+    SHOW_QR_CODE_METHOD,
+} from './verification/QRCode';
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
 import {encodeRecoveryKey} from './recoverykey';

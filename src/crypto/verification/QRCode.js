@@ -22,16 +22,9 @@ limitations under the License.
 
 import {VerificationBase as Base} from "./Base";
 import {
-    errorFactory,
-    newKeyMismatchError, newUnknownTransactionError,
-    newUserCancelledError,
+    newKeyMismatchError,
     newUserMismatchError,
 } from './Error';
-import * as qs from "qs";
-
-const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)\?(.+)$/;
-
-const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 
 export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
 export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
