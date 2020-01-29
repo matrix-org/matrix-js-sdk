@@ -388,8 +388,10 @@ SyncApi.prototype._peekPoll = function(peekRoom, token) {
         });
 
         // strip out events which aren't for the given room_id (e.g presence)
+        // and also ephemeral events (which we're assuming is anything without
+        // and event ID because the /events API doesn't separate them).
         const events = res.chunk.filter(function(e) {
-            return e.room_id === peekRoom.roomId;
+            return e.room_id === peekRoom.roomId && e.event_id;
         }).map(self.client.getEventMapper());
 
         peekRoom.addLiveEvents(events);
