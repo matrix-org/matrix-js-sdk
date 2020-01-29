@@ -45,6 +45,10 @@ export class ReciprocateQRCode extends Base {
         return new ReciprocateQRCode(...args);
     }
 
+    static get NAME() {
+        return "m.reciprocate.v1";
+    }
+
     async _doVerification() {
         const code = await new Promise((resolve, reject) => {
             this.emit("scan", {
@@ -124,5 +128,3 @@ export class ReciprocateQRCode extends Base {
         return {action, secret, otherUserKey, keys, targetUserId};
     }
 }
-
-ReciprocateQRCode.NAME = "m.reciprocate.v1";
