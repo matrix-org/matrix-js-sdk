@@ -76,5 +76,12 @@ export class ReciprocateQRCode extends Base {
         if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
+
+        // If we've gotten this far, verify the user's master cross signing key
+        const xsignInfo = this._baseApis.getStoredCrossSigningInfo(this.userId);
+        if (!xsignInfo) throw new Error("Missing cross signing info");
+
+        const masterKey = xsignInfo.getId("master");
+        await this._verifyKeys(this.userId, [masterKey, masterKey]);
     }
 }
