@@ -55,8 +55,8 @@ export class VerificationBase extends EventEmitter {
      *
      * @param {string} deviceId the device ID that is being verified
      *
-     * @param {object} startEvent the m.key.verification.start event that
-     * initiated this verification
+     * @param {object} [startEvent] the m.key.verification.start event that
+     * initiated this verification, if any
      *
      * @param {object} [request] the key verification request object related to
      * this verification, if any
