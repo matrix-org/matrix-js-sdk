@@ -33,60 +33,8 @@ const MATRIXTO_REGEXP = /^(?:https?:\/\/)?(?:www\.)?matrix\.to\/#\/([#@!+][^?]+)
 
 const newQRCodeError = errorFactory("m.qr_code.invalid", "Invalid QR code");
 
-/**
- * @class crypto/verification/QRCode/ShowQRCode
- * @extends {module:crypto/verification/Base}
- */
-export class ShowQRCode extends Base {
-    _doVerification() {
-        if (!this._done) {
-            const crossSigningInfo = this._baseApis.getStoredCrossSigningForUser(this.request.otherUserId);
-            const myKeyId = this._baseApis.getCrossSigningId();
-            const qrCodeKeys = [
-                [this._baseApis.getDeviceId(), this._baseApis.getDeviceEd25519Key()],
-                [myKeyId, myKeyId],
-            ];
-            const query = {
-                request: this.request.requestEvent.getId(),
-                action: "verify",
-                secret: this.request.encodedSharedSecret,
-                other_user_key: crossSigningInfo.getId("master"),
-            };
-            for (const key of qrCodeKeys) {
-                query[`key_${key[0]}`] = key[1];
-            }
-
-            const uri = `https://matrix.to/#/${this._baseApis.getUserId()}?${qs.stringify(query)}`;
-            this.emit("show_qr_code", {
-                url: uri,
-            });
-        }
-    }
-}
-
-ShowQRCode.NAME = "m.qr_code.show.v1";
-
-/**
- * @class crypto/verification/QRCode/ScanQRCode
- * @extends {module:crypto/verification/Base}
- */
-export class ScanQRCode extends Base {
-    static factory(...args) {
-        return new ScanQRCode(...args);
-    }
-
-    async _doVerification() {
-        const code = await new Promise((resolve, reject) => {
-            this.emit("scan", {
-                done: resolve,
-                cancel: () => reject(newUserCancelledError()),
-            });
-        });
-        const {action, secret, otherUserKey, keys, targetUserId} = ReciprocateQRCode.splitUrl(code);
-    }
-}
-
-ScanQRCode.NAME = "m.qr_code.scan.v1";
+export const SHOW_QR_CODE_METHOD = "m.qr_code.show.v1";
+export const SCAN_QR_CODE_METHOD = "m.qr_code.scan.v1";
 
 /**
  * @class crypto/verification/QRCode/ReciprocateQRCode
