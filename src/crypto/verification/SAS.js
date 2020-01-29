@@ -213,7 +213,6 @@ export class SAS extends Base {
                 }
             } catch (err) {
                 if (err instanceof SwitchStartEventError) {
-                    console.log("VERIFR: switching start event to sender " + err.startEvent.getSender());
                     // this changes what initiatedByMe returns
                     this.startEvent = err.startEvent;
                     retry = true;
@@ -249,13 +248,10 @@ export class SAS extends Base {
 
     async _doSendVerification() {
         this._waitingForAccept = true;
-        console.log("VERIFR: starting verification on initiator side");
         let startContent;
         if (this.startEvent) {
-            console.log("VERIFR: _doSendVerification not sending .start because already have a startEvent");
             startContent = this._channel.completedContentFromEvent(this.startEvent);
         } else {
-            console.log("VERIFR: _doSendVerification sending .start");
             startContent = await this._sendStart();
         }
 
@@ -341,7 +337,6 @@ export class SAS extends Base {
     }
 
     async _doRespondVerification() {
-        console.log("VERIFR: starting verification on receiver side");
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
         let content = this._channel.completedContentFromEvent(this.startEvent);

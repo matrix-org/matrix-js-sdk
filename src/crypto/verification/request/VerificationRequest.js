@@ -384,7 +384,6 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _setPhase(phase, notify = true) {
-        logger.info(`VERIFR: changing phase of request ${this.channel.transactionId} from ${this._phase} to ${phase} ${!notify ? "(silenty)" : ""}`);
         this._phase = phase;
         if (notify) {
             this.emit("change");
@@ -512,7 +511,6 @@ export class VerificationRequest extends EventEmitter {
      * @returns {Promise} a promise that resolves when any requests as an anwser to the passed-in event are sent.
      */
     async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
-        logger.info(`VERIFR: handleEvent start receive ${type}`);
         // if reached phase cancelled or done, ignore anything else that comes
         if (!this.pending) {
             return;
@@ -544,15 +542,11 @@ export class VerificationRequest extends EventEmitter {
             // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
             const oldSender = oldEvent ? oldEvent.getSender() : this._client.getUserId();
             const newEventWinsRace = event.getSender() < oldSender;
-            if (type === START_TYPE) {
-                logger.info(`VERIFR: checking if we should switch to new event from ${event.getSender()}?`, {canSwitch: this._verifier.canSwitchStartEvent(event), newEventWinsRace, sender: event.getSender(), oldSender});
-            }
             if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                 this._verifier.switchStartEvent(event);
             } else if (!isRemoteEcho) {
                  if (type === CANCEL_TYPE || (this._verifier.events
                     && this._verifier.events.includes(type))) {
-                    logger.info(`VERIFR: passing ${type} from ${event.getSender()} to verifier`);
                     this._verifier.handleEvent(event);
                 }
             }
@@ -565,10 +559,8 @@ export class VerificationRequest extends EventEmitter {
             // set phase as last thing as this emits the "change" event
             this._setPhase(phase);
         } else if (this._observeOnly !== wasObserveOnly) {
-            logger.info(`VERIFR: handleEvent emit change`);
             this.emit("change");
         }
-        logger.info(`VERIFR: handleEvent end receive ${type} ${this.phase} ${this.observeOnly}`);
     }
 
     _setupTimeout(phase) {
@@ -594,7 +586,7 @@ export class VerificationRequest extends EventEmitter {
         try {
             this.cancel({reason: "Other party didn't accept in time", code: "m.timeout"});
         } catch (err) {
-            console.error("Error while cancelling verification request", err);
+            logger.error("Error while cancelling verification request", err);
         }
     };
 
@@ -672,7 +664,7 @@ export class VerificationRequest extends EventEmitter {
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {
-            console.warn("could not find verifier constructor for method", method);
+            logger.warn("could not find verifier constructor for method", method);
             return;
         }
         return new VerifierCtor(
