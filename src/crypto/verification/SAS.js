@@ -225,9 +225,11 @@ export class SAS extends Base {
     }
 
     canSwitchStartEvent(event) {
+        if (event.getType() !== START_TYPE) {
+            return false;
+        }
         const content = event.getContent();
-        return event.getType() === START_TYPE &&
-            content.method === SAS.NAME &&
+        return content && content.method === SAS.NAME &&
             this._waitingForAccept;
     }
 
