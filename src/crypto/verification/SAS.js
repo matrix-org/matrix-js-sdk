@@ -233,7 +233,7 @@ export class SAS extends Base {
             this._waitingForAccept;
     }
 
-    async start() {
+    async _sendStart() {
         const startContent = this._channel.completeContent(START_TYPE, {
             method: SAS.NAME,
             from_device: this._baseApis.deviceId,
@@ -256,7 +256,7 @@ export class SAS extends Base {
             startContent = this._channel.completedContentFromEvent(this.startEvent);
         } else {
             console.log("VERIFR: _doSendVerification sending .start");
-            startContent = await this.start();
+            startContent = await this._sendStart();
         }
 
         // we might have switched to a different start event,

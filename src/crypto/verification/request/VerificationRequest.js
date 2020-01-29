@@ -307,37 +307,6 @@ export class VerificationRequest extends EventEmitter {
         return this._verifier;
     }
 
-    /* Start the key verification, creating a verifier and sending a .start event.
-     * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
-     * @param {string} method the name of the verification method to use.
-     * @returns {Promise<VerifierBase>} the verifier of the given method
-     */
-    async start(method) {
-        if (this.phase === PHASE_READY) {
-            // when called on a request that was initiated with .request event
-            // check the method is supported by both sides
-            if (this._commonMethods.length && !this._commonMethods.includes(method)) {
-                throw newUnknownMethodError();
-            }
-            // create a throwaway verifier to send the .start event.
-            // we don't store it on the object because the other party
-            // might also send a .start event that arrives earlier and then
-            // we need a verifier with a start event to be in receiving mode
-            const verifier = this._createVerifier(method);
-            if (!verifier) {
-                throw newUnknownMethodError();
-            }
-            // sends .start event
-            verifier.start().catch(err => {
-                logger.error("could not send .start event: " + err.message);
-            });
-            // wait for remote echo to arrive (or a .start event from the other party)
-            await this.waitFor(r => r.started);
-        }
-        // after the phase changed to started, we should have a verifier now
-        return this.verifier;
-    }
-
     /**
      * sends the initial .request event.
      * @returns {Promise} resolves when the event has been sent.
