@@ -582,7 +582,7 @@ export class VerificationRequest extends EventEmitter {
         try {
             this.cancel({reason: "Other party didn't accept in time", code: "m.timeout"});
         } catch (err) {
-            console.error("Error while cancelling verification request", err);
+            logger.error("Error while cancelling verification request", err);
         }
     };
 
@@ -660,7 +660,7 @@ export class VerificationRequest extends EventEmitter {
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {
-            console.warn("could not find verifier constructor for method", method);
+            logger.warn("could not find verifier constructor for method", method);
             return;
         }
         return new VerifierCtor(
