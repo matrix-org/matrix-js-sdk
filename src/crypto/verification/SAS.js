@@ -217,6 +217,8 @@ export class SAS extends Base {
                     // this changes what initiatedByMe returns
                     this.startEvent = err.startEvent;
                     retry = true;
+                } else {
+                    throw err;
                 }
             }
         } while (retry);
