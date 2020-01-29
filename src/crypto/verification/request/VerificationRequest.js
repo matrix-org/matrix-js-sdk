@@ -570,13 +570,19 @@ export class VerificationRequest extends EventEmitter {
         }
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && !isRemoteEcho && !this.observeOnly) {
-            if (this._verifier.canSwitchStartEvent(event) && event.getSender() < this._client.getUserId()) {
+        if (this._verifier && !this.observeOnly) {
+            const oldEvent = this._verifier.startEvent;
+            // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
+            const oldSender = oldEvent ? oldEvent.getSender() : this._client.getUserId();
+            const newEventWinsRace = event.getSender() < oldSender;
+            if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                 this._verifier.switchStartEvent(event);
-            } else if (type === CANCEL_TYPE || (this._verifier.events
-                && this._verifier.events.includes(type))) {
-                logger.info(`VERIFR: passing ${type} from ${event.getSender()} to verifier`);
-                this._verifier.handleEvent(event);
+            } else if (!isRemoteEcho) {
+                 if (type === CANCEL_TYPE || (this._verifier.events
+                    && this._verifier.events.includes(type))) {
+                    logger.info(`VERIFR: passing ${type} from ${event.getSender()} to verifier`);
+                    this._verifier.handleEvent(event);
+                }
             }
         }
 
