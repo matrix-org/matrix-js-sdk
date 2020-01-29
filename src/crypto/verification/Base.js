@@ -27,6 +27,13 @@ import {newTimeoutError} from "./Error";
 
 const timeoutException = new Error("Verification timed out");
 
+export class SwitchStartEventError extends Error {
+    constructor(startEvent) {
+        super();
+        this.startEvent = startEvent;
+    }
+}
+
 export class VerificationBase extends EventEmitter {
     /**
      * Base class for verification methods.
@@ -69,6 +76,19 @@ export class VerificationBase extends EventEmitter {
         this._transactionTimeoutTimer = null;
     }
 
+    get initiatedByMe() {
+        // if there is no start event yet,
+        // we probably want to send it,
+        // which happens if we initiate
+        if (!this.startEvent) {
+            return true;
+        }
+        const sender = this.startEvent.getSender();
+        const content = this.startEvent.getContent();
+        return sender === this._baseApis.getUserId() &&
+            content.from_device === this._baseApis.getDeviceId();
+    }
+
     _resetTimer() {
         logger.info("Refreshing/starting the verification transaction timeout timer");
         if (this._transactionTimeoutTimer !== null) {
@@ -102,6 +122,22 @@ export class VerificationBase extends EventEmitter {
             this._resolveEvent = resolve;
             this._rejectEvent = reject;
         });
+    }
+
+    canSwitchStartEvent() {
+        return false;
+    }
+
+    switchStartEvent(event) {
+        if (this.canSwitchStartEvent(event)) {
+            if (this._rejectEvent) {
+                const reject = this._rejectEvent;
+                this._rejectEvent = undefined;
+                reject(new SwitchStartEventError(event));
+            } else {
+                this.startEvent = event;
+            }
+        }
     }
 
     handleEvent(e) {

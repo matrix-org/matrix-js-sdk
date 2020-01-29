@@ -323,7 +323,7 @@ export class VerificationRequest extends EventEmitter {
     async cancel({reason = "User declined", code = "m.user"} = {}) {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
             if (this._verifier) {
-                return this._verifier.cancel(errorFactory(code, reason));
+                return this._verifier.cancel(errorFactory(code, reason)());
             } else {
                 this._cancellingUserId = this._client.getUserId();
                 await this.channel.send(CANCEL_TYPE, {code, reason});
@@ -421,9 +421,20 @@ export class VerificationRequest extends EventEmitter {
             transitions.push({phase: PHASE_READY, event: readyEvent});
         }
 
-        const startEvent = readyEvent || !requestEvent ?
-            this._getEventByEither(START_TYPE) : // any party can send .start after a .ready or unsent
-            this._getEventByOther(START_TYPE, requestEvent.getSender());
+        let startEvent;
+        if (readyEvent || !requestEvent) {
+            const theirStartEvent = this._eventsByThem.get(START_TYPE);
+            const ourStartEvent = this._eventsByUs.get(START_TYPE);
+            // any party can send .start after a .ready or unsent
+            if (theirStartEvent && ourStartEvent) {
+                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ?
+                    theirStartEvent : ourStartEvent;
+            } else {
+                startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
+            }
+        } else {
+            startEvent = this._getEventByOther(START_TYPE, requestEvent.getSender());
+        }
         if (startEvent) {
             const fromRequestPhase = phase() === PHASE_REQUESTED &&
                 requestEvent.getSender() !== startEvent.getSender();
@@ -521,10 +532,18 @@ export class VerificationRequest extends EventEmitter {
         }
         // only pass events from the other side to the verifier,
         // no remote echos of our own events
-        if (this._verifier && !isRemoteEcho && !this.observeOnly) {
-            if (type === CANCEL_TYPE || (this._verifier.events
-                && this._verifier.events.includes(type))) {
-                this._verifier.handleEvent(event);
+        if (this._verifier && !this.observeOnly) {
+            const oldEvent = this._verifier.startEvent;
+            // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
+            const oldSender = oldEvent ? oldEvent.getSender() : this._client.getUserId();
+            const newEventWinsRace = event.getSender() < oldSender;
+            if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
+                this._verifier.switchStartEvent(event);
+            } else if (!isRemoteEcho) {
+                 if (type === CANCEL_TYPE || (this._verifier.events
+                    && this._verifier.events.includes(type))) {
+                    this._verifier.handleEvent(event);
+                }
             }
         }
 
@@ -563,7 +582,7 @@ export class VerificationRequest extends EventEmitter {
         try {
             this.cancel({reason: "Other party didn't accept in time", code: "m.timeout"});
         } catch (err) {
-            console.error("Error while cancelling verification request", err);
+            logger.error("Error while cancelling verification request", err);
         }
     };
 
@@ -625,7 +644,6 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
-        const startedByMe = !startEvent || this._wasSentByOwnDevice(startEvent);
         if (!targetDevice) {
             const theirFirstEvent =
                 this._eventsByThem.get(REQUEST_TYPE) ||
@@ -642,7 +660,7 @@ export class VerificationRequest extends EventEmitter {
 
         const VerifierCtor = this._verificationMethods.get(method);
         if (!VerifierCtor) {
-            console.warn("could not find verifier constructor for method", method);
+            logger.warn("could not find verifier constructor for method", method);
             return;
         }
         return new VerifierCtor(
@@ -650,7 +668,7 @@ export class VerificationRequest extends EventEmitter {
             this._client,
             userId,
             deviceId,
-            startedByMe ? null : startEvent,
+            startEvent,
             this,
         );
     }

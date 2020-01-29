@@ -99,6 +99,10 @@ class MockVerifier {
             await this._channel.send(DONE_TYPE, {});
         }
     }
+
+    canSwitchStartEvent() {
+        return false;
+    }
 }
 
 function makeRemoteEcho(event) {
