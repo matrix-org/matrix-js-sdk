@@ -644,7 +644,6 @@ export class VerificationRequest extends EventEmitter {
     }
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
-        const startedByMe = !startEvent || this._wasSentByOwnDevice(startEvent);
         if (!targetDevice) {
             const theirFirstEvent =
                 this._eventsByThem.get(REQUEST_TYPE) ||
@@ -669,7 +668,7 @@ export class VerificationRequest extends EventEmitter {
             this._client,
             userId,
             deviceId,
-            startedByMe ? null : startEvent,
+            startEvent,
         );
     }
 
