@@ -123,10 +123,14 @@ export class VerificationBase extends EventEmitter {
     }
 
     switchStartEvent(event) {
-        if (this.canSwitchStartEvent(event) && this._rejectEvent) {
-             const reject = this._rejectEvent;
-            this._rejectEvent = undefined;
-            reject(new SwitchStartEventError(event));
+        if (this.canSwitchStartEvent(event)) {
+            if (this._rejectEvent) {
+                const reject = this._rejectEvent;
+                this._rejectEvent = undefined;
+                reject(new SwitchStartEventError(event));
+            } else {
+                this.startEvent = event;
+            }
         }
     }
 
