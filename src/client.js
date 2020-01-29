@@ -507,7 +507,7 @@ MatrixClient.prototype.isInitialSyncComplete = function() {
     if (!state) {
         return false;
     }
-    return state === "PREPAED" || state === "SYNCING";
+    return state === "PREPARED" || state === "SYNCING";
 };
 
 /**
