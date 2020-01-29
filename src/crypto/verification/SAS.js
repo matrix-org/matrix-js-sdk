@@ -207,9 +207,9 @@ export class SAS extends Base {
         do {
             try {
                 if (this.initiatedByMe) {
-                    return await this._doRespondVerification();
-                } else {
                     return await this._doSendVerification();
+                } else {
+                    return await this._doRespondVerification();
                 }
             } catch (err) {
                 if (err instanceof SwitchStartEventError) {
