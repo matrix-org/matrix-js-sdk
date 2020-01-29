@@ -77,6 +77,12 @@ export class VerificationBase extends EventEmitter {
     }
 
     get initiatedByMe() {
+        // if there is no start event yet,
+        // we probably want to send it,
+        // which happens if we initiate
+        if (!this.startEvent) {
+            return true;
+        }
         const sender = this.startEvent.getSender();
         const content = this.startEvent.getContent();
         return sender === this._baseApis.getUserId() &&
