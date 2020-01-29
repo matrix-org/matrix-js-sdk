@@ -651,6 +651,7 @@ export class VerificationRequest extends EventEmitter {
             userId,
             deviceId,
             startedByMe ? null : startEvent,
+            this,
         );
     }
 

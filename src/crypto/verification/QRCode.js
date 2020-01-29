@@ -23,7 +23,7 @@ limitations under the License.
 import {VerificationBase as Base} from "./Base";
 import {
     errorFactory,
-    newKeyMismatchError,
+    newKeyMismatchError, newUnknownTransactionError,
     newUserCancelledError,
     newUserMismatchError,
 } from './Error';
@@ -50,15 +50,15 @@ export class ReciprocateQRCode extends Base {
     }
 
     async _doVerification() {
-        const code = await new Promise((resolve, reject) => {
-            this.emit("scan", {
-                done: resolve,
-                cancel: () => reject(newUserCancelledError()),
-            });
-        });
-        const {secret, otherUserKey, keys, targetUserId} = ReciprocateQRCode.splitUrl(code);
+        if (!this.startEvent) {
+            // TODO: Support scanning QR codes
+            throw new Error("It is not currently possible to start verification" +
+                "with this method yet.");
+        }
 
+        const targetUserId = this.startEvent.getSender();
         if (!this.userId) {
+            console.log("Asking to confirm user ID");
             await new Promise((resolve, reject) => {
                 this.emit("confirm_user_id", {
                     userId: targetUserId,
@@ -66,65 +66,19 @@ export class ReciprocateQRCode extends Base {
                     cancel: () => reject(newUserMismatchError()),
                 });
             });
-        } else if (this.userId !== userId) {
+        } else if (targetUserId !== this.userId) {
             throw newUserMismatchError({
                 expected: this.userId,
                 actual: targetUserId,
             });
         }
 
-        const crossSigningInfo = this._baseApis.getStoredCrossSigningInfo(targetUserId);
-        if (!crossSigningInfo) throw new Error("Missing cross signing info for user"); // this shouldn't happen by now
-        if (crossSigningInfo.getId("master") !== otherUserKey) {
+        console.log(this.request);
+        if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
-        if (secret !== this.request.encodedSharedSecret) {
-            throw newQRCodeError();
-        }
-
-        // Verify our own keys that were sent in this code too
-        await this._verifyKeys(this._baseApis.getUserId(), keys, (keyId, device, key) => {
-            if (device.keys[keyId] !== key) {
-                throw newKeyMismatchError();
-            }
-        });
-
-        await this._verifyKeys(targetUserId, [otherUserKey, otherUserKey], (keyId, device, key) => {
-            if (device.keys[keyId] !== key) {
-                throw newKeyMismatchError();
-            }
-        });
-    }
-
-    static splitUrl(code) {
-        const match = code.match(MATRIXTO_REGEXP);
-        const keys = {};
-        if (!match) {
-            throw newQRCodeError();
-        }
-        const targetUserId = match[1];
-        const params = match[2].split("&").map(
-            (x) => x.split("=", 2).map(decodeURIComponent),
-        );
-        let action;
-        let otherUserKey;
-        let secret;
-        for (const [name, value] of params) {
-            if (name === "action") {
-                action = value;
-            } else if (name.startsWith("key_")) {
-                keys[name.substring("key_".length)] = value;
-            } else if (name === "other_user_key") {
-                otherUserKey = value;
-            } else if (name === "secret") {
-                secret = value;
-            }
-        }
-        if (!secret || !otherUserKey || action !== "verify" || Object.keys(keys).length === 0) {
-            throw newQRCodeError();
-        }
-
-        return {action, secret, otherUserKey, keys, targetUserId};
+        const requestEvent = this.request.requestEvent;
+        if (!requestEvent) throw new Error("Missing request event, somehow");
     }
 }
