@@ -59,10 +59,10 @@ export class ReciprocateQRCode extends Base {
         const targetUserId = this.startEvent.getSender();
         if (!this.userId) {
             console.log("Asking to confirm user ID");
-            await new Promise((resolve, reject) => {
+            this.userId = await new Promise((resolve, reject) => {
                 this.emit("confirm_user_id", {
                     userId: targetUserId,
-                    confirm: resolve,
+                    confirm: resolve, // takes a userId
                     cancel: () => reject(newUserMismatchError()),
                 });
             });
@@ -73,12 +73,8 @@ export class ReciprocateQRCode extends Base {
             });
         }
 
-        console.log(this.request);
         if (this.startEvent.getContent()['secret'] !== this.request.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
-
-        const requestEvent = this.request.requestEvent;
-        if (!requestEvent) throw new Error("Missing request event, somehow");
     }
 }
