@@ -323,7 +323,7 @@ export class VerificationRequest extends EventEmitter {
     async cancel({reason = "User declined", code = "m.user"} = {}) {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
             if (this._verifier) {
-                return this._verifier.cancel(errorFactory(code, reason));
+                return this._verifier.cancel(errorFactory(code, reason)());
             } else {
                 this._cancellingUserId = this._client.getUserId();
                 await this.channel.send(CANCEL_TYPE, {code, reason});
