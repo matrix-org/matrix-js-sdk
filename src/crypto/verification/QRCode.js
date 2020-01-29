@@ -71,10 +71,16 @@ export class ReciprocateQRCode extends Base {
         }
 
         // If we've gotten this far, verify the user's master cross signing key
-        const xsignInfo = this._baseApis.getStoredCrossSigningInfo(this.userId);
+        const xsignInfo = this._baseApis.getStoredCrossSigningForUser(this.userId);
         if (!xsignInfo) throw new Error("Missing cross signing info");
 
         const masterKey = xsignInfo.getId("master");
-        await this._verifyKeys(this.userId, [masterKey, masterKey]);
+        const masterKeyId = `ed25519:${masterKey}`;
+        await this._verifyKeys(this.userId, {[masterKeyId]:masterKey}, (keyId, device, keyInfo) => {
+            console.log({keyId, device, keyInfo});
+            if (keyId !== masterKeyId) {
+                throw newKeyMismatchError();
+            }
+        });
     }
 }
