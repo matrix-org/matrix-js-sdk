@@ -575,6 +575,9 @@ export class VerificationRequest extends EventEmitter {
             // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
             const oldSender = oldEvent ? oldEvent.getSender() : this._client.getUserId();
             const newEventWinsRace = event.getSender() < oldSender;
+            if (type === START_TYPE) {
+                logger.info(`VERIFR: checking if we should switch to new event from ${event.getSender()}?`, {canSwitch: this._verifier.canSwitchStartEvent(event), newEventWinsRace, sender: event.getSender(), oldSender});
+            }
             if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
                 this._verifier.switchStartEvent(event);
             } else if (!isRemoteEcho) {
