@@ -41,7 +41,7 @@ import {
 import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
-import {ReciprocateQRCode} from './verification/QRCode';
+import {ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD} from './verification/QRCode';
 import {SAS} from './verification/SAS';
 import {keyFromPassphrase} from './key_passphrase';
 import {encodeRecoveryKey} from './recoverykey';
@@ -49,12 +49,19 @@ import {VerificationRequest} from "./verification/request/VerificationRequest";
 import {InRoomChannel, InRoomRequests} from "./verification/request/InRoomChannel";
 import {ToDeviceChannel, ToDeviceRequests} from "./verification/request/ToDeviceChannel";
 import * as httpApi from "../http-api";
+import {IllegalMethod} from "./verification/IllegalMethod";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
 const defaultVerificationMethods = {
     [ReciprocateQRCode.NAME]: ReciprocateQRCode,
     [SAS.NAME]: SAS,
+
+    // These two can't be used for actual verification, but we do
+    // need to be able to define them here for the verification flows
+    // to start.
+    [SHOW_QR_CODE_METHOD]: IllegalMethod,
+    [SCAN_QR_CODE_METHOD]: IllegalMethod,
 };
 
 /**
@@ -130,6 +137,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                     method.NAME,
                     method,
                 );
+            } else {
+                console.warn(`Excluding unknown verification method ${method}`);
             }
         }
     }
