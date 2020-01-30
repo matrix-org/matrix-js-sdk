@@ -669,6 +669,7 @@ export class VerificationRequest extends EventEmitter {
             userId,
             deviceId,
             startEvent,
+            this,
         );
     }
 

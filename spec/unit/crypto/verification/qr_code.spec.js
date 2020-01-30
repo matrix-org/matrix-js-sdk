@@ -16,8 +16,6 @@ limitations under the License.
 */
 import "../../../olm-loader";
 import {logger} from "../../../../src/logger";
-import {DeviceInfo} from "../../../../src/crypto/deviceinfo";
-import {ScanQRCode, ShowQRCode} from "../../../../src/crypto/verification/QRCode";
 
 const Olm = global.Olm;
 
@@ -31,124 +29,13 @@ describe("QR code verification", function() {
         return Olm.init();
     });
 
-    describe("showing", function() {
-        it("should emit an event to show a QR code", async function() {
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ShowQRCode(channel, {
-                getUserId: () => "@alice:example.com",
-                deviceId: "ABCDEFG",
-                getDeviceEd25519Key: function() {
-                    return "device+ed25519+key";
-                },
-            });
-            const spy = jest.fn((e) => {
-                qrCode.done();
-            });
-            qrCode.on("show_qr_code", spy);
-            await qrCode.verify();
-            expect(spy).toHaveBeenCalledWith({
-                url: "https://matrix.to/#/@alice:example.com?device=ABCDEFG"
-                    + "&action=verify&key_ed25519%3AABCDEFG=device%2Bed25519%2Bkey",
-            });
-        });
-    });
-
-    describe("scanning", function() {
-        const QR_CODE_URL = "https://matrix.to/#/@alice:example.com?device=ABCDEFG"
-              + "&action=verify&key_ed25519%3AABCDEFG=device%2Bed25519%2Bkey";
-        it("should verify when a QR code is sent", async function() {
-            const device = DeviceInfo.fromStorage(
-                {
-                    algorithms: [],
-                    keys: {
-                        "curve25519:ABCDEFG": "device+curve25519+key",
-                        "ed25519:ABCDEFG": "device+ed25519+key",
-                    },
-                    verified: false,
-                    known: false,
-                    unsigned: {},
-                },
-                "ABCDEFG",
-            );
-            const client = {
-                getStoredDevice: jest.fn().mockReturnValue(device),
-                setDeviceVerified: jest.fn(),
-            };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(channel, client);
-            qrCode.on("confirm_user_id", ({userId, confirm}) => {
-                if (userId === "@alice:example.com") {
-                    confirm();
-                } else {
-                    qrCode.cancel(new Error("Incorrect user"));
-                }
-            });
-            qrCode.on("scan", ({done}) => {
-                done(QR_CODE_URL);
-            });
-            await qrCode.verify();
-            expect(client.getStoredDevice)
-                .toHaveBeenCalledWith("@alice:example.com", "ABCDEFG");
-            expect(client.setDeviceVerified)
-                .toHaveBeenCalledWith("@alice:example.com", "ABCDEFG");
-        });
-
-        it("should error when the user ID doesn't match", async function() {
-            const client = {
-                getStoredDevice: jest.fn(),
-                setDeviceVerified: jest.fn(),
-            };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(channel, client, "@bob:example.com", "ABCDEFG");
-            qrCode.on("scan", ({done}) => {
-                done(QR_CODE_URL);
-            });
-            const spy = jest.fn();
-            await qrCode.verify().catch(spy);
-            expect(spy).toHaveBeenCalled();
-            expect(channel.send).toHaveBeenCalled();
-            expect(client.getStoredDevice).not.toHaveBeenCalled();
-            expect(client.setDeviceVerified).not.toHaveBeenCalled();
-        });
-
-        it("should error if the key doesn't match", async function() {
-            const device = DeviceInfo.fromStorage(
-                {
-                    algorithms: [],
-                    keys: {
-                        "curve25519:ABCDEFG": "device+curve25519+key",
-                        "ed25519:ABCDEFG": "a+different+device+ed25519+key",
-                    },
-                    verified: false,
-                    known: false,
-                    unsigned: {},
-                },
-                "ABCDEFG",
-            );
-            const client = {
-                getStoredDevice: jest.fn().mockReturnValue(device),
-                setDeviceVerified: jest.fn(),
-            };
-            const channel = {
-                send: jest.fn(),
-            };
-            const qrCode = new ScanQRCode(
-                channel, client, "@alice:example.com", "ABCDEFG");
-            qrCode.on("scan", ({done}) => {
-                done(QR_CODE_URL);
-            });
-            const spy = jest.fn();
-            await qrCode.verify().catch(spy);
-            expect(spy).toHaveBeenCalled();
-            expect(channel.send).toHaveBeenCalled();
-            expect(client.getStoredDevice).toHaveBeenCalled();
-            expect(client.setDeviceVerified).not.toHaveBeenCalled();
+    describe("reciprocate", () => {
+        it("should verify the secret", () => {
+            // TODO: Actually write a test for this.
+            // Tests are hard because we are running before the verification
+            // process actually begins, and are largely UI-driven rather than
+            // logic-driven (compared to something like SAS). In the interest
+            // of time, tests are currently excluded.
         });
     });
 });
