@@ -272,6 +272,26 @@ export class VerificationRequest extends EventEmitter {
         return this._sharedSecret;
     }
 
+    /**
+     * Estimates which device the verification should be started with
+     * given the events sent so far in the verification. This is the
+     * same algorithm used to determine which device to send the
+     * verification to when no specific device is specified.
+     * @returns {{userId: *, deviceId: *}} The device information
+     */
+    get estimatedTargetDevice() {
+        const theirFirstEvent =
+            this._eventsByThem.get(REQUEST_TYPE) ||
+            this._eventsByThem.get(READY_TYPE) ||
+            this._eventsByThem.get(START_TYPE);
+        const theirFirstContent = theirFirstEvent.getContent();
+        const fromDevice = theirFirstContent.from_device;
+        return {
+            userId: this.otherUserId,
+            deviceId: fromDevice,
+        };
+    }
+
     /* Start the key verification, creating a verifier and sending a .start event.
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
      * @param {string} method the name of the verification method to use.
@@ -645,16 +665,7 @@ export class VerificationRequest extends EventEmitter {
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
         if (!targetDevice) {
-            const theirFirstEvent =
-                this._eventsByThem.get(REQUEST_TYPE) ||
-                this._eventsByThem.get(READY_TYPE) ||
-                this._eventsByThem.get(START_TYPE);
-            const theirFirstContent = theirFirstEvent.getContent();
-            const fromDevice = theirFirstContent.from_device;
-            targetDevice = {
-                userId: this.otherUserId,
-                deviceId: fromDevice,
-            };
+            targetDevice = this.estimatedTargetDevice;
         }
         const {userId, deviceId} = targetDevice;
 
