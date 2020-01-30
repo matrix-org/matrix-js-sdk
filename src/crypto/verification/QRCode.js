@@ -76,7 +76,8 @@ export class ReciprocateQRCode extends Base {
 
         const masterKey = xsignInfo.getId("master");
         const masterKeyId = `ed25519:${masterKey}`;
-        await this._verifyKeys(this.userId, {[masterKeyId]:masterKey}, (keyId, device, keyInfo) => {
+        const keys = {[masterKeyId]: masterKey};
+        await this._verifyKeys(this.userId, keys, (keyId, device, keyInfo) => {
             if (keyInfo !== masterKey) {
                 console.error("key ID from key info does not match");
                 throw newKeyMismatchError();
