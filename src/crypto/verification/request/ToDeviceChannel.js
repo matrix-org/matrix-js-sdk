@@ -139,7 +139,7 @@ export class ToDeviceChannel {
     async handleEvent(event, request, isLiveEvent) {
         const type = event.getType();
         const content = event.getContent();
-        if (type === REQUEST_TYPE || type === START_TYPE) {
+        if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
             if (!this.transactionId) {
                 this.transactionId = content.transaction_id;
             }
