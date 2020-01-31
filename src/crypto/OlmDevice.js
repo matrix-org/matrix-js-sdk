@@ -157,7 +157,7 @@ OlmDevice.prototype.init = async function(fromExportedDevice) {
  * @param {Object} exportedData Data exported from another device
  *     through the “export” method.
  * @param {module:crypto/store/base~CryptoStore} cryptoStore storage for the crypto layer
- * @param {*} pickleKey
+ * @param {string} pickleKey the key that was used to pickle the exported data
  * @param {*} account
  */
 async function _initialiseFromExportedDevice(
