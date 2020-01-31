@@ -116,7 +116,7 @@ describe("OlmDevice", function() {
                 "In contrast to most amphibians,"
                 + " the olm is entirely aquatic"
             );
-            const ciphertext_2 = await aliceOlmDevice.encryptMessage(
+            const ciphertext2 = await aliceOlmDevice.encryptMessage(
                 bobOlmDevice.deviceCurve25519Key,
                 sessionId,
                 MESSAGE_2,
@@ -126,13 +126,13 @@ describe("OlmDevice", function() {
             bobRecreatedAgainOlmDevice.init(exportedAgain);
 
             // Note: "decrypted_2" does not have the same structure as "decrypted"
-            const decrypted_2 = await bobRecreatedAgainOlmDevice.decryptMessage(
+            const decrypted2 = await bobRecreatedAgainOlmDevice.decryptMessage(
                 aliceOlmDevice.deviceCurve25519Key,
                 decrypted.session_id,
-                ciphertext_2.type,
-                ciphertext_2.body,
+                ciphertext2.type,
+                ciphertext2.body,
             );
-            expect(decrypted_2).toEqual(MESSAGE_2);
+            expect(decrypted2).toEqual(MESSAGE_2);
         });
 
         it("creates only one session at a time", async function() {
