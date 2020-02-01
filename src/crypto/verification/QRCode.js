@@ -77,25 +77,41 @@ export class ReciprocateQRCode extends Base {
         const masterKey = xsignInfo.getId("master");
         const masterKeyId = `ed25519:${masterKey}`;
         const keys = {[masterKeyId]: masterKey};
+
+        const devices = (await this._baseApis.getStoredDevicesForUser(this.userId)) || [];
+        const targetDevice = devices.find(d => d.deviceId === this.request.estimatedTargetDevice.deviceId);
+        if (!targetDevice) throw new Error("Device not found, somehow");
+        keys[`ed25519:${targetDevice.deviceId}`] = targetDevice.getFingerprint();
+
+        if (this.request.requestingUserId === this.request.receivingUserId) {
+            delete keys[masterKeyId];
+        }
+
         await this._verifyKeys(this.userId, keys, (keyId, device, keyInfo) => {
-            if (keyInfo !== masterKey) {
+            const targetKey = keys[keyId];
+            if (!targetKey) throw newKeyMismatchError();
+
+            if (keyInfo !== targetKey) {
                 console.error("key ID from key info does not match");
                 throw newKeyMismatchError();
             }
-            if (keyId !== masterKeyId) {
-                console.error("key id doesn't match");
-                throw newKeyMismatchError();
-            }
-            if (device.deviceId !== masterKey) {
-                console.error("master key does not match device ID");
-                throw newKeyMismatchError();
-            }
+            // if (keyId !== masterKeyId) {
+            //     console.error("key id doesn't match");
+            //     throw newKeyMismatchError();
+            // }
+            // if (device.deviceId !== targetKey) {
+            //     console.error("master key does not match device ID");
+            //     throw newKeyMismatchError();
+            // }
             for (const deviceKeyId in device.keys) {
-                if (deviceKeyId !== masterKeyId) {
-                    console.error("device key ID does not match");
-                    throw newKeyMismatchError();
-                }
-                if (device.keys[deviceKeyId] !== masterKey) {
+                if (!deviceKeyId.startsWith("ed25519")) continue;
+                const deviceTargetKey = keys[deviceKeyId];
+                if (!deviceTargetKey) throw newKeyMismatchError();
+                // if (deviceKeyId !== masterKeyId) {
+                //     console.error("device key ID does not match");
+                //     throw newKeyMismatchError();
+                // }
+                if (device.keys[deviceKeyId] !== deviceTargetKey) {
                     console.error("master key does not match");
                     throw newKeyMismatchError();
                 }
