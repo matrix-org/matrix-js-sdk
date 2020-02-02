@@ -318,8 +318,12 @@ export class SecretStorage extends EventEmitter {
             const encInfo = secretInfo.encrypted[keyId];
             switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1:
-                if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
-                    && encInfo.ephemeral) {
+                if (
+                    keyInfo.pubkey && (
+                        (encInfo.ciphertext && encInfo.mac && encInfo.ephemeral) ||
+                        encInfo.passthrough
+                    )
+                ) {
                     keys[keyId] = keyInfo;
                 }
                 break;
