@@ -72,13 +72,9 @@ export class InRoomChannel {
         const content = event.getContent();
         const receiver = content.to;
 
-        // request is not sent by or directed at us
-        if (sender !== ownUserId && receiver !== ownUserId) {
-            return sender;
-        }
         if (sender === ownUserId) {
             return receiver;
-        } else {
+        } else if (receiver === ownUserId) {
             return sender;
         }
     }
