@@ -123,7 +123,7 @@ export function OlmDevice(cryptoStore) {
  *     (exported data already provides a pickle key)
  * @param {object} opts.pickleKey (Optional) pickle key to set instead of default one
  */
-OlmDevice.prototype.init = async function(opts) {
+OlmDevice.prototype.init = async function(opts = {}) {
     let e2eKeys;
     const account = new global.Olm.Account();
 

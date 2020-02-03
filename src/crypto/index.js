@@ -245,7 +245,7 @@ Crypto.prototype.init = async function(opts) {
             ? "Crypto: initialising Olm device from exported device..."
             : "Crypto: initialising Olm device...",
     );
-    await this._olmDevice.init(exportedOlmDevice);
+    await this._olmDevice.init({ fromExportedDevice: exportedOlmDevice });
     logger.log("Crypto: loading device list...");
     await this._deviceList.load();
 

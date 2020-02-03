@@ -99,7 +99,7 @@ describe("OlmDevice", function() {
             );
 
             const bobRecreatedOlmDevice = makeOlmDevice();
-            bobRecreatedOlmDevice.init(exported);
+            bobRecreatedOlmDevice.init({ fromExportedDevice: exported });
 
             const decrypted = await bobRecreatedOlmDevice.createInboundSession(
                 aliceOlmDevice.deviceCurve25519Key,
@@ -123,7 +123,7 @@ describe("OlmDevice", function() {
             );
 
             const bobRecreatedAgainOlmDevice = makeOlmDevice();
-            bobRecreatedAgainOlmDevice.init(exportedAgain);
+            bobRecreatedAgainOlmDevice.init({ fromExportedDevice: exportedAgain });
 
             // Note: "decrypted_2" does not have the same structure as "decrypted"
             const decrypted2 = await bobRecreatedAgainOlmDevice.decryptMessage(
