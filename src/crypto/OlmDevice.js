@@ -116,14 +116,27 @@ export function OlmDevice(cryptoStore) {
  *
  * Reads the device keys from the OlmAccount object.
  *
- * @param {object} fromExportedDevice (Optional) data from exported device
+ * @param {object} opts
+ * @param {object} opts.fromExportedDevice (Optional) data from exported device
  *     that must be re-created.
+ *     If present, opts.pickleKey is ignored
+ *     (exported data already provides a pickle key)
+ * @param {object} opts.pickleKey (Optional) pickle key to set instead of default one
  */
-OlmDevice.prototype.init = async function(fromExportedDevice) {
+OlmDevice.prototype.init = async function(opts) {
     let e2eKeys;
     const account = new global.Olm.Account();
+
+    const { pickleKey, fromExportedDevice } = opts;
+
     try {
         if (fromExportedDevice) {
+            if (pickleKey) {
+                console.warn(
+                    'ignoring opts.pickleKey'
+                    + ' because opts.fromExportedDevice is present.',
+                );
+            }
             this._pickleKey = fromExportedDevice.pickleKey;
             await _initialiseFromExportedDevice(
                 fromExportedDevice,
@@ -132,6 +145,9 @@ OlmDevice.prototype.init = async function(fromExportedDevice) {
                 account,
             );
         } else {
+            if (pickleKey) {
+                this._pickleKey = pickleKey;
+            }
             await _initialiseAccount(
                 this._cryptoStore,
                 this._pickleKey,
