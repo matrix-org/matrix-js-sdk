@@ -111,6 +111,9 @@ export function OlmDevice(cryptoStore) {
  * Initialise the OlmAccount. This must be called before any other operations
  * on the OlmDevice.
  *
+ * Data from an exported Olm device can be provided
+ * in order to re-create this device.
+ *
  * Attempts to load the OlmAccount from the crypto store, or creates one if none is
  * found.
  *
