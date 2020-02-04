@@ -46,8 +46,9 @@ describe("InRoomChannel tests", function() {
             type: "m.room.message",
             content: { msgtype: "m.text" },
         });
+        // XXX: The event type doesn't matter too much, just as long as it's not a verification event
         expect(InRoomChannel.getEventType(messageEvent)).
-            toBeTruthy();
+            toStrictEqual("m.room.message");
     });
 
     it("getEventType should return actual type for non-message events", function() {

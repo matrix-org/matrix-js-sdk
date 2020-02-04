@@ -167,8 +167,11 @@ export class InRoomChannel {
                     return REQUEST_TYPE;
                 }
             }
-        } else if (type && type !== REQUEST_TYPE) {
+        }
+        if (type && type !== REQUEST_TYPE) {
             return type;
+        } else {
+            return "";
         }
     }
 
