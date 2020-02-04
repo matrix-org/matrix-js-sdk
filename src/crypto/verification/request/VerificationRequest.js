@@ -85,7 +85,7 @@ export class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
 
-        if (!type.startsWith(EVENT_PREFIX)) {
+        if (!type || !type.startsWith(EVENT_PREFIX)) {
             return false;
         }
 
@@ -556,6 +556,15 @@ export class VerificationRequest extends EventEmitter {
             this._setPhase(phase);
         } else if (this._observeOnly !== wasObserveOnly) {
             this.emit("change");
+        }
+
+        // log cancellations so we can see from rageshakes why riot sometimes cancels
+        // requests on its own
+        if (type === CANCEL_TYPE) {
+            logger.log(`verification request ${this.channel.transactionId}: ` +
+                `.cancel event with ${JSON.stringify(event.getContent())} ` +
+                `sender=${event.getSender()}, isSentByUs=${isSentByUs} ` +
+                `phase=${this.phase}`);
         }
     }
 

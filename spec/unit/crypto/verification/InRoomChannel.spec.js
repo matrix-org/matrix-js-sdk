@@ -29,7 +29,7 @@ describe("InRoomChannel tests", function() {
         const invalidEvent = new MatrixEvent({
             type: "m.key.verification.request",
         });
-        expect(InRoomChannel.getEventType(invalidEvent)).toStrictEqual(undefined);
+        expect(InRoomChannel.getEventType(invalidEvent)).toStrictEqual("");
         const validEvent = new MatrixEvent({
             type: "m.room.message",
             content: { msgtype: "m.key.verification.request" },
@@ -39,6 +39,25 @@ describe("InRoomChannel tests", function() {
         const validFooEvent = new MatrixEvent({ type: "m.foo" });
         expect(InRoomChannel.getEventType(validFooEvent)).
             toStrictEqual("m.foo");
+    });
+
+    it("getEventType should return m.room.message for messages", function() {
+        const messageEvent = new MatrixEvent({
+            type: "m.room.message",
+            content: { msgtype: "m.text" },
+        });
+        // XXX: The event type doesn't matter too much, just as long as it's not a verification event
+        expect(InRoomChannel.getEventType(messageEvent)).
+            toStrictEqual("m.room.message");
+    });
+
+    it("getEventType should return actual type for non-message events", function() {
+        const event = new MatrixEvent({
+            type: "m.room.member",
+            content: { },
+        });
+        expect(InRoomChannel.getEventType(event)).
+            toStrictEqual("m.room.member");
     });
 
     it("getOtherPartyUserId should not return anything for a request not " +
