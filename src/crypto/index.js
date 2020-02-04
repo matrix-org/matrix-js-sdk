@@ -1514,10 +1514,8 @@ Crypto.prototype.setDeviceVerification = async function(
     // Check if the 'device' is actually a cross signing key
     // The js-sdk's verification treats cross-signing keys as devices
     // and so uses this method to mark them verified.
-    // (Not our own master key though - there's no point signing ourselves
-    // as a user).
     const xsk = this._deviceList.getStoredCrossSigningForUser(userId);
-    if (xsk && xsk.getId() === deviceId && userId !== this._userId) {
+    if (xsk && xsk.getId() === deviceId) {
         if (blocked !== null || known !== null) {
             throw new Error("Cannot set blocked or known for a cross-signing key");
         }
@@ -1529,17 +1527,22 @@ Crypto.prototype.setDeviceVerification = async function(
             this._storeTrustedSelfKeys(xsk.keys);
         }
 
-        const device = await this._crossSigningInfo.signUser(xsk);
-        if (device) {
-            await this._baseApis.uploadKeySignatures({
-                [userId]: {
-                    [deviceId]: device,
-                },
-            });
-            // This will emit events when it comes back down the sync
-            // (we could do local echo to speed things up)
+        // Now sign the master key with our user signing key (unless it's ourself)
+        if (userId !== this._userId) {
+            const device = await this._crossSigningInfo.signUser(xsk);
+            if (device) {
+                await this._baseApis.uploadKeySignatures({
+                    [userId]: {
+                        [deviceId]: device,
+                    },
+                });
+                // This will emit events when it comes back down the sync
+                // (we could do local echo to speed things up)
+            }
+            return device;
+        } else {
+            return xsk;
         }
-        return device;
     }
 
     const devices = this._deviceList.getRawStoredDevicesForUser(userId);
