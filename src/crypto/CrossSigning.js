@@ -348,6 +348,7 @@ export class CrossSigningInfo extends EventEmitter {
 
     async signUser(key) {
         if (!this.keys.user_signing) {
+            logger.info("No user signing key: not signing user");
             return;
         }
         return this.signObject(key.keys.master, "user_signing");
@@ -360,6 +361,7 @@ export class CrossSigningInfo extends EventEmitter {
             );
         }
         if (!this.keys.self_signing) {
+            logger.info("No self signing key: not signing device");
             return;
         }
         return this.signObject(
