@@ -85,7 +85,7 @@ export class VerificationRequest extends EventEmitter {
         const content = event.getContent();
 
 
-        if (!type.startsWith(EVENT_PREFIX)) {
+        if (!type || !type.startsWith(EVENT_PREFIX)) {
             return false;
         }
 
