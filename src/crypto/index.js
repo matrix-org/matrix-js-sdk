@@ -1527,22 +1527,27 @@ Crypto.prototype.setDeviceVerification = async function(
             this._storeTrustedSelfKeys(xsk.keys);
         }
 
-        logger.info(
-            "Master key " + xsk.getId() + " for " + userId +
-            " marked verified. Signing...",
-        );
-        const device = await this._crossSigningInfo.signUser(xsk);
-        if (device) {
-            logger.info("Uploading signature for " + userId + "...");
-            await this._baseApis.uploadKeySignatures({
-                [userId]: {
-                    [deviceId]: device,
-                },
-            });
-            // This will emit events when it comes back down the sync
-            // (we could do local echo to speed things up)
+        // Now sign the master key with our user signing key (unless it's ourself)
+        if (userId !== this._userId) {
+            logger.info(
+                "Master key " + xsk.getId() + " for " + userId +
+                " marked verified. Signing...",
+            );
+            const device = await this._crossSigningInfo.signUser(xsk);
+            if (device) {
+                logger.info("Uploading signature for " + userId + "...");
+                await this._baseApis.uploadKeySignatures({
+                    [userId]: {
+                        [deviceId]: device,
+                    },
+                });
+                // This will emit events when it comes back down the sync
+                // (we could do local echo to speed things up)
+            }
+            return device;
+        } else {
+            return xsk;
         }
-        return device;
     }
 
     const devices = this._deviceList.getRawStoredDevicesForUser(userId);
