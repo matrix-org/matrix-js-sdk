@@ -303,7 +303,10 @@ export class VerificationBase extends EventEmitter {
             throw new Error("No devices could be verified");
         }
 
-        logger.info("Verification completed! Marking devices verified: ", verifiedDevices);
+        logger.info(
+            "Verification completed! Marking devices verified: ",
+            verifiedDevices,
+        );
         // TODO: There should probably be a batch version of this, otherwise it's going
         // to upload each signature in a separate API call which is silly because the
         // API supports as many signatures as you like.
