@@ -1527,8 +1527,13 @@ Crypto.prototype.setDeviceVerification = async function(
             this._storeTrustedSelfKeys(xsk.keys);
         }
 
+        logger.info(
+            "Master key " + xsk.getId() + " for " + userId +
+            " marked verified. Signing...",
+        );
         const device = await this._crossSigningInfo.signUser(xsk);
         if (device) {
+            logger.info("Uploading signature for " + userId + "...");
             await this._baseApis.uploadKeySignatures({
                 [userId]: {
                     [deviceId]: device,
@@ -1574,10 +1579,12 @@ Crypto.prototype.setDeviceVerification = async function(
 
     // do cross-signing
     if (verified && userId === this._userId) {
+        logger.info("Own device " + deviceId + " marked verified: signing");
         const device = await this._crossSigningInfo.signDevice(
             userId, DeviceInfo.fromStorage(dev, deviceId),
         );
         if (device) {
+            logger.info("Uploading signature for " + deviceId);
             await this._baseApis.uploadKeySignatures({
                 [userId]: {
                     [deviceId]: device,
