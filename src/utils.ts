@@ -28,7 +28,7 @@ import unhomoglyph from 'unhomoglyph';
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params) {
+export function encodeParams(params: Record<string, string>): string {
     let qs = "";
     for (const key in params) {
         if (!params.hasOwnProperty(key)) {
@@ -48,7 +48,8 @@ export function encodeParams(params) {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate, variables) {
+export function encodeUri(pathTemplate: string,
+                          variables: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -67,7 +68,7 @@ export function encodeUri(pathTemplate, variables) {
  * the array with the signature <code>fn(element){...}</code>
  * @return {Array} A new array with the results of the function.
  */
-export function map(array, fn) {
+export function map<T, S>(array: T[], fn: (t: T) => S): S[] {
     const results = new Array(array.length);
     for (let i = 0; i < array.length; i++) {
         results[i] = fn(array[i]);
@@ -83,8 +84,9 @@ export function map(array, fn) {
  * looks like <code>fn(element, index, array){...}</code>.
  * @return {Array} A new array with the results of the function.
  */
-export function filter(array, fn) {
-    const results = [];
+export function filter<T>(array: T[],
+                          fn: (t: T, i?: number, a?: T[]) => boolean): T[] {
+    const results: T[] = [];
     for (let i = 0; i < array.length; i++) {
         if (fn(array[i], i, array)) {
             results.push(array[i]);
@@ -98,15 +100,15 @@ export function filter(array, fn) {
  * @param {Object} obj The object to get the keys for.
  * @return {string[]} The keys of the object.
  */
-export function keys(obj) {
-    const keys = [];
+export function keys(obj: object): string[] {
+    const result = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
-        keys.push(key);
+        result.push(key);
     }
-    return keys;
+    return result;
 }
 
 /**
@@ -114,15 +116,15 @@ export function keys(obj) {
  * @param {Object} obj The object to get the values for.
  * @return {Array<*>} The values of the object.
  */
-export function values(obj) {
-    const values = [];
+export function values<T>(obj: Record<string, T>): T[] {
+    const result = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
-        values.push(obj[key]);
+        result.push(obj[key]);
     }
-    return values;
+    return result;
 }
 
 /**
@@ -131,7 +133,7 @@ export function values(obj) {
  * @param {Function} fn The function to invoke for each element. Has the
  * function signature <code>fn(element, index)</code>.
  */
-export function forEach(array, fn) {
+export function forEach<T>(array: T[], fn: (t: T, i: number) => void) {
     for (let i = 0; i < array.length; i++) {
         fn(array[i], i);
     }
@@ -148,7 +150,11 @@ export function forEach(array, fn) {
  * @return {*} The first value in the array which returns <code>true</code> for
  * the given function.
  */
-export function findElement(array, fn, reverse) {
+export function findElement<T>(
+        array: T[],
+        fn: (t: T, i?: number, a?: T[]) => boolean,
+        reverse?: boolean
+    ) {
     let i;
     if (reverse) {
         for (i = array.length - 1; i >= 0; i--) {
@@ -175,7 +181,11 @@ export function findElement(array, fn, reverse) {
  * @param {boolean} reverse True to search in reverse order.
  * @return {boolean} True if an element was removed.
  */
-export function removeElement(array, fn, reverse) {
+export function removeElement<T>(
+        array: T[],
+        fn: (t: T, i?: number, a?: T[]) => boolean,
+        reverse?: boolean
+    ) {
     let i;
     let removed;
     if (reverse) {
@@ -203,8 +213,8 @@ export function removeElement(array, fn, reverse) {
  * @param {*} value The thing to check.
  * @return {boolean} True if it is a function.
  */
-export function isFunction(value) {
-    return Object.prototype.toString.call(value) == "[object Function]";
+export function isFunction(value: any) {
+    return Object.prototype.toString.call(value) === "[object Function]";
 }
 
 /**
@@ -212,7 +222,7 @@ export function isFunction(value) {
  * @param {*} value The thing to check.
  * @return {boolean} True if it is an array.
  */
-export function isArray(value) {
+export function isArray(value: any) {
     return Array.isArray ? Array.isArray(value) :
         Boolean(value && value.constructor === Array);
 }
@@ -223,10 +233,11 @@ export function isArray(value) {
  * @param {string[]} keys The list of keys that 'obj' must have.
  * @throws If the object is missing keys.
  */
-export function checkObjectHasKeys(obj, keys) {
-    for (let i = 0; i < keys.length; i++) {
-        if (!obj.hasOwnProperty(keys[i])) {
-            throw new Error("Missing required key: " + keys[i]);
+// note using 'keys' here would shadow the 'keys' function defined above
+export function checkObjectHasKeys(obj: object, keys_: string[]) {
+    for (let i = 0; i < keys_.length; i++) {
+        if (!obj.hasOwnProperty(keys_[i])) {
+            throw new Error("Missing required key: " + keys_[i]);
         }
     }
 }
@@ -237,7 +248,7 @@ export function checkObjectHasKeys(obj, keys) {
  * @param {string[]} allowedKeys The list of allowed key names.
  * @throws If there are extra keys.
  */
-export function checkObjectHasNoAdditionalKeys(obj, allowedKeys) {
+export function checkObjectHasNoAdditionalKeys(obj: object, allowedKeys: string[]): void {
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
@@ -254,7 +265,7 @@ export function checkObjectHasNoAdditionalKeys(obj, allowedKeys) {
  * @param {Object} obj The object to deep copy.
  * @return {Object} A copy of the object without any references to the original.
  */
-export function deepCopy(obj) {
+export function deepCopy(obj: object): object {
     return JSON.parse(JSON.stringify(obj));
 }
 
@@ -266,7 +277,7 @@ export function deepCopy(obj) {
  *
  * @return {boolean} true if the two objects are equal
  */
-export function deepCompare(x, y) {
+export function deepCompare(x: any, y: any): boolean {
     // Inspired by
     // http://stackoverflow.com/questions/1068834/object-comparison-in-javascript#1144249
 
@@ -377,7 +388,7 @@ export function runPolyfills() {
     // SOURCE:
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/filter
     if (!Array.prototype.filter) {
-      Array.prototype.filter = function(fun/*, thisArg*/) {
+      Array.prototype.filter = function(fun: Function/*, thisArg*/) {
         if (this === void 0 || this === null) {
           throw new TypeError();
         }
@@ -453,7 +464,7 @@ export function runPolyfills() {
 
         // 8. Repeat, while k < len
         while (k < len) {
-          var kValue, mappedValue;
+          let kValue, mappedValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator
@@ -538,7 +549,7 @@ export function runPolyfills() {
 
         // 7. Repeat, while k < len
         while (k < len) {
-          var kValue;
+          let kValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator
@@ -572,7 +583,7 @@ export function runPolyfills() {
  *     prototype.
  * @param {function} superCtor Constructor function to inherit prototype from.
  */
-export function inherits(ctor, superCtor) {
+export function inherits(ctor: Function, superCtor: Function) {
     // Add util.inherits from Node.js
     // Source:
     // https://github.com/joyent/node/blob/master/lib/util.js
@@ -596,7 +607,7 @@ export function inherits(ctor, superCtor) {
     // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
     // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
     // USE OR OTHER DEALINGS IN THE SOFTWARE.
-    ctor.super_ = superCtor;
+    (ctor as any).super_ = superCtor;
     ctor.prototype = Object.create(superCtor.prototype, {
         constructor: {
             value: ctor,
@@ -617,7 +628,7 @@ export function inherits(ctor, superCtor) {
  * @param {any} SuperType The type to act as a super instance
  * @param {any} params Arguments to supply to the super type's constructor
  */
-export function polyfillSuper(thisArg, SuperType, ...params) {
+export function polyfillSuper(thisArg: any, SuperType: any, ...params: any[]) {
     try {
         SuperType.call(thisArg, ...params);
     } catch (e) {
@@ -633,7 +644,7 @@ export function polyfillSuper(thisArg, SuperType, ...params) {
  * @param {*} value the value to test
  * @return {boolean} whether or not value is a finite number without type-coercion
  */
-export function isNumber(value) {
+export function isNumber(value: any): boolean {
     return typeof value === 'number' && isFinite(value);
 }
 
@@ -643,7 +654,7 @@ export function isNumber(value) {
  * @param {string} str the string to remove hidden characters from
  * @return {string} a string with the hidden characters removed
  */
-export function removeHiddenChars(str) {
+export function removeHiddenChars(str: string): string {
     return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
 }
 
@@ -656,11 +667,11 @@ export function removeHiddenChars(str) {
 // Zero width no-break space (BOM) U+FEFF
 const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036f\uFEFF\s]/g;
 
-export function escapeRegExp(string) {
+export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob, extended) {
+export function globToRegexp(glob: string, extended: any): string {
     extended = typeof(extended) === 'boolean' ? extended : true;
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
@@ -679,7 +690,7 @@ export function globToRegexp(glob, extended) {
     return pat;
 }
 
-export function ensureNoTrailingSlash(url) {
+export function ensureNoTrailingSlash(url: string): string {
     if (url && url.endsWith("/")) {
         return url.substr(0, url.length - 1);
     } else {
@@ -688,13 +699,13 @@ export function ensureNoTrailingSlash(url) {
 }
 
 // Returns a promise which resolves with a given value after the given number of ms
-export function sleep(ms, value) {
+export function sleep<T>(ms: number, value: T): Promise<T> {
     return new Promise((resolve => {
         setTimeout(resolve, ms, value);
     }));
 }
 
-export function isNullOrUndefined(val) {
+export function isNullOrUndefined(val: any): boolean {
     return val === null || val === undefined;
 }
 
@@ -711,12 +722,15 @@ export function defer() {
     return {resolve, reject, promise};
 }
 
-export async function promiseMapSeries(promises, fn) {
+export async function promiseMapSeries<T>(
+        promises: Promise<T>[],
+        fn: (t: T) => void
+    ): Promise<void> {
     for (const o of await promises) {
         await fn(await o);
     }
 }
 
-export function promiseTry(fn) {
+export function promiseTry<T>(fn: () => T): Promise<T> {
     return new Promise((resolve) => resolve(fn()));
 }

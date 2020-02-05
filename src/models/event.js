@@ -22,7 +22,7 @@ limitations under the License.
  */
 
 import {EventEmitter} from 'events';
-import * as utils from '../utils.js';
+import * as utils from '../utils';
 import {logger} from '../logger';
 
 /**
