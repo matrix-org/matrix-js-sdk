@@ -5,6 +5,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "target": "es2016",
+    "esModuleInterop": true,
     "noImplicitAny": false,
     "sourceMap": true,
     "outDir": "./lib",
