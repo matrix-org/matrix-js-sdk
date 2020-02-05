@@ -28,7 +28,7 @@ import * as unhomoglyph from 'unhomoglyph';
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params: {[key: string]: string}): string {
+export function encodeParams(params: Record<string, string>): string {
     let qs = "";
     for (const key in params) {
         if (!params.hasOwnProperty(key)) {
@@ -49,7 +49,7 @@ export function encodeParams(params: {[key: string]: string}): string {
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
 export function encodeUri(pathTemplate: string,
-                          variables: {[key: string]: string}): string {
+                          variables: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -116,7 +116,7 @@ export function keys(obj: object): string[] {
  * @param {Object} obj The object to get the values for.
  * @return {Array<*>} The values of the object.
  */
-export function values<T>(obj: {[keys: string]: T}): T[] {
+export function values<T>(obj: Record<string, T>): T[] {
     const values = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
