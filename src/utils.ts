@@ -101,14 +101,14 @@ export function filter<T>(array: T[],
  * @return {string[]} The keys of the object.
  */
 export function keys(obj: object): string[] {
-    const keys = [];
+    const result = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
-        keys.push(key);
+        result.push(key);
     }
-    return keys;
+    return result;
 }
 
 /**
@@ -117,14 +117,14 @@ export function keys(obj: object): string[] {
  * @return {Array<*>} The values of the object.
  */
 export function values<T>(obj: Record<string, T>): T[] {
-    const values = [];
+    const result = [];
     for (const key in obj) {
         if (!obj.hasOwnProperty(key)) {
             continue;
         }
-        values.push(obj[key]);
+        result.push(obj[key]);
     }
-    return values;
+    return result;
 }
 
 /**
@@ -214,7 +214,7 @@ export function removeElement<T>(
  * @return {boolean} True if it is a function.
  */
 export function isFunction(value: any) {
-    return Object.prototype.toString.call(value) == "[object Function]";
+    return Object.prototype.toString.call(value) === "[object Function]";
 }
 
 /**
@@ -233,10 +233,11 @@ export function isArray(value: any) {
  * @param {string[]} keys The list of keys that 'obj' must have.
  * @throws If the object is missing keys.
  */
-export function checkObjectHasKeys(obj: object, keys: string[]) {
-    for (let i = 0; i < keys.length; i++) {
-        if (!obj.hasOwnProperty(keys[i])) {
-            throw new Error("Missing required key: " + keys[i]);
+// note using 'keys' here would shadow the 'keys' function defined above
+export function checkObjectHasKeys(obj: object, keys_: string[]) {
+    for (let i = 0; i < keys_.length; i++) {
+        if (!obj.hasOwnProperty(keys_[i])) {
+            throw new Error("Missing required key: " + keys_[i]);
         }
     }
 }
@@ -463,7 +464,7 @@ export function runPolyfills() {
 
         // 8. Repeat, while k < len
         while (k < len) {
-          var kValue, mappedValue;
+          let kValue, mappedValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator
@@ -548,7 +549,7 @@ export function runPolyfills() {
 
         // 7. Repeat, while k < len
         while (k < len) {
-          var kValue;
+          let kValue;
 
           // a. Let Pk be ToString(k).
           //   This is implicit for LHS operands of the in operator
