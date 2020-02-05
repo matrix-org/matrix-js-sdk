@@ -628,7 +628,7 @@ export function inherits(ctor: Function, superCtor: Function) {
  * @param {any} SuperType The type to act as a super instance
  * @param {any} params Arguments to supply to the super type's constructor
  */
-export function polyfillSuper(thisArg: any, SuperType: any, ...params: any) {
+export function polyfillSuper(thisArg: any, SuperType: any, ...params: any[]) {
     try {
         SuperType.call(thisArg, ...params);
     } catch (e) {
