@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+declare function unhomoglyph (s: string): string;
+
 declare module 'unhomoglyph' {
-    const unhomoglyph: (s: string) => string;
     export = unhomoglyph;
 }
