@@ -41,7 +41,7 @@ async function setupSession(initiator, opponent) {
     return sid;
 }
 
-describe("OlmDecryption", function() {
+describe("OlmDevice", function() {
     if (!global.Olm) {
         logger.warn('Not running megolm unit tests: libolm not present');
         return;
@@ -79,6 +79,60 @@ describe("OlmDecryption", function() {
             expect(result.payload).toEqual(
                 "The olm or proteus is an aquatic salamander in the family Proteidae",
             );
+        });
+
+        it('exports picked account and olm sessions', async function() {
+            const sessionId = await setupSession(aliceOlmDevice, bobOlmDevice);
+
+            const exported = await bobOlmDevice.export();
+            // At this moment only Alice (the “initiator” in setupSession) has a session
+            expect(exported.sessions).toEqual([]);
+
+            const MESSAGE = (
+                "The olm or proteus is an aquatic salamander"
+                + " in the family Proteidae"
+            );
+            const ciphertext = await aliceOlmDevice.encryptMessage(
+                bobOlmDevice.deviceCurve25519Key,
+                sessionId,
+                MESSAGE,
+            );
+
+            const bobRecreatedOlmDevice = makeOlmDevice();
+            bobRecreatedOlmDevice.init({ fromExportedDevice: exported });
+
+            const decrypted = await bobRecreatedOlmDevice.createInboundSession(
+                aliceOlmDevice.deviceCurve25519Key,
+                ciphertext.type,
+                ciphertext.body,
+            );
+            expect(decrypted.payload).toEqual(MESSAGE);
+
+            const exportedAgain = await bobRecreatedOlmDevice.export();
+            // this time we expect Bob to have a session to export
+            expect(exportedAgain.sessions).toHaveLength(1);
+
+            const MESSAGE_2 = (
+                "In contrast to most amphibians,"
+                + " the olm is entirely aquatic"
+            );
+            const ciphertext2 = await aliceOlmDevice.encryptMessage(
+                bobOlmDevice.deviceCurve25519Key,
+                sessionId,
+                MESSAGE_2,
+            );
+
+            const bobRecreatedAgainOlmDevice = makeOlmDevice();
+            bobRecreatedAgainOlmDevice.init({ fromExportedDevice: exportedAgain });
+
+            // Note: "decrypted_2" does not have the same structure as "decrypted"
+            const decrypted2 = await bobRecreatedAgainOlmDevice.decryptMessage(
+                aliceOlmDevice.deviceCurve25519Key,
+                decrypted.session_id,
+                ciphertext2.type,
+                ciphertext2.body,
+            );
+            expect(decrypted2).toEqual(MESSAGE_2);
         });
 
         it("creates only one session at a time", async function() {

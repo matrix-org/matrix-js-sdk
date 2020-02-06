@@ -263,11 +263,15 @@ export class MemoryCryptoStore {
     }
 
     getAllEndToEndSessions(txn, func) {
-        for (const deviceSessions of Object.values(this._sessions)) {
-            for (const sess of Object.values(deviceSessions)) {
-                func(sess);
-            }
-        }
+        Object.entries(this._sessions).forEach(([deviceKey, deviceSessions]) => {
+            Object.entries(deviceSessions).forEach(([sessionId, session]) => {
+                func({
+                    ...session,
+                    deviceKey,
+                    sessionId,
+                });
+            });
+        });
     }
 
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {

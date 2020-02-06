@@ -111,16 +111,52 @@ export function OlmDevice(cryptoStore) {
  * Initialise the OlmAccount. This must be called before any other operations
  * on the OlmDevice.
  *
+ * Data from an exported Olm device can be provided
+ * in order to re-create this device.
+ *
  * Attempts to load the OlmAccount from the crypto store, or creates one if none is
  * found.
  *
  * Reads the device keys from the OlmAccount object.
+ *
+ * @param {object} opts
+ * @param {object} opts.fromExportedDevice (Optional) data from exported device
+ *     that must be re-created.
+ *     If present, opts.pickleKey is ignored
+ *     (exported data already provides a pickle key)
+ * @param {object} opts.pickleKey (Optional) pickle key to set instead of default one
  */
-OlmDevice.prototype.init = async function() {
+OlmDevice.prototype.init = async function(opts = {}) {
     let e2eKeys;
     const account = new global.Olm.Account();
+
+    const { pickleKey, fromExportedDevice } = opts;
+
     try {
-        await _initialiseAccount(this._cryptoStore, this._pickleKey, account);
+        if (fromExportedDevice) {
+            if (pickleKey) {
+                console.warn(
+                    'ignoring opts.pickleKey'
+                    + ' because opts.fromExportedDevice is present.',
+                );
+            }
+            this._pickleKey = fromExportedDevice.pickleKey;
+            await _initialiseFromExportedDevice(
+                fromExportedDevice,
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
+        } else {
+            if (pickleKey) {
+                this._pickleKey = pickleKey;
+            }
+            await _initialiseAccount(
+                this._cryptoStore,
+                this._pickleKey,
+                account,
+            );
+        }
         e2eKeys = JSON.parse(account.identity_keys());
 
         this._maxOneTimeKeys = account.max_number_of_one_time_keys();
@@ -132,18 +168,67 @@ OlmDevice.prototype.init = async function() {
     this.deviceEd25519Key = e2eKeys.ed25519;
 };
 
-async function _initialiseAccount(cryptoStore, pickleKey, account) {
-    await cryptoStore.doTxn('readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT], (txn) => {
-        cryptoStore.getAccount(txn, (pickledAccount) => {
-            if (pickledAccount !== null) {
-                account.unpickle(pickleKey, pickledAccount);
-            } else {
-                account.create();
-                pickledAccount = account.pickle(pickleKey);
-                cryptoStore.storeAccount(txn, pickledAccount);
-            }
-        });
+/**
+ * Populates the crypto store using data that was exported from an existing device.
+ * Note that for now only the “account” and “sessions” stores are populated;
+ * Other stores will be as with a new device.
+ *
+ * @param {Object} exportedData Data exported from another device
+ *     through the “export” method.
+ * @param {module:crypto/store/base~CryptoStore} cryptoStore storage for the crypto layer
+ * @param {string} pickleKey the key that was used to pickle the exported data
+ * @param {Olm.Account} account an olm account to initialize
+ */
+async function _initialiseFromExportedDevice(
+    exportedData,
+    cryptoStore,
+    pickleKey,
+    account,
+) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            cryptoStore.storeAccount(txn, exportedData.pickledAccount);
+            exportedData.sessions.forEach((session) => {
+                const {
+                    deviceKey,
+                    sessionId,
+                } = session;
+                const sessionInfo = {
+                    session: session.session,
+                    lastReceivedMessageTs: session.lastReceivedMessageTs,
+                };
+                cryptoStore.storeEndToEndSession(
+                    deviceKey,
+                    sessionId,
+                    sessionInfo,
+                    txn,
+                );
+            });
     });
+    account.unpickle(pickleKey, exportedData.pickledAccount);
+}
+
+async function _initialiseAccount(cryptoStore, pickleKey, account) {
+    await cryptoStore.doTxn(
+        'readwrite',
+        [IndexedDBCryptoStore.STORE_ACCOUNT],
+        (txn) => {
+            cryptoStore.getAccount(txn, (pickledAccount) => {
+                if (pickledAccount !== null) {
+                    account.unpickle(pickleKey, pickledAccount);
+                } else {
+                    account.create();
+                    pickledAccount = account.pickle(pickleKey);
+                    cryptoStore.storeAccount(txn, pickledAccount);
+                }
+            });
+        },
+    );
 }
 
 /**
@@ -189,6 +274,38 @@ OlmDevice.prototype._getAccount = function(txn, func) {
  */
 OlmDevice.prototype._storeAccount = function(txn, account) {
     this._cryptoStore.storeAccount(txn, account.pickle(this._pickleKey));
+};
+
+/**
+ * Export data for re-creating the Olm device later.
+ * TODO export data other than just account and (P2P) sessions.
+ *
+ * @return {Promise<object>} The exported data
+*/
+OlmDevice.prototype.export = async function() {
+    const result = {
+        pickleKey: this._pickleKey,
+    };
+    await this._cryptoStore.doTxn(
+        'readonly',
+        [
+            IndexedDBCryptoStore.STORE_ACCOUNT,
+            IndexedDBCryptoStore.STORE_SESSIONS,
+        ],
+        (txn) => {
+            this._cryptoStore.getAccount(txn, (pickledAccount) => {
+                result.pickledAccount = pickledAccount;
+            });
+            result.sessions = [];
+            // Note that the pickledSession object we get in the callback
+            // is not exactly the same thing you get in method _getSession
+            // see documentation of IndexedDBCryptoStore.getAllEndToEndSessions
+            this._cryptoStore.getAllEndToEndSessions(txn, (pickledSession) => {
+                result.sessions.push(pickledSession);
+            });
+        },
+    );
+    return result;
 };
 
 /**
