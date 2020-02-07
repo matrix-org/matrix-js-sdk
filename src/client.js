@@ -221,6 +221,7 @@ function keyFromRecoverySession(session, decryptionKey) {
  *               pubkey: {UInt8Array}
  *           }
  *       }
+ *   {string} name the name of the value we want to read out of SSSS, for UI purposes.
  *
  * @param {function} [opts.cryptoCallbacks.onSecretRequested]
  * Optional. Function called when a request for a secret is received from another

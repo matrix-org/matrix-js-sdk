@@ -336,7 +336,7 @@ export class SecretStorage extends EventEmitter {
         let decryption;
         try {
             // fetch private key from app
-            [keyId, decryption] = await this._getSecretStorageKey(keys);
+            [keyId, decryption] = await this._getSecretStorageKey(keys, name);
 
             const encInfo = secretInfo.encrypted[keyId];
 
@@ -587,12 +587,12 @@ export class SecretStorage extends EventEmitter {
         }
     }
 
-    async _getSecretStorageKey(keys) {
+    async _getSecretStorageKey(keys, name) {
         if (!this._cryptoCallbacks.getSecretStorageKey) {
             throw new Error("No getSecretStorageKey callback supplied");
         }
 
-        const returned = await this._cryptoCallbacks.getSecretStorageKey({ keys });
+        const returned = await this._cryptoCallbacks.getSecretStorageKey({ keys }, name);
 
         if (!returned) {
             throw new Error("getSecretStorageKey callback returned falsey");
