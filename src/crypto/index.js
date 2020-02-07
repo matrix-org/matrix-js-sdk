@@ -362,6 +362,7 @@ Crypto.prototype.createRecoveryKeyFromPassphrase = async function(password) {
  * @param {bool} [opts.setupNewKeyBackup] If true, a new key backup version will be
  * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
  * is supplied.
+ * @param {bool} [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
  * Returns:
  *     {Promise} A promise which resolves to key creation data for
  *     SecretStorage#addKey: an object with `passphrase` and/or `pubkey` fields.
@@ -371,6 +372,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     createSecretStorageKey = async () => { },
     keyBackupInfo,
     setupNewKeyBackup,
+    setupNewSecretStorage,
 } = {}) {
     logger.log("Bootstrapping Secure Secret Storage");
 
@@ -386,7 +388,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
     const appCallbacks = Object.assign({}, this._baseApis._cryptoCallbacks);
 
     try {
-        const inStorage =
+        const inStorage = !setupNewSecretStorage &&
             await this._crossSigningInfo.isStoredInSecretStorage(this._secretStorage);
         if (!this._crossSigningInfo.getId() || !inStorage) {
             logger.log(
@@ -411,12 +413,13 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 );
             }
         } else {
+            if (setupNewSecretStorage) throw new Error("What the HELL");
             logger.log("Cross signing keys are present in secret storage");
         }
 
         // Check if Secure Secret Storage has a default key. If we don't have one, create
         // the default key (which will also be signed by the cross-signing master key).
-        if (!await this.hasSecretStorageKey()) {
+        if (setupNewSecretStorage || !await this.hasSecretStorageKey()) {
             let newKeyId;
             if (keyBackupInfo) {
                 logger.log("Secret storage default key not found, using key backup key");
