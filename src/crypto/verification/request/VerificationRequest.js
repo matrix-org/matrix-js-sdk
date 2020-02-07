@@ -273,13 +273,13 @@ export class VerificationRequest extends EventEmitter {
     }
 
     /**
-     * Estimates which device the verification should be started with
+     * Gets which device the verification should be started with
      * given the events sent so far in the verification. This is the
      * same algorithm used to determine which device to send the
      * verification to when no specific device is specified.
      * @returns {{userId: *, deviceId: *}} The device information
      */
-    get estimatedTargetDevice() {
+    get targetDevice() {
         const theirFirstEvent =
             this._eventsByThem.get(REQUEST_TYPE) ||
             this._eventsByThem.get(READY_TYPE) ||
@@ -665,7 +665,7 @@ export class VerificationRequest extends EventEmitter {
 
     _createVerifier(method, startEvent = null, targetDevice = null) {
         if (!targetDevice) {
-            targetDevice = this.estimatedTargetDevice;
+            targetDevice = this.targetDevice;
         }
         const {userId, deviceId} = targetDevice;
 
