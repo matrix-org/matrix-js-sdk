@@ -413,7 +413,6 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 );
             }
         } else {
-            if (setupNewSecretStorage) throw new Error("What the HELL");
             logger.log("Cross signing keys are present in secret storage");
         }
 
