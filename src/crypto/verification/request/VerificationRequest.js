@@ -466,8 +466,7 @@ export class VerificationRequest extends EventEmitter {
         }
 
         const ourDoneEvent = this._eventsByUs.get(DONE_TYPE);
-        const theirDoneEvent = this._eventsByThem.get(DONE_TYPE);
-        if (ourDoneEvent && theirDoneEvent && phase() === PHASE_STARTED) {
+        if (ourDoneEvent && phase() === PHASE_STARTED) {
             transitions.push({phase: PHASE_DONE});
         }
 
