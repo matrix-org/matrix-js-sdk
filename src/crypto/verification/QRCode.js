@@ -79,7 +79,9 @@ export class ReciprocateQRCode extends Base {
         const keys = {[masterKeyId]: masterKey};
 
         const devices = (await this._baseApis.getStoredDevicesForUser(this.userId)) || [];
-        const targetDevice = devices.find(d => d.deviceId === this.request.estimatedTargetDevice.deviceId);
+        const targetDevice = devices.find(d => {
+            return d.deviceId === this.request.estimatedTargetDevice.deviceId;
+        });
         if (!targetDevice) throw new Error("Device not found, somehow");
         keys[`ed25519:${targetDevice.deviceId}`] = targetDevice.getFingerprint();
 
@@ -95,22 +97,10 @@ export class ReciprocateQRCode extends Base {
                 console.error("key ID from key info does not match");
                 throw newKeyMismatchError();
             }
-            // if (keyId !== masterKeyId) {
-            //     console.error("key id doesn't match");
-            //     throw newKeyMismatchError();
-            // }
-            // if (device.deviceId !== targetKey) {
-            //     console.error("master key does not match device ID");
-            //     throw newKeyMismatchError();
-            // }
             for (const deviceKeyId in device.keys) {
                 if (!deviceKeyId.startsWith("ed25519")) continue;
                 const deviceTargetKey = keys[deviceKeyId];
                 if (!deviceTargetKey) throw newKeyMismatchError();
-                // if (deviceKeyId !== masterKeyId) {
-                //     console.error("device key ID does not match");
-                //     throw newKeyMismatchError();
-                // }
                 if (device.keys[deviceKeyId] !== deviceTargetKey) {
                     console.error("master key does not match");
                     throw newKeyMismatchError();
