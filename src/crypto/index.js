@@ -126,8 +126,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
-    this._verificationMethods = new Map();
     if (verificationMethods) {
+        this._verificationMethods = new Map();
         for (const method of verificationMethods) {
             if (typeof method === "string") {
                 if (defaultVerificationMethods[method]) {
@@ -145,8 +145,9 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                 console.warn(`Excluding unknown verification method ${method}`);
             }
         }
+    } else {
+        this._verificationMethods = defaultVerificationMethods;
     }
-
     // track whether this device's megolm keys are being backed up incrementally
     // to the server or not.
     // XXX: this should probably have a single source of truth from OlmAccount
