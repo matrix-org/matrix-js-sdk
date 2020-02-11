@@ -16,8 +16,9 @@ limitations under the License.
 
 import * as matrixcs from "./matrix";
 import * as utils from "./utils";
+import request from "request";
 
-matrixcs.request(import("request"));
+matrixcs.request(request);
 utils.runPolyfills();
 
 export * from "./matrix";
