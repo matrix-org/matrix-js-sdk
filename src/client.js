@@ -907,36 +907,32 @@ async function _setDeviceVerification(
  *
  * @param {string} userId the user to request verification with
  * @param {string} roomId the room to use for verification
- * @param {Array} methods array of verification methods to use.  Defaults to
- *    all known methods
  *
  * @returns {Promise<module:crypto/verification/request/VerificationRequest>} resolves to a VerificationRequest
  *    when the request has been sent to the other party.
  */
-MatrixClient.prototype.requestVerificationDM = function(userId, roomId, methods) {
+MatrixClient.prototype.requestVerificationDM = function(userId, roomId) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.requestVerificationDM(userId, roomId, methods);
+    return this._crypto.requestVerificationDM(userId, roomId);
 };
 
 /**
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
- * @param {Array} methods array of verification methods to use.  Defaults to
- *    all known methods
  * @param {Array} devices array of device IDs to send requests to.  Defaults to
  *    all devices owned by the user
  *
  * @returns {Promise<module:crypto/verification/request/VerificationRequest>} resolves to a VerificationRequest
  *    when the request has been sent to the other party.
  */
-MatrixClient.prototype.requestVerification = function(userId, methods, devices) {
+MatrixClient.prototype.requestVerification = function(userId, devices) {
     if (this._crypto === null) {
         throw new Error("End-to-end encryption disabled");
     }
-    return this._crypto.requestVerification(userId, methods, devices);
+    return this._crypto.requestVerification(userId, devices);
 };
 
 /**

@@ -1619,46 +1619,32 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
-Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
+Crypto.prototype.requestVerificationDM = function(userId, roomId) {
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
     return this._requestVerificationWithChannel(
         userId,
-        methods,
         channel,
         this._inRoomVerificationRequests,
     );
 };
 
-Crypto.prototype.requestVerification = function(userId, methods, devices) {
+Crypto.prototype.requestVerification = function(userId, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
     return this._requestVerificationWithChannel(
         userId,
-        methods,
         channel,
         this._toDeviceVerificationRequests,
     );
 };
 
 Crypto.prototype._requestVerificationWithChannel = async function(
-    userId, methods, channel, requestsMap,
+    userId, channel, requestsMap,
 ) {
-    let verificationMethods = this._verificationMethods;
-    if (methods) {
-        verificationMethods = methods.reduce((map, name) => {
-            const method = this._verificationMethods.get(name);
-            if (!method) {
-                throw new Error(`Verification method ${name} is not supported.`);
-            } else {
-                map.set(name, method);
-            }
-            return map;
-        }, new Map());
-    }
     let request = new VerificationRequest(
-        channel, verificationMethods, this._baseApis);
+        channel, this._verificationMethods, this._baseApis);
     await request.sendRequest();
     // don't replace the request created by a racing remote echo
     const racingRequest = requestsMap.getRequestByChannel(channel);

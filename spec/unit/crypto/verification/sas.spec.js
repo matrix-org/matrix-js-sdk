@@ -448,7 +448,7 @@ describe("SAS verification", function() {
             });
 
             const aliceRequest = await alice.client.requestVerificationDM(
-                bob.client.getUserId(), "!room_id", [verificationMethods.SAS],
+                bob.client.getUserId(), "!room_id",
             );
             await aliceRequest.waitFor(r => r.started);
             aliceVerifier = aliceRequest.verifier;
