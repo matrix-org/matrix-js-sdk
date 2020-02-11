@@ -409,19 +409,11 @@ export class VerificationRequest extends EventEmitter {
         return this._eventsByThem.get(type) || this._eventsByUs.get(type);
     }
 
-    _getEventByOther(type, notSender) {
-        if (notSender === this._client.getUserId()) {
+    _getEventBy(type, byThem) {
+        if (byThem) {
             return this._eventsByThem.get(type);
         } else {
             return this._eventsByUs.get(type);
-        }
-    }
-
-    _getEventBy(type, sender) {
-        if (sender === this._client.getUserId()) {
-            return this._eventsByUs.get(type);
-        } else {
-            return this._eventsByThem.get(type);
         }
     }
 
@@ -430,13 +422,14 @@ export class VerificationRequest extends EventEmitter {
         const phase = () => transitions[transitions.length - 1].phase;
 
         // always pass by .request first to be sure channel.userId has been set
-        const requestEvent = this._getEventByEither(REQUEST_TYPE);
+        const hasRequestByThem = this._eventsByThem.has(REQUEST_TYPE);
+        const requestEvent = this._getEventBy(REQUEST_TYPE, hasRequestByThem);
         if (requestEvent) {
             transitions.push({phase: PHASE_REQUESTED, event: requestEvent});
         }
 
         const readyEvent =
-            requestEvent && this._getEventByOther(READY_TYPE, requestEvent.getSender());
+            requestEvent && this._getEventBy(READY_TYPE, !hasRequestByThem);
         if (readyEvent && phase() === PHASE_REQUESTED) {
             transitions.push({phase: PHASE_READY, event: readyEvent});
         }
@@ -453,7 +446,7 @@ export class VerificationRequest extends EventEmitter {
                 startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
             }
         } else {
-            startEvent = this._getEventByOther(START_TYPE, requestEvent.getSender());
+            startEvent = this._getEventBy(START_TYPE, !hasRequestByThem);
         }
         if (startEvent) {
             const fromRequestPhase = phase() === PHASE_REQUESTED &&
