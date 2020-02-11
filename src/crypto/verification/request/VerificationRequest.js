@@ -540,6 +540,7 @@ export class VerificationRequest extends EventEmitter {
             }
         }
 
+        const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
 
         const transitions = this._calculatePhaseTransitions();
@@ -550,41 +551,44 @@ export class VerificationRequest extends EventEmitter {
         for (const transition of newTransitions) {
             this._transitionToPhase(transition);
         }
-        // only pass events from the other side to the verifier,
-        // no remote echos of our own events
-        if (this._verifier && !this.observeOnly) {
-            const oldEvent = this._verifier.startEvent;
-            // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
-            const oldSender = oldEvent ? oldEvent.getSender() : this._client.getUserId();
-            const newEventWinsRace = event.getSender() < oldSender;
-            if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
-                this._verifier.switchStartEvent(event);
-            } else if (!isRemoteEcho) {
-                 if (type === CANCEL_TYPE || (this._verifier.events
-                    && this._verifier.events.includes(type))) {
-                    this._verifier.handleEvent(event);
+        try {
+            // only pass events from the other side to the verifier,
+            // no remote echos of our own events
+            if (this._verifier && !this.observeOnly) {
+                const oldEvent = this._verifier.startEvent;
+                // if the verifier does not have a startEvent, it is because it's still sending and we are on the initator side
+                const oldSender = oldEvent ?
+                    oldEvent.getSender() :
+                    this._client.getUserId();
+                const newEventWinsRace = event.getSender() < oldSender;
+                if (this._verifier.canSwitchStartEvent(event) && newEventWinsRace) {
+                    this._verifier.switchStartEvent(event);
+                } else if (!isRemoteEcho) {
+                     if (type === CANCEL_TYPE || (this._verifier.events
+                        && this._verifier.events.includes(type))) {
+                        this._verifier.handleEvent(event);
+                    }
                 }
             }
-        }
 
-        if (newTransitions.length) {
-            const lastTransition = newTransitions[newTransitions.length - 1];
-            const {phase} = lastTransition;
+            if (newTransitions.length) {
+                const lastTransition = newTransitions[newTransitions.length - 1];
+                const {phase} = lastTransition;
 
-            this._setupTimeout(phase);
-            // set phase as last thing as this emits the "change" event
-            this._setPhase(phase);
-        } else if (this._observeOnly !== wasObserveOnly) {
-            this.emit("change");
-        }
-
-        // log cancellations so we can see from rageshakes why riot sometimes cancels
-        // requests on its own
-        if (type === CANCEL_TYPE) {
-            logger.log(`verification request ${this.channel.transactionId}: ` +
-                `.cancel event with ${JSON.stringify(event.getContent())} ` +
-                `sender=${event.getSender()}, isSentByUs=${isSentByUs} ` +
-                `phase=${this.phase}`);
+                this._setupTimeout(phase);
+                // set phase as last thing as this emits the "change" event
+                this._setPhase(phase);
+            } else if (this._observeOnly !== wasObserveOnly) {
+                this.emit("change");
+            }
+        } finally {
+            // log events we processed so we can see from rageshakes what events were added to a request
+            logger.log(`Verification request ${this.channel.transactionId}: ` +
+                `${type} event with ${JSON.stringify(event.getContent())} ` +
+                `deviceId:${this.channel.deviceId} ` +
+                `sender:${event.getSender()}, isSentByUs:${isSentByUs} ` +
+                `phase:${oldPhase}=>${this.phase}, ` +
+                `observeOnly:${wasObserveOnly}=>${this._observeOnly}`);
         }
     }
 
