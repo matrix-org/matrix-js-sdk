@@ -305,7 +305,6 @@ export class InRoomRequests {
     getRequest(event) {
         const roomId = event.getRoomId();
         const txnId = InRoomChannel.getTransactionId(event);
-//        console.log(`looking for request in room ${roomId} with txnId ${txnId} for an ${event.getType()} from ${event.getSender()}...`);
         return this._getRequestByTxnId(roomId, txnId);
     }
 
