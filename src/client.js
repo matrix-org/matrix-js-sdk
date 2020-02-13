@@ -919,6 +919,20 @@ MatrixClient.prototype.requestVerificationDM = function(userId, roomId) {
 };
 
 /**
+ * Finds a DM verification request that is already in progress for the given room id
+ *
+ * @param {string} roomId the room to use for verification
+ *
+ * @returns {module:crypto/verification/request/VerificationRequest?} the VerificationRequest that is in progress, if any
+ */
+MatrixClient.prototype.findVerificationRequestDMInProgress = function(roomId) {
+    if (this._crypto === null) {
+        throw new Error("End-to-end encryption disabled");
+    }
+    return this._crypto.findVerificationRequestDMInProgress(roomId);
+};
+
+/**
  * Request a key verification from another user.
  *
  * @param {string} userId the user to request verification with
