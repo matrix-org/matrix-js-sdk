@@ -1624,7 +1624,8 @@ Crypto.prototype.findVerificationRequestDMInProgress = function(roomId) {
 };
 
 Crypto.prototype.requestVerificationDM = function(userId, roomId) {
-    const existingRequest = this._inRoomVerificationRequests.findRequestInProgress(roomId);
+    const existingRequest = this._inRoomVerificationRequests.
+        findRequestInProgress(roomId);
     if (existingRequest) {
         return Promise.resolve(existingRequest);
     }
