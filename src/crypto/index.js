@@ -1641,6 +1641,11 @@ Crypto.prototype.requestVerification = function(userId, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
+    const existingRequest = this._toDeviceVerificationRequests
+        .findRequestInProgress(userId, devices);
+    if (existingRequest) {
+        return Promise.resolve(existingRequest);
+    }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
     return this._requestVerificationWithChannel(
         userId,
