@@ -126,8 +126,8 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._clientStore = clientStore;
     this._cryptoStore = cryptoStore;
     this._roomList = roomList;
-    this._verificationMethods = new Map();
     if (verificationMethods) {
+        this._verificationMethods = new Map();
         for (const method of verificationMethods) {
             if (typeof method === "string") {
                 if (defaultVerificationMethods[method]) {
@@ -145,8 +145,9 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
                 console.warn(`Excluding unknown verification method ${method}`);
             }
         }
+    } else {
+        this._verificationMethods = defaultVerificationMethods;
     }
-
     // track whether this device's megolm keys are being backed up incrementally
     // to the server or not.
     // XXX: this should probably have a single source of truth from OlmAccount
@@ -1618,46 +1619,32 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
-Crypto.prototype.requestVerificationDM = function(userId, roomId, methods) {
+Crypto.prototype.requestVerificationDM = function(userId, roomId) {
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
     return this._requestVerificationWithChannel(
         userId,
-        methods,
         channel,
         this._inRoomVerificationRequests,
     );
 };
 
-Crypto.prototype.requestVerification = function(userId, methods, devices) {
+Crypto.prototype.requestVerification = function(userId, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
     }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
     return this._requestVerificationWithChannel(
         userId,
-        methods,
         channel,
         this._toDeviceVerificationRequests,
     );
 };
 
 Crypto.prototype._requestVerificationWithChannel = async function(
-    userId, methods, channel, requestsMap,
+    userId, channel, requestsMap,
 ) {
-    let verificationMethods = this._verificationMethods;
-    if (methods) {
-        verificationMethods = methods.reduce((map, name) => {
-            const method = this._verificationMethods.get(name);
-            if (!method) {
-                throw new Error(`Verification method ${name} is not supported.`);
-            } else {
-                map.set(name, method);
-            }
-            return map;
-        }, new Map());
-    }
     let request = new VerificationRequest(
-        channel, verificationMethods, this._baseApis);
+        channel, this._verificationMethods, this._baseApis);
     await request.sendRequest();
     // don't replace the request created by a racing remote echo
     const racingRequest = requestsMap.getRequestByChannel(channel);
