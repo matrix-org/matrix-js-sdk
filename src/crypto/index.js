@@ -1620,6 +1620,10 @@ Crypto.prototype.setDeviceVerification = async function(
 };
 
 Crypto.prototype.requestVerificationDM = function(userId, roomId) {
+    const existingRequest = this._inRoomVerificationRequests.findLiveRequest(roomId);
+    if (existingRequest) {
+        return Promise.resolve(existingRequest);
+    }
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
     return this._requestVerificationWithChannel(
         userId,
