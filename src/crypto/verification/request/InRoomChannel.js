@@ -352,7 +352,7 @@ export class InRoomRequests {
         }
     }
 
-    findLiveRequest(roomId) {
+    findRequestInProgress(roomId) {
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             for(const request of requestsByTxnId.values()) {

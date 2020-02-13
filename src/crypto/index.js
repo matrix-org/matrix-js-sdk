@@ -1620,11 +1620,11 @@ Crypto.prototype.setDeviceVerification = async function(
 };
 
 Crypto.prototype.findVerificationRequestDMInProgress = function(roomId) {
-    return this._inRoomVerificationRequests.findLiveRequest(roomId);
+    return this._inRoomVerificationRequests.findRequestInProgress(roomId);
 };
 
 Crypto.prototype.requestVerificationDM = function(userId, roomId) {
-    const existingRequest = this._inRoomVerificationRequests.findLiveRequest(roomId);
+    const existingRequest = this._inRoomVerificationRequests.findRequestInProgress(roomId);
     if (existingRequest) {
         return Promise.resolve(existingRequest);
     }
