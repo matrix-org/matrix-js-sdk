@@ -355,7 +355,7 @@ export class InRoomRequests {
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             for(const request of requestsByTxnId.values()) {
-                if (!request.observeOnly && !request.cancelled && !request.done) {
+                if (request.pending) {
                     return request;
                 }
             }
