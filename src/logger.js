@@ -32,7 +32,7 @@ const DEFAULT_NAMESPACE = "matrix";
 // because rageshakes in react-sdk hijack the console log, also at module load time,
 // initializing the logger here races with the initialization of rageshakes.
 // to avoid the issue, we override the methodFactory of loglevel that binds to the
-// console methods at initialization time by a factory that looks op the console methods
+// console methods at initialization time by a factory that looks up the console methods
 // when logging so we always get the current value of console methods.
 log.methodFactory = function(methodName, logLevel, loggerName) {
     return function(...args) {
