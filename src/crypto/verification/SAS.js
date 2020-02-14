@@ -316,7 +316,7 @@ export class SAS extends Base {
                   + this._channel.transactionId;
             const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
             const verifySAS = new Promise((resolve, reject) => {
-                this.emit("show_sas", {
+                this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
                     confirm: () => {
                         this._sendMAC(olmSAS, macMethod);
@@ -324,7 +324,8 @@ export class SAS extends Base {
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
-                });
+                };
+                this.emit("show_sas", this.sasEvent);
             });
 
 
@@ -400,7 +401,7 @@ export class SAS extends Base {
                   + this._channel.transactionId;
             const sasBytes = olmSAS.generate_bytes(sasInfo, 6);
             const verifySAS = new Promise((resolve, reject) => {
-                this.emit("show_sas", {
+                this.sasEvent = {
                     sas: generateSas(sasBytes, sasMethods),
                     confirm: () => {
                         this._sendMAC(olmSAS, macMethod);
@@ -408,7 +409,8 @@ export class SAS extends Base {
                     },
                     cancel: () => reject(newUserCancelledError()),
                     mismatch: () => reject(newMismatchedSASError()),
-                });
+                };
+                this.emit("show_sas", this.sasEvent);
             });
 
 

@@ -43,6 +43,20 @@ export class ToDeviceChannel {
         this._deviceId = deviceId;
     }
 
+    isToDevices(devices) {
+        if (devices.length === this._devices.length) {
+            for (const device of devices) {
+                const d = this._devices.find(d => d.deviceId === device.deviceId);
+                if (!d) {
+                    return false;
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     get deviceId() {
         return this._deviceId;
     }
@@ -332,6 +346,17 @@ export class ToDeviceRequests {
             requestsByTxnId.delete(ToDeviceChannel.getTransactionId(event));
             if (requestsByTxnId.size === 0) {
                 this._requestsByUserId.delete(userId);
+            }
+        }
+    }
+
+    findRequestInProgress(userId, devices) {
+        const requestsByTxnId = this._requestsByUserId.get(userId);
+        if (requestsByTxnId) {
+            for (const request of requestsByTxnId.values()) {
+                if (request.pending && request.channel.isToDevices(devices)) {
+                    return request;
+                }
             }
         }
     }

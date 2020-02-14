@@ -1619,7 +1619,16 @@ Crypto.prototype.setDeviceVerification = async function(
     return deviceObj;
 };
 
+Crypto.prototype.findVerificationRequestDMInProgress = function(roomId) {
+    return this._inRoomVerificationRequests.findRequestInProgress(roomId);
+};
+
 Crypto.prototype.requestVerificationDM = function(userId, roomId) {
+    const existingRequest = this._inRoomVerificationRequests.
+        findRequestInProgress(roomId);
+    if (existingRequest) {
+        return Promise.resolve(existingRequest);
+    }
     const channel = new InRoomChannel(this._baseApis, roomId, userId);
     return this._requestVerificationWithChannel(
         userId,
@@ -1631,6 +1640,11 @@ Crypto.prototype.requestVerificationDM = function(userId, roomId) {
 Crypto.prototype.requestVerification = function(userId, devices) {
     if (!devices) {
         devices = Object.keys(this._deviceList.getRawStoredDevicesForUser(userId));
+    }
+    const existingRequest = this._toDeviceVerificationRequests
+        .findRequestInProgress(userId, devices);
+    if (existingRequest) {
+        return Promise.resolve(existingRequest);
     }
     const channel = new ToDeviceChannel(this._baseApis, userId, devices);
     return this._requestVerificationWithChannel(

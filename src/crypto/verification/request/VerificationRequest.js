@@ -181,8 +181,9 @@ export class VerificationRequest extends EventEmitter {
 
     /** whether this request has sent it's initial event and needs more events to complete */
     get pending() {
-        return this._phase !== PHASE_DONE
-            && this._phase !== PHASE_CANCELLED;
+        return !this.observeOnly &&
+            this._phase !== PHASE_DONE &&
+            this._phase !== PHASE_CANCELLED;
     }
 
     /** Whether this request was initiated by the syncing user.
