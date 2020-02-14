@@ -28,6 +28,7 @@ import {
     newUnknownMethodError,
     newUserCancelledError,
 } from './Error';
+import {logger} from '../../logger';
 
 const START_TYPE = "m.key.verification.start";
 
@@ -164,6 +165,15 @@ const macMethods = {
     "hkdf-hmac-sha256": "calculate_mac",
     "hmac-sha256": "calculate_mac_long_kdf",
 };
+
+function calculateMAC(olmSAS, method) {
+    return function(...args) {
+        const macFunction = olmSAS[macMethods[method]];
+        const mac = macFunction.apply(olmSAS, args);
+        logger.log("SAS calculateMAC:", method, args, mac);
+        return mac;
+    };
+}
 
 /* lists of algorithms/methods that are supported.  The key agreement, hashes,
  * and MAC lists should be sorted in order of preference (most preferred
@@ -429,7 +439,7 @@ export class SAS extends Base {
               + this._channel.transactionId;
 
         const deviceKeyId = `ed25519:${this._baseApis.deviceId}`;
-        mac[deviceKeyId] = olmSAS[macMethods[method]](
+        mac[deviceKeyId] = calculateMAC(olmSAS, method)(
             this._baseApis.getDeviceEd25519Key(),
             baseInfo + deviceKeyId,
         );
@@ -438,14 +448,14 @@ export class SAS extends Base {
         const crossSigningId = this._baseApis.getCrossSigningId();
         if (crossSigningId) {
             const crossSigningKeyId = `ed25519:${crossSigningId}`;
-            mac[crossSigningKeyId] = olmSAS[macMethods[method]](
+            mac[crossSigningKeyId] = calculateMAC(olmSAS, method)(
                 crossSigningId,
                 baseInfo + crossSigningKeyId,
             );
             keyList.push(crossSigningKeyId);
         }
 
-        const keys = olmSAS[macMethods[method]](
+        const keys = calculateMAC(olmSAS, method)(
             keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
@@ -458,7 +468,7 @@ export class SAS extends Base {
               + this._baseApis.getUserId() + this._baseApis.deviceId
               + this._channel.transactionId;
 
-        if (content.keys !== olmSAS[macMethods[method]](
+        if (content.keys !== calculateMAC(olmSAS, method)(
             Object.keys(content.mac).sort().join(","),
             baseInfo + "KEY_IDS",
         )) {
@@ -466,7 +476,7 @@ export class SAS extends Base {
         }
 
         await this._verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
-            if (keyInfo !== olmSAS[macMethods[method]](
+            if (keyInfo !== calculateMAC(olmSAS, method)(
                 device.keys[keyId],
                 baseInfo + keyId,
             )) {
