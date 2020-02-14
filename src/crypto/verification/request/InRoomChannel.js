@@ -354,7 +354,7 @@ export class InRoomRequests {
     findRequestInProgress(roomId) {
         const requestsByTxnId = this._requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
-            for(const request of requestsByTxnId.values()) {
+            for (const request of requestsByTxnId.values()) {
                 if (request.pending) {
                     return request;
                 }
