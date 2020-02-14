@@ -353,7 +353,7 @@ export class ToDeviceRequests {
     findRequestInProgress(userId, devices) {
         const requestsByTxnId = this._requestsByUserId.get(userId);
         if (requestsByTxnId) {
-            for(const request of requestsByTxnId.values()) {
+            for (const request of requestsByTxnId.values()) {
                 if (request.pending && request.channel.isToDevices(devices)) {
                     return request;
                 }
