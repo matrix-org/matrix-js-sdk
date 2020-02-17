@@ -1,3 +1,9 @@
+Changes in [5.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.0) (2020-02-17)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.0-rc.1...v5.0.0)
+
+ * No changes since rc.1
+
 Changes in [5.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.0-rc.1) (2020-02-13)
 ==========================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v4.0.0...v5.0.0-rc.1)
