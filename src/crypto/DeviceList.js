@@ -936,13 +936,12 @@ async function _storeDeviceKeys(_olmDevice, userStore, deviceResult) {
         deviceStore = userStore[deviceId];
 
         if (deviceStore.getFingerprint() != signKey) {
-            // this should only happen if the list has been MITMed; we are
-            // best off sticking with the original keys.
-            //
-            // Should we warn the user about it somehow?
-            logger.warn("Ed25519 key for device " + userId + ":" +
-               deviceId + " has changed");
-            return false;
+            // this happens if the other device rotated their keys (if indexeddb got cleared)
+            // or the list has been MITMed; we are still storing the new key, as otherwise
+            // verification breaks as we never have an up to date device key. Storing the new key
+            // will make it be marked as untrusted.
+            // Depending on the paranoia setting, we might still encrypt for this device.
+            logger.warn(`Changing Ed25519 key for device ${userId}:${deviceId}`);
         }
     } else {
         userStore[deviceId] = deviceStore = new DeviceInfo(deviceId);
