@@ -1,3 +1,107 @@
+Changes in [5.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.0) (2020-02-17)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.0-rc.1...v5.0.0)
+
+ * No changes since rc.1
+
+Changes in [5.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.0-rc.1) (2020-02-13)
+==========================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v4.0.0...v5.0.0-rc.1)
+
+BREAKING CHANGES
+---
+
+ * The verification methods API has removed an argument ([\#1206](https://github.com/matrix-org/matrix-js-sdk/pull/1206))
+
+All Changes
+---
+
+ * Remove methods argument to verification
+   [\#1206](https://github.com/matrix-org/matrix-js-sdk/pull/1206)
+ * don't do a dynamic import of request
+   [\#1207](https://github.com/matrix-org/matrix-js-sdk/pull/1207)
+ * QR self-verification fixes
+   [\#1201](https://github.com/matrix-org/matrix-js-sdk/pull/1201)
+ * Log every verification event
+   [\#1204](https://github.com/matrix-org/matrix-js-sdk/pull/1204)
+ * dont require .done event from other party
+   [\#1203](https://github.com/matrix-org/matrix-js-sdk/pull/1203)
+ * New option to fully reset Secret Storage keys in boostrapSecretStorage
+   [\#1202](https://github.com/matrix-org/matrix-js-sdk/pull/1202)
+ * Add function to estimate target device for a VerificationRequest
+   [\#1190](https://github.com/matrix-org/matrix-js-sdk/pull/1190)
+ * pass ssss item name to callback so we can differentiate UI on it
+   [\#1200](https://github.com/matrix-org/matrix-js-sdk/pull/1200)
+ * add export/import of Olm devices
+   [\#1167](https://github.com/matrix-org/matrix-js-sdk/pull/1167)
+ * Convert utils.js -> utils.ts
+   [\#1199](https://github.com/matrix-org/matrix-js-sdk/pull/1199)
+ * Don't sign ourselves as a user
+   [\#1197](https://github.com/matrix-org/matrix-js-sdk/pull/1197)
+ * Add a bunch of logging to verification
+   [\#1196](https://github.com/matrix-org/matrix-js-sdk/pull/1196)
+ * Fix: always return a valid string from InRoomChannel.getEventType
+   [\#1198](https://github.com/matrix-org/matrix-js-sdk/pull/1198)
+ * add logging when a request is being cancelled
+   [\#1195](https://github.com/matrix-org/matrix-js-sdk/pull/1195)
+ * Don't explode verification validation if we don't have an event type
+   [\#1194](https://github.com/matrix-org/matrix-js-sdk/pull/1194)
+ * Fix: verification request appearing for users that are not the receiver or
+   sender if they are in room
+   [\#1193](https://github.com/matrix-org/matrix-js-sdk/pull/1193)
+ * Fix getting secrets encoded with passthrough keys
+   [\#1192](https://github.com/matrix-org/matrix-js-sdk/pull/1192)
+ * Update QR code handling for new spec
+   [\#1175](https://github.com/matrix-org/matrix-js-sdk/pull/1175)
+ * Don't add ephemeral events to timeline when peeking
+   [\#1188](https://github.com/matrix-org/matrix-js-sdk/pull/1188)
+ * Fix typo
+   [\#1189](https://github.com/matrix-org/matrix-js-sdk/pull/1189)
+ * Verification: resolve race between .start events from both parties
+   [\#1187](https://github.com/matrix-org/matrix-js-sdk/pull/1187)
+ * Add option to bootstrap to start new key backup
+   [\#1184](https://github.com/matrix-org/matrix-js-sdk/pull/1184)
+ * Add a bunch of null guards to feature checks
+   [\#1182](https://github.com/matrix-org/matrix-js-sdk/pull/1182)
+ * docs: fix MatrixClient reference
+   [\#1183](https://github.com/matrix-org/matrix-js-sdk/pull/1183)
+ * Add helper to obtain the cancellation code for a verification request
+   [\#1180](https://github.com/matrix-org/matrix-js-sdk/pull/1180)
+ * Publish pre-releases as a separate tag on npm
+   [\#1178](https://github.com/matrix-org/matrix-js-sdk/pull/1178)
+ * Fix support for passthrough keys
+   [\#1177](https://github.com/matrix-org/matrix-js-sdk/pull/1177)
+ * Trust our own cross-signing keys if we verify them with another device
+   [\#1174](https://github.com/matrix-org/matrix-js-sdk/pull/1174)
+ * Ensure cross-signing keys are downloaded when checking trust
+   [\#1176](https://github.com/matrix-org/matrix-js-sdk/pull/1176)
+ * Don't log verification validation errors for normal messages
+   [\#1172](https://github.com/matrix-org/matrix-js-sdk/pull/1172)
+ * Fix bootstrap cleanup
+   [\#1173](https://github.com/matrix-org/matrix-js-sdk/pull/1173)
+ * QR code verification
+   [\#1155](https://github.com/matrix-org/matrix-js-sdk/pull/1155)
+ * expose deviceId prop on device channel
+   [\#1171](https://github.com/matrix-org/matrix-js-sdk/pull/1171)
+ * Move & upgrade babel runtime into dependencies (like it wants)
+   [\#1169](https://github.com/matrix-org/matrix-js-sdk/pull/1169)
+ * Add unit tests for verifying your own device, remove .event property on
+   verification request
+   [\#1166](https://github.com/matrix-org/matrix-js-sdk/pull/1166)
+ * For dm-verification, also consider events sent by other devices of same user
+   as "our" events
+   [\#1163](https://github.com/matrix-org/matrix-js-sdk/pull/1163)
+ * Add a prepare script
+   [\#1161](https://github.com/matrix-org/matrix-js-sdk/pull/1161)
+ * Remove :deviceId from /keys/upload/:deviceId as not spec-compliant
+   [\#1162](https://github.com/matrix-org/matrix-js-sdk/pull/1162)
+ * Refactor and expose some logic publicly for the TimelineWindow class.
+   [\#1159](https://github.com/matrix-org/matrix-js-sdk/pull/1159)
+ * Allow a device key upload request without auth
+   [\#1158](https://github.com/matrix-org/matrix-js-sdk/pull/1158)
+ * Support for .ready verification event (MSC2366) & other things
+   [\#1140](https://github.com/matrix-org/matrix-js-sdk/pull/1140)
+
 Changes in [4.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v4.0.0) (2020-01-27)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v4.0.0-rc.1...v4.0.0)
