@@ -80,7 +80,7 @@ export class ReciprocateQRCode extends Base {
 
         const devices = (await this._baseApis.getStoredDevicesForUser(this.userId)) || [];
         const targetDevice = devices.find(d => {
-            return d.deviceId === this.request.estimatedTargetDevice.deviceId;
+            return d.deviceId === this.request.targetDevice.deviceId;
         });
         if (!targetDevice) throw new Error("Device not found, somehow");
         keys[`ed25519:${targetDevice.deviceId}`] = targetDevice.getFingerprint();
