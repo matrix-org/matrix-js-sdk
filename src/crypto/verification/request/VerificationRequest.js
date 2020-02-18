@@ -71,6 +71,8 @@ export class VerificationRequest extends EventEmitter {
         this._observeOnly = false;
         this._timeoutTimer = null;
         this._sharedSecret = null; // used for QR codes
+        this._accepting = false;
+        this._declining = false;
     }
 
     /**
@@ -177,6 +179,18 @@ export class VerificationRequest extends EventEmitter {
     /** The verifier to do the actual verification, once the method has been established. Only defined when the `phase` is PHASE_STARTED. */
     get verifier() {
         return this._verifier;
+    }
+
+    get canAccept() {
+        return this.phase < PHASE_READY && !this._accepting && !this._declining;
+    }
+
+    get accepting() {
+        return this._accepting;
+    }
+
+    get declining() {
+        return this._declining;
     }
 
     /** whether this request has sent it's initial event and needs more events to complete */
@@ -343,6 +357,8 @@ export class VerificationRequest extends EventEmitter {
      */
     async cancel({reason = "User declined", code = "m.user"} = {}) {
         if (!this.observeOnly && this._phase !== PHASE_CANCELLED) {
+            this._declining = true;
+            this.emit("change");
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason)());
             } else {
@@ -359,6 +375,8 @@ export class VerificationRequest extends EventEmitter {
     async accept() {
         if (!this.observeOnly && this.phase === PHASE_REQUESTED && !this.initiatedByMe) {
             const methods = [...this._verificationMethods.keys()];
+            this._accepting = true;
+            this.emit("change");
             await this.channel.send(READY_TYPE, {methods});
             this._generateSharedSecret();
         }
