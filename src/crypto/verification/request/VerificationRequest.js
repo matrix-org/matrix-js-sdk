@@ -200,6 +200,33 @@ export class VerificationRequest extends EventEmitter {
             this._phase !== PHASE_CANCELLED;
     }
 
+    /** Checks whether the other party supports a given verification method.
+     *  This is useful when setting up the QR code UI, as it is somewhat asymmetrical:
+     *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
+     *  For methods that need to be supported by both ends, use the `methods` property.
+     *  @param {string} method the method to check
+     *  @return {bool} whether or not the other party said the supported the method */
+    otherPartySupportsMethod(method) {
+        if (!this.ready && !this.started) {
+            return false;
+        }
+        const theirMethodEvent = this._eventsByThem.get(REQUEST_TYPE) ||
+            this._eventsByThem.get(READY_TYPE);
+        if (!theirMethodEvent) {
+            return false;
+        }
+        const content = theirMethodEvent.getContent();
+        if (!content) {
+            return false;
+        }
+        const {methods} = content;
+        if (!Array.isArray(methods)) {
+            return false;
+        }
+
+        return methods.includes(method);
+    }
+
     /** Whether this request was initiated by the syncing user.
      * For InRoomChannel, this is who sent the .request event.
      * For ToDeviceChannel, this is who sent the .start event
