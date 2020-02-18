@@ -186,7 +186,7 @@ export class VerificationRequest extends EventEmitter {
     }
 
     /** Checks whether the other party supports a given verification method.
-     *  This is useful setting up the QR code UI, as it is somewhat asymmetrical:
+     *  This is useful when setting up the QR code UI, as it is somewhat asymmetrical:
      *  if the other party supports SCAN_QR, we should show a QR code in the UI, and vice versa.
      *  For methods that need to be supported by both ends, use the `methods` property.
      *  @param {string} method the method to check
