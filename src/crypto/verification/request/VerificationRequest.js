@@ -565,7 +565,7 @@ export class VerificationRequest extends EventEmitter {
      */
     async handleEvent(type, event, isLiveEvent, isRemoteEcho, isSentByUs) {
         // if reached phase cancelled or done, ignore anything else that comes
-        if (!this.pending) {
+        if (this.done || this.cancelled) {
             return;
         }
         const wasObserveOnly = this._observeOnly;
