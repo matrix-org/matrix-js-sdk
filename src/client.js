@@ -4797,6 +4797,13 @@ MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
         || (unstableFeatures && unstableFeatures["m.separate_add_and_bind"]);
 };
 
+MatrixClient.prototype.doesServerSupportUnstableFeature = async function(feature) {
+    const response = await this.getVersions();
+    if (!response) return false;
+    const unstableFeatures = response["unstable_features"];
+    return unstableFeatures && !!unstableFeatures[feature];
+};
+
 /**
  * Get if lazy loading members is being used.
  * @return {boolean} Whether or not members are lazy loaded by this client
