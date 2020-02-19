@@ -1,3 +1,20 @@
+Changes in [5.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.1) (2020-02-19)
+================================================================================================
+[Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.0...v5.0.1)
+
+ * add method for new /aliases endpoint
+   [\#1219](https://github.com/matrix-org/matrix-js-sdk/pull/1219)
+ * method for checking if other party supports verification method
+   [\#1213](https://github.com/matrix-org/matrix-js-sdk/pull/1213)
+ * add local echo state for accepting or declining a verif req
+   [\#1210](https://github.com/matrix-org/matrix-js-sdk/pull/1210)
+ * make logging compatible with rageshakes
+   [\#1214](https://github.com/matrix-org/matrix-js-sdk/pull/1214)
+ * Find existing requests when starting a new verification request
+   [\#1209](https://github.com/matrix-org/matrix-js-sdk/pull/1209)
+ * log MAC calculation during SAS
+   [\#1211](https://github.com/matrix-org/matrix-js-sdk/pull/1211)
+
 Changes in [5.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v5.0.0) (2020-02-17)
 ================================================================================================
 [Full Changelog](https://github.com/matrix-org/matrix-js-sdk/compare/v5.0.0-rc.1...v5.0.0)
