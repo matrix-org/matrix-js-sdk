@@ -1120,6 +1120,21 @@ MatrixBaseApis.prototype.deleteAlias = function(alias, callback) {
 };
 
 /**
+ * @param {string} roomId
+ * @param {module:client.callback} callback Optional.
+ * @return {Promise} Resolves: an object with an `aliases` property, containing an array of local aliases
+ * @return {module:http-api.MatrixError} Rejects: with an error response.
+ */
+MatrixBaseApis.prototype.unstableGetLocalAliases =
+function(roomId, callback) {
+    const path = utils.encodeUri("/rooms/$roomId/aliases",
+        {$roomId: roomId});
+    const prefix = PREFIX_UNSTABLE + "/org.matrix.msc2432";
+    return this._http.authedRequest(callback, "GET", path,
+        null, null, { prefix });
+};
+
+/**
  * Get room info for the given alias.
  * @param {string} alias The room alias to resolve.
  * @param {module:client.callback} callback Optional.

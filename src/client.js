@@ -4798,6 +4798,19 @@ MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
 };
 
 /**
+ * Query the server to see if it lists support for an unstable feature
+ * in the /versions response
+ * @param {string} feature the feature name
+ * @return {Promise<boolean>} true if the feature is supported
+ */
+MatrixClient.prototype.doesServerSupportUnstableFeature = async function(feature) {
+    const response = await this.getVersions();
+    if (!response) return false;
+    const unstableFeatures = response["unstable_features"];
+    return unstableFeatures && !!unstableFeatures[feature];
+};
+
+/**
  * Get if lazy loading members is being used.
  * @return {boolean} Whether or not members are lazy loaded by this client
  */
