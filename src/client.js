@@ -4797,6 +4797,12 @@ MatrixClient.prototype.doesServerSupportSeparateAddAndBind = async function() {
         || (unstableFeatures && unstableFeatures["m.separate_add_and_bind"]);
 };
 
+/**
+ * Query the server to see if it lists support for an unstable feature
+ * in the /versions response
+ * @param {string} feature the feature name
+ * @return {Promise<boolean>} true if the feature is supported
+ */
 MatrixClient.prototype.doesServerSupportUnstableFeature = async function(feature) {
     const response = await this.getVersions();
     if (!response) return false;
