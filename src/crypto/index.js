@@ -1244,6 +1244,15 @@ Crypto.prototype.getDeviceEd25519Key = function() {
 };
 
 /**
+ * Get the Curve25519 key for this device
+ *
+ * @return {string} base64-encoded curve25519 key.
+ */
+Crypto.prototype.getDeviceCurve25519Key = function() {
+    return this._olmDevice.deviceCurve25519Key;
+};
+
+/**
  * Set the global override for whether the client should ever send encrypted
  * messages to unverified devices.  This provides the default for rooms which
  * do not specify a value.

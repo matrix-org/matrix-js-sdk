@@ -764,6 +764,19 @@ MatrixClient.prototype.getDeviceEd25519Key = function() {
 };
 
 /**
+ * Get the Curve25519 key for this device
+ *
+ * @return {?string} base64-encoded curve25519 key. Null if crypto is
+ *    disabled.
+ */
+MatrixClient.prototype.getDeviceCurve25519Key = function() {
+    if (!this._crypto) {
+        return null;
+    }
+    return this._crypto.getDeviceCurve25519Key();
+};
+
+/**
  * Upload the device keys to the homeserver.
  * @return {object} A promise that will resolve when the keys are uploaded.
  */
