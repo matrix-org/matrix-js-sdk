@@ -598,6 +598,7 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
+        aliceClient._crypto.downloadKeys = async () => {};
         const bobDevice = bobClient._crypto._olmDevice;
 
         const roomId = "!someroom";
@@ -649,6 +650,7 @@ describe("MegolmDecryption", function() {
             bobClient.initCrypto(),
         ]);
         const bobDevice = bobClient._crypto._olmDevice;
+        aliceClient._crypto.downloadKeys = async () => {};
 
         const roomId = "!someroom";
 

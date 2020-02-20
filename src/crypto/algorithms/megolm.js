@@ -1262,17 +1262,25 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
             this.retryDecryptionFromSender(senderKey);
             return;
         }
-        const device = this._crypto._deviceList.getDeviceByIdentityKey(
+        let device = this._crypto._deviceList.getDeviceByIdentityKey(
             content.algorithm, senderKey,
         );
         if (!device) {
-            logger.info(
-                "Couldn't find device for identity key " + senderKey +
-                    ": not establishing session",
+            // if we don't know about the device, fetch the user's devices again
+            // and retry before giving up
+            await this._crypto.downloadKeys([sender], false);
+            device = this._crypto._deviceList.getDeviceByIdentityKey(
+                content.algorithm, senderKey,
             );
-            await this._olmDevice.recordSessionProblem(senderKey, "no_olm", false);
-            this.retryDecryptionFromSender(senderKey);
-            return;
+            if (!device) {
+                logger.info(
+                    "Couldn't find device for identity key " + senderKey +
+                        ": not establishing session",
+                );
+                await this._olmDevice.recordSessionProblem(senderKey, "no_olm", false);
+                this.retryDecryptionFromSender(senderKey);
+                return;
+            }
         }
         await olmlib.ensureOlmSessionsForDevices(
             this._olmDevice, this._baseApis, {[sender]: [device]}, false,

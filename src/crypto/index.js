@@ -2714,15 +2714,21 @@ Crypto.prototype._onToDeviceBadEncrypted = async function(event) {
     // on a current session.
     // Note that an undecryptable message from another device could easily be spoofed -
     // is there anything we can do to mitigate this?
-    const device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
+    let device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
     if (!device) {
-        logger.info(
-            "Couldn't find device for identity key " + deviceKey +
-            ": not re-establishing session",
-        );
-        await this._olmDevice.recordSessionProblem(deviceKey, "wedged", false);
-        retryDecryption();
-        return;
+        // if we don't know about the device, fetch the user's devices again
+        // and retry before giving up
+        await this.downloadKeys([sender], false);
+        device = this._deviceList.getDeviceByIdentityKey(algorithm, deviceKey);
+        if (!device) {
+            logger.info(
+                "Couldn't find device for identity key " + deviceKey +
+                    ": not re-establishing session",
+            );
+            await this._olmDevice.recordSessionProblem(deviceKey, "wedged", false);
+            retryDecryption();
+            return;
+        }
     }
     const devicesByUser = {};
     devicesByUser[sender] = [device];
