@@ -1475,7 +1475,6 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
 
 MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey) {
     const senderPendingEvents = this._pendingEvents[senderKey];
-    logger.warn(senderPendingEvents);
     if (!senderPendingEvents) {
         return true;
     }
@@ -1485,7 +1484,6 @@ MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey)
     await Promise.all([...senderPendingEvents].map(async ([_sessionId, pending]) => {
         await Promise.all([...pending].map(async (ev) => {
             try {
-                logger.warn(ev.getId());
                 await ev.attemptDecryption(this._crypto);
             } catch (e) {
                 // don't die if something goes wrong
