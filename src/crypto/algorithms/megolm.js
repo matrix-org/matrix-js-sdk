@@ -1241,6 +1241,9 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
 
     if (content.code === "m.no_olm") {
         const sender = event.getSender();
+        logger.warn(
+            `${sender}:${senderKey} was unable to establish an olm session with us`,
+        );
         // if the sender says that they haven't been able to establish an olm
         // session, let's proactively establish one
 
@@ -1252,6 +1255,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
         if (await this._olmDevice.getSessionIdForDevice(senderKey)) {
             // a session has already been established, so we don't need to
             // create a new one.
+            logger.debug("New session already created.  Not creating a new one.");
             await this._olmDevice.recordSessionProblem(senderKey, "no_olm", true);
             this.retryDecryptionFromSender(senderKey);
             return;
