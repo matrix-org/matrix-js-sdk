@@ -393,12 +393,6 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
             if (!sessionResult.sessionId) {
                 // no session with this device, probably because there
                 // were no one-time keys.
-                //
-                // we could send them a to_device message anyway, as a
-                // signal that they have missed out on the key sharing
-                // message because of the lack of keys, but there's not
-                // much point in that really; it will mostly serve to clog
-                // up to_device inboxes.
 
                 // mark this device as "handled" because we don't want to try
                 // to claim a one-time-key for dead devices on every message.
@@ -1247,6 +1241,9 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
 
     if (content.code === "m.no_olm") {
         const sender = event.getSender();
+        logger.warn(
+            `${sender}:${senderKey} was unable to establish an olm session with us`,
+        );
         // if the sender says that they haven't been able to establish an olm
         // session, let's proactively establish one
 
@@ -1258,6 +1255,7 @@ MegolmDecryption.prototype.onRoomKeyWithheldEvent = async function(event) {
         if (await this._olmDevice.getSessionIdForDevice(senderKey)) {
             // a session has already been established, so we don't need to
             // create a new one.
+            logger.debug("New session already created.  Not creating a new one.");
             await this._olmDevice.recordSessionProblem(senderKey, "no_olm", true);
             this.retryDecryptionFromSender(senderKey);
             return;
@@ -1481,7 +1479,6 @@ MegolmDecryption.prototype._retryDecryption = async function(senderKey, sessionI
 
 MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey) {
     const senderPendingEvents = this._pendingEvents[senderKey];
-    logger.warn(senderPendingEvents);
     if (!senderPendingEvents) {
         return true;
     }
@@ -1491,7 +1488,6 @@ MegolmDecryption.prototype.retryDecryptionFromSender = async function(senderKey)
     await Promise.all([...senderPendingEvents].map(async ([_sessionId, pending]) => {
         await Promise.all([...pending].map(async (ev) => {
             try {
-                logger.warn(ev.getId());
                 await ev.attemptDecryption(this._crypto);
             } catch (e) {
                 // don't die if something goes wrong
