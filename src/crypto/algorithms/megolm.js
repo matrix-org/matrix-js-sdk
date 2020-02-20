@@ -393,12 +393,6 @@ MegolmEncryption.prototype._splitUserDeviceMap = function(
             if (!sessionResult.sessionId) {
                 // no session with this device, probably because there
                 // were no one-time keys.
-                //
-                // we could send them a to_device message anyway, as a
-                // signal that they have missed out on the key sharing
-                // message because of the lack of keys, but there's not
-                // much point in that really; it will mostly serve to clog
-                // up to_device inboxes.
 
                 // mark this device as "handled" because we don't want to try
                 // to claim a one-time-key for dead devices on every message.
