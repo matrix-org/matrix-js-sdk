@@ -868,7 +868,7 @@ Room.prototype.getCanonicalAlias = function() {
 
 /**
  * Get this room's alternative aliases
- * @return {[string]} The room's alternative aliases, or an empty array
+ * @return {array} The room's alternative aliases, or an empty array
  */
 Room.prototype.getAltAliases = function() {
     const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
