@@ -867,6 +867,18 @@ Room.prototype.getCanonicalAlias = function() {
 };
 
 /**
+ * Get this room's alternative aliases
+ * @return {[string]} The room's alternative aliases, or an empty array
+ */
+Room.prototype.getAltAliases = function() {
+    const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
+    if (canonicalAlias) {
+        return canonicalAlias.getContent().alt_aliases || [];
+    }
+    return [];
+};
+
+/**
  * Add events to a timeline
  *
  * <p>Will fire "Room.timeline" for each event added.
