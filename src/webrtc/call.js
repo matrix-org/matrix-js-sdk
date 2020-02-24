@@ -57,6 +57,39 @@ const DEBUG = true;  // set true to enable console logging.
  * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
  */
 export class MatrixCall extends EventEmitter {
+    /** The length of time a call can be ringing for. */
+    static CALL_TIMEOUT_MS = 60000;
+
+    /** The fallback ICE server to use for STUN or TURN protocols. */
+    static FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
+
+    /** An error code when the local client failed to create an offer. */
+    static ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
+
+    /**
+     * An error code when there is no local mic/camera to use. This may be because
+     * the hardware isn't plugged in, or the user has explicitly denied access.
+     */
+    static ERR_NO_USER_MEDIA = "no_user_media";
+
+    /**
+     * Error code used when a call event failed to send
+     * because unknown devices were present in the room
+     */
+    static ERR_UNKNOWN_DEVICES = "unknown_devices";
+
+    /**
+     * Error code usewd when we fail to send the invite
+     * for some reason other than there being unknown devices
+     */
+    static ERR_SEND_INVITE = "send_invite";
+
+    /**
+     * Error code usewd when we fail to send the answer
+     * for some reason other than there being unknown devices
+     */
+    static ERR_SEND_ANSWER = "send_answer";
+
     constructor(opts) {
         super();
         this.roomId = opts.roomId;
@@ -432,8 +465,7 @@ export class MatrixCall extends EventEmitter {
      * @param {boolean} suppressEvent True to suppress emitting an event.
      */
     hangup(reason, suppressEvent) {
-        if (this.state == 'ended')
-            return;
+        if (this.state == 'ended') return;
         debuglog("Ending call " + this.callId);
         terminate(this, "local", reason, !suppressEvent);
         const content = {
@@ -832,8 +864,7 @@ export class MatrixCall extends EventEmitter {
      * @private
      */
     _onSignallingStateChanged() {
-        debuglog("call " + this.callId + ": Signalling state changed to: " +
-            this.peerConn.signalingState);
+        debuglog("call " + this.callId + ": Signalling state changed to: " + this.peerConn.signalingState);
     };
 
     /**
@@ -950,37 +981,7 @@ export class MatrixCall extends EventEmitter {
         debuglog("Answered elsewhere");
         terminate(this, "remote", "answered_elsewhere", true);
     }
-};
-
-/** The length of time a call can be ringing for. */
-MatrixCall.CALL_TIMEOUT_MS = 60000;
-/** The fallback ICE server to use for STUN or TURN protocols. */
-MatrixCall.FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
-/** An error code when the local client failed to create an offer. */
-MatrixCall.ERR_LOCAL_OFFER_FAILED = "local_offer_failed";
-/**
- * An error code when there is no local mic/camera to use. This may be because
- * the hardware isn't plugged in, or the user has explicitly denied access.
- */
-MatrixCall.ERR_NO_USER_MEDIA = "no_user_media";
-
-/*
- * Error code used when a call event failed to send
- * because unknown devices were present in the room
- */
-MatrixCall.ERR_UNKNOWN_DEVICES = "unknown_devices";
-
-/*
- * Error code usewd when we fail to send the invite
- * for some reason other than there being unknown devices
- */
-MatrixCall.ERR_SEND_INVITE = "send_invite";
-
-/*
- * Error code usewd when we fail to send the answer
- * for some reason other than there being unknown devices
- */
-MatrixCall.ERR_SEND_ANSWER = "send_answer";
+}
 
 const setTracksEnabled = function (tracks, enabled) {
     for (let i = 0; i < tracks.length; i++) {
