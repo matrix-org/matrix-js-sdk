@@ -47,11 +47,6 @@ function setProp(obj, keyNesting, val) {
  * @prop {?string} filterId The filter ID
  */
 export class Filter {
-    constructor(userId, filterId) {
-        this.userId = userId;
-        this.filterId = filterId;
-        this.definition = {};
-    }
     static LAZY_LOADING_MESSAGES_FILTER = {
         lazy_load_members: true,
     };
@@ -62,6 +57,11 @@ export class Filter {
         },
     };
 
+    constructor(userId, filterId) {
+        this.userId = userId;
+        this.filterId = filterId;
+        this.definition = {};
+    }
 
     /**
      * Get the ID of this filter on your homeserver (if known)
