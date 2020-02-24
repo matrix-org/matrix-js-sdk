@@ -38,7 +38,7 @@ import {
     DeviceTrustLevel,
     UserTrustLevel,
 } from './CrossSigning';
-import {SECRET_STORAGE_ALGORITHM_V1, SecretStorage} from './SecretStorage';
+import {SECRET_STORAGE_ALGORITHM_V1_AES, SecretStorage} from './SecretStorage';
 import {OutgoingRoomKeyRequestManager} from './OutgoingRoomKeyRequestManager';
 import {IndexedDBCryptoStore} from './store/indexeddb-crypto-store';
 import {
@@ -439,7 +439,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 }
 
                 newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1, opts,
+                    SECRET_STORAGE_ALGORITHM_V1_AES, opts,
                 );
 
                 // Add an entry for the backup key in SSSS as a 'passthrough' key
@@ -468,7 +468,7 @@ Crypto.prototype.bootstrapSecretStorage = async function({
                 logger.log("Secret storage default key not found, creating new key");
                 const keyOptions = await createSecretStorageKey();
                 newKeyId = await this.addSecretStorageKey(
-                    SECRET_STORAGE_ALGORITHM_V1,
+                    SECRET_STORAGE_ALGORITHM_V1_AES,
                     keyOptions,
                 );
             }

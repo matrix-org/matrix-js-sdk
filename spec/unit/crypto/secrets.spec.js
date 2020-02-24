@@ -16,10 +16,19 @@ limitations under the License.
 
 import '../../olm-loader';
 import * as olmlib from "../../../src/crypto/olmlib";
-import {SECRET_STORAGE_ALGORITHM_V1} from "../../../src/crypto/SecretStorage";
+import {SECRET_STORAGE_ALGORITHM_V1_AES} from "../../../src/crypto/SecretStorage";
 import {MatrixEvent} from "../../../src/models/event";
 import {TestClient} from '../../TestClient';
 import {makeTestClients} from './verification/util';
+
+import * as utils from "../../../src/utils";
+
+try {
+    const crypto = require('crypto');
+    utils.setCrypto(crypto);
+} catch (err) {
+    console.log('nodejs was compiled without crypto support');
+}
 
 async function makeTestClient(userInfo, options) {
     const client = (new TestClient(
@@ -51,9 +60,8 @@ describe("Secrets", function() {
     });
 
     it("should store and retrieve a secret", async function() {
-        const decryption = new global.Olm.PkDecryption();
-        const pubkey = decryption.generate_key();
-        const privkey = decryption.get_private_key();
+        const key = new Uint8Array(16);
+        for (let i = 0; i < 16; i++) key[i] = i;
 
         const signing = new global.Olm.PkSigning();
         const signingKey = signing.generate_seed();
@@ -69,7 +77,7 @@ describe("Secrets", function() {
 
         const getKey = jest.fn(e => {
             expect(Object.keys(e.keys)).toEqual(["abc"]);
-            return ['abc', privkey];
+            return ['abc', key];
         });
 
         const alice = await makeTestClient(
@@ -100,8 +108,7 @@ describe("Secrets", function() {
         };
 
         const keyAccountData = {
-            algorithm: SECRET_STORAGE_ALGORITHM_V1,
-            pubkey: pubkey,
+            algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
         };
         await alice._crypto._crossSigningInfo.signObject(keyAccountData, 'master');
 
@@ -149,6 +156,13 @@ describe("Secrets", function() {
     });
 
     it("should encrypt with default key if keys is null", async function() {
+        const key = new Uint8Array(16);
+        for (let i = 0; i < 16; i++) key[i] = i;
+        const getKey = jest.fn(e => {
+            expect(Object.keys(e.keys)).toEqual([newKeyId]);
+            return [newKeyId, key];
+        });
+
         let keys = {};
         const alice = await makeTestClient(
             {userId: "@alice:example.com", deviceId: "Osborne2"},
@@ -156,6 +170,7 @@ describe("Secrets", function() {
                 cryptoCallbacks: {
                     getCrossSigningKey: t => keys[t],
                     saveCrossSigningKeys: k => keys = k,
+                    getSecretStorageKey: getKey,
                 },
             },
         );
@@ -170,7 +185,7 @@ describe("Secrets", function() {
         alice.resetCrossSigningKeys();
 
         const newKeyId = await alice.addSecretStorageKey(
-            SECRET_STORAGE_ALGORITHM_V1,
+            SECRET_STORAGE_ALGORITHM_V1_AES,
         );
         // we don't await on this because it waits for the event to come down the sync
         // which won't happen in the test setup
@@ -252,10 +267,21 @@ describe("Secrets", function() {
     });
 
     it("bootstraps when no storage or cross-signing keys locally", async function() {
+        const key = new Uint8Array(16);
+        for (let i = 0; i < 16; i++) key[i] = i;
+        const getKey = jest.fn(e => {
+            return [Object.keys(e.keys)[0], key];
+        });
+
         const bob = await makeTestClient(
             {
                 userId: "@bob:example.com",
                 deviceId: "bob1",
+            },
+            {
+                cryptoCallbacks: {
+                    getSecretStorageKey: getKey,
+                },
             },
         );
         bob.uploadDeviceSigningKeys = async () => {};

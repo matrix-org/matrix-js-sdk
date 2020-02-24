@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,225 @@ import {logger} from '../logger';
 import * as olmlib from './olmlib';
 import {pkVerify} from './olmlib';
 import {randomString} from '../randomstring';
+import {decodeBase64, encodeBase64} from './olmlib';
+import {getCrypto} from '../utils';
 
-export const SECRET_STORAGE_ALGORITHM_V1 = "m.secret_storage.v1.curve25519-aes-sha2";
+export const SECRET_STORAGE_ALGORITHM_V1_AES
+    = "m.secret_storage.v1.aes-hmac-sha2";
+// don't use curve25519 for writing data.
+export const SECRET_STORAGE_ALGORITHM_V1_CURVE25519
+    = "m.secret_storage.v1.curve25519-aes-sha2";
+
+const subtleCrypto = typeof window === "undefined" ? null :
+    (window.crypto.subtle || window.crypto.webkitSubtle);
+
+// salt for HKDF, with 8 bytes of zeros
+const zerosalt = new Uint8Array(8);
+
+/** encrypt a string in Node.js
+ *
+ * @param {string} data the plaintext to encrypt
+ * @param {Uint8Array} key the encryption key to use
+ * @param {string} name the name of the secret
+ */
+async function encryptNode(data, key, name) {
+    const crypto = getCrypto();
+    if (!crypto) {
+        throw new Error("No usable crypto implementation");
+    }
+
+    const iv = crypto.randomBytes(16);
+
+    // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
+    // (which would mean we wouldn't be able to decrypt on Android). The loss
+    // of a single bit of iv is a price we have to pay.
+    iv[8] &= 0x7f;
+
+    const [aesKey, hmacKey] = deriveKeysNode(key, name);
+
+    const cipher = crypto.createCipheriv("aes-256-ctr", aesKey, iv);
+    const ciphertext = cipher.update(data, "utf-8", "base64")
+          + cipher.final("base64");
+
+    const hmac = crypto.createHmac("sha256", hmacKey)
+        .update(ciphertext, "base64").digest("base64");
+
+    return {
+        iv: encodeBase64(iv),
+        ciphertext: ciphertext,
+        mac: hmac,
+    };
+}
+
+/** decrypt a string in Node.js
+ *
+ * @param {object} data the encrypted data
+ * @param {string} data.ciphertext the ciphertext in base64
+ * @param {string} data.iv the initialization vector in base64
+ * @param {string} data.mac the HMAC in base64
+ * @param {Uint8Array} key the encryption key to use
+ * @param {string} name the name of the secret
+ */
+async function decryptNode(data, key, name) {
+    const crypto = getCrypto();
+    if (!crypto) {
+        throw new Error("No usable crypto implementation");
+    }
+
+    const [aesKey, hmacKey] = deriveKeysNode(key, name);
+
+    const hmac = crypto.createHmac("sha256", hmacKey)
+        .update(data.ciphertext, "base64").digest("base64");
+
+    if (hmac !== data.mac) {
+        throw new Error(`Error decrypting secret ${name}: bad MAC`);
+    }
+
+    const decipher = crypto.createDecipheriv(
+        "aes-256-ctr", aesKey, decodeBase64(data.iv),
+    );
+    return decipher.update(data.ciphertext, "base64", "utf-8")
+          + decipher.final("utf-8");
+}
+
+function deriveKeysNode(key, name) {
+    const crypto = getCrypto();
+    const prk = crypto.createHmac("sha256", zerosalt)
+        .update(key).digest();
+
+    const b = Buffer.alloc(1, 1);
+    const aesKey = crypto.createHmac("sha256", prk)
+        .update(name, "utf-8").update(b).digest();
+    b[0] = 2;
+    const hmacKey = crypto.createHmac("sha256", prk)
+        .update(aesKey).update(name, "utf-8").update(b).digest();
+
+    return [aesKey, hmacKey];
+}
+
+/** encrypt a string in Node.js
+ *
+ * @param {string} data the plaintext to encrypt
+ * @param {Uint8Array} key the encryption key to use
+ * @param {string} name the name of the secret
+ */
+async function encryptBrowser(data, key, name) {
+    const iv = new Uint8Array(16);
+    window.crypto.getRandomValues(iv);
+
+    // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
+    // (which would mean we wouldn't be able to decrypt on Android). The loss
+    // of a single bit of iv is a price we have to pay.
+    iv[8] &= 0x7f;
+
+    const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
+    const encodedData = new TextEncoder().encode(data);
+
+    const ciphertext = await subtleCrypto.encrypt(
+        {
+            name: "AES-CTR",
+            counter: iv,
+            length: 64,
+        },
+        aesKey,
+        encodedData,
+    );
+
+    const hmac = await subtleCrypto.sign(
+        {name: 'HMAC'},
+        hmacKey,
+        ciphertext,
+    );
+
+    return {
+        iv: encodeBase64(iv),
+        ciphertext: encodeBase64(ciphertext),
+        mac: encodeBase64(hmac),
+    };
+}
+
+/** decrypt a string in the browser
+ *
+ * @param {object} data the encrypted data
+ * @param {string} data.ciphertext the ciphertext in base64
+ * @param {string} data.iv the initialization vector in base64
+ * @param {string} data.mac the HMAC in base64
+ * @param {Uint8Array} key the encryption key to use
+ * @param {string} name the name of the secret
+ */
+async function decryptBrowser(data, key, name) {
+    const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
+
+    const ciphertext = decodeBase64(data.ciphertext);
+
+    if (!await subtleCrypto.verify(
+        {name: "HMAC"},
+        hmacKey,
+        decodeBase64(data.mac),
+        ciphertext,
+    )) {
+        throw new Error(`Error decrypting secret ${name}: bad MAC`);
+    }
+
+    const plaintext = await subtleCrypto.decrypt(
+        {
+            name: "AES-CTR",
+            counter: decodeBase64(data.iv),
+            length: 64,
+        },
+        aesKey,
+        ciphertext,
+    );
+
+    return new TextDecoder().decode(new Uint8Array(plaintext));
+}
+
+async function deriveKeysBrowser(key, name) {
+    const hkdfkey = await subtleCrypto.importKey(
+        'raw',
+        key,
+        {name: "HKDF"},
+        false,
+        ["deriveBits"],
+    );
+    const keybits = await subtleCrypto.deriveBits(
+        {
+            name: "HKDF",
+            salt: zerosalt,
+            info: (new TextEncoder().encode(name)),
+            hash: "SHA-256",
+        },
+        hkdfkey,
+        512,
+    );
+
+    const aesKey = keybits.slice(0, 32);
+    const hmacKey = keybits.slice(32);
+
+    const aesProm = await subtleCrypto.importKey(
+        'raw',
+        aesKey,
+        {name: 'AES-CTR'},
+        false,
+        ['encrypt', 'decrypt'],
+    );
+
+    const hmacProm = await subtleCrypto.importKey(
+        'raw',
+        hmacKey,
+        {
+            name: 'HMAC',
+            hash: {name: 'SHA-256'},
+        },
+        false,
+        ['sign', 'verify'],
+    );
+
+    return await Promise.all([aesProm, hmacProm]);
+}
+
+const [encryptAES, decryptAES] = (typeof window === "undefined") ?
+    [encryptNode, decryptNode] : [encryptBrowser, decryptBrowser];
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
@@ -85,20 +302,12 @@ export class SecretStorage extends EventEmitter {
         }
 
         switch (algorithm) {
-        case SECRET_STORAGE_ALGORITHM_V1:
+        case SECRET_STORAGE_ALGORITHM_V1_AES:
         {
             const decryption = new global.Olm.PkDecryption();
             try {
-                const { passphrase, pubkey } = opts;
-                // Copies in public key details of the form generated by
-                // the Crypto module's `createRecoveryKeyFromPassphrase`.
-                if (passphrase && pubkey) {
-                    keyData.passphrase = passphrase;
-                    keyData.pubkey = pubkey;
-                } else if (pubkey) {
-                    keyData.pubkey = pubkey;
-                } else {
-                    keyData.pubkey = decryption.generate_key();
+                if (opts.passphrase) {
+                    keyData.passphrase = opts.passphrase;
                 }
             } finally {
                 decryption.free();
@@ -207,24 +416,13 @@ export class SecretStorage extends EventEmitter {
                 throw new Error("Unknown key: " + keyId);
             }
 
-            // check signature of key info
-            pkVerify(
-                keyInfo,
-                this._crossSigningInfo.getId('master'),
-                this._crossSigningInfo.userId,
-            );
-
             // encrypt secret, based on the algorithm
             switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1:
+            case SECRET_STORAGE_ALGORITHM_V1_AES:
             {
-                const encryption = new global.Olm.PkEncryption();
-                try {
-                    encryption.set_recipient_key(keyInfo.pubkey);
-                    encrypted[keyId] = encryption.encrypt(secret);
-                } finally {
-                    encryption.free();
-                }
+                const keys = {[keyId]: keyInfo};
+                const [, encryption] = await this._getSecretStorageKey(keys, name);
+                encrypted[keyId] = await encryption.encrypt(secret);
                 break;
             }
             default:
@@ -236,29 +434,6 @@ export class SecretStorage extends EventEmitter {
 
         // save encrypted secret
         await this._baseApis.setAccountData(name, {encrypted});
-    }
-
-    /**
-     * Store a secret defined to be the same as the given key.
-     * No secret information will be stored, instead the secret will
-     * be stored with a marker to say that the contents of the secret is
-     * the value of the given key.
-     * This is useful for migration from systems that predate SSSS such as
-     * key backup.
-     *
-     * @param {string} name The name of the secret
-     * @param {string} keyId The ID of the key whose value will be the
-     *     value of the secret
-     * @returns {Promise} resolved when account data is saved
-     */
-    storePassthrough(name, keyId) {
-        return this._baseApis.setAccountData(name, {
-            encrypted: {
-                [keyId]: {
-                    passthrough: true,
-                },
-            },
-        });
     }
 
     /**
@@ -317,7 +492,12 @@ export class SecretStorage extends EventEmitter {
             );
             const encInfo = secretInfo.encrypted[keyId];
             switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1:
+            case SECRET_STORAGE_ALGORITHM_V1_AES:
+                if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
+                    keys[keyId] = keyInfo;
+                }
+                break;
+            case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
                 if (
                     keyInfo.pubkey && (
                         (encInfo.ciphertext && encInfo.mac && encInfo.ephemeral) ||
@@ -344,15 +524,9 @@ export class SecretStorage extends EventEmitter {
             // since we just want to return the key itself.
             if (encInfo.passthrough) return decryption.get_private_key();
 
-            // decrypt secret
-            switch (keys[keyId].algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1:
-                return decryption.decrypt(
-                    encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,
-                );
-            }
+            return await decryption.decrypt(encInfo);
         } finally {
-            if (decryption) decryption.free();
+            if (decryption && decryption.free) decryption.free();
         }
     }
 
@@ -387,22 +561,44 @@ export class SecretStorage extends EventEmitter {
             );
             if (!keyInfo) return false;
             const encInfo = secretInfo.encrypted[keyId];
-            if (checkKey) {
-                pkVerify(
-                    keyInfo,
-                    this._crossSigningInfo.getId('master'),
-                    this._crossSigningInfo.userId,
-                );
-            }
 
             // We don't actually need the decryption object if it's a passthrough
             // since we just want to return the key itself.
-            if (encInfo.passthrough) return true;
+            if (encInfo.passthrough) {
+                try {
+                    pkVerify(
+                        keyInfo,
+                        this._crossSigningInfo.getId('master'),
+                        this._crossSigningInfo.userId,
+                    );
+                } catch (e) {
+                    // not trusted, so move on to the next key
+                    continue;
+                }
+                return true;
+            }
 
             switch (keyInfo.algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1:
+            case SECRET_STORAGE_ALGORITHM_V1_AES:
+                if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
+                    return true;
+                }
+                break;
+            case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
                 if (keyInfo.pubkey && encInfo.ciphertext && encInfo.mac
                     && encInfo.ephemeral) {
+                    if (checkKey) {
+                        try {
+                            pkVerify(
+                                keyInfo,
+                                this._crossSigningInfo.getId('master'),
+                                this._crossSigningInfo.userId,
+                            );
+                        } catch (e) {
+                            // not trusted, so move on to the next key
+                            continue;
+                        }
+                    }
                     return true;
                 }
                 break;
@@ -607,26 +803,48 @@ export class SecretStorage extends EventEmitter {
         }
 
         switch (keys[keyId].algorithm) {
-            case SECRET_STORAGE_ALGORITHM_V1:
-            {
-                const decryption = new global.Olm.PkDecryption();
-                let pubkey;
-                try {
-                    pubkey = decryption.init_with_private_key(privateKey);
-                } catch (e) {
-                    decryption.free();
-                    throw new Error("getSecretStorageKey callback returned invalid key");
-                }
-                if (pubkey !== keys[keyId].pubkey) {
-                    decryption.free();
-                    throw new Error(
-                        "getSecretStorageKey callback returned incorrect key",
-                    );
-                }
-                return [keyId, decryption];
+        case SECRET_STORAGE_ALGORITHM_V1_AES:
+        {
+            const decryption = {
+                encrypt: async function(secret) {
+                    return await encryptAES(secret, privateKey, name);
+                },
+                decrypt: async function(encInfo) {
+                    return await decryptAES(encInfo, privateKey, name);
+                },
+            };
+            return [keyId, decryption];
+        }
+        case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
+        {
+            const pkDecryption = new global.Olm.PkDecryption();
+            let pubkey;
+            try {
+                pubkey = pkDecryption.init_with_private_key(privateKey);
+            } catch (e) {
+                pkDecryption.free();
+                throw new Error("getSecretStorageKey callback returned invalid key");
             }
-            default:
-                throw new Error("Unknown key type: " + keys[keyId].algorithm);
+            if (pubkey !== keys[keyId].pubkey) {
+                pkDecryption.free();
+                throw new Error(
+                    "getSecretStorageKey callback returned incorrect key",
+                );
+            }
+            const decryption = {
+                free: pkDecryption.free().bind(pkDecryption),
+                decrypt: async function(encInfo) {
+                    return pkDecryption.decrypt(
+                        encInfo.ephemeral, encInfo.mac, encInfo.ciphertext,
+                    );
+                },
+                // needed for passthrough
+                get_private_key: pkDecryption.get_private_key.bind(pkDecryption),
+            };
+            return [keyId, decryption];
+        }
+        default:
+            throw new Error("Unknown key type: " + keys[keyId].algorithm);
         }
     }
 }
