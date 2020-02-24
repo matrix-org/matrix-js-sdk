@@ -44,9 +44,9 @@ export class Group extends EventEmitter {
         this.myMembership = null;
         this.inviter = null;
     }
+
     setProfile(name, avatarUrl) {
-        if (this.name === name && this.avatarUrl === avatarUrl)
-            return;
+        if (this.name === name && this.avatarUrl === avatarUrl) return;
         this.name = name || this.groupId;
         this.avatarUrl = avatarUrl;
 
@@ -54,8 +54,7 @@ export class Group extends EventEmitter {
     };
 
     setMyMembership(membership) {
-        if (this.myMembership === membership)
-            return;
+        if (this.myMembership === membership) return;
         this.myMembership = membership;
 
         this.emit("Group.myMembership", this);
