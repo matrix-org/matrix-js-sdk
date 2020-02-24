@@ -115,7 +115,7 @@ export class IndexedDBStore extends MemoryStore {
         };
     }
 
-    static exists = function (indexedDB, dbName) {
+    static exists(indexedDB, dbName) {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     };
 
@@ -165,7 +165,7 @@ export class IndexedDBStore extends MemoryStore {
      */
     getSavedSyncToken = degradable(function () {
         return this.backend.getNextBatchToken();
-    }, "getSavedSyncToken"),
+    }, "getSavedSyncToken");
 
     /**
      * Delete all data from this store.
