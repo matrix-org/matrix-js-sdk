@@ -861,9 +861,21 @@ Room.prototype.getAliases = function() {
 Room.prototype.getCanonicalAlias = function() {
     const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
     if (canonicalAlias) {
-        return canonicalAlias.getContent().alias;
+        return canonicalAlias.getContent().alias || null;
     }
     return null;
+};
+
+/**
+ * Get this room's alternative aliases
+ * @return {array} The room's alternative aliases, or an empty array
+ */
+Room.prototype.getAltAliases = function() {
+    const canonicalAlias = this.currentState.getStateEvents("m.room.canonical_alias", "");
+    if (canonicalAlias) {
+        return canonicalAlias.getContent().alt_aliases || [];
+    }
+    return [];
 };
 
 /**
