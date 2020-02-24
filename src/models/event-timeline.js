@@ -347,7 +347,7 @@ export class EventTimeline {
      * @param {RoomState} stateContext  the room state to be queried
      * @param {bool} toStartOfTimeline  if true the event's forwardLooking flag is set false
      */
-    EventTimeline.setEventMetadata = function (event, stateContext, toStartOfTimeline) {
+    setEventMetadata(event, stateContext, toStartOfTimeline) {
         // set sender and target properties
         event.sender = stateContext.getSentinelMember(
             event.getSender(),
