@@ -428,14 +428,6 @@ export class TimelineWindow {
  * @param {number} index
  * @private
  */
-/**
- * a thing which contains a timeline reference, and an index into it.
- *
- * @constructor
- * @param {EventTimeline} timeline
- * @param {number} index
- * @private
- */
 export class TimelineIndex {
     constructor(timeline, index) {
         this.timeline = timeline;
