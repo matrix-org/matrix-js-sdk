@@ -45,12 +45,16 @@ export function syncPromise(client, count) {
 export function mock(constr, name) {
     // Based on
     // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
-    const HelperConstr = new Function(); // jshint ignore:line
-    HelperConstr.prototype = constr.prototype;
-    const result = new HelperConstr();
+    const result = new (class Anon extends constr {constructor() {
+        super();
+    }})();
+    //result.prototype = constr.prototype;
+    const origToString = result.toString.bind(result);
     result.toString = function() {
-        return "mock" + (name ? " of " + name : "");
+        return `Anon<${name || 'Unnamed'}> = ${origToString()}`;
     };
+    console.log(Object.keys(result.constructor.__proto__));
+    console.log(result.toString());
     for (const key in constr.prototype) { // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
