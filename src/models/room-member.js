@@ -70,7 +70,7 @@ export class RoomMember extends EventEmitter {
      */
     markOutOfBand() {
         this._isOutOfBand = true;
-    };
+    }
 
     /**
      * @return {bool} does the member come from a channel that is not sync?
@@ -79,7 +79,7 @@ export class RoomMember extends EventEmitter {
      */
     isOutOfBand() {
         return this._isOutOfBand;
-    };
+    }
 
     /**
      * Update this room member's membership event. May fire "RoomMember.name" if
@@ -117,7 +117,7 @@ export class RoomMember extends EventEmitter {
             this._updateModifiedTime();
             this.emit("RoomMember.name", event, this, oldName);
         }
-    };
+    }
 
     /**
      * Update this room member's power level event. May fire
@@ -158,7 +158,7 @@ export class RoomMember extends EventEmitter {
             this._updateModifiedTime();
             this.emit("RoomMember.powerLevel", powerLevelEvent, this);
         }
-    };
+    }
 
     /**
      * Update this room member's typing event. May fire "RoomMember.typing" if
@@ -191,7 +191,7 @@ export class RoomMember extends EventEmitter {
      */
     _updateModifiedTime() {
         this._modified = Date.now();
-    };
+    }
 
     /**
      * Get the timestamp when this RoomMember was last updated. This timestamp is
@@ -201,13 +201,13 @@ export class RoomMember extends EventEmitter {
      */
     getLastModifiedTime() {
         return this._modified;
-    };
+    }
 
 
     isKicked() {
         return this.membership === "leave" &&
             this.events.member.getSender() !== this.events.member.getStateKey();
-    };
+    }
 
     /**
      * If this member was invited with the is_direct flag set, return
@@ -238,8 +238,7 @@ export class RoomMember extends EventEmitter {
                 return inviteSender;
             }
         }
-    };
-
+    }
 
     /**
      * Get the avatar URL for a room member.
@@ -280,7 +279,8 @@ export class RoomMember extends EventEmitter {
             );
         }
         return null;
-    };
+    }
+
     /**
      * get the mxc avatar url, either from a state event, or from a lazily loaded member
      * @return {string} the mxc avatar url
@@ -292,7 +292,7 @@ export class RoomMember extends EventEmitter {
             return this.user.avatarUrl;
         }
         return null;
-    };
+    }
 }
 
 function calculateDisplayName(selfUserId, displayName, roomState) {
