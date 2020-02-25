@@ -196,8 +196,8 @@ describe("RoomState", function() {
         it("should call setPowerLevelEvent on each RoomMember for m.room.power_levels",
         function() {
             // mock up the room members
-            state.members[userA] = utils.mock(RoomMember);
-            state.members[userB] = utils.mock(RoomMember);
+            state.members[userA] = utils.mock(RoomMember, 'RoomMember');
+            state.members[userB] = utils.mock(RoomMember, 'RoomMember');
 
             const powerLevelEvent = utils.mkEvent({
                 type: "m.room.power_levels", room: roomId, user: userA, event: true,
