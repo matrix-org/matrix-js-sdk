@@ -197,16 +197,16 @@ export class DeviceList extends EventEmitter {
             const resolveSavePromise = this._resolveSavePromise;
             this._savePromiseTime = targetTime;
             this._saveTimer = setTimeout(() => {
-                logger.log('Saving device tracking data at token ' + this._syncToken);
+                logger.log('Saving device tracking data', this._syncToken);
+
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
-                // actually already happened. Likewise for the dirty flag.
+                // actually already happened.
                 this._savePromiseTime = null;
                 this._saveTimer = null;
                 this._savePromise = null;
                 this._resolveSavePromise = null;
 
-                this._dirty = false;
                 this._cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                         this._cryptoStore.storeEndToEndDeviceData({
@@ -217,7 +217,13 @@ export class DeviceList extends EventEmitter {
                         }, txn);
                     },
                 ).then(() => {
+                    // The device list is considered dirty until the write
+                    // completes.
+                    this._dirty = false;
                     resolveSavePromise();
+                }, err => {
+                    logger.error('Failed to save device tracking data', this._syncToken);
+                    logger.error(err);
                 });
             }, delay);
         }
