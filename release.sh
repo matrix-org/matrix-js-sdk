@@ -300,8 +300,9 @@ rm "${latest_changes}"
 # the default.
 npm publish --tag next
 if [ $prerelease -eq 0 ]; then
-    # For a release, also publish to the default `latest` tag.
-    npm publish
+    # For a release, also add the default `latest` tag.
+    package=$(cat package.json | jq -er .name)
+    npm dist-tag add "$package@$release" latest
 fi
 
 if [ -z "$skip_jsdoc" ]; then
