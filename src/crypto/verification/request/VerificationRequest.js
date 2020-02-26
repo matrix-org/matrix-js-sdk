@@ -622,9 +622,11 @@ export class VerificationRequest extends EventEmitter {
         } finally {
             // log events we processed so we can see from rageshakes what events were added to a request
             logger.log(`Verification request ${this.channel.transactionId}: ` +
-                `${type} event with ${JSON.stringify(event.getContent())} ` +
-                `deviceId:${this.channel.deviceId} ` +
-                `sender:${event.getSender()}, isSentByUs:${isSentByUs} ` +
+                `${type} event with id:${event.getId()}, ` +
+                `content:${JSON.stringify(event.getContent())} ` +
+                `deviceId:${this.channel.deviceId}, ` +
+                `sender:${event.getSender()}, isSentByUs:${isSentByUs}, ` +
+                `isLiveEvent:${isLiveEvent}, isRemoteEcho:${isRemoteEcho}, ` +
                 `phase:${oldPhase}=>${this.phase}, ` +
                 `observeOnly:${wasObserveOnly}=>${this._observeOnly}`);
         }
