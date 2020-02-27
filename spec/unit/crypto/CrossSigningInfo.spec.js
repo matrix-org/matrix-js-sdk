@@ -16,7 +16,15 @@ limitations under the License.
 */
 
 import '../../olm-loader';
-import { CrossSigningInfo } from '../../../src/crypto/CrossSigning';
+import {
+    CrossSigningInfo,
+    createCryptoStoreCacheCallbacks,
+} from '../../../src/crypto/CrossSigning';
+import {
+    IndexedDBCryptoStore,
+} from '../../../src/crypto/store/indexeddb-crypto-store';
+import 'fake-indexeddb/auto';
+import 'jest-localstorage-mock';
 
 const userId = "@alice:example.com";
 
@@ -168,5 +176,37 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
 
         /* Also expect that the cache gets updated */
         expect(storeCrossSigningKeyCache.mock.calls.length).toBe(1);
+    });
+});
+
+/* XXX/TODO: MemoryStore isn't tested
+ * But that's because at time of writing, MemoryStore probably never gets used ever.
+ */
+describe.each([
+    [global.indexedDB],
+    [undefined],
+])("CrossSigning > createCryptoStoreCacheCallbacks", function(db) {
+    let store;
+
+    beforeAll(() => {
+        store = new IndexedDBCryptoStore(db, "tests");
+    });
+
+    beforeEach(async () => {
+        await store.deleteAllData();
+    });
+
+    it("Caches data to the store and retrieves it", async () => {
+        const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
+          createCryptoStoreCacheCallbacks(store);
+        await storeCrossSigningKeyCache("master", masterKey);
+
+        // If we've not saved anything, don't expect anything
+        // Definitely don't accidentally return the wrong key for the type
+        const nokey = await getCrossSigningKeyCache("self", "");
+        expect(nokey).toBeNull();
+
+        const key = await getCrossSigningKeyCache("master", "");
+        expect(key).toEqual(masterKey);
     });
 });

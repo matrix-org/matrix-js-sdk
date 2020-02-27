@@ -220,8 +220,13 @@ export function Crypto(baseApis, sessionStore, userId, deviceId,
     this._inRoomVerificationRequests = new InRoomRequests();
 
     const cryptoCallbacks = this._baseApis._cryptoCallbacks || {};
+    const cacheCallbacks = {};
 
-    this._crossSigningInfo = new CrossSigningInfo(userId, cryptoCallbacks);
+    this._crossSigningInfo = new CrossSigningInfo(
+        userId,
+        cryptoCallbacks,
+        cacheCallbacks,
+    );
 
     this._secretStorage = new SecretStorage(
         baseApis, cryptoCallbacks, this._crossSigningInfo,

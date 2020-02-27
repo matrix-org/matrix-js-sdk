@@ -322,6 +322,16 @@ export class IndexedDBCryptoStore {
     }
 
     /**
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {function(string)} func Called with the private key
+     * @param {string} type A key type
+     */
+    async getCrossSigningPrivateKey(txn, func, type) {
+        const backend = await this._connect();
+        return backend.getCrossSigningPrivateKey(txn, func, type);
+    }
+
+    /**
      * Write the cross-signing keys back to the store
      *
      * @param {*} txn An active transaction. See doTxn().
@@ -330,6 +340,19 @@ export class IndexedDBCryptoStore {
     storeCrossSigningKeys(txn, keys) {
         this._backendPromise.then(backend => {
             backend.storeCrossSigningKeys(txn, keys);
+        });
+    }
+
+    /**
+     * Write the cross-signing private keys back to the store
+     *
+     * @param {*} txn An active transaction. See doTxn().
+     * @param {string} type The type of cross-signing private key to store
+     * @param {string} key keys object as getCrossSigningKeys()
+     */
+    storeCrossSigningPrivateKey(txn, type, key) {
+        this._backendPromise.then(backend => {
+            backend.storeCrossSigningPrivateKey(txn, type, key);
         });
     }
 

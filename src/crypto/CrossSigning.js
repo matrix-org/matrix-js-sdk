@@ -23,6 +23,7 @@ limitations under the License.
 import {decodeBase64, encodeBase64, pkSign, pkVerify} from './olmlib';
 import {EventEmitter} from 'events';
 import {logger} from '../logger';
+import {IndexedDBCryptoStore} from '../crypto/store/indexeddb-crypto-store';
 
 function publicKeyFromKeyInfo(keyInfo) {
     // `keys` is an object with { [`ed25519:${pubKey}`]: pubKey }
@@ -84,30 +85,22 @@ export class CrossSigningInfo extends EventEmitter {
 
         let privkey;
         if (this._cacheCallbacks.getCrossSigningKeyCache) {
-            privkey = await this._cacheCallbacks.getCrossSigningKeyCache(type, expectedPubkey);
+            privkey = await this._cacheCallbacks
+              .getCrossSigningKeyCache(type, expectedPubkey);
         }
 
-        if (privkey) {
-            const signing = new global.Olm.PkSigning();
-            const gotPubkey = signing.init_with_seed(privkey);
-            if (gotPubkey === expectedPubkey) {
-                return [gotPubkey, signing];
-            }
-            signing.free();
+        const cacheresult = validateKey(privkey);
+        if (cacheresult) {
+            return cacheresult;
         }
 
         privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
-
-        if (privkey) {
-            const signing = new global.Olm.PkSigning();
-            const gotPubkey = signing.init_with_seed(privkey);
-            if (gotPubkey === expectedPubkey) {
-                if (this._cacheCallbacks.storeCrossSigningKeyCache) {
-                    await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
-                }
-                return [gotPubkey, signing];
+        const result = validateKey(privkey);
+        if (result) {
+            if (this._cacheCallbacks.storeCrossSigningKeyCache) {
+                await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
             }
-            signing.free();
+            return result;
         }
 
         /* No keysource even returned a key */
@@ -573,4 +566,29 @@ export class DeviceTrustLevel {
     isTofu() {
         return this._tofu;
     }
+}
+
+export function createCryptoStoreCacheCallbacks(store) {
+    return {
+        getCrossSigningKeyCache: function(type, _expectedPublicKey) {
+            return new Promise((resolve) => {
+                return store.doTxn(
+                    'readonly',
+                    [IndexedDBCryptoStore.STORE_ACCOUNT],
+                    (txn) => {
+                        store.getCrossSigningPrivateKey(txn, resolve, type);
+                    },
+                );
+            });
+        },
+        storeCrossSigningKeyCache: function(type, key) {
+            return store.doTxn(
+                'readwrite',
+                [IndexedDBCryptoStore.STORE_ACCOUNT],
+                (txn) => {
+                    store.storeCrossSigningPrivateKey(txn, type, key);
+                },
+            );
+        },
+    };
 }

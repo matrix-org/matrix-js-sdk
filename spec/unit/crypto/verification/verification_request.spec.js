@@ -120,7 +120,6 @@ async function distributeEvent(ownRequest, theirRequest, event) {
 }
 
 describe("verification request unit tests", function() {
-
     beforeAll(function() {
         setupWebcrypto();
     });
