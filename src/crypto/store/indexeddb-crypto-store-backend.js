@@ -352,7 +352,11 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         const countReq = objectStore.count();
         countReq.onsuccess = function() {
-            func(countReq.result);
+            try {
+                func(countReq.result);
+            } catch (e) {
+                abortWithException(txn, e);
+            }
         };
     }
 
@@ -402,16 +406,16 @@ export class Backend {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
-            const cursor = getReq.result;
-            if (cursor) {
-                func(cursor.value);
-                cursor.continue();
-            } else {
-                try {
+            try {
+                const cursor = getReq.result;
+                if (cursor) {
+                    func(cursor.value);
+                    cursor.continue();
+                } else {
                     func(null);
-                } catch (e) {
-                    abortWithException(txn, e);
                 }
+            } catch (e) {
+                abortWithException(txn, e);
             }
         };
     }

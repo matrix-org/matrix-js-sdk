@@ -52,6 +52,18 @@ export class MemoryCryptoStore {
     }
 
     /**
+     * Ensure the database exists and is up-to-date.
+     *
+     * This must be called before the store can be used.
+     *
+     * @return {Promise} resolves to the store.
+     */
+    async startup() {
+        // No startup work to do for the memory store.
+        return this;
+    }
+
+    /**
      * Delete all data from this store.
      *
      * @returns {Promise} Promise which resolves when the store has been cleared.
