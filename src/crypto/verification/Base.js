@@ -130,6 +130,8 @@ export class VerificationBase extends EventEmitter {
 
     switchStartEvent(event) {
         if (this.canSwitchStartEvent(event)) {
+            logger.log("Verification Base: switching verification start event",
+                {restartingFlow: !!this._rejectEvent});
             if (this._rejectEvent) {
                 const reject = this._rejectEvent;
                 this._rejectEvent = undefined;
