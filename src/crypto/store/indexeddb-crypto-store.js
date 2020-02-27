@@ -46,6 +46,7 @@ export class IndexedDBCryptoStore {
         this._indexedDB = indexedDB;
         this._dbName = dbName;
         this._backendPromise = null;
+        this._backend = null;
     }
 
     static exists(indexedDB, dbName) {
@@ -56,10 +57,12 @@ export class IndexedDBCryptoStore {
      * Ensure the database exists and is up-to-date, or fall back to
      * a local storage or in-memory store.
      *
+     * This must be called before the store can be used.
+     *
      * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
      * or a MemoryCryptoStore
      */
-    _connect() {
+    startup() {
         if (this._backendPromise) {
             return this._backendPromise;
         }
@@ -135,6 +138,8 @@ export class IndexedDBCryptoStore {
                 );
                 return new MemoryCryptoStore();
             }
+        }).then(backend => {
+            this._backend = backend;
         });
 
         return this._backendPromise;
@@ -189,9 +194,7 @@ export class IndexedDBCryptoStore {
      *    same instance as passed in, or the existing one.
      */
     getOrAddOutgoingRoomKeyRequest(request) {
-        return this._connect().then((backend) => {
-            return backend.getOrAddOutgoingRoomKeyRequest(request);
-        });
+        return this._backend.getOrAddOutgoingRoomKeyRequest(request);
     }
 
     /**
@@ -205,9 +208,7 @@ export class IndexedDBCryptoStore {
      *    not found
      */
     getOutgoingRoomKeyRequest(requestBody) {
-        return this._connect().then((backend) => {
-            return backend.getOutgoingRoomKeyRequest(requestBody);
-        });
+        return this._backend.getOutgoingRoomKeyRequest(requestBody);
     }
 
     /**
@@ -221,9 +222,7 @@ export class IndexedDBCryptoStore {
      *    requests in those states, an arbitrary one is chosen.
      */
     getOutgoingRoomKeyRequestByState(wantedStates) {
-        return this._connect().then((backend) => {
-            return backend.getOutgoingRoomKeyRequestByState(wantedStates);
-        });
+        return this._backend.getOutgoingRoomKeyRequestByState(wantedStates);
     }
 
     /**
@@ -237,11 +236,9 @@ export class IndexedDBCryptoStore {
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
      */
     getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates) {
-        return this._connect().then((backend) => {
-            return backend.getOutgoingRoomKeyRequestsByTarget(
-                userId, deviceId, wantedStates,
-            );
-        });
+        return this._backend.getOutgoingRoomKeyRequestsByTarget(
+            userId, deviceId, wantedStates,
+        );
     }
 
     /**
@@ -257,11 +254,9 @@ export class IndexedDBCryptoStore {
      *    updated request, or null if no matching row was found
      */
     updateOutgoingRoomKeyRequest(requestId, expectedState, updates) {
-        return this._connect().then((backend) => {
-            return backend.updateOutgoingRoomKeyRequest(
-                requestId, expectedState, updates,
-            );
-        });
+        return this._backend.updateOutgoingRoomKeyRequest(
+            requestId, expectedState, updates,
+        );
     }
 
     /**
@@ -274,9 +269,7 @@ export class IndexedDBCryptoStore {
      * @returns {Promise} resolves once the operation is completed
      */
     deleteOutgoingRoomKeyRequest(requestId, expectedState) {
-        return this._connect().then((backend) => {
-            return backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
-        });
+        return this._backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
     }
 
     // Olm Account
@@ -289,9 +282,7 @@ export class IndexedDBCryptoStore {
      * @param {function(string)} func Called with the account pickle
      */
     getAccount(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAccount(txn, func);
-        });
+        this._backend.getAccount(txn, func);
     }
 
     /**
@@ -302,9 +293,7 @@ export class IndexedDBCryptoStore {
      * @param {string} newData The new account pickle to store.
      */
     storeAccount(txn, newData) {
-        this._backendPromise.then(backend => {
-            backend.storeAccount(txn, newData);
-        });
+        this._backend.storeAccount(txn, newData);
     }
 
     /**
@@ -316,9 +305,7 @@ export class IndexedDBCryptoStore {
      *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
      */
     getCrossSigningKeys(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getCrossSigningKeys(txn, func);
-        });
+        this._backend.getCrossSigningKeys(txn, func);
     }
 
     /**
@@ -328,9 +315,7 @@ export class IndexedDBCryptoStore {
      * @param {string} keys keys object as getCrossSigningKeys()
      */
     storeCrossSigningKeys(txn, keys) {
-        this._backendPromise.then(backend => {
-            backend.storeCrossSigningKeys(txn, keys);
-        });
+        this._backend.storeCrossSigningKeys(txn, keys);
     }
 
     // Olm sessions
@@ -341,9 +326,7 @@ export class IndexedDBCryptoStore {
      * @param {function(int)} func Called with the count of sessions
      */
     countEndToEndSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.countEndToEndSessions(txn, func);
-        });
+        this._backend.countEndToEndSessions(txn, func);
     }
 
     /**
@@ -359,9 +342,7 @@ export class IndexedDBCryptoStore {
      *     a message.
      */
     getEndToEndSession(deviceKey, sessionId, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndSession(deviceKey, sessionId, txn, func);
-        });
+        this._backend.getEndToEndSession(deviceKey, sessionId, txn, func);
     }
 
     /**
@@ -376,9 +357,7 @@ export class IndexedDBCryptoStore {
      *     a message.
      */
     getEndToEndSessions(deviceKey, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndSessions(deviceKey, txn, func);
-        });
+        this._backend.getEndToEndSessions(deviceKey, txn, func);
     }
 
     /**
@@ -389,9 +368,7 @@ export class IndexedDBCryptoStore {
      *     and session keys.
      */
     getAllEndToEndSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAllEndToEndSessions(txn, func);
-        });
+        this._backend.getAllEndToEndSessions(txn, func);
     }
 
     /**
@@ -402,29 +379,21 @@ export class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndSession(
-                deviceKey, sessionId, sessionInfo, txn,
-            );
-        });
+        this._backend.storeEndToEndSession(
+            deviceKey, sessionId, sessionInfo, txn,
+        );
     }
 
     storeEndToEndSessionProblem(deviceKey, type, fixed) {
-        return this._backendPromise.then(async (backend) => {
-            await backend.storeEndToEndSessionProblem(deviceKey, type, fixed);
-        });
+        return this._backend.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
     getEndToEndSessionProblem(deviceKey, timestamp) {
-        return this._backendPromise.then(async (backend) => {
-            return await backend.getEndToEndSessionProblem(deviceKey, timestamp);
-        });
+        return this._backend.getEndToEndSessionProblem(deviceKey, timestamp);
     }
 
     filterOutNotifiedErrorDevices(devices) {
-        return this._backendPromise.then(async (backend) => {
-            return await backend.filterOutNotifiedErrorDevices(devices);
-        });
+        return this._backend.filterOutNotifiedErrorDevices(devices);
     }
 
     // Inbound group sessions
@@ -439,11 +408,9 @@ export class IndexedDBCryptoStore {
      *     to Base64 end-to-end session.
      */
     getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, txn, func,
-            );
-        });
+        this._backend.getEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, txn, func,
+        );
     }
 
     /**
@@ -454,9 +421,7 @@ export class IndexedDBCryptoStore {
      *     sessionData}, then once with null to indicate the end of the list.
      */
     getAllEndToEndInboundGroupSessions(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getAllEndToEndInboundGroupSessions(txn, func);
-        });
+        this._backend.getAllEndToEndInboundGroupSessions(txn, func);
     }
 
     /**
@@ -469,11 +434,9 @@ export class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
-        this._backendPromise.then(backend => {
-            backend.addEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, sessionData, txn,
-            );
-        });
+        this._backend.addEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
     }
 
     /**
@@ -486,21 +449,17 @@ export class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndInboundGroupSession(
-                senderCurve25519Key, sessionId, sessionData, txn,
-            );
-        });
+        this._backend.storeEndToEndInboundGroupSession(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
     }
 
     storeEndToEndInboundGroupSessionWithheld(
         senderCurve25519Key, sessionId, sessionData, txn,
     ) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndInboundGroupSessionWithheld(
-                senderCurve25519Key, sessionId, sessionData, txn,
-            );
-        });
+        this._backend.storeEndToEndInboundGroupSessionWithheld(
+            senderCurve25519Key, sessionId, sessionData, txn,
+        );
     }
 
     // End-to-end device tracking
@@ -516,9 +475,7 @@ export class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndDeviceData(deviceData, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndDeviceData(deviceData, txn);
-        });
+        this._backend.storeEndToEndDeviceData(deviceData, txn);
     }
 
     /**
@@ -529,9 +486,7 @@ export class IndexedDBCryptoStore {
      *     device data
      */
     getEndToEndDeviceData(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndDeviceData(txn, func);
-        });
+        this._backend.getEndToEndDeviceData(txn, func);
     }
 
     // End to End Rooms
@@ -543,9 +498,7 @@ export class IndexedDBCryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     storeEndToEndRoom(roomId, roomInfo, txn) {
-        this._backendPromise.then(backend => {
-            backend.storeEndToEndRoom(roomId, roomInfo, txn);
-        });
+        this._backend.storeEndToEndRoom(roomId, roomInfo, txn);
     }
 
     /**
@@ -554,9 +507,7 @@ export class IndexedDBCryptoStore {
      * @param {function(Object)} func Function called with the end to end encrypted rooms
      */
     getEndToEndRooms(txn, func) {
-        this._backendPromise.then(backend => {
-            backend.getEndToEndRooms(txn, func);
-        });
+        this._backend.getEndToEndRooms(txn, func);
     }
 
     // session backups
@@ -568,9 +519,7 @@ export class IndexedDBCryptoStore {
      * @returns {Promise} resolves to an array of inbound group sessions
      */
     getSessionsNeedingBackup(limit) {
-        return this._connect().then((backend) => {
-            return backend.getSessionsNeedingBackup(limit);
-        });
+        return this._backend.getSessionsNeedingBackup(limit);
     }
 
     /**
@@ -579,9 +528,7 @@ export class IndexedDBCryptoStore {
      * @returns {Promise} resolves to the number of sessions
      */
     countSessionsNeedingBackup(txn) {
-        return this._connect().then((backend) => {
-            return backend.countSessionsNeedingBackup(txn);
-        });
+        return this._backend.countSessionsNeedingBackup(txn);
     }
 
     /**
@@ -591,9 +538,7 @@ export class IndexedDBCryptoStore {
      * @returns {Promise} resolves when the sessions are unmarked
      */
     unmarkSessionsNeedingBackup(sessions, txn) {
-        return this._connect().then((backend) => {
-            return backend.unmarkSessionsNeedingBackup(sessions, txn);
-        });
+        return this._backend.unmarkSessionsNeedingBackup(sessions, txn);
     }
 
     /**
@@ -603,9 +548,7 @@ export class IndexedDBCryptoStore {
      * @returns {Promise} resolves when the sessions are marked
      */
     markSessionsNeedingBackup(sessions, txn) {
-        return this._connect().then((backend) => {
-            return backend.markSessionsNeedingBackup(sessions, txn);
-        });
+        return this._backend.markSessionsNeedingBackup(sessions, txn);
     }
 
     /**
@@ -630,9 +573,7 @@ export class IndexedDBCryptoStore {
      *     exception will propagate to the caller of the getFoo method.
      */
     doTxn(mode, stores, func) {
-        return this._connect().then((backend) => {
-            return backend.doTxn(mode, stores, func);
-        });
+        return this._backend.doTxn(mode, stores, func);
     }
 }
 

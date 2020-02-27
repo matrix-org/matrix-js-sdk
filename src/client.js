@@ -685,6 +685,9 @@ MatrixClient.prototype.initCrypto = async function() {
         throw new Error(`Cannot enable encryption: no cryptoStore provided`);
     }
 
+    logger.log("Crypto: Starting up crypto store...");
+    await this._cryptoStore.startup();
+
     // initialise the list of encrypted rooms (whether or not crypto is enabled)
     logger.log("Crypto: initialising roomlist...");
     await this._roomList.init();
