@@ -40,8 +40,9 @@ export class CrossSigningInfo extends EventEmitter {
      * @param {string} userId the user that the information is about
      * @param {object} callbacks Callbacks used to interact with the app
      *     Requires getCrossSigningKey and saveCrossSigningKeys
+     * @param {object} cacheCallbacks Callbacks used to interact with the cache
      */
-    constructor(userId, callbacks) {
+    constructor(userId, callbacks, cacheCallbacks) {
         super();
 
         // you can't change the userId
@@ -50,6 +51,7 @@ export class CrossSigningInfo extends EventEmitter {
             value: userId,
         });
         this._callbacks = callbacks || {};
+        this._cacheCallbacks = cacheCallbacks || {};
         this.keys = {};
         this.firstUse = true;
     }
@@ -70,22 +72,55 @@ export class CrossSigningInfo extends EventEmitter {
             expectedPubkey = this.getId(type);
         }
 
-        const privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
+        function validateKey(key) {
+            if (!key) return;
+            const signing = new global.Olm.PkSigning();
+            const gotPubkey = signing.init_with_seed(key);
+            if (gotPubkey === expectedPubkey) {
+                return [gotPubkey, signing];
+            }
+            signing.free();
+        }
+
+        let privkey;
+        if (this._cacheCallbacks.getCrossSigningKeyCache) {
+            privkey = await this._cacheCallbacks.getCrossSigningKeyCache(type, expectedPubkey);
+        }
+
+        if (privkey) {
+            const signing = new global.Olm.PkSigning();
+            const gotPubkey = signing.init_with_seed(privkey);
+            if (gotPubkey === expectedPubkey) {
+                return [gotPubkey, signing];
+            }
+            signing.free();
+        }
+
+        privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
+
+        if (privkey) {
+            const signing = new global.Olm.PkSigning();
+            const gotPubkey = signing.init_with_seed(privkey);
+            if (gotPubkey === expectedPubkey) {
+                if (this._cacheCallbacks.storeCrossSigningKeyCache) {
+                    await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
+                }
+                return [gotPubkey, signing];
+            }
+            signing.free();
+        }
+
+        /* No keysource even returned a key */
         if (!privkey) {
             throw new Error(
                 "getCrossSigningKey callback for " + type + " returned falsey",
             );
         }
-        const signing = new global.Olm.PkSigning();
-        const gotPubkey = signing.init_with_seed(privkey);
-        if (gotPubkey !== expectedPubkey) {
-            signing.free();
-            throw new Error(
-                "Key type " + type + " from getCrossSigningKey callback did not match",
-            );
-        } else {
-            return [gotPubkey, signing];
-        }
+
+        /* We got some keys from the keysource, but none of them were valid */
+        throw new Error(
+            "Key type " + type + " from getCrossSigningKey callback did not match",
+        );
     }
 
     static fromStorage(obj, userId) {
