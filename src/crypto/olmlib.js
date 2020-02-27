@@ -413,7 +413,7 @@ export function encodeBase64(uint8Array) {
  * @return {string} The unpadded base64.
  */
 export function encodeUnpaddedBase64(uint8Array) {
-    return encodeBase64(uint8Array).replace(/=$/g, '');
+    return encodeBase64(uint8Array).replace(/=+$/g, '');
 }
 
 /**
