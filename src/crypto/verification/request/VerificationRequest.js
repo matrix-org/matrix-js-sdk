@@ -412,7 +412,7 @@ export class VerificationRequest extends EventEmitter {
     _generateSharedSecret() {
         const secretBytes = new Uint8Array(8);
         global.crypto.getRandomValues(secretBytes);
-        this._sharedSecret = olmlib.encodeBase64(secretBytes);
+        this._sharedSecret = olmlib.encodeUnpaddedBase64(secretBytes);
     }
 
     /**
