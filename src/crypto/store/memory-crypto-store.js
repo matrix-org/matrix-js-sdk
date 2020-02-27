@@ -243,8 +243,20 @@ export class MemoryCryptoStore {
         func(this._crossSigningKeys);
     }
 
+    // XXX cache not implemented: I think this is only used in tests
+    // and I have IndexedDb tests for this.
+    getCrossSigningPrivateKey(txn, func) {
+        return func(null);
+    }
+
     storeCrossSigningKeys(txn, keys) {
         this._crossSigningKeys = keys;
+    }
+
+    // XXX cache not implemented: I think this is only used in tests
+    // and I have IndexedDb tests for this.
+    storeCrossSigningPrivateKey() {
+        return;
     }
 
     // Olm Sessions
