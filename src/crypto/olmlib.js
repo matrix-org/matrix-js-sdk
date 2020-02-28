@@ -408,6 +408,15 @@ export function encodeBase64(uint8Array) {
 }
 
 /**
+ * Encode a typed array of uint8 as unpadded base64.
+ * @param {Uint8Array} uint8Array The data to encode.
+ * @return {string} The unpadded base64.
+ */
+export function encodeUnpaddedBase64(uint8Array) {
+    return encodeBase64(uint8Array).replace(/=+$/g, '');
+}
+
+/**
  * Decode a base64 string to a typed array of uint8.
  * @param {string} base64 The base64 to decode.
  * @return {Uint8Array} The decoded data.
