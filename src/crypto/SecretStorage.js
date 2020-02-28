@@ -365,6 +365,28 @@ export class SecretStorage extends EventEmitter {
     }
 
     /**
+     * Get the key information for a given ID.
+     *
+     * @param {string} [keyId = default key's ID] The ID of the key to check
+     *     for. Defaults to the default key ID if not provided.
+     * @returns {Array?} If the key was found, the return value is an array of
+     *     the form [keyId, keyInfo].  Otherwise, null is returned.
+     */
+    async getKey(keyId) {
+        if (!keyId) {
+            keyId = await this.getDefaultKeyId();
+        }
+        if (!keyId) {
+            return null;
+        }
+
+        const keyInfo = this._baseApis.getAccountDataFromServer(
+            "m.secret_storage.key." + keyId,
+        );
+        return keyInfo ? [keyId, keyInfo] : null;
+    }
+
+    /**
      * Check whether we have a key with a given ID.
      *
      * @param {string} [keyId = default key's ID] The ID of the key to check
@@ -372,16 +394,7 @@ export class SecretStorage extends EventEmitter {
      * @return {boolean} Whether we have the key.
      */
     async hasKey(keyId) {
-        if (!keyId) {
-            keyId = await this.getDefaultKeyId();
-        }
-        if (!keyId) {
-            return false;
-        }
-
-        return !!this._baseApis.getAccountDataFromServer(
-            "m.secret_storage.key." + keyId,
-        );
+        return !!(await this.getKey(keyId));
     }
 
     /**
@@ -536,21 +549,25 @@ export class SecretStorage extends EventEmitter {
      * @param {string} name the name of the secret
      * @param {boolean} checkKey check if the secret is encrypted by a trusted key
      *
-     * @return {boolean} whether or not the secret is stored
+     * @return {object?} map of key name to key info the secret is encrypted
+     *     with, or null if it is not present or not encrypted with a trusted
+     *     key
      */
     async isStored(name, checkKey) {
         // check if secret exists
         let secretInfo = await this._baseApis.getAccountDataFromServer(name);
-        if (!secretInfo) return false;
+        if (!secretInfo) return null;
         if (!secretInfo.encrypted) {
             // try to fix it up
             secretInfo = await this._fixupStoredSecret(name, secretInfo);
             if (!secretInfo || !secretInfo.encrypted) {
-                return false;
+                return null;
             }
         }
 
         if (checkKey === undefined) checkKey = true;
+
+        const ret = {};
 
         // check if secret is encrypted by a known/trusted secret and
         // encryption looks sane
@@ -559,7 +576,7 @@ export class SecretStorage extends EventEmitter {
             const keyInfo = await this._baseApis.getAccountDataFromServer(
                 "m.secret_storage.key." + keyId,
             );
-            if (!keyInfo) return false;
+            if (!keyInfo) continue;
             const encInfo = secretInfo.encrypted[keyId];
 
             // We don't actually need the decryption object if it's a passthrough
@@ -575,13 +592,14 @@ export class SecretStorage extends EventEmitter {
                     // not trusted, so move on to the next key
                     continue;
                 }
-                return true;
+                ret[keyId] = keyInfo;
+                continue;
             }
 
             switch (keyInfo.algorithm) {
             case SECRET_STORAGE_ALGORITHM_V1_AES:
                 if (encInfo.iv && encInfo.ciphertext && encInfo.mac) {
-                    return true;
+                    ret[keyId] = keyInfo;
                 }
                 break;
             case SECRET_STORAGE_ALGORITHM_V1_CURVE25519:
@@ -599,14 +617,14 @@ export class SecretStorage extends EventEmitter {
                             continue;
                         }
                     }
-                    return true;
+                    ret[keyId] = keyInfo;
                 }
                 break;
             default:
                 // do nothing if we don't understand the encryption algorithm
             }
         }
-        return false;
+        return Object.keys(ret).length ? ret : null;
     }
 
     /**

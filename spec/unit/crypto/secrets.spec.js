@@ -119,11 +119,11 @@ describe("Secrets", function() {
             }),
         ]);
 
-        expect(await secretStorage.isStored("foo")).toBe(false);
+        expect(await secretStorage.isStored("foo")).toBeFalsy();
 
         await secretStorage.store("foo", "bar", ["abc"]);
 
-        expect(await secretStorage.isStored("foo")).toBe(true);
+        expect(await secretStorage.isStored("foo")).toBeTruthy();
         expect(await secretStorage.get("foo")).toBe("bar");
 
         expect(getKey).toHaveBeenCalled();
