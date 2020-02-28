@@ -65,6 +65,8 @@ export class CrossSigningInfo extends EventEmitter {
      * @returns {Array} An array with [ public key, Olm.PkSigning ]
      */
     async getCrossSigningKey(type, expectedPubkey) {
+        const shouldCache = ["self_signing", "user_signing"].indexOf(type) >= 0;
+
         if (!this._callbacks.getCrossSigningKey) {
             throw new Error("No getCrossSigningKey callback supplied");
         }
@@ -84,7 +86,7 @@ export class CrossSigningInfo extends EventEmitter {
         }
 
         let privkey;
-        if (this._cacheCallbacks.getCrossSigningKeyCache) {
+        if (this._cacheCallbacks.getCrossSigningKeyCache && shouldCache) {
             privkey = await this._cacheCallbacks
               .getCrossSigningKeyCache(type, expectedPubkey);
         }
@@ -97,7 +99,7 @@ export class CrossSigningInfo extends EventEmitter {
         privkey = await this._callbacks.getCrossSigningKey(type, expectedPubkey);
         const result = validateKey(privkey);
         if (result) {
-            if (this._cacheCallbacks.storeCrossSigningKeyCache) {
+            if (this._cacheCallbacks.storeCrossSigningKeyCache && shouldCache) {
                 await this._cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
             }
             return result;

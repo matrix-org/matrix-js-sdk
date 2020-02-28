@@ -36,6 +36,13 @@ const testKey = new Uint8Array([
     0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
 ]);
 
+const types = [
+    { type: "master", shouldCache: false },
+    { type: "self_signing", shouldCache: true },
+    { type: "user_signing", shouldCache: true },
+    { type: "invalid", shouldCache: false },
+];
+
 const badKey = Uint8Array.from(testKey);
 badKey[0] ^= 1;
 
@@ -56,11 +63,12 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
         await expect(info.getCrossSigningKey("master")).rejects.toThrow();
     });
 
-    it("should throw if the callback returns falsey", async () => {
+    it.each(types)("should throw if the callback returns falsey",
+                   async ({type, shouldCache}) => {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => false,
         });
-        await expect(info.getCrossSigningKey("master")).rejects.toThrow("falsey");
+        await expect(info.getCrossSigningKey(type)).rejects.toThrow("falsey");
     });
 
     it("should throw if the expected key doesn't come back", async () => {
@@ -79,24 +87,33 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
         expect(ab).toEqual({a: 106712, b: 106712});
     });
 
-    it("should request a key from the cache callback (if set) and does not call app" +
-         " if one is found", async () => {
-        const getCrossSigningKey = jest.fn().mockRejectedValue(
-            new Error("Regular callback called"),
-        );
+    it.each(types)("should request a key from the cache callback (if set)" +
+                   " and does not call app if one is found" +
+                   `%o`,
+                   async ({ type, shouldCache }) => {
+        const getCrossSigningKey = jest.fn().mockImplementation(() => {
+            if (shouldCache) {
+                return Promise.reject(new Error("Regular callback called"));
+            } else {
+                return Promise.resolve(testKey);
+            }
+        });
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
         const info = new CrossSigningInfo(
             userId,
             { getCrossSigningKey },
             { getCrossSigningKeyCache },
         );
-        const [pubKey] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
-        expect(getCrossSigningKeyCache.mock.calls.length).toBe(1);
-        expect(getCrossSigningKeyCache.mock. calls[0][0]).toBe("master");
+        expect(getCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
+        if (shouldCache) {
+            expect(getCrossSigningKeyCache.mock.calls[0][0]).toBe(type);
+        }
     });
 
-    it("should store a key with the cache callback (if set)", async () => {
+    it.each(types)("should store a key with the cache callback (if set)",
+                   async ({ type, shouldCache }) => {
         const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(
@@ -104,14 +121,17 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
             { getCrossSigningKey },
             { storeCrossSigningKeyCache },
         );
-        const [pubKey] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
-        expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(1);
-        expect(storeCrossSigningKeyCache.mock.calls[0][0]).toBe("master");
-        expect(storeCrossSigningKeyCache.mock.calls[0][1]).toBe(testKey);
+        expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(shouldCache ? 1 : 0);
+        if (shouldCache) {
+            expect(storeCrossSigningKeyCache.mock.calls[0][0]).toBe(type);
+            expect(storeCrossSigningKeyCache.mock.calls[0][1]).toBe(testKey);
+        }
     });
 
-    it("does not store a bad key to the cache", async () => {
+    it.each(types)("does not store a bad key to the cache",
+                   async ({ type, shouldCache }) => {
         const getCrossSigningKey = jest.fn().mockResolvedValue(badKey);
         const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(
@@ -119,14 +139,19 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
             { getCrossSigningKey },
             { storeCrossSigningKeyCache },
         );
-        await expect(info.getCrossSigningKey("master", masterKeyPub)).rejects.toThrow();
+        await expect(info.getCrossSigningKey(type, masterKeyPub)).rejects.toThrow();
         expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(0);
     });
 
-    it("does not store a value to the cache if it came from the cache", async () => {
-        const getCrossSigningKey = jest.fn().mockRejectedValue(
-            new Error("Regular callback called"),
-        );
+    it.each(types)("does not store a value to the cache if it came from the cache",
+        async ({ type, shouldCache }) => {
+        const getCrossSigningKey = jest.fn().mockImplementation(() => {
+            if (shouldCache) {
+                return Promise.reject(new Error("Regular callback called"));
+            } else {
+                return Promise.resolve(testKey);
+            }
+        });
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
         const storeCrossSigningKeyCache = jest.fn().mockRejectedValue(
             new Error("Tried to store a value from cache"),
@@ -137,12 +162,12 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
             { getCrossSigningKeyCache, storeCrossSigningKeyCache },
         );
         expect(storeCrossSigningKeyCache.mock.calls.length).toBe(0);
-        const [pubKey] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
     });
 
-    it("requests a key from the cache callback (if set) and then calls app " +
-        "if one is not found", async () => {
+    it.each(types)("requests a key from the cache callback (if set) and then calls app" +
+        " if one is not found", async ({ type, shouldCache }) => {
         const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const storeCrossSigningKeyCache = jest.fn();
@@ -151,17 +176,17 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
             { getCrossSigningKey },
             { getCrossSigningKeyCache, storeCrossSigningKeyCache },
         );
-        const [pubKey] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
         expect(getCrossSigningKey.mock.calls.length).toBe(1);
-        expect(getCrossSigningKeyCache.mock.calls.length).toBe(1);
+        expect(getCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
 
         /* Also expect that the cache gets updated */
-        expect(storeCrossSigningKeyCache.mock.calls.length).toBe(1);
+        expect(storeCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
     });
 
-    it("requests a key from the cache callback (if set) and then calls app if " +
-        "that key doesn't match", async () => {
+    it.each(types)("requests a key from the cache callback (if set) and then" +
+        " calls app if that key doesn't match", async ({ type, shouldCache }) => {
         const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(badKey);
         const storeCrossSigningKeyCache = jest.fn();
@@ -170,13 +195,13 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
             { getCrossSigningKey },
             { getCrossSigningKeyCache, storeCrossSigningKeyCache },
         );
-        const [pubKey] = await info.getCrossSigningKey("master", masterKeyPub);
+        const [pubKey] = await info.getCrossSigningKey(type, masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
         expect(getCrossSigningKey.mock.calls.length).toBe(1);
-        expect(getCrossSigningKeyCache.mock.calls.length).toBe(1);
+        expect(getCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
 
         /* Also expect that the cache gets updated */
-        expect(storeCrossSigningKeyCache.mock.calls.length).toBe(1);
+        expect(storeCrossSigningKeyCache.mock.calls.length).toBe(shouldCache ? 1 : 0);
     });
 });
 
@@ -187,7 +212,7 @@ describe("CrossSigningInfo.getCrossSigningKey", function() {
 describe.each([
     ["IndexedDBCryptoStore",
      () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
-    ["LocalStorageCryptoStore", 
+    ["LocalStorageCryptoStore",
      () => new IndexedDBCryptoStore(undefined, "tests")],
     ["MemoryCryptoStore", () => {
         const store = new IndexedDBCryptoStore(undefined, "tests");
