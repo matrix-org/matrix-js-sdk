@@ -33,6 +33,7 @@ export class MemoryCryptoStore {
         this._outgoingRoomKeyRequests = [];
         this._account = null;
         this._crossSigningKeys = null;
+        this._privateKeys = {};
 
         // Map of {devicekey -> {sessionId -> session pickle}}
         this._sessions = {};
@@ -243,20 +244,17 @@ export class MemoryCryptoStore {
         func(this._crossSigningKeys);
     }
 
-    // XXX cache not implemented: I think this is only used in tests
-    // and I have IndexedDb tests for this.
-    getCrossSigningPrivateKey(txn, func) {
-        return func(null);
+    getCrossSigningPrivateKey(txn, func, type) {
+        const result = this._privateKeys[type];
+        return func(result || null);
     }
 
     storeCrossSigningKeys(txn, keys) {
         this._crossSigningKeys = keys;
     }
 
-    // XXX cache not implemented: I think this is only used in tests
-    // and I have IndexedDb tests for this.
-    storeCrossSigningPrivateKey() {
-        return;
+    storeCrossSigningPrivateKey(txn, type, key) {
+        this._privateKeys[type] = key;
     }
 
     // Olm Sessions

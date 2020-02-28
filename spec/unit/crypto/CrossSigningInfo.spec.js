@@ -1,5 +1,4 @@
 /*
-Copyright 2020 New Vector Ltd
 Copyright 2020 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,24 +22,26 @@ import {
 import {
     IndexedDBCryptoStore,
 } from '../../../src/crypto/store/indexeddb-crypto-store';
+import {MemoryCryptoStore} from '../../../src/crypto/store/memory-crypto-store';
 import 'fake-indexeddb/auto';
 import 'jest-localstorage-mock';
 
 const userId = "@alice:example.com";
 
-const masterKey = new Uint8Array([
+// Private key for tests only
+const testKey = new Uint8Array([
     0xda, 0x5a, 0x27, 0x60, 0xe3, 0x3a, 0xc5, 0x82,
     0x9d, 0x12, 0xc3, 0xbe, 0xe8, 0xaa, 0xc2, 0xef,
     0xae, 0xb1, 0x05, 0xc1, 0xe7, 0x62, 0x78, 0xa6,
     0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
 ]);
 
-const badKey = Uint8Array.from(masterKey);
+const badKey = Uint8Array.from(testKey);
 badKey[0] ^= 1;
 
 const masterKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
-describe("CrossSigningInfo.getCrossSigningKey()", function() {
+describe("CrossSigningInfo.getCrossSigningKey", function() {
     if (!global.Olm) {
         console.warn('Not running megolm backup unit tests: libolm not present');
         return;
@@ -50,40 +51,40 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         return global.Olm.init();
     });
 
-    it("Throws if no callback is provided", async () => {
+    it("should throw if no callback is provided", async () => {
         const info = new CrossSigningInfo(userId);
         await expect(info.getCrossSigningKey("master")).rejects.toThrow();
     });
 
-    it("Throws if the callback returns falsey", async () => {
+    it("should throw if the callback returns falsey", async () => {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => false,
         });
         await expect(info.getCrossSigningKey("master")).rejects.toThrow("falsey");
     });
 
-    it("Throws if the expected key doesn't come back", async () => {
+    it("should throw if the expected key doesn't come back", async () => {
         const info = new CrossSigningInfo(userId, {
             getCrossSigningKey: () => masterKeyPub,
         });
         await expect(info.getCrossSigningKey("master", "")).rejects.toThrow();
     });
 
-    it("Returns a key from its callback", async () => {
+    it("should return a key from its callback", async () => {
         const info = new CrossSigningInfo(userId, {
-            getCrossSigningKey: () => masterKey,
+            getCrossSigningKey: () => testKey,
         });
         const [pubKey, ab] = await info.getCrossSigningKey("master", masterKeyPub);
         expect(pubKey).toEqual(masterKeyPub);
         expect(ab).toEqual({a: 106712, b: 106712});
     });
 
-    it("Requests a key from the cache callback (if set) and does not call app" +
+    it("should request a key from the cache callback (if set) and does not call app" +
          " if one is found", async () => {
         const getCrossSigningKey = jest.fn().mockRejectedValue(
             new Error("Regular callback called"),
         );
-        const getCrossSigningKeyCache = jest.fn().mockResolvedValue(masterKey);
+        const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
         const info = new CrossSigningInfo(
             userId,
             { getCrossSigningKey },
@@ -95,8 +96,8 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         expect(getCrossSigningKeyCache.mock. calls[0][0]).toBe("master");
     });
 
-    it("Stores a key with the cache callback (if set)", async () => {
-        const getCrossSigningKey = jest.fn().mockResolvedValue(masterKey);
+    it("should store a key with the cache callback (if set)", async () => {
+        const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(
             userId,
@@ -107,10 +108,10 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         expect(pubKey).toEqual(masterKeyPub);
         expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(1);
         expect(storeCrossSigningKeyCache.mock.calls[0][0]).toBe("master");
-        expect(storeCrossSigningKeyCache.mock.calls[0][1]).toBe(masterKey);
+        expect(storeCrossSigningKeyCache.mock.calls[0][1]).toBe(testKey);
     });
 
-    it("Does not store a bad key to the cache", async () => {
+    it("does not store a bad key to the cache", async () => {
         const getCrossSigningKey = jest.fn().mockResolvedValue(badKey);
         const storeCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const info = new CrossSigningInfo(
@@ -122,11 +123,11 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         expect(storeCrossSigningKeyCache.mock.calls.length).toEqual(0);
     });
 
-    it("Does not store a value to the cache if it came from the cache", async () => {
+    it("does not store a value to the cache if it came from the cache", async () => {
         const getCrossSigningKey = jest.fn().mockRejectedValue(
             new Error("Regular callback called"),
         );
-        const getCrossSigningKeyCache = jest.fn().mockResolvedValue(masterKey);
+        const getCrossSigningKeyCache = jest.fn().mockResolvedValue(testKey);
         const storeCrossSigningKeyCache = jest.fn().mockRejectedValue(
             new Error("Tried to store a value from cache"),
         );
@@ -140,9 +141,9 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         expect(pubKey).toEqual(masterKeyPub);
     });
 
-    it("Requests a key from the cache callback (if set) and then calls app " +
-         "if one is not found", async () => {
-        const getCrossSigningKey = jest.fn().mockResolvedValue(masterKey);
+    it("requests a key from the cache callback (if set) and then calls app " +
+        "if one is not found", async () => {
+        const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(undefined);
         const storeCrossSigningKeyCache = jest.fn();
         const info = new CrossSigningInfo(
@@ -159,9 +160,9 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
         expect(storeCrossSigningKeyCache.mock.calls.length).toBe(1);
     });
 
-    it("Requests a key from the cache callback (if set) and then calls app if " +
-         "that key doesn't match", async () => {
-        const getCrossSigningKey = jest.fn().mockResolvedValue(masterKey);
+    it("requests a key from the cache callback (if set) and then calls app if " +
+        "that key doesn't match", async () => {
+        const getCrossSigningKey = jest.fn().mockResolvedValue(testKey);
         const getCrossSigningKeyCache = jest.fn().mockResolvedValue(badKey);
         const storeCrossSigningKeyCache = jest.fn();
         const info = new CrossSigningInfo(
@@ -179,27 +180,35 @@ describe("CrossSigningInfo.getCrossSigningKey()", function() {
     });
 });
 
-/* XXX/TODO: MemoryStore isn't tested
- * But that's because at time of writing, MemoryStore probably never gets used ever.
+/*
+ * Note that MemoryStore is weird.  It's only used for testing - as far as I can tell,
+ * it's not possible to get one in normal execution unless you hack as we do here.
  */
 describe.each([
-    [global.indexedDB],
-    [undefined],
-])("CrossSigning > createCryptoStoreCacheCallbacks", function(db) {
+    ["IndexedDBCryptoStore",
+     () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
+    ["LocalStorageCryptoStore", 
+     () => new IndexedDBCryptoStore(undefined, "tests")],
+    ["MemoryCryptoStore", () => {
+        const store = new IndexedDBCryptoStore(undefined, "tests");
+        store._backendPromise = Promise.resolve(new MemoryCryptoStore());
+        return store;
+    }],
+])("CrossSigning > createCryptoStoreCacheCallbacks [%s]", function(name, dbFactory) {
     let store;
 
     beforeAll(() => {
-        store = new IndexedDBCryptoStore(db, "tests");
+        store = dbFactory();
     });
 
     beforeEach(async () => {
         await store.deleteAllData();
     });
 
-    it("Caches data to the store and retrieves it", async () => {
+    it("should cache data to the store and retrieves it", async () => {
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
           createCryptoStoreCacheCallbacks(store);
-        await storeCrossSigningKeyCache("master", masterKey);
+        await storeCrossSigningKeyCache("master", testKey);
 
         // If we've not saved anything, don't expect anything
         // Definitely don't accidentally return the wrong key for the type
@@ -207,6 +216,6 @@ describe.each([
         expect(nokey).toBeNull();
 
         const key = await getCrossSigningKeyCache("master", "");
-        expect(key).toEqual(masterKey);
+        expect(key).toEqual(testKey);
     });
 });
