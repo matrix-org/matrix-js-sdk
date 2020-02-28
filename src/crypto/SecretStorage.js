@@ -214,7 +214,7 @@ async function deriveKeysBrowser(key, name) {
     const aesKey = keybits.slice(0, 32);
     const hmacKey = keybits.slice(32);
 
-    const aesProm = await subtleCrypto.importKey(
+    const aesProm = subtleCrypto.importKey(
         'raw',
         aesKey,
         {name: 'AES-CTR'},
@@ -222,7 +222,7 @@ async function deriveKeysBrowser(key, name) {
         ['encrypt', 'decrypt'],
     );
 
-    const hmacProm = await subtleCrypto.importKey(
+    const hmacProm = subtleCrypto.importKey(
         'raw',
         hmacKey,
         {
