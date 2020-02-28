@@ -73,6 +73,7 @@ export class VerificationRequest extends EventEmitter {
         this._sharedSecret = null; // used for QR codes
         this._accepting = false;
         this._declining = false;
+        this._verifierHasFinished = false;
     }
 
     /**
@@ -505,7 +506,7 @@ export class VerificationRequest extends EventEmitter {
         }
 
         const ourDoneEvent = this._eventsByUs.get(DONE_TYPE);
-        if (ourDoneEvent && phase() === PHASE_STARTED) {
+        if (this._verifierHasFinished || (ourDoneEvent && phase() === PHASE_STARTED)) {
             transitions.push({phase: PHASE_DONE});
         }
 
@@ -553,6 +554,18 @@ export class VerificationRequest extends EventEmitter {
         }
     }
 
+    _applyPhaseTransitions() {
+        const transitions = this._calculatePhaseTransitions();
+        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
+        // trim off phases we already went through, if any
+        const newTransitions = transitions.slice(existingIdx + 1);
+        // transition to all new phases
+        for (const transition of newTransitions) {
+            this._transitionToPhase(transition);
+        }
+        return newTransitions;
+    }
+
     /**
      * Changes the state of the request and verifier in response to a key verification event.
      * @param {string} type the "symbolic" event type, as returned by the `getEventType` function on the channel.
@@ -581,14 +594,8 @@ export class VerificationRequest extends EventEmitter {
         const oldPhase = this.phase;
         this._addEvent(type, event, isSentByUs);
 
-        const transitions = this._calculatePhaseTransitions();
-        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
-        // trim off phases we already went through, if any
-        const newTransitions = transitions.slice(existingIdx + 1);
-        // transition to all new phases
-        for (const transition of newTransitions) {
-            this._transitionToPhase(transition);
-        }
+        // this will create if needed the verifier so needs to happen before calling it
+        const newTransitions = this._applyPhaseTransitions();
         try {
             // only pass events from the other side to the verifier,
             // no remote echos of our own events
@@ -756,5 +763,17 @@ export class VerificationRequest extends EventEmitter {
             return false;
         }
         return true;
+    }
+
+    onVerifierFinished() {
+        if (this.channel.needsDoneMessage) {
+            // verification in DM requires a done message
+            this.channel.send("m.key.verification.done", {});
+        }
+        this._verifierHasFinished = true;
+        const newTransitions = this._applyPhaseTransitions();
+        if (newTransitions.length) {
+            this._setPhase(newTransitions[newTransitions.length - 1].phase);
+        }
     }
 }

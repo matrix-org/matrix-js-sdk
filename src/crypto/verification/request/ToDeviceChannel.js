@@ -62,7 +62,7 @@ export class ToDeviceChannel {
     }
 
     get needsDoneMessage() {
-        return true;
+        return false;
     }
 
     static getEventType(event) {

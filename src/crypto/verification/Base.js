@@ -186,10 +186,7 @@ export class VerificationBase extends EventEmitter {
     done() {
         this._endTimer(); // always kill the activity timer
         if (!this._done) {
-            if (this._channel.needsDoneMessage) {
-                // verification in DM requires a done message
-                this._send("m.key.verification.done", {});
-            }
+            this.request.onVerifierFinished();
             this._resolve();
         }
     }
