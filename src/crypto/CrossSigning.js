@@ -116,7 +116,8 @@ export class CrossSigningInfo extends EventEmitter {
      *     key
      */
     async isStoredInSecretStorage(secretStorage) {
-        const stored = await secretStorage.isStored("m.cross_signing.master", false) | {};
+        const stored =
+              await secretStorage.isStored("m.cross_signing.master", false) || {};
         function intersect(s) {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
