@@ -209,9 +209,9 @@ export class EventTimeline {
      * @return {RoomState} state at the start/end of the timeline
      */
     getState(direction) {
-        if (direction == EventTimeline.BACKWARDS) {
+        if (direction === EventTimeline.BACKWARDS) {
             return this._startState;
-        } else if (direction == EventTimeline.FORWARDS) {
+        } else if (direction === EventTimeline.FORWARDS) {
             return this._endState;
         } else {
             throw new Error("Invalid direction '" + direction + "'");
@@ -345,7 +345,7 @@ export class EventTimeline {
      *
      * @param {MatrixEvent} event   the event whose metadata is to be set
      * @param {RoomState} stateContext  the room state to be queried
-     * @param {bool} toStartOfTimeline  if true the event's forwardLooking flag is set false
+     * @param {boolean} toStartOfTimeline  if true the event's forwardLooking flag is set false
      */
     static setEventMetadata(event, stateContext, toStartOfTimeline) {
         // set sender and target properties

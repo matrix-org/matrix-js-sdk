@@ -3,6 +3,7 @@ import './olm-loader';
 
 import {logger} from '../src/logger';
 import {MatrixEvent} from "../src/models/event";
+import {polyfillSuper} from "../src/utils";
 
 /**
  * Return a promise that is resolved when the client next emits a
@@ -43,30 +44,61 @@ export function syncPromise(client, count) {
  * @return {Object} An instantiated object with spied methods/properties.
  */
 export function mock(constr, name) {
-    // Based on
-    // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
-    const result = new (class Anon extends constr {constructor() {
-        super();
-    }})();
-    //result.prototype = constr.prototype;
-    const origToString = result.toString.bind(result);
-    result.toString = function() {
-        return `Anon<${name || 'Unnamed'}> = ${origToString()}`;
-    };
-    console.log(Object.keys(result.constructor.__proto__));
-    console.log(result.toString());
-    for (const key in constr.prototype) { // eslint-disable-line guard-for-in
-        try {
-            if (constr.prototype[key] instanceof Function) {
-                result[key] = jest.fn();
+    console.log("Mocking " + name);
+    if (Object.keys(constr.prototype).length > 0) {
+        // Probably an actual prototype - use the old way
+
+        // Based on
+        // http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
+        const HelperContr = new Function(); // jshint ignore:line
+        HelperContr.prototype = constr.prototype;
+        const result = new HelperContr();
+        result.prototype = constr.prototype;
+        const origToString = result.toString.bind(result);
+        result.toString = function() {
+            return `Anon<${name || 'Unnamed'}> = ${origToString()}`;
+        };
+        for (const key in constr.prototype) { // eslint-disable-line guard-for-in
+            try {
+                if (constr.prototype[key] instanceof Function) {
+                    result[key] = jest.fn();
+                }
+            } catch (ex) {
+                // Direct access to some non-function fields of DOM prototypes may
+                // cause exceptions.
+                // Overwriting will not work either in that case.
             }
-        } catch (ex) {
-            // Direct access to some non-function fields of DOM prototypes may
-            // cause exceptions.
-            // Overwriting will not work either in that case.
         }
+        return result;
+    } else {
+        // Probably a class - use the new way to extend/override everything
+        const HelperClass = class HelperClass extends constr {
+            constructor() {
+                try {
+                    super();
+                    polyfillSuper(this, constr);
+                } catch (e) {
+                    // Ignore - we're about to stub the entire class anyways.
+                }
+            }
+        };
+        const result = new HelperClass();
+        let obj = result;
+        let depth = 0;
+        do {
+            if (depth++ >= 3) break; // This is where we get into node internals
+            const props = Object.getOwnPropertyNames(obj);
+            try {
+                for (const prop of props) {
+                    if (typeof(obj[prop]) !== 'function' || prop === 'constructor') continue;
+                    obj[prop] = jest.fn();
+                }
+            } catch (e) {
+                // Ignore - we probably just can't write to it
+            }
+        } while(!!(obj = Object.getPrototypeOf(obj)));
+        return result;
     }
-    return result;
 }
 
 /**
