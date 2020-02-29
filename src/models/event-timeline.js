@@ -396,5 +396,4 @@ export class EventTimeline {
     toString() {
         return this._name;
     }
-
 }

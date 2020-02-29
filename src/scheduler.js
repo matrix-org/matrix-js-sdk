@@ -66,10 +66,10 @@ export class MatrixScheduler {
         if (!name || !this._queues[name]) {
             return null;
         }
-        return utils.map(this._queues[name], function (obj) {
+        return utils.map(this._queues[name], function(obj) {
             return obj.event;
         });
-    };
+    }
 
     /**
      * Remove this event from the queue. The event is equal to another event if they
@@ -83,7 +83,7 @@ export class MatrixScheduler {
             return false;
         }
         let removed = false;
-        utils.removeElement(this._queues[name], function (element) {
+        utils.removeElement(this._queues[name], function(element) {
             if (element.event.getId() === event.getId()) {
                 // XXX we should probably reject the promise?
                 // https://github.com/matrix-org/matrix-js-sdk/issues/496
@@ -92,7 +92,7 @@ export class MatrixScheduler {
             }
         });
         return removed;
-    };
+    }
 
 
     /**
@@ -105,7 +105,7 @@ export class MatrixScheduler {
     setProcessFunction(fn) {
         this._procFn = fn;
         _startProcessingQueues(this);
-    };
+    }
 
     /**
      * Queue an event if it is required and start processing queues.
@@ -134,7 +134,7 @@ export class MatrixScheduler {
         );
         _startProcessingQueues(this);
         return defer.promise;
-    };
+    }
 
     /**
      * Retries events up to 4 times using exponential backoff. This produces wait
@@ -147,7 +147,7 @@ export class MatrixScheduler {
      * @return {Number}
      * @see module:scheduler~retryAlgorithm
      */
-    static RETRY_BACKOFF_RATELIMIT = function (event, attempts, err) {
+    static RETRY_BACKOFF_RATELIMIT = function(event, attempts, err) {
         if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
             // client error; no amount of retrying with save you now.
             return -1;
@@ -182,7 +182,7 @@ export class MatrixScheduler {
      * @return {string}
      * @see module:scheduler~queueAlgorithm
      */
-    static QUEUE_MESSAGES = function (event) {
+    static QUEUE_MESSAGES = function(event) {
         // enqueue messages or events that associate with another event (redactions and relations)
         if (event.getType() === "m.room.message" || event.hasAssocation()) {
             // put these events in the 'message' queue.
@@ -198,10 +198,10 @@ function _startProcessingQueues(scheduler) {
         return;
     }
     // for each inactive queue with events in them
-    utils.forEach(utils.filter(utils.keys(scheduler._queues), function (queueName) {
+    utils.forEach(utils.filter(utils.keys(scheduler._queues), function(queueName) {
         return scheduler._activeQueues.indexOf(queueName) === -1 &&
             scheduler._queues[queueName].length > 0;
-    }), function (queueName) {
+    }), function(queueName) {
         // mark the queue as active
         scheduler._activeQueues.push(queueName);
         // begin processing the head of the queue
@@ -235,14 +235,14 @@ function _processQueue(scheduler, queueName) {
     // the remove id of their target before being sent.
     Promise.resolve().then(() => {
         return scheduler._procFn(obj.event);
-    }).then(function (res) {
+    }).then(function(res) {
         // remove this from the queue
         _removeNextEvent(scheduler, queueName);
         debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
         obj.defer.resolve(res);
         // keep processing
         _processQueue(scheduler, queueName);
-    }, function (err) {
+    }, function(err) {
         obj.attempts += 1;
         // ask the retry algorithm when/if we should try again
         const waitTimeMs = scheduler.retryAlgorithm(obj.event, obj.attempts, err);
@@ -260,7 +260,7 @@ function _processQueue(scheduler, queueName) {
             // process next event
             _processQueue(scheduler, queueName);
         } else {
-            setTimeout(function () {
+            setTimeout(function() {
                 _processQueue(scheduler, queueName);
             }, waitTimeMs);
         }

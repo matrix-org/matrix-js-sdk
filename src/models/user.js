@@ -121,7 +121,7 @@ export class User extends EventEmitter {
         for (let i = 0; i < eventsToFire.length; i++) {
             this.emit(eventsToFire[i], event, this);
         }
-    };
+    }
 
     /**
      * Manually set this user's display name. No event is emitted in response to this
@@ -134,7 +134,7 @@ export class User extends EventEmitter {
         if (name !== oldName) {
             this._updateModifiedTime();
         }
-    };
+    }
 
 
     /**
@@ -144,7 +144,7 @@ export class User extends EventEmitter {
      */
     setRawDisplayName(name) {
         this.rawDisplayName = name;
-    };
+    }
 
 
     /**
@@ -158,14 +158,14 @@ export class User extends EventEmitter {
         if (url !== oldUrl) {
             this._updateModifiedTime();
         }
-    };
+    }
 
     /**
      * Update the last modified time to the current time.
      */
     _updateModifiedTime() {
         this._modified = Date.now();
-    };
+    }
 
     /**
      * Get the timestamp when this User was last updated. This timestamp is
@@ -175,7 +175,7 @@ export class User extends EventEmitter {
      */
     getLastModifiedTime() {
         return this._modified;
-    };
+    }
 
     /**
      * Get the absolute timestamp when this User was last known active on the server.
@@ -184,7 +184,7 @@ export class User extends EventEmitter {
      */
     getLastActiveTs() {
         return this.lastPresenceTs - this.lastActiveAgo;
-    };
+    }
 
     /**
      * Manually set the user's status message.
@@ -196,7 +196,7 @@ export class User extends EventEmitter {
         else this._unstable_statusMessage = event.getContent()["status"];
         this._updateModifiedTime();
         this.emit("User._unstable_statusMessage", this);
-    };
+    }
 }
 
 /**

@@ -81,10 +81,10 @@ function selectQuery(store, keyRange, resultMapper) {
 
 function txnAsPromise(txn) {
     return new Promise((resolve, reject) => {
-        txn.oncomplete = function (event) {
+        txn.oncomplete = function(event) {
             resolve(event);
         };
-        txn.onerror = function (event) {
+        txn.onerror = function(event) {
             reject(event.target.error);
         };
     });
@@ -92,10 +92,10 @@ function txnAsPromise(txn) {
 
 function reqAsEventPromise(req) {
     return new Promise((resolve, reject) => {
-        req.onsuccess = function (event) {
+        req.onsuccess = function(event) {
             resolve(event);
         };
-        req.onerror = function (event) {
+        req.onerror = function(event) {
             reject(event.target.error);
         };
     });
@@ -138,7 +138,7 @@ export class LocalIndexedDBStoreBackend {
     static exists(indexedDB, dbName) {
         dbName = "matrix-js-sdk:" + (dbName || "default");
         return IndexedDBHelpers.exists(indexedDB, dbName);
-    };
+    }
 
     /**
      * Attempt to connect to the database. This can fail if the user does not
@@ -225,7 +225,7 @@ export class LocalIndexedDBStoreBackend {
                 groups: syncData.groupsData,
                 account_data: {
                     events: accountData,
-                }
+                },
             });
         });
     }
@@ -572,4 +572,4 @@ export class LocalIndexedDBStoreBackend {
         }); // put == UPSERT
         await txnAsPromise(txn);
     }
-};
+}

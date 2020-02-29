@@ -28,7 +28,7 @@ const DEBUG = false;
 /**
  * @private
  */
-const debuglog = DEBUG ? logger.log.bind(logger) : function () { };
+const debuglog = DEBUG ? logger.log.bind(logger) : function() { };
 
 /**
  * the number of times we ask the server for more events before giving up
@@ -98,7 +98,7 @@ export class TimelineWindow {
 
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
-        const initFields = function (timeline) {
+        const initFields = function(timeline) {
             let eventIndex;
 
             const events = timeline.getEvents();
@@ -146,7 +146,7 @@ export class TimelineWindow {
             initFields(tl);
             return Promise.resolve();
         }
-    };
+    }
 
     /**
      * Get the TimelineIndex of the window in the given direction.
@@ -166,7 +166,7 @@ export class TimelineWindow {
         } else {
             throw new Error("Invalid direction '" + direction + "'");
         }
-    };
+    }
 
     /**
      * Try to extend the window using events that are already in the underlying
@@ -202,7 +202,7 @@ export class TimelineWindow {
         }
 
         return false;
-    };
+    }
 
     /**
      * Check if this window can be extended
@@ -237,7 +237,7 @@ export class TimelineWindow {
 
         return Boolean(tl.timeline.getNeighbouringTimeline(direction) ||
             tl.timeline.getPaginationToken(direction));
-    };
+    }
 
     /**
      * Attempt to extend the window
@@ -308,9 +308,9 @@ export class TimelineWindow {
         const prom = this._client.paginateEventTimeline(tl.timeline, {
             backwards: direction == EventTimeline.BACKWARDS,
             limit: size,
-        }).finally(function () {
+        }).finally(function() {
             tl.pendingPaginate = null;
-        }).then(function (r) {
+        }).then(function(r) {
             debuglog("TimelineWindow: request completed with result " + r);
             if (!r) {
                 // end of timeline
@@ -333,7 +333,7 @@ export class TimelineWindow {
         });
         tl.pendingPaginate = prom;
         return prom;
-    };
+    }
 
     /**
      * Remove `delta` events from the start or end of the timeline.
@@ -365,7 +365,7 @@ export class TimelineWindow {
             debuglog("TimelineWindow.unpaginate: dropped " + count +
                 " (now " + this._eventCount + ")");
         }
-    };
+    }
 
 
     /**
@@ -395,7 +395,7 @@ export class TimelineWindow {
             // (Note that both this._start.index and this._end.index are relative
             // to their respective timelines' BaseIndex).
             //
-            let startIndex = 0, endIndex = events.length;
+            let startIndex = 0; let endIndex = events.length;
             if (timeline === this._start.timeline) {
                 startIndex = this._start.index + timeline.getBaseIndex();
             }
@@ -416,7 +416,7 @@ export class TimelineWindow {
         }
 
         return result;
-    };
+    }
 }
 
 
@@ -442,7 +442,7 @@ export class TimelineIndex {
      */
     minIndex() {
         return this.timeline.getBaseIndex() * -1;
-    };
+    }
 
     /**
      * @return {number} the maximum possible value for the index in the current
@@ -451,7 +451,7 @@ export class TimelineIndex {
      */
     maxIndex() {
         return this.timeline.getEvents().length - this.timeline.getBaseIndex();
-    };
+    }
 
     /**
      * Try move the index forward, or into the neighbouring timeline
@@ -511,7 +511,7 @@ export class TimelineIndex {
         }
 
         return 0;
-    };
+    }
 
     /**
      * Try move the index backwards, or into the neighbouring timeline
@@ -521,5 +521,5 @@ export class TimelineIndex {
      */
     retreat(delta) {
         return this.advance(delta * -1) * -1;
-    };
+    }
 }

@@ -74,7 +74,7 @@ export class FilterComponent {
             event.getType(),
             event.getContent() ? event.getContent().url !== undefined : false,
         );
-    };
+    }
 
     /**
      * Checks whether the filter component matches the given event fields.
@@ -86,13 +86,13 @@ export class FilterComponent {
      */
     _checkFields(room_id, sender, event_type, contains_url) {
         const literal_keys = {
-            "rooms": function (v) {
+            "rooms": function(v) {
                 return room_id === v;
             },
-            "senders": function (v) {
+            "senders": function(v) {
                 return sender === v;
             },
-            "types": function (v) {
+            "types": function(v) {
                 return _matches_wildcard(event_type, v);
             },
         };
@@ -123,7 +123,7 @@ export class FilterComponent {
         }
 
         return true;
-    };
+    }
 
     /**
      * Filters a list of events down to those which match this filter component
@@ -132,7 +132,7 @@ export class FilterComponent {
      */
     filter(events) {
         return events.filter(this.check, this);
-    };
+    }
 
     /**
      * Returns the limit field for a given filter component, providing a default of
@@ -141,6 +141,5 @@ export class FilterComponent {
      */
     limit() {
         return this.filter_json.limit !== undefined ? this.filter_json.limit : 10;
-    };
-
+    }
 }

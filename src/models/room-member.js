@@ -134,7 +134,7 @@ export class RoomMember extends EventEmitter {
         const evContent = powerLevelEvent.getDirectionalContent();
 
         let maxLevel = evContent.users_default || 0;
-        utils.forEach(utils.values(evContent.users), function (lvl) {
+        utils.forEach(utils.values(evContent.users), function(lvl) {
             maxLevel = Math.max(maxLevel, lvl);
         });
         const oldPowerLevel = this.powerLevel;
@@ -184,7 +184,7 @@ export class RoomMember extends EventEmitter {
             this._updateModifiedTime();
             this.emit("RoomMember.typing", event, this);
         }
-    };
+    }
 
     /**
      * Update the last modified time to the current time.

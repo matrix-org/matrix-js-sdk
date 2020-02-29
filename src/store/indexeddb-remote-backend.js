@@ -194,4 +194,4 @@ export class RemoteIndexedDBStoreBackend {
             logger.warn("Unrecognised message from worker: " + msg);
         }
     }
-};
+}

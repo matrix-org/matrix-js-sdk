@@ -202,7 +202,7 @@ export class WebStorageSessionStore {
     getLocalTrustedBackupPubKey() {
         return this.store.getItem(KEY_END_TO_END_TRUSTED_BACKUP_PUBKEY);
     }
-};
+}
 
 const KEY_END_TO_END_ACCOUNT = E2E_PREFIX + "account";
 const KEY_END_TO_END_DEVICE_SYNC_TOKEN = E2E_PREFIX + "device_sync_token";

@@ -34,7 +34,7 @@ if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
 } else {
-    debuglog = function () { };
+    debuglog = function() { };
 }
 
 /**
@@ -101,14 +101,14 @@ export class EventTimelineSet extends EventEmitter {
      */
     getTimelines() {
         return this._timelines;
-    };
+    }
     /**
      * Get the filter object this timeline set is filtered on, if any
      * @return {?Filter} the optional filter for this timelineSet
      */
     getFilter() {
         return this._filter;
-    };
+    }
 
     /**
      * Set the filter object this timeline set is filtered on
@@ -117,7 +117,7 @@ export class EventTimelineSet extends EventEmitter {
      */
     setFilter(filter) {
         this._filter = filter;
-    };
+    }
 
     /**
      * Get the list of pending sent events for this timelineSet's room, filtered
@@ -138,7 +138,7 @@ export class EventTimelineSet extends EventEmitter {
         } else {
             return this.room.getPendingEvents();
         }
-    };
+    }
 
     /**
      * Get the live timeline for this room.
@@ -147,7 +147,7 @@ export class EventTimelineSet extends EventEmitter {
      */
     getLiveTimeline() {
         return this._liveTimeline;
-    };
+    }
 
     /**
      * Return the timeline (if any) this event is in.
@@ -156,7 +156,7 @@ export class EventTimelineSet extends EventEmitter {
      */
     eventIdToTimeline(eventId) {
         return this._eventIdToTimeline[eventId];
-    };
+    }
 
     /**
      * Track a new event as if it were in the same timeline as an old event,
@@ -170,7 +170,7 @@ export class EventTimelineSet extends EventEmitter {
             delete this._eventIdToTimeline[oldEventId];
             this._eventIdToTimeline[newEventId] = existingTimeline;
         }
-    };
+    }
 
     /**
      * Reset the live timeline, and start a new one.
@@ -225,7 +225,7 @@ export class EventTimelineSet extends EventEmitter {
         // Now we can swap the live timeline to the new one.
         this._liveTimeline = newTimeline;
         this.emit("Room.timelineReset", this.room, this, resetAllTimelines);
-    };
+    }
 
     /**
      * Get the timeline which contains the given event, if any
@@ -237,7 +237,7 @@ export class EventTimelineSet extends EventEmitter {
     getTimelineForEvent(eventId) {
         const res = this._eventIdToTimeline[eventId];
         return (res === undefined) ? null : res;
-    };
+    }
 
     /**
      * Get an event which is stored in our timelines
@@ -250,10 +250,10 @@ export class EventTimelineSet extends EventEmitter {
         if (!tl) {
             return undefined;
         }
-        return utils.findElement(tl.getEvents(), function (ev) {
+        return utils.findElement(tl.getEvents(), function(ev) {
             return ev.getId() == eventId;
         });
-    };
+    }
 
     /**
      * Add a new timeline to this timeline list
@@ -270,7 +270,7 @@ export class EventTimelineSet extends EventEmitter {
         const timeline = new EventTimeline(this);
         this._timelines.push(timeline);
         return timeline;
-    };
+    }
 
 
     /**
@@ -484,7 +484,7 @@ export class EventTimelineSet extends EventEmitter {
             }
             timeline.setPaginationToken(paginationToken, direction);
         }
-    };
+    }
 
     /**
      * Add an event to the end of this live timeline.
@@ -532,7 +532,7 @@ export class EventTimelineSet extends EventEmitter {
         }
 
         this.addEventToTimeline(event, this._liveTimeline, false, fromCache);
-    };
+    }
 
     /**
      * Add event to the given timeline, and emit Room.timeline. Assumes
@@ -562,7 +562,7 @@ export class EventTimelineSet extends EventEmitter {
         };
         this.emit("Room.timeline", event, this.room,
             Boolean(toStartOfTimeline), false, data);
-    };
+    }
 
     /**
      * Replaces event with ID oldEventId with one with newEventId, if oldEventId is
@@ -590,7 +590,7 @@ export class EventTimelineSet extends EventEmitter {
                 this.addEventToTimeline(localEvent, this._liveTimeline, false);
             }
         }
-    };
+    }
 
     /**
      * Removes a single event from this room.
@@ -615,7 +615,7 @@ export class EventTimelineSet extends EventEmitter {
             this.emit("Room.timeline", removed, this.room, undefined, true, data);
         }
         return removed;
-    };
+    }
 
     /**
      * Determine where two events appear in the timeline relative to one another
@@ -688,7 +688,7 @@ export class EventTimelineSet extends EventEmitter {
 
         // the timelines are not contiguous.
         return null;
-    };
+    }
 
     /**
      * Get a collection of relations to a given event in this timeline set.
@@ -723,7 +723,7 @@ export class EventTimelineSet extends EventEmitter {
         const relationsForEvent = this._relations[eventId] || {};
         const relationsWithRelType = relationsForEvent[relationType] || {};
         return relationsWithRelType[eventType];
-    };
+    }
 
     /**
      * Set an event as the target event if any Relations exist for it already
@@ -751,7 +751,7 @@ export class EventTimelineSet extends EventEmitter {
         if (relationsWithEventType) {
             relationsWithEventType.setTargetEvent(event);
         }
-    };
+    }
 
     /**
      * Add relation events to the relevant relation collection.
@@ -818,7 +818,7 @@ export class EventTimelineSet extends EventEmitter {
         if (isNewRelations && relatesToEvent) {
             relatesToEvent.emit("Event.relationsCreated", relationType, eventType);
         }
-    };
+    }
 }
 
 /**

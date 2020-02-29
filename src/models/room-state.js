@@ -118,7 +118,7 @@ export class RoomState extends EventEmitter {
             }, 0);
         }
         return this._joinedMemberCount;
-    };
+    }
 
     /**
      * Set the joined member count explicitly (like from summary part of the sync response)
@@ -126,7 +126,7 @@ export class RoomState extends EventEmitter {
      */
     setJoinedMemberCount(count) {
         this._summaryJoinedMemberCount = count;
-    };
+    }
     /**
      * Returns the number of invited members in this room
      * @return {integer} The number of members in this room whose membership is 'invite'
@@ -141,7 +141,7 @@ export class RoomState extends EventEmitter {
             }, 0);
         }
         return this._invitedMemberCount;
-    };
+    }
 
     /**
      * Set the amount of invited members in this room
@@ -149,7 +149,7 @@ export class RoomState extends EventEmitter {
      */
     setInvitedMemberCount(count) {
         this._summaryInvitedMemberCount = count;
-    };
+    }
 
     /**
      * Get all RoomMembers in this room.
@@ -157,7 +157,7 @@ export class RoomState extends EventEmitter {
      */
     getMembers() {
         return utils.values(this.members);
-    };
+    }
 
     /**
      * Get all RoomMembers in this room, excluding the user IDs provided.
@@ -167,7 +167,7 @@ export class RoomState extends EventEmitter {
     getMembersExcept(excludedIds) {
         return utils.values(this.members)
             .filter((m) => !excludedIds.includes(m.userId));
-    };
+    }
 
     /**
      * Get a room member by their user ID.
@@ -176,7 +176,7 @@ export class RoomState extends EventEmitter {
      */
     getMember(userId) {
         return this.members[userId] || null;
-    };
+    }
 
     /**
      * Get a room member whose properties will not change with this room state. You
@@ -200,7 +200,7 @@ export class RoomState extends EventEmitter {
             this._sentinels[userId] = sentinel;
         }
         return sentinel;
-    };
+    }
 
     /**
      * Get state events from the state of the room.
@@ -221,7 +221,7 @@ export class RoomState extends EventEmitter {
         }
         const event = this.events[eventType][stateKey];
         return event ? event : null;
-    };
+    }
 
     /**
      * Creates a copy of this room state so that mutations to either won't affect the other.
@@ -266,7 +266,7 @@ export class RoomState extends EventEmitter {
         }
 
         return copy;
-    };
+    }
 
     /**
      * Add previously unknown state events.
@@ -282,7 +282,7 @@ export class RoomState extends EventEmitter {
         });
 
         this.setStateEvents(unknownStateEvents);
-    };
+    }
 
     /**
      * Add an array of one or more state MatrixEvents, overwriting
@@ -299,7 +299,7 @@ export class RoomState extends EventEmitter {
         this._updateModifiedTime();
 
         // update the core event dict
-        utils.forEach(stateEvents, function (event) {
+        utils.forEach(stateEvents, function(event) {
             if (event.getRoomId() !== self.roomId) {
                 return;
             }
@@ -321,7 +321,7 @@ export class RoomState extends EventEmitter {
         // core event dict as these structures may depend on other state events in
         // the given array (e.g. disambiguating display names in one go to do both
         // clashing names rather than progressively which only catches 1 of them).
-        utils.forEach(stateEvents, function (event) {
+        utils.forEach(stateEvents, function(event) {
             if (event.getRoomId() !== self.roomId) {
                 return;
             }
@@ -352,7 +352,7 @@ export class RoomState extends EventEmitter {
                 self.emit("RoomState.members", event, self, member);
             } else if (event.getType() === "m.room.power_levels") {
                 const members = utils.values(self.members);
-                utils.forEach(members, function (member) {
+                utils.forEach(members, function(member) {
                     member.setPowerLevelEvent(event);
                     self.emit("RoomState.members", event, self, member);
                 });
@@ -361,7 +361,7 @@ export class RoomState extends EventEmitter {
                 self._sentinels = {};
             }
         });
-    };
+    }
 
     /**
      * Looks up a member by the given userId, and if it doesn't exist,
@@ -383,14 +383,14 @@ export class RoomState extends EventEmitter {
             this.emit("RoomState.newMember", event, this, member);
         }
         return member;
-    };
+    }
 
     _setStateEvent(event) {
         if (this.events[event.getType()] === undefined) {
             this.events[event.getType()] = {};
         }
         this.events[event.getType()][event.getStateKey()] = event;
-    };
+    }
 
     _updateMember(member) {
         // this member may have a power level already, so set it.
@@ -405,7 +405,7 @@ export class RoomState extends EventEmitter {
         this.members[member.userId] = member;
         this._joinedMemberCount = null;
         this._invitedMemberCount = null;
-    };
+    }
 
     /**
      * Get the out-of-band members loading state, whether loading is needed or not.
@@ -414,7 +414,7 @@ export class RoomState extends EventEmitter {
      */
     needsOutOfBandMembers() {
         return this._oobMemberFlags.status === OOB_STATUS_NOTSTARTED;
-    };
+    }
 
     /**
      * Mark this room state as waiting for out-of-band members,
@@ -426,7 +426,7 @@ export class RoomState extends EventEmitter {
             return;
         }
         this._oobMemberFlags.status = OOB_STATUS_INPROGRESS;
-    };
+    }
 
     /**
      * Mark this room state as having failed to fetch out-of-band members
@@ -436,7 +436,7 @@ export class RoomState extends EventEmitter {
             return;
         }
         this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
-    };
+    }
 
     /**
      * Clears the loaded out-of-band members
@@ -452,7 +452,7 @@ export class RoomState extends EventEmitter {
         });
         logger.log(`LL: RoomState removed ${count} members...`);
         this._oobMemberFlags.status = OOB_STATUS_NOTSTARTED;
-    };
+    }
 
     /**
      * Sets the loaded out-of-band members.
@@ -466,7 +466,7 @@ export class RoomState extends EventEmitter {
         logger.log(`LL: RoomState put in OOB_STATUS_FINISHED state ...`);
         this._oobMemberFlags.status = OOB_STATUS_FINISHED;
         stateEvents.forEach((e) => this._setOutOfBandMember(e));
-    };
+    }
 
     /**
      * Sets a single out of band member, used by both setOutOfBandMembers and clone
@@ -495,17 +495,17 @@ export class RoomState extends EventEmitter {
         this._setStateEvent(stateEvent);
         this._updateMember(member);
         this.emit("RoomState.members", stateEvent, this, member);
-    };
+    }
 
     /**
      * Set the current typing event for this room.
      * @param {MatrixEvent} event The typing event
      */
     setTypingEvent(event) {
-        utils.forEach(utils.values(this.members), function (member) {
+        utils.forEach(utils.values(this.members), function(member) {
             member.setTypingEvent(event);
         });
-    };
+    }
 
     /**
      * Get the m.room.member event which has the given third party invite token.
@@ -515,14 +515,14 @@ export class RoomState extends EventEmitter {
      */
     getInviteForThreePidToken(token) {
         return this._tokenToInvite[token] || null;
-    };
+    }
 
     /**
      * Update the last modified time to the current time.
      */
     _updateModifiedTime() {
         this._modified = Date.now();
-    };
+    }
 
     /**
      * Get the timestamp when this room state was last updated. This timestamp is
@@ -531,7 +531,7 @@ export class RoomState extends EventEmitter {
      */
     getLastModifiedTime() {
         return this._modified;
-    };
+    }
 
     /**
      * Get user IDs with the specified or similar display names.
@@ -540,7 +540,7 @@ export class RoomState extends EventEmitter {
      */
     getUserIdsWithDisplayName(displayName) {
         return this._displayNameToUserIds[utils.removeHiddenChars(displayName)] || [];
-    };
+    }
 
     /**
      * Returns true if userId is in room, event is not redacted and either sender of
@@ -561,7 +561,7 @@ export class RoomState extends EventEmitter {
         if (mxEvent.getSender() === userId) return canRedact;
 
         return this._hasSufficientPowerLevelFor('redact', member.powerLevel);
-    };
+    }
 
     /**
      * Returns true if the given power level is sufficient for action
@@ -583,7 +583,7 @@ export class RoomState extends EventEmitter {
         }
 
         return powerLevel >= requiredLevel;
-    };
+    }
 
     /**
      * Short-form for maySendEvent('m.room.message', userId)
@@ -593,7 +593,7 @@ export class RoomState extends EventEmitter {
      */
     maySendMessage(userId) {
         return this._maySendEventOfType('m.room.message', userId, false);
-    };
+    }
 
     /**
      * Returns true if the given user ID has permission to send a normal
@@ -606,7 +606,7 @@ export class RoomState extends EventEmitter {
      */
     maySendEvent(eventType, userId) {
         return this._maySendEventOfType(eventType, userId, false);
-    };
+    }
 
     /**
      * Returns true if the given MatrixClient has permission to send a state
@@ -622,7 +622,7 @@ export class RoomState extends EventEmitter {
             return false;
         }
         return this.maySendStateEvent(stateEventType, cli.credentials.userId);
-    };
+    }
 
     /**
      * Returns true if the given user ID has permission to send a state
@@ -635,7 +635,7 @@ export class RoomState extends EventEmitter {
      */
     maySendStateEvent(stateEventType, userId) {
         return this._maySendEventOfType(stateEventType, userId, true);
-    };
+    }
 
     /**
      * Returns true if the given user ID has permission to send a normal or state
@@ -685,7 +685,7 @@ export class RoomState extends EventEmitter {
             required_level = events_levels[eventType];
         }
         return powerLevel >= required_level;
-    };
+    }
 
     /**
      * Returns true if the given user ID has permission to trigger notification
@@ -714,7 +714,7 @@ export class RoomState extends EventEmitter {
         }
 
         return member.powerLevel >= notifLevel;
-    };
+    }
 }
 
 function _updateThirdPartyTokenCache(roomState, memberEvent) {

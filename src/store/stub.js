@@ -287,4 +287,4 @@ export class StubStore {
     storeClientOptions() {
         return Promise.resolve();
     }
-};
+}

@@ -51,14 +51,14 @@ export class Group extends EventEmitter {
         this.avatarUrl = avatarUrl;
 
         this.emit("Group.profile", this);
-    };
+    }
 
     setMyMembership(membership) {
         if (this.myMembership === membership) return;
         this.myMembership = membership;
 
         this.emit("Group.myMembership", this);
-    };
+    }
 
     /**
      * Sets the 'inviter' property. This does not emit an event (the inviter
@@ -68,8 +68,7 @@ export class Group extends EventEmitter {
      */
     setInviter(inviter) {
         this.inviter = inviter;
-    };
-
+    }
 }
 /**
  * Fires whenever a group's profile information is updated.

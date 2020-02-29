@@ -104,7 +104,7 @@ export class MatrixCall extends EventEmitter {
                 urls: [MatrixCall.FALLBACK_ICE_SERVER],
             });
         }
-        utils.forEach(this.turnServers, function (server) {
+        utils.forEach(this.turnServers, function(server) {
             utils.checkObjectHasKeys(server, ["urls"]);
         });
 
@@ -127,7 +127,7 @@ export class MatrixCall extends EventEmitter {
         this.screenSharingStream = null;
 
         this._answerContent = null;
-    };
+    }
 
     /**
      * Place a voice call to this room.
@@ -138,7 +138,7 @@ export class MatrixCall extends EventEmitter {
         checkForErrorListener(this);
         _placeCallWithConstraints(this, _getUserMediaVideoContraints('voice'));
         this.type = 'voice';
-    };
+    }
 
     /**
      * Place a video call to this room.
@@ -156,7 +156,7 @@ export class MatrixCall extends EventEmitter {
         _placeCallWithConstraints(this, _getUserMediaVideoContraints('video'));
         this.type = 'video';
         _tryPlayRemoteStream(this);
-    };
+    }
 
     /**
      * Place a screen-sharing call to this room. This includes audio.
@@ -178,12 +178,12 @@ export class MatrixCall extends EventEmitter {
         this.localVideoElement = localVideoElement;
         this.remoteVideoElement = remoteVideoElement;
         const self = this;
-        this.webRtc.getUserMedia(screenConstraints, function (stream) {
+        this.webRtc.getUserMedia(screenConstraints, function(stream) {
             self.screenSharingStream = stream;
             debuglog("Got screen stream, requesting audio stream...");
             const audioConstraints = _getUserMediaVideoContraints('voice');
             _placeCallWithConstraints(self, audioConstraints);
-        }, function (err) {
+        }, function(err) {
             self.emit("error",
                 callError(
                     MatrixCall.ERR_NO_USER_MEDIA,
@@ -193,7 +193,7 @@ export class MatrixCall extends EventEmitter {
         });
         this.type = 'video';
         _tryPlayRemoteStream(this);
-    };
+    }
 
     /**
      * Play the given HTMLMediaElement, serialising the operation into a chain
@@ -212,17 +212,17 @@ export class MatrixCall extends EventEmitter {
             // However, we should soldier on as best we can even if they fail, given
             // these failures may be non-fatal (as in the case of unmounts)
             this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function () {
+                this.mediaPromises[queueId].then(function() {
                     logger.log("previous promise completed for " + queueId);
                     return element.play();
-                }, function () {
+                }, function() {
                     logger.log("previous promise failed for " + queueId);
                     return element.play();
                 });
         } else {
             this.mediaPromises[queueId] = element.play();
         }
-    };
+    }
 
     /**
      * Pause the given HTMLMediaElement, serialising the operation into a chain
@@ -234,10 +234,10 @@ export class MatrixCall extends EventEmitter {
         logger.log("queuing pause on " + queueId + " and element " + element);
         if (this.mediaPromises[queueId]) {
             this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function () {
+                this.mediaPromises[queueId].then(function() {
                     logger.log("previous promise completed for " + queueId);
                     return element.pause();
-                }, function () {
+                }, function() {
                     logger.log("previous promise failed for " + queueId);
                     return element.pause();
                 });
@@ -246,7 +246,7 @@ export class MatrixCall extends EventEmitter {
             // and just in case it does in future.
             this.mediaPromises[queueId] = element.pause();
         }
-    };
+    }
 
     /**
      * Assign the given HTMLMediaElement by setting the .src attribute on it,
@@ -261,17 +261,17 @@ export class MatrixCall extends EventEmitter {
             srcObject);
         if (this.mediaPromises[queueId]) {
             this.mediaPromises[queueId] =
-                this.mediaPromises[queueId].then(function () {
+                this.mediaPromises[queueId].then(function() {
                     logger.log("previous promise completed for " + queueId);
                     element.srcObject = srcObject;
-                }, function () {
+                }, function() {
                     logger.log("previous promise failed for " + queueId);
                     element.srcObject = srcObject;
                 });
         } else {
             element.srcObject = srcObject;
         }
-    };
+    }
 
     /**
      * Retrieve the local <code>&lt;video&gt;</code> DOM element.
@@ -279,7 +279,7 @@ export class MatrixCall extends EventEmitter {
      */
     getLocalVideoElement() {
         return this.localVideoElement;
-    };
+    }
 
     /**
      * Retrieve the remote <code>&lt;video&gt;</code> DOM element
@@ -288,7 +288,7 @@ export class MatrixCall extends EventEmitter {
      */
     getRemoteVideoElement() {
         return this.remoteVideoElement;
-    };
+    }
 
     /**
      * Retrieve the remote <code>&lt;audio&gt;</code> DOM element
@@ -297,7 +297,7 @@ export class MatrixCall extends EventEmitter {
      */
     getRemoteAudioElement() {
         return this.remoteAudioElement;
-    };
+    }
 
     /**
      * Set the local <code>&lt;video&gt;</code> DOM element. If this call is active,
@@ -312,14 +312,14 @@ export class MatrixCall extends EventEmitter {
             this.assignElement(element, this.localAVStream, "localVideo");
             element.muted = true;
             const self = this;
-            setTimeout(function () {
+            setTimeout(function() {
                 const vel = self.getLocalVideoElement();
                 if (vel.play) {
                     self.playElement(vel, "localVideo");
                 }
             }, 0);
         }
-    };
+    }
 
     /**
      * Set the remote <code>&lt;video&gt;</code> DOM element. If this call is active,
@@ -329,7 +329,7 @@ export class MatrixCall extends EventEmitter {
     setRemoteVideoElement(element) {
         this.remoteVideoElement = element;
         _tryPlayRemoteStream(this);
-    };
+    }
 
     /**
      * Set the remote <code>&lt;audio&gt;</code> DOM element. If this call is active,
@@ -342,7 +342,7 @@ export class MatrixCall extends EventEmitter {
         this.remoteAudioElement = element;
         this.remoteAudioElement.muted = false;
         _tryPlayRemoteAudioStream(this);
-    };
+    }
 
     /**
      * Configure this call from an invite event. Used by MatrixClient.
@@ -377,7 +377,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         if (event.getAge()) {
-            setTimeout(function () {
+            setTimeout(function() {
                 if (self.state == 'ringing') {
                     debuglog("Call invite has expired. Hanging up.");
                     self.hangupParty = 'remote'; // effectively
@@ -390,7 +390,7 @@ export class MatrixCall extends EventEmitter {
                 }
             }, this.msg.lifetime - event.getAge());
         }
-    };
+    }
 
     /**
      * Configure this call from a hangup event. Used by MatrixClient.
@@ -403,7 +403,7 @@ export class MatrixCall extends EventEmitter {
         // come in reverse order and we want to remember that a call has been hung up)
         this.msg = event.getContent();
         setState(this, 'ended');
-    };
+    }
 
     /**
      * Answer a call.
@@ -429,7 +429,7 @@ export class MatrixCall extends EventEmitter {
         } else if (this.waitForLocalAVStream) {
             setState(this, 'wait_local_media');
         }
-    };
+    }
 
     /**
      * Replace this call with a new call, e.g. for glare resolution. Used by
@@ -457,7 +457,7 @@ export class MatrixCall extends EventEmitter {
         this.successor = newCall;
         this.emit("replaced", newCall);
         this.hangup(true);
-    };
+    }
 
     /**
      * Hangup a call.
@@ -474,7 +474,7 @@ export class MatrixCall extends EventEmitter {
             reason: reason,
         };
         sendEvent(this, 'm.call.hangup', content);
-    };
+    }
 
     /**
      * Set whether the local video preview should be muted or not.
@@ -485,7 +485,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
         setTracksEnabled(this.localAVStream.getVideoTracks(), !muted);
-    };
+    }
 
     /**
      * Check if local video is muted.
@@ -501,7 +501,7 @@ export class MatrixCall extends EventEmitter {
             return false;
         }
         return !isTracksEnabled(this.localAVStream.getVideoTracks());
-    };
+    }
 
     /**
      * Set whether the microphone should be muted or not.
@@ -512,7 +512,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
         setTracksEnabled(this.localAVStream.getAudioTracks(), !muted);
-    };
+    }
 
     /**
      * Check if the microphone is muted.
@@ -528,7 +528,7 @@ export class MatrixCall extends EventEmitter {
             return false;
         }
         return !isTracksEnabled(this.localAVStream.getAudioTracks());
-    };
+    }
 
     /**
      * Internal
@@ -566,7 +566,7 @@ export class MatrixCall extends EventEmitter {
                     this.assignElement(videoEl, stream, "localVideo");
                 }
                 videoEl.muted = true;
-                setTimeout(function () {
+                setTimeout(function() {
                     const vel = self.getLocalVideoElement();
                     if (vel.play) {
                         self.playElement(vel, "localVideo");
@@ -600,7 +600,7 @@ export class MatrixCall extends EventEmitter {
             constraints,
         );
         setState(self, 'create_offer');
-    };
+    }
 
     _sendAnswer(stream) {
         sendEvent(this, 'm.call.answer', this._answerContent).then(() => {
@@ -622,7 +622,7 @@ export class MatrixCall extends EventEmitter {
             this.emit("error", callError(code, message));
             throw error;
         });
-    };
+    }
 
     /**
      * Internal
@@ -643,7 +643,7 @@ export class MatrixCall extends EventEmitter {
                 localVidEl.autoplay = true;
                 this.assignElement(localVidEl, stream, "localVideo");
                 localVidEl.muted = true;
-                setTimeout(function () {
+                setTimeout(function() {
                     const vel = self.getLocalVideoElement();
                     if (vel.play) {
                         self.playElement(vel, "localVideo");
@@ -669,9 +669,9 @@ export class MatrixCall extends EventEmitter {
                 'OfferToReceiveVideo': self.type === 'video',
             },
         };
-        self.peerConn.createAnswer(function (description) {
+        self.peerConn.createAnswer(function(description) {
             debuglog("Created answer: ", description);
-            self.peerConn.setLocalDescription(description, function () {
+            self.peerConn.setLocalDescription(description, function() {
                 self._answerContent = {
                     version: 0,
                     call_id: self.callId,
@@ -681,14 +681,14 @@ export class MatrixCall extends EventEmitter {
                     },
                 };
                 self._sendAnswer();
-            }, function () {
+            }, function() {
                 debuglog("Error setting local description!");
             }, constraints);
-        }, function (err) {
+        }, function(err) {
             debuglog("Failed to create answer: " + err);
         });
         setState(self, 'create_answer');
-    };
+    }
 
     /**
      * Internal
@@ -713,7 +713,7 @@ export class MatrixCall extends EventEmitter {
             };
             sendCandidate(this, c);
         }
-    };
+    }
 
     /**
      * Used by MatrixClient.
@@ -728,10 +728,10 @@ export class MatrixCall extends EventEmitter {
         debuglog("Got remote ICE " + cand.sdpMid + " candidate: " + cand.candidate);
         this.peerConn.addIceCandidate(
             new this.webRtc.RtcIceCandidate(cand),
-            function () { },
-            function (e) { },
+            function() { },
+            function(e) { },
         );
-    };
+    }
 
     /**
      * Used by MatrixClient.
@@ -750,7 +750,7 @@ export class MatrixCall extends EventEmitter {
             hookCallback(self, self._onSetRemoteDescriptionError),
         );
         setState(self, 'connecting');
-    };
+    }
 
     /**
      * Internal
@@ -767,7 +767,7 @@ export class MatrixCall extends EventEmitter {
             return;
         }
 
-        self.peerConn.setLocalDescription(description, function () {
+        self.peerConn.setLocalDescription(description, function() {
             const content = {
                 version: 0,
                 call_id: self.callId,
@@ -788,7 +788,7 @@ export class MatrixCall extends EventEmitter {
             };
             sendEvent(self, 'm.call.invite', content).then(() => {
                 setState(self, 'invite_sent');
-                setTimeout(function () {
+                setTimeout(function() {
                     if (self.state == 'invite_sent') {
                         self.hangup('invite_timeout');
                     }
@@ -806,10 +806,10 @@ export class MatrixCall extends EventEmitter {
                 self.emit("error", callError(code, message));
                 throw error;
             });
-        }, function () {
+        }, function() {
             debuglog("Error setting local description!");
         });
-    };
+    }
 
     /**
      * Internal
@@ -818,7 +818,7 @@ export class MatrixCall extends EventEmitter {
      */
     _getLocalOfferFailed(error) {
         this.emit("error", callError(MatrixCall.ERR_LOCAL_OFFER_FAILED, "Failed to start audio for call!"));
-    };
+    }
 
     /**
      * Internal
@@ -835,7 +835,7 @@ export class MatrixCall extends EventEmitter {
                 "does this app have permission?",
             ),
         );
-    };
+    }
 
     /**
      * Internal
@@ -857,7 +857,7 @@ export class MatrixCall extends EventEmitter {
         } else if (this.peerConn.iceConnectionState == 'failed') {
             this.hangup('ice_failed');
         }
-    };
+    }
 
     /**
      * Internal
@@ -865,7 +865,7 @@ export class MatrixCall extends EventEmitter {
      */
     _onSignallingStateChanged() {
         debuglog("call " + this.callId + ": Signalling state changed to: " + this.peerConn.signalingState);
-    };
+    }
 
     /**
      * Internal
@@ -873,7 +873,7 @@ export class MatrixCall extends EventEmitter {
      */
     _onSetRemoteDescriptionSuccess() {
         debuglog("Set remote description");
-    };
+    }
 
     /**
      * Internal
@@ -882,7 +882,7 @@ export class MatrixCall extends EventEmitter {
      */
     _onSetRemoteDescriptionError(e) {
         debuglog("Failed to set remote description" + e);
-    };
+    }
 
     /**
      * Internal
@@ -904,7 +904,7 @@ export class MatrixCall extends EventEmitter {
         }
 
         const self = this;
-        forAllTracksOnStream(s, function (t) {
+        forAllTracksOnStream(s, function(t) {
             debuglog("Track id " + t.id + " added");
             // not currently implemented in chrome
             t.onstarted = hookCallback(self, self._onRemoteStreamTrackStarted);
@@ -926,7 +926,7 @@ export class MatrixCall extends EventEmitter {
         } else {
             _tryPlayRemoteAudioStream(this);
         }
-    };
+    }
 
     /**
      * Internal
@@ -935,7 +935,7 @@ export class MatrixCall extends EventEmitter {
      */
     _onRemoteStreamStarted(event) {
         setState(this, 'connected');
-    };
+    }
 
     /**
      * Internal
@@ -951,7 +951,7 @@ export class MatrixCall extends EventEmitter {
             this.peerConn.close();
         }
         this.emit("hangup", this);
-    };
+    }
 
     /**
      * Internal
@@ -960,7 +960,7 @@ export class MatrixCall extends EventEmitter {
      */
     _onRemoteStreamTrackStarted(event) {
         setState(this, 'connected');
-    };
+    }
 
     /**
      * Used by MatrixClient.
@@ -970,7 +970,7 @@ export class MatrixCall extends EventEmitter {
     _onHangupReceived(msg) {
         debuglog("Hangup received");
         terminate(this, "remote", msg.reason, true);
-    };
+    }
 
     /**
      * Used by MatrixClient.
@@ -983,13 +983,13 @@ export class MatrixCall extends EventEmitter {
     }
 }
 
-const setTracksEnabled = function (tracks, enabled) {
+const setTracksEnabled = function(tracks, enabled) {
     for (let i = 0; i < tracks.length; i++) {
         tracks[i].enabled = enabled;
     }
 };
 
-const isTracksEnabled = function (tracks) {
+const isTracksEnabled = function(tracks) {
     for (let i = 0; i < tracks.length; i++) {
         if (tracks[i].enabled) {
             return true; // at least one track is enabled
@@ -998,7 +998,7 @@ const isTracksEnabled = function (tracks) {
     return false;
 };
 
-const setState = function (self, state) {
+const setState = function(self, state) {
     const oldState = self.state;
     self.state = state;
     self.emit("state", state, oldState);
@@ -1011,11 +1011,11 @@ const setState = function (self, state) {
  * @param {Object} content
  * @return {Promise}
  */
-const sendEvent = function (self, eventType, content) {
+const sendEvent = function(self, eventType, content) {
     return self.client.sendEvent(self.roomId, eventType, content);
 };
 
-const sendCandidate = function (self, content) {
+const sendCandidate = function(self, content) {
     // Sends candidates with are sent in a special way because we try to amalgamate
     // them into one message
     self.candidateSendQueue.push(content);
@@ -1027,13 +1027,13 @@ const sendCandidate = function (self, content) {
     if (self.state == 'ringing') return;
 
     if (self.candidateSendTries === 0) {
-        setTimeout(function () {
+        setTimeout(function() {
             _sendCandidateQueue(self);
         }, 100);
     }
 };
 
-const terminate = function (self, hangupParty, hangupReason, shouldEmit) {
+const terminate = function(self, hangupParty, hangupReason, shouldEmit) {
     if (self.getRemoteVideoElement()) {
         if (self.getRemoteVideoElement().pause) {
             self.pauseElement(self.getRemoteVideoElement(), "remoteVideo");
@@ -1064,10 +1064,10 @@ const terminate = function (self, hangupParty, hangupReason, shouldEmit) {
     }
 };
 
-const stopAllMedia = function (self) {
+const stopAllMedia = function(self) {
     debuglog("stopAllMedia (stream=%s)", self.localAVStream);
     if (self.localAVStream) {
-        forAllTracksOnStream(self.localAVStream, function (t) {
+        forAllTracksOnStream(self.localAVStream, function(t) {
             if (t.stop) {
                 t.stop();
             }
@@ -1079,7 +1079,7 @@ const stopAllMedia = function (self) {
         }
     }
     if (self.screenSharingStream) {
-        forAllTracksOnStream(self.screenSharingStream, function (t) {
+        forAllTracksOnStream(self.screenSharingStream, function(t) {
             if (t.stop) {
                 t.stop();
             }
@@ -1089,14 +1089,14 @@ const stopAllMedia = function (self) {
         }
     }
     if (self.remoteAVStream) {
-        forAllTracksOnStream(self.remoteAVStream, function (t) {
+        forAllTracksOnStream(self.remoteAVStream, function(t) {
             if (t.stop) {
                 t.stop();
             }
         });
     }
     if (self.remoteAStream) {
-        forAllTracksOnStream(self.remoteAStream, function (t) {
+        forAllTracksOnStream(self.remoteAStream, function(t) {
             if (t.stop) {
                 t.stop();
             }
@@ -1104,12 +1104,12 @@ const stopAllMedia = function (self) {
     }
 };
 
-const _tryPlayRemoteStream = function (self) {
+const _tryPlayRemoteStream = function(self) {
     if (self.getRemoteVideoElement() && self.remoteAVStream) {
         const player = self.getRemoteVideoElement();
         player.autoplay = true;
         self.assignElement(player, self.remoteAVStream, "remoteVideo");
-        setTimeout(function () {
+        setTimeout(function() {
             const vel = self.getRemoteVideoElement();
             if (vel.play) {
                 self.playElement(vel, "remoteVideo");
@@ -1122,7 +1122,7 @@ const _tryPlayRemoteStream = function (self) {
     }
 };
 
-const _tryPlayRemoteAudioStream = async function (self) {
+const _tryPlayRemoteAudioStream = async function(self) {
     if (self.getRemoteAudioElement() && self.remoteAStream) {
         const player = self.getRemoteAudioElement();
 
@@ -1131,7 +1131,7 @@ const _tryPlayRemoteAudioStream = async function (self) {
 
         player.autoplay = true;
         self.assignElement(player, self.remoteAStream, "remoteAudio");
-        setTimeout(function () {
+        setTimeout(function() {
             const ael = self.getRemoteAudioElement();
             if (ael.play) {
                 self.playElement(ael, "remoteAudio");
@@ -1144,7 +1144,7 @@ const _tryPlayRemoteAudioStream = async function (self) {
     }
 };
 
-const checkForErrorListener = function (self) {
+const checkForErrorListener = function(self) {
     if (self.listeners("error").length === 0) {
         throw new Error(
             "You MUST attach an error listener using call.on('error', function() {})",
@@ -1152,19 +1152,19 @@ const checkForErrorListener = function (self) {
     }
 };
 
-const callError = function (code, msg) {
+const callError = function(code, msg) {
     const e = new Error(msg);
     e.code = code;
     return e;
 };
 
-const debuglog = function () {
+const debuglog = function() {
     if (DEBUG) {
         logger.log(...arguments);
     }
 };
 
-const _sendCandidateQueue = function (self) {
+const _sendCandidateQueue = function(self) {
     if (self.candidateSendQueue.length === 0) {
         return;
     }
@@ -1178,10 +1178,10 @@ const _sendCandidateQueue = function (self) {
         candidates: cands,
     };
     debuglog("Attempting to send " + cands.length + " candidates");
-    sendEvent(self, 'm.call.candidates', content).then(function () {
+    sendEvent(self, 'm.call.candidates', content).then(function() {
         self.candidateSendTries = 0;
         _sendCandidateQueue(self);
-    }, function (error) {
+    }, function(error) {
         for (let i = 0; i < cands.length; i++) {
             self.candidateSendQueue.push(cands[i]);
         }
@@ -1198,13 +1198,13 @@ const _sendCandidateQueue = function (self) {
         const delayMs = 500 * Math.pow(2, self.candidateSendTries);
         ++self.candidateSendTries;
         debuglog("Failed to send candidates. Retrying in " + delayMs + "ms");
-        setTimeout(function () {
+        setTimeout(function() {
             _sendCandidateQueue(self);
         }, delayMs);
     });
 };
 
-const _placeCallWithConstraints = function (self, constraints) {
+const _placeCallWithConstraints = function(self, constraints) {
     self.client.callList[self.callId] = self;
     self.webRtc.getUserMedia(
         constraints,
@@ -1216,7 +1216,7 @@ const _placeCallWithConstraints = function (self, constraints) {
     self.config = constraints;
 };
 
-const _createPeerConnection = function (self) {
+const _createPeerConnection = function(self) {
     const pc = new self.webRtc.RtcPeerConnection({
         iceTransportPolicy: self.forceTURN ? 'relay' : undefined,
         iceServers: self.turnServers,
@@ -1228,7 +1228,7 @@ const _createPeerConnection = function (self) {
     return pc;
 };
 
-const _getScreenSharingConstraints = function (call) {
+const _getScreenSharingConstraints = function(call) {
     const screen = global.screen;
     if (!screen) {
         call.emit("error", callError(
@@ -1253,7 +1253,7 @@ const _getScreenSharingConstraints = function (call) {
     };
 };
 
-const _getUserMediaVideoContraints = function (callType) {
+const _getUserMediaVideoContraints = function(callType) {
     const isWebkit = !!global.window.navigator.webkitGetUserMedia;
 
     switch (callType) {
@@ -1279,27 +1279,27 @@ const _getUserMediaVideoContraints = function (callType) {
     }
 };
 
-const hookCallback = function (call, fn) {
-    return function () {
+const hookCallback = function(call, fn) {
+    return function() {
         return fn.apply(call, arguments);
     };
 };
 
-const forAllVideoTracksOnStream = function (s, f) {
+const forAllVideoTracksOnStream = function(s, f) {
     const tracks = s.getVideoTracks();
     for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-const forAllAudioTracksOnStream = function (s, f) {
+const forAllAudioTracksOnStream = function(s, f) {
     const tracks = s.getAudioTracks();
     for (let i = 0; i < tracks.length; i++) {
         f(tracks[i]);
     }
 };
 
-const forAllTracksOnStream = function (s, f) {
+const forAllTracksOnStream = function(s, f) {
     forAllVideoTracksOnStream(s, f);
     forAllAudioTracksOnStream(s, f);
 };
@@ -1346,7 +1346,7 @@ export function createNewMatrixCall(client, roomId, options) {
         return null;
     }
     const webRtc = {};
-    webRtc.isOpenWebRTC = function () {
+    webRtc.isOpenWebRTC = function() {
         const scripts = doc.getElementById("script");
         if (!scripts || !scripts.length) {
             return false;
@@ -1363,7 +1363,7 @@ export function createNewMatrixCall(client, roomId, options) {
         w.navigator.mozGetUserMedia
     );
     if (getUserMedia) {
-        webRtc.getUserMedia = function () {
+        webRtc.getUserMedia = function() {
             return getUserMedia.apply(w.navigator, arguments);
         };
     }

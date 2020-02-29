@@ -75,7 +75,7 @@ export class DeviceInfo {
             }
         }
         return res;
-    };
+    }
 
     /**
      * Prepare a DeviceInfo for JSON serialisation in the session store
@@ -91,7 +91,7 @@ export class DeviceInfo {
             unsigned: this.unsigned,
             signatures: this.signatures,
         };
-    };
+    }
 
     /**
      * Get the fingerprint for this device (ie, the Ed25519 key)
@@ -100,7 +100,7 @@ export class DeviceInfo {
      */
     getFingerprint() {
         return this.keys["ed25519:" + this.deviceId];
-    };
+    }
 
     /**
      * Get the identity key for this device (ie, the Curve25519 key)
@@ -109,7 +109,7 @@ export class DeviceInfo {
      */
     getIdentityKey() {
         return this.keys["curve25519:" + this.deviceId];
-    };
+    }
 
     /**
      * Get the configured display name for this device, if any
@@ -118,7 +118,7 @@ export class DeviceInfo {
      */
     getDisplayName() {
         return this.unsigned.device_display_name || null;
-    };
+    }
 
     /**
      * Returns true if this device is blocked
@@ -127,7 +127,7 @@ export class DeviceInfo {
      */
     isBlocked() {
         return this.verified == DeviceVerification.BLOCKED;
-    };
+    }
 
     /**
      * Returns true if this device is verified
@@ -136,7 +136,7 @@ export class DeviceInfo {
      */
     isVerified() {
         return this.verified == DeviceVerification.VERIFIED;
-    };
+    }
 
     /**
      * Returns true if this device is unverified
@@ -145,7 +145,7 @@ export class DeviceInfo {
      */
     isUnverified() {
         return this.verified == DeviceVerification.UNVERIFIED;
-    };
+    }
 
     /**
      * Returns true if the user knows about this device's existence
@@ -154,7 +154,7 @@ export class DeviceInfo {
      */
     isKnown() {
         return this.known == true;
-    };
+    }
 
     /**
      * @enum

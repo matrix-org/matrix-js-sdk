@@ -68,15 +68,15 @@ class OlmEncryption extends EncryptionAlgorithm {
         }
 
         const self = this;
-        this._prepPromise = self._crypto.downloadKeys(roomMembers).then(function (res) {
+        this._prepPromise = self._crypto.downloadKeys(roomMembers).then(function(res) {
             return self._crypto.ensureOlmSessionsForUsers(roomMembers);
-        }).then(function () {
+        }).then(function() {
             self._sessionPrepared = true;
-        }).finally(function () {
+        }).finally(function() {
             self._prepPromise = null;
         });
         return this._prepPromise;
-    };
+    }
 
     /**
      * @inheritdoc
@@ -95,7 +95,7 @@ class OlmEncryption extends EncryptionAlgorithm {
 
         const members = await room.getEncryptionTargetMembers();
 
-        const users = utils.map(members, function (u) {
+        const users = utils.map(members, function(u) {
             return u.userId;
         });
 
@@ -143,7 +143,7 @@ class OlmEncryption extends EncryptionAlgorithm {
         }
 
         return await Promise.all(promises).then(() => encryptedContent);
-    };
+    }
 }
 
 /**
@@ -253,7 +253,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             senderCurve25519Key: deviceKey,
             claimedEd25519Key: claimedKeys.ed25519 || null,
         };
-    };
+    }
 
     /**
      * Attempt to decrypt an Olm message
@@ -333,7 +333,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             res.session_id + " with " + theirDeviceIdentityKey,
         );
         return res.payload;
-    };
+    }
 }
 
 

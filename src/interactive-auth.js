@@ -507,5 +507,5 @@ export class InteractiveAuth {
             }
         }
     }
-};
+}
 

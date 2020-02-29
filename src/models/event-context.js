@@ -52,7 +52,7 @@ export class EventContext {
      */
     getEvent() {
         return this._timeline[this._ourEventIndex];
-    };
+    }
 
     /**
      * Get the list of events in this context
@@ -61,7 +61,7 @@ export class EventContext {
      */
     getTimeline() {
         return this._timeline;
-    };
+    }
 
     /**
      * Get the index in the timeline of our event
@@ -70,7 +70,7 @@ export class EventContext {
      */
     getOurEventIndex() {
         return this._ourEventIndex;
-    };
+    }
 
     /**
      * Get a pagination token.
@@ -81,7 +81,7 @@ export class EventContext {
      */
     getPaginateToken(backwards) {
         return this._paginateTokens[backwards ? 'b' : 'f'];
-    };
+    }
 
     /**
      * Set a pagination token.
@@ -94,7 +94,7 @@ export class EventContext {
      */
     setPaginateToken(token, backwards) {
         this._paginateTokens[backwards ? 'b' : 'f'] = token;
-    };
+    }
 
     /**
      * Add more events to the timeline
@@ -112,5 +112,5 @@ export class EventContext {
         } else {
             this._timeline = this._timeline.concat(events);
         }
-    };
+    }
 }

@@ -69,7 +69,7 @@ export class Filter {
      */
     getFilterId() {
         return this.filterId;
-    };
+    }
 
     /**
      * Get the JSON body of the filter.
@@ -77,7 +77,7 @@ export class Filter {
      */
     getDefinition() {
         return this.definition;
-    };
+    }
 
     /**
      * Set the JSON body of the filter
@@ -149,7 +149,7 @@ export class Filter {
         //     new FilterComponent(definition.presence || {});
         // this._account_data_filter =
         //     new FilterComponent(definition.account_data || {});
-    };
+    }
 
     /**
      * Get the room.timeline filter component of the filter
@@ -157,7 +157,7 @@ export class Filter {
      */
     getRoomTimelineFilterComponent() {
         return this._room_timeline_filter;
-    };
+    }
 
     /**
      * Filter the list of events based on whether they are allowed in a timeline
@@ -167,7 +167,7 @@ export class Filter {
      */
     filterRoomTimeline(events) {
         return this._room_timeline_filter.filter(this._room_filter.filter(events));
-    };
+    }
 
     /**
      * Set the max number of events to return for each room's timeline.
@@ -175,7 +175,7 @@ export class Filter {
      */
     setTimelineLimit(limit) {
         setProp(this.definition, "room.timeline.limit", limit);
-    };
+    }
 
     /**
      * Control whether left rooms should be included in responses.
@@ -184,7 +184,7 @@ export class Filter {
      */
     setIncludeLeaveRooms(includeLeave) {
         setProp(this.definition, "room.include_leave", includeLeave);
-    };
+    }
 
     /**
      * Create a filter from existing data.
@@ -198,5 +198,5 @@ export class Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;
-    };
+    }
 }

@@ -117,7 +117,7 @@ export class IndexedDBStore extends MemoryStore {
 
     static exists(indexedDB, dbName) {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
-    };
+    }
 
     /**
      * @return {Promise} Resolved when loaded from indexed db.
@@ -143,19 +143,19 @@ export class IndexedDBStore extends MemoryStore {
                 this.storeUser(u);
             });
         });
-    };
+    }
 
     /**
      * @return {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync = degradable(function () {
+    getSavedSync = degradable(function() {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
     /** @return {Promise<bool>} whether or not the database was newly created in this session. */
-    isNewlyCreated = degradable(function () {
+    isNewlyCreated = degradable(function() {
         return this.backend.isNewlyCreated();
     }, "isNewlyCreated");
 
@@ -163,7 +163,7 @@ export class IndexedDBStore extends MemoryStore {
      * @return {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
-    getSavedSyncToken = degradable(function () {
+    getSavedSyncToken = degradable(function() {
         return this.backend.getNextBatchToken();
     }, "getSavedSyncToken");
 
@@ -171,7 +171,7 @@ export class IndexedDBStore extends MemoryStore {
      * Delete all data from this store.
      * @return {Promise} Resolves if the data was deleted from the database.
      */
-    deleteAllData = degradable(function () {
+    deleteAllData = degradable(function() {
         MemoryStore.prototype.deleteAllData.call(this);
         return this.backend.clearDatabase().then(() => {
             logger.log("Deleted indexeddb data.");
@@ -193,7 +193,7 @@ export class IndexedDBStore extends MemoryStore {
     wantsSave() {
         const now = Date.now();
         return now - this._syncTs > WRITE_DELAY_MS;
-    };
+    }
 
     /**
      * Possibly write data to the database.
@@ -207,9 +207,9 @@ export class IndexedDBStore extends MemoryStore {
             return this._reallySave();
         }
         return Promise.resolve();
-    };
+    }
 
-    _reallySave = degradable(function () {
+    _reallySave = degradable(function() {
         this._syncTs = Date.now(); // set now to guard against multi-writes
 
         // work out changed users (this doesn't handle deletions but you
@@ -228,7 +228,7 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.syncToDatabase(userTuples);
     });
 
-    setSyncData = degradable(function (syncData) {
+    setSyncData = degradable(function(syncData) {
         return this.backend.setSyncData(syncData);
     }, "setSyncData");
 
@@ -239,7 +239,7 @@ export class IndexedDBStore extends MemoryStore {
      * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns {null} in case the members for this room haven't been stored yet
      */
-    getOutOfBandMembers = degradable(function (roomId) {
+    getOutOfBandMembers = degradable(function(roomId) {
         return this.backend.getOutOfBandMembers(roomId);
     }, "getOutOfBandMembers");
 
@@ -251,7 +251,7 @@ export class IndexedDBStore extends MemoryStore {
      * @param {event[]} membershipEvents the membership events to store
      * @returns {Promise} when all members have been stored
      */
-    setOutOfBandMembers = degradable(function (
+    setOutOfBandMembers = degradable(function(
         roomId,
         membershipEvents,
     ) {
@@ -259,20 +259,19 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.setOutOfBandMembers(roomId, membershipEvents);
     }, "setOutOfBandMembers");
 
-    clearOutOfBandMembers = degradable(function (roomId) {
+    clearOutOfBandMembers = degradable(function(roomId) {
         MemoryStore.prototype.clearOutOfBandMembers.call(this);
         return this.backend.clearOutOfBandMembers(roomId);
     }, "clearOutOfBandMembers");
 
-    getClientOptions = degradable(function () {
+    getClientOptions = degradable(function() {
         return this.backend.getClientOptions();
     }, "getClientOptions");
 
-    storeClientOptions = degradable(function (options) {
+    storeClientOptions = degradable(function(options) {
         MemoryStore.prototype.storeClientOptions.call(this, options);
         return this.backend.storeClientOptions(options);
     }, "storeClientOptions");
-
 }
 utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
 /**
@@ -288,7 +287,7 @@ utils.extend(IndexedDBStore.prototype, EventEmitter.prototype);
  * @returns {Function} A wrapped member function.
  */
 function degradable(func, fallback) {
-    return async function (...args) {
+    return async function(...args) {
         try {
             return await func.call(this, ...args);
         } catch (e) {

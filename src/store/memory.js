@@ -117,7 +117,7 @@ export class MemoryStore {
         room.currentState.on("RoomState.members", this._onRoomMember.bind(this));
         // add existing members
         const self = this;
-        room.currentState.getMembers().forEach(function (m) {
+        room.currentState.getMembers().forEach(function(m) {
             self._onRoomMember(null, room.currentState, m);
         });
     }
@@ -184,7 +184,7 @@ export class MemoryStore {
      * @return {RoomSummary[]} A summary of each room.
      */
     getRoomSummaries() {
-        return utils.map(utils.values(this.rooms), function (room) {
+        return utils.map(utils.values(this.rooms), function(room) {
             return room.summary;
         });
     }
@@ -300,7 +300,7 @@ export class MemoryStore {
      */
     storeAccountDataEvents(events) {
         const self = this;
-        events.forEach(function (event) {
+        events.forEach(function(event) {
             self.accountData[event.getType()] = event;
         });
     }
@@ -425,4 +425,4 @@ export class MemoryStore {
         this._clientOptions = Object.assign({}, options);
         return Promise.resolve();
     }
-};
+}
